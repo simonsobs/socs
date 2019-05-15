@@ -1,0 +1,1506 @@
+
+
+<!doctype html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Lakeshore 372 &#8212; OCS 0.4.3+43.g2afab1b documentation</title>
+    <link rel="stylesheet" href="_static/bizstyle.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="_static/language_data.js"></script>
+    <script type="text/javascript" src="_static/bizstyle.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="OCS Site Configuration" href="site_config.html" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <!--[if lt IE 9]>
+    <script type="text/javascript" src="_static/css3-mediaqueries.js"></script>
+    <![endif]-->
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="site_config.html" title="OCS Site Configuration"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">OCS 0.4.3+43.g2afab1b documentation</a> &#187;</li> 
+      </ul>
+    </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Lakeshore 372</a><ul>
+<li><a class="reference internal" href="#ls372-ocs-quickstart">LS372 OCS Quickstart</a></li>
+<li><a class="reference internal" href="#opening-a-3g-file">Opening a 3g File</a></li>
+<li><a class="reference internal" href="#direct-communication">Direct Communication</a></li>
+<li><a class="reference internal" href="#api">API</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="site_config.html"
+                        title="previous chapter">OCS Site Configuration</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/lakeshore372.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="lakeshore-372">
+<span id="lakeshore372"></span><h1>Lakeshore 372<a class="headerlink" href="#lakeshore-372" title="Permalink to this headline">¶</a></h1>
+<p>The Lakeshore 372 (LS372) units are used for 100 mK and 1K thermometer readout.
+Basic functionality to interface and control an LS372 is provided by the
+<code class="docutils literal notranslate"><span class="pre">ocs.Lakeshore.Lakeshore372.py</span></code> module.</p>
+<div class="section" id="ls372-ocs-quickstart">
+<h2>LS372 OCS Quickstart<a class="headerlink" href="#ls372-ocs-quickstart" title="Permalink to this headline">¶</a></h2>
+<p>To quickly get started acquiring data from a Lakeshore 372 with OCS perform the
+following starting in the ocs directory (each in a separate terminal):</p>
+<ul>
+<li><p class="first">Start the crossbar server:</p>
+<div class="highlight-rst notranslate"><div class="highlight"><pre><span></span>$ cd example/
+$ make run_crossbar
+</pre></div>
+</div>
+</li>
+<li><p class="first">Configure the aggregator data frame and file durations.</p>
+</li>
+</ul>
+<p>In <code class="docutils literal notranslate"><span class="pre">agents/aggregator/aggregator_agent.py</span></code> there is a method called
+<code class="docutils literal notranslate"><span class="pre">start_aggregate</span></code>, this contains the following lines:</p>
+<div class="highlight-rst notranslate"><div class="highlight"><pre><span></span>time_per_frame = 60 * 10 # [s]
+time_per_file  = 60 * 60  # [s]
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">time_per_frame</span></code> indicates how often a Frame is flushed from memory to disk in
+the 3g file. The current amount is every 10 minutes. <code class="docutils literal notranslate"><span class="pre">time_per_file</span></code> indicates
+how often the file is closed out and a new one started. Currently this is every
+hour. Since we do not currently have a live monitoring system in place this is
+likely longer than you would like for the purposes of monitoring the data. You
+will not be able to open the g3 file until the file is closed, so you likely
+want to set both the frame and file duration to something short. The trade off
+here is we will generate many files.</p>
+<ul>
+<li><p class="first">Start the data aggregator agent:</p>
+<div class="highlight-rst notranslate"><div class="highlight"><pre><span></span>$ cd agents/aggregator/
+$ python3 aggregator_agent.py
+</pre></div>
+</div>
+</li>
+<li><p class="first">Configure the LS372 agent by putting the correct IP address in
+<code class="docutils literal notranslate"><span class="pre">agents/thermometry/LS372_agent.py</span></code>:</p>
+<div class="highlight-rst notranslate"><div class="highlight"><pre><span></span>therm = LS372_Agent(&quot;LS372A&quot;, &quot;10.10.10.2&quot; , fake_data=False)
+</pre></div>
+</div>
+</li>
+<li><p class="first">Start the LS372 Agent:</p>
+<div class="highlight-rst notranslate"><div class="highlight"><pre><span></span>$ cd agents/thermometry/
+$ python3 LS372_agent.py
+</pre></div>
+</div>
+</li>
+<li><p class="first">Run the <code class="docutils literal notranslate"><span class="pre">therm_and_agg_ctrl.py</span></code> client. This will collect 30 seconds of data.</p>
+</li>
+<li><p class="first">You can change this in the client either by extending the <code class="docutils literal notranslate"><span class="pre">sleep_time</span></code> or by replacing the loop and data acquisiton and aggregator stop commands with a small sleep time, for instance, replacing:</p>
+<div class="highlight-rst notranslate"><div class="highlight"><pre><span></span>sleep_time = 10
+for i in range(sleep_time):
+    print(&#39;sleeping for {:d} more seconds&#39;.format(sleep_time - i))
+    yield client_t.dsleep(1)
+
+
+print(&quot;Stopping Data Acquisition&quot;)
+yield get_data.stop()
+yield get_data.wait()
+
+print(&quot;Stopping Data Aggregator&quot;)
+yield aggregate.stop()
+yield aggregate.wait()
+</pre></div>
+</div>
+</li>
+</ul>
+<p>with:</p>
+<div class="highlight-rst notranslate"><div class="highlight"><pre><span></span>yield client_t.dsleep(.1)
+</pre></div>
+</div>
+<p>This will cause the client to run the data acquisition and close. You will see
+the data collected printed to the terminal <code class="docutils literal notranslate"><span class="pre">LS372_agent.py</span></code> is running. Data
+is saved to <code class="docutils literal notranslate"><span class="pre">ocs/agents/aggregator/data/</span></code>.</p>
+<p>Sampling rate can be adjusted by changing the sleep time in <code class="docutils literal notranslate"><span class="pre">LS372_agent.py</span></code>
+on line 91:</p>
+<div class="highlight-rst notranslate"><div class="highlight"><pre><span></span>active_channel = self.module.get_active_channel()
+data[active_channel.name] = (time.time(), self.module.get_temp(unit=&#39;S&#39;, chan=active_channel.channel_num))
+time.sleep(.01)
+</pre></div>
+</div>
+</div>
+<div class="section" id="opening-a-3g-file">
+<h2>Opening a 3g File<a class="headerlink" href="#opening-a-3g-file" title="Permalink to this headline">¶</a></h2>
+<p>This quick script will open the passed in 3g file:</p>
+<div class="highlight-rst notranslate"><div class="highlight"><pre><span></span>from spt3g import core
+import sys
+
+frames = [fr for fr in core.G3File(sys.argv[1])]
+</pre></div>
+</div>
+<p>Save it (say as <code class="docutils literal notranslate"><span class="pre">open.py</span></code>) and run with:</p>
+<div class="highlight-rst notranslate"><div class="highlight"><pre><span></span>python3 open.py &lt;filename&gt;
+</pre></div>
+</div>
+<p>Data is then accessible in each frame, for instance:</p>
+<div class="highlight-rst notranslate"><div class="highlight"><pre><span></span>frames[0][&#39;TODs&#39;].keys()
+</pre></div>
+</div>
+<p>This displays the channels recorded (should be only active ones) and then you
+can access the data with <code class="docutils literal notranslate"><span class="pre">frames[0]['TODs']['Channel</span> <span class="pre">01']</span></code> for instance.</p>
+</div>
+<div class="section" id="direct-communication">
+<h2>Direct Communication<a class="headerlink" href="#direct-communication" title="Permalink to this headline">¶</a></h2>
+<p>Direct communication with the Lakeshore can be achieved without OCS, using the
+<code class="docutils literal notranslate"><span class="pre">Lakeshore372.py</span></code> module in <code class="docutils literal notranslate"><span class="pre">ocs/ocs/Lakeshore/</span></code>. From that directory, you can run a script like:</p>
+<div class="highlight-rst notranslate"><div class="highlight"><pre><span></span>from Lakeshore372 import LS372
+
+ls = LS372(&#39;10.10.10.2&#39;)
+</pre></div>
+</div>
+<p>You can use the API detailed on this page to then interact with the Lakeshore.
+Each Channel is given a Channel object in <code class="docutils literal notranslate"><span class="pre">ls.channels</span></code>. You can query the
+resistance measured on the currently active channel with:</p>
+<div class="highlight-rst notranslate"><div class="highlight"><pre><span></span>ls.get_active_channel().get_resistance_reading()
+</pre></div>
+</div>
+<p>That should get you started with direct communication. The API is fairly full
+featured. Development on the Heater class is currently underway and has a
+development branch on GitHub.</p>
+</div>
+<div class="section" id="api">
+<h2>API<a class="headerlink" href="#api" title="Permalink to this headline">¶</a></h2>
+<p>For the API all methods should start with one of the following:</p>
+<blockquote>
+<div><ul class="simple">
+<li>set - set a parameter of arbitary input (i.e. set_excitation)</li>
+<li>get - get the status of a parameter (i.e. get_excitation)</li>
+<li>enable - enable a boolean parameter (i.e. enable_autoscan)</li>
+<li>disable - disbale a boolean parameter (i.e. disable_channel)</li>
+</ul>
+</div></blockquote>
+<span class="target" id="module-agents.thermometry.Lakeshore.Lakeshore372"></span><dl class="class">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Channel">
+<em class="property">class </em><code class="descclassname">agents.thermometry.Lakeshore.Lakeshore372.</code><code class="descname">Channel</code><span class="sig-paren">(</span><em>ls</em>, <em>channel_num</em><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Channel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Lakeshore 372 Channel Object</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ls</strong> (<em>LS372 Object</em>) – Lakeshore unit for communication</li>
+<li><strong>channel_num</strong> (<em>int</em>) – The channel number (1-8 or 1-16 depending on scanner
+type)</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Channel.disable_autorange">
+<code class="descname">disable_autorange</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Channel.disable_autorange" title="Permalink to this definition">¶</a></dt>
+<dd><p>Disable auto range for channel via INTYPE command.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Channel.disable_channel">
+<code class="descname">disable_channel</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Channel.disable_channel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Disable channel using INSET command.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">response from self._set_input_channel_parameter()</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Channel.disable_excitation">
+<code class="descname">disable_excitation</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Channel.disable_excitation" title="Permalink to this definition">¶</a></dt>
+<dd><p>Disable excitation by shunting the current source via INTYPE command.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">state of excitation</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Channel.enable_autorange">
+<code class="descname">enable_autorange</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Channel.enable_autorange" title="Permalink to this definition">¶</a></dt>
+<dd><p>Enable auto range for channel via INTYPE command.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Channel.enable_channel">
+<code class="descname">enable_channel</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Channel.enable_channel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Enable channel using INSET command.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">response from self._set_input_channel_parameter()</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Channel.enable_excitation">
+<code class="descname">enable_excitation</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Channel.enable_excitation" title="Permalink to this definition">¶</a></dt>
+<dd><p>Enable excitation by not shunting the current source via INTYPE command.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">state of excitation</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Channel.get_calibration_curve">
+<code class="descname">get_calibration_curve</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Channel.get_calibration_curve" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get calibration curve number using INSET?</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">curve number in use for the channel</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">int</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Channel.get_dwell">
+<code class="descname">get_dwell</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Channel.get_dwell" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get the autoscanning dwell time.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">the dwell time in seconds</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">int</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Channel.get_excitation">
+<code class="descname">get_excitation</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Channel.get_excitation" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get excitation value from INTYPE?</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">excitation value in volts or amps, depending on mode</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">float</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Channel.get_excitation_mode">
+<code class="descname">get_excitation_mode</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Channel.get_excitation_mode" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get the excitation mode form INTYPE?</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">excitation mode, ‘current’ or ‘voltage’</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Channel.get_excitation_power">
+<code class="descname">get_excitation_power</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Channel.get_excitation_power" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get the most recent power calculation for the channel via RDGPWR? command.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">power in Watts</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">float</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Channel.get_input_channel_parameter">
+<code class="descname">get_input_channel_parameter</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Channel.get_input_channel_parameter" title="Permalink to this definition">¶</a></dt>
+<dd><p>Run Input Channel Parameter Query</p>
+<div class="highlight-rst notranslate"><div class="highlight"><pre><span></span>Input channel parameters include:
+    off/on - Specifies whether the input/channel is disabled or enabled
+        type off/on - bool
+    dwell - Specifies a value for the autoscanning dwell time 1 to 200 s
+        type dwell - int in units of seconds
+    pause - Specifies a value for the change pause time: 3 to 200 s
+        type pause - int in units of seconds
+    curve number - Specifies which curve the channel uses
+        type curve number - int
+    tempco - Sets the temperature coefficien that will be used for
+             temperature control if no curve is selected
+        type tempco - str
+</pre></div>
+</div>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">response from INSET? command</td>
+</tr>
+</tbody>
+</table>
+<p>Reference: LakeShore 372 Manual - pg177</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Channel.get_input_setup">
+<code class="descname">get_input_setup</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Channel.get_input_setup" title="Permalink to this definition">¶</a></dt>
+<dd><p>Run Input Setup Query, storing results in human readable format.</p>
+<div class="highlight-rst notranslate"><div class="highlight"><pre><span></span>Input setup parameters include:
+    mode - Sensor excitation mode.
+           Measurement input: 0 = Voltage Excitation Mode,
+                              1 = Current Excitation Mode
+           Control input (channel A): 1 = Current Excitation
+        type mode - int
+    excitation - Measurement input excitation range
+        type excitation - int
+    autorange - Specifies if auto range is enabled.
+                    0 = off,
+                    1 = autorange current,
+                    2 = ROX102B Autorange (control input only)
+        type autorange - int
+    range - Measurement input resistance. Ignored for control input.
+        type range - int
+    cs shunt - Current source shunt.
+                0 = current source not shunted, excitation on
+                1 = current source shunted, excitation off
+        type cs shunt - int
+    units - Specifies the preferred units parameter for sensor readings
+            and for the control setpoint:
+                1 = kelvin,
+                2 = ohms
+        type units - int
+</pre></div>
+</div>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">response from INTYPE? command</td>
+</tr>
+</tbody>
+</table>
+<p>Reference: LakeShore 372 Manual - pg178-179</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Channel.get_kelvin_reading">
+<code class="descname">get_kelvin_reading</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Channel.get_kelvin_reading" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get temperature reading from channel.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">temperature from channel in Kelvin</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">float</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Channel.get_pause">
+<code class="descname">get_pause</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Channel.get_pause" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get the pause time from INSET.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">the pause time in seconds</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">int</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Channel.get_reading_status">
+<code class="descname">get_reading_status</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Channel.get_reading_status" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get status of input reading.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">list of errors on reading (or None if no errors)</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">list of str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Channel.get_resistance_range">
+<code class="descname">get_resistance_range</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Channel.get_resistance_range" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get the resistance range.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">resistance range in Ohms</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">float</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Channel.get_resistance_reading">
+<code class="descname">get_resistance_reading</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Channel.get_resistance_reading" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get resistence reading from channel.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">resistance from channel in Ohms</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">float</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Channel.get_sensor_input_name">
+<code class="descname">get_sensor_input_name</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Channel.get_sensor_input_name" title="Permalink to this definition">¶</a></dt>
+<dd><p>Run Sensor Input Name Query</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">response from INNAME? command</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Channel.get_sensor_reading">
+<code class="descname">get_sensor_reading</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Channel.get_sensor_reading" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get sensor reading from channel.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">resistance from channel in Ohms</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">float</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Channel.get_temperature_coefficient">
+<code class="descname">get_temperature_coefficient</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Channel.get_temperature_coefficient" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get temperature coefficient from INSET?</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">temperature coefficient</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Channel.get_temperature_limit">
+<code class="descname">get_temperature_limit</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Channel.get_temperature_limit" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get temperature limit, at which output controls are shutdown.</p>
+<p>A temperature limit of 0 disables this feature.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">temperature limit in Kelvin</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">float</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Channel.get_units">
+<code class="descname">get_units</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Channel.get_units" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get preferred units from INTYPE? command.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">preferred units</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Channel.set_calibration_curve">
+<code class="descname">set_calibration_curve</code><span class="sig-paren">(</span><em>curve_number</em><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Channel.set_calibration_curve" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set calibration curve using INSET.</p>
+<p>Note: If curve doesn’t exist, curve number gets set to 0.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>curve_number</strong> (<em>int</em>) – Curve number for temperature conversion</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Channel.set_dwell">
+<code class="descname">set_dwell</code><span class="sig-paren">(</span><em>dwell</em><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Channel.set_dwell" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the autoscanning dwell time.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>dwell</strong> (<em>int</em>) – Dwell time in seconds</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">response from self._set_input_channel_parameter()</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Channel.set_excitation">
+<code class="descname">set_excitation</code><span class="sig-paren">(</span><em>excitation_value</em><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Channel.set_excitation" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set voltage/current exitation to specified value via INTYPE command.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>excitation_value</strong> (<em>float</em>) – value in volts/amps of excitation</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">response from INTYPE command</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Channel.set_excitation_mode">
+<code class="descname">set_excitation_mode</code><span class="sig-paren">(</span><em>excitation_mode</em><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Channel.set_excitation_mode" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the excitation mode to either voltage excitation or current
+exitation.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>excitation_mode</strong> (<em>str</em>) – mode we want, must be ‘current’ or ‘voltage’</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">reply from INTYPE call</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Channel.set_pause">
+<code class="descname">set_pause</code><span class="sig-paren">(</span><em>pause</em><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Channel.set_pause" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set pause time.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>pause</strong> (<em>int</em>) – Pause time in seconds</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">response from self._set_input_channel_parameter()</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Channel.set_resistance_range">
+<code class="descname">set_resistance_range</code><span class="sig-paren">(</span><em>resistance_range</em><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Channel.set_resistance_range" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the resistance range.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>resistance_range</strong> (<em>float</em>) – range in ohms we want to measure. Doesn’t need
+to be exactly one of the options on the
+lakeshore, will select closest valid range,
+though note these are in increments of 2, 6.32, 20, 63.2, etc.</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">response from INTYPE command</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Channel.set_sensor_input_name">
+<code class="descname">set_sensor_input_name</code><span class="sig-paren">(</span><em>name</em><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Channel.set_sensor_input_name" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set sensor input name using INNAME.</p>
+<p>Note: ‘,’ and ‘;’ characters are sanatized from input</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>name</strong> (<em>str</em>) – name to give input channel</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Channel.set_temperature_coefficient">
+<code class="descname">set_temperature_coefficient</code><span class="sig-paren">(</span><em>coefficient</em><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Channel.set_temperature_coefficient" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set tempertaure coefficient with INSET.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>coefficient</strong> (<em>str</em>) – set coefficient to be used for temperature control
+if no curve is selected, either ‘negative’ or
+‘positive’</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">response from _set_input_channel_parameter()</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Channel.set_temperature_limit">
+<code class="descname">set_temperature_limit</code><span class="sig-paren">(</span><em>limit</em><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Channel.set_temperature_limit" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set temperature limit in kelvin for which to shutdown all control
+outputs when exceeded. A temperature limit of zero turns the
+temperature limit feature off for the given sensor input.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>limit</strong> (<em>float</em>) – temperature limit in kelvin</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">response from TLIMIT command</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Channel.set_units">
+<code class="descname">set_units</code><span class="sig-paren">(</span><em>units</em><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Channel.set_units" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set preferred units using INTYPE command.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>units</strong> (<em>str</em>) – preferred units parameter for sensor readings, ‘kelvin’
+or ‘ohms’</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">response from INTYPE command</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Curve">
+<em class="property">class </em><code class="descclassname">agents.thermometry.Lakeshore.Lakeshore372.</code><code class="descname">Curve</code><span class="sig-paren">(</span><em>ls</em>, <em>curve_num</em><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Curve" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calibration Curve class for the LS372.</p>
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Curve.delete_curve">
+<code class="descname">delete_curve</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Curve.delete_curve" title="Permalink to this definition">¶</a></dt>
+<dd><p>Delete the curve using the CRVDEL command.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">the response from the CRVDEL command</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Curve.get_coefficient">
+<code class="descname">get_coefficient</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Curve.get_coefficient" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get the curve temperature coefficient with the CRVHDR? command.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">The curve temperature coefficient</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Curve.get_curve">
+<code class="descname">get_curve</code><span class="sig-paren">(</span><em>_file=None</em><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Curve.get_curve" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get a calibration curve from the LS372.</p>
+<p>If _file is not None, save to file location.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Curve.get_data_point">
+<code class="descname">get_data_point</code><span class="sig-paren">(</span><em>index</em><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Curve.get_data_point" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get a single data point from a curve, given the index, using the
+CRVPT? command.</p>
+<p>The format for the return value, a 3-tuple of floats, is chosen to work
+with how the get_curve() method later stores the entire curve in a
+numpy structured array.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>index</strong> (<em>int</em>) – index of breakpoint to query</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">(units, tempertaure, curvature) values for the given breakpoint</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">3-tuple of floats</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Curve.get_format">
+<code class="descname">get_format</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Curve.get_format" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get the curve data format with the CRVHDR? command.”</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">The curve data format</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Curve.get_header">
+<code class="descname">get_header</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Curve.get_header" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get curve header description.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">response from CRVHDR? in list</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">list of str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Curve.get_limit">
+<code class="descname">get_limit</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Curve.get_limit" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get the curve temperature limit with the CRVHDR? command.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">The curve temperature limit</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Curve.get_name">
+<code class="descname">get_name</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Curve.get_name" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get the curve name with the CRVHDR? command.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">The curve name</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Curve.get_serial_number">
+<code class="descname">get_serial_number</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Curve.get_serial_number" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get the curve serial number with the CRVHDR? command.”</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">The curve serial number</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Curve.set_coefficient">
+<code class="descname">set_coefficient</code><span class="sig-paren">(</span><em>coefficient</em><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Curve.set_coefficient" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the curve temperature coefficient with the CRVHDR command.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>coefficient</strong> – The curve temperature coefficient, either ‘positive’ or ‘negative’</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">the response from the CRVHDR command</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Curve.set_curve">
+<code class="descname">set_curve</code><span class="sig-paren">(</span><em>_file</em><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Curve.set_curve" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set a calibration curve, loading it from the file.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>_file</strong> (<em>str</em>) – the file to load the calibration curve from</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">return the new curve header, refreshing the attributes</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">list of str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Curve.set_format">
+<code class="descname">set_format</code><span class="sig-paren">(</span><em>_format</em><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Curve.set_format" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the curve format with the CRVHDR command.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>_format</strong> – The curve format, valid formats are:
+“Ohm/K (linear)”
+“log Ohm/K (linear)”
+“Ohm/K (cubic spline)”</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">the response from the CRVHDR command</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Curve.set_limit">
+<code class="descname">set_limit</code><span class="sig-paren">(</span><em>limit</em><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Curve.set_limit" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the curve temperature limit with the CRVHDR command.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>limit</strong> (<em>float</em>) – The curve temperature limit</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">the response from the CRVHDR command</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Curve.set_name">
+<code class="descname">set_name</code><span class="sig-paren">(</span><em>name</em><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Curve.set_name" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the curve name with the CRVHDR command.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>name</strong> (<em>str</em>) – The curve name, limit of 15 characters, longer names get truncated</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">the response from the CRVHDR command</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Curve.set_serial_number">
+<code class="descname">set_serial_number</code><span class="sig-paren">(</span><em>serial_number</em><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Curve.set_serial_number" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the curve serial number with the CRVHDR command.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>serial_number</strong> – The curve serial number, limit of 10 characters,
+longer serials get truncated</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">the response from the CRVHDR command</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Heater">
+<em class="property">class </em><code class="descclassname">agents.thermometry.Lakeshore.Lakeshore372.</code><code class="descname">Heater</code><span class="sig-paren">(</span><em>ls</em>, <em>output</em><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Heater" title="Permalink to this definition">¶</a></dt>
+<dd><p>Heater class for LS372 control</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ls</strong> (<a class="reference internal" href="#agents.thermometry.Lakeshore.Lakeshore372.LS372" title="agents.thermometry.Lakeshore.Lakeshore372.LS372"><em>Lakeshore372.LS372</em></a>) – the lakeshore object we’re controlling</li>
+<li><strong>output</strong> (<em>int</em>) – the heater output we want to control, 0 = sample,
+1 = warm-up, 2 = still</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Heater.get_heater_range">
+<code class="descname">get_heater_range</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Heater.get_heater_range" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get heater range with RANGE? command.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">heater range in amps</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">float</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Heater.get_heater_setup">
+<code class="descname">get_heater_setup</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Heater.get_heater_setup" title="Permalink to this definition">¶</a></dt>
+<dd><p>Gets Heater setup params with the HTRSET? command.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Return resp:</th><td class="field-body">List of values that have been returned from the Lakeshore.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Heater.get_input_channel">
+<code class="descname">get_input_channel</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Heater.get_input_channel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get the control channel with the OUTMODE? command.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">The control channel</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Heater.get_mode">
+<code class="descname">get_mode</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Heater.get_mode" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set output mode with OUTMODE? commnd.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">The output mode</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Heater.get_output_mode">
+<code class="descname">get_output_mode</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Heater.get_output_mode" title="Permalink to this definition">¶</a></dt>
+<dd><p>Query the heater mode using the OUTMODE? command.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">6-tuple with output mode, input channel, whether powerup is
+enabled, polarity, unfiltered/filtered, and the autoscanning
+delay time.</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">tuple</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Heater.get_pid">
+<code class="descname">get_pid</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Heater.get_pid" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get PID parameters with PID? command.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">P, I, D</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">float, float, float</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Heater.set_delay">
+<code class="descname">set_delay</code><span class="sig-paren">(</span><em>delay</em><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Heater.set_delay" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>delay</strong> (<em>int</em>) – delay in seconds for setpoint change during autoscanning, 1-255 seconds</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Heater.set_filter">
+<code class="descname">set_filter</code><span class="sig-paren">(</span><em>_filter</em><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Heater.set_filter" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>_filter</strong> (<em>bool</em>) – specifies controlling on unfiltered or filtered readings, True = filtered, False = unfiltered</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Heater.set_heater_display">
+<code class="descname">set_heater_display</code><span class="sig-paren">(</span><em>display</em><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Heater.set_heater_display" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>display</strong> (<em>string</em>) – Display mode for heater. Can either be ‘current’ or ‘power’.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Heater.set_heater_output">
+<code class="descname">set_heater_output</code><span class="sig-paren">(</span><em>output</em>, <em>display_type=None</em><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Heater.set_heater_output" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set heater output with MOUT command.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>output</strong> (<em>float</em>) – heater output value. If display is ‘power’, value should
+be in Watts. If ‘current’, value should be in percent.
+If this is the still heater, value should be percent of
+max voltage (10 V).</li>
+<li><strong>display_type</strong> (<em>string</em>) – Display type if you want to set this before setting heater.
+Can be ‘power’ or ‘current’ if output is sample or warm-up heater.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">heater output</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">float</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Heater.set_heater_range">
+<code class="descname">set_heater_range</code><span class="sig-paren">(</span><em>_range</em><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Heater.set_heater_range" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set heater range with RANGE command.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>_range</strong> (<em>float</em><em> or </em><em>str</em><em> (</em><em>for &quot;On&quot; &quot;Off&quot;</em><em>)</em>) – heater range</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">heater range in amps</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">float</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Heater.set_input_channel">
+<code class="descname">set_input_channel</code><span class="sig-paren">(</span><em>_input</em><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Heater.set_input_channel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the control channel with the OUTMODE command.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>_input</strong> (<em>str</em><em> or </em><em>int</em>) – specifies which input or channel to control from</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Heater.set_mode">
+<code class="descname">set_mode</code><span class="sig-paren">(</span><em>mode</em><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Heater.set_mode" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set output mode with OUTMODE commnd.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>mode</strong> (<em>str</em>) – control mode for heater, see page 171 of LS372 Manual for
+valid modes, as it changes per output</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">the response from the OUTMODE command</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Heater.set_pid">
+<code class="descname">set_pid</code><span class="sig-paren">(</span><em>P</em>, <em>I</em>, <em>D</em><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Heater.set_pid" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set PID parameters for closed loop control.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Params P:</th><td class="field-body">proportional term in PID loop</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Params I:</th><td class="field-body">integral term in PID loop</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Params D:</th><td class="field-body">derivative term in PID loop</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">response from PID command</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Heater.set_polarity">
+<code class="descname">set_polarity</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Heater.set_polarity" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>polarity</strong> (<em>str</em>) – specifies output polarity: ‘unipolar’ or ‘bipolar’</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.Heater.set_powerup">
+<code class="descname">set_powerup</code><span class="sig-paren">(</span><em>powerup</em><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.Heater.set_powerup" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>powerup</strong> (<em>bool</em>) – specifies whether the output remains on or shuts off
+after power cycle. True for on after powerup</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.LS372">
+<em class="property">class </em><code class="descclassname">agents.thermometry.Lakeshore.Lakeshore372.</code><code class="descname">LS372</code><span class="sig-paren">(</span><em>ip</em>, <em>timeout=10</em>, <em>num_channels=16</em><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.LS372" title="Permalink to this definition">¶</a></dt>
+<dd><blockquote>
+<div>Lakeshore 372 class.</div></blockquote>
+<dl class="attribute">
+<dt>
+<code class="descname">channels - list of channels, index corresponds to channel number with</code></dt>
+<dd><p>index 0 corresponding to the control channel, ‘A’</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.LS372.disable_autoscan">
+<code class="descname">disable_autoscan</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.LS372.disable_autoscan" title="Permalink to this definition">¶</a></dt>
+<dd><p>Disable the autoscan feature of the Lakeshore 372.</p>
+<p>Will query active channel to pass already selected channel to SCAN
+command.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.LS372.enable_autoscan">
+<code class="descname">enable_autoscan</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.LS372.enable_autoscan" title="Permalink to this definition">¶</a></dt>
+<dd><p>Enable the autoscan feature of the Lakeshore 372.</p>
+<p>Will query active channel to pass already selected channel to SCAN
+command.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.LS372.get_active_channel">
+<code class="descname">get_active_channel</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.LS372.get_active_channel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Query the Lakeshore for which channel it’s currently scanning.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">channel object describing the scanned channel</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">Channel Object</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.LS372.get_autoscan">
+<code class="descname">get_autoscan</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.LS372.get_autoscan" title="Permalink to this definition">¶</a></dt>
+<dd><p>Determine state of autoscan.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">state of autoscanner</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">bool</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.LS372.get_id">
+<code class="descname">get_id</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.LS372.get_id" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get the ID number of the Lakeshore unit.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.LS372.get_temp">
+<code class="descname">get_temp</code><span class="sig-paren">(</span><em>unit=None</em>, <em>chan=-1</em><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.LS372.get_temp" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get temperature from the Lakeshore.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>unit</strong> (<em>str</em>) – Unit to return reading for (‘ohms’ or ‘kelvin’)</li>
+<li><strong>chan</strong> (<em>str</em>) – Channel to query, -1 for currently active channel</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">The reading from the lakeshore, either in ohms or kelvin.</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">float</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.LS372.msg">
+<code class="descname">msg</code><span class="sig-paren">(</span><em>message</em><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.LS372.msg" title="Permalink to this definition">¶</a></dt>
+<dd><p>Send message to the Lakeshore 372 over ethernet.</p>
+<p>If we’re asking for something from the Lakeshore (indicated by a ? in
+the message string), then we will attempt to ask twice before giving up
+due to potential communication timeouts.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>message</strong> (<em>str</em>) – Message string as described in the Lakeshore 372 manual.</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">Response string from the Lakeshore, if any. Else, an empty string.</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="agents.thermometry.Lakeshore.Lakeshore372.LS372.set_active_channel">
+<code class="descname">set_active_channel</code><span class="sig-paren">(</span><em>channel</em><span class="sig-paren">)</span><a class="headerlink" href="#agents.thermometry.Lakeshore.Lakeshore372.LS372.set_active_channel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the active scanner channel.</p>
+<p>Query using SCAN? to determine autoscan parameter and set active
+channel.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>channel</strong> (<em>int</em>) – Channel number to switch scanner to. 1-8 or 1-16
+depending on scanner type</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="site_config.html" title="OCS Site Configuration"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">OCS 0.4.3+43.g2afab1b documentation</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2018, Simons Observatory DAQ Group.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.8.3.
+    </div>
+  </body>
+</html>

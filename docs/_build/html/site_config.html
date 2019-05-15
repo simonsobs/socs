@@ -1,0 +1,991 @@
+
+
+<!doctype html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>OCS Site Configuration &#8212; OCS 0.4.3+43.g2afab1b documentation</title>
+    <link rel="stylesheet" href="_static/bizstyle.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="_static/language_data.js"></script>
+    <script type="text/javascript" src="_static/bizstyle.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Lakeshore 372" href="lakeshore372.html" />
+    <link rel="prev" title="Quickstart" href="quickstart.html" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <!--[if lt IE 9]>
+    <script type="text/javascript" src="_static/css3-mediaqueries.js"></script>
+    <![endif]-->
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="lakeshore372.html" title="Lakeshore 372"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="quickstart.html" title="Quickstart"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">OCS 0.4.3+43.g2afab1b documentation</a> &#187;</li> 
+      </ul>
+    </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">OCS Site Configuration</a><ul>
+<li><a class="reference internal" href="#overview">Overview</a></li>
+<li><a class="reference internal" href="#ocs-site-config-file">OCS Site Config File</a><ul>
+<li><a class="reference internal" href="#siteconfig">SiteConfig</a></li>
+<li><a class="reference internal" href="#hostconfig">HostConfig</a></li>
+<li><a class="reference internal" href="#instanceconfig">InstanceConfig</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#agent-site-related-command-line-parameters">Agent Site-related Command Line Parameters</a><ul>
+<li><a class="reference internal" href="#examples">Examples</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#control-clients-and-the-site-config">Control Clients and the Site Config</a></li>
+<li><a class="reference internal" href="#hostmaster-agent">HostMaster Agent</a><ul>
+<li><a class="reference internal" href="#agent-script-discovery">Agent Script Discovery</a></li>
+<li><a class="reference internal" href="#agent-configuration">Agent Configuration</a></li>
+<li><a class="reference internal" href="#systemd-integration-empty">Systemd Integration [empty]</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#ocsbow-command-line-tool">ocsbow command line tool</a><ul>
+<li><a class="reference internal" href="#Positional Arguments">Positional Arguments</a></li>
+<li><a class="reference internal" href="#Site Config Options">Site Config Options</a></li>
+<li><a class="reference internal" href="#Sub-commands:">Sub-commands:</a><ul>
+<li><a class="reference internal" href="#status">status</a></li>
+<li><a class="reference internal" href="#up">up</a></li>
+<li><a class="reference internal" href="#down">down</a></li>
+<li><a class="reference internal" href="#config">config</a><ul>
+<li><a class="reference internal" href="#Positional Arguments_repeat1">Positional Arguments</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#crossbar">crossbar</a><ul>
+<li><a class="reference internal" href="#Positional Arguments_repeat2">Positional Arguments</a></li>
+<li><a class="reference internal" href="#Named Arguments">Named Arguments</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#hostmaster">hostmaster</a><ul>
+<li><a class="reference internal" href="#Positional Arguments_repeat3">Positional Arguments</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#agent">agent</a><ul>
+<li><a class="reference internal" href="#Positional Arguments_repeat4">Positional Arguments</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="quickstart.html"
+                        title="previous chapter">Quickstart</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="lakeshore372.html"
+                        title="next chapter">Lakeshore 372</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/site_config.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="ocs-site-configuration">
+<span id="site-config"></span><h1>OCS Site Configuration<a class="headerlink" href="#ocs-site-configuration" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Permalink to this headline">¶</a></h2>
+<p>The purpose of <code class="docutils literal notranslate"><span class="pre">ocs.site_config</span></code> module is to help Agents and
+Control Clients self-configure within a particular “site” context.  By
+“site”, we mean the set of instances of Agents and Clients, spread
+across one or more hosts, that should form a single OCS network.</p>
+<p>In an observatory or lab, it will be convenient if Agents and Clients
+can determine the appropriate WAMP server and realm without user
+intervention.  Furthermore, in cases where the same Agent code is
+launched in multiple instances (to control distinct instances of the
+same hardware model, for example) there needs to be a system that
+assigns a WAMP base address (such as <code class="docutils literal notranslate"><span class="pre">detlab.cryo.thermo2</span></code>) to
+each Agent instance in a consistent matter.</p>
+<p>The approach adopted here is that <code class="docutils literal notranslate"><span class="pre">ocs.site_config</span></code> works with
+<code class="docutils literal notranslate"><span class="pre">ArgumentParser</span></code> to both consume and then modify the arguments being
+used to launch an Agent instance.  Roughly speaking, the following
+occurs:</p>
+<ol class="arabic simple">
+<li>When launching an Agent, the user uses command line arguments to
+specify a site configuration file.  If no arguments are set, a
+sensible default is chosen.</li>
+<li>The configuration file is parsed and the special configuration
+appropriate to this Agent instance is identified.  The
+configuration is determined based on the host the Agent instance is
+running on, and possibly by an “instance-id”, which helps
+distinguish between independent Agents running from the same source
+script.</li>
+<li>The special configuration parameters for this Agent instance are
+merged into the command line parameters.</li>
+<li>Through normal processing of command line parameters in the Agent
+script, the appropriate WAMP connections, address registrations,
+and hardware associations are made.</li>
+</ol>
+</div>
+<div class="section" id="ocs-site-config-file">
+<h2>OCS Site Config File<a class="headerlink" href="#ocs-site-config-file" title="Permalink to this headline">¶</a></h2>
+<p>The OCS Site Config File (SCF) will be a single YAML file.  The SCF
+may be shared between multiple hosts, providing distinct
+configurations for each one.</p>
+<p>Here is an example of an SCF for a site with two hosts, and 4 agent
+instances (running two different classes of agent):</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">hub</span><span class="p">:</span>
+
+  <span class="nt">wamp_server</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">ws://host-2:8001/ws</span>
+  <span class="nt">wamp_http</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">http://host-2:8001/call</span>
+  <span class="nt">wamp_realm</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">detlab_realm</span>
+  <span class="nt">address_root</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">detlab.cryo</span>
+  <span class="nt">registry_agent</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">observatory.registry</span>
+
+<span class="nt">hosts</span><span class="p">:</span>
+
+  <span class="nt">host-1</span><span class="p">:</span> <span class="p p-Indicator">{</span>
+
+    <span class="c1"># Directory for logs.</span>
+<span class="nt">    &#39;log-dir&#39;</span><span class="p">:</span> <span class="s">&#39;/simonsobs/log/ocs/&#39;</span><span class="p p-Indicator">,</span>
+
+    <span class="c1"># List of additional paths to Agent plugin modules.</span>
+<span class="nt">    &#39;agent-paths&#39;</span><span class="p">:</span> <span class="p p-Indicator">[</span>
+      <span class="s">&#39;/simonsobs/ocs/agents/&#39;</span><span class="p p-Indicator">,</span>
+    <span class="p p-Indicator">],</span>
+
+    <span class="c1"># Description of host-1&#39;s Agents?  We have two readout devices;</span>
+    <span class="c1"># they are both Riverbank 320.  But they can be distinguished, on</span>
+    <span class="c1"># startup, by a device serial number.</span>
+
+<span class="nt">    &#39;agent-instances&#39;</span><span class="p">:</span> <span class="p p-Indicator">[</span>
+      <span class="p p-Indicator">{</span><span class="nt">&#39;agent-class&#39;</span><span class="p">:</span> <span class="s">&#39;Riverbank320Agent&#39;</span><span class="p p-Indicator">,</span>
+<span class="nt">       &#39;instance-id&#39;</span><span class="p">:</span> <span class="s">&#39;thermo1&#39;</span><span class="p p-Indicator">,</span>
+<span class="nt">       &#39;arguments&#39;</span><span class="p">:</span> <span class="p p-Indicator">[[</span><span class="s">&#39;--serial-number&#39;</span><span class="p p-Indicator">,</span> <span class="s">&#39;PX1204312&#39;</span><span class="p p-Indicator">],</span>
+                     <span class="p p-Indicator">[</span><span class="s">&#39;--mode&#39;</span><span class="p p-Indicator">,</span> <span class="s">&#39;idle&#39;</span><span class="p p-Indicator">]]},</span>
+      <span class="p p-Indicator">{</span><span class="nt">&#39;agent-class&#39;</span><span class="p">:</span> <span class="s">&#39;Riverbank320Agent&#39;</span><span class="p p-Indicator">,</span>
+<span class="nt">       &#39;instance-id&#39;</span><span class="p">:</span> <span class="s">&#39;thermo2&#39;</span><span class="p p-Indicator">,</span>
+<span class="nt">       &#39;arguments&#39;</span><span class="p">:</span> <span class="p p-Indicator">[[</span><span class="s">&#39;--serial-number&#39;</span><span class="p p-Indicator">,</span> <span class="s">&#39;PX1204315&#39;</span><span class="p p-Indicator">],</span>
+                     <span class="p p-Indicator">[</span><span class="s">&#39;--mode&#39;</span><span class="p p-Indicator">,</span> <span class="s">&#39;run&#39;</span><span class="p p-Indicator">]]},</span>
+    <span class="p p-Indicator">]</span>
+  <span class="p p-Indicator">}</span>
+
+  <span class="nt">host-2</span><span class="p">:</span> <span class="p p-Indicator">{</span>
+
+    <span class="c1"># Crossbar start-up instructions (optional).</span>
+<span class="nt">    &#39;crossbar&#39;</span><span class="p">:</span> <span class="p p-Indicator">{</span><span class="nt">&#39;config-dir&#39;</span><span class="p">:</span> <span class="nv">/simonsobs/ocs/dot_crossbar/&#39;</span><span class="p p-Indicator">},</span>
+
+    <span class="c1"># Directory for logs.</span>
+<span class="nt">    &#39;log-dir&#39;</span><span class="p">:</span> <span class="s">&#39;/simonsobs/log/ocs/&#39;</span><span class="p p-Indicator">,</span>
+
+    <span class="c1"># List of additional paths to Agent plugin modules.</span>
+<span class="nt">    &#39;agent-paths&#39;</span><span class="p">:</span> <span class="p p-Indicator">[</span>
+      <span class="s">&#39;/simonsobs/ocs/agents/&#39;</span><span class="p p-Indicator">,</span>
+    <span class="p p-Indicator">],</span>
+
+    <span class="c1"># Description of host-2&#39;s Agents?  We have two devices: another</span>
+    <span class="c1"># Riverbank 320, and a motor controller of some kind.</span>
+
+<span class="nt">    &#39;agent-instances&#39;</span><span class="p">:</span> <span class="p p-Indicator">[</span>
+      <span class="p p-Indicator">{</span><span class="nt">&#39;agent-class&#39;</span><span class="p">:</span> <span class="s">&#39;Riverbank320Agent&#39;</span><span class="p p-Indicator">,</span>
+<span class="nt">       &#39;instance-id&#39;</span><span class="p">:</span> <span class="s">&#39;thermo3&#39;</span><span class="p p-Indicator">,</span>
+<span class="nt">       &#39;arguments&#39;</span><span class="p">:</span> <span class="p p-Indicator">[[</span><span class="s">&#39;--serial-number&#39;</span><span class="p p-Indicator">,</span> <span class="s">&#39;JM1212&#39;</span><span class="p p-Indicator">],</span>
+                     <span class="p p-Indicator">[</span><span class="s">&#39;--mode&#39;</span><span class="p p-Indicator">,</span> <span class="s">&#39;run&#39;</span><span class="p p-Indicator">]]},</span>
+      <span class="p p-Indicator">{</span><span class="nt">&#39;agent-class&#39;</span><span class="p">:</span> <span class="s">&#39;MotorControlAgent&#39;</span><span class="p p-Indicator">,</span>
+<span class="nt">       &#39;instance-id&#39;</span><span class="p">:</span> <span class="s">&#39;motor4&#39;</span><span class="p p-Indicator">,</span>
+       <span class="p p-Indicator">},</span>
+    <span class="p p-Indicator">]</span>
+  <span class="p p-Indicator">}</span>
+</pre></div>
+</div>
+<p>By default the system will look for site files in the path pointed to
+by environment variable OCS_CONFIG_DIR.  The default site filename is
+<code class="docutils literal notranslate"><span class="pre">default.yaml</span></code>.  In practice, users will set the environment
+variable and create or symlink <code class="docutils literal notranslate"><span class="pre">default.yaml</span></code> with their site’s
+configuration.  During development, multiple YAML files may be in
+active use; then users will identify their config file through command
+line arguments when launching Agents and Control Clients (see below).</p>
+<div class="section" id="siteconfig">
+<h3>SiteConfig<a class="headerlink" href="#siteconfig" title="Permalink to this headline">¶</a></h3>
+<p>At root level, the configuration file should encode a SiteConfig
+object.  The structure is described in the <code class="docutils literal notranslate"><span class="pre">from_dict</span></code> method of
+the SiteConfig class:</p>
+<dl class="class">
+<dt id="ocs.site_config.SiteConfig">
+<em class="property">class </em><code class="descclassname">ocs.site_config.</code><code class="descname">SiteConfig</code><a class="headerlink" href="#ocs.site_config.SiteConfig" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="classmethod">
+<dt id="ocs.site_config.SiteConfig.from_dict">
+<em class="property">classmethod </em><code class="descname">from_dict</code><span class="sig-paren">(</span><em>data</em><span class="sig-paren">)</span><a class="headerlink" href="#ocs.site_config.SiteConfig.from_dict" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>data</strong> – The configuration dictionary.</td>
+</tr>
+</tbody>
+</table>
+<p>The configuration dictionary should have the following elements:</p>
+<dl class="docutils">
+<dt><code class="docutils literal notranslate"><span class="pre">hub</span></code> (required)</dt>
+<dd>Describes what WAMP server and realm Agents and Clients
+should use.</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">hosts</span></code> (required)</dt>
+<dd>A dictionary of HostConfig descriptions.  The keys in this
+dictionary can be real host names on the network,
+pseudo-host names, or the special value “localhost”.</dd>
+</dl>
+<p>A HostConfig marked for “localhost” will match any host that
+does not have an exact match in the hosts dictionary.  This
+should normally be used only in single-host test systems or
+examples.</p>
+<p>Client programs will normally (i.e., by default) try to load
+the HostConfig associated with the system hostname (that which
+is returned by socket.gethostname()). But this can be
+overridden easily, for example by using the <code class="docutils literal notranslate"><span class="pre">--site-host</span></code>
+command line argument.  It is thus quite reasonable to use the
+hosts dictionary to hold a set of useful configurations
+indexed by a user-specified string (a pseudo-host).</p>
+</dd></dl>
+
+</dd></dl>
+
+<p>The <code class="docutils literal notranslate"><span class="pre">hub</span></code> information is used by all Agent and Control Clients, on
+all hosts, to connect to the OCS WAMP router.  This WAMP router
+(probably crossbar) usually has its own configuration file.  The
+settings in SCF <code class="docutils literal notranslate"><span class="pre">hub</span></code> block are parsed by the <code class="docutils literal notranslate"><span class="pre">from_dict</span></code> method
+of the HubConfig class:</p>
+<dl class="class">
+<dt id="ocs.site_config.HubConfig">
+<em class="property">class </em><code class="descclassname">ocs.site_config.</code><code class="descname">HubConfig</code><a class="headerlink" href="#ocs.site_config.HubConfig" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="classmethod">
+<dt id="ocs.site_config.HubConfig.from_dict">
+<em class="property">classmethod </em><code class="descname">from_dict</code><span class="sig-paren">(</span><em>data</em>, <em>parent=None</em><span class="sig-paren">)</span><a class="headerlink" href="#ocs.site_config.HubConfig.from_dict" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>data</strong> – The configuration dictionary.</li>
+<li><strong>parent</strong> – the SiteConfig from which this data was extracted
+(this is stored as self.parent, but not used).</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<p>The configuration dictionary should have the following elements:</p>
+<dl class="docutils">
+<dt><code class="docutils literal notranslate"><span class="pre">wamp_server</span></code> (required): URL to the WAMP router’s websocket</dt>
+<dd>access point for ocs.  E.g., <code class="docutils literal notranslate"><span class="pre">ws://host-2:8001/ws</span></code>.
+WAMP routers can have multiple access points, with
+different protocols, security layers, and permissions.
+(Command line override: <code class="docutils literal notranslate"><span class="pre">--site-hub</span></code>.)</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">wamp_http</span></code> (optional): URL to the WAMP router’s http bridge</dt>
+<dd>interface.  This is the best interface for simple clients
+to use.  E.g., <code class="docutils literal notranslate"><span class="pre">http://host-2:8001/call</span></code>.</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">wamp_realm</span></code> (required): The WAMP realm to use.  WAMP</dt>
+<dd>clients operating in a particular realm are isolated from
+clients connected to other realms.  Example and test code
+will often use <code class="docutils literal notranslate"><span class="pre">debug_realm</span></code> here.  (Command line
+override: <code class="docutils literal notranslate"><span class="pre">--site-realm</span></code>.)</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">address_root</span></code> (required): The base address to be used by</dt>
+<dd>all OCS Agents.  This is normally something simple like
+<code class="docutils literal notranslate"><span class="pre">observatory</span></code> or <code class="docutils literal notranslate"><span class="pre">detlab.system1</span></code>.  (Command line
+override: <code class="docutils literal notranslate"><span class="pre">--address-root</span></code>.)</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">registry_address</span></code> (optional): The address of the OCS Registry</dt>
+<dd>Agent.  See <span class="xref std std-ref">registry</span>.  (Command line override:
+<code class="docutils literal notranslate"><span class="pre">--registry-address</span></code>.)</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="hostconfig">
+<h3>HostConfig<a class="headerlink" href="#hostconfig" title="Permalink to this headline">¶</a></h3>
+<p>The structure of HostConfig encoding is described in the <code class="docutils literal notranslate"><span class="pre">from_dict</span></code>
+method of the HostConfig class:</p>
+<dl class="class">
+<dt id="ocs.site_config.HostConfig">
+<em class="property">class </em><code class="descclassname">ocs.site_config.</code><code class="descname">HostConfig</code><span class="sig-paren">(</span><em>name=None</em><span class="sig-paren">)</span><a class="headerlink" href="#ocs.site_config.HostConfig" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="classmethod">
+<dt id="ocs.site_config.HostConfig.from_dict">
+<em class="property">classmethod </em><code class="descname">from_dict</code><span class="sig-paren">(</span><em>data</em>, <em>parent=None</em>, <em>name=None</em><span class="sig-paren">)</span><a class="headerlink" href="#ocs.site_config.HostConfig.from_dict" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>data</strong> – The configuration dictionary.</li>
+<li><strong>parent</strong> – the SiteConfig from which this data was extracted
+(this is stored as self.parent, but not used).</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<p>The configuration dictionary should have the following elements:</p>
+<dl class="docutils">
+<dt><code class="docutils literal notranslate"><span class="pre">agent-instances</span></code> (required)</dt>
+<dd>A list of AgentConfig descriptions.</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">agent-paths</span></code> (optional)</dt>
+<dd>A list of additional paths where OCS is permitted to
+search for Agent plugin modules.</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">crossbar</span></code> (optional)</dt>
+<dd>Settings to assist with starting / stopping / monitoring a
+crossbar server running on this host.  There is a single
+crossbar server for an OCS network and thus this entry
+should be defined for at most one of the hosts in the site
+config file.  Note that setting this to None (or null)
+will disable host crossbar control, while setting it to an
+empty dictionary, {}, will enable local host crossbar
+control with default settings.</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">log-dir</span></code> (optional)</dt>
+<dd>Path at which to write log files.  Relative paths will be
+interpreted relative to the “working directory”; see
+–working-dir command line option.</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<p>To allow ocs to manipulate the <code class="docutils literal notranslate"><span class="pre">crossbar</span></code> router (e.g. if you want
+to easily start and stop it using <code class="docutils literal notranslate"><span class="pre">ocsbow</span></code>), then the <code class="docutils literal notranslate"><span class="pre">crossbar</span></code>
+variable should be defined, with (at least) an empty dictionary.  The
+details of the options are described in the <code class="docutils literal notranslate"><span class="pre">from_dict</span></code> method of
+the CrossbarConfig class:</p>
+<dl class="class">
+<dt id="ocs.site_config.CrossbarConfig">
+<em class="property">class </em><code class="descclassname">ocs.site_config.</code><code class="descname">CrossbarConfig</code><a class="headerlink" href="#ocs.site_config.CrossbarConfig" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="classmethod">
+<dt id="ocs.site_config.CrossbarConfig.from_dict">
+<em class="property">classmethod </em><code class="descname">from_dict</code><span class="sig-paren">(</span><em>data</em>, <em>parent=None</em><span class="sig-paren">)</span><a class="headerlink" href="#ocs.site_config.CrossbarConfig.from_dict" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>data</strong> – The configuration dictionary, or None.</li>
+<li><strong>parent</strong> – the HostConfig from which this data was extracted
+(this is stored as self.parent, but not used).</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<p>The configuration dictionary should have the following elements:</p>
+<dl class="docutils">
+<dt><code class="docutils literal notranslate"><span class="pre">config-dir</span></code> (optional): Location of crossbar config.json;</dt>
+<dd>this gets passed to <code class="docutils literal notranslate"><span class="pre">--cbdir</span></code>, if specified..</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">bin</span></code> (optional): The path to the crossbar executable.</dt>
+<dd>This defaults to shutil.which(‘crossbar’).</dd>
+</dl>
+<p>If data is None, returns None.  Otherwise returns a
+CrossbarConfig object.</p>
+</dd></dl>
+
+</dd></dl>
+
+<p>The significance of <code class="docutils literal notranslate"><span class="pre">agent-paths</span></code> is described more in
+<a class="reference internal" href="#agent-plugins"><span class="std std-ref">Agent Script Discovery</span></a>.</p>
+</div>
+<div class="section" id="instanceconfig">
+<h3>InstanceConfig<a class="headerlink" href="#instanceconfig" title="Permalink to this headline">¶</a></h3>
+<p>The structure of InstanceConfig encoding is described in the
+<code class="docutils literal notranslate"><span class="pre">from_dict</span></code> method of the InstanceConfig class:</p>
+<dl class="class">
+<dt id="ocs.site_config.InstanceConfig">
+<em class="property">class </em><code class="descclassname">ocs.site_config.</code><code class="descname">InstanceConfig</code><a class="headerlink" href="#ocs.site_config.InstanceConfig" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="classmethod">
+<dt id="ocs.site_config.InstanceConfig.from_dict">
+<em class="property">classmethod </em><code class="descname">from_dict</code><span class="sig-paren">(</span><em>data</em>, <em>parent=None</em><span class="sig-paren">)</span><a class="headerlink" href="#ocs.site_config.InstanceConfig.from_dict" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>data</strong> – The configuration dictionary.</li>
+<li><strong>parent</strong> – the HostConfig from which this data was extracted
+(this is stored as self.parent, but not used).</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<p>The configuration dictionary should have the following elements:</p>
+<dl class="docutils">
+<dt><code class="docutils literal notranslate"><span class="pre">instance-id</span></code> (str, required)</dt>
+<dd>This string is used to set the Agent instance’s base
+address.  This may also be matched against the instance-id
+provided by the Agent instance, as a way of finding the
+right InstanceConfig.</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">agent-class</span></code> (str, optional)</dt>
+<dd>Name of the Agent class.  This
+may be matched against the agent_class name provided by
+the Agent instance, as a way of finding the right
+InstanceConfig.</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">arguments</span></code> (list, optional):</dt>
+<dd>A list of arguments that should be passed back to the
+agent.  Each element of the list should be a pair of
+strings, like <code class="docutils literal notranslate"><span class="pre">['--option-name',</span> <span class="pre">'value']</span></code>.  This is not
+as general as one might like, but is required in the
+current scheme.</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="agent-site-related-command-line-parameters">
+<h2>Agent Site-related Command Line Parameters<a class="headerlink" href="#agent-site-related-command-line-parameters" title="Permalink to this headline">¶</a></h2>
+<p>Agent code can connect to the <code class="docutils literal notranslate"><span class="pre">ocs.site_config</span></code> using the following
+boilerplate code:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">ocs</span> <span class="kn">import</span> <span class="n">site_config</span>
+
+<span class="k">class</span> <span class="nc">MyHardwareDevice</span><span class="p">:</span>
+    <span class="c1"># ...</span>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="c1"># Get an ArgumentParser</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">site_config</span><span class="o">.</span><span class="n">add_arguments</span><span class="p">()</span>
+
+    <span class="c1"># Add arguments that are specific to this Agent&#39;s function.</span>
+    <span class="n">pgroup</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">add_argument_group</span><span class="p">(</span><span class="s1">&#39;Agent Options&#39;</span><span class="p">)</span>
+    <span class="n">pgroup</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--serial-number&#39;</span><span class="p">)</span>
+    <span class="n">pgroup</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--mode&#39;</span><span class="p">)</span>
+
+    <span class="c1"># Get the parser to process the command line.</span>
+    <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
+
+    <span class="c1"># Interpret options in the context of site_config.</span>
+    <span class="n">site_config</span><span class="o">.</span><span class="n">reparse_args</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s1">&#39;Riverbank320Agent&#39;</span><span class="p">)</span>
+    <span class="k">print</span><span class="p">(</span><span class="s1">&#39;I am in charge of device with serial number: </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">args</span><span class="o">.</span><span class="n">serial_number</span><span class="p">)</span>
+
+    <span class="c1"># Call launcher function (initiates connection to appropriate</span>
+    <span class="c1"># WAMP hub and realm).</span>
+    <span class="n">agent</span><span class="p">,</span> <span class="n">runner</span> <span class="o">=</span> <span class="n">ocs_agent</span><span class="o">.</span><span class="n">init_site_agent</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+
+    <span class="n">my_hd</span> <span class="o">=</span> <span class="n">MyHardwareDevice</span><span class="p">()</span>
+    <span class="c1">#... register processes and tasks, e.g.:</span>
+    <span class="n">agent</span><span class="o">.</span><span class="n">register_process</span><span class="p">(</span><span class="s1">&#39;acq&#39;</span><span class="p">,</span> <span class="n">my_hd</span><span class="o">.</span><span class="n">start_acq</span><span class="p">,</span> <span class="n">my_hd</span><span class="o">.</span><span class="n">stop_acq</span><span class="p">)</span>
+
+    <span class="n">runner</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">agent</span><span class="p">,</span> <span class="n">auto_reconnect</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The call to <code class="docutils literal notranslate"><span class="pre">site_config.reparse_args()</span></code> will add a bunch of
+arguments to the parser.  These can be used to select a particular
+site configuration file, or to override site configuration entirely.</p>
+<p>The command line options are described in the docstring for <code class="docutils literal notranslate"><span class="pre">add_arguments</span></code>:</p>
+<dl class="function">
+<dt id="ocs.site_config.add_arguments">
+<code class="descclassname">ocs.site_config.</code><code class="descname">add_arguments</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ocs.site_config.add_arguments" title="Permalink to this definition">¶</a></dt>
+<dd><p>Add OCS site_config options to an ArgumentParser.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>parser</strong> – an ArgumentParser.  If this is None, a new parser is
+created.</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">The ArgumentParser that was passed in, or the new one.</td>
+</tr>
+</tbody>
+</table>
+<p>Arguments include the <code class="docutils literal notranslate"><span class="pre">--site-*</span></code> family.  See code or online
+documentation for details.</p>
+</dd></dl>
+
+<div class="section" id="examples">
+<h3>Examples<a class="headerlink" href="#examples" title="Permalink to this headline">¶</a></h3>
+<p>In the following examples, suppose we have “river_agent.py”, which
+implements an Agent for talking to Riverbank320 devices.  Suppose
+these are being run on a host called “host-1”.  Refer to the example
+site configuration listed above.  <em>(Note that to run these in the
+example tree you will usually need to add the options that select the
+example SCF and host, namely:</em> <code class="docutils literal notranslate"><span class="pre">--site-file</span> <span class="pre">telescope.yaml</span> <span class="pre">--site-host</span>
+<span class="pre">host-1</span></code> <em>. One exception to this is when using</em> <code class="docutils literal notranslate"><span class="pre">--site=none</span></code>. <em>)</em></p>
+<ol class="arabic">
+<li><p class="first">Because there are two instances of “Riverbank320Agent” registered
+in the SCF, we must somehow pick one when running the agent:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ python river_agent.py --instance-id<span class="o">=</span>thermo1
+I am in charge of device with serial number: PX1204312
+</pre></div>
+</div>
+</li>
+<li><p class="first">We can ask our agent to connect to a different WAMP realm, for
+testing purposes (note this realm would need to be enabled in
+crossbar, probably):</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ python river_agent.py --instance-id<span class="o">=</span>thermo1 --site-realm<span class="o">=</span>my_other_realm
+I am in charge of device with serial number: PX1204312
+</pre></div>
+</div>
+</li>
+<li><p class="first">Run an instance of an Agent, but force all configuration matching
+to occur as though the Agent were running on a host called
+“host-2”:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ python river_agent.py --site-host<span class="o">=</span>host-2
+I am in charge of device with serial number: JM1212
+</pre></div>
+</div>
+<p>Note that we do not need to specify an <code class="docutils literal notranslate"><span class="pre">--instance-id</span></code>, because
+the SCF only lists one Riverbank320Agent instance.</p>
+</li>
+<li><p class="first">To avoid referring to a SCF at all, pass <code class="docutils literal notranslate"><span class="pre">--site=none</span></code>.  Then
+specify enough information for the agent to connect and run:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ python river_agent.py --site<span class="o">=</span>none <span class="se">\</span>
+--site-hub ws://localhost:8001/ws --site-realm debug_realm <span class="se">\</span>
+--address-root<span class="o">=</span>observatory --instance-id<span class="o">=</span>thermo1 <span class="se">\</span>
+--serial-number<span class="o">=</span>PX1204312 --mode<span class="o">=</span>testing
+I am in charge of device with serial number: PX1204312
+</pre></div>
+</div>
+</li>
+</ol>
+</div>
+</div>
+<div class="section" id="control-clients-and-the-site-config">
+<h2>Control Clients and the Site Config<a class="headerlink" href="#control-clients-and-the-site-config" title="Permalink to this headline">¶</a></h2>
+<p>As of this writing, Control Clients do not store configuration in the
+SCF.  But there is an interim interface available for Control Clients
+to access the Site Configuration, with the usual command-line
+overrides.  Control Clients that use the <code class="docutils literal notranslate"><span class="pre">run_control_script</span></code>
+function to launch can instead use <code class="docutils literal notranslate"><span class="pre">run_control_script2</span></code>, which
+behaves as follows:</p>
+<dl class="function">
+<dt id="ocs.client_t.run_control_script2">
+<code class="descclassname">ocs.client_t.</code><code class="descname">run_control_script2</code><span class="sig-paren">(</span><em>function</em>, <em>parser=None</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#ocs.client_t.run_control_script2" title="Permalink to this definition">¶</a></dt>
+<dd><p>Run a function in a ControlClientSession, within a site_config
+paradigm, assuming that additional configuration will be passed
+through command line arguments.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>function</strong> – The function to call.</li>
+<li><strong>parser</strong> – argparse.ArgumentParser, with control script options
+pre-loaded.  If None, this will be created internally in
+the usual way.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<p>The command line is parsed and site configuration information is
+loaded.  The WAMP server information is used to configure the
+Control Client’s connection before launching the function.  The
+function is invoked as:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="k">function</span><span class="o">(</span>app, parser_args, *args, **kwargs<span class="o">)</span>
+</pre></div>
+</div>
+<p>where app is the ControlClientSession and parser_args is the
+argparse.Namespace object including processing done by
+ocs.site_config.  Note that the observatory root_address is
+contained in parser_args.root_address.  Any additional arguments
+defined in the parser will also be present.</p>
+<p>This function can be invoked with parser=None, or else with a
+parser that has been initialized for control client purposes, like
+this:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>from ocs import client_t, site_config
+<span class="nv">parser</span> <span class="o">=</span> site_control.add_arguments<span class="o">()</span>  <span class="c1"># initialized ArgParser</span>
+parser.add_option<span class="o">(</span><span class="s1">&#39;--target&#39;</span><span class="o">)</span>          <span class="c1"># Options for this client</span>
+client_t.run_control_script2<span class="o">(</span>my_script, <span class="nv">parser</span><span class="o">=</span>parser<span class="o">)</span>
+</pre></div>
+</div>
+<p>In the my_script function, use parser_args.target to get the
+target.</p>
+</dd></dl>
+
+<p>The control client script might look something like this (see also
+river_ctrl.py in the examples):</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">my_script</span><span class="p">(</span><span class="n">app</span><span class="p">,</span> <span class="n">pargs</span><span class="p">):</span>
+    <span class="kn">from</span> <span class="nn">ocs</span> <span class="kn">import</span> <span class="n">client_t</span>
+
+    <span class="c1"># We&#39;ve added a --target option.</span>
+    <span class="c1"># Construct the full agent address.</span>
+    <span class="n">agent_addr</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">%s</span><span class="s1">.</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">pargs</span><span class="o">.</span><span class="n">address_root</span><span class="p">,</span> <span class="n">pargs</span><span class="o">.</span><span class="n">target</span><span class="p">)</span>
+
+    <span class="c1"># Create a ProcessClient for the process &#39;acq&#39;.</span>
+    <span class="n">cw</span> <span class="o">=</span> <span class="n">client_t</span><span class="o">.</span><span class="n">ProcessClient</span><span class="p">(</span><span class="n">app</span><span class="p">,</span> <span class="n">agent_addr</span><span class="p">,</span> <span class="s1">&#39;acq&#39;</span><span class="p">)</span>
+
+    <span class="k">print</span><span class="p">(</span><span class="s1">&#39;Starting a data acquisition process...&#39;</span><span class="p">)</span>
+    <span class="n">d1</span> <span class="o">=</span> <span class="k">yield</span> <span class="n">cw</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+    <span class="c1">#...</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="hostmaster-agent">
+<h2>HostMaster Agent<a class="headerlink" href="#hostmaster-agent" title="Permalink to this headline">¶</a></h2>
+<p>The HostMaster Agent (HMA) helps to manage the many Agent instances
+that need to run on a single host machine.  The HMA is [will be] able
+to:</p>
+<ul class="simple">
+<li>Parse the entire site configuration file, and help to start, stop,
+and monitor each Agent instance running on a certain host.</li>
+<li>Integrate with systemd as a daemon, to allow the process to be
+controlled using standard systemctl commands, including how it
+behaves on system start up.</li>
+<li>Accept control commands through the usual OCS channels, i.e. from
+anywhere in the network.</li>
+</ul>
+<p>Direct user interaction with an HMA can be achieved through the
+<code class="docutils literal notranslate"><span class="pre">ocsbow</span></code> command line script.</p>
+<div class="section" id="agent-script-discovery">
+<span id="agent-plugins"></span><h3>Agent Script Discovery<a class="headerlink" href="#agent-script-discovery" title="Permalink to this headline">¶</a></h3>
+<p>Agent scripts are currently written as stand-alone python scripts (and
+thus not not importable through the main <code class="docutils literal notranslate"><span class="pre">ocs</span></code> python module).  To
+support automatic launching of Agents, <code class="docutils literal notranslate"><span class="pre">site_config</span></code> includes a
+plugin-style system to register Agent scripts.  This is flexible
+enough to support both the natively packaged Agents and any
+“third-party” agents needed in a particular installation.  The system
+works like this:</p>
+<ul class="simple">
+<li>A bundle of Agent scripts is assembled at some location.  There are
+no restrictions on where these scripts can live in the file system.
+For example, a script called <code class="docutils literal notranslate"><span class="pre">riverbank_agent.py</span></code> might live in
+<code class="docutils literal notranslate"><span class="pre">/simonsobs/agents/</span></code>.</li>
+<li>A special “registration script” is written, with a filename of the
+form <code class="docutils literal notranslate"><span class="pre">ocs_plugin_*.py</span></code>.  This script should live in Python’s
+import path, or else (and this is better), the path to the script
+should be included in the <code class="docutils literal notranslate"><span class="pre">agent-paths</span></code> variable in the SCF for
+this host.  For example, we might put the file in <code class="docutils literal notranslate"><span class="pre">/simonsobs/agents</span></code>
+and call it <code class="docutils literal notranslate"><span class="pre">ocs_plugin_simonsobs.py</span></code>.</li>
+<li>When the site_config system (specifically the HostMaster agent)
+needs to find a particular agent script, it:<ul>
+<li>Adds any directories in <code class="docutils literal notranslate"><span class="pre">agent-paths</span></code> to the Python import path.</li>
+<li>Scans through all importable modules, and imports them if they
+match the <code class="docutils literal notranslate"><span class="pre">ocs_plugin_*</span></code> name pattern.</li>
+</ul>
+</li>
+<li>The <code class="docutils literal notranslate"><span class="pre">ocs_plugin</span></code> script makes calls into ocs to associate a
+particular script filenames to agent class names.  In our example,
+<code class="docutils literal notranslate"><span class="pre">ocs_plugin_simonsobs.py</span></code> would call
+<code class="docutils literal notranslate"><span class="pre">ocs.site_config.register_agent_class('RiverBank',</span>
+<span class="pre">'/simonsobs/agents/riverbank_agent.py')</span></code>.</li>
+</ul>
+<p>A good example of a plugin script can be found in the OCS agents
+directory, <code class="docutils literal notranslate"><span class="pre">ocs_plugins_standard.py</span></code>.</p>
+</div>
+<div class="section" id="agent-configuration">
+<h3>Agent Configuration<a class="headerlink" href="#agent-configuration" title="Permalink to this headline">¶</a></h3>
+<p>The Host Master Agent is an optional component.  In order to function
+properly, it requires that site_config be in use.  It should be listed
+in the SCF like other agents.  There should only be a single HMA per
+host definition block.</p>
+<p>Here’s an abbreviated SCF showing the correct configuration:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">...</span>
+<span class="nt">hosts</span><span class="p">:</span>
+  <span class="l l-Scalar l-Scalar-Plain">...</span>
+  <span class="l l-Scalar l-Scalar-Plain">host-1</span><span class="p p-Indicator">:</span> <span class="p p-Indicator">{</span>
+    <span class="nv">...</span>
+    <span class="nv">&#39;agent-instances&#39;</span><span class="p p-Indicator">:</span> <span class="p p-Indicator">[</span>
+      <span class="nv">...</span>
+      <span class="p p-Indicator">{</span><span class="nt">&#39;agent-class&#39;</span><span class="p">:</span> <span class="s">&#39;HostMaster&#39;</span><span class="p p-Indicator">,</span>
+<span class="nt">       &#39;instance-id&#39;</span><span class="p">:</span> <span class="s">&#39;master-host-1&#39;</span><span class="p p-Indicator">,</span>
+<span class="nt">       &#39;arguments&#39;</span><span class="p">:</span> <span class="p p-Indicator">[]}</span>
+      <span class="nv">...</span>
+    <span class="p p-Indicator">]</span>
+    <span class="nv">...</span>
+  <span class="p p-Indicator">}</span>
+  <span class="l l-Scalar l-Scalar-Plain">...</span>
+<span class="nn">...</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">agent-class</span></code> should be <code class="docutils literal notranslate"><span class="pre">HostMaster</span></code>.  The <code class="docutils literal notranslate"><span class="pre">instance-id</span></code> in
+this example is based on a (recommended) convention that HostMaster
+live at <code class="docutils literal notranslate"><span class="pre">master-{host}</span></code>.</p>
+</div>
+<div class="section" id="systemd-integration-empty">
+<h3>Systemd Integration [empty]<a class="headerlink" href="#systemd-integration-empty" title="Permalink to this headline">¶</a></h3>
+</div>
+</div>
+<div class="section" id="ocsbow-command-line-tool">
+<h2>ocsbow command line tool<a class="headerlink" href="#ocsbow-command-line-tool" title="Permalink to this headline">¶</a></h2>
+<p>(The output from <code class="docutils literal notranslate"><span class="pre">ocsbow</span> <span class="pre">--help</span></code> should be rendered here.)</p>
+<p>This is the high level control script for ocs.  Its principal uses
+are to inspect the local host’s site configuration file, and to start
+and communicate with the HostMaster Agent for the local host.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>usage: ocsbow <span class="o">[</span>-h<span class="o">]</span> <span class="o">[</span>--site SITE<span class="o">]</span> <span class="o">[</span>--site-file SITE_FILE<span class="o">]</span>
+              <span class="o">[</span>--site-host SITE_HOST<span class="o">]</span> <span class="o">[</span>--site-hub SITE_HUB<span class="o">]</span>
+              <span class="o">[</span>--site-http SITE_HTTP<span class="o">]</span> <span class="o">[</span>--site-realm SITE_REALM<span class="o">]</span>
+              <span class="o">[</span>--instance-id INSTANCE_ID<span class="o">]</span> <span class="o">[</span>--address-root ADDRESS_ROOT<span class="o">]</span>
+              <span class="o">[</span>--registry-address REGISTRY_ADDRESS<span class="o">]</span> <span class="o">[</span>--log-dir LOG_DIR<span class="o">]</span>
+              <span class="o">[</span>--working-dir WORKING_DIR<span class="o">]</span>
+              <span class="o">{</span>status,up,down,config,crossbar,hostmaster,agent<span class="o">}</span> ...
+</pre></div>
+</div>
+<div class="section" id="Positional Arguments">
+<h3>Positional Arguments<a class="headerlink" href="#Positional Arguments" title="Permalink to this headline">¶</a></h3>
+<table class="docutils option-list" frame="void" rules="none">
+<col class="option" />
+<col class="description" />
+<tbody valign="top">
+<tr><td class="option-group">
+<kbd>command</kbd></td>
+<td>Possible choices: status, up, down, config, crossbar, hostmaster, agent</td></tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="Site Config Options">
+<h3>Site Config Options<a class="headerlink" href="#Site Config Options" title="Permalink to this headline">¶</a></h3>
+<table class="docutils option-list" frame="void" rules="none">
+<col class="option" />
+<col class="description" />
+<tbody valign="top">
+<tr><td class="option-group">
+<kbd>--site</kbd></td>
+<td><dl class="first last docutils">
+<dt>Instead of the default site, use the configuration for the</dt>
+<dd>specified site.  The configuration is loaded from
+<code class="docutils literal notranslate"><span class="pre">$OCS_CONFIG_DIR/{site}.yaml</span></code>.  If <code class="docutils literal notranslate"><span class="pre">--site=none</span></code>, the
+site_config facility will not be used at all.</dd>
+</dl>
+</td></tr>
+<tr><td class="option-group">
+<kbd>--site-file</kbd></td>
+<td><dl class="first last docutils">
+<dt>Instead of the default site config, use the specified file.  Full</dt>
+<dd>path must be specified.</dd>
+</dl>
+</td></tr>
+<tr><td class="option-group">
+<kbd>--site-host</kbd></td>
+<td><dl class="first last docutils">
+<dt>Override the OCS determination of what host this instance is</dt>
+<dd>running on, and instead use the configuration for the indicated
+host.</dd>
+</dl>
+</td></tr>
+<tr><td class="option-group">
+<kbd>--site-hub</kbd></td>
+<td>Override the ocs hub url (wamp_server).</td></tr>
+<tr><td class="option-group">
+<kbd>--site-http</kbd></td>
+<td>Override the ocs hub http url (wamp_http).</td></tr>
+<tr><td class="option-group">
+<kbd>--site-realm</kbd></td>
+<td>Override the ocs hub realm (wamp_realm).</td></tr>
+<tr><td class="option-group">
+<kbd>--instance-id</kbd></td>
+<td><dl class="first last docutils">
+<dt>Look in the SCF for Agent-instance specific configuration options,</dt>
+<dd>and use those to launch the Agent.</dd>
+</dl>
+</td></tr>
+<tr><td class="option-group">
+<kbd>--address-root</kbd></td>
+<td>Override the site default address root.</td></tr>
+<tr><td class="option-group" colspan="2">
+<kbd>--registry-address</kbd></td>
+</tr>
+<tr><td>&#160;</td><td>Override the site default registry address.</td></tr>
+<tr><td class="option-group">
+<kbd>--log-dir</kbd></td>
+<td>Set the logging directory.</td></tr>
+<tr><td class="option-group">
+<kbd>--working-dir</kbd></td>
+<td>Propagate the working directory.</td></tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="Sub-commands:">
+<h3>Sub-commands:<a class="headerlink" href="#Sub-commands:" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="status">
+<h4>status<a class="headerlink" href="#status" title="Permalink to this headline">¶</a></h4>
+<p>Show status of the HostMaster.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ocsbow status <span class="o">[</span>-h<span class="o">]</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="up">
+<h4>up<a class="headerlink" href="#up" title="Permalink to this headline">¶</a></h4>
+<p>Start everything on the target host.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ocsbow up <span class="o">[</span>-h<span class="o">]</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="down">
+<h4>down<a class="headerlink" href="#down" title="Permalink to this headline">¶</a></h4>
+<p>Stop everything on the target host.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ocsbow down <span class="o">[</span>-h<span class="o">]</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="config">
+<h4>config<a class="headerlink" href="#config" title="Permalink to this headline">¶</a></h4>
+<p>Query the local OCS config.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ocsbow config <span class="o">[</span>-h<span class="o">]</span> <span class="o">[{</span>summary,plugins,crossbar<span class="o">}]</span>
+</pre></div>
+</div>
+<div class="section" id="Positional Arguments_repeat1">
+<h5>Positional Arguments<a class="headerlink" href="#Positional Arguments_repeat1" title="Permalink to this headline">¶</a></h5>
+<table class="docutils option-list" frame="void" rules="none">
+<col class="option" />
+<col class="description" />
+<tbody valign="top">
+<tr><td class="option-group">
+<kbd>cfg_request</kbd></td>
+<td><p class="first">Possible choices: summary, plugins, crossbar</p>
+<p class="last">Default: “summary”</p>
+</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="section" id="crossbar">
+<h4>crossbar<a class="headerlink" href="#crossbar" title="Permalink to this headline">¶</a></h4>
+<p>Manipulate the local crossbar router.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ocsbow crossbar <span class="o">[</span>-h<span class="o">]</span> <span class="o">[</span>--fg<span class="o">]</span> <span class="o">{</span>start,stop,status,generate_config<span class="o">}</span>
+</pre></div>
+</div>
+<div class="section" id="Positional Arguments_repeat2">
+<h5>Positional Arguments<a class="headerlink" href="#Positional Arguments_repeat2" title="Permalink to this headline">¶</a></h5>
+<table class="docutils option-list" frame="void" rules="none">
+<col class="option" />
+<col class="description" />
+<tbody valign="top">
+<tr><td class="option-group">
+<kbd>cb_request</kbd></td>
+<td><p class="first">Possible choices: start, stop, status, generate_config</p>
+<p class="last">Use these commands to start, stop, or request status from the local crossbar server, if such configuration is described in the host config.  The generate_config sub-command can be used to produce a crossbar JSON configuration file consistent with the parameters in the host config.</p>
+</td></tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="Named Arguments">
+<h5>Named Arguments<a class="headerlink" href="#Named Arguments" title="Permalink to this headline">¶</a></h5>
+<table class="docutils option-list" frame="void" rules="none">
+<col class="option" />
+<col class="description" />
+<tbody valign="top">
+<tr><td class="option-group">
+<kbd>--fg</kbd></td>
+<td><p class="first">If request is “start”, run in foreground rather than spawning to background.</p>
+<p class="last">Default: False</p>
+</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="section" id="hostmaster">
+<h4>hostmaster<a class="headerlink" href="#hostmaster" title="Permalink to this headline">¶</a></h4>
+<p>Manipulate the local HostMaster agent instance.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ocsbow hostmaster <span class="o">[</span>-h<span class="o">]</span> <span class="o">{</span>start,stop,restart,status<span class="o">}</span>
+</pre></div>
+</div>
+<div class="section" id="Positional Arguments_repeat3">
+<h5>Positional Arguments<a class="headerlink" href="#Positional Arguments_repeat3" title="Permalink to this headline">¶</a></h5>
+<table class="docutils option-list" frame="void" rules="none">
+<col class="option" />
+<col class="description" />
+<tbody valign="top">
+<tr><td class="option-group">
+<kbd>hm_request</kbd></td>
+<td><p class="first">Possible choices: start, stop, restart, status</p>
+<p class="last">Use these commands to start, stop, restart, or request status from the HostMaster Agent instance.</p>
+</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="section" id="agent">
+<h4>agent<a class="headerlink" href="#agent" title="Permalink to this headline">¶</a></h4>
+<p>Manipulate child Agent instances controlled by the HostMaster.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ocsbow agent <span class="o">[</span>-h<span class="o">]</span> <span class="o">{</span>start,stop,restart,status<span class="o">}</span> <span class="o">[</span>target <span class="o">[</span>target ...<span class="o">]]</span>
+</pre></div>
+</div>
+<div class="section" id="Positional Arguments_repeat4">
+<h5>Positional Arguments<a class="headerlink" href="#Positional Arguments_repeat4" title="Permalink to this headline">¶</a></h5>
+<table class="docutils option-list" frame="void" rules="none">
+<col class="option" />
+<col class="description" />
+<tbody valign="top">
+<tr><td class="option-group">
+<kbd>agent_request</kbd></td>
+<td><p class="first">Possible choices: start, stop, restart, status</p>
+<p class="last">Use these commands to start, stop, or request the status of individual Agents controlled by the HostMaster.</p>
+</td></tr>
+<tr><td class="option-group">
+<kbd>target</kbd></td>
+<td><p class="first">Agent instance_id to which the command should be applied.</p>
+<p class="last">Default: [‘all’]</p>
+</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="lakeshore372.html" title="Lakeshore 372"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="quickstart.html" title="Quickstart"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">OCS 0.4.3+43.g2afab1b documentation</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2018, Simons Observatory DAQ Group.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.8.3.
+    </div>
+  </body>
+</html>
