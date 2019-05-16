@@ -1,31 +1,21 @@
 import socket as socket
 
-ip = '192.168.1.3'
-escapeString = 'xYzZyX'
+DEFAULT_IP = '192.168.1.3'
+DEFAULT_ESCAPE = 'xYzZyX'
+
 
 class prologixInterface:
 
-    def __init__(self, ip=ip, escapeString=escapeString):
+    def __init__(self, ip=DEFAULT_IP, escapeString=DEFAULT_ESCAPE):
         self.ip = ip
         self.escapeString = escapeString
         #self.gpibAddr = gpibAddr
         self.connSocket()
         self.configure()
 
-#	def connSocket(self):
-#		attempts = 0
-#		while attempts < 5:
-#			try:
-#				self.pro = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-#				self.pro.settimeout(1)
-#				self.pro.connect((ip, 1234))
-#			except socket.timeout:
-#				print 'timeout, trying again'
-#				attempts += 1
-
     def connSocket(self):
         self.pro = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.pro.connect((ip, 1234))
+        self.pro.connect((self.ip, 1234))
         self.pro.settimeout(5)
 
     def configure(self):
