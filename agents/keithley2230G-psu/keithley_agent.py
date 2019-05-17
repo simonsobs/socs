@@ -1,5 +1,4 @@
 from ocs import ocs_agent, site_config, client_t
-from ocs.Lakeshore.Lakeshore240 import Module
 import random
 import time
 import threading
