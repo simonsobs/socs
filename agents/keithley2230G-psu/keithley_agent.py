@@ -3,6 +3,7 @@ import random
 import time
 import threading
 import os
+import socket
 
 from ocs.ocs_twisted import TimeoutLock
 
@@ -123,7 +124,7 @@ class Keithley2230GAgent:
             channel (int): Channel number (1, 2, or 3)
             state (bool): True for on, False for off
         """
-        with self.lock.acacquire_timeout(1) as acquired:
+        with self.lock.acquire_timeout(1) as acquired:
             if acquired:
                 self.psu.setOutput(params['channel'], params['state'])
             else:
