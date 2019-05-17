@@ -15,7 +15,7 @@
 import os
 import sys
 sys.path.insert(0, os.path.abspath('..'))
-from ocs import __version__ as ocs_version
+from socs_version import get_versions
 
 # -- Project information -----------------------------------------------------
 
@@ -24,9 +24,9 @@ copyright = '2018-2019, Simons Observatory DAQ Group'
 author = 'Simons Observatory DAQ Group'
 
 # The short X.Y version.
-version = ocs_version
+version = get_versions()['version']
 # The full version, including alpha/beta/rc tags.
-release = ocs_version
+release = version
 
 
 # -- General configuration ---------------------------------------------------
