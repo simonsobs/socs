@@ -1,35 +1,114 @@
-import random
-import time, threading
-import numpy as np
-import ocs
+import time
+import threading
 import glob
 import os
 
 import datetime
 from datetime import timezone
 
-from autobahn.wamp.exception import ApplicationError
-from ocs import ocs_agent, site_config, client_t
-from ocs.Lakeshore.Lakeshore372 import LS372
+from ocs import ocs_agent, site_config
+
+
+class LogTracker:
+    def __init__(self, log_dir):
+        """Log Tracking helper class. Always tracks current date's logs.
+
+        Parameters
+        ----------
+        log_dir : str
+            Top level log directory
+
+        """
+        self.log_dir = log_dir
+        self.date = datetime.date.fromtimestamp(time.time())
+        self.file_objects = {}
+
+    def _build_file_list(self):
+        """Get list of files to open."""
+        # generate file list
+            # temperature/372 logs
+                # glob.glob("%s/%s/CH*.log"%(self.log_directory, self.date))
+            # channel logs
+                # glob.glob("%s/%s/Channels*.log"%(self.log_directory, self.date))
+            # flowmeter logs
+                # glob.glob("%s/%s/Flowmeter*.log"%(self.log_directory, self.date))
+            # Pressure logs
+                # glob.glob("%s/%s/maxigauge*.log"%(self.log_directory, self.date))
+
+        # Only T data right now...
+        date_str = self.date.strftime("%y-%m-%d")
+        file_list = glob.glob("{}/{}/CH* T *.log".format(self.log_dir,
+                                                         date_str))
+        return file_list
+
+    def _open_file(self, filename):
+        """Open a single file, adding it to self.file_objects.
+
+        Parameters
+        ----------
+        filename : str
+            Full path to filename to open
+
+        """
+        if filename not in self.file_objects.keys():
+            print("{} not yet open, opening...".format(filename))
+            self.file_objects[filename] = open(filename, 'r')
+        else:
+            pass
+
+    def check_open_files(self):
+        """Check all log files are opened.
+
+        The Status logs don't always exist, but we want to catch them when they
+        do get generated. This rebuilds the file list and checks all the files in it
+        are in the open file objects dictionary.
+        """
+        file_list = self._build_file_list()
+        for f in file_list:
+            self._open_file(f)
+
+    def set_active_date(self):
+        """Set the active date to today."""
+        new_date = datetime.date.fromtimestamp(time.time())
+
+        if new_date > self.date:
+            self.close_all_files()
+            self.date = new_date
+            self.open_file_list()
+
+    def open_all_logs(self):
+        """Open today's logs and move to end of files."""
+        file_list = self._build_file_list()
+
+        self.file_objects = {}
+        for _file in file_list:
+            self._open_file(_file)
+
+        for k, v in self.file_objects.items():
+            v.readlines()
+
+    def close_all_files(self):
+        """Close all the files tracked by the LogTracker."""
+        for k, v in self.file_objects.items():
+            v.close()
+            self.file_objects.pop(k)
+
 
 class Bluefors_Agent:
     """Agent to connect to a single Lakeshore 372 device.
-        
+
     Parameters
     ----------
         name: Application Session
-        ip:  ip address of agent 
-        fake_data: generates random numbers without connecting to LS if True. 
+        ip:  ip address of agent
+        fake_data: generates random numbers without connecting to LS if True.
 
     """
     def __init__(self, agent, log_directory):
         self.lock = threading.Semaphore()
         self.job = None
 
-        self.log_directory = log_directory
-        self.file_list = []
-        self.date = None # track the day for log rotations, directory format %y-%m-%d
-        self.open = False # are file objects opened
+        self.log_tracker = LogTracker(log_directory)
 
         self.log = agent.log
         self.agent = agent
@@ -42,14 +121,14 @@ class Bluefors_Agent:
                         }
         }
         self.agent.register_feed('bluefors',
-                                 aggregate=True,
+                                 record=True,
                                  agg_params=agg_params,
-                                 buffered=True, buffer_time=1)
+                                 buffer_time=1)
 
     def try_set_job(self, job_name):
         print(self.job, job_name)
         with self.lock:
-            if self.job == None:
+            if self.job is None:
                 self.job = job_name
                 return (True, 'ok')
             else:
@@ -59,8 +138,7 @@ class Bluefors_Agent:
         with self.lock:
             self.job = None
 
-    def init_lakeshore_task(self, session, params=None):
-        # TODO: task to refresh log list perhaps?
+    def init_bluefors_task(self, session, params=None):
         ok, msg = self.try_set_job('init')
 
         self.log.info('Initialized Bluefors log tracking: {status}', status=ok)
@@ -70,7 +148,7 @@ class Bluefors_Agent:
         session.set_status('running')
 
         # since we only work on T logs right now, let's limit to that
-        self.file_list = glob.glob("%s/*/CH* T *.log"%self.log_directory)
+        self.file_list = glob.glob("%s/*/CH* T *.log" % self.log_directory)
         print(self.file_list)
 
         self.set_job_done()
@@ -80,19 +158,13 @@ class Bluefors_Agent:
 
         ok, msg = self.try_set_job('acq')
         if not ok:
-             return ok, msg
+            return ok, msg
 
         session.set_status('running')
- 
-        file_objects = {}
-        for _file in self.file_list:
-            file_objects[_file] = open(_file, 'r')
 
-        # skip over already existing file contents
-        for k, v in file_objects.items():
-            v.readlines()
- 
-        print(file_objects) 
+        # Create file objects for all logs in today's directory
+        self.log_tracker.open_all_logs()
+
         while True:
             with self.lock:
                 if self.job == '!acq':
@@ -102,38 +174,19 @@ class Bluefors_Agent:
                 else:
                     return 10
 
-            # Handle log rotation
-                # check today's date
-                    # if stored date is None, store new date and proceed with opening files
-                    # else, compare with stored date
-                        # has the date changed since last loop iteration?
-                            # if no, continue
-                            # if yes, close all open file objects, search for new files, store new date
-                                    # mark files as closed
+            # Make sure we're looking at today's logs
+            self.log_tracker.set_active_date()
 
-            # generate file list
-                # temperature/372 logs
-                    # glob.glob("%s/%s/CH*.log"%(self.log_directory, self.date))
-                # channel logs
-                    # glob.glob("%s/%s/Channels*.log"%(self.log_directory, self.date))
-                # flowmeter logs
-                    # glob.glob("%s/%s/Flowmeter*.log"%(self.log_directory, self.date))
-                # Pressure logs
-                    # glob.glob("%s/%s/maxigauge*.log"%(self.log_directory, self.date))
+            # Ensure all the logs we want are open
+            self.log_tracker.check_open_files()
 
-            # open file objects
-                # if files not open:
-                    # open all file objects
-                # else:
-                    # continue
-
-            for k, v in file_objects.items():
+            for k, v in self.log_tracker.file_objects.items():
                 # this only works on temperature logs right now...
-                channel = os.path.basename(k)[:3] #i.e. 'CH6'
+                channel = os.path.basename(k)[:3]  # i.e. 'CH6'
                 new = v.readline()
-                if new != '': 
+                if new != '':
                     date, _time, data_value = new.strip().split(',')
-                    time_str = "%s,%s"%(date, _time)
+                    time_str = "%s,%s" % (date, _time)
                     dt = datetime.datetime.strptime(time_str, "%d-%m-%y,%H:%M:%S")
                     timestamp = dt.replace(tzinfo=timezone.utc).timestamp()
 
@@ -144,8 +197,8 @@ class Bluefors_Agent:
                         'data': {}
                     }
 
-                    data['data']['%s T'%channel] = data_value
-                    #print(k, timestamp, data_value)
+                    data['data']['%s T' % channel] = data_value
+                    # print(k, timestamp, data_value)
 
                     print("Data: {}".format(data))
                     session.app.publish_to_feed('bluefors', data)
@@ -158,11 +211,11 @@ class Bluefors_Agent:
     def stop_acq(self, session, params=None):
         ok = False
         with self.lock:
-            if self.job =='acq':
+            if self.job == 'acq':
                 self.job = '!acq'
                 ok = True
         return (ok, {True: 'Requested process stop.',
-                    False: 'Failed to request process stop.'}[ok])
+                     False: 'Failed to request process stop.'}[ok])
 
 
 if __name__ == '__main__':
@@ -184,7 +237,7 @@ if __name__ == '__main__':
 
     lake_agent = Bluefors_Agent(agent, args.log_directory)
 
-    agent.register_task('init_lakeshore', lake_agent.init_lakeshore_task)
+    agent.register_task('init_lakeshore', lake_agent.init_bluefors_task)
     agent.register_process('acq', lake_agent.start_acq, lake_agent.stop_acq)
 
     runner.run(agent, auto_reconnect=True)
