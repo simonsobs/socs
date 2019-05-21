@@ -8,6 +8,7 @@ import sys
 
 from twisted.logger import Logger, formatEvent, FileLogObserver
 import time
+import os
 
 
 class Receiver:
@@ -46,6 +47,7 @@ class PysmurfScriptProtocol(protocol.ProcessProtocol):
         self.end_status = None
 
     def connectionMade(self):
+        print("Connection Made")
         self.transport.closeStdin()
 
     def outReceived(self, data):
@@ -54,8 +56,12 @@ class PysmurfScriptProtocol(protocol.ProcessProtocol):
                           fname=self.fname.split('/')[-1],
                           data=data.strip())
 
+    def errReceived(self, data):
+        self.log.error(data)
+
     def processEnded(self, status):
-        # self.log.info("Process ended: {reason}", reason=status)
+        # if self.log is not None:
+        #     self.log.info("Process ended: {reason}", reason=status)
         self.end_status = status
 
 
@@ -120,9 +126,9 @@ class PysmurfController(DatagramProtocol):
         self.prot = PysmurfScriptProtocol(**params)
         pyth = sys.executable
         cmd = [pyth, script_file] + args
-
+        self.log.info("{exec}, {cmd}", exec=pyth, cmd=cmd)
         reactor.callFromThread(
-            reactor.spawnProcess, self.prot, pyth, cmd
+            reactor.spawnProcess, self.prot, pyth, cmd, env=os.environ
         )
 
         while self.prot.end_status is None:
