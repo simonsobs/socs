@@ -1,12 +1,19 @@
 import time
 import threading
 import glob
-import os
+import re
 
 import datetime
-from datetime import timezone
 
 from ocs import ocs_agent, site_config
+
+# Notes:
+# Each Lakeshore log gets its own "block" due to tracking the logs
+# being somewhat tricky. If a block structure is established and
+# then the thermometer removed from the scan, say if the user
+# switches to scanning a single channel, then the block structure
+# won't be reconstructed and thus won't match the existing
+# structure, causing an error.
 
 
 class LogTracker:
@@ -24,21 +31,15 @@ class LogTracker:
         self.file_objects = {}
 
     def _build_file_list(self):
-        """Get list of files to open."""
-        # generate file list
-            # temperature/372 logs
-                # glob.glob("%s/%s/CH*.log"%(self.log_directory, self.date))
-            # channel logs
-                # glob.glob("%s/%s/Channels*.log"%(self.log_directory, self.date))
-            # flowmeter logs
-                # glob.glob("%s/%s/Flowmeter*.log"%(self.log_directory, self.date))
-            # Pressure logs
-                # glob.glob("%s/%s/maxigauge*.log"%(self.log_directory, self.date))
+        """Get list of files to open.
 
-        # Only T data right now...
+        Assumes all logs are set to log to same top level directory,
+        i.e. /home/bluefors/logs/
+
+        """
         date_str = self.date.strftime("%y-%m-%d")
-        file_list = glob.glob("{}/{}/CH* T *.log".format(self.log_dir,
-                                                         date_str))
+        file_list = glob.glob("{}/{}/*.log".format(self.log_dir,
+                                                   date_str))
         return file_list
 
     def _open_file(self, filename):
@@ -94,14 +95,227 @@ class LogTracker:
             self.file_objects.pop(k)
 
 
+class LogParser:
+    def __init__(self, tracker):
+        """Log Parsing helper class.
+
+        Knows the internal formats for each log type. Used to loop over all
+        logs tracked by a LogTracker and publish their contents to an OCS Feed.
+
+        Parameters
+        ----------
+        tracker : LogTracker
+            log tracker that contains paths and file objects to parse
+
+        """
+        self.log_tracker = tracker
+        self.patterns = {'channels': ['v11', 'v2', 'v1', 'turbo1', 'v12', 'v3', 'v10',
+                                      'v14', 'v4', 'v13', 'compressor', 'v15', 'v5',
+                                      'hs-still', 'v21', 'v16', 'v6', 'scroll1', 'v17',
+                                      'v7', 'scroll2', 'v18', 'v8', 'pulsetube', 'v19',
+                                      'v20', 'v9', 'hs-mc', 'ext'],
+                         'status': ['tc400errorcode', 'tc400ovtempelec',
+                                    'tc400ovtemppump', 'tc400setspdatt',
+                                    'tc400pumpaccel', 'tc400commerr',
+                                    'tc400errorcode_2', 'tc400ovtempelec_2',
+                                    'tc400ovtemppump_2', 'tc400setspdatt_2',
+                                    'tc400pumpaccel_2', 'tc400commerr_2',
+                                    'ctrl_pres', 'cpastate', 'cparun', 'cpawarn',
+                                    'cpaerr', 'cpatempwi', 'cpatempwo', 'cpatempo',
+                                    'cpatemph', 'cpalp', 'cpalpa', 'cpahp', 'cpahpa',
+                                    'cpadp', 'cpacurrent', 'cpahours', 'cpapscale',
+                                    'cpatscale', 'cpasn', 'cpamodel'],
+                         'heater': ["a1_u", "a1_r_lead", "a1_r_htr", "a2_u",
+                                    "a2_r_lead", "a2_r_htr", "htr", "htr_range"]}
+
+    @staticmethod
+    def timestamp_from_str(time_string):
+        """Convert time string from Bluefors log file into a UNIX timestamp.
+
+        Parameters
+        ----------
+        time_string : str
+            String in format "%d-%m-%y,%H:%M:%S"
+
+        Returns
+        -------
+        float
+            UNIX timestamp
+
+        """
+        dt = datetime.datetime.strptime(time_string, "%d-%m-%y,%H:%M:%S")
+        timestamp = dt.timestamp()
+        return timestamp
+
+    def _parse_single_value_log(self, new_line, log_name):
+        """Parses a simple single value log. Valid for LS372 and flowmeter log
+        files.
+
+        Parameters
+        ----------
+        new_line : str
+            The new line read by the Parser
+        log_name : str
+            The name of the log, returned by self.identify_log()
+        """
+        date, _time, data_value = new_line.strip().split(',')
+        time_str = "%s,%s" % (date, _time)
+        timestamp = self.timestamp_from_str(time_str)
+
+        # Data array to populate
+        data = {
+            'timestamp': timestamp,
+            'block_name': log_name,
+            'data': {}
+        }
+
+        data['data'][log_name] = data_value
+
+        return data
+
+    def _parse_maxigauge_log(self, new_line, log_name):
+        """Parse the maxigauge logs.
+
+        Parameters
+        ----------
+        new_line : str
+            The new line read by the Parser
+        log_name : str
+            The name of the log, returned by self.identify_log()
+
+        """
+        ts, *channels = new_line.strip().split('CH')
+        time_str = ts.strip(',')
+        timestamp = self.timestamp_from_str(time_str)
+
+        ch_data = {}
+        for ch in channels:
+            ch_num, _, state, value, *_ = ch.split(',')
+            ch_data["pressure_ch{}_state".format(ch_num)] = int(state)
+            ch_data["pressure_ch{}".format(ch_num)] = float(value)
+
+        data = {
+            'timestamp': timestamp,
+            'block_name': log_name,
+            'data': ch_data
+        }
+
+        return data
+
+    def _parse_multi_value_log(self, new_line, log_type, log_name):
+        """Parse a log containing multiple values on each line. Valid for
+        Channel, Status, and heater logs.
+
+        Patterns to search for are all known by the parser a class attribute.
+
+        Parameters
+        ----------
+        new_line : str
+            The new line read by the Parser
+        log_type : str
+            Log type as identified by self.identify_log, used to select search
+            patterns
+        log_name : str
+            The name of the log, returned by self.identify_log()
+
+        """
+        date, _time, *_ = new_line.strip().split(',')
+        time_str = "%s,%s" % (date, _time)
+        timestamp = self.timestamp_from_str(time_str)
+
+        data_array = {}
+        for pattern in self.patterns[log_type]:
+            regex = re.compile(rf'{pattern},([0-9\.\+\-E]+)')
+            m = regex.search(new_line)
+            if log_type == 'channels':
+                data_array[pattern] = int(m.group(1))
+            else:
+                data_array[pattern] = float(m.group(1))
+
+        data = {
+            'timestamp': timestamp,
+            'block_name': log_name,
+            'data': data_array
+        }
+
+        return data
+
+    @staticmethod
+    def identify_log(filename):
+        """Identify type of log return unique identifier
+
+        Parameters
+        ----------
+        filename : str
+            path to file for identification
+
+        Returns
+        -------
+        tuple
+            A tuple containing two strings:
+                1. The log type, i.e. 'lakeshore', 'flowmeter'
+                2. Unique identifier based on filetype, i.e. 'lakeshore_ch8_p',
+                   'pressure_ch1_state'
+
+        """
+        # file type: regex search pattern to identify
+        file_types = {'lakeshore': '(CH[0-9]+ [T,R,P])',
+                      'flowmeter': '(Flowmeter)',
+                      'maxiguage': '(maxigauge)',
+                      'channels': '(Channels)',
+                      'status': '(Status)',
+                      'heater': '(heaters)'}
+
+        for k, v in file_types.items():
+            if re.search(v, filename):
+                _type = k
+
+                m = re.search(file_types[_type], filename)
+                if _type == 'lakeshore':
+                    return _type, "{}_{}".format(_type, m.group(0).lower().replace(' ', '_'))
+                else:
+                    return _type, m.group(0).lower()
+
+        # If nothing matches return None
+        return (None, None)
+
+    def read_and_publish_logs(self, app_session):
+        """Read a new line from each log file if there is one, and publish its
+        contents to the app_session's feed.
+
+        Parameters
+        ----------
+        app_session : ocs.ocs_agent.OpSession
+            session from the ocs_agent, used to publish to bluefors feed
+
+        """
+        for k, v in self.log_tracker.file_objects.items():
+            log_type, log_name = self.identify_log(k)
+
+            new = v.readline()
+            if new == '':
+                continue
+
+            if log_type in ['lakeshore', 'flowmeter']:
+                data = self._parse_single_value_log(new, log_name)
+
+            if log_type == 'maxiguage':
+                data = self._parse_maxigauge_log(new, log_name)
+
+            if log_type in ['channels', 'status', 'heater']:
+                data = self._parse_multi_value_log(new, log_type, log_name)
+
+            # print("Data: {}".format(data))
+            app_session.app.publish_to_feed('bluefors', data)
+
+
 class Bluefors_Agent:
-    """Agent to connect to a single Lakeshore 372 device.
+    """Agent to track the Bluefors logs generated by an LD400.
 
     Parameters
     ----------
-        name: Application Session
-        ip:  ip address of agent
-        fake_data: generates random numbers without connecting to LS if True.
+    log_directory : str
+        Top level log directory for the Bluefors logs
 
     """
     def __init__(self, agent, log_directory):
@@ -115,10 +329,7 @@ class Bluefors_Agent:
 
         # Registers bluefors feed
         agg_params = {
-            'blocking': {
-                         'CH5': {'data': ['CH5 T']},
-                         'CH6': {'data': ['CH6 T']},
-                        }
+            'frame_length': 10*60  # [sec]
         }
         self.agent.register_feed('bluefors',
                                  record=True,
@@ -137,22 +348,6 @@ class Bluefors_Agent:
     def set_job_done(self):
         with self.lock:
             self.job = None
-
-    def init_bluefors_task(self, session, params=None):
-        ok, msg = self.try_set_job('init')
-
-        self.log.info('Initialized Bluefors log tracking: {status}', status=ok)
-        if not ok:
-            return ok, msg
-
-        session.set_status('running')
-
-        # since we only work on T logs right now, let's limit to that
-        self.file_list = glob.glob("%s/*/CH* T *.log" % self.log_directory)
-        print(self.file_list)
-
-        self.set_job_done()
-        return True, 'Bluefors log tracking initialized.'
 
     def start_acq(self, session, params=None):
 
@@ -180,28 +375,11 @@ class Bluefors_Agent:
             # Ensure all the logs we want are open
             self.log_tracker.check_open_files()
 
-            for k, v in self.log_tracker.file_objects.items():
-                # this only works on temperature logs right now...
-                channel = os.path.basename(k)[:3]  # i.e. 'CH6'
-                new = v.readline()
-                if new != '':
-                    date, _time, data_value = new.strip().split(',')
-                    time_str = "%s,%s" % (date, _time)
-                    dt = datetime.datetime.strptime(time_str, "%d-%m-%y,%H:%M:%S")
-                    timestamp = dt.replace(tzinfo=timezone.utc).timestamp()
+            # Pass tracking information to parser class
+            parser = LogParser(self.log_tracker)
 
-                    # Data array to populate
-                    data = {
-                        'timestamp': timestamp,
-                        'block_name': channel,
-                        'data': {}
-                    }
-
-                    data['data']['%s T' % channel] = data_value
-                    # print(k, timestamp, data_value)
-
-                    print("Data: {}".format(data))
-                    session.app.publish_to_feed('bluefors', data)
+            # Check for new lines and publish to feed
+            parser.read_and_publish_logs(session)
 
             time.sleep(0.01)
 
@@ -237,7 +415,6 @@ if __name__ == '__main__':
 
     lake_agent = Bluefors_Agent(agent, args.log_directory)
 
-    agent.register_task('init_lakeshore', lake_agent.init_bluefors_task)
     agent.register_process('acq', lake_agent.start_acq, lake_agent.stop_acq)
 
     runner.run(agent, auto_reconnect=True)
