@@ -2,6 +2,10 @@
 SOCS - Simons Observatory Control System
 ========================================
 
+.. image:: https://readthedocs.org/projects/socs/badge/?version=latest
+    :target: https://socs.readthedocs.io/en/latest/?badge=latest
+    :alt: Documentation Status
+
 Overview
 --------
 
