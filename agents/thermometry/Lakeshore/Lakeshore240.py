@@ -180,7 +180,7 @@ class Channel:
 
         if unit is not None:
             if unit in [1, 2, 3, 4]:
-                self._unit = unit_key[unit]
+                self._unit = units_key[unit]
             else:
                 print("unit must be 1, 2, 3, or 4")
 
