@@ -11,6 +11,7 @@ from autobahn.wamp.exception import ApplicationError
 
 from keithley_driver import psuInterface
 
+
 class Keithley2230GAgent:
     def __init__(self, agent, ip_address, gpib_slot):
         self.agent = agent
@@ -25,16 +26,16 @@ class Keithley2230GAgent:
         self.psu = None
 
         # Registers Temperature and Voltage feeds
-        # agg_params = {
-        #     'frame_length': 10,
-        # }
-        # self.agent.register_feed('psu_output',
-        #                          record=True,
-        #                          agg_params=agg_params,
-        #                          buffer_time=0)
-
+        agg_params = {
+            'frame_length': 10*60,
+        }
+        self.agent.register_feed('psu_output',
+                                 record=True,
+                                 agg_params=agg_params,
+                                 buffer_time=0)
 
     def init_psu(self, session, params=None):
+        """ Task to connect to Keithley power supply """
 
         with self.lock.acquire_timeout(0) as acquired:
             if not acquired:
@@ -51,6 +52,14 @@ class Keithley2230GAgent:
         return True, 'Initialized PSU.'
 
     def monitor_output(self, session, params=None):
+        """
+            Process to continuously monitor PSU output current and voltage and
+            send info to aggregator.
+
+            Args:
+                wait (float, optional):
+                    time to wait between measurements [seconds].
+        """
         if params is None:
             params = {}
 
@@ -70,8 +79,8 @@ class Keithley2230GAgent:
                         data['data']["Current_{}".format(chan)] = self.psu.getCurr(chan)
 
                     # self.log.info(str(data))
-                    print(data)
-                    # self.agent.publish_to_feed('psu_output', data)
+                    # print(data)
+                    self.agent.publish_to_feed('psu_output', data)
                 else:
                     self.log.warn("Could not acquire in monitor_current")
 
@@ -89,7 +98,7 @@ class Keithley2230GAgent:
 
         Args:
             channel (int): Channel number (1, 2, or 3)
-            "volts" (float): Voltage to set. Must be between 0 and 30.
+            volts (float): Voltage to set. Must be between 0 and 30.
         """
 
         with self.lock.acquire_timeout(1) as acquired:
