@@ -117,7 +117,7 @@ class Keithley2230GAgent:
             channel (int): Channel number (1, 2, or 3)
             "current" (float): Curent to set. Must be between x and y.
         """
-        with self.lock.acacquire_timeout(1) as acquired:
+        with self.lock.acquire_timeout(1) as acquired:
             if acquired:
                 self.psu.setCurr(params['channel'],params['current'])
             else:
