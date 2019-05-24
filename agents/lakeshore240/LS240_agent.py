@@ -78,6 +78,68 @@ class LS240_Agent:
         self.set_job_done()
         return True, 'Lakeshore module initialized.'
 
+    def set_values(self, session, params=None):
+        """
+        A task to set sensor parameters for a Lakeshore240 Channel
+
+        Args:
+
+            channel (int): Channel number to  set
+
+        Optional Args:
+            sensor (int, 1, 2, or 3):
+                1 = Diode, 2 = PlatRTC, 3 = NTC RTD
+            auto_range (int, 0 or 1):
+                Must be 0 or 1. Specifies if channel should use autorange.
+            range (int 0-8):
+                Specifies range if autorange is false. Only settable for NTC RTD.
+                    0 = 10 Ohms (1 mA)
+                    1 = 30 Ohms (300 uA)
+                    2 = 100 Ohms (100 uA)
+                    3 = 300 Ohms (30 uA)
+                    4 = 1 kOhm (10 uA)
+                    5 = 3 kOhms (3 uA)
+                    6 = 10 kOhms (1 uA)
+                    7 = 30 kOhms (300 nA)
+                    8 = 100 kOhms (100 nA)
+            current_reversal (int, 0 or 1):
+                Specifies if input current reversal is on or off.
+                Always 0 if input is a diode.
+            units (int, 1-4):
+                Specifies preferred units parameter, and sets the units
+                for alarm settings.
+                    1 = Kelvin
+                    2 = Celsius
+                    3 = Sensor
+                    4 = Fahrenheit
+            enabled (int, 0 or 1):
+                sets if channel is enabled
+            name (str):
+                sets name of channel
+        """
+        ok, msg = self.try_set_job('set_values')
+
+        self.log.info('set_values: {status}', status=ok)
+        if not ok:
+            return ok, msg
+
+        if params is None:
+            params = {}
+
+        self.module.channels[params['channels']].set_values(
+            sensor=params.get('sensor'),
+            auto_range=params.get('auto_range'),
+            range=params.get('range'),
+            current_reversal=params.get('current_reversal'),
+            unit=params.get('unit'),
+            enabled=params.get('enabled'),
+            name=params.get('name'),
+        )
+
+        self.set_job_done()
+        return True, 'Set values for channel {}'.format(params['channel'])
+
+
     # Process functions.
     def start_acq(self, session, params=None):
         """Start data acquisition.
