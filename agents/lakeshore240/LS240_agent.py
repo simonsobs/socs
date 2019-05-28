@@ -4,6 +4,7 @@ import random
 import time
 import threading
 import os
+from ocs.ocs_twisted import TimeoutLock
 
 from autobahn.wamp.exception import ApplicationError
 
@@ -17,13 +18,14 @@ class LS240_Agent:
         self.active = True
         self.agent = agent
         self.log = agent.log
-        self.lock = threading.Semaphore()
-        self.job = None
+        self.lock = TimeoutLock()
         self.fake_data = fake_data
         self.module = None
         self.port = port
         self.thermometers = ['Channel {}'.format(i + 1) for i in range(num_channels)]
         self.log = agent.log
+
+        self.take_data = False
 
         # Registers Temperature and Voltage feeds
         agg_params = {
@@ -34,48 +36,34 @@ class LS240_Agent:
                                  agg_params=agg_params,
                                  buffer_time=1)
 
-
-    # Exclusive access management.
-    def try_set_job(self, job_name):
-        with self.lock:
-            if self.job == None:
-                self.job = job_name
-                return True, 'ok.'
-            return False, 'Conflict: "%s" is already running.' % self.job
-
-    def set_job_done(self):
-        with self.lock:
-            self.job = None
-
     # Task functions.
     def init_lakeshore_task(self, session, params=None):
         """
         Task to initialize Lakeshore 240 Module.
         """
-        ok, msg = self.try_set_job('init')
+        with self.lock.acquire_timeout(0, job='init') as acquired:
+            if not acquired:
+                self.log.warn("Could not start init because {} is already running"
+                              .format(self.lock.job))
+                return False, "Could not acquire lock."
 
-        self.log.info('Initialized Lakeshore: {status}', status=ok)
-        if not ok:
-            return ok, msg
+            session.set_status('starting')
 
-        session.set_status('starting')
-
-        if self.fake_data:
-            session.add_message("No initialization since faking data")
-            # self.thermometers = ["chan_1", "chan_2"]
-
-        else:
-            try:
-                self.module = Module(port=self.port)
-                print("Initialized Lakeshore module: {!s}".format(self.module))
-                session.add_message("Lakeshore initialized with ID: %s"%self.module.inst_sn)
-
+            if self.fake_data:
+                session.add_message("No initialization since faking data")
                 # self.thermometers = ["chan_1", "chan_2"]
 
-            except Exception as e:
-                print(e)
+            else:
+                try:
+                    self.module = Module(port=self.port)
+                    print("Initialized Lakeshore module: {!s}".format(self.module))
+                    session.add_message("Lakeshore initialized with ID: %s"%self.module.inst_sn)
 
-        self.set_job_done()
+                    # self.thermometers = ["chan_1", "chan_2"]
+
+                except Exception as e:
+                    print(e)
+
         return True, 'Lakeshore module initialized.'
 
     def set_values(self, session, params=None):
@@ -84,7 +72,7 @@ class LS240_Agent:
 
         Args:
 
-            channel (int): Channel number to  set
+            channel (int): Channel number to  set.
 
         Optional Args:
             sensor (int, 1, 2, or 3):
@@ -117,92 +105,86 @@ class LS240_Agent:
             name (str):
                 sets name of channel
         """
-        ok, msg = self.try_set_job('set_values')
-
-        self.log.info('set_values: {status}', status=ok)
-        if not ok:
-            return ok, msg
-
         if params is None:
             params = {}
 
-        self.module.channels[params['channels']].set_values(
-            sensor=params.get('sensor'),
-            auto_range=params.get('auto_range'),
-            range=params.get('range'),
-            current_reversal=params.get('current_reversal'),
-            unit=params.get('unit'),
-            enabled=params.get('enabled'),
-            name=params.get('name'),
-        )
+        with self.lock.acquire_timeout(0, job='set_values') as acquired:
+            if not acquired:
+                self.log.warn("Could not start set_values because {} is already running"
+                              .format(self.lock.job))
+                return False, "Could not acquire lock."
 
-        self.set_job_done()
+            if not self.fake_data:
+                self.module.channels[params['channels']].set_values(
+                    sensor=params.get('sensor'),
+                    auto_range=params.get('auto_range'),
+                    range=params.get('range'),
+                    current_reversal=params.get('current_reversal'),
+                    unit=params.get('unit'),
+                    enabled=params.get('enabled'),
+                    name=params.get('name'),
+                )
+
         return True, 'Set values for channel {}'.format(params['channel'])
 
-
-    # Process functions.
     def start_acq(self, session, params=None):
-        """Start data acquisition.
+        """
+        Task to start data acquisition.
 
         Args:
-            params (dict): params dictionary with keys:
-                'sampling_frequency' (float): sampling frequency for data collection
-                                              defaults to 2.5 Hz
+
+            sampling_frequency (float):
+                Sampling frequency for data collection. Defaults to 2.5 Hz
 
         """
         if params is None:
             params = {}
 
         f_sample = params.get('sampling_frequency', 2.5)
-
         sleep_time = 1/f_sample - 0.01
-        ok, msg = self.try_set_job('acq')
-        if not ok: return ok, msg
-        session.set_status('running')
 
-        while True:
-            with self.lock:
-                if self.job == '!acq':
-                    break
-                elif self.job == 'acq':
-                    pass
+        with self.lock.acquire_timeout(0, job='acq') as acquired:
+            if not acquired:
+                self.log.warn("Could not start acq because {} is already running"
+                              .format(self.lock.job))
+                return False, "Could not acquire lock."
+
+            session.set_status('running')
+
+            self.take_data = True
+
+            while self.take_data:
+                data = {
+                    'timestamp': time.time(),
+                    'block_name': 'temps',
+                    'data': {}
+                }
+
+                if self.fake_data:
+                    for therm in self.thermometers:
+                        data['data'][therm + ' T'] = random.randrange(250, 350)
+                        data['data'][therm + ' V'] = random.randrange(250, 350)
+                    time.sleep(.2)
+
                 else:
-                    return 10
+                    for i, therm in enumerate(self.thermometers):
+                        data['data'][therm + ' T'] = self.module.channels[i].get_reading(unit='K')
+                        data['data'][therm + ' V'] = self.module.channels[i].get_reading(unit='S')
 
-            data = {
-                'timestamp': time.time(),
-                'block_name': 'temps',
-                'data': {}
-            }
+                    time.sleep(sleep_time)
 
-            if self.fake_data:
-                for therm in self.thermometers:
-                    data['data'][therm + ' T'] = random.randrange(250, 350)
-                    data['data'][therm + ' V'] = random.randrange(250, 350)
-                time.sleep(.2)
+                self.agent.publish_to_feed('temperatures', data)
 
-            else:
-                for i, therm in enumerate(self.thermometers):
-                    data['data'][therm + ' T'] = self.module.channels[i].get_reading(unit='K')
-                    data['data'][therm + ' V'] = self.module.channels[i].get_reading(unit='S')
+            self.agent.feeds['temperatures'].flush_buffer()
 
-                time.sleep(sleep_time)
-
-            session.app.publish_to_feed('temperatures', data)
-
-        self.agent.feeds['temperatures'].flush_buffer()
-        self.set_job_done()
         return True, 'Acquisition exited cleanly.'
 
     def stop_acq(self, session, params=None):
-        ok = False
-        with self.lock:
-            if self.job =='acq':
-                self.job = '!acq'
-                ok = True
-        return (ok, {True: 'Requested process stop.',
-                     False: 'Failed to request process stop.'}[ok])
-
+        if self.take_data:
+            self.take_data = False
+            return True, 'requested to stop taking data.'
+        else:
+            return False, 'acq is not currently running'
 
 if __name__ == '__main__':
     parser = site_config.add_arguments()
@@ -246,6 +228,7 @@ if __name__ == '__main__':
                             fake_data=fake_data, port=device_port)
 
         agent.register_task('init_lakeshore', therm.init_lakeshore_task)
+        agent.register_task('set_values', therm.set_values)
         agent.register_process('acq', therm.start_acq, therm.stop_acq)
 
         runner.run(agent, auto_reconnect=True)
