@@ -43,8 +43,8 @@ class LS240_Agent:
         """
         with self.lock.acquire_timeout(0, job='init') as acquired:
             if not acquired:
-                self.log.warn("Could not start init because {} is already running"
-                              .format(self.lock.job))
+                self.log.warn("Could not start init because "
+                              "{} is already running".format(self.lock.job))
                 return False, "Could not acquire lock."
 
             session.set_status('starting')
@@ -54,15 +54,9 @@ class LS240_Agent:
                 # self.thermometers = ["chan_1", "chan_2"]
 
             else:
-                try:
-                    self.module = Module(port=self.port)
-                    print("Initialized Lakeshore module: {!s}".format(self.module))
-                    session.add_message("Lakeshore initialized with ID: %s"%self.module.inst_sn)
-
-                    # self.thermometers = ["chan_1", "chan_2"]
-
-                except Exception as e:
-                    print(e)
+                self.module = Module(port=self.port)
+                print("Initialized Lakeshore module: {!s}".format(self.module))
+                session.add_message("Lakeshore initialized with ID: %s"%self.module.inst_sn)
 
         return True, 'Lakeshore module initialized.'
 
@@ -72,7 +66,7 @@ class LS240_Agent:
 
         Args:
 
-            channel (int): Channel number to  set.
+            channel (int, 1 -- 2 or 8): Channel number to  set.
 
         Optional Args:
             sensor (int, 1, 2, or 3):
@@ -110,12 +104,12 @@ class LS240_Agent:
 
         with self.lock.acquire_timeout(0, job='set_values') as acquired:
             if not acquired:
-                self.log.warn("Could not start set_values because {} is already running"
-                              .format(self.lock.job))
+                self.log.warn("Could not start set_values because "
+                              "{} is already running".format(self.lock.job))
                 return False, "Could not acquire lock."
 
             if not self.fake_data:
-                self.module.channels[params['channels']].set_values(
+                self.module.channels[params['channels'] - 1].set_values(
                     sensor=params.get('sensor'),
                     auto_range=params.get('auto_range'),
                     range=params.get('range'),
@@ -126,6 +120,32 @@ class LS240_Agent:
                 )
 
         return True, 'Set values for channel {}'.format(params['channel'])
+
+    def upload_cal_curve(self, session, params=None):
+        """
+        Task to upload a calibration curve to a channel.
+
+        Args:
+
+            channel (int, 1 -- 2 or 8): Channel number
+            filename (str): filename for cal curve
+        """
+
+        channel = params['channel']
+        filename = params['filename']
+
+        with self.lock.acquire_timeout(0, job='upload_cal_curve') as acquired:
+            if not acquired:
+                self.log.warn("Could not start set_values because "
+                              "{} is already running".format(self.lock.job))
+                return False, "Could not acquire lock."
+
+            channel = self.module.channels[channel - 1]
+            self.log.info("Starting upload to channel {}...".format(channel))
+            channel.load_curves(filename)
+            self.log.info("Finished uploading.")
+
+        return True, "Uploaded curve to channel {}".format(channel)
 
     def start_acq(self, session, params=None):
         """
@@ -180,6 +200,9 @@ class LS240_Agent:
         return True, 'Acquisition exited cleanly.'
 
     def stop_acq(self, session, params=None):
+        """
+        Stops acq process.
+        """
         if self.take_data:
             self.take_data = False
             return True, 'requested to stop taking data.'
@@ -229,6 +252,7 @@ if __name__ == '__main__':
 
         agent.register_task('init_lakeshore', therm.init_lakeshore_task)
         agent.register_task('set_values', therm.set_values)
+        agent.register_task('upload_cal_curve', therm.upload_cal_curve)
         agent.register_process('acq', therm.start_acq, therm.stop_acq)
 
         runner.run(agent, auto_reconnect=True)
