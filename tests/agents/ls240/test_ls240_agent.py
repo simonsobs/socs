@@ -1,11 +1,9 @@
 
 def assert_session_success(session, success=True):
-    assert session['success']==success
-
-    print("\nSession messages:")
+    print("\n{} messages:".format(session['op_name']))
     for m in session['messages']:
         print('>>> {}'.format(m))
-
+    assert session['success'] == success
 
 
 def test_set_values(client):
