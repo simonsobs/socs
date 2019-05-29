@@ -25,6 +25,7 @@ class LS240_Agent:
         self.thermometers = ['Channel {}'.format(i + 1) for i in range(num_channels)]
         self.log = agent.log
 
+        self.initialized = False
         self.take_data = False
 
         # Registers Temperature and Voltage feeds
@@ -41,6 +42,10 @@ class LS240_Agent:
         """
         Task to initialize Lakeshore 240 Module.
         """
+
+        if self.initialized:
+            return True, "Already Initialized Module"
+
         with self.lock.acquire_timeout(0, job='init') as acquired:
             if not acquired:
                 self.log.warn("Could not start init because "
@@ -58,6 +63,7 @@ class LS240_Agent:
                 print("Initialized Lakeshore module: {!s}".format(self.module))
                 session.add_message("Lakeshore initialized with ID: %s"%self.module.inst_sn)
 
+        self.initialized = True
         return True, 'Lakeshore module initialized.'
 
     def set_values(self, session, params=None):
@@ -140,10 +146,11 @@ class LS240_Agent:
                               "{} is already running".format(self.lock.job))
                 return False, "Could not acquire lock."
 
-            channel = self.module.channels[channel - 1]
-            self.log.info("Starting upload to channel {}...".format(channel))
-            channel.load_curves(filename)
-            self.log.info("Finished uploading.")
+            if not self.fake_data:
+                channel = self.module.channels[channel - 1]
+                self.log.info("Starting upload to channel {}...".format(channel))
+                channel.load_curves(filename)
+                self.log.info("Finished uploading.")
 
         return True, "Uploaded curve to channel {}".format(channel)
 
