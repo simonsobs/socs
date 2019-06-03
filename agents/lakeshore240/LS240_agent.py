@@ -165,7 +165,11 @@ if __name__ == '__main__':
     # This should work for devices with the cp210x driver
     device_port = ""
 
-    if os.path.exists('/dev/serial/by-id'):
+    # This exists if udev rules are setup properly for the 240s
+    if os.path.exists('/dev/{}'.format(args.serial_number)):
+        device_port = "/dev/{}".format(args.serial_number)
+
+    elif os.path.exists('/dev/serial/by-id'):
         ports = os.listdir('/dev/serial/by-id')
         for port in ports:
             if args.serial_number in port:

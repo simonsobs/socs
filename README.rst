@@ -2,6 +2,9 @@
 SOCS - Simons Observatory Control System
 ========================================
 
+.. image:: https://travis-ci.com/simonsobs/socs.svg?branch=master
+    :target: https://travis-ci.com/simonsobs/socs
+
 .. image:: https://readthedocs.org/projects/socs/badge/?version=latest
     :target: https://socs.readthedocs.io/en/latest/?badge=latest
     :alt: Documentation Status
