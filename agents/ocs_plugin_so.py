@@ -9,8 +9,8 @@ import os
 root = os.path.abspath(os.path.split(__file__)[0])
 
 for n,f in [
-        ('Lakeshore372Agent', 'thermometry/LS372_agent.py'),
-        ('Lakeshore240Agent', 'thermometry/LS240_agent.py'),
+        ('Lakeshore372Agent', 'lakeshore372/LS372_agent.py'),
+        ('Lakeshore240Agent', 'lakeshore240/LS240_agent.py'),
         ('Keithley2230G-PSU', 'keithley2230G-psu/keithley_agent.py'),
         ('PysmurfController', 'smurf/pysmurf_control.py')
 ]:
