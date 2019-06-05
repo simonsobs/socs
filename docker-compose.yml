@@ -17,3 +17,10 @@ services:
   ocs-lakeshore240-agent:
     image: "ocs-lakeshore240-agent"
     build: ./agents/lakeshore240/
+
+  # --------------------------------------------------------------------------
+  # The Pysmurf Controller Agent
+  # --------------------------------------------------------------------------
+  ocs-pysmurf-agent:
+    image: "ocs-pysmurf-agent"
+    build: ./agents/pysmurf_controller/
