@@ -115,7 +115,7 @@ class LS240_Agent:
                 return False, "Could not acquire lock."
 
             if not self.fake_data:
-                self.module.channels[params['channels'] - 1].set_values(
+                self.module.channels[params['channel'] - 1].set_values(
                     sensor=params.get('sensor'),
                     auto_range=params.get('auto_range'),
                     range=params.get('range'),
@@ -149,7 +149,7 @@ class LS240_Agent:
             if not self.fake_data:
                 channel = self.module.channels[channel - 1]
                 self.log.info("Starting upload to channel {}...".format(channel))
-                channel.load_curves(filename)
+                channel.load_curve(filename)
                 self.log.info("Finished uploading.")
 
         return True, "Uploaded curve to channel {}".format(channel)

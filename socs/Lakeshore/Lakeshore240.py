@@ -299,7 +299,7 @@ class Channel:
         range_unit = "V" if self._sensor == 1 else "Ohm"
         string += "{!s:<18} {!s:>13} ({} {})\n".format("Range:", self._range, ranges[self._sensor-1][self._range], range_unit)
         string += "{!s:<18} {!s:>13}\n".format("Current Reversal:", self._current_reversal)
-        string += "{!s:<18} {!s:>13} ({})\n".format("Units:", self._unit, unitStrings[self._unit])
+        string += "{!s:<18} {!s:>13}\n".format("Units:", self._unit)
 
         return string
 
