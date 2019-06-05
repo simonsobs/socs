@@ -10,7 +10,6 @@ WORKDIR /app
 #RUN pip3 install -r requirements.txt
 
 # Where ocs config stuff will be mounted
-ENV OCS_CONFIG_DIR=/config
 
 WORKDIR /app/libs
 RUN git clone https://github.com/simonsobs/ocs.git \
@@ -21,6 +20,7 @@ RUN git clone https://github.com/simonsobs/ocs.git \
 ENV PYTHONPATH="/app/libs/ocs/:${PYTHONPATH}"
 ENV PATH="/app/libs/ocs/bin:${PATH}"
 ENV OCS_CONFIG_DIR /config
+ENV JUPYTER_CONFIG_DIR /config/jupyter/
 
 # Run registry on container startup
 WORKDIR /app/pysmurf_controller
