@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 import versioneer
 
@@ -7,4 +7,4 @@ setup(name = 'socs',
       cmdclass=versioneer.get_cmdclass(),
       description = 'Simons Observatory Control System',
       package_dir = {'socs': 'socs'},
-      packages = ['socs',])
+      packages = find_packages())
