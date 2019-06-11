@@ -133,5 +133,5 @@ For the API all methods should start with one of the following:
     * enable - enable a boolean parameter (i.e. enable_autoscan)
     * disable - disbale a boolean parameter (i.e. disable_channel)
 
-.. automodule:: agents.thermometry.Lakeshore.Lakeshore372
+.. automodule:: socs.Lakeshore.Lakeshore372
     :members:

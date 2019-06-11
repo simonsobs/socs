@@ -3,10 +3,19 @@
 Installation
 ============
 
-To checkout SOCS, clone the repository::
+To checkout SOCS, clone the repository and run `setup.py`::
 
   git clone https://github.com/simonsobs/socs.git
-  cd socs
+  cd socs/
+  python3 setup.py install
+
+.. note::
+    If you are expecting to develop socs code you should consider using
+    'develop' instead of 'install'.
+
+.. note::
+    If you would like to install for just the local user, throw the `--user`
+    flag when running `setup.py`.
 
 The Agent scripts live in the ``agents/`` sub-directory of the
 repository.  Take note of the full path to the ``agents`` directory,
