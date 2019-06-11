@@ -1,1 +1,3 @@
+pyserial
+numpy
 sphinx-argparse
