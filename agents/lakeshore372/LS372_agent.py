@@ -5,7 +5,7 @@ import ocs
 
 from autobahn.wamp.exception import ApplicationError
 from ocs import ocs_agent, site_config, client_t
-from Lakeshore.Lakeshore372 import LS372
+from socs.Lakeshore.Lakeshore372 import LS372
 
 class LS372_Agent:
     """
