@@ -24,3 +24,10 @@ services:
   ocs-pysmurf-agent:
     image: "ocs-pysmurf-agent"
     build: ./agents/pysmurf_controller/
+
+  # --------------------------------------------------------------------------
+  # Smurf stream simulator agent
+  # --------------------------------------------------------------------------
+  ocs-smurf-stream-sim-agent:
+    image: "ocs-smurf-stream-sim"
+    build: ./agents/smurf-stream-simulator/
