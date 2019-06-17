@@ -1,8 +1,8 @@
 # SOCS Lakeshore 372 Agent
 # socs Agent container for interacting with a Lakeshore 372.
 
-# Use ocs base image
-FROM grumpy.physics.yale.edu/ocs:latest
+# Use socs base image
+FROM socs:latest
 
 # Set the working directory to registry directory
 WORKDIR /app/agents/lakeshore372/
