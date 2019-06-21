@@ -12,12 +12,16 @@ import time
 import sys
 import numpy as np
 from collections import OrderedDict
+import socket
+from typing import List
+
+
+BUFF_SIZE = 1024
 
 try:
     from tqdm import *
 except ModuleNotFoundError:
     tqdm = lambda x: x
-
 
 class Module:
     """
@@ -29,7 +33,30 @@ class Module:
         """
             Establish Serial communication and initialize channels.
         """
-        self.com = Serial(port=port, baudrate=baud, timeout=timeout)
+
+        # Running with a simulator
+        # Make sure to write over tcp instead of serial.
+        if port[:6] == 'tcp://':
+            self.simulator = True
+            address, socket_port = port[6:].split(':')
+            socket_port = int(socket_port)
+
+            for p in range(socket_port, socket_port + 10):
+                try:
+                    print(f"Trying to connect on port {p}")
+                    self.com = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    self.com.connect(('localhost', p))
+                    print(f"Found connection on port {p}")
+                    break
+                except ConnectionRefusedError as e:
+                    if e.errno == 61:
+                        continue
+                    else:
+                        raise e
+
+        else:
+            self.com = Serial(port=port, baudrate=baud, timeout=timeout)
+            self.simulator = False
 
         # First comms usually fails if this is your first time communicating
         # after plugging in the LS240. Try three times, then give up.
@@ -46,43 +73,49 @@ class Module:
 
         self.name = self.msg("MODNAME?")
 
-        self.channels = []
+        self.channels: List[Channel] = []
         for i in range(num_channels):
             c = Channel(self, i+1)
             self.channels.append(c)
 
-    def open_com(self):
-        try:
-            self.com.open()
-        except SerialException:
-            print("Port already open")
+    def close(self):
+        if self.simulator:
+            self.com.close()
 
-    def close_com(self):
-        self.com.close()
+    def __exit__(self):
+        self.close()
 
     def msg(self, msg):
         """
             Send command or query to module.
             Return response (within timeout) if message is a query.
         """
-        # Writes message
-        message_string = "{}\r\n;".format(msg).encode()
+        if self.simulator:
+            self.com.send(msg.encode())
+            resp = ''
+            if '?' in msg:
+                resp = self.com.recv(BUFF_SIZE).decode()
+            return resp
 
-        # write(message_string)
-        self.com.write(message_string)
+        else:
+            # Writes message
+            message_string = "{}\r\n;".format(msg).encode()
 
-        # Reads response if queried
-        resp = ''
-        if "?" in msg:
-            resp = self.com.readline()
-            resp = str(resp[:-2], 'utf-8')       # Strips terminating chars
-            if not resp:
-                raise TimeoutError("Device timed out")
+            # write(message_string)
+            self.com.write(message_string)
 
-        # Must wait 10 ms before sending another command
-        time.sleep(.01)
+            # Reads response if queried
+            resp = ''
+            if "?" in msg:
+                resp = self.com.readline()
+                resp = str(resp[:-2], 'utf-8')       # Strips terminating chars
+                if not resp:
+                    raise TimeoutError("Device timed out")
 
-        return resp
+            # Must wait 10 ms before sending another command
+            time.sleep(.01)
+
+            return resp
 
     def set_name(self, name):
         self.name = name
@@ -137,11 +170,11 @@ class Channel:
         self._auto_range = int(data[1])
         self._range = int(data[2])
         self._current_reversal = int(data[3])
-        self._unit = units_key[int(data[4])]
+        self._unit = int(data[4])
         self._enabled = int(data[5])
 
         response = self.ls.msg("INNAME? %d" % (self.channel_num))
-        self._name = response.strip()
+        self.name = response.strip()
 
     def set_values(self, sensor=None, auto_range=None, range=None,
                    current_reversal=None, unit=None, enabled=None, name=None):
@@ -180,7 +213,7 @@ class Channel:
 
         if unit is not None:
             if unit in [1, 2, 3, 4]:
-                self._unit = units_key[unit]
+                self._unit = unit
             else:
                 print("unit must be 1, 2, 3, or 4")
 
@@ -191,14 +224,14 @@ class Channel:
                 print("enabled must be 0 or 1")
 
         if name is not None:
-            self._name = name
+            self.name = name
 
         # Writes new values to module
-        self.ls.msg("INNAME {},{!s}".format(self.channel_num, self._name))
+        self.ls.msg("INNAME {},{!s}".format(self.channel_num, self.name))
 
         input_type_message = "INTYPE "
         input_type_message += ",".join(["{}".format(c) for c in [ self.channel_num, self._sensor, self._auto_range,
-                                                                    self._range, self._current_reversal, unit,
+                                                                    self._range, self._current_reversal, self._unit,
                                                                     int(self._enabled)]])
         self.ls.msg(input_type_message)
 
@@ -236,7 +269,7 @@ class Channel:
 
         """
         if unit is None:
-            u = self._unit
+            u = units_key[self._unit]
         else:
             u = unit
 
@@ -274,7 +307,7 @@ class Channel:
         bps = self.curve.breakpoints
         assert len(bps) <= 200, "Curve must have 200 breakpoints or less"
 
-        print ("Loading Curve to {}".format(self._name))
+        print ("Loading Curve to {}".format(self.name))
         for i in range(200):
             if i < len(bps):
                 self.load_curve_point(i+1, bps[i][0], bps[i][1])
@@ -289,7 +322,7 @@ class Channel:
 
     def __str__(self):
         string = "-" * 40 + "\n"
-        string += "{} -- Channel {}: {}\n".format(self.ls.inst_sn, self.channel_num, self._name)
+        string += "{} -- Channel {}: {}\n".format(self.ls.inst_sn, self.channel_num, self.name)
         string += "-"*40 + "\n"
 
         string += "{!s:<18} {!s:>13}\n".format("Enabled:", self._enabled)
@@ -299,7 +332,7 @@ class Channel:
         range_unit = "V" if self._sensor == 1 else "Ohm"
         string += "{!s:<18} {!s:>13} ({} {})\n".format("Range:", self._range, ranges[self._sensor-1][self._range], range_unit)
         string += "{!s:<18} {!s:>13}\n".format("Current Reversal:", self._current_reversal)
-        string += "{!s:<18} {!s:>13}\n".format("Units:", self._unit)
+        string += "{!s:<18} {!s:>13}\n".format("Units:", units_key[self._unit])
 
         return string
 

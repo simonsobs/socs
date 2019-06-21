@@ -5,25 +5,24 @@ import time
 import threading
 import os
 from ocs.ocs_twisted import TimeoutLock
+from typing import Optional
+
 
 from autobahn.wamp.exception import ApplicationError
 
 class LS240_Agent:
 
     def __init__(self, agent,
-                 num_channels=2,
-                 fake_data=False,
                  port="/dev/ttyUSB0"):
-        print(num_channels)
-        self.active = True
+
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
-        self.fake_data = fake_data
-        self.module = None
+
         self.port = port
-        self.thermometers = ['Channel {}'.format(i + 1) for i in range(num_channels)]
-        self.log = agent.log
+        self.module: Optional[Module] = None
+
+        # self.thermometers = ['Channel {}'.format(i + 1) for i in range(num_channels)]
 
         self.initialized = False
         self.take_data = False
@@ -64,14 +63,9 @@ class LS240_Agent:
 
             session.set_status('starting')
 
-            if self.fake_data:
-                session.add_message("No initialization since faking data")
-                # self.thermometers = ["chan_1", "chan_2"]
-
-            else:
-                self.module = Module(port=self.port)
-                print("Initialized Lakeshore module: {!s}".format(self.module))
-                session.add_message("Lakeshore initialized with ID: %s"%self.module.inst_sn)
+            self.module = Module(port=self.port)
+            print("Initialized Lakeshore module: {!s}".format(self.module))
+            session.add_message("Lakeshore initialized with ID: %s"%self.module.inst_sn)
 
         self.initialized = True
 
@@ -129,16 +123,15 @@ class LS240_Agent:
                               "{} is already running".format(self.lock.job))
                 return False, "Could not acquire lock."
 
-            if not self.fake_data:
-                self.module.channels[params['channel'] - 1].set_values(
-                    sensor=params.get('sensor'),
-                    auto_range=params.get('auto_range'),
-                    range=params.get('range'),
-                    current_reversal=params.get('current_reversal'),
-                    unit=params.get('unit'),
-                    enabled=params.get('enabled'),
-                    name=params.get('name'),
-                )
+            self.module.channels[params['channel'] - 1].set_values(
+                sensor=params.get('sensor'),
+                auto_range=params.get('auto_range'),
+                range=params.get('range'),
+                current_reversal=params.get('current_reversal'),
+                unit=params.get('unit'),
+                enabled=params.get('enabled'),
+                name=params.get('name'),
+            )
 
         return True, 'Set values for channel {}'.format(params['channel'])
 
@@ -161,11 +154,10 @@ class LS240_Agent:
                               "{} is already running".format(self.lock.job))
                 return False, "Could not acquire lock."
 
-            if not self.fake_data:
-                channel = self.module.channels[channel - 1]
-                self.log.info("Starting upload to channel {}...".format(channel))
-                channel.load_curve(filename)
-                self.log.info("Finished uploading.")
+            channel = self.module.channels[channel - 1]
+            self.log.info("Starting upload to channel {}...".format(channel))
+            channel.load_curve(filename)
+            self.log.info("Finished uploading.")
 
         return True, "Uploaded curve to channel {}".format(channel)
 
@@ -202,18 +194,12 @@ class LS240_Agent:
                     'data': {}
                 }
 
-                if self.fake_data:
-                    for therm in self.thermometers:
-                        data['data'][therm + ' T'] = random.randrange(250, 350)
-                        data['data'][therm + ' V'] = random.randrange(250, 350)
-                    time.sleep(.2)
+                for chan in self.module.channels:
+                    chan_string = "channel_{}".format(chan.channel_num)
+                    data['data'][chan_string + '_T'] = chan.get_reading(unit='K')
+                    data['data'][chan_string + '_V'] = chan.get_reading(unit='S')
 
-                else:
-                    for i, therm in enumerate(self.thermometers):
-                        data['data'][therm + ' T'] = self.module.channels[i].get_reading(unit='K')
-                        data['data'][therm + ' V'] = self.module.channels[i].get_reading(unit='S')
-
-                    time.sleep(sleep_time)
+                time.sleep(sleep_time)
 
                 self.agent.publish_to_feed('temperatures', data)
 
@@ -237,19 +223,20 @@ if __name__ == '__main__':
     # Add options specific to this agent.
     pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--serial-number')
+    pgroup.add_argument('--port')
     pgroup.add_argument('--num-channels', default='2')
     pgroup.add_argument('--mode')
     pgroup.add_argument('--fake-data', default='0')
-    pgroup.add_argument('--auto-acquire', type=bool, default=True,
-                        help='Automatically start data acquisition on startup')
 
-    # Parse comand line.
+    # Parse command line.
     args = parser.parse_args()
 
     # Automatically acquire data if requested (default)
-    init_params = False
-    if args.auto_acquire:
-        init_params = {'auto_acquire': True}
+    init_params=False
+    if args.mode == 'init':
+        init_params={'auto_acquire': False}
+    elif args.mode == 'acq':
+        init_params={'auto_acquire': True}
 
     # Interpret options in the context of site_config.
     site_config.reparse_args(args, 'Lakeshore240Agent')
@@ -259,25 +246,29 @@ if __name__ == '__main__':
 
     # Finds usb-port for device
     # This should work for devices with the cp210x driver
-    device_port = ""
 
-    # This exists if udev rules are setup properly for the 240s
-    if os.path.exists('/dev/{}'.format(args.serial_number)):
-        device_port = "/dev/{}".format(args.serial_number)
+    if args.port is not None:
+        device_port = args.port
+    else:
 
-    elif os.path.exists('/dev/serial/by-id'):
-        ports = os.listdir('/dev/serial/by-id')
-        for port in ports:
-            if args.serial_number in port:
-                device_port = "/dev/serial/by-id/{}".format(port)
-                print("Found port {}".format(device_port))
-                break
+        device_port = ""
 
-    if device_port or fake_data:
+        # This exists if udev rules are setup properly for the 240s
+        if os.path.exists('/dev/{}'.format(args.serial_number)):
+            device_port = "/dev/{}".format(args.serial_number)
+
+        elif os.path.exists('/dev/serial/by-id'):
+            ports = os.listdir('/dev/serial/by-id')
+            for port in ports:
+                if args.serial_number in port:
+                    device_port = "/dev/serial/by-id/{}".format(port)
+                    print("Found port {}".format(device_port))
+                    break
+
+    if device_port:
         agent, runner = ocs_agent.init_site_agent(args)
 
-        therm = LS240_Agent(agent, num_channels=num_channels,
-                            fake_data=fake_data, port=device_port)
+        therm = LS240_Agent(agent, port=device_port)
 
         agent.register_task('init_lakeshore', therm.init_lakeshore_task,
                             startup=init_params)
