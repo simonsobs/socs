@@ -298,15 +298,16 @@ class LogParser:
 
             if log_type in ['lakeshore', 'flowmeter']:
                 data = self._parse_single_value_log(new, log_name)
-
-            if log_type == 'maxiguage':
+            elif log_type == 'maxiguage':
                 data = self._parse_maxigauge_log(new, log_name)
-
-            if log_type in ['channels', 'status', 'heater']:
+            elif log_type in ['channels', 'status', 'heater']:
                 data = self._parse_multi_value_log(new, log_type, log_name)
+            else:
+                data = None
 
-            # print("Data: {}".format(data))
-            app_session.app.publish_to_feed('bluefors', data)
+            if data is not None:
+                # print("Data: {}".format(data))
+                app_session.app.publish_to_feed('bluefors', data)
 
 
 class BlueforsAgent:
