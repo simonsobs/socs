@@ -92,7 +92,9 @@ class LogTracker:
         """Close all the files tracked by the LogTracker."""
         for k, v in self.file_objects.items():
             v.close()
-            self.file_objects.pop(k)
+            print("Closed file: {}".format(k))
+
+        self.file_objects = {}
 
 
 class LogParser:
