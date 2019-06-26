@@ -12,46 +12,26 @@ aggregator.
 
 The Bluefors software must run on a Windows OS. This may make integrating into
 OCS different than on a linux box (where we run in a Docker container)
-depending on your computer configuration. We'll discuss possible (and
-recommended) configurations here.
+depending on your computer configuration.
 
-Configuration Examples
-----------------------
-Below are configuration examples for the ocs config file and for running the
-Agent in a docker container.
+Running the Bluefors Agent in a Docker container is the recommended
+configuration, but you have options for whether that container runs on Windows
+or on Linux. If neither of those solutions works, running directly on the
+Windows Subsystem for Linux is possible.
 
-ocs-config
-``````````
-An example configuration for your ocs config file::
-
-      {'agent-class': 'BlueforsAgent',
-       'instance-id': 'bluefors',
-       'arguments': [['--log-directory', '/mnt/c/Users/Dilfridge/Desktop/BlueFors/Logs/']]
-      }
-
-The `--log-directory` argument will need to be updated in your configuration.
-
-Docker
-``````
-Example docker-compose configuration::
-
-  ocs-bluefors:
-    image: grumpy.physics.yale.edu/ocs-bluefors-agent:latest
-    hostname: ocs-docker
-    volumes:
-      - ${OCS_CONFIG_DIR}:/config:ro
-      - /home/simonsobs/bluefors/logs/:/logs:ro
-
-The logs directory should be mounted inside the container to `/logs` and
-configured for that directory in your ocs-config file.
-
-
+Configuring the Bluefors Logs
+-----------------------------
+You should configure your Bluefors software to all log to the same directory.
+This will place thermometry logs and system logs in the same date directories
+within this top level directory.
 
 Docker Container on Windows
 ---------------------------
-This is the recommended configuration, but has yet to be developed and tested
-on Windows. Check back soon. In the meantime, you can run on the WSL, as
-detailed below.
+Running Docker on Windows can vary a lot depending on what version of Windows
+you have, what kind of hardware you are running on, and whether or not you are
+running Windows virtually. As such, the setup can change significantly based on
+your configuration. We'll try to provide general guidelines for how to setup
+the system.
 
 Dependencies
 ````````````
@@ -59,24 +39,29 @@ There are various limitations to what you can run on Windows depending on your
 configuration. For instance, Docker for Windows doesn't run on Windows 10 Home,
 but a legacy tool called Docker Toolbox works.
 
-- Windows 10 Pro/Enterprise and Docker for Windows
+- Windows 10 Pro/Enterprise
+- Docker for Windows
 
 Or:
 
-- Windows 10 Home and Docker Toolbox for Windows
+- Windows 10 Home
+- `Docker Toolbox`_ for Windows
 
 Setup
 `````
-The general outline for setup of Docker Toolbox (which should also work on
-Windows 10 Pro/Enterprise) is:
+The general outline for setup of `Docker Toolbox`_ (which probably also works on
+Windows 10 Pro/Enterprise, but Docker recommends upgrading to more modern
+tools, i.e. Docker for Windows, if possible) is:
 
-- Install Docker Toolbox
+- Install `Docker Toolbox`_
 - Run docker terminal (this performs some Virtualbox setup)
 - Run docker login
 - Clone the ocs-site-configs repo and create a directory for your machine
 - Configure ocs/docker-compose files
 - Make sure your system clock is set to UTC
 - Bring up the container(s)
+
+.. _`Docker Toolbox`: https://docs.docker.com/toolbox/toolbox_install_windows/
 
 Docker Container on Linux
 -------------------------
@@ -96,9 +81,41 @@ OCS Agents in Docker containers, this configuration is still possible.
 
 You should refer to the OCS documentation for how to install, but the general
 outline is:
+
 - Install git
 - Clone the ocs, socs, and ocs-site-configs repositories
 - Install ocs and socs
 - Configure your ocs-config file and perform the associated setup
 - Start the Bluefors agent and command it to acquire data via an OCS client
 - Create a sisock-data-feed-server container for live monitoring
+
+Configuration File Examples
+---------------------------
+Below are configuration examples for the ocs config file and for running the
+Agent in a docker container.
+
+ocs-config
+``````````
+An example configuration for your ocs config file::
+
+      {'agent-class': 'BlueforsAgent',
+       'instance-id': 'bluefors',
+       'arguments': [['--log-directory', '/logs']]
+      }
+
+The `--log-directory` argument will need to be updated in your configuration if
+you are running outside of a Docker container.
+
+Docker
+``````
+Example docker-compose configuration::
+
+  ocs-bluefors:
+    image: grumpy.physics.yale.edu/ocs-bluefors-agent:latest
+    hostname: ocs-docker
+    volumes:
+      - ${OCS_CONFIG_DIR}:/config:ro
+      - /home/simonsobs/bluefors/logs/:/logs:ro
+
+Depending on how you are running your containers it might be easier to hard
+code the `OCS_CONFIG_DIR` environment variable.

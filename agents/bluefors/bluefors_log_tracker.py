@@ -305,6 +305,8 @@ class LogParser:
             elif log_type in ['channels', 'status', 'heater']:
                 data = self._parse_multi_value_log(new, log_type, log_name)
             else:
+                print("Warning: Unknown log type. Skipping publish step. " +
+                      "This probably shouldn't happen.")
                 data = None
 
             if data is not None:
