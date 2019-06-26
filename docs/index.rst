@@ -23,6 +23,7 @@ Agent Reference
    keithley-psu
    lakeshore240
    lakeshore372
+   bluefors_agent
 
 
 Indices and tables
