@@ -420,6 +420,7 @@ if __name__ == '__main__':
 
     bluefors_agent = BlueforsAgent(agent, args.log_directory)
 
-    agent.register_process('acq', bluefors_agent.start_acq, bluefors_agent.stop_acq)
+    agent.register_process('acq', bluefors_agent.start_acq, 
+                           bluefors_agent.stop_acq, startup=True)
 
     runner.run(agent, auto_reconnect=True)
