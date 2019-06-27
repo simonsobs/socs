@@ -75,7 +75,7 @@ class LogTracker:
         if new_date > self.date:
             self.close_all_files()
             self.date = new_date
-            self.open_file_list()
+            self.open_all_logs()
 
     def open_all_logs(self):
         """Open today's logs and move to end of files."""
