@@ -2,9 +2,9 @@ import socket
 import argparse
 import numpy as np
 import logging
-import sys
 
 BUFF_SIZE = 1024
+
 
 class Lakeshore240_Simulator:
 
@@ -98,46 +98,48 @@ class Lakeshore240_Simulator:
             print(f"Could not connect to ports in {range(self.port, self.port+5)}")
 
         sock.listen(1)
-        self.log.info('waiting for a connection....')
-        conn, client_address = sock.accept()
-        self.log.info(f"Made connection with {client_address}")
-        with conn:
 
-            # Main data loop
-            while True:
-                data = conn.recv(BUFF_SIZE)
+        while True:
+            self.log.info('waiting for a connection....')
+            conn, client_address = sock.accept()
+            self.log.info(f"Made connection with {client_address}")
+            with conn:
 
-                if not data:
-                    self.log.info("Connection closed by client")
-                    break
+                # Main data loop
+                while True:
+                    data = conn.recv(BUFF_SIZE)
+
+                    if not data:
+                        self.log.info("Connection closed by client")
+                        break
 
 
-                # Only takes first command in case multiple commands are s
-                cmds = data.decode().split(';')
+                    # Only takes first command in case multiple commands are s
+                    cmds = data.decode().split(';')
 
-                for c in cmds:
-                    cmd_list = c.strip().split(' ')
+                    for c in cmds:
+                        cmd_list = c.strip().split(' ')
 
-                    if len(cmd_list) == 1:
-                        cmd, args = cmd_list[0], []
-                    else:
-                        cmd, args = cmd_list[0], cmd_list[1].split(',')
-                    self.log.debug(f"{cmd} {args}")
+                        if len(cmd_list) == 1:
+                            cmd, args = cmd_list[0], []
+                        else:
+                            cmd, args = cmd_list[0], cmd_list[1].split(',')
+                        self.log.debug(f"{cmd} {args}")
 
-                    try:
-                        cmd_fn = self.cmds.get(cmd)
-                        if cmd_fn is None:
-                            self.log.warning(f"Command {cmd} is not registered")
+                        try:
+                            cmd_fn = self.cmds.get(cmd)
+                            if cmd_fn is None:
+                                self.log.warning(f"Command {cmd} is not registered")
+                                continue
+
+                            resp = cmd_fn(*args)
+
+                        except TypeError as e:
+                            self.log.error(f"Command error: {e}")
                             continue
 
-                        resp = cmd_fn(*args)
-
-                    except TypeError as e:
-                        self.log.error(f"Command error: {e}")
-                        continue
-
-                    if resp is not None:
-                        conn.send(resp.encode())
+                        if resp is not None:
+                            conn.send(resp.encode())
 
     def get_idn(self):
         return ','.join([
@@ -219,7 +221,6 @@ class ChannelSim:
         return str(rv)
 
 
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--port', type=int, default=1094)
@@ -230,9 +231,7 @@ if __name__ == '__main__':
                         choices=['debug', 'info', 'warning', 'error'],
                         default='info')
 
-
     args = parser.parse_args()
-
 
     log_level = {
         'debug': logging.DEBUG,
@@ -242,7 +241,6 @@ if __name__ == '__main__':
     }[args.log_level]
 
     format_string = '%(asctime)-15s [%(levelname)s]:  %(message)s'
-
 
     logging.basicConfig(level=log_level, filename=args.log_file, format=format_string)
 
