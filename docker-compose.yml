@@ -45,3 +45,10 @@ services:
   ocs-bluefors-agent:
     image: "ocs-bluefors-agent"
     build: ./agents/bluefors/
+
+  # --------------------------------------------------------------------------
+  # Power Supply control Agent
+  # --------------------------------------------------------------------------
+  ocs-psu-agent:
+    image: "ocs-psu-agent"
+    build: ./agents/keithley2230G-psu/
