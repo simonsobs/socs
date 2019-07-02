@@ -4,6 +4,7 @@ import time
 import os
 from ocs.ocs_twisted import TimeoutLock
 from typing import Optional
+import argparse
 
 
 class LS240_Agent:
@@ -75,42 +76,63 @@ class LS240_Agent:
         return True, 'Lakeshore module initialized.'
 
     def set_values(self, session, params=None):
-        """
+        """set_values(params=None)
+
         A task to set sensor parameters for a Lakeshore240 Channel
 
         Args:
-
-            channel (int, 1 -- 2 or 8): Channel number to  set.
-
-        Optional Args:
-            sensor (int, 1, 2, or 3):
-                1 = Diode, 2 = PlatRTC, 3 = NTC RTD
-            auto_range (int, 0 or 1):
+            channel (int, 1 -- 2 or 8):
+                Channel number to  set.
+            sensor (int, 1, 2, or 3, optional):
+                Specifies sensor type:
+                    +---+---------+
+                    | 1 | Diode   |
+                    +---+---------+
+                    | 2 | PlatRTC |
+                    +---+---------+
+                    | 3 | NTC RTD |
+                    +---+---------+
+            auto_range (int, 0 or 1, optional):
                 Must be 0 or 1. Specifies if channel should use autorange.
-            range (int 0-8):
-                Specifies range if autorange is false. Only settable for NTC RTD.
-                    0 = 10 Ohms (1 mA)
-                    1 = 30 Ohms (300 uA)
-                    2 = 100 Ohms (100 uA)
-                    3 = 300 Ohms (30 uA)
-                    4 = 1 kOhm (10 uA)
-                    5 = 3 kOhms (3 uA)
-                    6 = 10 kOhms (1 uA)
-                    7 = 30 kOhms (300 nA)
-                    8 = 100 kOhms (100 nA)
-            current_reversal (int, 0 or 1):
+            range (int 0-8, optional):
+                Specifies range if autorange is false. Only settable for NTC RTD:
+                    +---+--------------------+
+                    | 0 | 10 Ohms (1 mA)     |
+                    +---+--------------------+
+                    | 1 | 30 Ohms (300 uA)   |
+                    +---+--------------------+
+                    | 2 | 100 Ohms (100 uA)  |
+                    +---+--------------------+
+                    | 3 | 300 Ohms (30 uA)   |
+                    +---+--------------------+
+                    | 4 | 1 kOhm (10 uA)     |
+                    +---+--------------------+
+                    | 5 | 3 kOhms (3 uA)     |
+                    +---+--------------------+
+                    | 6 | 10 kOhms (1 uA)    |
+                    +---+--------------------+
+                    | 7 | 30 kOhms (300 nA)  |
+                    +---+--------------------+
+                    | 8 | 100 kOhms (100 nA) |
+                    +---+--------------------+
+            current_reversal (int, 0 or 1, optional):
                 Specifies if input current reversal is on or off.
                 Always 0 if input is a diode.
-            units (int, 1-4):
+            units (int, 1-4, optional):
                 Specifies preferred units parameter, and sets the units
-                for alarm settings.
-                    1 = Kelvin
-                    2 = Celsius
-                    3 = Sensor
-                    4 = Fahrenheit
-            enabled (int, 0 or 1):
+                for alarm settings:
+                    +---+------------+
+                    | 1 | Kelvin     |
+                    +---+------------+
+                    | 2 | Celsius    |
+                    +---+------------+
+                    | 3 | Sensor     |
+                    +---+------------+
+                    | 4 | Fahrenheit |
+                    +---+------------+
+            enabled (int, 0 or 1, optional):
                 sets if channel is enabled
-            name (str):
+            name (str, optional):
                 sets name of channel
         """
         if params is None:
@@ -160,8 +182,9 @@ class LS240_Agent:
 
         return True, "Uploaded curve to channel {}".format(channel)
 
-    def start_acq(self, session, params=None):
-        """
+    def acq(self, session, params=None):
+        """acq(params=None)
+
         Task to start data acquisition.
 
         Args:
@@ -221,21 +244,33 @@ class LS240_Agent:
             return False, 'acq is not currently running'
 
 
-def main():
-    parser = site_config.add_arguments()
+def make_parser(parser=None):
+    if parser is None:
+        parser = argparse.ArgumentParser()
 
-    # Add options specific to this agent.
-    pgroup = parser.add_argument_group('Agent Options')
-    pgroup.add_argument('--serial-number')
-    pgroup.add_argument('--port')
-    pgroup.add_argument('--mode')
-    pgroup.add_argument('--sampling-frequency')
+    pgroup = parser.add_argument_group('Agent Config')
+    pgroup.add_argument('--serial-number', type=str,
+                        help="Serial number of your Lakeshore240 device")
+    pgroup.add_argument('--port', type=str,
+                        help="Path to USB node for the lakeshore")
+    pgroup.add_argument('--mode', type=str, choices=['idle', 'init', 'acq'],
+                        help="Starting action for the agent.")
+    pgroup.add_argument('--sampling-frequency', type=float,
+                        help="Sampling frequency for data acquisition")
+
+    return parser
+
+
+def main():
+    p = site_config.add_arguments()
+    parser = make_parser(parser=p)
 
     #Not used anymore, but we don't it to break the agent if these args are passed
-    pgroup.add_argument('--fake-data')
-    pgroup.add_argument('--num-channels')
+    parser.add_argument('--fake-data')
+    parser.add_argument('--num-channels')
 
     args = parser.parse_args()
+
     if args.fake_data is not None:
         print("WARNING: the --fake-data parameter is deprecated, please remove"
               "your site-config file")

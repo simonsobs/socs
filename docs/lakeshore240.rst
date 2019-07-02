@@ -9,6 +9,16 @@ Lakeshore 240
 The Lakeshore 240 is a 4-lead meausrement device used for readout of ROXes and
 Diodes at 1K and above.
 
+.. argparse::
+    :filename: ../agents/lakeshore240/LS240_agent.py
+    :func: make_parser
+    :prog: python3 LS240_agent.py
+
+
+    These options can be included in the site-config entry for the agent,
+    or can be specified manually from the command line.
+
+
 Driver Setup
 ------------
 The Lakeshore 240 requires USB drivers to be compiled for your machine. A
@@ -55,6 +65,11 @@ configuration block::
 
 Each device requires configuration under 'agent-instances'. See the OCS site
 configs documentation for more details.
+
+The following tasks are registered for the LS240 agent.
+
+.. autoclass:: agents.lakeshore240.LS240_agent.LS240_Agent
+    :members: init_lakeshore, set_values, upload_cal_curve, acq
 
 Docker Configuration
 --------------------
