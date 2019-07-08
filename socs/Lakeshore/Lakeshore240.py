@@ -91,7 +91,8 @@ class Module:
             Return response (within timeout) if message is a query.
         """
         if self.simulator:
-            self.com.send(msg.encode())
+            message_string = "{};".format(msg)
+            self.com.send(message_string.encode())
             resp = ''
             if '?' in msg:
                 resp = self.com.recv(BUFF_SIZE).decode()

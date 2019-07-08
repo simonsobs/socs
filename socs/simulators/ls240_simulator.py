@@ -113,11 +113,14 @@ class Lakeshore240_Simulator:
                         self.log.info("Connection closed by client")
                         break
 
-
+                    self.log.debug("Command: {}".format(data))
                     # Only takes first command in case multiple commands are s
                     cmds = data.decode().split(';')
 
                     for c in cmds:
+                        if c.strip() == '':
+                            continue
+
                         cmd_list = c.strip().split(' ')
 
                         if len(cmd_list) == 1:
@@ -221,16 +224,32 @@ class ChannelSim:
         return str(rv)
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--port', type=int, default=1094)
-    parser.add_argument('--num-channels', type=int, default=8)
-    parser.add_argument('--sn', type=str, default='LS_SIM')
-    parser.add_argument('--log-file', type=str, default='log.txt')
+def make_parser(parser=None):
+    if parser is None:
+        parser = argparse.ArgumentParser()
+
+    parser.add_argument('-p', '--port', type=int, default=1094,
+                        help="Port which simulator will wait for a connection."
+                             "If taken, it will test several consecutive ports"
+                             "until it finds one that is free.")
+    parser.add_argument('--num-channels', type=int, default=8,
+                        help="Number of channels which the simulator will have.")
+    parser.add_argument('--sn', type=str, default='LS_SIM',
+                        help="Serial number for the device")
+    parser.add_argument('--log-file', type=str, default=None,
+                        help="File where logs are written")
     parser.add_argument('--log-level',
                         choices=['debug', 'info', 'warning', 'error'],
-                        default='info')
+                        default='info',
+                        help="Minimum log level to be displayed")
+    parser.add_argument('-o', '--log-stdout', action="store_true",
+                        help="Log to stdout")
+    return parser
 
+
+if __name__ == '__main__':
+
+    parser = make_parser()
     args = parser.parse_args()
 
     log_level = {
@@ -241,17 +260,20 @@ if __name__ == '__main__':
     }[args.log_level]
 
     format_string = '%(asctime)-15s [%(levelname)s]:  %(message)s'
-
-    logging.basicConfig(level=log_level, filename=args.log_file, format=format_string)
-
+    # logging.basicConfig(level=log_level, format=format_string)
     formatter = logging.Formatter(format_string)
-
     log = logging.getLogger()
+    log.setLevel(log_level)
 
-    consoleHandler = logging.StreamHandler()
-    consoleHandler.setFormatter(formatter)
+    if args.log_file is None or args.log_stdout:
+        consoleHandler = logging.StreamHandler()
+        consoleHandler.setFormatter(formatter)
+        log.addHandler(consoleHandler)
 
-    log.addHandler(consoleHandler)
+    if args.log_file is not None:
+        fileHandler = logging.FileHandler(args.log_file)
+        fileHandler.setFormatter(formatter)
+        log.addHandler(fileHandler)
 
     ls = Lakeshore240_Simulator(args.port,
                                 num_channels=args.num_channels,
