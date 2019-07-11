@@ -54,6 +54,18 @@ class LS372_Agent:
             self.job = None
 
     def init_lakeshore_task(self, session, params=None):
+        """Perform first time setup of Lakeshore 372 communication.
+
+        Parameters
+        ----------
+        params : dict
+            Parameters dictionary for passing parameters to task. Supports the
+            following keys:
+
+            - 'auto_acquire' (bool, optional): Default is False. Starts data
+              acquisition after initialization if True.
+
+        """
         if params is None:
             params = {}
 
@@ -81,6 +93,11 @@ class LS372_Agent:
             self.thermometers = [channel.name for channel in self.module.channels]
         self.initialized = True
         self.set_job_done()
+
+        # Start data acquisition if requested
+        if params.get('auto_acquire', False):
+            self.agent.start('acq')
+
         return True, 'Lakeshore module initialized.'
 
     def start_acq(self, session, params=None):
@@ -443,9 +460,16 @@ if __name__ == '__main__':
     pgroup.add_argument('--mode')
     pgroup.add_argument('--fake-data', type=int, default=0,
                         help='Set non-zero to fake data, without hardware.')
+    pgroup.add_argument('--auto-acquire', type=bool, default=True,
+                        help='Automatically start data acquisition on startup')
 
     # Parse comand line.
     args = parser.parse_args()
+
+    # Automatically acquire data if requested (default)
+    init_params = False
+    if args.auto_acquire:
+        init_params = {'auto_acquire': True}
 
     # Interpret options in the context of site_config.
     site_config.reparse_args(args, 'Lakeshore372Agent')
@@ -455,7 +479,8 @@ if __name__ == '__main__':
 
     lake_agent = LS372_Agent(agent, args.serial_number, args.ip_address , fake_data=False)
 
-    agent.register_task('init_lakeshore', lake_agent.init_lakeshore_task)
+    agent.register_task('init_lakeshore', lake_agent.init_lakeshore_task,
+                        startup=init_params)
     agent.register_task('set_heater_range', lake_agent.set_heater_range)
     agent.register_task('set_excitation_mode', lake_agent.set_excitation_mode)
     agent.register_task('set_excitation', lake_agent.set_excitation)
