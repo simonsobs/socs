@@ -39,8 +39,17 @@ class LS240_Agent:
 
     # Task functions.
     def init_lakeshore_task(self, session, params=None):
-        """
-        Task to initialize Lakeshore 240 Module.
+        """Perform first time setup of the Lakeshore 240 Module.
+
+        Parameters
+        ----------
+        params : dict
+            Parameters dictionary for passing parameters to task. Supports the
+            following keys:
+
+            - 'auto_acquire' (bool, optional: Default is False. Starts data
+              acquisition after initialization if True.
+
         """
 
         if self.initialized:
@@ -64,6 +73,11 @@ class LS240_Agent:
                 session.add_message("Lakeshore initialized with ID: %s"%self.module.inst_sn)
 
         self.initialized = True
+
+        # Start data acquisition if requested
+        if params.get('auto_acquire', False):
+            self.agent.start('acq')
+
         return True, 'Lakeshore module initialized.'
 
     def set_values(self, session, params=None):
@@ -225,9 +239,16 @@ if __name__ == '__main__':
     pgroup.add_argument('--num-channels', default='2')
     pgroup.add_argument('--mode')
     pgroup.add_argument('--fake-data', default='0')
+    pgroup.add_argument('--auto-acquire', type=bool, default=True,
+                        help='Automatically start data acquisition on startup')
 
     # Parse comand line.
     args = parser.parse_args()
+
+    # Automatically acquire data if requested (default)
+    init_params = False
+    if args.auto_acquire:
+        init_params = {'auto_acquire': True}
 
     # Interpret options in the context of site_config.
     site_config.reparse_args(args, 'Lakeshore240Agent')
@@ -257,7 +278,8 @@ if __name__ == '__main__':
         therm = LS240_Agent(agent, num_channels=num_channels,
                             fake_data=fake_data, port=device_port)
 
-        agent.register_task('init_lakeshore', therm.init_lakeshore_task)
+        agent.register_task('init_lakeshore', therm.init_lakeshore_task,
+                            startup=init_params)
         agent.register_task('set_values', therm.set_values)
         agent.register_task('upload_cal_curve', therm.upload_cal_curve)
         agent.register_process('acq', therm.start_acq, therm.stop_acq)

@@ -51,10 +51,14 @@ configuration block::
   {'agent-class': 'Lakeshore240Agent',
    'instance-id': 'LSA22Z2',
    'arguments': [['--serial-number', 'LSA22Z2'],
-                     ['--num-channels', 8]]},
+                 ['--num-channels', 8]]},
 
 Each device requires configuration under 'agent-instances'. See the OCS site
 configs documentation for more details.
+
+Optional arguments::
+   'arguments': [['--fake-data', 1],
+                 ['--auto-acquire', False]]},
 
 Docker Configuration
 --------------------
