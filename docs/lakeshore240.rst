@@ -27,7 +27,7 @@ automatically when the 240s are connected to the computer.
 To install the drivers clone the ls240_drivers repository and run ``make`` to
 build the drivers::
 
-    $ git clone <drivers URL>
+    $ git clone https://github.com/simonsobs/ls240-drivers.git
     $ make
 
 Update the udev rules file, ``50-ls240.rules``, adding an entry for your
