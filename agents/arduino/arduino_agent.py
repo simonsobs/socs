@@ -13,9 +13,13 @@ class Arduino:
         self.com = serial.Serial(port=port, baudrate=baud, timeout=timeout)
 
     def read(self):
-        try:
+        '''
+        Reads data from an Arduino. First decodes the read data, then splits 
+        the read line to remove doubled values and takes the second one.
+        '''
+        try: 
             data = bytes.decode(self.com.readline()[:-2])
-            sin_data = float(data.split(' ')[0])
+            sin_data = float(data.split(' ')[1])
             return sin_data
         except Exception as e:
             print(e)
@@ -39,7 +43,9 @@ class ArduinoAgent:
 
 
     def init_arduino(self):
-
+        '''
+        Initializes the Arduino connection.
+        '''
         if self.initialized:
             return True, "Already initialized."
 
@@ -58,6 +64,9 @@ class ArduinoAgent:
 
 
     def start_acq(self, session, params):
+        '''
+        Starts acquiring data from an Arduino.
+        '''
 
         f_sample = params.get('sampling_frequency', 2.5)
         sleep_time = 1/f_sample - 0.1
@@ -86,6 +95,9 @@ class ArduinoAgent:
         return True, 'Acquisition exited cleanly.'
 
     def stop_acq(self, session, params=None):
+        '''
+        Stops the data acquisiton.
+        '''
         if self.take_data:
             self.take_data = False
             return True, 'requested to stop taking data.'
