@@ -12,3 +12,7 @@ COPY . /app/agents/lakeshore372/
 
 # Run registry on container startup
 ENTRYPOINT ["python3", "-u", "LS372_agent.py"]
+
+# Sensible default arguments
+CMD ["--site-hub=ws://sisock-crossbar:8001/ws", \
+     "--site-http=http://sisock-crossbar:8001/call"]
