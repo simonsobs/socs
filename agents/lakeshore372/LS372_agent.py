@@ -8,13 +8,14 @@ from ocs import ocs_agent, site_config, client_t
 from socs.Lakeshore.Lakeshore372 import LS372
 
 class LS372_Agent:
-    """
-        Agent to connect to a single Lakeshore 372 device.
-        
-        Params:
-            name: Application Session
-            ip:  ip address of agent
-            fake_data: generates random numbers without connecting to LS if True.
+    """Agent to connect to a single Lakeshore 372 device.
+
+    Args:
+        name (ApplicationSession): ApplicationSession for the Agent.
+        ip (str): IP Address for the 372 device.
+        fake_data (bool, optional): generates random numbers without connecting
+            to LS if True.
+
     """
     def __init__(self, agent, name, ip, fake_data=False):
         self.lock = threading.Semaphore()
@@ -39,7 +40,6 @@ class LS372_Agent:
                                  agg_params=agg_params,
                                  buffer_time=1)
 
-
     def try_set_job(self, job_name):
         print(self.job, job_name)
         with self.lock:
@@ -54,18 +54,20 @@ class LS372_Agent:
             self.job = None
 
     def init_lakeshore_task(self, session, params=None):
-        """Perform first time setup of Lakeshore 372 communication.
+        """init_lakeshore_task(params=None)
 
-        Parameters
-        ----------
-        params : dict
-            Parameters dictionary for passing parameters to task. Supports the
-            following keys:
+        Perform first time setup of the Lakeshore 372 communication.
 
-            - 'auto_acquire' (bool, optional): Default is False. Starts data
-              acquisition after initialization if True.
+        Args:
+            params (dict): Parameters dictionary for passing parameters to
+                task.
+
+        Parameters:
+            auto_acquire (bool, optional): Default is False. Starts data
+                acquisition after initialization if True.
 
         """
+
         if params is None:
             params = {}
 

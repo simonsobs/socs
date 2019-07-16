@@ -39,16 +39,17 @@ class LS240_Agent:
 
     # Task functions.
     def init_lakeshore_task(self, session, params=None):
-        """Perform first time setup of the Lakeshore 240 Module.
+        """init_lakeshore_task(params=None)
 
-        Parameters
-        ----------
-        params : dict
-            Parameters dictionary for passing parameters to task. Supports the
-            following keys:
+        Perform first time setup of the Lakeshore 240 Module.
 
-            - 'auto_acquire' (bool, optional: Default is False. Starts data
-              acquisition after initialization if True.
+        Args:
+            params (dict): Parameters dictionary for passing parameters to
+                task.
+
+        Parameters:
+            auto_acquire (bool, optional): Default is False. Starts data
+                acquisition after initialization if True.
 
         """
 

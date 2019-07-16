@@ -56,10 +56,6 @@ configuration block::
 Each device requires configuration under 'agent-instances'. See the OCS site
 configs documentation for more details.
 
-Optional arguments::
-   'arguments': [['--fake-data', 1],
-                 ['--auto-acquire', False]]},
-
 Docker Configuration
 --------------------
 

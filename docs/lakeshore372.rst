@@ -84,8 +84,14 @@ That should get you started with direct communication. The API is fairly full
 featured. For any feature requests for functionality that might be missing,
 please file a Github issue.
 
-API
----
+Agent API
+---------
+
+.. autoclass:: agents.lakeshore372.LS372_agent.LS372_Agent
+    :members: init_lakeshore_task
+
+Driver API
+----------
 
 For the API all methods should start with one of the following:
 
