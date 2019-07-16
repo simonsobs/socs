@@ -10,6 +10,11 @@ The Lakeshore 372 (LS372) units are used for 100 mK and 1K thermometer readout.
 Basic functionality to interface and control an LS372 is provided by the
 ``socs.Lakeshore.Lakeshore372.py`` module.
 
+.. argparse::
+    :filename: ../agents/lakeshore372/LS372_agent.py
+    :func: make_parser
+    :prog: python3 LS372_agent.py
+
 OCS Configuration
 -----------------
 
@@ -24,10 +29,6 @@ configuration block::
 
 Each device requires configuration under 'agent-instances'. See the OCS site
 configs documentation for more details.
-
-Optional arguments::
-   'arguments': [['--fake-data', 1],
-                 ['--auto-acquire', False]]},
 
 Docker Configuration
 --------------------

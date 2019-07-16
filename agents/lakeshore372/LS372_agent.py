@@ -1,4 +1,5 @@
 import random
+import argparse
 import time, threading
 import numpy as np
 import ocs
@@ -451,9 +452,13 @@ class LS372_Agent:
         self.set_job_done()
         return True, "Set {} display to {}, output to {}".format(heater, display, output)
 
-if __name__ == '__main__':
-    # Get the default ocs argument parser.
-    parser = site_config.add_arguments()
+def make_parser(parser=None):
+    """Build the argument parser for the Agent. Allows sphinx to automatically
+    build documentation based on this function.
+
+    """
+    if parser is None:
+        parser = argparse.ArgumentParser()
 
     # Add options specific to this agent.
     pgroup = parser.add_argument_group('Agent Options')
@@ -464,6 +469,14 @@ if __name__ == '__main__':
                         help='Set non-zero to fake data, without hardware.')
     pgroup.add_argument('--auto-acquire', type=bool, default=True,
                         help='Automatically start data acquisition on startup')
+
+    return parser
+
+if __name__ == '__main__':
+    # Get the default ocs argument parser.
+    site_parser = site_config.add_arguments()
+
+    parser = make_parser(site_parser)
 
     # Parse comand line.
     args = parser.parse_args()
