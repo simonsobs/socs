@@ -1,4 +1,5 @@
 import random
+import argparse
 import time, threading
 import numpy as np
 import ocs
@@ -8,13 +9,14 @@ from ocs import ocs_agent, site_config, client_t
 from socs.Lakeshore.Lakeshore372 import LS372
 
 class LS372_Agent:
-    """
-        Agent to connect to a single Lakeshore 372 device.
-        
-        Params:
-            name: Application Session
-            ip:  ip address of agent
-            fake_data: generates random numbers without connecting to LS if True.
+    """Agent to connect to a single Lakeshore 372 device.
+
+    Args:
+        name (ApplicationSession): ApplicationSession for the Agent.
+        ip (str): IP Address for the 372 device.
+        fake_data (bool, optional): generates random numbers without connecting
+            to LS if True.
+
     """
     def __init__(self, agent, name, ip, fake_data=False):
         self.lock = threading.Semaphore()
@@ -39,7 +41,6 @@ class LS372_Agent:
                                  agg_params=agg_params,
                                  buffer_time=1)
 
-
     def try_set_job(self, job_name):
         print(self.job, job_name)
         with self.lock:
@@ -54,6 +55,20 @@ class LS372_Agent:
             self.job = None
 
     def init_lakeshore_task(self, session, params=None):
+        """init_lakeshore_task(params=None)
+
+        Perform first time setup of the Lakeshore 372 communication.
+
+        Args:
+            params (dict): Parameters dictionary for passing parameters to
+                task.
+
+        Parameters:
+            auto_acquire (bool, optional): Default is False. Starts data
+                acquisition after initialization if True.
+
+        """
+
         if params is None:
             params = {}
 
@@ -81,6 +96,11 @@ class LS372_Agent:
             self.thermometers = [channel.name for channel in self.module.channels]
         self.initialized = True
         self.set_job_done()
+
+        # Start data acquisition if requested
+        if params.get('auto_acquire', False):
+            self.agent.start('acq')
+
         return True, 'Lakeshore module initialized.'
 
     def start_acq(self, session, params=None):
@@ -432,9 +452,13 @@ class LS372_Agent:
         self.set_job_done()
         return True, "Set {} display to {}, output to {}".format(heater, display, output)
 
-if __name__ == '__main__':
-    # Get the default ocs argument parser.
-    parser = site_config.add_arguments()
+def make_parser(parser=None):
+    """Build the argument parser for the Agent. Allows sphinx to automatically
+    build documentation based on this function.
+
+    """
+    if parser is None:
+        parser = argparse.ArgumentParser()
 
     # Add options specific to this agent.
     pgroup = parser.add_argument_group('Agent Options')
@@ -443,9 +467,24 @@ if __name__ == '__main__':
     pgroup.add_argument('--mode')
     pgroup.add_argument('--fake-data', type=int, default=0,
                         help='Set non-zero to fake data, without hardware.')
+    pgroup.add_argument('--auto-acquire', type=bool, default=True,
+                        help='Automatically start data acquisition on startup')
+
+    return parser
+
+if __name__ == '__main__':
+    # Get the default ocs argument parser.
+    site_parser = site_config.add_arguments()
+
+    parser = make_parser(site_parser)
 
     # Parse comand line.
     args = parser.parse_args()
+
+    # Automatically acquire data if requested (default)
+    init_params = False
+    if args.auto_acquire:
+        init_params = {'auto_acquire': True}
 
     # Interpret options in the context of site_config.
     site_config.reparse_args(args, 'Lakeshore372Agent')
@@ -455,7 +494,8 @@ if __name__ == '__main__':
 
     lake_agent = LS372_Agent(agent, args.serial_number, args.ip_address , fake_data=False)
 
-    agent.register_task('init_lakeshore', lake_agent.init_lakeshore_task)
+    agent.register_task('init_lakeshore', lake_agent.init_lakeshore_task,
+                        startup=init_params)
     agent.register_task('set_heater_range', lake_agent.set_heater_range)
     agent.register_task('set_excitation_mode', lake_agent.set_excitation_mode)
     agent.register_task('set_excitation', lake_agent.set_excitation)
