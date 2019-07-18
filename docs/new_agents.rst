@@ -253,7 +253,7 @@ example of a simple Agent.
                 runner.run(agent, auto_reconnect=True)
 
 
-Host an Agent
+Configuration
 -------------
 Because the agent program needs to be implemented in OCS, writing the agent
 file is not sufficient for running it. Before you can run your agent, you
