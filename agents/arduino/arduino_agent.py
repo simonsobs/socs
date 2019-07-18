@@ -1,9 +1,9 @@
 from ocs import ocs_agent, site_config, client_t
-import random
+# import random
 import time
 import threading
 import serial
-import os, sys
+# import os, sys
 from ocs.ocs_twisted import TimeoutLock
 
 from autobahn.wamp.exception import ApplicationError
