@@ -1,12 +1,15 @@
+import os
 import random
 import argparse
-import time, threading
+import time
+import threading
 import numpy as np
-import ocs
 
-from autobahn.wamp.exception import ApplicationError
-from ocs import ocs_agent, site_config, client_t
 from socs.Lakeshore.Lakeshore372 import LS372
+
+on_rtd = os.environ.get('READTHEDOCS') == 'True'
+if not on_rtd:
+    from ocs import ocs_agent, site_config
 
 class LS372_Agent:
     """Agent to connect to a single Lakeshore 372 device.
