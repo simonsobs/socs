@@ -5,7 +5,7 @@ import os
 from ocs.ocs_twisted import TimeoutLock
 from typing import Optional
 import argparse
-
+import warnings
 
 class LS240_Agent:
 
@@ -266,28 +266,29 @@ def main():
     parser = make_parser(parser=p)
 
     #Not used anymore, but we don't it to break the agent if these args are passed
-    parser.add_argument('--fake-data')
-    parser.add_argument('--num-channels')
+    parser.add_argument('--fake-data', help=argparse.SUPPRESS)
+    parser.add_argument('--num-channels', help=argparse.SUPPRESS)
 
     args = parser.parse_args()
 
     if args.fake_data is not None:
-        print("WARNING: the --fake-data parameter is deprecated, please remove"
-              "your site-config file")
+        warnings.warn("WARNING: the --fake-data parameter is deprecated, please "
+                      "remove from your site-config file", DeprecationWarning)
 
     if args.num_channels is not None:
-        print("WARNING: the --num-channels parameter is deprecated, please remove"
-              "your site-config file")
-
-    # Automatically acquire data if requested (default)
-    init_params=False
-    if args.mode == 'init':
-        init_params={'auto_acquire': False}
-    elif args.mode == 'acq':
-        init_params={'auto_acquire': True}
+        warnings.warn("WARNING: the --num-channels parameter is deprecated, please "
+            "remove from your site-config file", DeprecationWarning)
 
     # Interpret options in the context of site_config.
     site_config.reparse_args(args, 'Lakeshore240Agent')
+
+    # Automatically acquire data if requested (default)
+    init_params = False
+    if args.mode == 'init':
+        init_params = {'auto_acquire': False}
+    elif args.mode == 'acq':
+        init_params = {'auto_acquire': True}
+
 
     device_port = None
     if args.port is not None:
@@ -315,16 +316,17 @@ def main():
     kwargs = {
         'port': device_port
     }
+
     if args.sampling_frequency is not None:
         kwargs['f_sample'] = float(args.sampling_frequency)
 
     therm = LS240_Agent(agent, **kwargs)
 
-        agent.register_task('init_lakeshore', therm.init_lakeshore_task,
-                            startup=init_params)
-        agent.register_task('set_values', therm.set_values)
-        agent.register_task('upload_cal_curve', therm.upload_cal_curve)
-        agent.register_process('acq', therm.start_acq, therm.stop_acq)
+    agent.register_task('init_lakeshore', therm.init_lakeshore_task,
+                        startup=init_params)
+    agent.register_task('set_values', therm.set_values)
+    agent.register_task('upload_cal_curve', therm.upload_cal_curve)
+    agent.register_process('acq', therm.acq, therm.stop_acq)
 
     runner.run(agent, auto_reconnect=True)
 
