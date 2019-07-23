@@ -221,9 +221,9 @@ class LS240_Agent:
                 }
 
                 for chan in self.module.channels:
-                    chan_string = "channel_{}".format(chan.channel_num)
-                    data['data'][chan_string + '_T'] = chan.get_reading(unit='K')
-                    data['data'][chan_string + '_V'] = chan.get_reading(unit='S')
+                    chan_string = "Channel {}".format(chan.channel_num)
+                    data['data'][chan_string + ' T'] = chan.get_reading(unit='K')
+                    data['data'][chan_string + ' V'] = chan.get_reading(unit='S')
 
                 self.agent.publish_to_feed('temperatures', data)
 
