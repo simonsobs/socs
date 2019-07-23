@@ -71,7 +71,9 @@ class Keithley2230GAgent:
             with self.lock.acquire_timeout(1) as acquired:
                 if acquired:
                     data = {
-                        'data': {}, 'timestamp': time.time()
+                        'timestamp': time.time(),
+                        'block_name': 'output',
+                        'data': {}
                     }
 
                     for chan in [1,2,3]:
