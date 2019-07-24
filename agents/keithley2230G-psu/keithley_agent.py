@@ -1,16 +1,13 @@
-from ocs import ocs_agent, site_config, client_t
-import random
 import time
-import threading
 import os
 import socket
 
-from ocs.ocs_twisted import TimeoutLock
-
-from autobahn.wamp.exception import ApplicationError
-
 from keithley_driver import psuInterface
 
+on_rtd = os.environ.get('READTHEDOCS') == 'True'
+if not on_rtd:
+    from ocs import ocs_agent, site_config
+    from ocs.ocs_twisted import TimeoutLock
 
 class Keithley2230GAgent:
     def __init__(self, agent, ip_address, gpib_slot):

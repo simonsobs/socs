@@ -1,11 +1,16 @@
-from ocs import ocs_agent, site_config
-from socs.Lakeshore.Lakeshore240 import Module
 import time
 import os
-from ocs.ocs_twisted import TimeoutLock
-from typing import Optional
 import argparse
 import warnings
+
+from typing import Optional
+
+from socs.Lakeshore.Lakeshore240 import Module
+
+on_rtd = os.environ.get('READTHEDOCS') == 'True'
+if not on_rtd:
+    from ocs import ocs_agent, site_config
+    from ocs.ocs_twisted import TimeoutLock
 
 class LS240_Agent:
 
@@ -333,4 +338,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
