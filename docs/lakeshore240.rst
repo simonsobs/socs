@@ -69,7 +69,7 @@ configs documentation for more details.
 The following tasks are registered for the LS240 agent.
 
 .. autoclass:: agents.lakeshore240.LS240_agent.LS240_Agent
-    :members: init_lakeshore, set_values, upload_cal_curve, acq
+    :members: init_lakeshore_task, set_values, upload_cal_curve, acq
 
 Out of the box, the Lakeshore 240 channels are not enabled or configured
 to correctly measure thermometers. To enable, you can use the ``set_values`` task
