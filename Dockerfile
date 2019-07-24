@@ -2,7 +2,7 @@
 # A container setup with an installation of socs.
 
 # Use the ocs image as a base
-FROM grumpy.physics.yale.edu/ocs:v0.5.0-30-g4d4dcd0
+FROM grumpy.physics.yale.edu/ocs:v0.5.0-39-g18ffe16
 
 # Set the working directory to /app_socs
 WORKDIR /app_socs
