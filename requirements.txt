@@ -1,3 +1,6 @@
 sphinx-argparse
 numpy
 autobahn[serialization]
+
+# Lakeshore240
+pyserial
