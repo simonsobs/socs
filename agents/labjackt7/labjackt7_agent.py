@@ -1,14 +1,9 @@
-from ocs import ocs_agent, site_config, client_t
-import random
+from ocs import ocs_agent, site_config
 import time
-import threading
-import os
 import struct
 from pymodbus.client.sync import ModbusTcpClient
 
 from ocs.ocs_twisted import TimeoutLock
-
-from autobahn.wamp.exception import ApplicationError
 
 
 '''
@@ -88,7 +83,7 @@ LabJack agent class
 '''
 
 class LabJackT7_agent:
-    def __init__(self,agent,ip_address,num_channels):
+    def __init__(self, agent, ip_address, num_channels):
         self.active = True
         self.agent = agent
         self.ip_address = ip_address
@@ -111,7 +106,7 @@ class LabJackT7_agent:
                                  buffer_time=1)
 
 
-    def init_labjack_task(self, session, params = None):
+    def init_labjack_task(self, session, params=None):
         """
         task to initialize labjack module
         """
@@ -126,7 +121,7 @@ class LabJackT7_agent:
     
             session.set_status('starting')
         
-        self.module = ModbusTcpClient(str(self.ip_address))
+            self.module = ModbusTcpClient(str(self.ip_address))
         print("Initialized labjack module")
         session.add_message("Labjack initialized")
     
@@ -161,7 +156,7 @@ class LabJackT7_agent:
             while self.take_data:
                 data = {
                     'timestamp': time.time(),
-                    'block_name': 'temps',
+                    'block_name': 'sens',
                     'data': {}
                 }
 
@@ -183,7 +178,7 @@ class LabJackT7_agent:
             self.take_data = False
             return True, 'requested to stop taking data.'
         else:
-            return False,'acq is not currently running'
+            return False, 'acq is not currently running'
 
 
 
@@ -208,8 +203,5 @@ if __name__ == '__main__':
 
     agent.register_task('init_labjack', sensors.init_labjack_task)
     agent.register_process('acq', sensors.start_acq, sensors.stop_acq)
-
+    
     runner.run(agent, auto_reconnect=True)
-
-
-
