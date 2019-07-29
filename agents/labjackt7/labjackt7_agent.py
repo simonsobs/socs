@@ -5,14 +5,12 @@ from pymodbus.client.sync import ModbusTcpClient
 
 from ocs.ocs_twisted import TimeoutLock
 
-
 '''
 Convert Data
 '''
 
 def float2int(num):
     return struct.unpack("=i", struct.pack("=f", num))[0]
-
 
 def concatData(data):
     tVal = 0
@@ -26,7 +24,6 @@ def concatData(data):
             upper = True
     return tVal
 
-
 '''
 Converting numbers to 16-bit data arrays
 '''
@@ -34,20 +31,17 @@ Converting numbers to 16-bit data arrays
 def uint16_to_data(num):
     return struct.unpack("=H", struct.pack("=H", num & 0xFFFF))[0]
 
-
 def uint32_to_data(num):
     data = [0, 0]
     data[0] = struct.unpack("=H", struct.pack("=H", (num>>16)&0xffff))[0]
     data[1] = struct.unpack("=H", struct.pack("=H", num&0xffff))[0]
     return data
 
-
 def int32_to_data(num):
     data = [0, 0]
     data[0] = struct.unpack("=H", struct.pack("=H", (num >> 16) & 0xffff))[0]
     data[1] = struct.unpack("=H", struct.pack("=H", num & 0xffff))[0]
     return data
-
 
 def float32_to_data(num):
     intNum = float2int(num)
@@ -56,7 +50,6 @@ def float32_to_data(num):
     data[1] = intNum & 0xFFFF
     return data
 
-
 '''
 Converting data arrays to numbers
 '''
@@ -64,18 +57,14 @@ Converting data arrays to numbers
 def data_to_uint16(data):
     return data[0]
 
-
 def data_to_uint32(data):
     return concatData(data)
-
 
 def data_to_int32(data):
     return struct.unpack("=i", struct.pack("=I", concatData(data)))[0]
 
-
 def data_to_float32(data):
     return struct.unpack("=f", struct.pack("=I", concatData(data)))[0]
-
 
 
 '''
@@ -86,11 +75,10 @@ class LabJackT7_agent:
     def __init__(self, agent, ip_address, num_channels):
         self.active = True
         self.agent = agent
-        self.ip_address = ip_address
-        self.module = None
         self.log = agent.log
         self.lock = TimeoutLock()
-        self.log = agent.log
+        self.ip_address = ip_address
+        self.module = None
         self.sensors = ['Channel {}'.format(i + 1) for i in range(num_channels)]
         
         self.initialized = False
@@ -105,7 +93,7 @@ class LabJackT7_agent:
                                  agg_params=agg_params,
                                  buffer_time=1)
 
-
+    #Task functions.
     def init_labjack_task(self, session, params=None):
         """
         task to initialize labjack module
@@ -122,13 +110,14 @@ class LabJackT7_agent:
             session.set_status('starting')
         
             self.module = ModbusTcpClient(str(self.ip_address))
+        
         print("Initialized labjack module")
+        
         session.add_message("Labjack initialized")
     
         self.initialized = True
+        
         return True, 'LabJack module initialized.'
-    
-    
     
     def start_acq(self, session, params=None):
         """
@@ -160,11 +149,10 @@ class LabJackT7_agent:
                     'data': {}
                 }
 
-
                 for i, sens in enumerate(self.sensors):
                     rr = self.module.read_input_registers(2*i, 2)
-                    
                     data['data'][sens + 'V'] = data_to_float32(rr.registers)
+                
                 time.sleep(sleep_time)
 
                 self.agent.publish_to_feed('Sensors', data)
@@ -181,12 +169,12 @@ class LabJackT7_agent:
             return False, 'acq is not currently running'
 
 
-
 if __name__ == '__main__':
     
     parser = site_config.add_arguments()
 
     pgroup = parser.add_argument_group('Agent Options')
+    
     pgroup.add_argument('--ip-address')
     pgroup.add_argument('--num-channels', default='13')
 
