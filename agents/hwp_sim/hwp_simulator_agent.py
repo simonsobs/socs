@@ -8,7 +8,7 @@ from ocs.ocs_twisted import TimeoutLock
 
 from autobahn.wamp.exception import ApplicationError
 
-class Arduino:
+class HWPSimulator:
     def __init__(self, port='/dev/ttyACM0', baud=9600, timeout=0.1):
         self.com = serial.Serial(port=port, baudrate=baud, timeout=timeout)
 
@@ -25,7 +25,7 @@ class Arduino:
             print(e)
 
 
-class ArduinoAgent:
+class HWPSimulatorAgent:
 
     def __init__(self, agent, port='/dev/ttyACM0'):
         self.active = True
@@ -112,7 +112,7 @@ if __name__ == '__main__':
     
     args = parser.parse_args()
 
-    site_config.reparse_args(args, 'ArduinoAgent')
+    site_config.reparse_args(args, 'HWPSimulatorAgent')
 
     agent, runner = ocs_agent.init_site_agent(args)
     
