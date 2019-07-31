@@ -1,14 +1,10 @@
-# SOCS Lakeshore 240 Agent
-# socs Agent container for interacting with a Lakeshore 240.
+# SOCS smurf stream simulator
 
 # Use socs base image
 FROM socs:latest
 
 # Set the working directory to registry directory
-WORKDIR /app/agents/smurf-stream-simulator/
-
-# Copy this agent into the app/agents directory
-COPY . /app/agents/smurf-stream-simulator/
+WORKDIR /app/socs/agents/smurf-stream-simulator/
 
 # Run registry on container startup
 ENTRYPOINT ["python3", "-u", "smurf-stream-simulator.py"]

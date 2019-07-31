@@ -3,15 +3,18 @@
 
 # Use socs base image
 FROM socs:latest
+#FROM simonsobs/socs:latest
 
 # Set the working directory to registry directory
-WORKDIR /app/socs/agents/lakeshore240/
+WORKDIR /app/socs/agents/pysmurf_archiver/
 
 # Copy this agent into the app/agents directory
-#COPY . /app/agents/lakeshore240/
+#COPY . /app/agents/pysmurf_archiver/
+
+RUN pip3 install -r requirements.txt
 
 # Run registry on container startup
-ENTRYPOINT ["python3", "-u", "LS240_agent.py"]
+ENTRYPOINT ["python3", "-u", "pysmurf_archiver_agent.py"]
 
 CMD ["--site-hub=ws://sisock-crossbar:8001/ws", \
      "--site-http=http://sisock-crossbar:8001/call"]

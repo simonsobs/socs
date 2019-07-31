@@ -9,22 +9,21 @@ WORKDIR /app
 #COPY requirements.txt .
 #RUN pip3 install -r requirements.txt
 
-# Where ocs config stuff will be mounted
-
-WORKDIR /app/libs
+# OCS installation
 RUN git clone https://github.com/simonsobs/ocs.git \
-    && cd ocs \
-    && pip3 install -r requirements.txt
+    && pip3 install -r ocs/requirements.txt \
+    && pip3 install -e ocs
 
+# SOCS installation
+RUN git clone https://github.com/simonsobs/socs.git \
+    && pip3 install -r socs/requirements.txt \
+    && pip3 install -e socs
 
-ENV PYTHONPATH="/app/libs/ocs/:${PYTHONPATH}"
-ENV PATH="/app/libs/ocs/bin:${PATH}"
 ENV OCS_CONFIG_DIR /config
-ENV JUPYTER_CONFIG_DIR /config/jupyter/
 
 # Run registry on container startup
-WORKDIR /app/pysmurf_controller
-COPY . .
+WORKDIR /app/socs/agents/pysmurf_controller
+
 ENTRYPOINT ["python3", "-u", "pysmurf_controller.py"]
 
 # Sensible defaults for setup with sisock
