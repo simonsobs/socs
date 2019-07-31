@@ -3,7 +3,6 @@
 
 # Use socs base image
 FROM socs:latest
-#FROM simonsobs/socs:latest
 
 # Set the working directory to registry directory
 WORKDIR /app/socs/agents/pysmurf_archiver/
