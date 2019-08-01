@@ -407,15 +407,24 @@ activities. These options limit the maximum file size of the logs and
 automatically rotates them. This should generally remain constant for all of
 your agents.
 
-Final Steps
------------
-After setting up the agent, you can run it from the command line with
+Running the Agent
+-----------------
+If you do not initially include your Agent in your docker-compose file, you can 
+run it from the command line with
 
 ::
 
         python3 agent_name.py --instance-id=hwp-simulator
 
 Here ``--instance-id`` is the same as that given in your ocs-site-configs
-``default.yaml`` file. The agent will then run until it is manually ended. Once
-you have a successfully running Agent, then you can build a Docker image for
-it.
+``default.yaml`` file. The agent will then run until it is manually ended.
+
+Once your Agent is added to your docker-compose file, you can start all of your 
+containerized Agents together with the command
+
+::
+
+        docker-compose up -d
+
+Depending on your host's permissions, this command may need to be run with 
+``sudo``.
