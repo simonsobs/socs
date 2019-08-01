@@ -34,7 +34,7 @@ class HWPSimulatorAgent:
         self.lock = TimeoutLock()
         self.port = port
         self.take_data = False
-        self.arduino = Arduino(port=self.port)
+        self.arduino = HWPSimulator(port=self.port)
 
         self.initialized = False
 
@@ -57,15 +57,15 @@ class HWPSimulatorAgent:
                 self.arduino.read()
             except ValueError:
                 pass
-            print("Arduino initialized.")
+            print("Arduino HWP Simulator initialized.")
 
         self.initialized = True
-        return True, 'Arduino initialized.'
+        return True, 'Arduino HWP Simulator initialized.'
 
 
     def start_acq(self, session, params):
         '''
-        Starts acquiring data from an Arduino.
+        Starts acquiring data.
         '''
 
         f_sample = params.get('sampling_frequency', 2.5)
