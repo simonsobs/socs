@@ -33,6 +33,13 @@ services:
     build: ./agents/pysmurf_controller/
 
   # --------------------------------------------------------------------------
+  # The Pysmurf Archiver Agent
+  # --------------------------------------------------------------------------
+  ocs-pysmurf-archiver-agent:
+    image: "ocs-pysmurf-archiver-agent"
+    build: ./agents/pysmurf_archiver/
+
+  # --------------------------------------------------------------------------
   # Smurf stream simulator agent
   # --------------------------------------------------------------------------
   ocs-smurf-stream-sim-agent:

@@ -9,20 +9,28 @@ import sys
 from twisted.logger import Logger, formatEvent, FileLogObserver
 import time
 import os
+import hashlib
+
+
+def get_md5sum(filename):
+    m = hashlib.md5()
+
+    for line in open(filename, 'rb'):
+        m.update(line)
+    return m.hexdigest()
 
 
 class Receiver:
     def __init__(self, controller, addr):
         self.addr = addr
         self.controller = controller
-        self.agent = controller.agent
+        self.agent: ocs_agent.OCSAgent = controller.agent
         self.log = self.agent.log
 
         self.types = []
         self.last_seq = None
 
     def recv(self, d):
-
         if self.last_seq is None:
             print("New sequence: {}".format(d['seq_no']))
         else:
@@ -32,12 +40,24 @@ class Receiver:
                 self.types = []
 
         self.last_seq = d['seq_no']
-        if not d['type'] in self.types:
-            self.log.info('New type: %s at %i' % (d['type'], d['seq_no']))
-            self.types.append(d['type'])
 
-        if d['type'] in ['start', 'stop']:
-            self.log.info("{d}", d=d)
+        dtype = d['type']
+        print(dtype)
+        if dtype in ['start', 'stop']:
+            self.log.info('{d}', d=d)
+
+        if dtype in ['data_file', 'plot']:
+            self.log.info("New file: {fname}", fname=d['payload']['path'])
+            file_data = d['payload']
+            file_data['md5sum'] = get_md5sum(file_data['path'])
+
+            # Matthew didn't like this for some reason, hopefully
+            # the URI structure doesn't change...
+            root, instance_id = self.agent.agent_address.split('.')
+            file_data['site'] = root
+            file_data['pysmurf_instance'] = instance_id
+
+            self.agent.publish_to_feed('pysmurf_files', file_data)
 
 
 class PysmurfScriptProtocol(protocol.ProcessProtocol):
@@ -67,7 +87,7 @@ class PysmurfScriptProtocol(protocol.ProcessProtocol):
 
 class PysmurfController(DatagramProtocol):
     def __init__(self, agent, udp_ip: str, udp_port: int):
-        self.agent = agent
+        self.agent: ocs_agent.OCSAgent = agent
         self.log = agent.log
         self.lock = ocs_twisted.TimeoutLock()
 
@@ -76,6 +96,8 @@ class PysmurfController(DatagramProtocol):
 
         self.receivers = {}
         self.prot = None
+
+        self.agent.register_feed('pysmurf_files')
 
     def datagramReceived(self, data, addr):
         """Function called whenever data is passed to UDP socket"""
@@ -163,8 +185,7 @@ if __name__ == '__main__':
     agent, runner = ocs_agent.init_site_agent(args)
     controller = PysmurfController(agent, args.udp_ip, int(args.udp_port))
 
-    agent.register_task('run', controller.run_script)
-    agent.register_task('abort', controller.abort_script)
+    agent.register_process('run', controller.run_script, controller.abort_script)
 
     reactor.listenUDP(int(args.udp_port), controller)
 
