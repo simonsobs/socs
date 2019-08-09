@@ -12,6 +12,31 @@ import os
 import hashlib
 
 
+class PysmurfScriptProtocol(protocol.ProcessProtocol):
+    def __init__(self, fname, log=None):
+        self.fname = fname
+        self.log = log
+        self.end_status = None
+
+    def connectionMade(self):
+        print("Connection Made")
+        self.transport.closeStdin()
+
+    def outReceived(self, data):
+        if self.log:
+            self.log.info("{fname}: {data}",
+                          fname=self.fname.split('/')[-1],
+                          data=data.strip().decode('utf-8'))
+
+    def errReceived(self, data):
+        self.log.error(data)
+
+    def processEnded(self, status):
+        # if self.log is not None:
+        #     self.log.info("Process ended: {reason}", reason=status)
+        self.end_status = status
+
+
 def get_md5sum(filename):
     m = hashlib.md5()
 
@@ -21,7 +46,7 @@ def get_md5sum(filename):
 
 
 class Receiver:
-    def __init__(self, controller, addr):
+    def __init__(self, controller, addr, cache_len=10):
         self.addr = addr
         self.controller = controller
         self.agent: ocs_agent.OCSAgent = controller.agent
@@ -29,6 +54,9 @@ class Receiver:
 
         self.types = []
         self.last_seq = None
+
+        self.cache_len = cache_len
+        self.file_cache = []
 
     def recv(self, d):
         if self.last_seq is None:
@@ -57,57 +85,55 @@ class Receiver:
             file_data['site'] = root
             file_data['pysmurf_instance'] = instance_id
 
+
+            self.file_cache.append(file_data)
+
             self.agent.publish_to_feed('pysmurf_files', file_data)
 
 
-class PysmurfScriptProtocol(protocol.ProcessProtocol):
-    def __init__(self, fname, log=None):
-        self.fname = fname
-        self.log = log
-        self.end_status = None
-
-    def connectionMade(self):
-        print("Connection Made")
-        self.transport.closeStdin()
-
-    def outReceived(self, data):
-        if self.log:
-            self.log.info("{fname}: {data}",
-                          fname=self.fname.split('/')[-1],
-                          data=data.strip().decode('utf-8'))
-
-    def errReceived(self, data):
-        self.log.error(data)
-
-    def processEnded(self, status):
-        # if self.log is not None:
-        #     self.log.info("Process ended: {reason}", reason=status)
-        self.end_status = status
-
-
 class PysmurfController(DatagramProtocol):
-    def __init__(self, agent, udp_ip: str, udp_port: int):
+    def __init__(self, agent, udp_ip: str, udp_port: int, cache_len=10):
         self.agent: ocs_agent.OCSAgent = agent
         self.log = agent.log
         self.lock = ocs_twisted.TimeoutLock()
 
+        self.prot = None
+
+        # For monitoring pysmurf publisher
         self.udp_ip = udp_ip
         self.udp_port = udp_port
 
-        self.receivers = {}
-        self.prot = None
+        self.file_cache = []
+        self.cache_len = cache_len
 
         self.agent.register_feed('pysmurf_files')
 
-    def datagramReceived(self, data, addr):
+    def datagramReceived(self, _data, addr):
         """Function called whenever data is passed to UDP socket"""
-        try:
-            r = self.receivers[addr]
-        except KeyError:
-            self.receivers[addr] = Receiver(self, addr)
-            r = self.receivers[addr]
+        data = json.loads(_data)
 
-        r.recv(json.loads(data))
+        if data['type'] in ['data_file', 'plot']:
+            self.log.info("New file: {fname}", fname=data['payload']['path'])
+
+            file_data = data['payload']
+            file_data['md5sum'] = get_md5sum(file_data['path'])
+            file_data['site'], file_data['instance_id'] = self.agent.agent_address.split('.')
+
+            self.file_cache.append(file_data)
+
+            if len(self.file_cache) > self.cache_len:
+                self.file_cache.pop(0)
+
+            self.agent.publish_to_feed('pysmurf_files', file_data)
+
+    def flush_files(self, session, params=None):
+        """
+        Task to flush all cahced files to pysmurf_files feed.
+        """
+        for f in self.file_cache:
+            self.agent.publish_to_feed('pysmurf_files', f)
+
+        return True, f"Flushed {len(self.file_cache)} files"
 
     def run_script(self, session, params=None):
         """
@@ -186,6 +212,8 @@ if __name__ == '__main__':
     controller = PysmurfController(agent, args.udp_ip, int(args.udp_port))
 
     agent.register_process('run', controller.run_script, controller.abort_script)
+    agent.register_task('flush_files', controller.flush_files)
+
 
     reactor.listenUDP(int(args.udp_port), controller)
 
