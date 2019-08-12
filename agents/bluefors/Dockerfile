@@ -8,7 +8,7 @@ FROM socs:latest
 WORKDIR /app/socs/agents/bluefors/
 
 ## Copy this agent into the app/agents directory
-#COPY . /app/socs/agents/bluefors/
+COPY . .
 
 # Run registry on container startup
 ENTRYPOINT ["python3", "-u", "bluefors_log_tracker.py"]

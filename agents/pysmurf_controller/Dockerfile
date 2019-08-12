@@ -24,6 +24,9 @@ ENV OCS_CONFIG_DIR /config
 # Run registry on container startup
 WORKDIR /app/socs/agents/pysmurf_controller
 
+COPY . .
+RUN pip3 install -r requirements.t
+
 ENTRYPOINT ["python3", "-u", "pysmurf_controller.py"]
 
 # Sensible defaults for setup with sisock

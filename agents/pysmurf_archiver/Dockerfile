@@ -6,9 +6,8 @@ FROM socs:latest
 
 # Set the working directory to registry directory
 WORKDIR /app/socs/agents/pysmurf_archiver/
-
 # Copy this agent into the app/agents directory
-#COPY . /app/agents/pysmurf_archiver/
+COPY . .
 
 RUN pip3 install -r requirements.txt
 

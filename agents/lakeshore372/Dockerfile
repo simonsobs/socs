@@ -8,7 +8,7 @@ FROM socs:latest
 WORKDIR /app/socs/agents/lakeshore372/
 
 # Copy this agent into the app/agents directory
-#COPY . /app/agents/lakeshore372/
+COPY . .
 
 # Run registry on container startup
 ENTRYPOINT ["python3", "-u", "LS372_agent.py"]

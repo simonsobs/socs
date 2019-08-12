@@ -9,7 +9,7 @@ FROM socs:latest
 WORKDIR /app/socs/agents/keithley2230G-psu/
 
 ## Copy this agent into the app/agents directory
-#COPY . /app/agents/keithley2230G-psu/
+COPY . .
 
 # Run agent on container startup
 ENTRYPOINT ["python3", "-u", "keithley_agent.py"]
