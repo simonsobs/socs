@@ -5,10 +5,10 @@
 FROM socs:latest
 
 # Set the working directory to registry directory
-WORKDIR /app/agents/lakeshore240/
+WORKDIR /app/socs/agents/lakeshore240/
 
 # Copy this agent into the app/agents directory
-COPY . /app/agents/lakeshore240/
+COPY . .
 
 # Run registry on container startup
 ENTRYPOINT ["python3", "-u", "LS240_agent.py"]
