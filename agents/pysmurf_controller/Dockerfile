@@ -25,7 +25,7 @@ ENV OCS_CONFIG_DIR /config
 WORKDIR /app/socs/agents/pysmurf_controller
 
 COPY . .
-RUN pip3 install -r requirements.t
+RUN pip3 install -r requirements.txt
 
 ENTRYPOINT ["python3", "-u", "pysmurf_controller.py"]
 
