@@ -11,6 +11,8 @@ import time
 import os
 import hashlib
 
+from twisted.enterprise import adbapi
+
 from socs.util import get_db_connection, get_md5sum
 
 
@@ -65,32 +67,48 @@ class PysmurfController(DatagramProtocol):
         if db_host is not None:
             self.sql_config['host'] = db_host
 
-        with get_db_connection(**self.sql_config) as con:
-            cur = con.cursor()
-            cur.execute("SHOW TABLES;")
-            table_names = [x[0] for x in cur.fetchall()]
-            if not 'pysmurf_files' in table_names:
-                self.log.info("Could not find pysmurf_files table. "
-                              "Creating one now....")
+        self.dbpool = adbapi.ConnectionPool('mysql.connector', **self.sql_config)
+        self.dbpool.runInteraction(self._create_table)
 
-                cur.execute("""
-                    CREATE TABLE pysmurf_files (
-                        id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-                        path VARCHAR(260) UNIQUE NOT NULL,
-                        timestamp TIMESTAMP,
-                        format VARCHAR(32),
-                        type VARCHAR(32),
-                        site VARCHAR(32),
-                        instance_id VARCHAR(32),
-                        copied TINYINT(1),
-                        failed_copy_attempts INT,
-                        md5sum BINARY(16) NOT NULL
-                    );
-                """)
+    def _create_table(self, txn):
+        txn.execute("SHOW TABLES;")
+        table_names = [x[0] for x in txn.fetchall()]
+        if 'pysmurf_files' not in table_names:
+            self.log.info("Creating pysmurf_files table")
+            txn.execute("""
+                CREATE TABLE pysmurf_files (
+                    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                    path VARCHAR(260) UNIQUE NOT NULL,
+                    timestamp TIMESTAMP,
+                    format VARCHAR(32),
+                    type VARCHAR(32),
+                    site VARCHAR(32),
+                    instance_id VARCHAR(32),
+                    copied TINYINT(1),
+                    failed_copy_attempts INT,
+                    md5sum BINARY(16) NOT NULL
+                );
+            """)
+        else:
+            self.log.info("Found existing pysmurf_files table")
 
-                con.commit()
-            else:
-                self.log.info("Found existing table pysmurf_files.")
+    def _add_file(self, txn, d):
+        dt = datetime.datetime.utcfromtimestamp(d['timestamp'])
+        md5sum = get_md5sum(d['path'])
+        site, instance_id = self.agent.agent_address.split('.')
+
+        txn.execute(f"""
+            INSERT INTO pysmurf_files (
+                path, timestamp, format, type, site, 
+                instance_id, copied, failed_copy_attempts, md5sum
+            )
+            VALUES (
+                '{d['path']}', '{dt}', '{d['format']}', '{d['type']}', '{site}', 
+                '{instance_id}', 0, 0, UNHEX('{md5sum}')                    
+            )
+            
+        """)
+        self.log.info(f"Inserted {d['path']} into database")
 
     def datagramReceived(self, _data, addr):
         """Function called whenever data is passed to UDP socket"""
@@ -99,24 +117,7 @@ class PysmurfController(DatagramProtocol):
         if data['type'] in ['data_file', 'plot']:
             self.log.info("New file: {fname}", fname=data['payload']['path'])
             d = data['payload']
-            cols = ['path', 'timestamp', 'format', 'type', 'site', 'instance_id',
-                    'copied', 'failed_copy_attempts', 'md5sum']
-
-            dt = datetime.datetime.utcfromtimestamp(d['timestamp'])
-            md5sum = get_md5sum(d['path'])
-            site, instance_id = self.agent.agent_address.split('.')
-            query = f"""
-                INSERT INTO pysmurf_files ({', '.join(cols)}) VALUES (
-                    '{d['path']}', '{dt}', '{d['format']}', '{d['type']}', '{site}', 
-                    '{instance_id}', 0, 0, UNHEX('{md5sum}')                    
-                )
-            """
-
-            with get_db_connection(**self.sql_config) as con:
-                cur = con.cursor()
-                cur.execute(query)
-                self.log.info(f"Inserted {d['path']} into database")
-                con.commit()
+            self.dbpool.runInteraction(self._add_file, d)
 
     def run_script(self, session, params=None):
         """
