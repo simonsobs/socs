@@ -11,6 +11,8 @@ import time
 import os
 import hashlib
 
+from socs.util import get_db_connection, get_md5sum
+
 
 class PysmurfScriptProtocol(protocol.ProcessProtocol):
     def __init__(self, fname, log=None):
@@ -37,60 +39,6 @@ class PysmurfScriptProtocol(protocol.ProcessProtocol):
         self.end_status = status
 
 
-def get_md5sum(filename):
-    m = hashlib.md5()
-
-    for line in open(filename, 'rb'):
-        m.update(line)
-    return m.hexdigest()
-
-
-class Receiver:
-    def __init__(self, controller, addr, cache_len=10):
-        self.addr = addr
-        self.controller = controller
-        self.agent: ocs_agent.OCSAgent = controller.agent
-        self.log = self.agent.log
-
-        self.types = []
-        self.last_seq = None
-
-        self.cache_len = cache_len
-        self.file_cache = []
-
-    def recv(self, d):
-        if self.last_seq is None:
-            print("New sequence: {}".format(d['seq_no']))
-        else:
-            delta = d['seq_no'] - self.last_seq
-            if delta != 1:
-                self.log.info('Sequence jump: %i + %i' % (self.last_seq, delta))
-                self.types = []
-
-        self.last_seq = d['seq_no']
-
-        dtype = d['type']
-        print(dtype)
-        if dtype in ['start', 'stop']:
-            self.log.info('{d}', d=d)
-
-        if dtype in ['data_file', 'plot']:
-            self.log.info("New file: {fname}", fname=d['payload']['path'])
-            file_data = d['payload']
-            file_data['md5sum'] = get_md5sum(file_data['path'])
-
-            # Matthew didn't like this for some reason, hopefully
-            # the URI structure doesn't change...
-            root, instance_id = self.agent.agent_address.split('.')
-            file_data['site'] = root
-            file_data['pysmurf_instance'] = instance_id
-
-
-            self.file_cache.append(file_data)
-
-            self.agent.publish_to_feed('pysmurf_files', file_data)
-
-
 class PysmurfController(DatagramProtocol):
     def __init__(self, agent, udp_ip: str, udp_port: int, cache_len=10):
         self.agent: ocs_agent.OCSAgent = agent
@@ -108,32 +56,66 @@ class PysmurfController(DatagramProtocol):
 
         self.agent.register_feed('pysmurf_files')
 
+        self.sql_config = {
+            'user': os.environ["MYSQL_USER"],
+            'passwd': os.environ["MYSQL_PASSWORD"],
+            'database': 'files'
+        }
+        db_host = os.environ.get('MYSQL_HOST')
+        if db_host is not None:
+            self.sql_config['host'] = db_host
+
+        with get_db_connection(**self.sql_config) as con:
+            cur = con.cursor()
+            cur.execute("SHOW TABLES;")
+            table_names = [x[0] for x in cur.fetchall()]
+            if not 'pysmurf_files' in table_names:
+                self.log.info("Could not find pysmurf_files table. "
+                              "Creating one now....")
+
+                cur.execute("""
+                    CREATE TABLE pysmurf_files (
+                        id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                        path VARCHAR(260) UNIQUE NOT NULL,
+                        timestamp TIMESTAMP,
+                        format VARCHAR(32),
+                        type VARCHAR(32),
+                        site VARCHAR(32),
+                        instance_id VARCHAR(32),
+                        copied TINYINT(1),
+                        failed_copy_attempts INT,
+                        md5sum BINARY(16) NOT NULL
+                    );
+                """)
+
+                con.commit()
+            else:
+                self.log.info("Found existing table pysmurf_files.")
+
     def datagramReceived(self, _data, addr):
         """Function called whenever data is passed to UDP socket"""
         data = json.loads(_data)
 
         if data['type'] in ['data_file', 'plot']:
             self.log.info("New file: {fname}", fname=data['payload']['path'])
+            d = data['payload']
+            cols = ['path', 'format', 'type', 'site', 'instance_id',
+                    'copied', 'failed_copy_attempts', 'md5sum']
 
-            file_data = data['payload']
-            file_data['md5sum'] = get_md5sum(file_data['path'])
-            file_data['site'], file_data['instance_id'] = self.agent.agent_address.split('.')
+            md5sum = get_md5sum(d['path'])
+            site, instance_id = self.agent.agent_address.split('.')
+            query = f"""
+                INSERT INTO pysmurf_files ({', '.join(cols)}) VALUES (
+                    '{d['path']}', '{d['format']}', '{d['type']}', '{site}', 
+                    '{instance_id}', 0, 0, UNHEX('{md5sum}')                    
+                )
+            """
 
-            self.file_cache.append(file_data)
-
-            if len(self.file_cache) > self.cache_len:
-                self.file_cache.pop(0)
-
-            self.agent.publish_to_feed('pysmurf_files', file_data)
-
-    def flush_files(self, session, params=None):
-        """
-        Task to flush all cahced files to pysmurf_files feed.
-        """
-        for f in self.file_cache:
-            self.agent.publish_to_feed('pysmurf_files', f)
-
-        return True, f"Flushed {len(self.file_cache)} files"
+            with get_db_connection(**self.sql_config) as con:
+                cur = con.cursor()
+                cur.execute(query)
+                self.log.info(f"Inserted {d['path']} into database")
+                con.commit()
 
     def run_script(self, session, params=None):
         """
@@ -212,8 +194,6 @@ if __name__ == '__main__':
     controller = PysmurfController(agent, args.udp_ip, int(args.udp_port))
 
     agent.register_process('run', controller.run_script, controller.abort_script)
-    agent.register_task('flush_files', controller.flush_files)
-
 
     reactor.listenUDP(int(args.udp_port), controller)
 
