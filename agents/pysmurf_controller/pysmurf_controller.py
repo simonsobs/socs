@@ -5,7 +5,7 @@ from twisted.internet.protocol import DatagramProtocol
 from twisted.internet import reactor, protocol
 from twisted.internet.error import ProcessDone, ProcessTerminated
 import sys
-
+import datetime
 from twisted.logger import Logger, formatEvent, FileLogObserver
 import time
 import os
@@ -99,14 +99,15 @@ class PysmurfController(DatagramProtocol):
         if data['type'] in ['data_file', 'plot']:
             self.log.info("New file: {fname}", fname=data['payload']['path'])
             d = data['payload']
-            cols = ['path', 'format', 'type', 'site', 'instance_id',
+            cols = ['path', 'timestamp', 'format', 'type', 'site', 'instance_id',
                     'copied', 'failed_copy_attempts', 'md5sum']
 
+            dt = datetime.datetime.utcfromtimestamp(d['timestamp'])
             md5sum = get_md5sum(d['path'])
             site, instance_id = self.agent.agent_address.split('.')
             query = f"""
                 INSERT INTO pysmurf_files ({', '.join(cols)}) VALUES (
-                    '{d['path']}', '{d['format']}', '{d['type']}', '{site}', 
+                    '{d['path']}', '{dt}', '{d['format']}', '{d['type']}', '{site}', 
                     '{instance_id}', 0, 0, UNHEX('{md5sum}')                    
                 )
             """

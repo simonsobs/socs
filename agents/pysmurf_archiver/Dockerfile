@@ -1,5 +1,5 @@
-# SOCS Lakeshore 240 Agent
-# socs Agent container for interacting with a Lakeshore 240.
+# SOCS Pysmurf Archiver
+# socs Agent for copying pysmurf data files and plots to archive
 
 # Use socs base image
 FROM socs:latest

@@ -6,12 +6,13 @@ import queue
 import subprocess
 from socs.util import get_db_connection, get_md5sum
 import binascii
+import datetime
 
 class PysmurfArchiverAgent:
     """
     Agent to archive pysmurf config files and plots. It should be run on the
-    computer where you want files to be archived, and must be on the same
-    OCS network as the pysmurf agents that it monitors.
+    computer where you want files to be archived, and must have access to the
+    database with the `pysmurf_files` table.
 
     Files must each have a unique filename (not just a unique path), and a
     file type: (tuning, channel_map, final_registers, etc.).
@@ -65,7 +66,7 @@ class PysmurfArchiverAgent:
 
         cmd.append(new_path)
 
-        self.log.debug(f"Running: {' '.join(cmd)}")
+        self.log.info(f"Running: {' '.join(cmd)}")
         subprocess.check_output(cmd)
 
     def run(self, session, params=None):
@@ -92,17 +93,18 @@ class PysmurfArchiverAgent:
 
                 files = cur.fetchall()
 
-                self.log.debug(f"Found {len(files)} uncopied files.")
+                self.log.info(f"Found {len(files)} uncopied files.")
 
                 for f in files:
                     _, fname = os.path.split(f['path'])
 
                     # Should get the timestamp from db
-                    ts = time.time()
+                    dt = f['timestamp']
 
                     subdir = os.path.join(self.data_dir,
-                                          f"{str(ts):.5}",
+                                          f"{str(dt.timestamp()):.5}",
                                           f"{f['type']}")
+
                     if not os.path.exists(subdir):
                         os.makedirs(subdir)
 
