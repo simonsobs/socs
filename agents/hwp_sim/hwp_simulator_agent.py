@@ -1,27 +1,31 @@
 from ocs import ocs_agent, site_config, client_t
-import random
+# import random
 import time
 import threading
 import serial
-import os, sys
+# import os, sys
 from ocs.ocs_twisted import TimeoutLock
 
 from autobahn.wamp.exception import ApplicationError
 
-class Arduino:
+class HWPSimulator:
     def __init__(self, port='/dev/ttyACM0', baud=9600, timeout=0.1):
         self.com = serial.Serial(port=port, baudrate=baud, timeout=timeout)
 
     def read(self):
-        try:
+        """
+        Reads data from an Arduino. First decodes the read data, then splits 
+        the read line to remove doubled values and takes the second one.
+        """
+        try: 
             data = bytes.decode(self.com.readline()[:-2])
-            sin_data = float(data.split(' ')[0])
+            sin_data = float(data.split(' ')[1])
             return sin_data
         except Exception as e:
             print(e)
 
 
-class ArduinoAgent:
+class HWPSimulatorAgent:
 
     def __init__(self, agent, port='/dev/ttyACM0'):
         self.active = True
@@ -30,7 +34,7 @@ class ArduinoAgent:
         self.lock = TimeoutLock()
         self.port = port
         self.take_data = False
-        self.arduino = Arduino(port=self.port)
+        self.arduino = HWPSimulator(port=self.port)
 
         self.initialized = False
 
@@ -39,7 +43,9 @@ class ArduinoAgent:
 
 
     def init_arduino(self):
-
+        """
+        Initializes the Arduino connection.
+        """
         if self.initialized:
             return True, "Already initialized."
 
@@ -51,14 +57,20 @@ class ArduinoAgent:
                 self.arduino.read()
             except ValueError:
                 pass
-            print("Arduino initialized.")
+            print("Arduino HWP Simulator initialized.")
 
         self.initialized = True
-        return True, 'Arduino initialized.'
+        return True, 'Arduino HWP Simulator initialized.'
 
 
     def start_acq(self, session, params):
+        """Starts acquiring data.
 
+        Args:
+            sampling_frequency (float):
+                Sampling frequency for data collection. Defaults to 2.5 Hz
+
+        """
         f_sample = params.get('sampling_frequency', 2.5)
         sleep_time = 1/f_sample - 0.1
 
@@ -86,6 +98,9 @@ class ArduinoAgent:
         return True, 'Acquisition exited cleanly.'
 
     def stop_acq(self, session, params=None):
+        """
+        Stops the data acquisiton.
+        """
         if self.take_data:
             self.take_data = False
             return True, 'requested to stop taking data.'
@@ -100,7 +115,7 @@ if __name__ == '__main__':
     
     args = parser.parse_args()
 
-    site_config.reparse_args(args, 'ArduinoAgent')
+    site_config.reparse_args(args, 'HWPSimulatorAgent')
 
     agent, runner = ocs_agent.init_site_agent(args)
     
@@ -110,6 +125,3 @@ if __name__ == '__main__':
     agent.register_process('acq', arduino_agent.start_acq, arduino_agent.stop_acq, startup=True)
 
     runner.run(agent, auto_reconnect=True)
-
-
-
