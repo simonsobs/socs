@@ -13,10 +13,10 @@ class HWPSimulator:
         self.com = serial.Serial(port=port, baudrate=baud, timeout=timeout)
 
     def read(self):
-        '''
+        """
         Reads data from an Arduino. First decodes the read data, then splits 
         the read line to remove doubled values and takes the second one.
-        '''
+        """
         try: 
             data = bytes.decode(self.com.readline()[:-2])
             sin_data = float(data.split(' ')[1])
@@ -43,9 +43,9 @@ class HWPSimulatorAgent:
 
 
     def init_arduino(self):
-        '''
+        """
         Initializes the Arduino connection.
-        '''
+        """
         if self.initialized:
             return True, "Already initialized."
 
@@ -64,10 +64,13 @@ class HWPSimulatorAgent:
 
 
     def start_acq(self, session, params):
-        '''
-        Starts acquiring data.
-        '''
+        """Starts acquiring data.
 
+        Args:
+            sampling_frequency (float):
+                Sampling frequency for data collection. Defaults to 2.5 Hz
+
+        """
         f_sample = params.get('sampling_frequency', 2.5)
         sleep_time = 1/f_sample - 0.1
 
@@ -95,9 +98,9 @@ class HWPSimulatorAgent:
         return True, 'Acquisition exited cleanly.'
 
     def stop_acq(self, session, params=None):
-        '''
+        """
         Stops the data acquisiton.
-        '''
+        """
         if self.take_data:
             self.take_data = False
             return True, 'requested to stop taking data.'
@@ -122,6 +125,3 @@ if __name__ == '__main__':
     agent.register_process('acq', arduino_agent.start_acq, arduino_agent.stop_acq, startup=True)
 
     runner.run(agent, auto_reconnect=True)
-
-
-
