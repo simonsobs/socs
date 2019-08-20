@@ -314,6 +314,7 @@ is the path to the Agent file (from the ``socs/agents`` directory). An example
 of this script is shown below:
 
 ::
+
         import ocs
         import os
         root =os.path.abspath(os.path.split(__file__)[0])
@@ -334,9 +335,10 @@ applications with their libraries and dependencies. OCS is recommended to be
 installed in a Docker container (for ease of installation). For Agents that are 
 not meant solely to be used with one lab computer, it can be useful to add them 
 to a Docker container as well. This requires creating a ``Dockerfile`` for your 
-Agent and adding the Agent services to your OCS Docker container in a 
-``docker-compose.yml`` file. Adding your Agent in the ``docker-compose.yml`` file 
-will also allow you to view your data feed when you run the Agent.
+Agent and adding a new service to your OCS Docker Compose file,
+``docker-compose.yml``. Adding your Agent in the ``docker-compose.yml`` file,
+along with an appropriate data feed server service, will also allow you to view
+your data feed when you run the Agent.
 
 To create a ``Dockerfile``, change directories to the directory containing your 
 Agent file. Within this directory, create a file called ``Dockerfile``. The format 
@@ -368,11 +370,11 @@ specifically to the correct in-container paths to the directories and files for
 the HWP Simulator agent. The final ``CMD`` argument provides a default for the 
 Crossbar (WAMP) connection. 
 
-To include your new Agent among the services provided in your OCS Docker 
-container, navigate to the ``docker-compose.yml`` file in the same sub-directory 
+To include your new Agent among the services provided by your OCS Docker
+containers, navigate to the ``docker-compose.yml`` file in the same sub-directory
 as your ``default.yaml`` or ``your_institution.yaml`` file. Within 
-``docker-compose.yml``, you should find (or create) a list of services that the 
-docker container provides. You can add your new agent following the example format:
+``docker-compose.yml``, you should find (or create) a list of services that the
+docker will run. You can add your new agent following the example format:
 
 ::
 
