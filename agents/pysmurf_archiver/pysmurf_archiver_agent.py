@@ -8,6 +8,8 @@ from socs.util import get_db_connection, get_md5sum
 import binascii
 import datetime
 
+from twisted.enterprise import adbapi
+
 class PysmurfArchiverAgent:
     """
     Agent to archive pysmurf config files and plots. It should be run on the
@@ -59,10 +61,13 @@ class PysmurfArchiverAgent:
         # Copies file over from computer
         cmd = ["rsync"]
 
+        fname = old_path
         if self.host is not None:
-            cmd.append(f"{self.user}@{self.host}:{old_path}'")
-        else:
-            cmd.append(old_path)
+            fname = f'{self.host}:' + fname
+            if self.user is not None:
+                fname = f'{self.user}@' + fname
+
+        cmd.append(fname)
 
         cmd.append(new_path)
 
@@ -113,11 +118,13 @@ class PysmurfArchiverAgent:
                     try:
                         self._copy_file(f['path'], new_path)
 
-                        #Verify md5sum
+                        # Verify md5sum
                         new_md5 = get_md5sum(new_path)
                         if (new_md5 != binascii.hexlify(f['md5sum']).decode()):
                             os.remove(new_path)
                             raise RuntimeError("Copied file failed md5sum verification.")
+                        else:
+                            self.log.info(f"Sucessfully copied {f['path']} to {new_path}")
 
                         query = f"""
                             UPDATE pysmurf_files SET path='{new_path}', copied=1 
