@@ -11,14 +11,15 @@ import time
 import os
 import hashlib
 
+from ocs.ocs_twisted import TimeoutLock
 from twisted.enterprise import adbapi
 
 from socs.util import get_db_connection, get_md5sum
 
 
 class PysmurfScriptProtocol(protocol.ProcessProtocol):
-    def __init__(self, fname, log=None):
-        self.fname = fname
+    def __init__(self, path, log=None):
+        self.path = path
         self.log = log
         self.end_status = None
 
@@ -28,8 +29,8 @@ class PysmurfScriptProtocol(protocol.ProcessProtocol):
 
     def outReceived(self, data):
         if self.log:
-            self.log.info("{fname}: {data}",
-                          fname=self.fname.split('/')[-1],
+            self.log.info("{path}: {data}",
+                          path=self.path.split('/')[-1],
                           data=data.strip().decode('utf-8'))
 
     def errReceived(self, data):
@@ -48,6 +49,7 @@ class PysmurfController(DatagramProtocol):
         self.lock = ocs_twisted.TimeoutLock()
 
         self.prot = None
+        self.protocol_lock = TimeoutLock()
 
         # For monitoring pysmurf publisher
         self.udp_ip = udp_ip
@@ -119,8 +121,58 @@ class PysmurfController(DatagramProtocol):
             d = data['payload']
             self.dbpool.runInteraction(self._add_file, d)
 
+    def _run_script(self, script, args, log):
+        """
+        Runs a pysmurf control script. Run primarily from tasks in worker threads.
+
+        Args:
+
+            script (string): path to the script you wish to run
+            args (list, optional):
+                List of command line arguments to pass to the script.
+                Defaults to [].
+            log (string/bool, optional):
+                Determines if and how the process's stdout should be logged.
+                You can pass the path to a logfile, True to use the agent's log,
+                or False to not log at all.
+        """
+
+        with self.protocol_lock.acquire_timeout(0, job=script) as acquired:
+            if not acquired:
+                return False, "Process {} is already running".format(self.protocol_lock.job)
+
+            logger = None
+            if isinstance(log, str):
+                log_file = open(log, 'a')
+                logger = Logger(observer=FileLogObserver(log_file, log_formatter))
+            elif log:
+                # If log==True, use agent's logger
+                logger = self.log
+
+            self.prot = PysmurfScriptProtocol(script, log=logger)
+            python_exec = sys.executable
+
+            cmd = [python_exec, '-u', script] + args
+            self.log.info("{exec}, {cmd}", exec=python_exec, cmd=cmd)
+
+            reactor.callFromThread(
+                reactor.spawnProcess, self.prot, python_exec, cmd, env=os.environ
+            )
+
+            while self.prot.end_status is None:
+                time.sleep(1)
+
+            end_status = self.prot.end_status
+            self.prot = None
+
+            if isinstance(end_status.value, ProcessDone):
+                return True, "Script has finished naturally"
+            elif isinstance(end_status.value, ProcessTerminated):
+                return False, "Script has been killed"
+
     def run_script(self, session, params=None):
         """
+        Run task.
         Runs a pysmurf control script.
 
         Args:
@@ -135,43 +187,11 @@ class PysmurfController(DatagramProtocol):
                 or False to not log at all.
 
         """
-        if params is None:
-            params = {}
+        ok, msg = self._run_script(params['script'],
+                                   params.get('args', []),
+                                   params.get('log', True))
 
-        if self.prot is not None:
-            return False, "Process {} is already running".format(self.prot.fname)
-
-        script_file = params['script']
-        args = params.get('args', [])
-        log_file = params.get('log', True)
-
-        params = {'fname': script_file}
-
-        if type(log_file) is str:
-            fout = open(log_file, 'a')
-            params['log'] = Logger(observer=FileLogObserver(fout, log_formatter))
-        elif log_file:
-            params['log'] = self.log
-        else:
-            params['log'] = None
-
-        self.prot = PysmurfScriptProtocol(**params)
-        pyth = sys.executable
-        cmd = [pyth, '-u', script_file] + args
-        self.log.info("{exec}, {cmd}", exec=pyth, cmd=cmd)
-        reactor.callFromThread(
-            reactor.spawnProcess, self.prot, pyth, cmd, env=os.environ
-        )
-
-        while self.prot.end_status is None:
-            time.sleep(1)
-
-        end_status = self.prot.end_status
-        self.prot = None
-        if isinstance(end_status.value, ProcessDone):
-            return True, "Script has finished naturally"
-        elif isinstance(end_status.value, ProcessTerminated):
-            return False, "Script has been killed"
+        return ok, msg
 
     def abort_script(self, session, params=None):
         """
@@ -179,6 +199,31 @@ class PysmurfController(DatagramProtocol):
         """
         self.prot.transport.signalProcess('KILL')
         return True, "Aborting process"
+
+    def tune_squids(self, session, params=None):
+        """
+        Task to run tune_squids.py script
+
+        Args:
+
+            args (list, optional):
+                List of command line arguments to pass to the script.
+                Defaults to [].
+            log (string/bool, optional):
+                Determines if and how the process's stdout should be logged.
+                You can pass the path to a logfile, True to use the agent's log,
+                or False to not log at all.
+        """
+        if params is None:
+            params = {}
+
+        ok, msg = self._run_script(
+            '/config/scripts/pysmurf/tune_squids.py',
+            params.get('args', []),
+            params.get('log', True)
+        )
+
+        return ok, msg
 
 
 if __name__ == '__main__':
@@ -195,7 +240,9 @@ if __name__ == '__main__':
     agent, runner = ocs_agent.init_site_agent(args)
     controller = PysmurfController(agent, args.udp_ip, int(args.udp_port))
 
-    agent.register_process('run', controller.run_script, controller.abort_script)
+    agent.register_task('run', controller.run_script)
+    agent.register_task('abort', controller.abort_script)
+    agent.register_task('tune_squids', controller.tune_squids)
 
     reactor.listenUDP(int(args.udp_port), controller)
 
