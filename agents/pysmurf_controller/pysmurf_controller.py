@@ -7,9 +7,12 @@ from twisted.internet.error import ProcessDone, ProcessTerminated
 import sys
 import datetime
 from twisted.logger import Logger, formatEvent, FileLogObserver
+
+from twisted.python.failure import Failure
 import time
 import os
-import hashlib
+import mysql.connector
+import argparse
 
 from ocs.ocs_twisted import TimeoutLock
 from twisted.enterprise import adbapi
@@ -43,20 +46,13 @@ class PysmurfScriptProtocol(protocol.ProcessProtocol):
 
 
 class PysmurfController(DatagramProtocol):
-    def __init__(self, agent, udp_ip: str, udp_port: int, cache_len=10):
+    def __init__(self, agent, args):
         self.agent: ocs_agent.OCSAgent = agent
         self.log = agent.log
         self.lock = ocs_twisted.TimeoutLock()
 
         self.prot = None
         self.protocol_lock = TimeoutLock()
-
-        # For monitoring pysmurf publisher
-        self.udp_ip = udp_ip
-        self.udp_port = udp_port
-
-        self.file_cache = []
-        self.cache_len = cache_len
 
         self.agent.register_feed('pysmurf_files')
 
@@ -69,30 +65,11 @@ class PysmurfController(DatagramProtocol):
         if db_host is not None:
             self.sql_config['host'] = db_host
 
-        self.dbpool = adbapi.ConnectionPool('mysql.connector', **self.sql_config)
-        self.dbpool.runInteraction(self._create_table)
+        self.default_params = {
+            'create_table': args.create_table
+        }
 
-    def _create_table(self, txn):
-        txn.execute("SHOW TABLES;")
-        table_names = [x[0] for x in txn.fetchall()]
-        if 'pysmurf_files' not in table_names:
-            self.log.info("Creating pysmurf_files table")
-            txn.execute("""
-                CREATE TABLE pysmurf_files (
-                    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-                    path VARCHAR(260) UNIQUE NOT NULL,
-                    timestamp TIMESTAMP,
-                    format VARCHAR(32),
-                    type VARCHAR(32),
-                    site VARCHAR(32),
-                    instance_id VARCHAR(32),
-                    copied TINYINT(1),
-                    failed_copy_attempts INT,
-                    md5sum BINARY(16) NOT NULL
-                );
-            """)
-        else:
-            self.log.info("Found existing pysmurf_files table")
+        self.dbpool = adbapi.ConnectionPool('mysql.connector', **self.sql_config)
 
     def _add_file(self, txn, d):
         dt = datetime.datetime.utcfromtimestamp(d['timestamp'])
@@ -112,6 +89,12 @@ class PysmurfController(DatagramProtocol):
         """)
         self.log.info(f"Inserted {d['path']} into database")
 
+        return True
+
+    def _add_file_errback(self, failure: Failure, d):
+        self.log.error(f"ERROR!!! {d['path']} was not added to the database")
+        return failure
+
     def datagramReceived(self, _data, addr):
         """Function called whenever data is passed to UDP socket"""
         data = json.loads(_data)
@@ -119,7 +102,49 @@ class PysmurfController(DatagramProtocol):
         if data['type'] in ['data_file', 'plot']:
             self.log.info("New file: {fname}", fname=data['payload']['path'])
             d = data['payload']
-            self.dbpool.runInteraction(self._add_file, d)
+
+            deferred = self.dbpool.runInteraction(self._add_file, d)
+            deferred.addErrback(self._add_file_errback, d)
+
+
+    def init(self, session, params=None):
+        if params is None:
+            params = {}
+
+        for k in ['create_table']:
+            if k not in params:
+                params[k] = self.default_params[k]
+
+        if params['create_table']:
+            try:
+                con: mysql.connector.MySQLConnection = self.dbpool.connect()
+                cur = con.cursor()
+
+                cur.execute("SHOW TABLES;")
+                table_names = [x[0] for x in cur.fetchall()]
+                if 'pysmurf_files' not in table_names:
+                    self.log.info("Creating pysmurf_files table")
+                    cur.execute("""
+                        CREATE TABLE pysmurf_files (
+                            id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                            path VARCHAR(260) UNIQUE NOT NULL,
+                            timestamp TIMESTAMP,
+                            format VARCHAR(32),
+                            type VARCHAR(32),
+                            site VARCHAR(32),
+                            instance_id VARCHAR(32),
+                            copied TINYINT(1),
+                            failed_copy_attempts INT,
+                            md5sum BINARY(16) NOT NULL
+                        );
+                    """)
+                    cur.commit()
+                else:
+                    self.log.info("Found existing pysmurf_files table")
+            finally:
+                self.dbpool.disconnect(con)
+
+        return True, "Initialized agent"
 
     def _run_script(self, script, args, log):
         """
@@ -226,24 +251,37 @@ class PysmurfController(DatagramProtocol):
         return ok, msg
 
 
+def make_parser(parser=None):
+    if parser is None:
+        parser = argparse.ArgumentParser()
+
+    pgroup = parser.add_argument_group('Agent Config')
+    pgroup.add_argument('--udp-port', type=int,
+                        help="Port for upd-publisher")
+    pgroup.add_argument('--create-table', type=bool,
+                       help="Specifies whether agent should create pysmurf_files"
+                            "table if none exist.", default=True)
+
+    return parser
+
+
 if __name__ == '__main__':
     parser = site_config.add_arguments()
 
-    pgroup = parser.add_argument_group('Agent Options')
-    pgroup.add_argument('--udp-port')
-    pgroup.add_argument('--udp-ip')
+    parser = make_parser(parser)
 
     args = parser.parse_args()
 
     site_config.reparse_args(args, 'PysmurfController')
 
     agent, runner = ocs_agent.init_site_agent(args)
-    controller = PysmurfController(agent, args.udp_ip, int(args.udp_port))
+    controller = PysmurfController(agent, args)
 
+    agent.register_task('init', controller.init, startup=True)
     agent.register_task('run', controller.run_script)
     agent.register_task('abort', controller.abort_script)
     agent.register_task('tune_squids', controller.tune_squids)
 
-    reactor.listenUDP(int(args.udp_port), controller)
+    reactor.listenUDP(args.udp_port, controller)
 
     runner.run(agent, auto_reconnect=True)
