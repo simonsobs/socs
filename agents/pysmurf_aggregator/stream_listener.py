@@ -21,7 +21,7 @@ class G3StreamListener:
         self.log.info("Writing data to {}".format(data_dir))
         self.log.info("New file every {} seconds".format(time_per_file))
 
-        reader = core.G3Reader("tcp://localhost:{}".format(self.port))
+        reader = core.G3Reader("tcp://{}:{}".format(params.get('address', 'localhost'), self.port))
         writer = None
 
         last_meta = None
