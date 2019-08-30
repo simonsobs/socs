@@ -66,8 +66,10 @@ class G3StreamListener:
                 writer(core.G3Frame(core.G3FrameType.EndProcessing))
                 writer = None
 
+        # Once we're done writing close out the file
         if writer is not None:
             writer(core.G3Frame(core.G3FrameType.EndProcessing))
+            writer = None
 
         return True, "Finished Streaming"
 
