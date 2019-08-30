@@ -5,9 +5,10 @@ import os
 
 
 class G3StreamListener:
-    def __init__(self, agent, port=4536):
+    def __init__(self, agent, address='localhost', port=4536):
         self.agent = agent
         self.log = self.agent.log
+        self.address = address
         self.port = port
         self.is_streaming = False
 
@@ -20,8 +21,10 @@ class G3StreamListener:
 
         self.log.info("Writing data to {}".format(data_dir))
         self.log.info("New file every {} seconds".format(time_per_file))
+        self.log.info("Listening to {}:{}".format(self.address, self.port))
 
-        reader = core.G3Reader("tcp://{}:{}".format(params.get('address', 'localhost'), self.port))
+        reader = core.G3Reader("tcp://{}:{}".format(self.address,
+                                                    self.port))
         writer = None
 
         last_meta = None
@@ -68,7 +71,9 @@ if __name__ == '__main__':
     site_config.reparse_args(args, 'G3StreamListener')
 
     agent, runner = ocs_agent.init_site_agent(args)
-    listener = G3StreamListener(agent, port=int(args.port))
+    listener = G3StreamListener(agent,
+                                address=args.address,
+                                port=int(args.port))
 
     agent.register_process('stream', listener.start_stream, listener.stop_stream)
 
