@@ -44,22 +44,21 @@ def _create_file_path(start_time, data_dir):
 
 
 class G3StreamListener:
-    def __init__(self, agent, address='localhost', port=4536):
+    def __init__(self, agent, time_per_file, data_dir, address='localhost', port=4536):
         self.agent = agent
         self.log = self.agent.log
         self.address = address
         self.port = port
         self.is_streaming = False
+        self.time_per_file = time_per_file
+        self.data_dir = data_dir
 
     def start_stream(self, session, params=None):
         if params is None:
             params = {}
 
-        time_per_file = params.get("time_per_file", 60*60)  # [sec]
-        data_dir = params.get("data_dir", "data/")
-
-        self.log.info("Writing data to {}".format(data_dir))
-        self.log.info("New file every {} seconds".format(time_per_file))
+        self.log.info("Data directory set to {}".format(self.data_dir))
+        self.log.info("New file every {} seconds".format(self.time_per_file))
         self.log.info("Listening to {}:{}".format(self.address, self.port))
 
         reader = core.G3Reader("tcp://{}:{}".format(self.address,
@@ -72,7 +71,8 @@ class G3StreamListener:
         while self.is_streaming:
             if writer is None:
                 start_time = time.time()
-                filepath = _create_file_path(start_time, data_dir)
+                filepath = _create_file_path(start_time, self.data_dir)
+                self.log.info("Writing to file {}".format(filepath))
                 writer = core.G3Writer(filename=filepath)
 
                 if last_meta is not None:
@@ -84,7 +84,7 @@ class G3StreamListener:
                     last_meta = f
                 writer(f)
 
-            if (time.time() - start_time) > time_per_file:
+            if (time.time() - start_time) > self.time_per_file:
                 writer(core.G3Frame(core.G3FrameType.EndProcessing))
                 writer = None
 
@@ -102,16 +102,28 @@ class G3StreamListener:
 
 if __name__ == '__main__':
     parser = site_config.add_arguments()
+
+    # Add options specific to this agent.
+    pgroup = parser.add_argument_group('Agent Options')
+    pgroup.add_argument('--auto-start', default=False, type=bool)
+    pgroup.add_argument('--time-per-file', default=3600)
+    pgroup.add_argument('--data-dir', default='/data/')
+    pgroup.add_argument('--port', default=50000)
+    pgroup.add_argument('--address', default='localhost')
+
     args = parser.parse_args()
     site_config.reparse_args(args, 'G3StreamListener')
 
     agent, runner = ocs_agent.init_site_agent(args)
     listener = G3StreamListener(agent,
+                                int(args.time_per_file),
+                                args.data_dir,
                                 address=args.address,
                                 port=int(args.port))
 
     agent.register_process('stream',
                            listener.start_stream,
-                           listener.stop_stream)
+                           listener.stop_stream,
+                           startup=bool(args.auto_start))
 
     runner.run(agent, auto_reconnect=True)
