@@ -1,7 +1,9 @@
+import os
+import time
+import datetime
+
 from ocs import ocs_agent, site_config
 from spt3g import core
-from datetime import datetime
-import os
 
 
 class G3StreamListener:
@@ -16,7 +18,7 @@ class G3StreamListener:
         if params is None:
             params = {}
 
-        time_per_file = params.get("time_per_file", 60*60) # [sec]
+        time_per_file = params.get("time_per_file", 60*60)  # [sec]
         data_dir = params.get("data_dir", "data/")
 
         self.log.info("Writing data to {}".format(data_dir))
@@ -32,16 +34,25 @@ class G3StreamListener:
 
         while self.is_streaming:
             if writer is None:
-                start_time = datetime.utcnow()
-                ts = start_time.timestamp()
-                subdir = os.path.join(data_dir, "{:.5}".format(str(ts)))
+                start_time = time.time()
+                start_datetime = datetime.datetime \
+                                         .fromtimestamp(start_time,
+                                                        tz=datetime
+                                                        .timezone.utc)
 
-                if not os.path.exists(subdir):
-                    os.makedirs(subdir)
+                sub_dir = os.path.join(data_dir,
+                                       "{:.5}".format(str(start_time)))
 
-                filename = start_time.strftime("%Y-%m-%d-%H-%M-%S.g3")
-                filepath = os.path.join(subdir, filename)
+                # Create new dir for current day
+                if not os.path.exists(sub_dir):
+                    os.makedirs(sub_dir)
+
+                time_string = start_datetime.strftime("%Y-%m-%d-%H-%M-%S")
+                filename = "{}.g3".format(time_string)
+                filepath = os.path.join(sub_dir, filename)
+
                 writer = core.G3Writer(filename=filepath)
+
                 if last_meta is not None:
                     writer(last_meta)
 
@@ -51,7 +62,7 @@ class G3StreamListener:
                     last_meta = f
                 writer(f)
 
-            if (datetime.utcnow().timestamp() - ts) > time_per_file:
+            if (time.time() - start_time) > time_per_file:
                 writer(core.G3Frame(core.G3FrameType.EndProcessing))
                 writer = None
 
@@ -75,7 +86,8 @@ if __name__ == '__main__':
                                 address=args.address,
                                 port=int(args.port))
 
-    agent.register_process('stream', listener.start_stream, listener.stop_stream)
+    agent.register_process('stream',
+                           listener.start_stream,
+                           listener.stop_stream)
 
     runner.run(agent, auto_reconnect=True)
-
