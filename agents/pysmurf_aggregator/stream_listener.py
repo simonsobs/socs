@@ -83,6 +83,7 @@ class G3StreamListener:
                 if f.type == core.G3FrameType.Observation:
                     last_meta = f
                 writer(f)
+                writer.Flush()
 
             if (time.time() - start_time) > self.time_per_file:
                 writer(core.G3Frame(core.G3FrameType.EndProcessing))
