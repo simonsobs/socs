@@ -231,7 +231,7 @@ class LS372:
                 try:
                     self.com.send(msg_str)
                     time.sleep(0.01)
-                    resp = str(self.com.recv(4096)[:-2], 'utf-8')
+                    resp = str(self.com.recv(4096), 'utf-8').strip()
                     break
                 except socket.timeout:
                     print("Warning: Caught timeout waiting for response to '%s', trying again " \
