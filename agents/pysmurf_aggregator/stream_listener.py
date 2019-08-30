@@ -6,6 +6,43 @@ from ocs import ocs_agent, site_config
 from spt3g import core
 
 
+def _create_file_path(start_time, data_dir):
+    """Create the file path for .g3 file output.
+
+    Note: This will create directories if they don't exist already.
+
+    Arguments
+    ---------
+    start_time : float
+        Timestamp for start of data collection
+    data_dir : str
+        Top level data directory for output
+
+    Returns
+    -------
+    str
+        Full filepath of .g3 file for output
+
+    """
+    start_datetime = datetime.datetime \
+                             .fromtimestamp(start_time,
+                                            tz=datetime
+                                            .timezone.utc)
+
+    sub_dir = os.path.join(data_dir,
+                           "{:.5}".format(str(start_time)))
+
+    # Create new dir for current day
+    if not os.path.exists(sub_dir):
+        os.makedirs(sub_dir)
+
+    time_string = start_datetime.strftime("%Y-%m-%d-%H-%M-%S")
+    filename = "{}.g3".format(time_string)
+    filepath = os.path.join(sub_dir, filename)
+
+    return filepath
+
+
 class G3StreamListener:
     def __init__(self, agent, address='localhost', port=4536):
         self.agent = agent
@@ -35,22 +72,7 @@ class G3StreamListener:
         while self.is_streaming:
             if writer is None:
                 start_time = time.time()
-                start_datetime = datetime.datetime \
-                                         .fromtimestamp(start_time,
-                                                        tz=datetime
-                                                        .timezone.utc)
-
-                sub_dir = os.path.join(data_dir,
-                                       "{:.5}".format(str(start_time)))
-
-                # Create new dir for current day
-                if not os.path.exists(sub_dir):
-                    os.makedirs(sub_dir)
-
-                time_string = start_datetime.strftime("%Y-%m-%d-%H-%M-%S")
-                filename = "{}.g3".format(time_string)
-                filepath = os.path.join(sub_dir, filename)
-
+                filepath = _create_file_path(start_time, data_dir)
                 writer = core.G3Writer(filename=filepath)
 
                 if last_meta is not None:
