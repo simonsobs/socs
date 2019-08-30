@@ -47,7 +47,7 @@ class G3StreamListener:
 
             frames = reader.Process(None)
             for f in frames:
-                if f.type == core.G3FrameType.Housekeeping:
+                if f.type == core.G3FrameType.Observation:
                     last_meta = f
                 writer(f)
 
