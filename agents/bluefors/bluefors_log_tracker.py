@@ -171,7 +171,7 @@ class LogParser:
             'data': {}
         }
 
-        data['data'][log_name] = data_value
+        data['data'][log_name] = float(data_value)
 
         return data
 
