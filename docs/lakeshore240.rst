@@ -56,12 +56,12 @@ OCS Configuration
 
 To configure your Lakeshore 240 for use with OCS you need to add a
 Lakeshore240Agent block to your ocs configuration file. Here is an example
-configuration block::
+configuration block that will automatically start data acquisition::
 
   {'agent-class': 'Lakeshore240Agent',
    'instance-id': 'LSA22Z2',
    'arguments': [['--serial-number', 'LSA22Z2'],
-                 ['--num-channels', 8]]},
+                 ['--mode', 'acq']]},
 
 Each device requires configuration under 'agent-instances'. See the OCS site
 configs documentation for more details.
