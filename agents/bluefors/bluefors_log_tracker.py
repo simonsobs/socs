@@ -2,8 +2,10 @@ import time
 import threading
 import glob
 import re
-
 import datetime
+import txaio
+
+from os import environ
 
 from ocs import ocs_agent, site_config
 
@@ -14,6 +16,10 @@ from ocs import ocs_agent, site_config
 # switches to scanning a single channel, then the block structure
 # won't be reconstructed and thus won't match the existing
 # structure, causing an error.
+
+# For logging
+txaio.use_twisted()
+LOG = txaio.make_logger()
 
 
 class LogTracker:
@@ -266,6 +272,7 @@ class LogParser:
                       'maxiguage': '(maxigauge)',
                       'channels': '(Channels)',
                       'status': '(Status)',
+                      'errors': '(Errors)',
                       'heater': '(heaters)'}
 
         for k, v in file_types.items():
@@ -304,13 +311,18 @@ class LogParser:
                 data = self._parse_maxigauge_log(new, log_name)
             elif log_type in ['channels', 'status', 'heater']:
                 data = self._parse_multi_value_log(new, log_type, log_name)
+            elif log_type == 'errors':
+                LOG.info("The Bluefors Agent cannot process error logs. " +
+                         "Not publishing.")
+                data = None
             else:
-                print("Warning: Unknown log type. Skipping publish step. " +
-                      "This probably shouldn't happen.")
+                LOG.warn("Warning: Unknown log type. Skipping publish step. " +
+                         "This probably shouldn't happen.")
+                LOG.warn("Filename: {}".format(k))
                 data = None
 
             if data is not None:
-                # print("Data: {}".format(data))
+                LOG.debug("Data: {d}", d=data)
                 app_session.app.publish_to_feed('bluefors', data)
 
 
@@ -334,8 +346,10 @@ class BlueforsAgent:
 
         # Registers bluefors feed
         agg_params = {
-            'frame_length': 10*60  # [sec]
+            'frame_length': float(environ.get("FRAME_LENGTH", 10*60))  # [sec]
         }
+        self.log.debug("frame_length set to {length}",
+                       length=agg_params['frame_length'])
         self.agent.register_feed('bluefors',
                                  record=True,
                                  agg_params=agg_params,
@@ -402,6 +416,9 @@ class BlueforsAgent:
 
 
 if __name__ == '__main__':
+    # Start logging
+    txaio.start_logging(level=environ.get("LOGLEVEL", "info"))
+
     # Get the default ocs argument parser.
     parser = site_config.add_arguments()
 

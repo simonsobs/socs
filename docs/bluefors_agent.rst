@@ -116,6 +116,9 @@ Example docker-compose configuration::
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
       - /home/simonsobs/bluefors/logs/:/logs:ro
+    environment:
+      LOGLEVEL: "info"
+      FRAME_LENGTH: 600
 
 Depending on how you are running your containers it might be easier to hard
 code the `OCS_CONFIG_DIR` environment variable.
