@@ -3,8 +3,10 @@ import time
 import datetime
 import argparse
 
-from ocs import ocs_agent, site_config
-from spt3g import core
+on_rtd = os.environ.get('READTHEDOCS') == 'True'
+if not on_rtd:
+    from ocs import ocs_agent, site_config
+    from spt3g import core
 
 
 def _create_file_path(start_time, data_dir):
