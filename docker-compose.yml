@@ -47,6 +47,13 @@ services:
     build: ./agents/smurf-stream-simulator/
 
   # --------------------------------------------------------------------------
+  # SMuRF timestream aggregator
+  # --------------------------------------------------------------------------
+  ocs-timestream-aggregator:
+    image: "ocs-timestream-aggregator"
+    build: ./agents/timestream_aggregator/
+
+  # --------------------------------------------------------------------------
   # The Bluefors log tracking Agent
   # --------------------------------------------------------------------------
   ocs-bluefors-agent:
