@@ -40,11 +40,11 @@ services:
     build: ./agents/smurf-stream-simulator/
 
   # --------------------------------------------------------------------------
-  # Smurf stream listener/aggregator
+  # SMuRF timestream aggregator
   # --------------------------------------------------------------------------
-  ocs-pysmurf-aggregator:
-    image: "ocs-pysmurf-aggregator"
-    build: ./agents/pysmurf_aggregator/
+  ocs-timestream-aggregator:
+    image: "ocs-timestream-aggregator"
+    build: ./agents/timestream_aggregator/
 
   # --------------------------------------------------------------------------
   # The Bluefors log tracking Agent

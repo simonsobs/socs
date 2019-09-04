@@ -1,6 +1,7 @@
 import os
 import time
 import datetime
+import argparse
 
 from ocs import ocs_agent, site_config
 from spt3g import core
@@ -43,7 +44,7 @@ def _create_file_path(start_time, data_dir):
     return filepath
 
 
-class G3StreamAggregator:
+class TimestreamAggregator:
     """Aggregator for G3 data streams sent over the G3NetworkSender.
 
     This Agent is built to work with the SMuRF data streamer, which collects
@@ -90,7 +91,7 @@ class G3StreamAggregator:
 
     """
 
-    def __init__(self, agent, time_per_file, data_dir, address='localhost',
+    def __init__(self, agent, time_per_file, data_dir, address="localhost",
                  port=4536):
         self.agent = agent
         self.time_per_file = time_per_file
@@ -158,28 +159,49 @@ class G3StreamAggregator:
         return True, "Stopping streaming"
 
 
-if __name__ == '__main__':
-    parser = site_config.add_arguments()
+def make_parser(parser=None):
+    """Build the argument parser for the Agent. Allows sphinx to automatically
+    build documentation based on this function.
+
+    """
+    if parser is None:
+        parser = argparse.ArgumentParser()
 
     # Add options specific to this agent.
-    pgroup = parser.add_argument_group('Agent Options')
-    pgroup.add_argument('--auto-start', default=False, type=bool)
-    pgroup.add_argument('--time-per-file', default=3600)
-    pgroup.add_argument('--data-dir', default='/data/')
-    pgroup.add_argument('--port', default=50000)
-    pgroup.add_argument('--address', default='localhost')
+    pgroup = parser.add_argument_group("Agent Options")
+    pgroup.add_argument("--auto-start", default=False, type=bool,
+                        help="Automatically start listening for data at " +
+                             "Agent startup.")
+    pgroup.add_argument("--time-per-file", default=3600,
+                        help="Amount of time in seconds to put in each file.")
+    pgroup.add_argument("--data-dir", default="/data/",
+                        help="Location of data directory.")
+    pgroup.add_argument("--port", default=50000,
+                        help="Port to listen on.")
+    pgroup.add_argument("--address", default="localhost",
+                        help="Address to listen to.")
 
+    return parser
+
+
+if __name__ == "__main__":
+    # Get the default ocs agrument parser
+    site_parser = site_config.add_arguments()
+    parser = make_parser(site_parser)
+
+    # Parse commandline
     args = parser.parse_args()
-    site_config.reparse_args(args, 'G3StreamAggregator')
+
+    site_config.reparse_args(args, "TimestreamAggregator")
 
     agent, runner = ocs_agent.init_site_agent(args)
-    listener = G3StreamAggregator(agent,
-                                  int(args.time_per_file),
-                                  args.data_dir,
-                                  address=args.address,
-                                  port=int(args.port))
+    listener = TimestreamAggregator(agent,
+                                    int(args.time_per_file),
+                                    args.data_dir,
+                                    address=args.address,
+                                    port=int(args.port))
 
-    agent.register_process('stream',
+    agent.register_process("stream",
                            listener.start_aggregation,
                            listener.stop_aggregation,
                            startup=bool(args.auto_start))

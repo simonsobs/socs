@@ -24,6 +24,7 @@ Agent Reference
    lakeshore240
    lakeshore372
    bluefors_agent
+   timestream_aggregator
 
 
 Indices and tables
