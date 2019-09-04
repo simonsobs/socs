@@ -61,6 +61,7 @@ class PysmurfController(DatagramProtocol):
             'passwd': os.environ["MYSQL_PASSWORD"],
             'database': 'files'
         }
+
         db_host = os.environ.get('MYSQL_HOST')
         if db_host is not None:
             self.sql_config['host'] = db_host
@@ -138,7 +139,7 @@ class PysmurfController(DatagramProtocol):
                             md5sum BINARY(16) NOT NULL
                         );
                     """)
-                    cur.commit()
+                    con.commit()
                 else:
                     self.log.info("Found existing pysmurf_files table")
             finally:
