@@ -1,5 +1,5 @@
-# SOCS Lakeshore 240 Agent
-# socs Agent container for interacting with a Lakeshore 240.
+# SOCS Pysmurf Archiver
+# socs Agent for copying pysmurf data files and plots to archive
 
 # Use socs base image
 FROM socs:latest
@@ -8,6 +8,8 @@ FROM socs:latest
 WORKDIR /app/socs/agents/pysmurf_archiver/
 # Copy this agent into the app/agents directory
 COPY . .
+
+RUN apt-get install rsync -y
 
 RUN pip3 install -r requirements.txt
 
