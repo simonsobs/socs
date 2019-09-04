@@ -1,6 +1,7 @@
 from ocs import ocs_agent, site_config
 from spt3g import core
 import time
+import argparse
 import numpy as np
 
 
@@ -86,16 +87,40 @@ class SmurfStreamSimulator:
         return True, "Stopping stream"
 
 
+def make_parser(parser=None):
+    """Build the argument parser for the Agent. Allows sphinx to automatically
+    build documentation based on this function.
+
+    """
+    if parser is None:
+        parser = argparse.ArgumentParser()
+
+    # Add options specific to this agent.
+    pgroup = parser.add_argument_group("Agent Options")
+    pgroup.add_argument("--auto-start", default=False, type=bool,
+                        help="Automatically start streaming at " +
+                        "Agent startup.")
+    pgroup.add_argument("--port", default=50000,
+                        help="Port to listen on.")
+    pgroup.add_argument("--num-chans", default=528,
+                        help="Number of detector channels to simulate.")
+
+    return parser
+
+
 if __name__ == '__main__':
-    parser = site_config.add_arguments()
+    site_parser = site_config.add_arguments()
+    parser = make_parser(site_parser)
+
     args = parser.parse_args()
     site_config.reparse_args(args, 'SmurfStreamSimulator')
 
     agent, runner = ocs_agent.init_site_agent(args)
-    sim = SmurfStreamSimulator(agent, port=int(args.port), num_chans=int(args.num_chans))
+    sim = SmurfStreamSimulator(agent, port=int(args.port),
+                               num_chans=int(args.num_chans))
 
     # agent.register_task('set', ss.set_channel)
-    agent.register_process('stream', sim.start_stream, sim.stop_stream)
+    agent.register_process('stream', sim.start_stream, sim.stop_stream,
+                           startup=bool(args.auto_start))
 
     runner.run(agent, auto_reconnect=True)
-
