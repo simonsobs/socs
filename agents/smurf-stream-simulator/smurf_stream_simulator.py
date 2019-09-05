@@ -1,25 +1,73 @@
-from ocs import ocs_agent, site_config
-from spt3g import core
+import os
 import time
 import argparse
 import numpy as np
 
+ON_RTD = os.environ.get('READTHEDOCS') == 'True'
+if not ON_RTD:
+    from ocs import ocs_agent, site_config
+    from spt3g import core
+
 
 class StreamChannel:
+    """Simulated SMuRF channel for stream testing.
+
+    Uses np.random.normal to generate random Gaussian data.
+
+    Parameters
+    ----------
+    mean : float
+        Mean value of Gaussian to simulate data with
+    stdev : float
+        Standard deviation of Gaussian to simulate data
+
+    """
     def __init__(self, mean, stdev):
         self.mean = mean
         self.stdev = stdev
 
-    def read(self, t):
+    def read(self):
+        """Read a value from the channel.
+
+        Returns
+        -------
+        float
+            Random, normally distributed, value
+
+        """
         return np.random.normal(self.mean, self.stdev)
 
 
 class SmurfStreamSimulator:
-    def __init__(self, agent, port=4536, num_chans=528):
-        """
+    """OCS Agent to simulate data streaming without connection to a SMuRF.
 
-        OCS Agent to simulate data streaming without connection to a smurf.
-        """
+    Parameters
+    ----------
+    agent : OCSAgent
+        OCSAgent object which forms this Agent
+    port : int
+        Port to send data over
+    num_chans : int
+        Number of channels to simulate
+
+    Attributes
+    ----------
+    agent : OCSAgent
+        OCSAgent object which forms this Agent
+    log : txaio.tx.Logger
+        txaio logger ojbect, created by the OCSAgent
+    port : int
+        Port to send data over
+    writer : spt3g.core.G3NetworkSender
+        G3NetworkSender object for sending the data
+    is_streaming : bool
+        flag to track if we're currently streaming, used in stop task to stop
+        the streaming process
+    channels : list
+        List of simulated channels to stream
+
+    """
+    def __init__(self, agent, port=4536, num_chans=528):
         self.agent = agent
         self.log = agent.log
 
@@ -34,16 +82,18 @@ class SmurfStreamSimulator:
         ]
 
     def start_stream(self, session, params=None):
-        """
-        Task to stream fake detector data as G3Frames
+        """start_stream(params=None)
 
-        Args:
-            frame_rate (float, optional):
-                Frequency [Hz] at which G3Frames are sent over the network.
-                Defaults to 1 frame pers sec.
-            sample_rate (float, optional):
-                Sample rate [Hz] for each channel.
-                Defaults to 10 Hz.
+        Process to stream fake detector data as G3Frames.
+
+        Parameters
+        ----------
+        frame_rate : float, optional
+            Frequency [Hz] at which G3Frames are sent over the network.
+            Defaults to 1 frame pers sec.
+        sample_rate : float, optional
+            Sample rate [Hz] for each channel. Defaults to 10 Hz.
+
         """
         if params is None:
             params = {}
@@ -63,7 +113,7 @@ class SmurfStreamSimulator:
             frame_start = time.time()
             time.sleep(1. / frame_rate)
             frame_stop = time.time()
-            times = np.arange(frame_start, frame_stop, 1./ sample_rate)
+            times = np.arange(frame_start, frame_stop, 1. / sample_rate)
 
             f = core.G3Frame(core.G3FrameType.Scan)
             f['session_id'] = 0
@@ -71,7 +121,7 @@ class SmurfStreamSimulator:
             f['data'] = core.G3TimestreamMap()
 
             for i, chan in enumerate(self.channels):
-                ts = core.G3Timestream([chan.read(t) for t in times])
+                ts = core.G3Timestream([chan.read() for t in times])
                 ts.start = core.G3Time(frame_start * core.G3Units.sec)
                 ts.stop = core.G3Time(frame_stop * core.G3Units.sec)
                 f['data'][str(i)] = ts
@@ -83,6 +133,11 @@ class SmurfStreamSimulator:
         return True, "Finished streaming"
 
     def stop_stream(self, session, params=None):
+        """stop_stream(params=None)
+
+        Stop method associated with start_stream process.
+
+        """
         self.is_streaming = False
         return True, "Stopping stream"
 
@@ -119,7 +174,6 @@ if __name__ == '__main__':
     sim = SmurfStreamSimulator(agent, port=int(args.port),
                                num_chans=int(args.num_chans))
 
-    # agent.register_task('set', ss.set_channel)
     agent.register_process('stream', sim.start_stream, sim.stop_stream,
                            startup=bool(args.auto_start))
 

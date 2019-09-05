@@ -149,7 +149,7 @@ class TimestreamAggregator:
             writer(core.G3Frame(core.G3FrameType.EndProcessing))
             writer = None
 
-        return True, "Finished streaming"
+        return True, "Finished aggregation"
 
     def stop_aggregation(self, session, params=None):
         """stop_aggregation(params=None)
@@ -158,7 +158,7 @@ class TimestreamAggregator:
 
         """
         self.is_streaming = False
-        return True, "Stopping streaming"
+        return True, "Stopping aggregration"
 
 
 def make_parser(parser=None):
