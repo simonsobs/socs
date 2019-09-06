@@ -2,6 +2,12 @@ import os
 import time
 import datetime
 import argparse
+import txaio
+
+from os import environ
+
+# For logging
+txaio.use_twisted()
 
 on_rtd = os.environ.get('READTHEDOCS') == 'True'
 if not on_rtd:
@@ -187,6 +193,9 @@ def make_parser(parser=None):
 
 
 if __name__ == "__main__":
+    # Start logging
+    txaio.start_logging(level=environ.get("LOGLEVEL", "info"))
+
     # Get the default ocs agrument parser
     site_parser = site_config.add_arguments()
     parser = make_parser(site_parser)
