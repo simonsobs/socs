@@ -128,23 +128,36 @@ class TimestreamAggregator:
 
         last_meta = None
         self.is_streaming = True
+        last_frame_write_time = None
 
         while self.is_streaming:
+            # Currenly this blocks until we get a Frame, thus we'll only write
+            # a file once we've started data collection.
+            frames = reader.Process(None)
+
+            if last_frame_write_time is not None:
+                if (time.time() - last_frame_write_time) > 5:
+                    self.log.debug("Last frame written more than 5 seconds " +
+                                   "ago, rotating file")
+                    writer(core.G3Frame(core.G3FrameType.EndProcessing))
+                    writer = None
+
             if writer is None:
                 start_time = time.time()
                 filepath = _create_file_path(start_time, self.data_dir)
                 self.log.info("Writing to file {}".format(filepath))
                 writer = core.G3Writer(filename=filepath)
 
+                # Write the last metadata frame to the start of the new file
                 if last_meta is not None:
                     writer(last_meta)
 
-            frames = reader.Process(None)
             for f in frames:
                 if f.type == core.G3FrameType.Observation:
                     last_meta = f
                 writer(f)
                 writer.Flush()
+                last_frame_write_time = time.time()
 
             if (time.time() - start_time) > self.time_per_file:
                 writer(core.G3Frame(core.G3FrameType.EndProcessing))
