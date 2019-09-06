@@ -180,7 +180,7 @@ def make_parser(parser=None):
     pgroup.add_argument("--auto-start", default=False, type=bool,
                         help="Automatically start listening for data at " +
                              "Agent startup.")
-    pgroup.add_argument("--time-per-file", default=3600,
+    pgroup.add_argument("--time-per-file", default=600,
                         help="Amount of time in seconds to put in each file.")
     pgroup.add_argument("--data-dir", default="/data/",
                         help="Location of data directory.")
