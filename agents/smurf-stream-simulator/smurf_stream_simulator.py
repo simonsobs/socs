@@ -56,6 +56,8 @@ class SmurfStreamSimulator:
         OCSAgent object which forms this Agent
     log : txaio.tx.Logger
         txaio logger ojbect, created by the OCSAgent
+    target_host : str
+        Target remote host address
     port : int
         Port to send data over
     writer : spt3g.core.G3NetworkSender
@@ -67,13 +69,14 @@ class SmurfStreamSimulator:
         List of simulated channels to stream
 
     """
-    def __init__(self, agent, port=4536, num_chans=528):
+    def __init__(self, agent, target_host="*", port=4536, num_chans=528):
         self.agent = agent
         self.log = agent.log
 
         self.port = port
 
-        self.writer = core.G3NetworkSender(hostname="*", port=self.port)
+        self.writer = core.G3NetworkSender(hostname=target_host,
+                                           port=self.port)
 
         self.is_streaming = False
 
@@ -155,6 +158,8 @@ def make_parser(parser=None):
     pgroup.add_argument("--auto-start", default=False, type=bool,
                         help="Automatically start streaming at " +
                         "Agent startup.")
+    pgroup.add_argument("--target-host", default="*",
+                        help="Target remote host.")
     pgroup.add_argument("--port", default=50000,
                         help="Port to listen on.")
     pgroup.add_argument("--num-chans", default=528,
@@ -171,7 +176,8 @@ if __name__ == '__main__':
     site_config.reparse_args(args, 'SmurfStreamSimulator')
 
     agent, runner = ocs_agent.init_site_agent(args)
-    sim = SmurfStreamSimulator(agent, port=int(args.port),
+    sim = SmurfStreamSimulator(agent, target_host=args.target_host,
+                               port=int(args.port),
                                num_chans=int(args.num_chans))
 
     agent.register_process('stream', sim.start_stream, sim.stop_stream,
