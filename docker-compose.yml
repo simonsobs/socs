@@ -33,6 +33,13 @@ services:
     build: ./agents/pysmurf_controller/
 
   # --------------------------------------------------------------------------
+  # The Pysmurf Monitor Agent
+  # --------------------------------------------------------------------------
+  ocs-pysmurf-monitor-agent:
+    image: "ocs-pysmurf-monitor-agent"
+    build: ./agents/pysmurf_monitor/
+
+  # --------------------------------------------------------------------------
   # The Pysmurf Archiver Agent
   # --------------------------------------------------------------------------
   ocs-pysmurf-archiver-agent:
