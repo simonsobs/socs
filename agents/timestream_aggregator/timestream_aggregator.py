@@ -154,18 +154,30 @@ class TimestreamAggregator:
         self.log.info("New file every {} seconds".format(self.time_per_file))
         self.log.info("Listening to {}:{}".format(self.address, self.port))
 
+        self.is_streaming = True
+
         reader = self._establish_reader_connection()
         writer = None
 
+        frames = []
         last_meta = None
-        self.is_streaming = True
         last_frame_write_time = None
 
         while self.is_streaming:
-            # Currenly this blocks until we get a Frame, thus we'll only write
-            # a file once we've started data collection.
-            frames = reader.Process(None)
+            # Try to read frames or reconnect to NetworkSender until we get
+            # something.
+            if not frames:
+                while not frames:
+                    frames = reader.Process(None)
+                    if frames:
+                        continue
+                    self.log.debug("Could not read frames. Connection " +
+                                   "timed out, or G3NetworkSender offline. " +
+                                   "Reestablishing connection...")
+                    reader = self._establish_reader_connection()
 
+            # Rotate files to match data acquisitions (assuming 5 seconds apart
+            # or more until flow control improved on streaming end)
             if last_frame_write_time is not None:
                 if (time.time() - last_frame_write_time) > 5:
                     self.log.debug("Last frame written more than 5 seconds " +
@@ -189,6 +201,9 @@ class TimestreamAggregator:
                 writer(f)
                 writer.Flush()
                 last_frame_write_time = time.time()
+
+            # clear frames list
+            frames = []
 
             if (time.time() - start_time) > self.time_per_file:
                 writer(core.G3Frame(core.G3FrameType.EndProcessing))
