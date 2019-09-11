@@ -109,6 +109,38 @@ class TimestreamAggregator:
         self.is_streaming = False
         self.log = self.agent.log
 
+    def _establish_reader_connection(self, timeout=5):
+        """Establish the connection to the G3NetworkSender.
+
+        This will keep trying until a connection is established.
+
+        Parameters
+        ----------
+        timeout : int
+            Timeout in seconds for the G3Reader, afterwhich the connection will
+            drop and G3Reader will return empty lists on each Process call.
+
+        Returns
+        -------
+        reader : spt3g.core.G3Reader
+            The G3Reader object connected to the configured address and port
+
+        """
+        reader = None
+        while reader is None:
+            try:
+                reader = core.G3Reader("tcp://{}:{}".format(self.address,
+                                                            self.port),
+                                       timeout=timeout)
+            except RuntimeError:
+                self.log.error("G3Reader could not connect. Retrying...")
+                time.sleep(1)
+
+        self.log.info("G3Reader connection established")
+
+        return reader
+
+
     def start_aggregation(self, session, params=None):
         """start_aggregation(params=None)
 
@@ -122,8 +154,7 @@ class TimestreamAggregator:
         self.log.info("New file every {} seconds".format(self.time_per_file))
         self.log.info("Listening to {}:{}".format(self.address, self.port))
 
-        reader = core.G3Reader("tcp://{}:{}".format(self.address,
-                                                    self.port))
+        reader = self._establish_reader_connection()
         writer = None
 
         last_meta = None
