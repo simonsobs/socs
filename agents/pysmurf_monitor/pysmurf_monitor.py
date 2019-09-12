@@ -4,6 +4,8 @@ from twisted.internet.protocol import DatagramProtocol
 from twisted.internet import reactor
 import datetime
 
+from socs.db import pysmurf_files_manager
+
 from twisted.python.failure import Failure
 import os
 import mysql.connector
@@ -11,8 +13,7 @@ import argparse
 
 from twisted.enterprise import adbapi
 
-from socs.util import get_db_connection, get_md5sum
-
+from socs.util import get_md5sum
 
 class PysmurfMonitor(DatagramProtocol):
     def __init__(self, agent, args):
@@ -49,7 +50,6 @@ class PysmurfMonitor(DatagramProtocol):
                 '{d['path']}', '{dt}', '{d['format']}', '{d['type']}', '{site}', 
                 '{instance_id}', 0, 0, UNHEX('{md5sum}')                    
             )
-            
         """)
         self.log.info(f"Inserted {d['path']} into database")
 
@@ -70,7 +70,6 @@ class PysmurfMonitor(DatagramProtocol):
             deferred = self.dbpool.runInteraction(self._add_file, d)
             deferred.addErrback(self._add_file_errback, d)
 
-
     def init(self, session, params=None):
         if params is None:
             params = {}
@@ -83,28 +82,8 @@ class PysmurfMonitor(DatagramProtocol):
             try:
                 con: mysql.connector.MySQLConnection = self.dbpool.connect()
                 cur = con.cursor()
-
-                cur.execute("SHOW TABLES;")
-                table_names = [x[0] for x in cur.fetchall()]
-                if 'pysmurf_files' not in table_names:
-                    self.log.info("Creating pysmurf_files table")
-                    cur.execute("""
-                        CREATE TABLE pysmurf_files (
-                            id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-                            path VARCHAR(260) UNIQUE NOT NULL,
-                            timestamp TIMESTAMP,
-                            format VARCHAR(32),
-                            type VARCHAR(32),
-                            site VARCHAR(32),
-                            instance_id VARCHAR(32),
-                            copied TINYINT(1),
-                            failed_copy_attempts INT,
-                            md5sum BINARY(16) NOT NULL
-                        );
-                    """)
-                    con.commit()
-                else:
-                    self.log.info("Found existing pysmurf_files table")
+                pysmurf_files_manager.create_table(cur, update=True)
+                con.commit()
             finally:
                 self.dbpool.disconnect(con)
 
