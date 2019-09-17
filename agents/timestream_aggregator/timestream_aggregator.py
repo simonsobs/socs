@@ -102,6 +102,9 @@ class FrameRecorder:
     TimestreamAggregator OCS Agent. They're meant to be looped over still and
     for that we provide the run() method.
 
+    This class is not safe to run in the twisted reactor, run in a worker
+    thread.
+
     Parameters
     ----------
     file_duration : int
@@ -143,6 +146,9 @@ class FrameRecorder:
         For enumerating files within an acquisition. We want to split files in
         10 minute intervals, but the names should remain the same with a
         "_0001" style suffix, which we track with this attribute.
+    start_time : float
+        Start time of current file. Only agrees with basename time if
+        filename_suffix == 0.
     dirname : str
         The directory path currently in use.
     basename : str
@@ -170,6 +176,11 @@ class FrameRecorder:
         self.start_time = None
         self.dirname = None
         self.basename = None
+
+    def __del__(self):
+        """Clean up by closing out the file once writing is complete."""
+        if self.writer is not None:
+            self.close_file()
 
     def _establish_reader_connection(self, timeout=5):
         """Establish the connection to the G3NetworkSender.
@@ -205,20 +216,20 @@ class FrameRecorder:
         """Try to read frames or reconnect to NetworkSender until we get
         something.
 
-        Closes out the current file with an EndProcessing frame if the reader
-        timesout or has otherwise lost its connection.
+        Clear internally buffered data and cleanup with call to
+        self.close_file() if the reader timesout or has otherwise lost its
+        connection.
 
         """
-        if not self.frames:
-            while not self.frames:
-                self.frames = self.reader.Process(None)
-                if self.frames:
-                    continue
-                self.log.debug("Could not read frames. Connection " +
-                               "timed out, or G3NetworkSender offline. " +
-                               "Reestablishing connection...")
-                self.close_file()
-                self.reader = self._establish_reader_connection()
+        while not self.frames:
+            self.frames = self.reader.Process(None)
+            if self.frames:
+                break
+            self.log.debug("Could not read frames. Connection " +
+                           "timed out, or G3NetworkSender offline. " +
+                           "Reestablishing connection...")
+            self.close_file()
+            self.reader = self._establish_reader_connection()
 
     def check_for_frame_gap(self, gap_size=5):
         """Check for incoming frame time gap. If frames stop coming in likely
@@ -241,9 +252,10 @@ class FrameRecorder:
             return
 
         if self.last_frame_write_time is not None:
-            if (time.time() - self.last_frame_write_time) > gap_size:
+            t_diff = time.time() - self.last_frame_write_time
+            if t_diff > gap_size:
                 self.log.debug("Last frame written more than {g} seconds " +
-                               "ago, rotating file", g=gap_size)
+                               "ago, rotating file", g=t_diff)
                 self.close_file()
 
     def create_new_file(self):
@@ -289,7 +301,7 @@ class FrameRecorder:
     def write_frames_to_file(self):
         """Write all frames to file.
 
-        Note: Assumes file writer is already instatiated.
+        Note: Assumes file writer is already instantiated.
 
         """
         for f in self.frames:
@@ -313,16 +325,18 @@ class FrameRecorder:
             return
 
         if (time.time() - self.start_time) > self.time_per_file:
+            # Flush internal cache and clean-up (no frame written)
             self.writer(core.G3Frame(core.G3FrameType.EndProcessing))
             self.writer = None
             self.filename_suffix += 1
 
     def close_file(self):
-        """Close a file. Write the EndProcessing frame, set self.writer to
+        """Close a file. Clean up with EndProcessing frame, set self.writer to
         None, rezero suffix.
 
         """
         if self.writer is not None:
+            # Flush internal cache and clean-up (no frame written)
             self.writer(core.G3Frame(core.G3FrameType.EndProcessing))
         self.writer = None
         self.filename_suffix = 0
@@ -402,7 +416,9 @@ class TimestreamAggregator:
     def start_aggregation(self, session, params=None):
         """start_aggregation(params=None)
 
-        OCS Process to start data aggregation.
+        OCS Process to start data aggregation. This Process uses FrameRecorder,
+        which deals with I/O, requiring this process to run in a worker thread.
+        Be sure to register with blocking=True.
 
         """
         if params is None:
@@ -420,9 +436,8 @@ class TimestreamAggregator:
         while self.is_streaming:
             recorder.run()
 
-        # Once we're done writing close out the file
-        if recorder.writer is not None:
-            recorder.close_file()
+        # Explicitly clean up when done
+        del recorder
 
         return True, "Finished aggregation"
 
