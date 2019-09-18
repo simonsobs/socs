@@ -10,6 +10,50 @@ import datetime
 
 from twisted.enterprise import adbapi
 
+
+def create_local_path(file, data_dir):
+    """
+        Creates local path from file database entry.
+        If subdirectories do not exist, they will be created.
+
+        The file path will be:
+
+            data_dir/<5 ctime digits>/<file_type>/<file_name>
+
+        E.g.
+
+            /data/pysmurf/15647/tuning/1564799250_tuning_b1.txt
+
+        Arguments
+        ---------
+        file: dict
+            Database entry for file.
+        data_dir: string
+            Path to base directory where files should be copied.
+
+        Returns
+        -------
+        path: string
+            Local pathname for file
+    """
+
+    print(file['path'])
+    filename = os.path.basename(file['path'])
+
+    dt = file['timestamp']
+
+    subdir = os.path.join(
+                data_dir,
+                f"{str(dt.timestamp()):.5}",
+                f"{file['type']}"
+             )
+
+    if not os.path.exists(subdir):
+        os.makedirs(subdir)
+
+    return os.path.join(subdir, filename)
+
+
 class PysmurfArchiverAgent:
     """
     Agent to archive pysmurf config files and plots. It should be run on the
@@ -27,6 +71,39 @@ class PysmurfArchiverAgent:
 
         /data/pysmurf/15647/tuning/1564799250_tuning_b1.txt
 
+    Arguments
+    ---------
+    agent: ocs.ocs_agent.OCSAgent
+        OCSAgent object which is running
+    data_dir: string
+        Path to base directory where files will be copied.
+    targets: List[string]
+        list of instance-id's of pysmurf-monitors who publish the files
+        that should be copied over
+    host: string
+        Host name of the smurf-server that host original files
+    user: string
+        username on host to use for copying
+
+    Attributes
+    -----------
+    agent: ocs.ocs_agent.OCSAgent
+        OCSAgent object which is running
+    log: txaio.tx.Logger
+        txaio logger object created by agent
+    data_dir: string
+        Path to base directory where files will be copied.
+    targets: List[string]
+        list of instance-id's of pysmurf-monitors who publish the files
+        that should be copied over
+    host: string
+        Host name of the smurf-server that host original files
+    user: string
+        username on host to use for copying
+    running: bool
+        If run task is currently running
+    sql_config: dict
+        sql login info
     """
     def __init__(self, agent, data_dir=None, targets=[], host=None, user=None):
         self.agent: ocs_agent.OCSAgent = agent
@@ -38,7 +115,6 @@ class PysmurfArchiverAgent:
         self.targets = targets
 
         self.running = False
-        self.file_queue = queue.Queue()
 
         self.sql_config = {
             'user': os.environ["MYSQL_USER"],
@@ -49,14 +125,27 @@ class PysmurfArchiverAgent:
         if db_host is not None:
             self.sql_config['host'] = db_host
 
-    def _copy_file(self, old_path, new_path):
+    def _copy_file(self, old_path, new_path, md5sum=None):
         """
         Copies file from remote computer to host.
         Called from the worker thread of the `run` process.
 
-        Args:
-            old_path (string): Path to file on remote computer
-            new_path (string): Path to file on local computer
+        If md5sum is specified, the md5sum of the new file will be checked against
+        the old one. If it does not match, copied file will be deleted.
+
+        Arguments
+        ---------
+        old_path: string
+            Path to file on remote computer
+        new_path: string
+            Path to file on local computer
+        md5sum: string, optional
+            md5sum of file on remote computer.
+
+        Returns
+        -------
+        success: bool
+            True if file copied successfully. False otherwise
         """
         # Copies file over from computer
         cmd = ["rsync"]
@@ -72,7 +161,23 @@ class PysmurfArchiverAgent:
         cmd.append(new_path)
 
         self.log.info(f"Running: {' '.join(cmd)}")
-        subprocess.check_output(cmd)
+
+        try:
+            subprocess.check_output(cmd)
+        except subprocess.CalledProcessError as e:
+            self.log.error("rsync call failed:\n{e}", e=e)
+            return False
+
+        # Verify md5sum
+        new_md5 = get_md5sum(new_path)
+        if new_md5 != md5sum:
+            os.remove(new_path)
+            self.log.error("{} copy failed. md5sums do not match.")
+            return False
+
+        self.log.debug(f"Successfully copied {old_path} to {new_path}")
+        return True
+
 
     def run(self, session, params=None):
         """
@@ -89,62 +194,43 @@ class PysmurfArchiverAgent:
             with get_db_connection(**self.sql_config) as con:
                 cur = con.cursor(dictionary=True)
 
-                target_strings = [f"'{t}'" for t in self.targets]
-                query = f"""
-                    SELECT * FROM pysmurf_files WHERE copied=0 AND
-                        instance_id IN ({', '.join(target_strings)})
-                """
-                cur.execute(query)
+                query = """
+                    SELECT * FROM pysmurf_files 
+                    WHERE copied=0 AND instance_id IN ({})
+                """.format(", ".join(["%s" for _ in self.targets]))
+
+                cur.execute(query, self.targets)
 
                 files = cur.fetchall()
-
-                self.log.info(f"Found {len(files)} uncopied files.")
+                if files:
+                    self.log.debug(f"Found {len(files)} uncopied files.")
 
                 for f in files:
-                    _, fname = os.path.split(f['path'])
 
-                    # Should get the timestamp from db
-                    dt = f['timestamp']
+                    new_path = create_local_path(f, self.data_dir)
 
-                    subdir = os.path.join(self.data_dir,
-                                          f"{str(dt.timestamp()):.5}",
-                                          f"{f['type']}")
-
-                    if not os.path.exists(subdir):
-                        os.makedirs(subdir)
-
-                    new_path = os.path.join(subdir, fname)
-
-                    try:
-                        self._copy_file(f['path'], new_path)
-
-                        # Verify md5sum
-                        new_md5 = get_md5sum(new_path)
-                        if (new_md5 != binascii.hexlify(f['md5sum']).decode()):
-                            os.remove(new_path)
-                            raise RuntimeError("Copied file failed md5sum verification.")
-                        else:
-                            self.log.info(f"Sucessfully copied {f['path']} to {new_path}")
-
-                        query = f"""
-                            UPDATE pysmurf_files SET path='{new_path}', copied=1 
-                            WHERE id={f['id']}
+                    md5sum = binascii.hexlify(f['md5sum']).decode()
+                    if self._copy_file(f['path'], new_path, md5sum=md5sum):
+                        # If file copied successfully
+                        self.log.debug("Successfully coppied file {}".format(f['path']))
+                        query = """
+                            UPDATE pysmurf_files SET path=%s, copied=1 
+                            WHERE id=%s
                         """
-                        cur.execute(query)
+                        cur.execute(query, (new_path, f['id']))
+                    else:
+                        self.log.debug("Failed to copy {}".format(f['path']))
 
-                    except (subprocess.CalledProcessError, RuntimeError) as e:
-                        self.log.warn(f"Failed to copy {f['path']}")
-                        cur.execute(f"""
+                        query = """
                             UPDATE pysmurf_files 
                             SET failed_copy_attempts = failed_copy_attempts + 1
-                            WHERE id={f['id']}
-                        """)
-                        print(e)
+                            WHERE id=%s
+                        """
+                        cur.execute(query, (f['id'],))
 
                 con.commit()
 
-            # This time should probably be set as site-config param
-            time.sleep(20)
+            time.sleep(10)
 
         return True, "Stopped archiving data."
 
@@ -184,7 +270,6 @@ def main():
 
     if type(args.target) == str:
         args.target = [args.target]
-
     agent, runner = ocs_agent.init_site_agent(args)
 
     archiver = PysmurfArchiverAgent(agent, data_dir=args.data_dir,

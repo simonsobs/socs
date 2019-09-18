@@ -7,28 +7,54 @@ import getpass
 
 
 class Column:
-    def __init__(self, name, type, opts=""):
-        self.name, self.type, self.opts = name, type, opts
+    def __init__(self, name, type, opts="", fmt="%s"):
+        self.name = name
+        self.type = type
+        self.opts = opts
+        self.fmt = fmt
 
     def __str__(self):
         return " ".join([self.name, self.type, self.opts])
 
 
-columns = [Column(*args) for args in [
-    ("id", "INT", "NOT NULL AUTO_INCREMENT PRIMARY KEY"),
-    ("path", "VARCHAR(260)", "UNIQUE NOT NULL"),
-    ("timestamp", "TIMESTAMP"),
-    ("format" ,"VARCHAR(32)"),
-    ("type", "VARCHAR(32)"),
-    ("site", "VARCHAR(32)"),
-    ("instance_id", "VARCHAR(32)"),
-    ("copied", "TINYINT(1)"),
-    ("failed_copy_attempts", "INT"),
-    ("md5sum", "BINARY(16)", "NOT NULL"),
-    ("pysmurf_version", "VARCHAR(64)"),
-    ("socs_version", "VARCHAR(64)"),
-    ("script_path", "VARCHAR(64)")
-]]
+columns = [
+    Column("id", "INT", opts="NOT NULL AUTO_INCREMENT PRIMARY KEY"),
+    Column("path", "VARCHAR(260)", opts="UNIQUE NOT NULL"),
+    Column("timestamp", "TIMESTAMP"),
+    Column("format", "VARCHAR(32)"),
+    Column("plot", "TINYINT(1)"),
+    Column("type", "VARCHAR(32)", opts="NOT NULL"),
+    Column("site", "VARCHAR(32)"),
+    Column("pub_id", "INT"),
+    Column("instance_id", "VARCHAR(32)"),
+    Column("copied", "TINYINT(1)"),
+    Column("failed_copy_attempts", "INT"),
+    Column("md5sum", "BINARY(16)", opts="NOT NULL", fmt="UNHEX(%s)"),
+    Column("pysmurf_version", "VARCHAR(64)"),
+    Column("socs_version", "VARCHAR(64)"),
+]
+col_dict = {c.name: c for c in columns}
+
+
+def add_entry(cur, entry):
+    """
+    Adds entry to table.
+    """
+
+    if not set(col_dict.keys()).issuperset(entry.keys()):
+        raise RuntimeError(
+            "Invalid file entry provided... \n"
+            "Keys given: {}\n"
+            "Keys allowed: {}".format(entry.keys(), col_dict.keys())
+        )
+    keys = list(entry.keys())
+    vals = [entry[k] for k in keys]
+    fmts = [col_dict[k].fmt for k in keys]
+
+    query = "INSERT INTO pysmurf_files ({}) VALUES ({})"\
+            .format(", ".join(keys), ", ".join(fmts))
+
+    cur.execute(query, tuple(vals))
 
 
 def create_table(cur, update=True):
@@ -68,7 +94,7 @@ def update_columns(cur):
     missing.
     """
     cur.execute("DESCRIBE pysmurf_files");
-    existing_cols = [c[0] for c in cur.fetchall()]
+    existing_cols = set([c[0] for c in cur.fetchall()])
 
     try:
         for c in columns:
@@ -93,7 +119,7 @@ def drop_table(cur):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('cmd', choices=['create', 'update', 'drop'])
+    parser.add_argument('cmd', choices=['create', 'update', 'drop', 'test'])
     parser.add_argument('--password', '-p', type=str,
                         help="Password for development database")
     args = parser.parse_args()
@@ -103,23 +129,42 @@ if __name__ == '__main__':
         'database': 'files',
         'passwd': args.password
     }
+
     if sql_config['passwd'] is None:
         sql_config['passwd'] = getpass.getpass("Password for development db: ")
 
     con = mysql.connector.connect(**sql_config)
     cur = con.cursor()
     try:
+        if args.cmd == 'test':
+            import datetime
+            entry = {
+                'path':'/data/pysmurf_test/1568779322_fake_tuning4.txt',
+                'type': 'fake_tuning',
+                'timestamp': datetime.datetime(2019, 9, 18, 4, 2, 2, 188764),
+                'plot': 1,
+                'format': 'txt',
+                'md5sum': '7ac66c0f148de9519b8bd264312c4d64',
+                'site': 'observatory',
+                'instance_id': 'pysmurf-monitor',
+                'copied': 0,
+                'failed_copy_attempts': 0,
+                'socs_version': '0+untagged.140.g5307c6b.dirty'
+            }
+
+            add_entry(cur, entry)
+            con.commit()
         if args.cmd == 'create':
-            create_table(con)
+            create_table(cur)
             con.commit()
         elif args.cmd == 'update':
-            update_columns(con)
+            update_columns(cur)
             con.commit()
         elif args.cmd == 'drop':
             while True:
                 resp = input("Are you sure you want to drop pysmurf_files? [y/n]: ")
                 if resp.lower().strip() == 'y':
-                    drop_table(con)
+                    drop_table(cur)
                     con.commit()
                     break
                 elif resp.lower().strip() == 'n':

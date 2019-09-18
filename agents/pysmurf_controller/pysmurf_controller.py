@@ -1,77 +1,111 @@
-from ocs import ocs_agent, site_config, client_t, ocs_twisted
+from ocs import ocs_agent, site_config, ocs_twisted
 from ocs.ocs_agent import log_formatter
-import json
-from twisted.internet.protocol import DatagramProtocol
 from twisted.internet import reactor, protocol
+from twisted.python.failure import Failure
 from twisted.internet.error import ProcessDone, ProcessTerminated
 import sys
-import datetime
-from twisted.logger import Logger, formatEvent, FileLogObserver
-
-from twisted.python.failure import Failure
+from twisted.logger import Logger, FileLogObserver
+from typing import Optional
 import time
 import os
-import mysql.connector
 import argparse
 
-import importlib
-
 from ocs.ocs_twisted import TimeoutLock
-from twisted.enterprise import adbapi
-
-from socs.util import get_db_connection, get_md5sum
 
 
 class PysmurfScriptProtocol(protocol.ProcessProtocol):
+    """
+    The process protocol used to dispatch external Pysmurf scripts, and manage
+    the stdin, stdout, and stderr pipelines.
+
+    Arguments
+    ---------
+    path : str
+        Path of script to run.
+    log : txaio.tx.Logger
+        txaio logger object, used to log stdout and stderr messages.
+
+    Attributes
+    -----------
+    path : str
+        Path of script to run.
+    log : txaio.tx.Logger
+        txaio logger object, used to log stdout and stderr messages.
+    end_status : twisted.python.failure.Failure
+        Reason that the process ended.
+    """
     def __init__(self, path, log=None):
         self.path = path
         self.log = log
-        self.end_status = None
+        self.end_status: Optional[Failure] = None
 
     def connectionMade(self):
-        print("Connection Made")
+        """Called when process is started"""
         self.transport.closeStdin()
 
     def outReceived(self, data):
+        """Called whenever data is received through stdout"""
         if self.log:
             self.log.info("{path}: {data}",
                           path=self.path.split('/')[-1],
                           data=data.strip().decode('utf-8'))
 
     def errReceived(self, data):
+        """Called whenever data is received through stderr"""
         self.log.error(data)
 
-    def processExited(self, status):
-        # if self.log is not None:
-        #     self.log.info("Process ended: {reason}", reason=status)
+    def processExited(self, status: Failure):
+        """Called when process has exited."""
+        if self.log is not None:
+            self.log.info("Process ended: {reason}", reason=status)
+
         self.end_status = status
 
 
 class PysmurfController:
+    """
+    Controller object for running pysmurf scripts and functions.
+
+    Arguments
+    ---------
+    agent: ocs.ocs_agent.OCSAgent
+        OCSAgent object which is running
+    args: Namespace
+        argparse namespace with site_config and agent specific arguments
+
+    Attributes
+    ----------
+    agent: ocs.ocs_agent.OCSAgent
+        OCSAgent object which is running
+    log: txaio.tx.Logger
+        txaio logger object created by agent
+    prot: PysmurfScriptProtocol
+        protocol used to call and monitor external pysmurf scripts
+    protocol_lock: ocs.ocs_twisted.TimeoutLock
+        lock to protect multiple pysmurf scripts from running simultaneously.
+    """
     def __init__(self, agent, args):
         self.agent: ocs_agent.OCSAgent = agent
         self.log = agent.log
-        self.lock = ocs_twisted.TimeoutLock()
 
         self.prot = None
         self.protocol_lock = TimeoutLock()
-
-        self.plugin = args.plugin
 
     def _run_script(self, script, args, log):
         """
         Runs a pysmurf control script. Run primarily from tasks in worker threads.
 
-        Args:
-
-            script (string): path to the script you wish to run
-            args (list, optional):
-                List of command line arguments to pass to the script.
-                Defaults to [].
-            log (string/bool, optional):
-                Determines if and how the process's stdout should be logged.
-                You can pass the path to a logfile, True to use the agent's log,
-                or False to not log at all.
+        Arguments
+        ----------
+        script: string
+            path to the script you wish to run
+        args: list, optional
+            List of command line arguments to pass to the script.
+            Defaults to [].
+        log: string/bool, optional
+            Determines if and how the process's stdout should be logged.
+            You can pass the path to a logfile, True to use the agent's log,
+            or False to not log at all.
         """
 
         with self.protocol_lock.acquire_timeout(0, job=script) as acquired:
@@ -108,21 +142,22 @@ class PysmurfController:
                 return False, "Script has been killed"
 
     def run_script(self, session, params=None):
-        """
+        """run(params=None)
+
         Run task.
         Runs a pysmurf control script.
 
-        Args:
-
-            script (string): path to the script you wish to run
-            args (list, optional):
-                List of command line arguments to pass to the script.
-                Defaults to [].
-            log (string/bool, optional):
-                Determines if and how the process's stdout should be logged.
-                You can pass the path to a logfile, True to use the agent's log,
-                or False to not log at all.
-
+        Arguments
+        ----------
+        script: string
+            path to the script you wish to run
+        args: list, optional
+            List of command line arguments to pass to the script.
+            Defaults to [].
+        log: string/bool, optional
+            Determines if and how the process's stdout should be logged.
+            You can pass the path to a logfile, True to use the agent's log,
+            or False to not log at all.
         """
         ok, msg = self._run_script(params['script'],
                                    params.get('args', []),
@@ -139,17 +174,17 @@ class PysmurfController:
 
     def tune_squids(self, session, params=None):
         """
-        Task to run tune_squids.py script
+        Task to run /config/scripts/pysmurf/tune_squids.py
 
-        Args:
-
-            args (list, optional):
-                List of command line arguments to pass to the script.
-                Defaults to [].
-            log (string/bool, optional):
-                Determines if and how the process's stdout should be logged.
-                You can pass the path to a logfile, True to use the agent's log,
-                or False to not log at all.
+        Arguments
+        ---------
+        args: list, optional
+            List of command line arguments to pass to the script.
+            Defaults to [].
+        log: string/bool, optional
+            Determines if and how the process's stdout should be logged.
+            You can pass the path to a logfile, True to use the agent's log,
+            or False to not log at all.
         """
         if params is None:
             params = {}
@@ -164,6 +199,9 @@ class PysmurfController:
 
 
 def make_parser(parser=None):
+    """
+    Builds argsparse parser, allowing sphinx to auto-document it.
+    """
     if parser is None:
         parser = argparse.ArgumentParser()
 
