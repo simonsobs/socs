@@ -24,8 +24,9 @@ def g3_to_array(g3file):
 
     frametimes = []
     for frame in frames:
-        frametime = frame['data'].times()
-        frametimes.append(frametime)
+        if frame.type == core.G3FrameType.Scan:
+            frametime = frame['data'].times()
+            frametimes.append(frametime)
     strtimes = np.hstack(frametimes)
     
     times = []
@@ -35,20 +36,23 @@ def g3_to_array(g3file):
     times = np.asarray(times)
     
     channums = []
-    try:
-        for chan in frames[0]['data'].keys():
+    
+    if frames[1].type == core.G3FrameType.Scan:
+        for chan in frames[1]['data'].keys():
             channums.append(int(chan))
-        channums.sort()
-        for ch in channums:
+    else:
+        for chan in frames[2]['data'].keys():
+            channums.append(int(chan))
+    channums.sort()
+    for ch in channums:
  #           print('Adding channel %s'%ch)
-            chdata = []
-            for frame in frames:
+        chdata = []
+        for frame in frames:
+            if frame.type == core.G3FrameType.Scan:
                 framedata = frame['data'][str(ch)]
                 chdata.append(framedata)
             chdata_all = np.hstack(chdata)
             data.append(chdata_all)
-    except KeyError:
-        pass
 
     data = np.asarray(data)
     return times, data
