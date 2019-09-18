@@ -51,8 +51,8 @@ def g3_to_array(g3file):
             if frame.type == core.G3FrameType.Scan:
                 framedata = frame['data'][str(ch)]
                 chdata.append(framedata)
-                chdata_all = np.hstack(chdata)
-                data.append(chdata_all)
+        chdata_all = np.hstack(chdata)
+        data.append(chdata_all)
 
     data = np.asarray(data)
     return times, data
