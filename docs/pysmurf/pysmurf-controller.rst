@@ -32,15 +32,6 @@ Example site-config entry::
        'arguments': []},
 
 
-Docker Configuration
----------------------
-
-The pysmurf-controller docker is built on the pysmurf base image instead
-of the standard socs image.
-The pysmurf base docker does not always include the most recent version of
-pysmurf, so it is common to mount a local dev branch of the repo into the
-docker container to ``/usr/local/src/pysmurf``.
-
 Pysmurf Publisher options
 .........................
 
@@ -69,8 +60,15 @@ discarded instead of published.
         module DEFAULT_UDP_PORT.
 
 
-Example docker-compose entry
-..............................
+Docker Configuration
+--------------------
+
+The pysmurf-controller docker is built on the pysmurf base image instead
+of the standard socs image.
+The pysmurf base docker does not always include the most recent version of
+pysmurf, so it is common to mount a local dev branch of the repo into the
+docker container to ``/usr/local/src/pysmurf``.
+
 
 The docker-compose for the pysmurf-controller that publishes to a container
 named ``ocs-pysmurf-monitor`` might look something like::
