@@ -102,6 +102,9 @@ class PysmurfMonitor(DatagramProtocol):
             d['timestamp'] = datetime.datetime.utcfromtimestamp(d['timestamp'])
             d['md5sum'] = get_md5sum(d['path'])
             d['plot'] = int(d['plot'])
+            d['pub_id'] = data['id']
+            d['script_id'] = data['script']
+
             d.update(self.base_file_info)
 
             deferred = self.dbpool.runInteraction(pysmurf_files_manager.add_entry, d)
