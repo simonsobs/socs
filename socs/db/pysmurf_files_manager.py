@@ -20,10 +20,10 @@ class Column:
 columns = [
     Column("id", "INT", opts="NOT NULL AUTO_INCREMENT PRIMARY KEY"),
     Column("path", "VARCHAR(260)", opts="UNIQUE NOT NULL"),
+    Column("type", "VARCHAR(32)", opts="NOT NULL"),
     Column("timestamp", "TIMESTAMP"),
     Column("format", "VARCHAR(32)"),
     Column("plot", "TINYINT(1)"),
-    Column("type", "VARCHAR(32)", opts="NOT NULL"),
     Column("site", "VARCHAR(32)"),
     Column("pub_id", "INT"),
     Column("instance_id", "VARCHAR(32)"),
@@ -174,4 +174,6 @@ if __name__ == '__main__':
     finally:
         print("Closing connection")
         con.close()
+
+
 
