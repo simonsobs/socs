@@ -26,6 +26,17 @@ Agent Reference
    bluefors_agent
    timestream_aggregator
 
+Simulator Reference
+-------------------
+
+Simulators are used to mock software and hardware interfaces when access to
+actual hardware is unavailable. These are useful for testing other code.
+
+.. toctree::
+   :maxdepth: 2
+
+   smurf_stream_simulator
+
 
 Indices and tables
 ==================
