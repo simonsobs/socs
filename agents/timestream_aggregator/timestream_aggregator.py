@@ -20,8 +20,8 @@ def _create_dirname(start_time, data_dir):
 
     Note: This will create directories if they don't exist already.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     start_time : float
         Timestamp for start of data collection
     data_dir : str
@@ -46,8 +46,8 @@ def _create_dirname(start_time, data_dir):
 def _create_basename(start_time):
     """Create the timestamp based basename for a file, i.e. 2019-01-01-13-37-00.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     start_time : float
         Timestamp for start of data collection
 
@@ -70,8 +70,8 @@ def _create_basename(start_time):
 def _create_file_path(dirname, basename, suffix="", extension="g3"):
     """Create the full path to the output file for writing.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     dirname : str
         dirname for output, likely from _create_dirname
     basename : str
@@ -142,6 +142,10 @@ class FrameRecorder:
     last_frame_write_time : float
         The time at which we wrote the last frame. Used to track when files
         should be rotated between acquisitions.
+    last_connection_time : float
+        The time at which we last attempted to establish a network connection.
+        Used to rate limit the number of attempted connections to the
+        G3NetworkSender.
     filename_suffix : int
         For enumerating files within an acquisition. We want to split files in
         10 minute intervals, but the names should remain the same with a
@@ -164,13 +168,14 @@ class FrameRecorder:
         self.log = log
 
         # Reader/Writer
-        self.reader = self._establish_reader_connection()
+        self.reader = None
         self.writer = None
 
         # Attributes
         self.frames = []
         self.last_meta = None
         self.last_frame_write_time = None
+        self.last_connection_time = None
 
         self.filename_suffix = 0
         self.start_time = None
@@ -185,7 +190,8 @@ class FrameRecorder:
     def _establish_reader_connection(self, timeout=5):
         """Establish the connection to the G3NetworkSender.
 
-        This will keep trying until a connection is established.
+        Attempts to connect once and waits if connection could not be made and
+        last connection attempt was very recent.
 
         Parameters
         ----------
@@ -200,36 +206,52 @@ class FrameRecorder:
 
         """
         reader = None
-        while reader is None:
-            try:
-                reader = core.G3Reader(self.address,
-                                       timeout=timeout)
-            except RuntimeError:
-                self.log.error("G3Reader could not connect. Retrying...")
-                time.sleep(1)
+        try:
+            reader = core.G3Reader(self.address,
+                                   timeout=timeout)
+            self.log.info("G3Reader connection established")
+        except RuntimeError:
+            self.log.error("G3Reader could not connect.")
 
-        self.log.info("G3Reader connection established")
+        # Prevent rapid connection attempts
+        if self.last_connection_time is not None:
+            t_diff = time.time() - self.last_connection_time
+            if t_diff < 1:
+                self.log.debug("Last connection was only {d} seconds ago. " +
+                               "Sleeping for {t}.", d=t_diff, t=(1 - t_diff))
+                time.sleep(1 - t_diff)
+
+        self.last_connection_time = time.time()
 
         return reader
 
     def read_frames(self):
-        """Try to read frames or reconnect to NetworkSender until we get
-        something.
+        """Establish a connection to the G3NetworkSender if one does not exist,
+        then try to read frames from it, discarding any flow control frames.
 
         Clear internally buffered data and cleanup with call to
         self.close_file() if the reader timesout or has otherwise lost its
         connection.
 
         """
-        while not self.frames:
-            self.frames = self.reader.Process(None)
-            if self.frames:
-                break
+        # Try to connect if we are not already
+        if self.reader is None:
+            self.reader = self._establish_reader_connection()
+
+            if self.reader is None:
+                return
+
+        self.frames = self.reader.Process(None)
+        if self.frames:
+            # Discard flow control frames
+            self.frames = [x for x in self.frames if x.type != core.G3FrameType.none]
+            return
+        else:
             self.log.debug("Could not read frames. Connection " +
                            "timed out, or G3NetworkSender offline. " +
-                           "Reestablishing connection...")
+                           "Cleaning up...")
             self.close_file()
-            self.reader = self._establish_reader_connection()
+            self.reader = None
 
     def check_for_frame_gap(self, gap_size=5):
         """Check for incoming frame time gap. If frames stop coming in likely
@@ -305,8 +327,18 @@ class FrameRecorder:
 
         """
         for f in self.frames:
+            # Do not record flowcontrol frames
+            if f.type == core.G3FrameType.none:
+                self.log.warn("Received flow control frame with value {v}." +
+                              "Flow control frames should be discarded " +
+                              "earlier than this",
+                               v=f.get('sostream_flowcontrol'))
+                continue
+
+            # Write most recent meta data frame
             if f.type == core.G3FrameType.Observation:
                 self.last_meta = f
+
             self.writer(f)
             self.writer.Flush()
             self.last_frame_write_time = time.time()
@@ -324,7 +356,10 @@ class FrameRecorder:
         if self.writer is None:
             return
 
-        if (time.time() - self.start_time) > self.time_per_file:
+        t_diff = time.time() - self.start_time
+        if t_diff > self.time_per_file:
+            self.log.debug("{s} seconds elapsed since start of file, " +
+                           "splitting acquisition", s=t_diff)
             # Flush internal cache and clean-up (no frame written)
             self.writer(core.G3Frame(core.G3FrameType.EndProcessing))
             self.writer = None
@@ -338,23 +373,27 @@ class FrameRecorder:
         if self.writer is not None:
             # Flush internal cache and clean-up (no frame written)
             self.writer(core.G3Frame(core.G3FrameType.EndProcessing))
+            self.log.debug("File closed.")
         self.writer = None
         self.filename_suffix = 0
-        self.log.debug("File closed.")
 
     def run(self):
         """Run the DataRecorder, performing all frame collection, file setup,
         file rotation, and writing to file.
 
-        Meant to be run in a loop. When finished, make sure to call
-        self.close_file().
+        Will only perform actions if frames can be read, with the exception of
+        closing the open file if a gap is encountered (i.e. the current
+        acquisition has stopped.)
+
+        Meant to be run in a loop.
 
         """
         self.read_frames()
         self.check_for_frame_gap(5)
-        self.create_new_file()
-        self.write_frames_to_file()
-        self.split_acquisition()
+        if self.frames:
+            self.create_new_file()
+            self.write_frames_to_file()
+            self.split_acquisition()
 
 
 class TimestreamAggregator:

@@ -20,20 +20,27 @@ Description
 -----------
 The Timestream Aggregator Agent automatically starts listening for a
 G3NetworkSender which will send it frames. This will typically be the SMuRF
-Streamer. It will keep trying to connect to a sender until it is able to do so,
-meaning it is safe to start the Agent before a connection is available.
+Streamer. There are several steps performed in a loop, the first of which is an
+attempt to read frames from an established connection. A connection attempt is
+made if it is not already setup. Meaning it is safe to start the Agent before
+a connection is available.
 
-Once a connection is made it will wait for frames to come in. Once they do, it
-will expect frames every second. If the reader times out then the file will be
-closed and the Agent will attempt to reestablish a connection. It will write
-the frames to file with file names and location based on the timestamp when the
-acquisition was started (i.e. the first frame was written.)
+Once a connection is made it will read frames that are sent by the streamer.
+Frames should be sent approximately every second. Flow control frames
+indicating the connection should stay alive should be sent and are discarded
+immediately upon receipt before proceeding to the next step. If the reader
+times out then the file will be closed and the reader destroyed, meaning the
+connection will need to be reestablished in the next iteration of the loop.
+This should be fine, as long as we do not enter a state where many connections
+are made in succession.
 
-Files will be at most "time-per-file" long, which is configurable but defaults
-to 10 minutes (the same duration planned for when we are on the telescope.)
-Acquisitions that are longer than that will have the same start to their
-filenames based on the timestamp when acquisition started, but will increment a
-zero padded suffix so one will end up with files like
+The aggregator will write the frames to file with file names and location based
+on the timestamp when the acquisition was started (i.e. the first frame was
+written.) Files will be at most "time-per-file" long, which is configurable but
+defaults to 10 minutes (the same duration planned for when we are on the
+telescope.) Acquisitions that are longer than that will have the same start to
+their filenames based on the timestamp when acquisition started, but will
+increment a zero padded suffix so one will end up with files like
 `2019-01-01-12-00-00_000.g3`, `2019-01-01-12-00-00_001.g3`, etc. for
 acquisitions started at 12:00:00 UTC on Jan 1st, 2019.
 
