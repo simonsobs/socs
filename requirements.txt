@@ -1,6 +1,7 @@
 sphinx-argparse
 numpy
 autobahn[serialization]
+twisted
 
 # Lakeshore240
 pyserial
