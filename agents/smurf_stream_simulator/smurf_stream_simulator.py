@@ -45,6 +45,8 @@ class SmurfStreamSimulator:
     ----------
     agent : OCSAgent
         OCSAgent object which forms this Agent
+    target_host : str
+        Target remote host address
     port : int
         Port to send data over
     num_chans : int
@@ -60,11 +62,12 @@ class SmurfStreamSimulator:
         Target remote host address
     port : int
         Port to send data over
-    writer : spt3g.core.G3NetworkSender
-        G3NetworkSender object for sending the data
     is_streaming : bool
         flag to track if we're currently streaming, used in stop task to stop
-        the streaming process
+        the streaming process. If stopped then keep alive flow control frames
+        are still being sent.
+    running_in_background : bool
+        flag to track if the streaming process is running in the background,
     channels : list
         List of simulated channels to stream
 
@@ -72,22 +75,23 @@ class SmurfStreamSimulator:
     def __init__(self, agent, target_host="*", port=4536, num_chans=528):
         self.agent = agent
         self.log = agent.log
+        self.target_host = target_host
 
         self.port = port
 
-        self.writer = core.G3NetworkSender(hostname=target_host,
-                                           port=self.port)
-
         self.is_streaming = False
+        self.running_in_background = False
 
         self.channels = [
             StreamChannel(0, 1) for i in range(num_chans)
         ]
 
-    def start_stream(self, session, params=None):
-        """start_stream(params=None)
+    def start_background_streamer(self, session, params=None):
+        """start_background_streamer(params=None)
 
-        Process to stream fake detector data as G3Frames.
+        Process to run streaming process. Whether or note the stream is
+        streaming actual data is controlled by the start and stop tasks. Either
+        way keep alive flow control frames are being sent.
 
         Parameters
         ----------
@@ -101,48 +105,87 @@ class SmurfStreamSimulator:
         if params is None:
             params = {}
 
+        writer = core.G3NetworkSender(hostname=self.target_host,
+                                      port=self.port)
+
         frame_rate = params.get('frame_rate', 1.)
         sample_rate = params.get('sample_rate', 10.)
 
         f = core.G3Frame(core.G3FrameType.Observation)
         f['session_id'] = 0
         f['start_time'] = time.time()
-        self.writer.Process(f)
+        writer.Process(f)
 
         frame_num = 0
         self.is_streaming = True
-        while self.is_streaming:
+        self.running_in_background = True
 
-            frame_start = time.time()
-            time.sleep(1. / frame_rate)
-            frame_stop = time.time()
-            times = np.arange(frame_start, frame_stop, 1. / sample_rate)
+        while self.running_in_background:
+            print("stream running in background")
+            # Send keep alive flow control frame
+            f = core.G3Frame(core.G3FrameType.none)
+            f['sostream_flowcontrol'] = 0
+            writer.Process(f)
 
-            f = core.G3Frame(core.G3FrameType.Scan)
-            f['session_id'] = 0
-            f['frame_num'] = frame_num
-            f['data'] = core.G3TimestreamMap()
+            if self.is_streaming:
+                frame_start = time.time()
+                time.sleep(1. / frame_rate)
+                frame_stop = time.time()
+                times = np.arange(frame_start, frame_stop, 1. / sample_rate)
 
-            for i, chan in enumerate(self.channels):
-                ts = core.G3Timestream([chan.read() for t in times])
-                ts.start = core.G3Time(frame_start * core.G3Units.sec)
-                ts.stop = core.G3Time(frame_stop * core.G3Units.sec)
-                f['data'][str(i)] = ts
+                f = core.G3Frame(core.G3FrameType.Scan)
+                f['session_id'] = 0
+                f['frame_num'] = frame_num
+                f['data'] = core.G3TimestreamMap()
 
-            self.writer.Process(f)
-            self.log.info("Writing frame...")
-            frame_num += 1
+                for i, chan in enumerate(self.channels):
+                    ts = core.G3Timestream([chan.read() for t in times])
+                    ts.start = core.G3Time(frame_start * core.G3Units.sec)
+                    ts.stop = core.G3Time(frame_stop * core.G3Units.sec)
+                    f['data'][str(i)] = ts
+
+                writer.Process(f)
+                self.log.info("Writing frame...")
+                frame_num += 1
+
+            else:
+                # Don't send keep alive frames too quickly
+                time.sleep(1)
+
+        # Teardown writer
+        writer.Close()
+        writer = None
 
         return True, "Finished streaming"
 
-    def stop_stream(self, session, params=None):
-        """stop_stream(params=None)
+    def stop_background_streamer(self, session, params=None):
+        """stop_background_streamer(params=None)
 
-        Stop method associated with start_stream process.
+        Stop method associated with start_background_streamer process.
+
+        """
+        self.running_in_background = False
+        return True, "Stopping stream"
+
+    def set_stream_on(self, session, params=None):
+        """set_stream_on(params=None)
+
+        Task to start the stream of actual data frames from the background
+        streaming process.
+
+        """
+        self.is_streaming = True
+        return True, "Started stream"
+
+    def set_stream_off(self, session, params=None):
+        """set_stream_off(params=None)
+
+        Task to stop the stream of actual data frames from the background
+        streaming process. Keep alive flow control frames will still be sent.
 
         """
         self.is_streaming = False
-        return True, "Stopping stream"
+        return True, "Stopped stream"
 
 
 def make_parser(parser=None):
@@ -180,7 +223,10 @@ if __name__ == '__main__':
                                port=int(args.port),
                                num_chans=int(args.num_chans))
 
-    agent.register_process('stream', sim.start_stream, sim.stop_stream,
+    agent.register_process('stream', sim.start_background_streamer,
+                           sim.stop_background_streamer,
                            startup=bool(args.auto_start))
+    agent.register_task('start', sim.set_stream_on)
+    agent.register_task('stop', sim.set_stream_off)
 
     runner.run(agent, auto_reconnect=True)

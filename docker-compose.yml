@@ -44,7 +44,7 @@ services:
   # --------------------------------------------------------------------------
   ocs-smurf-stream-sim-agent:
     image: "ocs-smurf-stream-sim"
-    build: ./agents/smurf-stream-simulator/
+    build: ./agents/smurf_stream_simulator/
 
   # --------------------------------------------------------------------------
   # SMuRF timestream aggregator
