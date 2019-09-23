@@ -86,8 +86,8 @@ class SmurfStreamSimulator:
             StreamChannel(0, 1) for i in range(num_chans)
         ]
 
-    def run_background_stream(self, session, params=None):
-        """run_background_stream(params=None)
+    def start_background_streamer(self, session, params=None):
+        """start_background_streamer(params=None)
 
         Process to run streaming process. Whether or note the stream is
         streaming actual data is controlled by the start and stop tasks. Either
@@ -158,30 +158,30 @@ class SmurfStreamSimulator:
 
         return True, "Finished streaming"
 
-    def stop_background_stream(self, session, params=None):
-        """stop_background_stream(params=None)
+    def stop_background_streamer(self, session, params=None):
+        """stop_background_streamer(params=None)
 
-        Stop method associated with run_background_stream process.
+        Stop method associated with start_background_streamer process.
 
         """
         self.running_in_background = False
         return True, "Stopping stream"
 
-    def start_data_stream(self, session, params=None):
-        """start_data_stream(params=None)
+    def set_stream_on(self, session, params=None):
+        """set_stream_on(params=None)
 
-        Start the stream of actual data frames from the background streaming
-        process.
+        Task to start the stream of actual data frames from the background
+        streaming process.
 
         """
         self.is_streaming = True
         return True, "Started stream"
 
-    def stop_data_stream(self, session, params=None):
-        """stop_data_stream(params=None)
+    def set_stream_off(self, session, params=None):
+        """set_stream_off(params=None)
 
-        Stop the stream of actual data frames from the background streaming
-        process. Keep alive flow control frames will still be sent.
+        Task to stop the stream of actual data frames from the background
+        streaming process. Keep alive flow control frames will still be sent.
 
         """
         self.is_streaming = False
@@ -223,10 +223,10 @@ if __name__ == '__main__':
                                port=int(args.port),
                                num_chans=int(args.num_chans))
 
-    agent.register_process('stream', sim.run_background_stream,
-                           sim.stop_background_stream,
+    agent.register_process('stream', sim.start_background_streamer,
+                           sim.stop_background_streamer,
                            startup=bool(args.auto_start))
-    agent.register_task('start', sim.start_data_stream)
-    agent.register_task('stop', sim.stop_data_stream)
+    agent.register_task('start', sim.set_stream_on)
+    agent.register_task('stop', sim.set_stream_off)
 
     runner.run(agent, auto_reconnect=True)
