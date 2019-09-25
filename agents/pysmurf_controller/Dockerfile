@@ -1,4 +1,4 @@
-FROM tidair/pysmurf:R2.1.0
+FROM tidair/pysmurf:R3.1.3
 
 # Installs Jupyter requirements
 RUN pip3 install jupyter
