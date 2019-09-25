@@ -1,7 +1,11 @@
 import hashlib
 from typing import ContextManager
 from contextlib import contextmanager
-import mysql.connector
+import os
+
+on_rtd = os.environ.get('READTHEDOCS') == 'True'
+if not on_rtd:
+    import mysql.connector
 
 
 def get_md5sum(filename):
