@@ -1,4 +1,4 @@
-FROM tidair/pysmurf:R3.1.3
+FROM tidair/pysmurf:pr92
 
 # Installs Jupyter requirements
 RUN pip3 install jupyter
@@ -20,6 +20,7 @@ RUN git clone https://github.com/simonsobs/socs.git \
     && pip3 install -e socs
 
 ENV OCS_CONFIG_DIR /config
+
 
 # Run registry on container startup
 WORKDIR /app/socs/agents/pysmurf_controller
