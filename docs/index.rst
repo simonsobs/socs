@@ -25,6 +25,7 @@ Agent Reference
    lakeshore372
    bluefors_agent
    timestream_aggregator
+   pysmurf/index
 
 Simulator Reference
 -------------------
