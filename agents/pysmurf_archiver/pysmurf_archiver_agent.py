@@ -1,4 +1,3 @@
-from ocs import ocs_agent, site_config
 import argparse
 import os
 import time
@@ -9,6 +8,10 @@ import binascii
 import datetime
 
 from twisted.enterprise import adbapi
+
+on_rtd = os.environ.get('READTHEDOCS') == 'True'
+if not on_rtd:
+    from ocs import ocs_agent, site_config
 
 
 def create_local_path(file, data_dir):

@@ -1,5 +1,3 @@
-from ocs import ocs_agent, site_config, ocs_twisted
-from ocs.ocs_agent import log_formatter
 from twisted.internet import reactor, protocol
 from twisted.python.failure import Failure
 from twisted.internet.error import ProcessDone, ProcessTerminated
@@ -10,7 +8,11 @@ import time
 import os
 import argparse
 
-from ocs.ocs_twisted import TimeoutLock
+on_rtd = os.environ.get('READTHEDOCS') == 'True'
+if not on_rtd:
+    from ocs import ocs_agent, site_config, ocs_twisted
+    from ocs.ocs_agent import log_formatter
+    from ocs.ocs_twisted import TimeoutLock
 
 
 class PysmurfScriptProtocol(protocol.ProcessProtocol):
