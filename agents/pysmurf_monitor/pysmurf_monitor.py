@@ -1,4 +1,3 @@
-from ocs import ocs_agent, site_config
 import json
 from twisted.internet.protocol import DatagramProtocol
 from twisted.internet import reactor
@@ -15,6 +14,10 @@ import argparse
 from twisted.enterprise import adbapi
 
 from socs.util import get_md5sum
+
+on_rtd = os.environ.get('READTHEDOCS') == 'True'
+if not on_rtd:
+    from ocs import ocs_agent, site_config
 
 
 class PysmurfMonitor(DatagramProtocol):
