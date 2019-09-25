@@ -17,7 +17,7 @@ def get_md5sum(filename):
 
 
 @contextmanager
-def get_db_connection(**config) -> ContextManager[mysql.connector.connection.MySQLConnection]:
+def get_db_connection(**config):
     """
     Mysql connection context manager.
 
