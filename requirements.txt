@@ -5,3 +5,5 @@ twisted
 
 # Lakeshore240
 pyserial
+
+mysql-connector>=2.1.6

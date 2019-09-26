@@ -1,7 +1,11 @@
 import hashlib
 from typing import ContextManager
 from contextlib import contextmanager
-import mysql.connector
+import os
+
+on_rtd = os.environ.get('READTHEDOCS') == 'True'
+if not on_rtd:
+    import mysql.connector
 
 
 def get_md5sum(filename):
@@ -13,7 +17,7 @@ def get_md5sum(filename):
 
 
 @contextmanager
-def get_db_connection(**config) -> ContextManager[mysql.connector.connection.MySQLConnection]:
+def get_db_connection(**config):
     """
     Mysql connection context manager.
 
