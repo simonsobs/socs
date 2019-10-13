@@ -73,3 +73,10 @@ services:
   ocs-psu-agent:
     image: "ocs-psu-agent"
     build: ./agents/keithley2230G-psu/
+
+  # --------------------------------------------------------------------------
+  # Cryomech CPA1114 compressor log agent
+  # --------------------------------------------------------------------------
+  ocs-cryomech-cpa1114-agent:
+    image: "ocs-cryomech-cpa1114-agent"
+    build: ./agents/cryomech-cpa1114/

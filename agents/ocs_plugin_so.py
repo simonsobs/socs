@@ -15,5 +15,6 @@ for n,f in [
         ('PysmurfController', 'smurf/pysmurf_control.py'),
         ('BlueforsAgent', 'bluefors/bluefors_log_tracker.py'),
         ('HWPSimulatorAgent', 'hwp_sim/hwp_simulator_agent.py'),
+	('CryomechCPA1114Agent', 'cryomech-cpa1114/cryomech_cpa1114_agent.py'),
 ]:
     ocs.site_config.register_agent_class(n, os.path.join(root, f))
