@@ -35,7 +35,73 @@ def time_limit(seconds):
         yield
     finally:
         signal.alarm(0)
+
+class PTC:
+    def __init__(self, ip_address, port=502, timeout=10):
+        self.ip_address = ip_address
+        self.port = port  
         
+        self.comm = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.comm.connect((self.ip_address, self.port))
+        self.comm.settimeout(timeout)
+                 
+    def get_data(self):
+        """
+        Gets the raw data from the ptc and returns it in a usable format. 
+        """
+        self.comm.sendall(self.buildRegistersQuery()) 
+        data = self.comm.recv(1024)
+        brd = self.breakdownReplyData(data)
+            
+        return brd    
+    
+    def buildRegistersQuery(self):
+        query = bytes([0x09, 0x99,  # Message ID
+                       0x00, 0x00,  # Unused
+                       0x00, 0x06,  # Message size in bytes
+                       0x01,        # Slave Address
+                       0x04,        # Function Code  3= Read HOLDING registers, 4 read INPUT registers
+                       0x00,0x01,   # The starting Register Number
+                       0x00,0x35])  # How many to read
+        return query
+
+    def breakdownReplyData(self, rawdata):
+        """
+        Take in raw ptc data, and return a dictionary. The dictionary keys are the data labels, 
+        the dictionary values are the data in floats or ints. 
+        """
+        
+        #Associations between keys and their location in rawData
+        keyloc = {"Operating State": [9,10], "Pump State": [11, 12], "Warnings": [15, 16, 13, 14], "Alarms":[19, 20, 17, 18],
+                  "Coolant In": [22, 21, 24, 23], "Coolant Out": [26, 25, 28, 27], "Oil": [30, 29, 32, 31], 
+                  "Helium": [34, 33, 36, 35], "Low Pressure": [38, 37, 40, 39], "Low Pressure Average":[42, 41, 44, 43],
+                  "High Pressure": [46,45,48,47], "High Pressure Average": [50, 49, 52, 51], "Delta Pressure": [54, 53, 56, 55],
+                  "Motor Current": [58, 57, 60, 59]}
+        
+        #Iterate through all keys and return the data in a usable format
+        data = {}
+        for key in keyloc.keys():
+            locs = keyloc[key] 
+            wkrBytes = bytes([rawdata[loc] for loc in locs])
+            
+            #three different data formats to unpack
+            if key in list(keyloc.keys())[0:2]:
+                state = int.from_bytes(wkrBytes, byteorder='big')
+                data[key] = state
+            
+            if key in list(keyloc.keys())[2:4]:
+                data[key] = float(''.join('{:02x}'.format(x) for x in wkrBytes))
+                
+            if key in list(keyloc.keys())[4:]:
+                data[key] = struct.unpack('f', wkrBytes)[0]
+                
+        return data
+    
+    def __del__(self):
+        """
+        If the PTC class instance is destroyed, close the connection to the ptc. 
+        """
+        self.comm.close()
 
 class PTCAgent:
     def __init__(self, agent, serial_mode, port, ip_address, f_sample=2.5):
@@ -61,6 +127,9 @@ class PTCAgent:
                                  buffer_time=1)
         
     def init_ptc_task(self, session, params=None):
+        """
+        Initializes the connection to the ptc. 
+        """
         if params is None:
             params = {}
 
@@ -76,6 +145,8 @@ class PTCAgent:
                 return False, "Could not acquire lock."
 
             session.set_status('starting')
+            #Establish connection to ptc
+            self.ptc = PTC(self.ip_address, self.port)
 
         self.initialized = True
 
@@ -83,105 +154,16 @@ class PTCAgent:
         if auto_acquire:
             self.agent.start('acq')
 
-        return True, "PTC agent initialized"
+        return True, "PTC agent initialized"          
 
-    def buildRegistersQuery(self):
-        query = bytes([0x09, 0x99,  # Message ID
-                       0x00, 0x00,  # Unused
-                       0x00, 0x06,  # Message size in bytes
-                       0x01,        # Slave Address
-                       0x04,        # Function Code  3= Read HOLDING registers, 4 read INPUT registers
-                       0x00,0x01,   # The starting Register Number
-                       0x00,0x35])  # How many to read
-        return query
-
-    def get_data(self):
-        """
-        Open a socket connection to the ptc, get the raw data, convert into a usable form, and close the connection. 
-        """
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.connect((self.ip_address, self.port))
-            s.sendall(self.buildRegistersQuery()) 
-            data = s.recv(1024)
-            brd = self.breakdownReplyData(data)
-            s.close()
-            
-        return brd
-            
-    def create_logfile(self):
-        timestamp = time.strftime("%Y-%m-%dT%Hh%M")
-
-        if len(sys.argv) <=10: #number of arguments taken at the command line
-                config_dir = os.environ["OCS_CONFIG_DIR"]
-                logfile1 = os.path.join(config_dir, 'logs/ptc_logs/log_ptc1_'+ timestamp +'.dat')
-                f1 = open(logfile1,'w')
-        else:
-            #timestamp = sys.argv[1]
-            logfile1 = 'log/log_ptc1_'+ timestamp +'.dat'
-            if not (os.path.isfile(logfile1)):
-                print(logfile1, ' not exiting')
-                exit()
-            f1 = open(logfile1,'a')
-
-        #create timestamp for logfile
-        timestamp = time.strftime("%Y-%m-%dT%Hh%M")
-
-        strout = time.ctime()+'| '
-        strout = strout[:-2]
-        print('PTC1:', strout)
-        f1.write(strout+'\n')
-        return f1
-    
-    def write_logs(self, register, data, logfile):
-        logfile.write(register+ data+'\n')
-        logfile.flush()
-        time.sleep(1)
-
-    def breakdownReplyData(self, rawdata):
-        """
-        Take in raw ptc data, and return a dictionary. The dictionary keys are the data labels, 
-        the dictionary values are the data in a usable format. 
-        """
-        
-        #Associations between keys and their location in rawData
-        keyloc = {"Operating State": [9,10], "Pump State": [11, 12], "Warnings": [15, 16, 13, 14], "Alarms":[19, 20, 17, 18],
-                  "Coolant In": [22, 21, 24, 23], "Coolant Out": [26, 25, 28, 27], "Oil": [30, 29, 32, 31], 
-                  "Helium": [34, 33, 36, 35], "Low Pressure": [38, 37, 40, 39], "Low Pressure Average":[42, 41, 44, 43],
-                  "High Pressure": [46,45,48,47], "High Pressure Average": [50, 49, 52, 51], "Delta Pressure": [54, 53, 56, 55],
-                  "Motor Current": [58, 57, 60, 59]}
-        
-        #Iterate through all keys and return the data in a usable format
-        data = {}
-        for key in keyloc.keys():
-            locs = keyloc[key] 
-            wkrBytes = bytes([rawdata[loc] for loc in locs])
-            
-            #three different data formats to unpack
-            if key in list(keyloc.keys())[0:2]:
-                state = int.from_bytes(wkrBytes, byteorder='big')
-                data[key] = state
-                print(f'key is {key}, type is {type(data[key])}')
-            
-            if key in list(keyloc.keys())[2:4]:
-                data[key] = float(''.join('{:02x}'.format(x) for x in wkrBytes))
-                print(f'key is {key}, type is {type(data[key])}')
-                
-            if key in list(keyloc.keys())[4:]:
-                data[key] = struct.unpack('f', wkrBytes)[0]
-                print(f'key is {key}, type is {type(data[key])}')
-                
-        return data
 
     def start_acq(self, session, params=None):
         """
-        Starts acq process
+        Starts acqusition of data from the ptc.
         """
         
         if params is None:
             params = {}
-            
-        if not self.initialized:
-            self.init_ptc_task()
 
         with self.lock.acquire_timeout(0, job='acq') as acquired:
             if not acquired:
@@ -196,11 +178,10 @@ class PTCAgent:
             #Publish data, waiting 1/f_sample seconds in between calls. 
             while self.take_data:
                 pub_data = {'timestamp':time.time(), 'block_name':'ptc_status'}
-                data = self.get_data()
+                data = self.ptc.get_data()
                 pub_data['data'] = data
                 time.sleep(1./self.f_sample)
                 self.agent.publish_to_feed('ptc_status',pub_data)
-                print('published')
 
             self.agent.feeds["ptc_status"].flush_buffer() 
 
@@ -208,7 +189,7 @@ class PTCAgent:
 
     def stop_acq(self, session, params=None):
         """
-        Stops acq process.
+        Stops acqusition of data from the ptc..
         """
         if self.take_data:
             self.take_data = False
