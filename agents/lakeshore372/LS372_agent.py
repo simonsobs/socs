@@ -332,7 +332,6 @@ class LS372_Agent:
 
             # Make sure we aren't servoing too high in temperature.
             if params["temperature"] > 1:
-                self.set_job_done()
                 return False, f'Servo temperature is set above 1K. Aborting.'
 
             self.module.sample_heater.set_setpoint(params["temperature"])
@@ -376,7 +375,6 @@ class LS372_Agent:
                 session.add_message(f'Setpoint Difference: ' + str(mean - setpoint))
                 session.add_message(f'Average is within {params["threshold"]} K threshold. Proceeding with calibration.')
 
-                self.set_job_done()
                 return True, f"Servo temperature is stable within {params['threshold']} K"
 
             else:
