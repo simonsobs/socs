@@ -198,10 +198,6 @@ class LS372_Agent:
                               f"{self.lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            ok, msg = self.try_set_job('set_excitation_mode')
-            if not ok:
-                return ok, msg
-
             session.set_status('running')
 
             self.module.channels[params['channel']].set_excitation_mode(params['mode'])
