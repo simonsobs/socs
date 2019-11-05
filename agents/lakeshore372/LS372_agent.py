@@ -2,15 +2,19 @@ import os
 import random
 import argparse
 import time
-import threading
 import numpy as np
+import txaio
 
 from socs.Lakeshore.Lakeshore372 import LS372
 
-on_rtd = os.environ.get('READTHEDOCS') == 'True'
-if not on_rtd:
+ON_RTD = os.environ.get('READTHEDOCS') == 'True'
+if not ON_RTD:
     from ocs import ocs_agent, site_config
     from ocs.ocs_twisted import TimeoutLock
+
+# For logging
+txaio.use_twisted()
+LOG = txaio.make_logger()
 
 class LS372_Agent:
     """Agent to connect to a single Lakeshore 372 device.
@@ -77,7 +81,7 @@ class LS372_Agent:
             session.set_status('running')
 
             if self.fake_data:
-                self.res = random.randrange(1, 1000);
+                self.res = random.randrange(1, 1000)
                 session.add_message("No initialization since faking data")
                 self.thermometers = ["thermA", "thermB"]
             else:
@@ -105,6 +109,7 @@ class LS372_Agent:
 
             session.set_status('running')
             self.log.info("Starting data acquisition for {}".format(self.agent.agent_address))
+            previous_channel = None
 
             self.take_data = True
             while self.take_data:
@@ -119,9 +124,30 @@ class LS372_Agent:
                         reading = np.random.normal(self.res, 20)
                         data['data'][therm] = reading
                     time.sleep(.1)
-                    
+
                 else:
                     active_channel = self.module.get_active_channel()
+
+                    # The 372 reports the last updated measurement repeatedly
+                    # during the "pause change time", this results in several
+                    # stale datapoints being recorded. To get around this we
+                    # query the pause time and skip data collection during it
+                    # if the channel has changed (as it would if autoscan is
+                    # enabled.)
+                    if previous_channel != active_channel:
+                        if previous_channel is not None:
+                            pause_time = active_channel.get_pause()
+                            self.log.debug("Pause time for {c}: {p}",
+                                           c=active_channel.channel_num,
+                                           p=pause_time)
+                            for i in range(pause_time):
+                                self.log.debug("Sleeping for {t} more seconds...",
+                                               t=pause_time-i)
+                                time.sleep(1)
+
+                        # Track the last channel we measured
+                        previous_channel = self.module.get_active_channel()
+
                     data = {
                         'timestamp': time.time(),
                         'block_name': active_channel.name,
@@ -129,9 +155,10 @@ class LS372_Agent:
                     }
 
                     # Collect both temperature and resistance values from each Channel
-                    data['data'][active_channel.name + ' T'] = self.module.get_temp(unit='kelvin', chan=active_channel.channel_num)
-                    data['data'][active_channel.name + ' R'] = self.module.get_temp(unit='ohms', chan=active_channel.channel_num)
-                    time.sleep(.01)
+                    data['data'][active_channel.name + ' T'] = \
+                        self.module.get_temp(unit='kelvin', chan=active_channel.channel_num)
+                    data['data'][active_channel.name + ' R'] = \
+                        self.module.get_temp(unit='ohms', chan=active_channel.channel_num)
 
                 session.app.publish_to_feed('temperatures', data)
 
@@ -478,6 +505,9 @@ def make_parser(parser=None):
     return parser
 
 if __name__ == '__main__':
+    # Start logging
+    txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
+
     # Get the default ocs argument parser.
     site_parser = site_config.add_arguments()
 
@@ -497,7 +527,7 @@ if __name__ == '__main__':
 
     agent, runner = ocs_agent.init_site_agent(args)
 
-    lake_agent = LS372_Agent(agent, args.serial_number, args.ip_address , fake_data=args.fake_data)
+    lake_agent = LS372_Agent(agent, args.serial_number, args.ip_address, fake_data=args.fake_data)
 
     agent.register_task('init_lakeshore', lake_agent.init_lakeshore_task,
                         startup=init_params)
