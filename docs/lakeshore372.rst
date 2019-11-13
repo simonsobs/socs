@@ -25,7 +25,8 @@ configuration block::
   {'agent-class': 'Lakeshore372Agent',
    'instance-id': 'LSA22YG',
    'arguments': [['--serial-number', 'LSA22YG'],
-                 ['--ip-address', '10.10.10.2']]},
+                 ['--ip-address', '10.10.10.2'],
+                 ['--dwell-time-delay', 0]]},
 
 Each device requires configuration under 'agent-instances'. See the OCS site
 configs documentation for more details.
