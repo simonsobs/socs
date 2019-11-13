@@ -85,14 +85,14 @@ class PTC:
             wkrBytes = bytes([rawdata[loc] for loc in locs])
             
             #three different data formats to unpack
-            if key in list(keyloc.keys())[0:2]:
+            if key in ["Operating State", "Pump State"]:
                 state = int.from_bytes(wkrBytes, byteorder='big')
                 data[key] = state
             
-            if key in list(keyloc.keys())[2:4]:
-                data[key] = float(''.join('{:02x}'.format(x) for x in wkrBytes))
+            if key in ["Warnings", "Alarms"]:
+                data[key] = int(''.join('{:02x}'.format(x) for x in wkrBytes))
                 
-            if key in list(keyloc.keys())[4:]:
+            if key in ["Coolant In", "Coolant Out", "Oil", "Helium", "Low Pressure", "Low Pressure Average","High Pressure", "High Pressure Average", "Delta Pressure","Motor Current"]:
                 data[key] = struct.unpack('f', wkrBytes)[0]
                 
         return data
