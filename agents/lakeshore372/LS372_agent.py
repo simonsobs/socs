@@ -2,13 +2,13 @@ import os
 import random
 import argparse
 import time
-import threading
 import numpy as np
+import txaio
 
 from socs.Lakeshore.Lakeshore372 import LS372
 
-on_rtd = os.environ.get('READTHEDOCS') == 'True'
-if not on_rtd:
+ON_RTD = os.environ.get('READTHEDOCS') == 'True'
+if not ON_RTD:
     from ocs import ocs_agent, site_config
     from ocs.ocs_twisted import TimeoutLock
 
@@ -20,15 +20,22 @@ class LS372_Agent:
         ip (str): IP Address for the 372 device.
         fake_data (bool, optional): generates random numbers without connecting
             to LS if True.
+        dwell_time_delay (int, optional): Amount of time, in seconds, to
+            delay data collection after switching channels. Note this time
+            should not include the change pause time, which is automatically
+            accounted for. Will automatically be reduced to dwell_time - 1
+            second if it is set longer than a channel's dwell time. This
+            ensures at least one second of data collection at the end of a scan.
 
     """
-    def __init__(self, agent, name, ip, fake_data=False):
+    def __init__(self, agent, name, ip, fake_data=False, dwell_time_delay=0):
         self.lock = TimeoutLock()
         self.job = None
 
         self.name = name
         self.ip = ip
         self.fake_data = fake_data
+        self.dwell_time_delay = dwell_time_delay
         self.module = None
         self.thermometers = []
 
@@ -77,7 +84,7 @@ class LS372_Agent:
             session.set_status('running')
 
             if self.fake_data:
-                self.res = random.randrange(1, 1000);
+                self.res = random.randrange(1, 1000)
                 session.add_message("No initialization since faking data")
                 self.thermometers = ["thermA", "thermB"]
             else:
@@ -105,6 +112,7 @@ class LS372_Agent:
 
             session.set_status('running')
             self.log.info("Starting data acquisition for {}".format(self.agent.agent_address))
+            previous_channel = None
 
             self.take_data = True
             while self.take_data:
@@ -119,9 +127,50 @@ class LS372_Agent:
                         reading = np.random.normal(self.res, 20)
                         data['data'][therm] = reading
                     time.sleep(.1)
-                    
+
                 else:
                     active_channel = self.module.get_active_channel()
+
+                    # The 372 reports the last updated measurement repeatedly
+                    # during the "pause change time", this results in several
+                    # stale datapoints being recorded. To get around this we
+                    # query the pause time and skip data collection during it
+                    # if the channel has changed (as it would if autoscan is
+                    # enabled.)
+                    if previous_channel != active_channel:
+                        if previous_channel is not None:
+                            pause_time = active_channel.get_pause()
+                            self.log.debug("Pause time for {c}: {p}",
+                                           c=active_channel.channel_num,
+                                           p=pause_time)
+
+                            dwell_time = active_channel.get_dwell()
+                            self.log.debug("User set dwell_time_delay: {p}",
+                                           p=self.dwell_time_delay)
+
+                            # Check user set dwell time isn't too long
+                            if self.dwell_time_delay > dwell_time:
+                                self.log.warn("WARNING: User set dwell_time_delay of " + \
+                                              "{delay} s is larger than channel " + \
+                                              "dwell time of {chan_time} s. If " + \
+                                              "you are autoscanning this will " + \
+                                              "cause no data to be collected. " + \
+                                              "Reducing dwell time delay to {s} s.",
+                                              delay=self.dwell_time_delay,
+                                              chan_time=dwell_time,
+                                              s=dwell_time - 1)
+                                total_time = pause_time + dwell_time - 1
+                            else:
+                                total_time = pause_time + self.dwell_time_delay
+
+                            for i in range(total_time):
+                                self.log.debug("Sleeping for {t} more seconds...",
+                                               t=total_time-i)
+                                time.sleep(1)
+
+                        # Track the last channel we measured
+                        previous_channel = self.module.get_active_channel()
+
                     data = {
                         'timestamp': time.time(),
                         'block_name': active_channel.name,
@@ -129,9 +178,10 @@ class LS372_Agent:
                     }
 
                     # Collect both temperature and resistance values from each Channel
-                    data['data'][active_channel.name + ' T'] = self.module.get_temp(unit='kelvin', chan=active_channel.channel_num)
-                    data['data'][active_channel.name + ' R'] = self.module.get_temp(unit='ohms', chan=active_channel.channel_num)
-                    time.sleep(.01)
+                    data['data'][active_channel.name + ' T'] = \
+                        self.module.get_temp(unit='kelvin', chan=active_channel.channel_num)
+                    data['data'][active_channel.name + ' R'] = \
+                        self.module.get_temp(unit='ohms', chan=active_channel.channel_num)
 
                 session.app.publish_to_feed('temperatures', data)
 
@@ -472,12 +522,28 @@ def make_parser(parser=None):
     pgroup.add_argument('--mode')
     pgroup.add_argument('--fake-data', type=int, default=0,
                         help='Set non-zero to fake data, without hardware.')
+    pgroup.add_argument('--dwell-time-delay', type=int, default=0,
+                        help="Amount of time, in seconds, to delay data\
+                              collection after switching channels. Note this\
+                              time should not include the change pause time,\
+                              which is automatically accounted for.\
+                              Will automatically be reduced to dwell_time - 1\
+                              second if it is set longer than a channel's dwell\
+                              time. This ensures at least one second of data\
+                              collection at the end of a scan.")
     pgroup.add_argument('--auto-acquire', type=bool, default=True,
                         help='Automatically start data acquisition on startup')
 
     return parser
 
 if __name__ == '__main__':
+    # For logging
+    txaio.use_twisted()
+    LOG = txaio.make_logger()
+
+    # Start logging
+    txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
+
     # Get the default ocs argument parser.
     site_parser = site_config.add_arguments()
 
@@ -497,7 +563,9 @@ if __name__ == '__main__':
 
     agent, runner = ocs_agent.init_site_agent(args)
 
-    lake_agent = LS372_Agent(agent, args.serial_number, args.ip_address , fake_data=args.fake_data)
+    lake_agent = LS372_Agent(agent, args.serial_number, args.ip_address,
+                             fake_data=args.fake_data,
+                             dwell_time_delay=args.dwell_time_delay)
 
     agent.register_task('init_lakeshore', lake_agent.init_lakeshore_task,
                         startup=init_params)
