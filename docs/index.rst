@@ -13,6 +13,7 @@ General Information
    intro
    installation
    new_agents
+   webserver
 
 Agent Reference
 ---------------
