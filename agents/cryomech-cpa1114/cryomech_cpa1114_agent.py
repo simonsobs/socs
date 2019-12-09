@@ -42,7 +42,7 @@ class PTC:
         self.port = port  
         
         self.comm = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.comm.connect((self.ip_address, self.port))
+        self.comm.connect((self.ip_address, self.port)) #connects to the PTC
         self.comm.settimeout(timeout)
                  
     def get_data(self):
@@ -78,24 +78,33 @@ class PTC:
                   "High Pressure": [46,45,48,47], "High Pressure Average": [50, 49, 52, 51], "Delta Pressure": [54, 53, 56, 55],
                   "Motor Current": [58, 57, 60, 59]}
         
-        #Iterate through all keys and return the data in a usable format
+        #Iterate through all keys and return the data in a usable format. If there is an error in the string format, print the  
+        # error to logs, return an empty dictionary, and flag the data as bad
         data = {}
-        for key in keyloc.keys():
-            locs = keyloc[key] 
-            wkrBytes = bytes([rawdata[loc] for loc in locs])
-            
-            #three different data formats to unpack
-            if key in ["Operating State", "Pump State"]:
-                state = int.from_bytes(wkrBytes, byteorder='big')
-                data[key] = state
-            
-            if key in ["Warnings", "Alarms"]:
-                data[key] = int(''.join('{:02x}'.format(x) for x in wkrBytes))
-                
-            if key in ["Coolant In", "Coolant Out", "Oil", "Helium", "Low Pressure", "Low Pressure Average","High Pressure", "High Pressure Average", "Delta Pressure","Motor Current"]:
-                data[key] = struct.unpack('f', wkrBytes)[0]
-                
-        return data
+        
+        try:
+            for key in keyloc.keys():
+                locs = keyloc[key] 
+                wkrBytes = bytes([rawdata[loc] for loc in locs])
+
+                #three different data formats to unpack
+                if key in ["Operating State", "Pump State"]:
+                    state = int.from_bytes(wkrBytes, byteorder='big')
+                    data[key] = state
+
+                if key in ["Warnings", "Alarms"]:
+                    data[key] = int(''.join('{:02x}'.format(x) for x in wkrBytes))
+
+                if key in ["Coolant In", "Coolant Out", "Oil", "Helium", "Low Pressure", "Low Pressure Average","High Pressure", "High Pressure Average", "Delta Pressure","Motor Current"]:
+                    data[key] = struct.unpack('f', wkrBytes)[0]
+                    
+            data_flag = False
+                    
+        except:
+            data_flag = True
+            print(f"Compressor output could not be converted to numbers. Skipping this data block. Bad output string is {rawdata}")
+           
+        return data_flag, data
     
     def __del__(self):
         """
@@ -175,13 +184,15 @@ class PTCAgent:
 
             self.take_data = True
             
-            #Publish data, waiting 1/f_sample seconds in between calls. 
+            #Publish data, waiting 1/f_sample seconds in between calls.
             while self.take_data:
                 pub_data = {'timestamp':time.time(), 'block_name':'ptc_status'}
-                data = self.ptc.get_data()
+                data_flag, data = self.ptc.get_data()
                 pub_data['data'] = data
                 time.sleep(1./self.f_sample)
-                self.agent.publish_to_feed('ptc_status',pub_data)
+                #If there is an error in compressor output (data_flag = True), do not publish
+                if not data_flag: 
+                    self.agent.publish_to_feed('ptc_status',pub_data)
 
             self.agent.feeds["ptc_status"].flush_buffer() 
 
