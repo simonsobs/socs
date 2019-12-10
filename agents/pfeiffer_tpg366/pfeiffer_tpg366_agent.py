@@ -7,10 +7,10 @@ import numpy as np
 
 BUFF_SIZE = 128
 ENQ = '\x05'
-
+IP_ADDRESS = '10.10.10.20'
 
 class pfeiffer:
-    def __init__(self, ip_address, port=8000, timeout=10):
+    def __init__(self, ip_address=IP_ADDRESS, port=8000, timeout=10):
         self.ip_address = ip_address
         self.port = port
         
