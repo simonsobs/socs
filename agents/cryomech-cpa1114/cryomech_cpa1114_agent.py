@@ -1,5 +1,5 @@
 #script to log and readout PTC data through ethernet connection
-#Tamar Ervin, September 2019
+#Tamar Ervin and Jake Spisak, December 2019
 
 import sys, os
 import binascii
@@ -51,9 +51,9 @@ class PTC:
         """
         self.comm.sendall(self.buildRegistersQuery()) 
         data = self.comm.recv(1024)
-        brd = self.breakdownReplyData(data)
+        data_flag, brd = self.breakdownReplyData(data)
             
-        return brd    
+        return data_flag, brd    
     
     def buildRegistersQuery(self):
         query = bytes([0x09, 0x99,  # Message ID
@@ -72,11 +72,13 @@ class PTC:
         """
         
         #Associations between keys and their location in rawData
-        keyloc = {"Operating State": [9,10], "Pump State": [11, 12], "Warnings": [15, 16, 13, 14], "Alarms":[19, 20, 17, 18],
-                  "Coolant In": [22, 21, 24, 23], "Coolant Out": [26, 25, 28, 27], "Oil": [30, 29, 32, 31], 
-                  "Helium": [34, 33, 36, 35], "Low Pressure": [38, 37, 40, 39], "Low Pressure Average":[42, 41, 44, 43],
-                  "High Pressure": [46,45,48,47], "High Pressure Average": [50, 49, 52, 51], "Delta Pressure": [54, 53, 56, 55],
-                  "Motor Current": [58, 57, 60, 59]}
+        keyloc = {"Operating State": [9,10], "Pump State": [11, 12], 
+                  "Warnings": [15, 16, 13, 14], "Alarms":[19, 20, 17, 18],
+                  "Coolant In": [22, 21, 24, 23], "Coolant Out": [26, 25, 28, 27], 
+                  "Oil": [30, 29, 32, 31], "Helium": [34, 33, 36, 35], 
+                  "Low Pressure": [38, 37, 40, 39], "Low Pressure Average":[42, 41, 44, 43],
+                  "High Pressure": [46,45,48,47], "High Pressure Average": [50, 49, 52, 51], 
+                  "Delta Pressure": [54, 53, 56, 55], "Motor Current": [58, 57, 60, 59]}
         
         #Iterate through all keys and return the data in a usable format. If there is an error in the string format, print the  
         # error to logs, return an empty dictionary, and flag the data as bad
@@ -93,16 +95,19 @@ class PTC:
                     data[key] = state
 
                 if key in ["Warnings", "Alarms"]:
-                    data[key] = int(''.join('{:02x}'.format(x) for x in wkrBytes))
+                    data[key] = int(''.join('{:02x}'.format(x) for x in wkrBytes), 16)
 
-                if key in ["Coolant In", "Coolant Out", "Oil", "Helium", "Low Pressure", "Low Pressure Average","High Pressure", "High Pressure Average", "Delta Pressure","Motor Current"]:
+                if key in ["Coolant In", "Coolant Out", "Oil", "Helium", "Low Pressure", 
+                           "Low Pressure Average","High Pressure", "High Pressure Average", 
+                           "Delta Pressure","Motor Current"]:
                     data[key] = struct.unpack('f', wkrBytes)[0]
                     
             data_flag = False
                     
         except:
             data_flag = True
-            print(f"Compressor output could not be converted to numbers. Skipping this data block. Bad output string is {rawdata}")
+            print("Compressor output could not be converted to numbers."
+                  f"Skipping this data block. Bad output string is {rawdata}")
            
         return data_flag, data
     
@@ -189,10 +194,10 @@ class PTCAgent:
                 pub_data = {'timestamp':time.time(), 'block_name':'ptc_status'}
                 data_flag, data = self.ptc.get_data()
                 pub_data['data'] = data
-                time.sleep(1./self.f_sample)
                 #If there is an error in compressor output (data_flag = True), do not publish
                 if not data_flag: 
                     self.agent.publish_to_feed('ptc_status',pub_data)
+                time.sleep(1./self.f_sample)
 
             self.agent.feeds["ptc_status"].flush_buffer() 
 
