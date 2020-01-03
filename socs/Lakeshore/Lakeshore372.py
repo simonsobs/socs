@@ -227,12 +227,10 @@ class LS372:
 
         if '?' in message:
             self.com.send(msg_str)
-             # Try once, if we timeout, try again. Usually gets around single event glitches.
+            # Try once, if we timeout, try again. Usually gets around single event glitches.
             for attempt in range(2):
                 try:
-                    #print('before sending {}'.format(msg_str))
-                    #print('after sending {}'.format(msg_str))
-                    time.sleep(0.05)
+                    time.sleep(0.061)
                     resp = str(self.com.recv(4096), 'utf-8').strip()
                     break
                 except socket.timeout:
@@ -1296,6 +1294,7 @@ class Curve:
 
         # refresh curve attributes
         self.get_header()
+        self._check_curve(_file)
 
     def _check_curve(self, _file):
         """After setting a data point for calibration curve,
@@ -1311,12 +1310,9 @@ class Curve:
             content = f.readlines()
 
         #skipping header info
-
         values = []
         for i in range(9, len(content)):
             values.append(content[i].strip().split()) #data points that should have been uploaded
-
-
         for j in range(1, 201):
             try:
                 resp = self.get_data_point(j) #response from the 372
@@ -1327,7 +1323,7 @@ class Curve:
                 assert temperature == float(point[2]), "Point number %s not uploaded"%point[0]
                 print("Successfully uploaded %s, %s" %(units,temperature))
             #if AssertionError, tell 372 to re-upload points
-            except:
+            except AssertionError:
                 if units != float(point[1]):
                     self.set_curve(_file)
 
@@ -1372,7 +1368,7 @@ class Heater:
         self.filter = None
         self.delay = None
 
-        self.range =  None
+        self.range = None
 
         self.resistance = None
         self.max_current = None
