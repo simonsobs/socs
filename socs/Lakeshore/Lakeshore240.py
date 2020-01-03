@@ -43,9 +43,9 @@ class Module:
 
             for p in range(socket_port, socket_port + 10):
                 try:
-                    print(f"Trying to connect on port {p}")
+                    print(f"Trying to connect to {address} on port {p}")
                     self.com = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                    self.com.connect(('localhost', p))
+                    self.com.connect((address, p))
                     print(f"Found connection on port {p}")
                     break
                 except ConnectionRefusedError as e:

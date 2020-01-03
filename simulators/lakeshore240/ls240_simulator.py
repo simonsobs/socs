@@ -87,7 +87,7 @@ class Lakeshore240_Simulator:
         for p in range(self.port, self.port+10):
             try:
                 self.log.info(f"Trying to listen on port {p}")
-                sock.bind(('localhost', p))
+                sock.bind(('', p))
                 break
             except OSError as e:
                 if e.errno == 48:
@@ -173,7 +173,7 @@ class ChannelSim:
         self.range = 0
         self.current_reversal = 0
         self.units = 3
-        self.enabled = 0
+        self.enabled = 1
         self.value = 100
 
     def get_intype(self):

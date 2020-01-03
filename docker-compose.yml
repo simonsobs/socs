@@ -80,3 +80,14 @@ services:
   ocs-cryomech-cpa1114-agent:
     image: "ocs-cryomech-cpa1114-agent"
     build: ./agents/cryomech-cpa1114/
+
+  # --------------------------------------------------------------------------
+  # SOCS Simulators
+  # --------------------------------------------------------------------------
+
+  # --------------------------------------------------------------------------
+  # Lakeshore240 Simulator
+  # --------------------------------------------------------------------------
+  ocs-lakeshore240-simulator:
+    image: "ocs-lakeshore240-simulator"
+    build: ./simulators/lakeshore240/
