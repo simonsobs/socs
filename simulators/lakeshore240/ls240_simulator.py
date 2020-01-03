@@ -173,7 +173,7 @@ class ChannelSim:
         self.range = 0
         self.current_reversal = 0
         self.units = 3
-        self.enabled = 0
+        self.enabled = 1
         self.value = 100
 
     def get_intype(self):
