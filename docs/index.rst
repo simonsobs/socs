@@ -37,6 +37,7 @@ actual hardware is unavailable. These are useful for testing other code.
 .. toctree::
    :maxdepth: 2
 
+   simulators/ls240_simulator
    smurf_stream_simulator
 
 
