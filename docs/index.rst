@@ -17,6 +17,7 @@ Start here for information about the design and use of SOCS.
 
    intro
    installation
+   network
    new_agents
    webserver
 
