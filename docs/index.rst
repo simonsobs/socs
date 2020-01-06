@@ -1,11 +1,16 @@
 Simons Observatory Control System
 =================================
 
-.. Each heading and TOC below will render as a separate section of the
-   output PDF.
+The Simons Observatory Control System (SOCS) repository contains SO specific
+OCS code. This includes OCS Agents designed for interfacing with SO specific
+hardware, as well as SO specific configuration recommendations. For information
+about general OCS components, see the `OCS Documentation
+<https://ocs.readthedocs.io/en/latest/?badge=latest>`_.
 
 General Information
 -------------------
+
+Start here for information about the design and use of SOCS.
 
 .. toctree::
    :maxdepth: 2
@@ -18,15 +23,19 @@ General Information
 Agent Reference
 ---------------
 
+Agents are the OCS components that interface with other systems. These run at
+all times, awaiting commands from OCS Clients. These are the Agents specifc to
+SO hardware.
+
 .. toctree::
    :maxdepth: 2
 
-   keithley-psu
-   lakeshore240
-   lakeshore372
-   bluefors_agent
-   timestream_aggregator
-   pysmurf/index
+   agents/bluefors_agent
+   agents/keithley-psu
+   agents/lakeshore240
+   agents/lakeshore372
+   agents/pysmurf/index
+   agents/timestream_aggregator
 
 Simulator Reference
 -------------------
@@ -38,8 +47,7 @@ actual hardware is unavailable. These are useful for testing other code.
    :maxdepth: 2
 
    simulators/ls240_simulator
-   smurf_stream_simulator
-
+   simulators/smurf_stream_simulator
 
 Indices and tables
 ==================

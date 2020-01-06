@@ -3,7 +3,7 @@
 .. _pysmurf:
 
 ====================
-Pysmurf/OCS overview
+Pysmurf/OCS Overview
 ====================
 
 There are three agents used to interact with `pysmurf <https://github.com/slaclab/pysmurf>`_.

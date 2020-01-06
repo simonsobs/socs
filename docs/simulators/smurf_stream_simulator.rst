@@ -49,4 +49,4 @@ Agent API
 ---------
 
 .. autoclass:: agents.smurf_stream_simulator.smurf_stream_simulator.SmurfStreamSimulator
-    :members: run_background_stream, stop_background_stream, start_data_stream, stop_data_stream
+    :members: start_background_streamer, stop_background_streamer, set_stream_on, set_stream_off
