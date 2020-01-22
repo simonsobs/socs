@@ -66,7 +66,7 @@ class pfeiffer:
         self.comm.close()
 
 class pfeifferAgent:
-    def __init__(self, agent, port=8000):
+    def __init__(self, agent,ip_address = IP_ADDRESS, port=8000):
         self.active = True  
         self.agent = agent
         self.log = agent.log
@@ -83,7 +83,51 @@ class pfeifferAgent:
                                  record=True,
                                  agg_params=agg_params,
                                  buffer_time=1)
+    def get_pressure(self, params = None):
+        """
+        Get pressures from the Pfeiffer gauges
+        """
+        with self.acquire_timeout(timeout=0, job='init') as acquired:
+        # Locking mechanism stops code from proceeding if no lock acquired
+        if not acquired:
+                self.log.warn("Could not start init because {} is already running".format(self.lock.job))
+                return False, "Could not acquire lock."
+        # Run the function you want to run
+        try:
+                self.read_pressure_all.()
+        except ValueError:
+                pass
+        print("Retreiving pressure data from Pfeiffer gauges")
+        # This part is for the record and to allow future calls to proceed, so does not require the lock
+        self.initialized = True
+        return True, 'Retreiving pressure data'
 
-        ##
+    def stop_acq(self, params = None):
+        """
+        End pressure data acquisition
+        """
+        if self.take_data:
+            #self.take_data = False
+            self.close()
+            return True, 'requested to stop taking data.'
+        else:
+            return False, 'acq is not currently running'
+
+if __name__ == '__main__':
+        parser = site_config.add_arguments()
+
+        pgroup = parser.add_argument_group('Agent Options')
+        pgroup.add_argument('--ip_address')
+        pgroup.add_argument('--port')
+
+        args = parser.parse_args()
         
+
+        site_config.reparse_args(args, 'pfeifferAgent')
+        agent, runner = ocs_agent.init_site_agent(args)
+        pfeiffer_agent = pfeifferAgent(agent) 
         
+        agent.register_task('get_pressure', pfeiffer_agent.get_pressure)
+        agent.register_task('close', pfeiffer_agent.stop_acq)
+
+        runner.run(agent, auto_reconnect=True)
