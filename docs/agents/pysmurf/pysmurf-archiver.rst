@@ -38,7 +38,8 @@ Example site-config entry::
 
 Setting up SSH Permissions
 --------------------------
-This still needs work...
+For instructions on how to setup ssh-permissions for the pysmurf-archiver,
+see the following SO-wiki page: http://simonsobservatory.wikidot.com/daq:smurf-ssh-permissions
 
 Docker Configuration
 --------------------
@@ -55,6 +56,7 @@ The docker-compose entry is similar to that of the pysmurf-monitor. For example:
             MYSQL_PASSWORD: ${DB_PW}
         volumes:
             - ${OCS_CONFIG_DIR}:/config
+            - /home/ocs:/home/ocs
             - /data:/data
         depends_on:
             - "sisock-crossbar"
