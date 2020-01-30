@@ -79,7 +79,7 @@ services:
   # --------------------------------------------------------------------------
   ocs-cryomech-cpa1114-agent:
     image: "ocs-cryomech-cpa1114-agent"
-    build: ./agents/cryomech-cpa1114/
+    build: ./agents/cryomech_cpa1114/
 
   # --------------------------------------------------------------------------
   # SOCS Simulators
