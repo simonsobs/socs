@@ -1,5 +1,8 @@
 FROM tidair/pysmurf:pr92
 
+# Set locale
+ENV LANG C.UTF-8
+
 # Installs Jupyter requirements
 RUN pip3 install jupyter
 
