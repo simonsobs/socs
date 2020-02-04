@@ -61,6 +61,20 @@ An example docker-compose service configuration is shown here::
 Since the agent within the container needs to communicate with hardware on the
 host network you must use ``network_mode: "host"`` in your compose file.
 
+Example Client
+---------------------------
+Below is an example client to start data acqusition (currently the only use case)::
+
+    from ocs.matched_client import MatchedClient
+
+    ptc1 = MatchedClient('ptc1', args=[])
+
+    ptc1.init.start()
+    ptc1.init.wait()
+
+    status, msg, session = ptc1.acq.start()
+
+
 Agent API
 ---------
 
