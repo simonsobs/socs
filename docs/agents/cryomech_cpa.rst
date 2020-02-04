@@ -1,24 +1,22 @@
 .. highlight:: rst
 
-.. _cryomech_cpa1114:
+.. _cryomech_cpa:
 
 ======================
-Cryomech CPA1114 Agent
+Cryomech CPA Agent
 ======================
 
-The Cryomech CPA1114 compressor is a commonly used compressor model for the
-pulse tubes within SO. The CPA1114 Agent interfaces with the compressor over
+The Cryomech CPA compressor is a commonly used compressor model for the
+pulse tubes within SO. The CPA Agent interfaces with the compressor over
 ethernet to monitor the health of the unit, including stats such as Helium
 temperature and pressure, oil temperature, and more. Control is not yet
 implemented.
 
 .. argparse::
-    :filename: ../agents/cryomech_cpa1114/cryomech_cpa1114_agent.py
+    :filename: ../agents/cryomech_cpa/cryomech_cpa_agent.py
     :func: make_parser
-    :prog: python3 crypmech_cpa1114_agent.py
+    :prog: python3 crypmech_cpa_agent.py
 
-Description
------------
 
 Configuration File Examples
 ---------------------------
@@ -27,11 +25,11 @@ Agent in a docker container.
 
 ocs-config
 ``````````
-To configure the Cryomech CPA1114 Agent we need to add a CryomechCPA1114Agent
+To configure the Cryomech CPA Agent we need to add a CryomechCPAAgent
 block to our ocs configuration file. Here is an example configuration block
 using all of the available arguments::
 
-       {'agent-class': 'CryomechCPA1114Agent',
+       {'agent-class': 'CryomechCPAAgent',
         'instance-id': 'ptc1',
         'arguments':[
           ['--ip-address', '10.10.10.111'],
@@ -46,11 +44,11 @@ should not need to change that unless you have reconfigured your compressor.
 
 Docker
 ``````
-The Cryomech CPA1114 Agent should be configured to run in a Docker container.
+The Cryomech CPA Agent should be configured to run in a Docker container.
 An example docker-compose service configuration is shown here::
 
   ocs-ptc1:
-    image: simonsobs/ocs-cryomech-cpa1114-agent:latest
+    image: simonsobs/ocs-cryomech-cpa-agent:latest
     hostname: ocs-docker
     network_mode: "host"
     volumes:
@@ -63,7 +61,9 @@ host network you must use ``network_mode: "host"`` in your compose file.
 
 Example Client
 ---------------------------
-Below is an example client to start data acqusition (currently the only use case)::
+Below is an example client to start data acquisition (currently the only use 
+case). Note that if ['--mode', 'acq'] is specified in the ocs configuration
+file, acquisition will begin automatically upon agent startup.::
 
     from ocs.matched_client import MatchedClient
 
@@ -78,5 +78,5 @@ Below is an example client to start data acqusition (currently the only use case
 Agent API
 ---------
 
-.. autoclass:: agents.cryomech_cpa1114.cryomech_cpa1114_agent.PTCAgent
+.. autoclass:: agents.cryomech_cpa.cryomech_cpa_agent.PTCAgent
     :members: start_acq

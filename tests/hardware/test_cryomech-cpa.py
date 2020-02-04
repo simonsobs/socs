@@ -1,4 +1,4 @@
-"""Test for Cryomech cpa-1114 error handling.
+"""Test for Cryomech cpa error handling.
 
 IMPORTANT: The ocs site config file needs to have ['fake-errors', True]
 passed as an argument to the compressor for this test to work.

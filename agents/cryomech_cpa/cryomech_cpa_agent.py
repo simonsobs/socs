@@ -1,5 +1,5 @@
 # Script to log and readout PTC data through ethernet connection.
-# Tamar Ervin and Jake Spisak, December 2019
+# Tamar Ervin and Jake Spisak, February 2019
 
 import argparse
 import time
@@ -275,7 +275,7 @@ def main():
     args = parser.parse_args()
 
     # Interpret options in the context of site_config.
-    site_config.reparse_args(args, 'CryomechCPA1114Agent')
+    site_config.reparse_args(args, 'CryomechCPAAgent')
     print('I am in charge of device with serial number: %s' % args.serial_number)
 
     # Automatically acquire data if requested (default)
