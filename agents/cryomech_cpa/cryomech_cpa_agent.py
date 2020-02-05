@@ -146,7 +146,7 @@ class PTCAgent:
         ip_address (str): IP Address for the compressor.
         f_sample (float, optional): Data acquisiton rate
         fake_errors (bool, optional): Generates fake errors in
-        the string output 50% of the time.
+                                      the string output 50% of the time.
 
     """
     def __init__(self, agent, port, ip_address, f_sample=2.5,

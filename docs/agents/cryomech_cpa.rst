@@ -2,9 +2,9 @@
 
 .. _cryomech_cpa:
 
-======================
+==================
 Cryomech CPA Agent
-======================
+==================
 
 The Cryomech CPA compressor is a commonly used compressor model for the
 pulse tubes within SO. The CPA Agent interfaces with the compressor over
@@ -60,10 +60,8 @@ Since the agent within the container needs to communicate with hardware on the
 host network you must use ``network_mode: "host"`` in your compose file.
 
 Example Client
----------------------------
-Below is an example client to start data acquisition (currently the only use 
-case). Note that if ['--mode', 'acq'] is specified in the ocs configuration
-file, acquisition will begin automatically upon agent startup.::
+--------------
+Below is an example client to start data acquisition::
 
     from ocs.matched_client import MatchedClient
 
@@ -74,6 +72,10 @@ file, acquisition will begin automatically upon agent startup.::
 
     status, msg, session = ptc1.acq.start()
 
+.. note:: 
+    If ``['--mode', 'acq']`` is specified in the ocs configuration file,
+    acquisition will begin automatically upon agent startup, so there may be no
+    need to run this client.
 
 Agent API
 ---------
