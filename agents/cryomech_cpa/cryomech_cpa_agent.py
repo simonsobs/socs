@@ -1,15 +1,19 @@
 # Script to log and readout PTC data through ethernet connection.
 # Tamar Ervin and Jake Spisak, February 2019
 
+import os
 import argparse
 import time
 import struct
 import socket
 import signal
 from contextlib import contextmanager
-from ocs import site_config, ocs_agent
-from ocs.ocs_twisted import TimeoutLock
 import random
+
+ON_RTD = os.environ.get('READTHEDOCS') == 'True'
+if not ON_RTD:
+    from ocs import site_config, ocs_agent
+    from ocs.ocs_twisted import TimeoutLock
 
 STX = '\x02'
 ADDR = '\x10'

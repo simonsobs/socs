@@ -121,9 +121,4 @@ Agent API
 This agent registers the **run**, **abort**, and **tune_squids** tasks.
 
 .. autoclass:: agents.pysmurf_controller.pysmurf_controller.PysmurfController
-    :members: run, abort, tune_squids
-
-
-
-
-
+    :members: run_script, abort_script, tune_squids
