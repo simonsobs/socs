@@ -6,7 +6,7 @@
 Pysmurf/OCS Overview
 ====================
 
-There are three agents used to interact with `pysmurf <https://github.com/slaclab/pysmurf>`_.
+There are three agents used to interact with `pysmurf <https://github.com/slaclab/pysmurf>`__.
 The Pysmurf Controller is used to run pysmurf scripts.
 The Pysmurf Monitor listens to pysmurf messages published with the *pysmurf publisher*.
 The Pysmurf Archiver copies files pysmurf writes onto a storage node.
