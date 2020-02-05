@@ -32,6 +32,7 @@ SO hardware.
    :maxdepth: 2
 
    agents/bluefors_agent
+   agents/cryomech_cpa
    agents/keithley-psu
    agents/lakeshore240
    agents/lakeshore372

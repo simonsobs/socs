@@ -7,15 +7,15 @@ FROM socs:latest
 
 # Set the working directory to registry directory
 
-WORKDIR /app/socs/agents/cryomech-cpa1114/
+WORKDIR /app/socs/agents/cryomech-cpa/
 
 # Copy this agent into the app/socs/agents directory
 
-COPY . /app/socs/agents/cryomech-cpa1114/
+COPY . /app/socs/agents/cryomech-cpa/
 
 # Run agent on container startup
 
-ENTRYPOINT ["python3", "-u", "cryomech_cpa1114_agent.py"]
+ENTRYPOINT ["python3", "-u", "cryomech_cpa_agent.py"]
 
 CMD ["--site-hub=ws://sisock-crossbar:8001/ws", \
      "--site-http=http://sisock-crossbar:8001/call"]
