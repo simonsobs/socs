@@ -2,6 +2,7 @@ import time
 import os
 import argparse
 import warnings
+import txaio
 
 from typing import Optional
 
@@ -187,13 +188,12 @@ class LS240_Agent:
 
         return True, "Uploaded curve to channel {}".format(channel)
 
-    def acq(self, session, params=None):
+    def start_acq(self, session, params=None):
         """acq(params=None)
 
-        Task to start data acquisition.
+        Method to start data acquisition process.
 
         Args:
-
             sampling_frequency (float):
                 Sampling frequency for data collection. Defaults to 2.5 Hz
 
@@ -267,6 +267,9 @@ def make_parser(parser=None):
 
 
 def main():
+    # Start logging
+    txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
+
     p = site_config.add_arguments()
     parser = make_parser(parser=p)
 
@@ -331,7 +334,7 @@ def main():
                         startup=init_params)
     agent.register_task('set_values', therm.set_values)
     agent.register_task('upload_cal_curve', therm.upload_cal_curve)
-    agent.register_process('acq', therm.acq, therm.stop_acq)
+    agent.register_process('acq', therm.start_acq, therm.stop_acq)
 
     runner.run(agent, auto_reconnect=True)
 
