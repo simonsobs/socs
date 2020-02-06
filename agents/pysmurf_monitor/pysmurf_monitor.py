@@ -101,6 +101,9 @@ class PysmurfMonitor(DatagramProtocol):
             self.log.info("New file: {fname}", fname=data['payload']['path'])
             d = data['payload'].copy()
 
+            if (d['format'] == 'npy') and (not d['path'].endswith('.npy')):
+                d['path'] += '.npy'
+
             # Adds additional db info to dict
             d['timestamp'] = datetime.datetime.utcfromtimestamp(d['timestamp'])
             d['md5sum'] = get_md5sum(d['path'])
