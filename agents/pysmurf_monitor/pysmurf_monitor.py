@@ -72,7 +72,7 @@ class PysmurfMonitor(DatagramProtocol):
         if db_host is not None:
             sql_config['host'] = db_host
 
-        self.dbpool = adbapi.ConnectionPool('mysql.connector', **sql_config)
+        self.dbpool = adbapi.ConnectionPool('mysql.connector', **sql_config, cp_reconnect=True)
 
     def _add_file_callback(self, res, d):
         """Callback for when a file is successfully added to DB"""
