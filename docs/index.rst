@@ -7,49 +7,49 @@ hardware, as well as SO specific configuration recommendations. For information
 about general OCS components, see the `OCS Documentation
 <https://ocs.readthedocs.io/en/latest/?badge=latest>`_.
 
-General Information
--------------------
+Contents
+========
 
-Start here for information about the design and use of SOCS.
-
-.. toctree::
-   :maxdepth: 2
-
-   intro
-   installation
-   network
-   new_agents
-   webserver
-
-Agent Reference
----------------
-
-Agents are the OCS components that interface with other systems. These run at
-all times, awaiting commands from OCS Clients. These are the Agents specifc to
-SO hardware.
+===================  ============================================================
+Section              Description
+===================  ============================================================
+User Guide           Start here for information about the design and use of SOCS.
+Agent Reference      Agents are the OCS components that interface with other
+                     systems. These run at all times, awaiting commands from
+                     OCS Clients. These are the Agents specifc to SO hardware.
+Simulator Reference  Simulators are used to mock software and hardware
+                     interfaces when access to actual hardware is unavailable.
+                     These are useful for testing other code.
+===================  ============================================================
 
 .. toctree::
-   :maxdepth: 2
+    :caption: User Guide
+    :maxdepth: 2
 
-   agents/bluefors_agent
-   agents/cryomech_cpa
-   agents/keithley-psu
-   agents/lakeshore240
-   agents/lakeshore372
-   agents/pysmurf/index
-   agents/timestream_aggregator
-
-Simulator Reference
--------------------
-
-Simulators are used to mock software and hardware interfaces when access to
-actual hardware is unavailable. These are useful for testing other code.
+    user/intro
+    user/installation
+    user/network
+    user/new_agents
+    user/webserver
 
 .. toctree::
-   :maxdepth: 2
+    :caption: Agent Reference
+    :maxdepth: 2
 
-   simulators/ls240_simulator
-   simulators/smurf_stream_simulator
+    agents/bluefors_agent
+    agents/cryomech_cpa
+    agents/keithley-psu
+    agents/lakeshore240
+    agents/lakeshore372
+    agents/pysmurf/index
+    agents/timestream_aggregator
+
+.. toctree::
+    :caption: Simulator Reference
+    :maxdepth: 2
+
+    simulators/ls240_simulator
+    simulators/smurf_stream_simulator
 
 Indices and tables
 ==================

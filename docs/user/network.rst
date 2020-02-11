@@ -28,7 +28,7 @@ crossbar, Grafana, a web server, InfluxDB, etc.) In this instance, all required
 hardware communicates with this single node (node01) over a local network. This
 configuration is common in small setups found in test labs.
 
-.. image:: _static/socs_single_node_diagram.png
+.. image:: ../_static/socs_single_node_diagram.png
 
 Addressed blocks in the subnet of this diagram represent networked hardware
 such as the Lakeshore 372 or Pulse Tube compressor. Solid blocks without a
@@ -104,7 +104,7 @@ Once hardware that requires additional compute nodes, such as a SMuRF crate or
 Bluefors system, is added to a network it often makes sense to configure a
 multi-node network.
 
-.. image:: _static/socs_multi_node_diagram.png
+.. image:: ../_static/socs_multi_node_diagram.png
 
 Addressed blocks in the subnet of this diagram represent networked hardware
 such as the Lakeshore 372 or Pulse Tube compressor. Solid blocks without a
