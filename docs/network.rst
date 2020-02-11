@@ -149,7 +149,12 @@ This initializes the swarm. On your other nodes (we'll stick to one other node,
     user@node02:~$ docker swarm join --token <your_token> <your_ip_address>:2377
     This node joined a swarm as a worker.
 
-The joins ``node02`` to the swarm managed by ``node01``, however, this does not
+.. note::
+    If you have a firewall in place, such as ``ufw``, then you will need to
+    open ports 2377, 7946, and 4789 to any node you would like to join to the
+    swarm.
+
+This joins ``node02`` to the swarm managed by ``node01``, however, this does not
 establish the overlay network yet. If you look at your available networks you
 will likely see something like::
 
@@ -165,6 +170,11 @@ Create an attachable overlay network::
 
     user@node01:~$ docker network create --driver=overlay --attachable ocs-net
     u81efzewueadmb4v4act6b4yi
+
+.. note::
+    If you have followed the single-node configuration above you will already
+    have a network named ``ocs-net``. You will either want to remove that network,
+    or name your overlay network differently.
 
 You should see the new network in your network list::
 
