@@ -20,6 +20,7 @@ class Column:
 columns = [
     Column("id", "INT", opts="NOT NULL AUTO_INCREMENT PRIMARY KEY"),
     Column("path", "VARCHAR(260)", opts="UNIQUE NOT NULL"),
+    Column('archived_path', 'VARCHAR(260)', opts='UNIQUE'),
     Column("type", "VARCHAR(32)", opts="NOT NULL"),
     Column("timestamp", "TIMESTAMP"),
     Column("format", "VARCHAR(32)"),

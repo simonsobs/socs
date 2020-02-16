@@ -21,11 +21,13 @@ def create_local_path(file, data_dir):
 
         The file path will be:
 
-            data_dir/<5 ctime digits>/<file_type>/<file_name>
+            data_dir/<5 ctime digits>/<pub_id>/<time_action>/outputs/fname
 
-        E.g.
+        or 
 
-            /data/pysmurf/15647/tuning/1564799250_tuning_b1.txt
+            data_dir/<5 ctime digits>/<pub_id>/<time_action>/plots/fname
+        
+        depending on whether the file is a plot
 
         Arguments
         ---------
@@ -42,13 +44,18 @@ def create_local_path(file, data_dir):
 
     print(file['path'])
     filename = os.path.basename(file['path'])
+    filename_ts = filename.split('_')[0]
 
     dt = file['timestamp']
 
+    dir_type = "plots" if file['plot'] else 'outputs'
+
     subdir = os.path.join(
-                data_dir,
-                f"{str(dt.timestamp()):.5}",
-                f"{file['type']}"
+                data_dir,                       # Base directory
+                f"{str(dt.timestamp()):.5}",    # 5 ctime digits
+                file['pub_id'],                 # Publisher_id
+                                                # timestamp_function
+                dir_type                        # plots/outputs
              )
 
     if not os.path.exists(subdir):
@@ -217,7 +224,7 @@ class PysmurfArchiverAgent:
                         # If file copied successfully
                         self.log.debug("Successfully coppied file {}".format(f['path']))
                         query = """
-                            UPDATE pysmurf_files SET path=%s, copied=1 
+                            UPDATE pysmurf_files SET archived_path=%s, copied=1 
                             WHERE id=%s
                         """
                         cur.execute(query, (new_path, f['id']))
