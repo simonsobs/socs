@@ -81,7 +81,7 @@ class PysmurfMonitor(DatagramProtocol):
     def _add_file_errback(self, failure: Failure, d):
         """Errback for when there is an exception when adding file to DB"""
         self.log.error(f"ERROR!!! {d['path']} was not added to the database")
-        return failure
+        self.log.error(f"Failure:\n{failure}")
 
     def datagramReceived(self, _data, addr):
         """
