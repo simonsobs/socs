@@ -72,7 +72,7 @@ class PysmurfMonitor(DatagramProtocol):
         if db_host is not None:
             sql_config['host'] = db_host
 
-        self.dbpool = adbapi.ConnectionPool('mysql.connector', **sql_config)
+        self.dbpool = adbapi.ConnectionPool('mysql.connector', **sql_config, cp_reconnect=True)
 
     def _add_file_callback(self, res, d):
         """Callback for when a file is successfully added to DB"""
@@ -81,7 +81,7 @@ class PysmurfMonitor(DatagramProtocol):
     def _add_file_errback(self, failure: Failure, d):
         """Errback for when there is an exception when adding file to DB"""
         self.log.error(f"ERROR!!! {d['path']} was not added to the database")
-        return failure
+        self.log.error(f"Failure:\n{failure}")
 
     def datagramReceived(self, _data, addr):
         """
@@ -100,6 +100,9 @@ class PysmurfMonitor(DatagramProtocol):
         if data['type'] in ['data_file']:
             self.log.info("New file: {fname}", fname=data['payload']['path'])
             d = data['payload'].copy()
+
+            if (d['format'] == 'npy') and (not d['path'].endswith('.npy')):
+                d['path'] += '.npy'
 
             # Adds additional db info to dict
             d['timestamp'] = datetime.datetime.utcfromtimestamp(d['timestamp'])
