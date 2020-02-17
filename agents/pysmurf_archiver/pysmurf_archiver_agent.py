@@ -13,6 +13,51 @@ on_rtd = os.environ.get('READTHEDOCS') == 'True'
 if not on_rtd:
     from ocs import ocs_agent, site_config
 
+action_types = {
+    # These tags are doubled up in different functions, so just grouping like
+    # this for now...
+    "adc": 'adc',  
+    "dac": 'dac',
+
+    # From smurf_util.py
+    "bias_bump": 'bias_bump',
+    "delay": 'estimate_phase_delay',
+    "mask": 'gcp_mask',
+    
+    #from smurf_tune.py
+    "amp_vs_err": 'tracking_setup',
+    "eta": 'eta_fit',
+    "find_freq": 'find_peak',
+    "flux_ramp": 'flux_ramp_check',
+    "full_band_resp": 'full_band_resp',
+    "resonances": 'tune_band',
+    "response": 'full_band_resp',
+    "sweep_response": 'find_freq',
+    "tracking": 'tracking_setup',
+    "tune": 'tune',
+
+    # From smurf_noise.py
+    # Grouping all noise files together...
+    "datafiles": 'noise',
+    "noise": 'noise',
+    "noise_timestream": 'noise',
+    "noise_vs_tone_data": 'noise',
+    "noise_vs_tone_tone": 'noise',
+    "noise_vs": 'noise',
+    "psd": 'noise',
+
+    # From smurf_iv.py
+    "iv": 'slow_iv',
+    "iv_bias": 'slow_iv',
+    "iv_hist": 'slow_iv',
+    "iv_raw": 'slow_iv',
+    "iv_stream": 'slow_iv',
+    "opt_efficiency": 'opt_eff',
+    "plc_bias": 'partial_load_curve',
+    "plc_raw": 'partial_load_curve',
+    "plc_stream": 'partial_load_curve'
+}
+
 
 def create_local_path(file, data_dir):
     """
@@ -44,19 +89,29 @@ def create_local_path(file, data_dir):
 
     print(file['path'])
     filename = os.path.basename(file['path'])
-    filename_ts = filename.split('_')[0]
-
     dt = file['timestamp']
-
     dir_type = "plots" if file['plot'] else 'outputs'
 
+    time_action_string = ""
+    try:
+        group_time = int(filename.split('_')[0])
+        time_action_string += str(group_time) + "_"
+    except ValueError as e:
+        print("Filename does not start with a timestamp. Using file creation timestamp")
+        time_action_string += str(int(dt.timestamp())) + "_"
+
+    # Tries to get general action name from dict, but defaults to type if not 
+    # present
+    time_action_string += action_types.get(file['type'], file['type'])
+
+
     subdir = os.path.join(
-                data_dir,                       # Base directory
-                f"{str(dt.timestamp()):.5}",    # 5 ctime digits
-                file['pub_id'],                 # Publisher_id
-                                                # timestamp_function
-                dir_type                        # plots/outputs
-             )
+        data_dir,                       # Base directory
+        f"{str(dt.timestamp()):.5}",    # 5 ctime digits
+        file['pub_id'],                 # Publisher_id
+        time_action_string,             # grouptime_action
+        dir_type                        # plots/outputs
+    )
 
     if not os.path.exists(subdir):
         os.makedirs(subdir)
