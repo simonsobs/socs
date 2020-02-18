@@ -62,6 +62,8 @@ class SmurfStreamSimulator:
         Target remote host address
     port : int
         Port to send data over
+    writer : spt3g.core.G3NetworkSender
+        G3 writer for sending frames to, in this case a G3NetworkSender
     is_streaming : bool
         flag to track if we're currently streaming, used in stop task to stop
         the streaming process. If stopped then keep alive flow control frames
@@ -79,6 +81,7 @@ class SmurfStreamSimulator:
 
         self.port = port
 
+        self.writer = None
         self.is_streaming = False
         self.running_in_background = False
 
@@ -105,8 +108,8 @@ class SmurfStreamSimulator:
         if params is None:
             params = {}
 
-        writer = core.G3NetworkSender(hostname=self.target_host,
-                                      port=self.port)
+        self.writer = core.G3NetworkSender(hostname=self.target_host,
+                                           port=self.port)
 
         frame_rate = params.get('frame_rate', 1.)
         sample_rate = params.get('sample_rate', 10.)
@@ -114,10 +117,10 @@ class SmurfStreamSimulator:
         f = core.G3Frame(core.G3FrameType.Observation)
         f['session_id'] = 0
         f['start_time'] = time.time()
-        writer.Process(f)
+        self.writer.Process(f)
 
         frame_num = 0
-        self.is_streaming = True
+        self.set_stream_on()  # sends start flowcontrol
         self.running_in_background = True
 
         while self.running_in_background:
@@ -125,7 +128,7 @@ class SmurfStreamSimulator:
             # Send keep alive flow control frame
             f = core.G3Frame(core.G3FrameType.none)
             f['sostream_flowcontrol'] = 0
-            writer.Process(f)
+            self.writer.Process(f)
 
             if self.is_streaming:
                 frame_start = time.time()
@@ -144,7 +147,7 @@ class SmurfStreamSimulator:
                     ts.stop = core.G3Time(frame_stop * core.G3Units.sec)
                     f['data'][str(i)] = ts
 
-                writer.Process(f)
+                self.writer.Process(f)
                 self.log.info("Writing frame...")
                 frame_num += 1
 
@@ -153,10 +156,26 @@ class SmurfStreamSimulator:
                 time.sleep(1)
 
         # Teardown writer
-        writer.Close()
-        writer = None
+        self.writer.Close()
+        self.writer = None
 
         return True, "Finished streaming"
+
+    def _send_start_flowcontrol_frame(self):
+        """Send START flowcontrol frame."""
+        if self.writer is not None:
+            self.log("Sending START flowcontrol frame")
+            f = core.G3Frame(core.G3FrameType.none)
+            f['sostream_flowcontrol'] = 1
+            self.writer.Process(f)
+
+    def _send_end_flowcontrol_frame(self):
+        """Send END flowcontrol frame."""
+        if self.writer is not None:
+            self.log("Sending END flowcontrol frame")
+            f = core.G3Frame(core.G3FrameType.none)
+            f['sostream_flowcontrol'] = 2
+            self.writer.Process(f)
 
     def stop_background_streamer(self, session, params=None):
         """stop_background_streamer(params=None)
@@ -164,6 +183,9 @@ class SmurfStreamSimulator:
         Stop method associated with start_background_streamer process.
 
         """
+        if self.is_streaming:
+            self._send_end_flowcontrol_frame()
+
         self.running_in_background = False
         return True, "Stopping stream"
 
@@ -174,6 +196,9 @@ class SmurfStreamSimulator:
         streaming process.
 
         """
+        if not self.is_streaming:
+            self._send_start_flowcontrol_frame()
+
         self.is_streaming = True
         return True, "Started stream"
 
@@ -184,6 +209,9 @@ class SmurfStreamSimulator:
         streaming process. Keep alive flow control frames will still be sent.
 
         """
+        if self.is_streaming:
+            self._send_end_flowcontrol_frame()
+
         self.is_streaming = False
         return True, "Stopped stream"
 
