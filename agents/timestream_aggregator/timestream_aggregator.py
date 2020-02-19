@@ -219,6 +219,18 @@ class FrameRecorder:
 
         self.frames = self.reader.Process(None)
         if self.frames:
+            # Handle flow control frames
+            for f in self.frames:
+                if f.type in [core.G3FrameType.none]:
+                    # START; create_new_file
+                    if f.get('sostream_flowcontrol') == 1:
+                        self.close_file()
+                        self.create_new_file()
+
+                    # END; close_file
+                    if f.get('sostream_flowcontrol') == 2:
+                        self.close_file()
+
             # Discard flow control frames
             self.frames = [x for x in self.frames if x.type != core.G3FrameType.none]
             return
