@@ -120,7 +120,7 @@ class SmurfStreamSimulator:
         self.writer.Process(f)
 
         frame_num = 0
-        self.set_stream_on()  # sends start flowcontrol
+        self._set_stream_on()  # sends start flowcontrol
         self.running_in_background = True
 
         while self.running_in_background:
@@ -164,7 +164,7 @@ class SmurfStreamSimulator:
     def _send_start_flowcontrol_frame(self):
         """Send START flowcontrol frame."""
         if self.writer is not None:
-            self.log("Sending START flowcontrol frame")
+            self.log.info("Sending START flowcontrol frame")
             f = core.G3Frame(core.G3FrameType.none)
             f['sostream_flowcontrol'] = 1
             self.writer.Process(f)
@@ -172,7 +172,7 @@ class SmurfStreamSimulator:
     def _send_end_flowcontrol_frame(self):
         """Send END flowcontrol frame."""
         if self.writer is not None:
-            self.log("Sending END flowcontrol frame")
+            self.log.info("Sending END flowcontrol frame")
             f = core.G3Frame(core.G3FrameType.none)
             f['sostream_flowcontrol'] = 2
             self.writer.Process(f)
@@ -201,6 +201,18 @@ class SmurfStreamSimulator:
 
         self.is_streaming = True
         return True, "Started stream"
+
+    def _set_stream_on(self):
+        """Private method that that isn't a "task".
+
+        Starts the stream of actual data frames from the background streaming
+        process.
+
+        """
+        if not self.is_streaming:
+            self._send_start_flowcontrol_frame()
+
+        self.is_streaming = True
 
     def set_stream_off(self, session, params=None):
         """set_stream_off(params=None)
