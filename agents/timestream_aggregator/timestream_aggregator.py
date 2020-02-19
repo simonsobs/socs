@@ -377,7 +377,7 @@ class FrameRecorder:
 
         """
         self.read_frames()
-        self.check_for_frame_gap(5)
+        self.check_for_frame_gap(10)
         if self.frames:
             self.create_new_file()
             self.write_frames_to_file()
