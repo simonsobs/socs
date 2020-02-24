@@ -122,6 +122,10 @@ class FrameRecorder:
         The time at which we last attempted to establish a network connection.
         Used to rate limit the number of attempted connections to the
         G3NetworkSender.
+    _last_file_timestamp : int
+        Timestamp of last filename. Used to check if a new file was started
+        within the same second a new file is being made to avoid naming
+        conflicts.
     filename_suffix : int
         For enumerating files within an acquisition. We want to split files in
         10 minute intervals, but the names should remain the same with a
@@ -152,6 +156,7 @@ class FrameRecorder:
         self.last_meta = None
         self.last_frame_write_time = None
         self.last_connection_time = None
+        self._last_file_timestamp = None
 
         self.filename_suffix = 0
         self.start_time = None
@@ -294,6 +299,14 @@ class FrameRecorder:
             # Used for tracking when to split acquisitions
             self.start_time = time.time()
 
+            # Avoid duplicate filenames if new file started within 1 sec
+            if self._last_file_timestamp is None:
+                pass
+            elif int(self.start_time) == self._last_file_timestamp:
+                self.log.debug("New file started within 1 second of previous " +
+                               "file, incrementing filename suffix.")
+                self.filename_suffix += 1
+
             # Only create new dir and basename if we've finished an acquisition
             if self.filename_suffix == 0:
                 self.dirname = _create_dirname(self.start_time, self.data_dir)
@@ -303,6 +316,7 @@ class FrameRecorder:
             filepath = _create_file_path(self.dirname, self.basename, suffix)
             self.log.info("Writing to file {}".format(filepath))
             self.writer = core.G3Writer(filename=filepath)
+            self._last_file_timestamp = int(self.start_time)
 
             # Write the last metadata frame to the start of the new file
             if self.last_meta is not None:
