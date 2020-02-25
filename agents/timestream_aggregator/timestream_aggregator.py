@@ -43,30 +43,6 @@ def _create_dirname(start_time, data_dir):
     return sub_dir
 
 
-def _create_basename(start_time):
-    """Create the timestamp based basename for a file, i.e. 2019-01-01-13-37-00.
-
-    Parameters
-    ----------
-    start_time : float
-        Timestamp for start of data collection
-
-    Returns
-    -------
-    str
-        Basename for file. Suffix and extension to be added separately.
-
-    """
-    start_datetime = datetime.datetime \
-                             .fromtimestamp(start_time,
-                                            tz=datetime
-                                            .timezone.utc)
-
-    time_string = start_datetime.strftime("%Y-%m-%d-%H-%M-%S")
-
-    return time_string
-
-
 def _create_file_path(dirname, basename, suffix="", extension="g3"):
     """Create the full path to the output file for writing.
 
@@ -309,7 +285,7 @@ class FrameRecorder:
             # Only create new dir and basename if we've finished an acquisition
             if self.filename_suffix == 0:
                 self.dirname = _create_dirname(self.start_time, self.data_dir)
-                self.basename = _create_basename(self.start_time)
+                self.basename = int(self.start_time)
 
             suffix = "_{:03d}".format(self.filename_suffix)
             filepath = _create_file_path(self.dirname, self.basename, suffix)
