@@ -1,5 +1,6 @@
 import os
 from os import environ
+from enum import Enum
 
 import time
 import datetime
@@ -14,6 +15,12 @@ if not on_rtd:
     from ocs import ocs_agent, site_config
     from spt3g import core
 
+class FlowControl(Enum):
+    """Flow control enumeration."""
+    ALIVE = 0
+    START = 1
+    END = 2
+    CLEANSE = 3
 
 def _create_dirname(start_time, data_dir):
     """Create the file path for .g3 file output.
@@ -227,13 +234,19 @@ class FrameRecorder:
             # Handle flow control frames
             for f in self.frames:
                 if f.type in [core.G3FrameType.none]:
+                    if 'sostream_flowcontrol' not in f:
+                        self.log.warn("Improperly formatted flow control " +
+                                      "frame encountered.")
+
+                    flow = f.get('sostream_flowcontrol')
+
                     # START; create_new_file
-                    if f.get('sostream_flowcontrol') == 1:
+                    if FlowControl(flow) is FlowControl.START:
                         self.close_file()
                         self.create_new_file()
 
                     # END; close_file
-                    if f.get('sostream_flowcontrol') == 2:
+                    if FlowControl(flow) == FlowControl.END:
                         self.close_file()
 
             # Discard flow control frames
@@ -334,7 +347,7 @@ class FrameRecorder:
                 self.log.warn("Received flow control frame with value {v}." +
                               "Flow control frames should be discarded " +
                               "earlier than this",
-                               v=f.get('sostream_flowcontrol'))
+                              v=f.get('sostream_flowcontrol'))
                 continue
 
             # Write most recent meta data frame

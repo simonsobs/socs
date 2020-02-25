@@ -1,12 +1,23 @@
 import os
 import time
 import argparse
+
+from enum import Enum
+
 import numpy as np
 
 ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 if not ON_RTD:
     from ocs import ocs_agent, site_config
     from spt3g import core
+
+
+class FlowControl(Enum):
+    """Flow control enumeration."""
+    ALIVE = 0
+    START = 1
+    END = 2
+    CLEANSE = 3
 
 
 class StreamChannel:
@@ -127,7 +138,7 @@ class SmurfStreamSimulator:
             print("stream running in background")
             # Send keep alive flow control frame
             f = core.G3Frame(core.G3FrameType.none)
-            f['sostream_flowcontrol'] = 0
+            f['sostream_flowcontrol'] = FlowControl.ALIVE.value
             self.writer.Process(f)
 
             if self.is_streaming:
@@ -166,7 +177,7 @@ class SmurfStreamSimulator:
         if self.writer is not None:
             self.log.info("Sending START flowcontrol frame")
             f = core.G3Frame(core.G3FrameType.none)
-            f['sostream_flowcontrol'] = 1
+            f['sostream_flowcontrol'] = FlowControl.START.value
             self.writer.Process(f)
 
     def _send_end_flowcontrol_frame(self):
@@ -174,7 +185,7 @@ class SmurfStreamSimulator:
         if self.writer is not None:
             self.log.info("Sending END flowcontrol frame")
             f = core.G3Frame(core.G3FrameType.none)
-            f['sostream_flowcontrol'] = 2
+            f['sostream_flowcontrol'] = FlowControl.END.value
             self.writer.Process(f)
 
     def stop_background_streamer(self, session, params=None):
