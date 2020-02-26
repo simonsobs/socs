@@ -237,6 +237,7 @@ class FrameRecorder:
                     if 'sostream_flowcontrol' not in f:
                         self.log.warn("Improperly formatted flow control " +
                                       "frame encountered.")
+                        continue
 
                     flow = f.get('sostream_flowcontrol')
 
