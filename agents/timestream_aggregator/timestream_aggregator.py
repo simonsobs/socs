@@ -229,11 +229,15 @@ class FrameRecorder:
             if self.reader is None:
                 return
 
+        flowcontrol_types = [core.G3FrameType.none,
+                             core.G3FrameType.Observation,
+                             core.G3FrameType.Wiring]
+
         self.frames = self.reader.Process(None)
         if self.frames:
             # Handle flow control frames
             for f in self.frames:
-                if f.type in [core.G3FrameType.none]:
+                if f.type in flowcontrol_types:
                     if 'sostream_flowcontrol' not in f:
                         self.log.warn("Improperly formatted flow control " +
                                       "frame encountered.")
@@ -250,8 +254,10 @@ class FrameRecorder:
                     if FlowControl(flow) == FlowControl.END:
                         self.close_file()
 
-            # Discard flow control frames
-            self.frames = [x for x in self.frames if x.type != core.G3FrameType.none]
+                    # ALIVE and CLEANSE; do nothing
+
+            # Discard all flow control frames
+            self.frames = [x for x in self.frames if 'sostream_flowcontrol' not in x]
             return
         else:
             self.log.debug("Could not read frames. Connection " +
@@ -345,7 +351,7 @@ class FrameRecorder:
         for f in self.frames:
             # Do not record flowcontrol frames
             if f.type == core.G3FrameType.none:
-                self.log.warn("Received flow control frame with value {v}." +
+                self.log.warn("Received flow control frame with value {v}. " +
                               "Flow control frames should be discarded " +
                               "earlier than this",
                               v=f.get('sostream_flowcontrol'))
