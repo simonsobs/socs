@@ -2,9 +2,15 @@ import os
 import time
 import argparse
 
+from os import environ
 from enum import Enum
+from collections import deque
 
+import txaio
 import numpy as np
+
+# For logging
+txaio.use_twisted()
 
 ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 if not ON_RTD:
@@ -18,6 +24,10 @@ class FlowControl(Enum):
     START = 1
     END = 2
     CLEANSE = 3
+
+
+# Could extend FlowControl, but this keeps this simulator only thing separate
+SHUTDOWN = 'shutdown'
 
 
 class StreamChannel:
@@ -131,11 +141,24 @@ class SmurfStreamSimulator:
         self.writer.Process(f)
 
         frame_num = 0
-        self._set_stream_on()  # sends start flowcontrol
         self.running_in_background = True
 
+        # Control flags FIFO stack to keep Writer single threaded
+        self.flags = deque([FlowControl.START])
+
+        # TODO: set flag to START if startup triggers stream
+        # determining if there is startup is sorta strange
+        # print("startup-ops:", self.startup_ops)
+
         while self.running_in_background:
+            # Send START frame
+            if next(iter(self.flags), None) is FlowControl.START:
+                self._set_stream_on()  # sends start flowcontrol
+                self.is_streaming = True
+                self.flags.popleft()
+
             print("stream running in background")
+            self.log.debug("control flags: {f}", f=self.flags)
             # Send keep alive flow control frame
             f = core.G3Frame(core.G3FrameType.none)
             f['sostream_flowcontrol'] = FlowControl.ALIVE.value
@@ -162,6 +185,17 @@ class SmurfStreamSimulator:
                 self.log.info("Writing frame...")
                 frame_num += 1
 
+                # Send END frame
+                if next(iter(self.flags), None) is FlowControl.END:
+                    self._send_end_flowcontrol_frame()
+                    self.is_streaming = False
+                    self.flags.popleft()
+
+                # Shutdown streamer
+                if next(iter(self.flags), None) is SHUTDOWN:
+                    self.running_in_background = False
+                    self.flags.popleft()
+
             else:
                 # Don't send keep alive frames too quickly
                 time.sleep(1)
@@ -172,6 +206,7 @@ class SmurfStreamSimulator:
 
         return True, "Finished streaming"
 
+    # Not thread safe, be aware of where you're calling these
     def _send_start_flowcontrol_frame(self):
         """Send START flowcontrol frame."""
         if self.writer is not None:
@@ -188,31 +223,6 @@ class SmurfStreamSimulator:
             f['sostream_flowcontrol'] = FlowControl.END.value
             self.writer.Process(f)
 
-    def stop_background_streamer(self, session, params=None):
-        """stop_background_streamer(params=None)
-
-        Stop method associated with start_background_streamer process.
-
-        """
-        if self.is_streaming:
-            self._send_end_flowcontrol_frame()
-
-        self.running_in_background = False
-        return True, "Stopping stream"
-
-    def set_stream_on(self, session, params=None):
-        """set_stream_on(params=None)
-
-        Task to start the stream of actual data frames from the background
-        streaming process.
-
-        """
-        if not self.is_streaming:
-            self._send_start_flowcontrol_frame()
-
-        self.is_streaming = True
-        return True, "Started stream"
-
     def _set_stream_on(self):
         """Private method that that isn't a "task".
 
@@ -225,17 +235,60 @@ class SmurfStreamSimulator:
 
         self.is_streaming = True
 
+    # Thread safe
+    def stop_background_streamer(self, session, params=None):
+        """stop_background_streamer(params=None)
+
+        Stop method associated with start_background_streamer process.
+
+        The design here sets a flag that is checked in the main
+        background_streamer process, that way we keep the G3Writer writing from
+        a single thread.
+
+        """
+        if self.is_streaming:
+            if FlowControl.END not in self.flags:
+                self.flags.append(FlowControl.END)
+
+        # This would be better in an Enum, but that would require either
+        # extending the FlowControl one or a single valued Enum, which sounds
+        # strange
+        if SHUTDOWN not in self.flags:
+            self.flags.append(SHUTDOWN)
+        return True, "Stopping stream"
+
+    def set_stream_on(self, session, params=None):
+        """set_stream_on(params=None)
+
+        Task to start the stream of actual data frames from the background
+        streaming process.
+
+        The design here sets a flag that is checked in the main
+        background_streamer process, that way we keep the G3Writer writing from
+        a single thread.
+
+        """
+        if not self.is_streaming:
+            if FlowControl.START not in self.flags:
+                self.flags.append(FlowControl.START)
+
+        return True, "Started stream"
+
     def set_stream_off(self, session, params=None):
         """set_stream_off(params=None)
 
         Task to stop the stream of actual data frames from the background
         streaming process. Keep alive flow control frames will still be sent.
 
+        The design here sets a flag that is checked in the main
+        background_streamer process, that way we keep the G3Writer writing from
+        a single thread.
+
         """
         if self.is_streaming:
-            self._send_end_flowcontrol_frame()
+            if FlowControl.END not in self.flags:
+                self.flags.append(FlowControl.END)
 
-        self.is_streaming = False
         return True, "Stopped stream"
 
 
@@ -263,6 +316,9 @@ def make_parser(parser=None):
 
 
 if __name__ == '__main__':
+    # Start logging
+    txaio.start_logging(level=environ.get("LOGLEVEL", "info"))
+
     site_parser = site_config.add_arguments()
     parser = make_parser(site_parser)
 
