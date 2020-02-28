@@ -183,14 +183,14 @@ class SmurfStreamSimulator:
                     self.is_streaming = False
                     self.flags.popleft()
 
-                # Shutdown streamer
-                if next(iter(self.flags), None) is SHUTDOWN:
-                    self.running_in_background = False
-                    self.flags.popleft()
-
             else:
                 # Don't send keep alive frames too quickly
                 time.sleep(1)
+
+            # Shutdown streamer
+            if next(iter(self.flags), None) is SHUTDOWN:
+                self.running_in_background = False
+                self.flags.popleft()
 
         # Teardown writer
         self.writer.Close()
