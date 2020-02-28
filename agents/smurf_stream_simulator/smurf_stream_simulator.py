@@ -146,10 +146,6 @@ class SmurfStreamSimulator:
         # Control flags FIFO stack to keep Writer single threaded
         self.flags = deque([FlowControl.START])
 
-        # TODO: set flag to START if startup triggers stream
-        # determining if there is startup is sorta strange
-        # print("startup-ops:", self.startup_ops)
-
         while self.running_in_background:
             # Send START frame
             if next(iter(self.flags), None) is FlowControl.START:
@@ -248,9 +244,6 @@ class SmurfStreamSimulator:
             if FlowControl.END not in self.flags:
                 self.flags.append(FlowControl.END)
 
-        # This would be better in an Enum, but that would require either
-        # extending the FlowControl one or a single valued Enum, which sounds
-        # strange
         if SHUTDOWN not in self.flags:
             self.flags.append(SHUTDOWN)
         return True, "Stopping stream"
