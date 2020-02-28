@@ -184,6 +184,7 @@ class SmurfStreamSimulator:
                 # Send END frame
                 if next(iter(self.flags), None) is FlowControl.END:
                     self._send_end_flowcontrol_frame()
+                    self._send_cleanse_flowcontrol_frame()
                     self.is_streaming = False
                     self.flags.popleft()
 
@@ -217,6 +218,19 @@ class SmurfStreamSimulator:
             self.log.info("Sending END flowcontrol frame")
             f = core.G3Frame(core.G3FrameType.none)
             f['sostream_flowcontrol'] = FlowControl.END.value
+            self.writer.Process(f)
+
+    def _send_cleanse_flowcontrol_frame(self):
+        """Send CLEANSE flowcontrol frames."""
+        if self.writer is not None:
+            self.log.info("Sending CLEANSE flowcontrol frame")
+
+            f = core.G3Frame(core.G3FrameType.Observation)
+            f['sostream_flowcontrol'] = FlowControl.CLEANSE.value
+            self.writer.Process(f)
+
+            f = core.G3Frame(core.G3FrameType.Wiring)
+            f['sostream_flowcontrol'] = FlowControl.CLEANSE.value
             self.writer.Process(f)
 
     def _set_stream_on(self):
