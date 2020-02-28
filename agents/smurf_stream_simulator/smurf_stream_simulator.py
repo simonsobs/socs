@@ -113,9 +113,9 @@ class SmurfStreamSimulator:
     def start_background_streamer(self, session, params=None):
         """start_background_streamer(params=None)
 
-        Process to run streaming process. Whether or note the stream is
-        streaming actual data is controlled by the start and stop tasks. Either
-        way keep alive flow control frames are being sent.
+        Process to run streaming process. A data stream is started
+        automatically. It can be stopped and started by the start and stop
+        tasks. Either way keep alive flow control frames are being sent.
 
         Parameters
         ----------
@@ -230,9 +230,7 @@ class SmurfStreamSimulator:
         process.
 
         """
-        if not self.is_streaming:
-            self._send_start_flowcontrol_frame()
-
+        self._send_start_flowcontrol_frame()
         self.is_streaming = True
 
     # Thread safe
@@ -267,8 +265,20 @@ class SmurfStreamSimulator:
         background_streamer process, that way we keep the G3Writer writing from
         a single thread.
 
+        Parameters
+        ----------
+        force : bool
+            Whether to force a start frame or not, defaults to False
+
         """
-        if not self.is_streaming:
+        if params is None:
+            params = {}
+
+        force = params.get('force', False)
+        if force:
+            self.log.debug("force starting stream")
+
+        if not self.is_streaming or force:
             if FlowControl.START not in self.flags:
                 self.flags.append(FlowControl.START)
 
@@ -284,8 +294,18 @@ class SmurfStreamSimulator:
         background_streamer process, that way we keep the G3Writer writing from
         a single thread.
 
+        Parameters
+        ----------
+        force : bool
+            Whether to force a start frame or not, defaults to False
+
         """
-        if self.is_streaming:
+        if params is None:
+            params = {}
+
+        force = params.get('force', False)
+
+        if self.is_streaming or force:
             if FlowControl.END not in self.flags:
                 self.flags.append(FlowControl.END)
 
