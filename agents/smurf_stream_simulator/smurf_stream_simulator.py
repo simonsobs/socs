@@ -135,11 +135,6 @@ class SmurfStreamSimulator:
         frame_rate = params.get('frame_rate', 1.)
         sample_rate = params.get('sample_rate', 10.)
 
-        f = core.G3Frame(core.G3FrameType.Observation)
-        f['session_id'] = 0
-        f['start_time'] = time.time()
-        self.writer.Process(f)
-
         frame_num = 0
         self.running_in_background = True
 
@@ -211,6 +206,13 @@ class SmurfStreamSimulator:
             f = core.G3Frame(core.G3FrameType.none)
             f['sostream_flowcontrol'] = FlowControl.START.value
             self.writer.Process(f)
+
+            # Send new Observation frame at start of observation
+            f = core.G3Frame(core.G3FrameType.Observation)
+            f['session_id'] = 0
+            f['start_time'] = time.time()
+            self.writer.Process(f)
+
 
     def _send_end_flowcontrol_frame(self):
         """Send END flowcontrol frame."""

@@ -252,8 +252,11 @@ class FrameRecorder:
                     # END; close_file
                     if FlowControl(flow) == FlowControl.END:
                         self.close_file()
+                        self.last_meta = None
 
                     # ALIVE and CLEANSE; do nothing
+                    if FlowControl(flow) is FlowControl.CLEANSE:
+                        self.log.debug("I saw a CLEANSE frame.")
 
             # Discard all flow control frames
             self.frames = [x for x in self.frames if 'sostream_flowcontrol' not in x]
