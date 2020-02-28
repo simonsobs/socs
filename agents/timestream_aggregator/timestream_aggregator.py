@@ -248,7 +248,6 @@ class FrameRecorder:
                     # START; create_new_file
                     if FlowControl(flow) is FlowControl.START:
                         self.close_file()
-                        self.create_new_file()
 
                     # END; close_file
                     if FlowControl(flow) == FlowControl.END:
