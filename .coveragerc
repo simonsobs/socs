@@ -1,0 +1,11 @@
+[run]
+source = socs
+
+omit =
+  # omit versioneer
+  */_version.py
+
+[paths]
+source =
+  socs/
+  /app/socs/socs/

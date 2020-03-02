@@ -1,14 +1,20 @@
 import time
+from unittest.mock import MagicMock
 
 import pytest
 
 from socs.agent.timestream_aggregator import FrameRecorder
+from spt3g import core
 
 @pytest.fixture
 def frame_recorder(tmpdir):
     p = tmpdir.mkdir("data")
     record = FrameRecorder(10, "tcp://127.0.0.1:4536", p)
     return record
+
+# test basic initialization
+def test_frame_recorder_init(frame_recorder):
+    pass
 
 
 # Test reader connection
@@ -34,35 +40,116 @@ class TestReaderConnection():
         frame_recorder._establish_reader_connection(timeout=1)
 
 
+# test split_acquisition
+class TestSplitAcquisition():
+    """Splitting an acquisition is time based, and rotates the file we're
+    writing to. This class tests various scenarios with this file splitting.
+
+    """
+    def test_null_writer_on_split(self, frame_recorder):
+        """If writer is None we should just return."""
+        frame_recorder.split_acquisition()
+
+    def test_split(self, frame_recorder):
+        """We should split if the current time - last file start time is
+        greater than the time_per_file set for the frame recorder.
+
+        In this test suite we've set a 10 second time_per_file. Here we mock a
+        writer to get passed the writer is None check and force our start_time
+        to be well enough in the past to get a file split.
+
+        """
+        frame_recorder.writer = MagicMock()
+        frame_recorder.start_time = time.time() - 20
+        frame_recorder.split_acquisition()
+
+        assert frame_recorder.filename_suffix == 1
+        assert frame_recorder.writer is None
+
+# test close_file
+def test_frame_recorder_init(frame_recorder):
+    """Test closing out the file and removing the writer."""
+    frame_recorder.writer = MagicMock()
+    frame_recorder.filename_suffix = 1
+    frame_recorder.close_file()
+
+    assert frame_recorder.writer is None
+    assert frame_recorder.filename_suffix == 0
+
+# test check_for_frame_gap
+class TestFrameGap():
+    def test_null_writer_check_for_frame_gap(self, frame_recorder):
+        """If writer is None return."""
+        frame_recorder.check_for_frame_gap()
+
+    def test_check_for_frame_gap(self, frame_recorder):
+        """Mock a writer and test that we detect the gap and close the file."""
+        frame_recorder.writer = MagicMock()
+        frame_recorder.last_frame_write_time = time.time() - 10
+        frame_recorder.check_for_frame_gap()
+
+        assert frame_recorder.writer is None
+
+# test create_new_file
+class TestCreateNewFile():
+    def test_create_new_file(self, frame_recorder):
+        """Writer should be None to create a new file."""
+        frame_recorder.create_new_file()
+
+        assert frame_recorder.writer is not None
+        assert frame_recorder.start_time is not None
+
+    def test_rapid_create_new_file(self, frame_recorder):
+        # Force a quick file creation and remove the writer
+        frame_recorder.create_new_file()
+        frame_recorder.writer = None
+
+        frame_recorder.create_new_file()
+
+        assert frame_recorder.filename_suffix == 1
+
+    def test_write_last_meta(self, frame_recorder):
+        """If last_meta exists, write it to file."""
+        f = core.G3Frame(core.G3FrameType.Observation)
+        f['session_id'] = 0
+        f['start_time'] = time.time()
+
+        frame_recorder.last_meta = f
+        frame_recorder.create_new_file()
+
+
+# test write_frames_to_file
+class TestWriteFrames():
+    def test_write_flowcontrol_frame(self, frame_recorder):
+        """Flow control frames should log a warning and continue."""
+        from socs.agent.timestream_aggregator import FlowControl
+
+        f = core.G3Frame(core.G3FrameType.none)
+        f['sostream_flowcontrol'] = FlowControl.START.value
+
+        frame_recorder.frames = [f]
+        frame_recorder.write_frames_to_file()
+
+        assert frame_recorder.frames == []
+
+    def test_write_obs_frame(self, frame_recorder):
+        """Test writing an observation frame to file."""
+        f = core.G3Frame(core.G3FrameType.Observation)
+        f['session_id'] = 0
+        f['start_time'] = time.time()
+
+        filepath = frame_recorder.create_new_file()
+        frame_recorder.frames = [f]
+        frame_recorder.write_frames_to_file()
+
+        # Check the frame we wrote
+        frames = [fr for fr in core.G3File(filepath)]
+        assert len(frames) == 1
+        assert frames[0]['session_id'] == 0
+        assert frames[0].type is core.G3FrameType.Observation
+        assert frame_recorder.last_meta is f
+
 # test read_frames
 ## test it establishes a connection if one doesn't exist
 ## test frames can come in (need simulator sending frames)
 ## test reader timesout properly
-
-# test write_frames_to_file
-## test control frames don't make it into file
-## test writing a frame
-
-# test split_acquisition
-def test_null_writer_on_split(frame_recorder):
-    frame_recorder.split_acquisition()
-
-
-# test close_file
-
-
-## Tests below here ##
-
-# test basic initialization
-def test_frame_recorder_init(frame_recorder):
-    pass
-
-# test check_for_frame_gap
-## test if writer is none we don't do anything
-def test_check_for_frame_gap(frame_recorder):
-    frame_recorder.check_for_frame_gap()
-## test we close file if acquisition split by gap size (need simulator running)
-
-# test create_new_file
-def test_create_new_file(frame_recorder):
-    frame_recorder.create_new_file()

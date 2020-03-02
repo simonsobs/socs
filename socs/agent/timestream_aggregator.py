@@ -341,6 +341,8 @@ class FrameRecorder:
             if self.last_meta is not None:
                 self.writer(self.last_meta)
 
+            return filepath
+
     def write_frames_to_file(self):
         """Write all frames to file.
 
