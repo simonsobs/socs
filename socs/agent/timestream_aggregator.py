@@ -120,8 +120,6 @@ class FrameRecorder:
     data_dir : str
         Location to write data files to. Subdirectories will be created within
         this directory roughly corresponding to one day.
-    log : txaio.tx.Logger
-        txaio logger object, created by the OCSAgent.
 
     Attributes
     ----------
@@ -134,7 +132,7 @@ class FrameRecorder:
         Location to write data files to. Subdirectories will be created within
         this directory roughly corresponding to one day.
     log : txaio.tx.Logger
-        txaio logger object, created by the OCSAgent.
+        txaio logger object.
     reader : spt3g.core.G3Reader
         G3Reader object to read the frames from the G3NetworkSender.
     writer : spt3g.core.G3Writer
@@ -170,7 +168,7 @@ class FrameRecorder:
         also contain the tracked suffix.
 
     """
-    def __init__(self, file_duration, tcp_addr, data_dir, log):
+    def __init__(self, file_duration, tcp_addr, data_dir):
         # Parameters
         self.time_per_file = file_duration
         self.address = tcp_addr

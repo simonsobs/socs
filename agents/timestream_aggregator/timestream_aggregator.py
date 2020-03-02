@@ -88,7 +88,7 @@ class TimestreamAggregator:
         self.is_streaming = True
 
         recorder = FrameRecorder(self.time_per_file, self.address,
-                                 self.data_dir, self.log)
+                                 self.data_dir)
 
         while self.is_streaming:
             recorder.run()
