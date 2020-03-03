@@ -2,7 +2,6 @@ import os
 from enum import Enum
 
 import time
-import datetime
 import txaio
 
 # For logging
@@ -210,7 +209,7 @@ class FrameRecorder:
 
         return reader
 
-    def read_frames(self):
+    def read_frames(self, timeout=5):
         """Establish a connection to the G3NetworkSender if one does not exist,
         then try to read frames from it, discarding any flow control frames.
 
@@ -218,10 +217,15 @@ class FrameRecorder:
         self.close_file() if the reader timesout or has otherwise lost its
         connection.
 
+        Parameters
+        ----------
+        timeout : int
+            Timeout in seconds for establishing the G3Reader connection.
+
         """
         # Try to connect if we are not already
         if self.reader is None:
-            self.reader = self._establish_reader_connection()
+            self.reader = self._establish_reader_connection(timeout)
 
             if self.reader is None:
                 return
@@ -230,7 +234,10 @@ class FrameRecorder:
                              core.G3FrameType.Observation,
                              core.G3FrameType.Wiring]
 
-        self.frames = self.reader.Process(None)
+        # Allows tests to Mock a reader
+        if type(self.reader) is core.G3Reader:
+            self.frames = self.reader.Process(None)
+
         if self.frames:
             # Handle flow control frames
             for f in self.frames:

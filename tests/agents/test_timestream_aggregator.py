@@ -3,14 +3,23 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from socs.agent.timestream_aggregator import FrameRecorder
+from socs.agent.timestream_aggregator import FrameRecorder, FlowControl
+
 from spt3g import core
+
 
 @pytest.fixture
 def frame_recorder(tmpdir):
     p = tmpdir.mkdir("data")
     record = FrameRecorder(10, "tcp://127.0.0.1:4536", p)
     return record
+
+
+@pytest.fixture
+def networksender():
+    networksender = core.G3NetworkSender(hostname="*", port=4536)
+    return networksender
+
 
 # test basic initialization
 def test_frame_recorder_init(frame_recorder):
@@ -19,8 +28,12 @@ def test_frame_recorder_init(frame_recorder):
 
 # Test reader connection
 class TestReaderConnection():
-    ## test successful connection (w/simulator in docker container)
-    ## test unsucessfull connection (no simulator running)
+    def test_g3reader_connection(self, frame_recorder, networksender):
+        """Test we can establish a connection with a G3NetworkSender."""
+        frame_recorder._establish_reader_connection(timeout=1)
+        networksender.Close()
+        networksender = None
+
     def test_failed_g3reader_connection(self, frame_recorder):
         """Without a backend setup this will fail, though we catch the
         RuntimeError, so it should pass anyway.
@@ -28,7 +41,6 @@ class TestReaderConnection():
         """
         frame_recorder._establish_reader_connection(timeout=1)
 
-    ## test rapid connection attempt (should take a second)
     def test_rapid_reader_connection(self, frame_recorder):
         """Without a backend setup this will fail, though we catch the
         RuntimeError, so it should pass anyway.
@@ -66,8 +78,9 @@ class TestSplitAcquisition():
         assert frame_recorder.filename_suffix == 1
         assert frame_recorder.writer is None
 
+
 # test close_file
-def test_frame_recorder_init(frame_recorder):
+def test_close_file(frame_recorder):
     """Test closing out the file and removing the writer."""
     frame_recorder.writer = MagicMock()
     frame_recorder.filename_suffix = 1
@@ -75,6 +88,7 @@ def test_frame_recorder_init(frame_recorder):
 
     assert frame_recorder.writer is None
     assert frame_recorder.filename_suffix == 0
+
 
 # test check_for_frame_gap
 class TestFrameGap():
@@ -89,6 +103,7 @@ class TestFrameGap():
         frame_recorder.check_for_frame_gap()
 
         assert frame_recorder.writer is None
+
 
 # test create_new_file
 class TestCreateNewFile():
@@ -122,8 +137,6 @@ class TestCreateNewFile():
 class TestWriteFrames():
     def test_write_flowcontrol_frame(self, frame_recorder):
         """Flow control frames should log a warning and continue."""
-        from socs.agent.timestream_aggregator import FlowControl
-
         f = core.G3Frame(core.G3FrameType.none)
         f['sostream_flowcontrol'] = FlowControl.START.value
 
@@ -149,7 +162,110 @@ class TestWriteFrames():
         assert frames[0].type is core.G3FrameType.Observation
         assert frame_recorder.last_meta is f
 
+
 # test read_frames
-## test it establishes a connection if one doesn't exist
-## test frames can come in (need simulator sending frames)
-## test reader timesout properly
+class TestReadFrames():
+    def test_failed_g3reader_connection(self, frame_recorder):
+        """Should just return if we can't get a connection.
+
+        """
+        frame_recorder.read_frames(1)
+
+    def test_g3reader_connection(self, frame_recorder, networksender):
+        """Test we can establish a connection with a G3NetworkSender.
+
+        We aren't sending any frames, so we just make the connection, no frames
+        will be processed, so we timeout.
+
+        """
+        frame_recorder.read_frames(1)
+        networksender.Close()
+        networksender = None
+        assert frame_recorder.reader is None
+
+    def test_start_frame_processing(self, frame_recorder):
+        """Start frame should close the currently open file."""
+        frame_recorder.reader = MagicMock()  # mock the reader
+
+        # Make conditions so asserts would fail at end
+        frame_recorder.writer = MagicMock()
+        frame_recorder.filename_suffix = 1
+
+        f = core.G3Frame(core.G3FrameType.none)
+        f['sostream_flowcontrol'] = FlowControl.START.value
+
+        frame_recorder.frames = [f]
+        frame_recorder.read_frames()
+
+        assert frame_recorder.writer is None
+        assert frame_recorder.filename_suffix == 0
+
+        # check flow control frame discarded
+        assert frame_recorder.frames == []
+
+    def test_end_frame_processing(self, frame_recorder):
+        """END frame should close the currently open file, and unset the
+        last_meta cache.
+
+        """
+        frame_recorder.reader = MagicMock()  # mock the reader
+
+        # Make conditions so asserts would fail at end
+        frame_recorder.writer = MagicMock()
+        frame_recorder.filename_suffix = 1
+        frame_recorder.last_meta = 1
+
+        f = core.G3Frame(core.G3FrameType.none)
+        f['sostream_flowcontrol'] = FlowControl.END.value
+
+        frame_recorder.frames = [f]
+        frame_recorder.read_frames()
+
+        assert frame_recorder.writer is None
+        assert frame_recorder.filename_suffix == 0
+        assert frame_recorder.last_meta is None
+
+        # check flow control frame discarded
+        assert frame_recorder.frames == []
+
+    def test_alive_frame_processing(self, frame_recorder):
+        """ALIVE frame should simply be discarded."""
+        frame_recorder.reader = MagicMock()  # mock the reader
+
+        f = core.G3Frame(core.G3FrameType.none)
+        f['sostream_flowcontrol'] = FlowControl.ALIVE.value
+
+        frame_recorder.frames = [f]
+        frame_recorder.read_frames()
+
+        # check flow control frame discarded
+        assert frame_recorder.frames == []
+
+    def test_cleanse_frame_processing(self, frame_recorder):
+        """CLEANSE frame should simply be discarded."""
+        frame_recorder.reader = MagicMock()  # mock the reader
+
+        f = core.G3Frame(core.G3FrameType.Observation)
+        f['sostream_flowcontrol'] = FlowControl.CLEANSE.value
+
+        frame_recorder.frames = [f]
+        frame_recorder.read_frames()
+
+        # check flow control frame discarded
+        assert frame_recorder.frames == []
+
+    def test_improper_flow_control_frame(self, frame_recorder):
+        """FlowControl type frames don't contain 'sostream_flowcontrol' should
+        log a warning and the frame will be recorded.
+
+        """
+        frame_recorder.reader = MagicMock()  # mock the reader
+
+        f = core.G3Frame(core.G3FrameType.none)
+        f['test'] = time.time()
+
+        frame_recorder.frames = [f]
+        frame_recorder.read_frames()
+
+        # check flow control frame not discarded
+        assert frame_recorder.frames != []
