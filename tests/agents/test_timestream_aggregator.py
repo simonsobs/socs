@@ -254,9 +254,11 @@ class TestReadFrames():
         # check flow control frame discarded
         assert frame_recorder.frames == []
 
-    def test_improper_flow_control_frame(self, frame_recorder):
-        """FlowControl type frames don't contain 'sostream_flowcontrol' should
-        log a warning and the frame will be recorded.
+    def test_improper_flow_control_frames(self, frame_recorder):
+        """FlowControl frames are defined as having the key
+        'sostream_flowcontrol' in them. Other flow control frame types that
+        don't contain 'sostream_flowcontrol' should be recorded, including none
+        type frames.
 
         """
         frame_recorder.reader = MagicMock()  # mock the reader

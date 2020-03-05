@@ -230,10 +230,6 @@ class FrameRecorder:
             if self.reader is None:
                 return
 
-        flowcontrol_types = [core.G3FrameType.none,
-                             core.G3FrameType.Observation,
-                             core.G3FrameType.Wiring]
-
         # Allows tests to Mock a reader
         if type(self.reader) is core.G3Reader:
             self.frames = self.reader.Process(None)
@@ -241,14 +237,9 @@ class FrameRecorder:
         if self.frames:
             # Handle flow control frames
             for f in self.frames:
-                if f.type in flowcontrol_types:
-                    if 'sostream_flowcontrol' not in f:
-                        self.log.warn("Improperly formatted flow control " +
-                                      "frame encountered.")
-                        continue
+                flow = f.get('sostream_flowcontrol')
 
-                    flow = f.get('sostream_flowcontrol')
-
+                if flow is not None:
                     # START; create_new_file
                     if FlowControl(flow) is FlowControl.START:
                         self.close_file()
@@ -264,6 +255,7 @@ class FrameRecorder:
 
             # Discard all flow control frames
             self.frames = [x for x in self.frames if 'sostream_flowcontrol' not in x]
+
             return
         else:
             self.log.debug("Could not read frames. Connection " +
@@ -357,12 +349,12 @@ class FrameRecorder:
 
         """
         for f in self.frames:
-            # Do not record flowcontrol frames
-            if f.type == core.G3FrameType.none:
+            # Make sure we do not record flowcontrol frames
+            flow = f.get('sostream_flowcontrol')
+            if flow is not None:
                 self.log.warn("Received flow control frame with value {v}. " +
                               "Flow control frames should be discarded " +
-                              "earlier than this",
-                              v=f.get('sostream_flowcontrol'))
+                              "earlier than this", v=flow)
                 continue
 
             # Write most recent meta data frame
