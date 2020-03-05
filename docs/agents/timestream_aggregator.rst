@@ -44,15 +44,19 @@ increment a zero padded suffix so one will end up with files like
 `2019-01-01-12-00-00_000.g3`, `2019-01-01-12-00-00_001.g3`, etc. for
 acquisitions started at 12:00:00 UTC on Jan 1st, 2019.
 
-If a gap in the flow of frames exceeds 5 seconds, then the acquisition is
-considered different and the filename timestamp is updated, resulting in a new
-base file name. This is an attempt to match output of other files from the
-SMuRF, which may be grouped by observation. The time based file rotation should
-be a temporary fix until a mechanism for passing when acquisition is started and
-stopped is introduced. Directory location for a group of files will not rotate
-through a date change, i.e. if you cross the threshold in ctime between say
-15684 and 15685, but are still on the same acquisition, all files will end up
-in 15684 to keep them grouped together.
+The aggregator handles flow control frames to indicate the start and end of
+each acquisition. If a start frame is seen, the currently open file (if there
+is one) is closed, and a new file created. If an end frame is seen, the current
+file is closed. If frames are seen without a beginning start frame, then they
+will be recorded as if a start frame was sent. If a file was started, but no
+new frames are acquired for 10 seconds, then the file is closed. A new file
+will be created when frames start to come in again. This is an attempt to match
+output of other files from the SMuRF, which may be grouped by observation.
+
+Directory location for a group of files will not rotate through a date change,
+i.e. if you cross the threshold in ctime between say 15684 and 15685, but are
+still on the same acquisition, all files will end up in 15684 to keep them
+grouped together.
 
 Configuration File Examples
 ---------------------------
