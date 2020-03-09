@@ -54,8 +54,8 @@ class SmurfRecorder:
     port : int
         Port to listen for data on.
     is_streaming : bool
-        Tracks whether or not the aggregator is writing to disk. Setting to
-        false stops the aggregation of data.
+        Tracks whether or not the recorder is writing to disk. Setting to
+        false stops the recording of data.
     log : txaio.tx.Logger
         txaio logger object, created by the OCSAgent
 
@@ -70,12 +70,12 @@ class SmurfRecorder:
         self.is_streaming = False
         self.log = self.agent.log
 
-    def start_aggregation(self, session, params=None):
-        """start_aggregation(params=None)
+    def start_recording(self, session, params=None):
+        """start_recording(params=None)
 
-        OCS Process to start data aggregation. This Process uses FrameRecorder,
-        which deals with I/O, requiring this process to run in a worker thread.
-        Be sure to register with blocking=True.
+        OCS Process to start recording SMuRF data. This Process uses
+        FrameRecorder, which deals with I/O, requiring this process to run in a
+        worker thread. Be sure to register with blocking=True.
 
         """
         if params is None:
@@ -96,16 +96,16 @@ class SmurfRecorder:
         # Explicitly clean up when done
         del recorder
 
-        return True, "Finished aggregation"
+        return True, "Finished Recording"
 
-    def stop_aggregation(self, session, params=None):
-        """stop_aggregation(params=None)
+    def stop_recording(self, session, params=None):
+        """stop_recording(params=None)
 
-        Stop method associated with start_aggregation process.
+        Stop method associated with start_recording process.
 
         """
         self.is_streaming = False
-        return True, "Stopping aggregration"
+        return True, "Stopping Recording"
 
 
 def make_parser(parser=None):
@@ -154,8 +154,8 @@ if __name__ == "__main__":
                              port=int(args.port))
 
     agent.register_process("stream",
-                           listener.start_aggregation,
-                           listener.stop_aggregation,
+                           listener.start_recording,
+                           listener.stop_recording,
                            startup=bool(args.auto_start))
 
     runner.run(agent, auto_reconnect=True)

@@ -1,24 +1,24 @@
 .. highlight:: rst
 
-.. _timestream_aggregator:
+.. _smurf_recorder:
 
-===========================
-Timestream Aggregator Agent
-===========================
+====================
+SMuRF Recorder Agent
+====================
 
-The Timestream Aggregator Agent is an OCS Agent which listens for G3 Frames
+The SMuRF Recorder Agent is an OCS Agent which listens for G3 Frames
 incoming from a G3NetworkSender connection using a G3Reader and writes them to
-disk. This is used in conjunction with the SMuRF Streamer to aggregate
-timestream data from the SMuRF systems.
+disk. This is used in conjunction with the SMuRF Streamer to record data from
+the SMuRF systems.
 
 .. argparse::
-    :filename: ../agents/timestream_aggregator/timestream_aggregator.py
+    :filename: ../agents/smurf_recorder/smurf_recorder.py
     :func: make_parser
-    :prog: python3 timestream_aggregator.py
+    :prog: python3 smurf_recorder.py
 
 Description
 -----------
-The Timestream Aggregator Agent automatically starts listening for a
+The SMuRF Recorder Agent automatically starts listening for a
 G3NetworkSender which will send it frames. This will typically be the SMuRF
 Streamer. There are several steps performed in a loop, the first of which is an
 attempt to read frames from an established connection. A connection attempt is
@@ -34,7 +34,7 @@ connection will need to be reestablished in the next iteration of the loop.
 This should be fine, as long as we do not enter a state where many connections
 are made in succession.
 
-The aggregator will write the frames to file with file names and location based
+The recorder will write the frames to file with file names and location based
 on the timestamp when the acquisition was started (i.e. the first frame was
 written.) Files will be at most "time-per-file" long, which is configurable but
 defaults to 10 minutes (the same duration planned for when we are on the
@@ -44,7 +44,7 @@ increment a zero padded suffix so one will end up with files like
 `2019-01-01-12-00-00_000.g3`, `2019-01-01-12-00-00_001.g3`, etc. for
 acquisitions started at 12:00:00 UTC on Jan 1st, 2019.
 
-The aggregator handles flow control frames to indicate the start and end of
+The recorder handles flow control frames to indicate the start and end of
 each acquisition. If a start frame is seen, the currently open file (if there
 is one) is closed, and a new file created. If an end frame is seen, the current
 file is closed. If frames are seen without a beginning start frame, then they
@@ -65,12 +65,12 @@ Agent in a docker container.
 
 ocs-config
 ``````````
-To configure the Timestream Aggregator we need to add a TimestreamAggregator
+To configure the SMuRF Recorder we need to add a SmurfRecorder
 block to our ocs configuration file. Here is an example configuration block
 using all of the available arguments::
 
-      {'agent-class': 'TimestreamAggregator',
-       'instance-id': 'timestream-agg',
+      {'agent-class': 'SmurfRecorder',
+       'instance-id': 'smurf-recorder',
        'arguments': [['--auto-start', True],
                      ['--time-per-file', '600'],
                      ['--data-dir', '/data/'],
@@ -86,11 +86,11 @@ an IP address, with the container running with the "host" network-mode.
 
 Docker
 ``````
-The Timestream Aggregator should be configured to run in a Docker container. An
+The SMuRF Recorder should be configured to run in a Docker container. An
 example docker-compose service configuration is shown here::
 
-  timestream-aggregator:
-    image: simonsobs/timestream-aggregator
+  ocs-smurf-recorder:
+    image: simonsobs/ocs-smurf-recorder
     hostname: ocs-docker
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
@@ -105,12 +105,12 @@ be used to set the log level for debugging. The default level is "info".
 Agent API
 ---------
 
-.. autoclass:: agents.timestream_aggregator.timestream_aggregator.TimestreamAggregator
-    :members: start_aggregation
+.. autoclass:: agents.smurf_recorder.smurf_recorder.SmurfRecorder
+    :members: start_recording
 
 Developer Info
 --------------
-If you're editing the Timestream Aggregator code you might find this info useful.
+If you're editing the SMuRF Recorder code you might find this info useful.
 
-.. autoclass:: agents.timestream_aggregator.timestream_aggregator.FrameRecorder
+.. autoclass:: agents.smurf_recorder.smurf_recorder.FrameRecorder
     :members:

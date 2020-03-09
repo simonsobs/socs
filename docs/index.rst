@@ -42,7 +42,7 @@ Simulator Reference  Simulators are used to mock software and hardware
     agents/lakeshore240
     agents/lakeshore372
     agents/pysmurf/index
-    agents/timestream_aggregator
+    agents/smurf_recorder
 
 .. toctree::
     :caption: Simulator Reference
