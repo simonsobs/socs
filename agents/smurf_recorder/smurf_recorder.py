@@ -4,7 +4,7 @@ from os import environ
 import argparse
 import txaio
 
-from socs.agent.timestream_aggregator import FrameRecorder
+from socs.agent.smurf_recorder import FrameRecorder
 
 # For logging
 txaio.use_twisted()
@@ -14,7 +14,7 @@ if not on_rtd:
     from ocs import ocs_agent, site_config
 
 
-class TimestreamAggregator:
+class SmurfRecorder:
     """Aggregator for G3 data streams sent over the G3NetworkSender.
 
     This Agent is built to work with the SMuRF data streamer, which collects
@@ -144,14 +144,14 @@ if __name__ == "__main__":
     # Parse commandline
     args = parser.parse_args()
 
-    site_config.reparse_args(args, "TimestreamAggregator")
+    site_config.reparse_args(args, "SmurfRecorder")
 
     agent, runner = ocs_agent.init_site_agent(args)
-    listener = TimestreamAggregator(agent,
-                                    int(args.time_per_file),
-                                    args.data_dir,
-                                    address=args.address,
-                                    port=int(args.port))
+    listener = SmurfRecorder(agent,
+                             int(args.time_per_file),
+                             args.data_dir,
+                             address=args.address,
+                             port=int(args.port))
 
     agent.register_process("stream",
                            listener.start_aggregation,
