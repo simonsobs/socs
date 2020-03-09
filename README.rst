@@ -9,6 +9,9 @@ SOCS - Simons Observatory Control System
     :target: https://socs.readthedocs.io/en/latest/?badge=latest
     :alt: Documentation Status
 
+.. image:: https://coveralls.io/repos/github/simonsobs/socs/badge.svg?branch=travis
+    :target: https://coveralls.io/github/simonsobs/socs?branch=travis
+
 Overview
 --------
 
