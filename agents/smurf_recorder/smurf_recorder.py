@@ -15,7 +15,7 @@ if not on_rtd:
 
 
 class SmurfRecorder:
-    """Aggregator for G3 data streams sent over the G3NetworkSender.
+    """Recorder for G3 data streams sent over the G3NetworkSender.
 
     This Agent is built to work with the SMuRF data streamer, which collects
     data from a SMuRF blade, packages it into a G3 Frame and sends it over the
@@ -70,8 +70,8 @@ class SmurfRecorder:
         self.is_streaming = False
         self.log = self.agent.log
 
-    def start_recording(self, session, params=None):
-        """start_recording(params=None)
+    def start_record(self, session, params=None):
+        """start_record(params=None)
 
         OCS Process to start recording SMuRF data. This Process uses
         FrameRecorder, which deals with I/O, requiring this process to run in a
@@ -98,10 +98,10 @@ class SmurfRecorder:
 
         return True, "Finished Recording"
 
-    def stop_recording(self, session, params=None):
-        """stop_recording(params=None)
+    def stop_record(self, session, params=None):
+        """stop_record(params=None)
 
-        Stop method associated with start_recording process.
+        Stop method associated with start_record process.
 
         """
         self.is_streaming = False
@@ -153,9 +153,9 @@ if __name__ == "__main__":
                              address=args.address,
                              port=int(args.port))
 
-    agent.register_process("stream",
-                           listener.start_recording,
-                           listener.stop_recording,
+    agent.register_process("record",
+                           listener.start_record,
+                           listener.stop_record,
                            startup=bool(args.auto_start))
 
     runner.run(agent, auto_reconnect=True)
