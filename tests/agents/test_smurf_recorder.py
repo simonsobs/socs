@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from socs.agent.timestream_aggregator import FrameRecorder, FlowControl
+from socs.agent.smurf_recorder import FrameRecorder, FlowControl
 
 from spt3g import core
 

@@ -4,7 +4,7 @@ from os import environ
 import argparse
 import txaio
 
-from socs.agent.timestream_aggregator import FrameRecorder
+from socs.agent.smurf_recorder import FrameRecorder
 
 # For logging
 txaio.use_twisted()
@@ -14,8 +14,8 @@ if not on_rtd:
     from ocs import ocs_agent, site_config
 
 
-class TimestreamAggregator:
-    """Aggregator for G3 data streams sent over the G3NetworkSender.
+class SmurfRecorder:
+    """Recorder for G3 data streams sent over the G3NetworkSender.
 
     This Agent is built to work with the SMuRF data streamer, which collects
     data from a SMuRF blade, packages it into a G3 Frame and sends it over the
@@ -54,8 +54,8 @@ class TimestreamAggregator:
     port : int
         Port to listen for data on.
     is_streaming : bool
-        Tracks whether or not the aggregator is writing to disk. Setting to
-        false stops the aggregation of data.
+        Tracks whether or not the recorder is writing to disk. Setting to
+        false stops the recording of data.
     log : txaio.tx.Logger
         txaio logger object, created by the OCSAgent
 
@@ -70,12 +70,12 @@ class TimestreamAggregator:
         self.is_streaming = False
         self.log = self.agent.log
 
-    def start_aggregation(self, session, params=None):
-        """start_aggregation(params=None)
+    def start_record(self, session, params=None):
+        """start_record(params=None)
 
-        OCS Process to start data aggregation. This Process uses FrameRecorder,
-        which deals with I/O, requiring this process to run in a worker thread.
-        Be sure to register with blocking=True.
+        OCS Process to start recording SMuRF data. This Process uses
+        FrameRecorder, which deals with I/O, requiring this process to run in a
+        worker thread. Be sure to register with blocking=True.
 
         """
         if params is None:
@@ -96,16 +96,16 @@ class TimestreamAggregator:
         # Explicitly clean up when done
         del recorder
 
-        return True, "Finished aggregation"
+        return True, "Finished Recording"
 
-    def stop_aggregation(self, session, params=None):
-        """stop_aggregation(params=None)
+    def stop_record(self, session, params=None):
+        """stop_record(params=None)
 
-        Stop method associated with start_aggregation process.
+        Stop method associated with start_record process.
 
         """
         self.is_streaming = False
-        return True, "Stopping aggregration"
+        return True, "Stopping Recording"
 
 
 def make_parser(parser=None):
@@ -144,18 +144,18 @@ if __name__ == "__main__":
     # Parse commandline
     args = parser.parse_args()
 
-    site_config.reparse_args(args, "TimestreamAggregator")
+    site_config.reparse_args(args, "SmurfRecorder")
 
     agent, runner = ocs_agent.init_site_agent(args)
-    listener = TimestreamAggregator(agent,
-                                    int(args.time_per_file),
-                                    args.data_dir,
-                                    address=args.address,
-                                    port=int(args.port))
+    listener = SmurfRecorder(agent,
+                             int(args.time_per_file),
+                             args.data_dir,
+                             address=args.address,
+                             port=int(args.port))
 
-    agent.register_process("stream",
-                           listener.start_aggregation,
-                           listener.stop_aggregation,
+    agent.register_process("record",
+                           listener.start_record,
+                           listener.stop_record,
                            startup=bool(args.auto_start))
 
     runner.run(agent, auto_reconnect=True)
