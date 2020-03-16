@@ -101,21 +101,31 @@ class PysmurfMonitor(DatagramProtocol):
 
         if data['type'] in ['data_file']:
             self.log.info("New file: {fname}", fname=data['payload']['path'])
-            d = data['payload'].copy()
+            d = data['payload']
 
+            site, instance = self.agent.agent_address.split('.')
+
+            path = d['path']
             if (d['format'] == 'npy') and (not d['path'].endswith('.npy')):
-                d['path'] += '.npy'
+                path += '.npy'
 
-            # Adds additional db info to dict
-            d['timestamp'] = datetime.datetime.utcfromtimestamp(d['timestamp'])
-            d['md5sum'] = get_md5sum(d['path'])
-            d['plot'] = int(d['plot'])
-            d['pub_id'] = data['id']
-            d['script_id'] = data['script']
+            entry = {
+                'path':                 path,
+                'type':                 d['action'],
+                'timestamp':            datetime.datetime.utcfromtimestamp(d['timestamp']),
+                'action_timestamp':     d['action_ts'],
+                'format':               d['format'],
+                'plot':                 int(d['plot']),
+                'site':                 site,
+                'pub_id':               data['id'],
+                'instance_id':          instance,
+                'copied':               0,
+                'failed_copy_attempts': 0,
+                'md5sum':               get_md5sum(d['path']),
+                'socs_version':         socs.__version__,
+            }
 
-            d.update(self.base_file_info)
-
-            deferred = self.dbpool.runInteraction(pysmurf_files_manager.add_entry, d)
+            deferred = self.dbpool.runInteraction(pysmurf_files_manager.add_entry, entry)
             deferred.addErrback(self._add_file_errback, d)
             deferred.addCallback(self._add_file_callback, d)
 

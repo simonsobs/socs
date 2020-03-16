@@ -23,6 +23,7 @@ columns = [
     Column("path", "VARCHAR(260)", opts="NOT NULL"),
     Column("type", "VARCHAR(32)", opts="NOT NULL"),
     Column("timestamp", "TIMESTAMP"),
+    Column("action_timestamp", "INT"),
     Column("format", "VARCHAR(32)"),
     Column("plot", "TINYINT(1)"),
     Column("site", "VARCHAR(32)"),
@@ -49,7 +50,7 @@ def add_entry(cur, entry):
             "Keys allowed: {}".format(entry.keys(), col_dict.keys())
         )
     keys = list(entry.keys())
-    vals = [entry[k] for k in keys]
+    vals = [entry[k] for k in keys if entry[k] is not None]
     fmts = [col_dict[k].fmt for k in keys]
 
     query = "INSERT INTO {} ({}) VALUES ({})"\

@@ -50,11 +50,28 @@ def create_local_path(file, data_dir):
 
     dt = file['timestamp']
 
+    action = file['type']
+
+    # First tries to get action timestamp entry
+    action_ts = file['action_timestamp']
+
+    if action_ts is None:
+        try:
+            # If that doesn't exist, try to get the group timestamp from the filename
+            action_ts = int(filename.split('_')[0])
+        except ValueError as e:
+            # If that doesn't work, just use the file creation timestamp
+            action_ts = str(int(dt.timestamp()))
+
+    dir_type = 'plots' if file['plot'] else 'outputs'
+
     subdir = os.path.join(
-                data_dir,
-                f"{str(dt.timestamp()):.5}",
-                f"{file['type']}"
-             )
+        data_dir,                       # Base directory
+        f"{str(dt.timestamp()):.5}",    # 5 ctime digits
+        file['pub_id'],                 # publisher id
+        f"{action_ts}_{action}",        # grouptime_action
+        dir_type,                       # plots/outputs
+    )
     new_path = os.path.join(subdir, filename)
     unique_path = new_path
     i = 1
