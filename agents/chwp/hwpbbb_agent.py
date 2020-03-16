@@ -18,6 +18,8 @@ COUNTER_PACKET_SIZE = 4 + 4 * COUNTER_INFO_LENGTH+8 * COUNTER_INFO_LENGTH + 12
 IRIG_PACKET_SIZE = 132
 # The slit scaler value for rough HWP rotating frequency
 NUM_SLITS = 570
+# Maximum number of encoder counter queue
+MAX_COUNTER_QUEUE = 1000
 
 ### Definitions of utility functions ###
 
@@ -258,6 +260,38 @@ class HWPBBBAgent:
 
         self.ep = EncoderParser()
 
+        data_counter = {'timestamps':[], 'block_name':'HWPEncoder_counter','data':{}}
+        self.lastdata_counter = data_counter
+
+    def publish_encoder(self):
+        counter_list = []
+        counter_index_list = []
+        while len(self.ep.counter_queue):
+            counter_data = self.ep.counter_queue.popleft()
+            counter_list += counter_data[0].tolist()
+            counter_index_list += counter_data[1].tolist()
+
+        if (len(counter_list)):
+            self.lastdata_counter = data_counter 
+            data_counter = {'timestamps':[], 'block_name':'HWPEncoder_counter','data':{}}
+            # This timestamps are 1-D counte_list length numpy array of the same timestamp of curren time
+            data_counter['timestamps'] = numpy.ones(len(counter_list)) * time.time()
+            data_counter['data']['counter'] = counter_list
+            data_counter['data']['counter_index'] = counter_index_list
+
+            data_quad = {'timestamps':[], 'block_name':'HWPEncoder_quad','data':{}}
+            quad_list = []
+            while len(self.ep.quad_queue):
+                quad_data = self.ep.quad_queue.popleft()
+                quad_list += quad_data
+            data_quad['timestamps'] = numpy.ones(len(quad_list)) * time.time()
+            data_quad['data']['quad'] = quad_list
+
+            self.agent.publish_to_feed('HWPEncoder_counter', data_counter)
+            self.agent.publish_to_feed('HWPEncoder_quad', data_quad)
+            self.agent.feeds['HWPEncoder_counter'].flush_buffer()
+            self.agent.feeds['HWPEncoder_quad'].flush_buffer()
+
     def start_acq(self, session, params):
         """Starts acquiring data.
         """
@@ -271,31 +305,11 @@ class HWPBBBAgent:
 
             self.take_data = True
 
-            data_counter = {'timestamps':[], 'block_name':'HWPEncoder_counter','data':{}}
             data_irig = {'timestamp':time.time(), 'block_name':'HWPEncoder_irig','data':{}}
             while self.take_data:
                 self.ep.grab_and_parse_data()
                 while len(self.ep.irig_queue):
-                    lastdata_counter = data_counter
-                    data_counter = {'timestamps':[], 'block_name':'HWPEncoder_counter','data':{}}
-                    counter_list = []
-                    counter_index_list = []
-                    while len(self.ep.counter_queue):
-                        counter_data = self.ep.counter_queue.popleft()
-                        counter_list += counter_data[0].tolist()
-                        counter_index_list += counter_data[1].tolist()
-                    # This timestamps are 1-D counte_list length numpy array of the same timestamp of curren time
-                    data_counter['timestamps'] = numpy.ones(len(counter_list)) * time.time()
-                    data_counter['data']['counter'] = counter_list
-                    data_counter['data']['counter_index'] = counter_index_list
-
-                    data_quad = {'timestamps':[], 'block_name':'HWPEncoder_quad','data':{}}
-                    quad_list = []
-                    while len(self.ep.quad_queue):
-                        quad_data = self.ep.quad_queue.popleft()
-                        quad_list += quad_data
-                    data_quad['timestamps'] = numpy.ones(len(quad_list)) * time.time()
-                    data_quad['data']['quad'] = quad_list
+                    self.publish_encoder()
 
                     irig_data = self.ep.irig_queue.popleft()
                     rising_edge_time = irig_data[0]
@@ -315,7 +329,7 @@ class HWPBBBAgent:
                     for i in range(10):
                         data_irig['data']['irig_synch_pulse_clock_times_%d'%i] = synch_pulse_clock_times[i]
                     # For rough estimation of HWP rotation frequency
-                    if 'rising_edge_time' in lastdata_irig['data'] and 'counter' in lastdata_counter['data']:
+                    if 'rising_edge_time' in lastdata_irig['data'] and 'counter' in self.lastdata_counter['data'] and len(counter_list):
                         dclock_onesec = data_irig['data']['rising_edge_time'] - lastdata_irig['data']['rising_edge_time']
                         dclock_counter = data_counter['data']['counter'][-1] - data_counter['data']['counter'][0]
                         dindex_counter = data_counter['data']['counter_index'][-1]-data_counter['data']['counter_index'][0]
@@ -326,13 +340,12 @@ class HWPBBBAgent:
                     else:
                         data_irig['data']['approx_hwp_freq'] = 0
                         
-                    self.agent.publish_to_feed('HWPEncoder_counter', data_counter)
                     self.agent.publish_to_feed('HWPEncoder_irig', data_irig)
-                    self.agent.publish_to_feed('HWPEncoder_quad', data_quad)
-
-                    self.agent.feeds['HWPEncoder_counter'].flush_buffer()
                     self.agent.feeds['HWPEncoder_irig'].flush_buffer()
-                    self.agent.feeds['HWPEncoder_quad'].flush_buffer()
+
+                # Even if IRIG-B is not available, publish only the counter data periodically
+                if len(self.ep.counter_queue) > MAX_COUNTER_QUEUE:
+                    self.publish_encoder()
 
         return True, 'Acquisition exited cleanly.'
 
