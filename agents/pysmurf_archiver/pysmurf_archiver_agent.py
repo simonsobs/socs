@@ -54,11 +54,10 @@ def create_local_path(file, data_dir):
 
     # First tries to get action timestamp entry
     action_ts = file['action_timestamp']
-
     if action_ts is None:
         try:
             # If that doesn't exist, try to get the group timestamp from the filename
-            action_ts = int(filename.split('_')[0])
+            action_ts = int(os.path.splitext(filename)[0].split('_')[0])
         except ValueError as e:
             # If that doesn't work, just use the file creation timestamp
             action_ts = str(int(dt.timestamp()))

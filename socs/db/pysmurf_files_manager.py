@@ -49,9 +49,14 @@ def add_entry(cur, entry):
             "Keys given: {}\n"
             "Keys allowed: {}".format(entry.keys(), col_dict.keys())
         )
-    keys = list(entry.keys())
-    vals = [entry[k] for k in keys if entry[k] is not None]
-    fmts = [col_dict[k].fmt for k in keys]
+
+    keys, vals, fmts = [], [], []
+    for k in list(entry.keys()):
+        if entry[k] is None:
+            continue
+        keys.append(k)
+        vals.append(entry[k])
+        fmts.append(col_dict[k].fmt)
 
     query = "INSERT INTO {} ({}) VALUES ({})"\
             .format(table, ", ".join(keys), ", ".join(fmts))
