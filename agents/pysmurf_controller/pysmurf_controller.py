@@ -108,10 +108,11 @@ class PysmurfController:
         data, feed = _data
 
         if self.current_session is not None:
-            if isinstance(data, dict):
-                self.current_session.data.update(data)
-            else:
-                self.log.warn("Session data not passed as a dict!! Skipping...")
+            if data['id'] == os.environ.get("SMURFPUB_ID"):
+                if isinstance(data, dict):
+                    self.current_session.data.update(data['payload'])
+                else:
+                    self.log.warn("Session data not passed as a dict!! Skipping...")
 
     @inlineCallbacks
     def _run_script(self, script, args, log, session):

@@ -121,7 +121,7 @@ class PysmurfMonitor(DatagramProtocol):
 
         elif data['type'] == "session_data":
             self.agent.publish_to_feed(
-                "pysmurf_session_data", data['payload'], from_reactor=True
+                "pysmurf_session_data", data, from_reactor=True
             )
 
     def init(self, session, params=None):
