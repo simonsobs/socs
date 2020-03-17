@@ -1,8 +1,11 @@
 from twisted.internet import reactor, protocol
 from twisted.python.failure import Failure
 from twisted.internet.error import ProcessDone, ProcessTerminated
-import sys
+from twisted.internet.defer import inlineCallbacks
+from autobahn.twisted.util import sleep as dsleep
 from twisted.logger import Logger, FileLogObserver
+
+import sys
 from typing import Optional
 import time
 import os
@@ -93,7 +96,25 @@ class PysmurfController:
         self.prot = None
         self.protocol_lock = TimeoutLock()
 
-    def _run_script(self, script, args, log):
+        self.current_session = None
+
+        if args.monitor_id is not None:
+            self.agent.subscribe_on_start(
+                self._on_session_data,
+                'observatory.{}.feeds.pysmurf_session_data'.format(args.monitor_id),
+            )
+
+    def _on_session_data(self, _data):
+        data, feed = _data
+
+        if self.current_session is not None:
+            if isinstance(data, dict):
+                self.current_session.data.update(data)
+            else:
+                self.log.warn("Session data not passed as a dict!! Skipping...")
+
+    @inlineCallbacks
+    def _run_script(self, script, args, log, session):
         """
         Runs a pysmurf control script. Run primarily from tasks in worker threads.
 
@@ -114,35 +135,41 @@ class PysmurfController:
             if not acquired:
                 return False, "Process {} is already running".format(self.protocol_lock.job)
 
-            logger = None
-            if isinstance(log, str):
-                log_file = open(log, 'a')
-                logger = Logger(observer=FileLogObserver(log_file, log_formatter))
-            elif log:
-                # If log==True, use agent's logger
-                logger = self.log
+            self.current_session = session
+            try:
+                logger = None
+                if isinstance(log, str):
+                    log_file = open(log, 'a')
+                    logger = Logger(observer=FileLogObserver(log_file, log_formatter))
+                elif log:
+                    # If log==True, use agent's logger
+                    logger = self.log
 
-            self.prot = PysmurfScriptProtocol(script, log=logger)
-            python_exec = sys.executable
+                self.prot = PysmurfScriptProtocol(script, log=logger)
+                python_exec = sys.executable
 
-            cmd = [python_exec, '-u', script] + args
-            self.log.info("{exec}, {cmd}", exec=python_exec, cmd=cmd)
+                cmd = [python_exec, '-u', script] + args
+                self.log.info("{exec}, {cmd}", exec=python_exec, cmd=cmd)
 
-            reactor.callFromThread(
-                reactor.spawnProcess, self.prot, python_exec, cmd, env=os.environ
-            )
+                reactor.callFromThread(
+                    reactor.spawnProcess, self.prot, python_exec, cmd, env=os.environ
+                )
 
-            while self.prot.end_status is None:
-                time.sleep(1)
+                while self.prot.end_status is None:
+                    yield dsleep(1)
 
-            end_status = self.prot.end_status
-            self.prot = None
+                end_status = self.prot.end_status
+                self.prot = None
 
-            if isinstance(end_status.value, ProcessDone):
-                return True, "Script has finished naturally"
-            elif isinstance(end_status.value, ProcessTerminated):
-                return False, "Script has been killed"
+                if isinstance(end_status.value, ProcessDone):
+                    return True, "Script has finished naturally"
+                elif isinstance(end_status.value, ProcessTerminated):
+                    return False, "Script has been killed"
 
+            finally:
+                self.current_session = None
+
+    @inlineCallbacks
     def run_script(self, session, params=None):
         """run(params=None)
 
@@ -161,9 +188,13 @@ class PysmurfController:
             You can pass the path to a logfile, True to use the agent's log,
             or False to not log at all.
         """
-        ok, msg = self._run_script(params['script'],
-                                   params.get('args', []),
-                                   params.get('log', True))
+
+        ok, msg = yield self._run_script(
+            params['script'],
+            params.get('args', []),
+            params.get('log', True),
+            session
+        )
 
         return ok, msg
 
@@ -174,6 +205,7 @@ class PysmurfController:
         self.prot.transport.signalProcess('KILL')
         return True, "Aborting process"
 
+    @inlineCallbacks
     def tune_squids(self, session, params=None):
         """
         Task to run /config/scripts/pysmurf/tune_squids.py
@@ -191,10 +223,11 @@ class PysmurfController:
         if params is None:
             params = {}
 
-        ok, msg = self._run_script(
+        ok, msg = yield self._run_script(
             '/config/scripts/pysmurf/tune_squids.py',
             params.get('args', []),
-            params.get('log', True)
+            params.get('log', True),
+            session
         )
 
         return ok, msg
@@ -209,6 +242,9 @@ def make_parser(parser=None):
 
     pgroup = parser.add_argument_group('Agent Config')
     pgroup.add_argument('--plugin', action='store_true')
+    pgroup.add_argument('--monitor-id', '-m', type=str,
+                        help="Instance id for pysmurf-monitor corresponding to "
+                             "this pysmurf instance.")
 
     return parser
 
@@ -225,8 +261,8 @@ if __name__ == '__main__':
     agent, runner = ocs_agent.init_site_agent(args)
     controller = PysmurfController(agent, args)
 
-    agent.register_task('run', controller.run_script)
-    agent.register_task('abort', controller.abort_script)
-    agent.register_task('tune_squids', controller.tune_squids)
+    agent.register_task('run', controller.run_script, blocking=False)
+    agent.register_task('abort', controller.abort_script, blocking=False)
+    agent.register_task('tune_squids', controller.tune_squids, blocking=False)
 
     runner.run(agent, auto_reconnect=True)

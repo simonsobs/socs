@@ -52,6 +52,8 @@ class PysmurfMonitor(DatagramProtocol):
         self.agent: ocs_agent.OCSAgent = agent
         self.log = agent.log
 
+        self.agent.register_feed('pysmurf_session_data')
+
         self.create_table = bool(args.create_table)
 
         site, instance = self.agent.agent_address.split('.')
@@ -116,6 +118,11 @@ class PysmurfMonitor(DatagramProtocol):
             deferred = self.dbpool.runInteraction(pysmurf_files_manager.add_entry, d)
             deferred.addErrback(self._add_file_errback, d)
             deferred.addCallback(self._add_file_callback, d)
+
+        elif data['type'] == "session_data":
+            self.agent.publish_to_feed(
+                "pysmurf_session_data", data['payload'], from_reactor=True
+            )
 
     def init(self, session, params=None):
         """
