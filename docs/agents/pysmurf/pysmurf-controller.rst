@@ -29,7 +29,7 @@ Example site-config entry::
 
       {'agent-class': 'PysmurfController',
        'instance-id': 'pysmurf-controller',
-       'arguments': []},
+       'arguments': [['--monitor-id', 'pysmurf-monitor']]},
 
 
 Pysmurf Publisher options
@@ -114,6 +114,35 @@ OCS client from my host computer::
 
 where my ``$OCS_CONFIG_DIR`` is mounted to ``/config`` in the docker.
 
+
+Passing Session Data
+---------------------
+
+Often you might want to take data from your pysmurf-script, and access it from
+ocs client script. This is now possible by using the smurf publisher.
+If you want to access the location of a smurf datafile,
+you can put the following into your pysmurf-script::
+
+    datafile = S.stream_data_on()
+    S.pub.publish({'datafile': datafile}, msgtype='session_data')
+
+Marking the publish call with ``msgtype='session_data'`` will make the
+pysmurf-monitor (if it exists) pass this data back to the pysmurf-controller. You can
+then view the data from the client by running ``status`` or ``wait`` to check the
+session data. For example, if the ``tune.py`` file publishes the datafile variable,
+you can run::
+
+    from ocs.matched_client import MatchedClient
+
+    controller = MatchedClient('pysmurf-controller', args=[])
+
+    script_path = '/config/scripts/pysmurf/tune.py'
+    controller.run.start(script=script_path))
+
+    ok, msg, sess = controller.run.wait()
+    print(sess['data'])
+
+    >> {'datafile': '/data/smurf_data/20200316/1584401673/outputs/1584402020.dat'}
 
 Agent API
 ---------------
