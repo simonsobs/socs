@@ -260,8 +260,8 @@ class HWPBBBAgent:
 
         self.ep = EncoderParser()
 
-        data_counter = {'timestamps':[], 'block_name':'HWPEncoder_counter','data':{}}
-        self.lastdata_counter = data_counter
+        self.data_counter = {'timestamps':[], 'block_name':'HWPEncoder_counter','data':{}}
+        self.lastdata_counter = self.data_counter
 
     def publish_encoder(self):
         counter_list = []
@@ -272,12 +272,12 @@ class HWPBBBAgent:
             counter_index_list += counter_data[1].tolist()
 
         if (len(counter_list)):
-            self.lastdata_counter = data_counter 
-            data_counter = {'timestamps':[], 'block_name':'HWPEncoder_counter','data':{}}
+            self.lastdata_counter = self.data_counter 
+            self.data_counter = {'timestamps':[], 'block_name':'HWPEncoder_counter','data':{}}
             # This timestamps are 1-D counte_list length numpy array of the same timestamp of curren time
-            data_counter['timestamps'] = numpy.ones(len(counter_list)) * time.time()
-            data_counter['data']['counter'] = counter_list
-            data_counter['data']['counter_index'] = counter_index_list
+            self.data_counter['timestamps'] = numpy.ones(len(counter_list)) * time.time()
+            self.data_counter['data']['counter'] = counter_list
+            self.data_counter['data']['counter_index'] = counter_index_list
 
             data_quad = {'timestamps':[], 'block_name':'HWPEncoder_quad','data':{}}
             quad_list = []
@@ -287,7 +287,7 @@ class HWPBBBAgent:
             data_quad['timestamps'] = numpy.ones(len(quad_list)) * time.time()
             data_quad['data']['quad'] = quad_list
 
-            self.agent.publish_to_feed('HWPEncoder_counter', data_counter)
+            self.agent.publish_to_feed('HWPEncoder_counter', self.data_counter)
             self.agent.publish_to_feed('HWPEncoder_quad', data_quad)
             self.agent.feeds['HWPEncoder_counter'].flush_buffer()
             self.agent.feeds['HWPEncoder_quad'].flush_buffer()
@@ -329,11 +329,12 @@ class HWPBBBAgent:
                     for i in range(10):
                         data_irig['data']['irig_synch_pulse_clock_times_%d'%i] = synch_pulse_clock_times[i]
                     # For rough estimation of HWP rotation frequency
-                    if 'rising_edge_time' in lastdata_irig['data'] and 'counter' in self.lastdata_counter['data'] and len(counter_list):
+                    if 'rising_edge_time' in lastdata_irig['data'] and 'counter' in self.lastdata_counter['data'] and 'counter' in self.data_counter['data']:
+                        dsec = data_irig['data']['irig_time'] - lastdata_irig['data']['irig_time']
                         dclock_onesec = data_irig['data']['rising_edge_time'] - lastdata_irig['data']['rising_edge_time']
-                        dclock_counter = data_counter['data']['counter'][-1] - data_counter['data']['counter'][0]
-                        dindex_counter = data_counter['data']['counter_index'][-1]-data_counter['data']['counter_index'][0]
-                        pulse_rate = dindex_counter / dclock_counter * dclock_onesec
+                        dclock_counter = self.data_counter['data']['counter'][-1] - self.data_counter['data']['counter'][0]
+                        dindex_counter = self.data_counter['data']['counter_index'][-1]-self.data_counter['data']['counter_index'][0]
+                        pulse_rate = dindex_counter / dclock_counter * dclock_sec / dsec
                         hwp_freq = pulse_rate / 2. / NUM_SLITS
                         print('pulse_rate', pulse_rate, hwp_freq)
                         data_irig['data']['approx_hwp_freq'] = hwp_freq
