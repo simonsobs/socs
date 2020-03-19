@@ -331,7 +331,8 @@ class HWPBBBAgent:
                     # For rough estimation of HWP rotation frequency
                     if 'rising_edge_time' in lastdata_irig['data'] and 'counter' in self.lastdata_counter['data'] and 'counter' in self.data_counter['data']:
                         dsec = data_irig['data']['irig_time'] - lastdata_irig['data']['irig_time']
-                        dclock_onesec = data_irig['data']['rising_edge_time'] - lastdata_irig['data']['rising_edge_time']
+                        dclock_sec = data_irig['data']['rising_edge_time'] - lastdata_irig['data']['rising_edge_time']
+
                         dclock_counter = self.data_counter['data']['counter'][-1] - self.data_counter['data']['counter'][0]
                         dindex_counter = self.data_counter['data']['counter_index'][-1]-self.data_counter['data']['counter_index'][0]
                         pulse_rate = dindex_counter / dclock_counter * dclock_sec / dsec
