@@ -1,16 +1,15 @@
-from ocs import ocs_agent, site_config
 import time
 import struct
 from pymodbus.client.sync import ModbusTcpClient
 
+from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
-'''
-Convert Data
-'''
 
+# Convert Data
 def float2int(num):
     return struct.unpack("=i", struct.pack("=f", num))[0]
+
 
 def concatData(data):
     tVal = 0
@@ -24,24 +23,25 @@ def concatData(data):
             upper = True
     return tVal
 
-'''
-Converting numbers to 16-bit data arrays
-'''
 
+# Converting numbers to 16-bit data arrays
 def uint16_to_data(num):
     return struct.unpack("=H", struct.pack("=H", num & 0xFFFF))[0]
 
+
 def uint32_to_data(num):
     data = [0, 0]
-    data[0] = struct.unpack("=H", struct.pack("=H", (num>>16)&0xffff))[0]
-    data[1] = struct.unpack("=H", struct.pack("=H", num&0xffff))[0]
+    data[0] = struct.unpack("=H", struct.pack("=H", (num >> 16) & 0xffff))[0]
+    data[1] = struct.unpack("=H", struct.pack("=H", num & 0xffff))[0]
     return data
+
 
 def int32_to_data(num):
     data = [0, 0]
     data[0] = struct.unpack("=H", struct.pack("=H", (num >> 16) & 0xffff))[0]
     data[1] = struct.unpack("=H", struct.pack("=H", num & 0xffff))[0]
     return data
+
 
 def float32_to_data(num):
     intNum = float2int(num)
@@ -50,27 +50,25 @@ def float32_to_data(num):
     data[1] = intNum & 0xFFFF
     return data
 
-'''
-Converting data arrays to numbers
-'''
 
+# Converting data arrays to numbers
 def data_to_uint16(data):
     return data[0]
+
 
 def data_to_uint32(data):
     return concatData(data)
 
+
 def data_to_int32(data):
     return struct.unpack("=i", struct.pack("=I", concatData(data)))[0]
+
 
 def data_to_float32(data):
     return struct.unpack("=f", struct.pack("=I", concatData(data)))[0]
 
 
-'''
-LabJack agent class
-'''
-
+# LabJack agent class
 class LabJackT7_agent:
     def __init__(self, agent, ip_address, num_channels):
         self.active = True
@@ -79,11 +77,11 @@ class LabJackT7_agent:
         self.lock = TimeoutLock()
         self.ip_address = ip_address
         self.module = None
-        self.sensors = ['Channel {}'.format(i + 1) for i in range(num_channels)]
-        
+        self.sensors = ['Channel {}'.format(i+1) for i in range(num_channels)]
+
         self.initialized = False
         self.take_data = False
-        
+
         # Register feed
         agg_params = {
             'frame_length': 60,
@@ -93,32 +91,33 @@ class LabJackT7_agent:
                                  agg_params=agg_params,
                                  buffer_time=1)
 
-    #Task functions.
+    # Task functions
     def init_labjack_task(self, session, params=None):
         """
         task to initialize labjack module
         """
-        
+
         if self.initialized:
             return True, "Already initialized module"
-        
-        with self.lock.acquire_timeout(0, job = 'init') as acquired:
+
+        with self.lock.acquire_timeout(0, job='init') as acquired:
             if not acquired:
-                self.log.warn("Could not start init because" "{} is already running".format(self.lock.job))
+                self.log.warn("Could not start init because "
+                              "{} is already running".format(self.lock.job))
                 return False, "Could not acquire lock."
-    
+
             session.set_status('starting')
-        
+
             self.module = ModbusTcpClient(str(self.ip_address))
-        
+
         print("Initialized labjack module")
-        
+
         session.add_message("Labjack initialized")
-    
+
         self.initialized = True
-        
+
         return True, 'LabJack module initialized.'
-    
+
     def start_acq(self, session, params=None):
         """
         Task to start data acquisition.
@@ -134,8 +133,8 @@ class LabJackT7_agent:
 
         with self.lock.acquire_timeout(0, job='acq') as acquired:
             if not acquired:
-                self.log.warn("Could not start acq because {} is already running"
-                              .format(self.lock.job))
+                self.log.warn("Could not start acq because "
+                              "{} is already running".format(self.lock.job))
                 return False, "Could not acquire lock."
 
             session.set_status('running')
@@ -152,7 +151,7 @@ class LabJackT7_agent:
                 for i, sens in enumerate(self.sensors):
                     rr = self.module.read_input_registers(2*i, 2)
                     data['data'][sens + 'V'] = data_to_float32(rr.registers)
-                
+
                 time.sleep(sleep_time)
 
                 self.agent.publish_to_feed('Sensors', data)
@@ -160,8 +159,8 @@ class LabJackT7_agent:
             self.agent.feeds['Sensors'].flush_buffer()
 
         return True, 'Acquisition exited cleanly.'
-    
-    def stop_acq(self, session, params = None):
+
+    def stop_acq(self, session, params=None):
         if self.take_data:
             self.take_data = False
             return True, 'requested to stop taking data.'
@@ -170,26 +169,28 @@ class LabJackT7_agent:
 
 
 if __name__ == '__main__':
-    
+
     parser = site_config.add_arguments()
 
     pgroup = parser.add_argument_group('Agent Options')
-    
+
     pgroup.add_argument('--ip-address')
     pgroup.add_argument('--num-channels', default='13')
 
     args = parser.parse_args()
 
     site_config.reparse_args(args, 'LabJackT7Agent')
-    
+
     ip_address = str(args.ip_address)
     num_channels = int(args.num_channels)
 
     agent, runner = ocs_agent.init_site_agent(args)
 
-    sensors = LabJackT7_agent(agent, ip_address = ip_address, num_channels=num_channels)
+    sensors = LabJackT7_agent(agent,
+                              ip_address=ip_address,
+                              num_channels=num_channels)
 
     agent.register_task('init_labjack', sensors.init_labjack_task)
     agent.register_process('acq', sensors.start_acq, sensors.stop_acq)
-    
+
     runner.run(agent, auto_reconnect=True)
