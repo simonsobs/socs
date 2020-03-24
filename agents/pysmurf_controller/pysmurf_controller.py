@@ -1,7 +1,7 @@
 from twisted.internet import reactor, protocol
 from twisted.python.failure import Failure
 from twisted.internet.error import ProcessDone, ProcessTerminated
-from twisted.internet.defer import inlineCallbacks
+from twisted.internet.defer import inlineCallbacks, Deferred
 from autobahn.twisted.util import sleep as dsleep
 from twisted.logger import Logger, FileLogObserver
 
@@ -61,10 +61,12 @@ class PysmurfScriptProtocol(protocol.ProcessProtocol):
 
     def processExited(self, status: Failure):
         """Called when process has exited."""
-        if self.log is not None:
-            self.log.info("Process ended: {reason}", reason=status)
 
-        self.end_status = status
+        rc = status.value.exitCode
+        if self.log is not None:
+            self.log.info("Process ended with exit code {rc}", rc=rc)
+
+        self.deferred.callback(rc)
 
 
 class PysmurfController:
@@ -109,15 +111,20 @@ class PysmurfController:
 
         if self.current_session is not None:
             if data['id'] == os.environ.get("SMURFPUB_ID"):
-                if isinstance(data, dict):
-                    self.current_session.data.update(data['payload'])
-                else:
-                    self.log.warn("Session data not passed as a dict!! Skipping...")
+                if data['type'] == 'session_data':
+                    if isinstance(data['payload'], dict):
+                        self.current_session.data.update(data['payload'])
+                    else:
+                        self.log.warn("Session data not passed as a dict!! Skipping...")
+
+                elif data['type'] == 'session_log':
+                    if isinstance(data['payload'], str):
+                        self.current_session.add_message(data['payload'])
 
     @inlineCallbacks
     def _run_script(self, script, args, log, session):
         """
-        Runs a pysmurf control script. Run primarily from tasks in worker threads.
+        Runs a pysmurf control script. Can only run from the reactor.
 
         Arguments
         ----------
@@ -134,10 +141,14 @@ class PysmurfController:
 
         with self.protocol_lock.acquire_timeout(0, job=script) as acquired:
             if not acquired:
-                return False, "Process {} is already running".format(self.protocol_lock.job)
+                return False, "The requested script cannot be run because " \
+                              "script {} is already running".format(self.protocol_lock.job)
 
             self.current_session = session
             try:
+                # IO  is not really safe from the reactor thread, so we possibly
+                # need to find another way to do this if people use it and it
+                # causes problems...
                 logger = None
                 if isinstance(log, str):
                     log_file = open(log, 'a')
@@ -147,27 +158,23 @@ class PysmurfController:
                     logger = self.log
 
                 self.prot = PysmurfScriptProtocol(script, log=logger)
+                self.prot.deferred = Deferred()
                 python_exec = sys.executable
 
-                cmd = [python_exec, '-u', script] + args
+                cmd = [python_exec, '-u', script] + list(map(str, args))
+
                 self.log.info("{exec}, {cmd}", exec=python_exec, cmd=cmd)
 
-                reactor.callFromThread(
-                    reactor.spawnProcess, self.prot, python_exec, cmd, env=os.environ
-                )
+                reactor.spawnProcess(self.prot, python_exec, cmd, env=os.environ)
 
-                while self.prot.end_status is None:
-                    yield dsleep(1)
+                rc = yield self.prot.deferred
 
-                end_status = self.prot.end_status
-                self.prot = None
-
-                if isinstance(end_status.value, ProcessDone):
-                    return True, "Script has finished naturally"
-                elif isinstance(end_status.value, ProcessTerminated):
-                    return False, "Script has been killed"
+                return (rc == 0), "Script has finished with exit code {}".format(rc)
 
             finally:
+                # Sleep to allow any remaining messages to be put into the
+                # session var
+                yield dsleep(1.0)
                 self.current_session = None
 
     @inlineCallbacks

@@ -123,8 +123,11 @@ ocs client script. This is now possible by using the smurf publisher.
 If you want to access the location of a smurf datafile,
 you can put the following into your pysmurf-script::
 
+    active_channels = S.which_on(0)
     datafile = S.stream_data_on()
-    S.pub.publish({'datafile': datafile}, msgtype='session_data')
+    S.pub.publish({
+        'datafile': datafile, 'active_channels': active_channels
+    }, msgtype='session_data')
 
 Marking the publish call with ``msgtype='session_data'`` will make the
 pysmurf-monitor (if it exists) pass this data back to the pysmurf-controller. You can
@@ -142,7 +145,24 @@ you can run::
     ok, msg, sess = controller.run.wait()
     print(sess['data'])
 
-    >> {'datafile': '/data/smurf_data/20200316/1584401673/outputs/1584402020.dat'}
+    >> {
+        'datafile': '/data/smurf_data/20200316/1584401673/outputs/1584402020.dat',
+        'active_channels': [0,1,2,3,4]
+    }
+
+You can also use this to communicate pysmurf status info to the client. For
+instance you can run::
+
+    S.pub.publish({'status': 'Starting take_stream_data'}, msgtype='session_data')
+    datafile = S.take_stream_data(10) # Streams data for 10 seconds
+    S.pub.publish({
+        'status': 'Finished take_stream_data', 'datafile': datafile
+     }, msgtype='session_data')
+
+Then if you inspect the session object returned from ``controller.run.status()``
+you'll be able to check whether or not ``take_stream_data`` has finished or not.
+This can be extremely helpful to monitor progress in long-running pysmurf
+scripts from the ocs-web monitor.
 
 Agent API
 ---------------
