@@ -1,10 +1,13 @@
 import argparse
 import time
 import struct
+import os
 from pymodbus.client.sync import ModbusTcpClient
 
-from ocs import ocs_agent, site_config
-from ocs.ocs_twisted import TimeoutLock
+ON_RTD = os.environ.get('READTHEDOCS') == 'True'
+if not ON_RTD:
+    from ocs import ocs_agent, site_config
+    from ocs.ocs_twisted import TimeoutLock
 
 
 # Convert Data
