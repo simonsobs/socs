@@ -39,6 +39,7 @@ Simulator Reference  Simulators are used to mock software and hardware
     agents/bluefors_agent
     agents/cryomech_cpa
     agents/keithley-psu
+    agents/labjack
     agents/lakeshore240
     agents/lakeshore372
     agents/pysmurf/index
