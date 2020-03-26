@@ -1,3 +1,4 @@
+import argparse
 import time
 import struct
 from pymodbus.client.sync import ModbusTcpClient
@@ -121,9 +122,11 @@ class LabJackAgent:
     def start_acq(self, session, params=None):
         """
         Task to start data acquisition.
+
         Args:
             sampling_frequency (float):
                 Sampling frequency for data collection. Defaults to 2.5 Hz
+
         """
         if params is None:
             params = {}
@@ -167,15 +170,25 @@ class LabJackAgent:
         else:
             return False, 'acq is not currently running'
 
+def make_parser(parser=None):
+    """Build the argument parser for the Agent. Allows sphinx to automatically
+    build documentation based on this function.
 
-if __name__ == '__main__':
+    """
+    if parser is None:
+        parser = argparse.ArgumentParser()
 
-    parser = site_config.add_arguments()
-
+    # Add options specific to this agent.
     pgroup = parser.add_argument_group('Agent Options')
 
     pgroup.add_argument('--ip-address')
     pgroup.add_argument('--num-channels', default='13')
+
+    return parser
+
+if __name__ == '__main__':
+    site_parser = site_config.add_arguments()
+    parser = make_parser(site_parser)
 
     args = parser.parse_args()
 
