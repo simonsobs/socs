@@ -12,7 +12,7 @@ BUFF_SIZE = 128
 ENQ = '\x05'
 
 
-class pfeiffer:
+class Pfeiffer:
     """CLASS to control and retrieve data from the pfeiffer tpg366
     pressure gauage controller
 
@@ -88,7 +88,7 @@ class pfeiffer:
         self.comm.close()
 
 
-class pfeifferAgent:
+class PfeifferAgent:
 
     def __init__(self, agent, ip_address, port, f_sample=2.5):
         self.active = True
@@ -97,7 +97,7 @@ class pfeifferAgent:
         self.lock = TimeoutLock()
         self.f_sample = f_sample
         self.take_data = False
-        self.gauge = pfeiffer(ip_address, int(port))
+        self.gauge = Pfeiffer(ip_address, int(port))
         self.port = port
         agg_params = {'frame length': 60, }
 
@@ -172,9 +172,9 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    site_config.reparse_args(args, 'pfeifferAgent')
+    site_config.reparse_args(args, 'PfeifferAgent')
     agent, runner = ocs_agent.init_site_agent(args)
-    pfeiffer_agent = pfeifferAgent(agent, args.ip_address, args.port)
+    pfeiffer_agent = PfeifferAgent(agent, args.ip_address, args.port)
     agent.register_process('acq', pfeiffer_agent.start_acq,
                            pfeiffer_agent.stop_acq, startup=True)
     agent.register_task('close', pfeiffer_agent.stop_acq)
