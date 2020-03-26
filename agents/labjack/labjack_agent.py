@@ -69,7 +69,7 @@ def data_to_float32(data):
 
 
 # LabJack agent class
-class LabJackT7_agent:
+class LabJackAgent:
     def __init__(self, agent, ip_address, num_channels):
         self.active = True
         self.agent = agent
@@ -179,16 +179,16 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    site_config.reparse_args(args, 'LabJackT7Agent')
+    site_config.reparse_args(args, 'LabJackAgent')
 
     ip_address = str(args.ip_address)
     num_channels = int(args.num_channels)
 
     agent, runner = ocs_agent.init_site_agent(args)
 
-    sensors = LabJackT7_agent(agent,
-                              ip_address=ip_address,
-                              num_channels=num_channels)
+    sensors = LabJackAgent(agent,
+                           ip_address=ip_address,
+                           num_channels=num_channels)
 
     agent.register_task('init_labjack', sensors.init_labjack_task)
     agent.register_process('acq', sensors.start_acq, sensors.stop_acq)
