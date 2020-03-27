@@ -25,11 +25,11 @@ using all of the available arguments::
 
        {'agent-class': 'PfeifferAgent',
         'instance-id': 'pfeiffer',
-        'arguments':[
+        'arguments': [
           ['--ip-address', '10.10.10.20'],
           ['--port', '8000'],
           ['--mode', 'acq'],
-          ]
+          ]}
 
 You should assign a static IP address to Pfeiffer device, and record it here. 
 In general, the Pfeiffer device will assign port 8000 by default. This should
@@ -43,7 +43,7 @@ example of what to insest into your institution's docker-compose file. ::
 
 
   ocs-pfeiffer:
-    image: ocs-pfeiffer-tpg366-agent:latest
+    image: simonsobs/ocs-pfeiffer-tpg366-agent:latest
     hostname: ocs-docker
     network_mode: "host"
     volumes:
@@ -60,7 +60,7 @@ Below is an example client to start data acquisition
 
     from ocs.matched_client import MatchedClienti
     import time
-    pfeiffer = MatchedClient("pfeiffer_1", args=[])
+    pfeiffer = MatchedClient("pfeiffer", args=[])
     params = {'auto_acquire': True}
     pfeiffer.acq.start(**params)
     pfeiffer.acq.wait()
