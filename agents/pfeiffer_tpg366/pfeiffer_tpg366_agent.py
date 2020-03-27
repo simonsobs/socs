@@ -23,11 +23,8 @@ class Pfeiffer:
 
     Attributes:
        read_pressure reads the pressure from one channel (given as an argument)
-       read_pressure_all reads pressrue from the six channels
+       read_pressure_all reads pressures from the six channels
        close closes the socket
-
-    Todo:
-        -Generalize IP address inputs (input IP  via command line?)
     """
     def __init__(self, ip_address, port, timeout=10,
                  f_sample=2.5):
@@ -98,7 +95,6 @@ class PfeifferAgent:
         self.f_sample = f_sample
         self.take_data = False
         self.gauge = Pfeiffer(ip_address, int(port))
-        self.port = port
         agg_params = {'frame length': 60, }
 
         self.agent.register_feed('pressures',
