@@ -62,7 +62,7 @@ Below is an example client to start data acquisition
     import time
     pfeiffer = MatchedClient("pfeiffer_1", args=[])
     params = {'auto_acquire': True}
-    pfeiffer.acq.start(\*\*params)
+    pfeiffer.acq.start(**params)
     pfeiffer.acq.wait()
     time.sleep(0.05)
 
