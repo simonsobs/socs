@@ -87,6 +87,13 @@ services:
   ocs-labjack-agent:
     image: "ocs-labjack-agent"
     build: ./agents/labjack/
+    
+  # --------------------------------------------------------------------------
+  # Pfeiffer tpg366 agent
+  # --------------------------------------------------------------------------
+  ocs-pfeiffer-tpg366-agent:
+    image: "ocs-pfeiffer-tpg366-agent"
+    build: ./agents/pfeiffer_tpg366/
 
   # --------------------------------------------------------------------------
   # SOCS Simulators
