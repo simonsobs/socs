@@ -54,7 +54,9 @@ example of what to insest into your institution's docker-compose file. ::
 
 Example Client
 --------------
-Below is an example client to start data acquisition::
+Below is an example client to start data acquisition
+
+::
 
     from ocs.matched_client import MatchedClienti
     import time
