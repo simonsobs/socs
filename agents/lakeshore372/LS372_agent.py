@@ -29,8 +29,17 @@ class LS372_Agent:
 
     """
     def __init__(self, agent, name, ip, fake_data=False, dwell_time_delay=0):
-        self.lock = TimeoutLock()
-        self.job = None
+
+        # self._acq_proc_lock is held for the duration of the acq Process.
+        # Tasks that require acq to not be running, at all, should use
+        # this lock.
+        self._acq_proc_lock = TimeoutLock()
+
+        # self._lock is the general Task lock, that is held by the acq
+        # Process only when accessing the hardware.  Tasks that are,
+        # in principal, safe to run during idle time in the acq
+        # process can try to acquire this lock.
+        self._lock = TimeoutLock()
 
         self.name = name
         self.ip = ip
@@ -52,6 +61,16 @@ class LS372_Agent:
                                  record=True,
                                  agg_params=agg_params,
                                  buffer_time=1)
+
+    def _lock_acquire(self, job, timeout=5):
+        # Returns a ContextManager -- the abstraction here is just to
+        # set a default timeout parameter.
+        return self._lock.acquire_timeout(timeout=timeout, job=job)
+
+    def _acq_proc_lock_acquire(self, job, timeout=0):
+        # Returns a ContextManager -- the abstraction here is just to
+        # set a default timeout parameter.
+        return self._acq_proc_lock.acquire_timeout(timeout=timeout, job=job)
 
     def init_lakeshore_task(self, session, params=None):
         """init_lakeshore_task(params=None)
@@ -75,10 +94,15 @@ class LS372_Agent:
             self.log.info("Lakeshore already initialized. Returning...")
             return True, "Already initialized"
 
-        with self.lock.acquire_timeout(0, job='init') as acquired:
-            if not acquired:
+        with self._lock_acquire('init') as acquired1, \
+             self._acq_proc_lock_acquire('init') as acquired2:
+            if not acquired1:
                 self.log.warn(f"Could not start init because "
-                              f"{self.lock.job} is already running")
+                              f"{self._lock.job} is already running")
+                return False, "Could not acquire lock"
+            if not acquired2:
+                self.log.warn(f"Could not start init because "
+                              f"{self._acq_proc_lock.job} is already running")
                 return False, "Could not acquire lock"
 
             session.set_status('running')
@@ -104,10 +128,10 @@ class LS372_Agent:
 
     def start_acq(self, session, params=None):
 
-        with self.lock.acquire_timeout(0, job='acq') as acquired:
-            if not acquired:
-                self.log.warn(f"Could not start init because "
-                              f"{self.lock.job} is already running")
+        with self._acq_proc_lock_acquire(job='acq') as acq_acquired:
+            if not acq_acquired:
+                self.log.warn(f"Could not start Process because "
+                              f"{self._acq_proc_lock.job} is already running")
                 return False, "Could not acquire lock"
 
             session.set_status('running')
@@ -129,16 +153,24 @@ class LS372_Agent:
                     time.sleep(.1)
 
                 else:
-                    active_channel = self.module.get_active_channel()
 
-                    # The 372 reports the last updated measurement repeatedly
-                    # during the "pause change time", this results in several
-                    # stale datapoints being recorded. To get around this we
-                    # query the pause time and skip data collection during it
-                    # if the channel has changed (as it would if autoscan is
-                    # enabled.)
-                    if previous_channel != active_channel:
-                        if previous_channel is not None:
+                    with self._lock_acquire('acq', 10.) as acquired:
+                        if not acquired:
+                            self.log.warn(f"Failed to re-acquire sampling lock, "
+                                          f"currently held by {self._lock.job}.")
+                            continue
+                        active_channel = self.module.get_active_channel()
+
+                        # The 372 reports the last updated measurement repeatedly
+                        # during the "pause change time", this results in several
+                        # stale datapoints being recorded. To get around this we
+                        # query the pause time and skip data collection during it
+                        # if the channel has changed (as it would if autoscan is
+                        # enabled.)
+                        if previous_channel is None:
+                            previous_channel = active_channel
+
+                        elif previous_channel != active_channel:
                             pause_time = active_channel.get_pause()
                             self.log.debug("Pause time for {c}: {p}",
                                            c=active_channel.channel_num,
@@ -168,20 +200,20 @@ class LS372_Agent:
                                                t=total_time-i)
                                 time.sleep(1)
 
-                        # Track the last channel we measured
-                        previous_channel = self.module.get_active_channel()
+                            # Track the last channel we measured
+                            previous_channel = self.module.get_active_channel()
 
-                    data = {
-                        'timestamp': time.time(),
-                        'block_name': active_channel.name,
-                        'data': {}
-                    }
+                        data = {
+                            'timestamp': time.time(),
+                            'block_name': active_channel.name,
+                            'data': {}
+                        }
 
-                    # Collect both temperature and resistance values from each Channel
-                    data['data'][active_channel.name + ' T'] = \
-                        self.module.get_temp(unit='kelvin', chan=active_channel.channel_num)
-                    data['data'][active_channel.name + ' R'] = \
-                        self.module.get_temp(unit='ohms', chan=active_channel.channel_num)
+                        # Collect both temperature and resistance values from each Channel
+                        data['data'][active_channel.name + ' T'] = \
+                            self.module.get_temp(unit='kelvin', chan=active_channel.channel_num)
+                        data['data'][active_channel.name + ' R'] = \
+                            self.module.get_temp(unit='ohms', chan=active_channel.channel_num)
 
                 session.app.publish_to_feed('temperatures', data)
 
@@ -210,10 +242,10 @@ class LS372_Agent:
                the servo to adjust to the new heater range, typical value of
                ~600 seconds
         """
-        with self.lock.acquire_timeout(0, job='set_heater_range') as acquired:
+        with self._lock_acquire('set_heater_range') as acquired:
             if not acquired:
-                self.log.warn(f"Could not start init because "
-                              f"{self.lock.job} is already running")
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
             session.set_status('running')
@@ -242,10 +274,10 @@ class LS372_Agent:
         :type params: dict
         """
 
-        with self.lock.acquire_timeout(0, job='set_excitation_mode') as acquired:
+        with self._lock_acquire('set_excitation_mode') as acquired:
             if not acquired:
-                self.log.warn(f"Could not start init because "
-                              f"{self.lock.job} is already running")
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
             session.set_status('running')
@@ -263,10 +295,10 @@ class LS372_Agent:
         :param params: dict with "channel" and "value" keys for Channel.set_excitation()
         :type params: dict
         """
-        with self.lock.acquire_timeout(0, job='set_excitation') as acquired:
+        with self._lock_acquire('set_excitation') as acquired:
             if not acquired:
-                self.log.warn(f"Could not start init because "
-                              f"{self.lock.job} is already running")
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
             session.set_status('running')
@@ -289,10 +321,10 @@ class LS372_Agent:
         :param params: dict with "P", "I", and "D" keys for Heater.set_pid()
         :type params: dict
         """
-        with self.lock.acquire_timeout(0, job='set_pid') as acquired:
+        with self._lock_acquire('set_pid') as acquired:
             if not acquired:
-                self.log.warn(f"Could not start init because "
-                              f"{self.lock.job} is already running")
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
             session.set_status('running')
@@ -310,10 +342,10 @@ class LS372_Agent:
         :param params: dict with "channel" number
         :type params: dict
         """
-        with self.lock.acquire_timeout(0, job='set_active_channel') as acquired:
+        with self._lock_acquire('set_active_channel') as acquired:
             if not acquired:
-                self.log.warn(f"Could not start init because "
-                              f"{self.lock.job} is already running")
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
             session.set_status('running')
@@ -329,10 +361,10 @@ class LS372_Agent:
         Sets autoscan on the LS372.
         :param params: dict with "autoscan" value
         """
-        with self.lock.acquire_timeout(0, job='set_autoscan') as acquired:
+        with self._lock_acquire('set_autoscan') as acquired:
             if not acquired:
-                self.log.warn(f"Could not start init because "
-                              f"{self.lock.job} is already running")
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
             session.set_status('running')
@@ -352,10 +384,10 @@ class LS372_Agent:
         :param params: dict with "temperature" Heater.set_setpoint() in unites of K
         :type params: dict
         """
-        with self.lock.acquire_timeout(0, job='servo_to_temperature') as acquired:
+        with self._lock_acquire('servo_to_temperature') as acquired:
             if not acquired:
-                self.log.warn(f"Could not start init because "
-                              f"{self.lock.job} is already running")
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
             session.set_status('running')
@@ -397,10 +429,10 @@ class LS372_Agent:
         measurements - number of measurements to average for stability check
         threshold - amount within which the average needs to be to the setpoint for stability
         """
-        with self.lock.acquire_timeout(0, job='check_temp_stability') as acquired:
+        with self._lock_acquire('check_temp_stability') as acquired:
             if not acquired:
-                self.log.warn(f"Could not start init because "
-                              f"{self.lock.job} is already running")
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
             session.set_status('running')
@@ -445,10 +477,10 @@ class LS372_Agent:
                     "Zone", "Still", "Closed Loop", or "Warm up"
         """
 
-        with self.lock.acquire_timeout(0, job='set_output_mode') as acquired:
+        with self._lock_acquire('set_output_mode') as acquired:
             if not acquired:
-                self.log.warn(f"Could not start init because "
-                              f"{self.lock.job} is already running")
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
             session.set_status('running')
@@ -478,10 +510,10 @@ class LS372_Agent:
 
         """
 
-        with self.lock.acquire_timeout(0, job='set_heater_output') as acquired:
+        with self._lock_acquire('set_heater_output') as acquired:
             if not acquired:
-                self.log.warn(f"Could not start init because "
-                              f"{self.lock.job} is already running")
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
             heater = params['heater'].lower()
