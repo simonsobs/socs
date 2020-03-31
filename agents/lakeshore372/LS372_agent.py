@@ -183,7 +183,7 @@ class LS372_Agent:
                 self.log.warn(f"Could not start Process because "
                               f"{self._acq_proc_lock.job} is already running")
                 return False, "Could not acquire lock"
-            if not acq_acquired:
+            if not acquired:
                 self.log.warn(f"Could not start Process because "
                               f"{self._lock.job} is holding the lock")
                 return False, "Could not acquire lock"
