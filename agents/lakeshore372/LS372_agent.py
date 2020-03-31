@@ -128,20 +128,36 @@ class LS372_Agent:
 
     def start_acq(self, session, params=None):
 
-        with self._acq_proc_lock_acquire(job='acq') as acq_acquired:
+        with self._acq_proc_lock_acquire(job='acq') as acq_acquired, \
+             self._lock_acquire(job='acq') as acquired:
             if not acq_acquired:
                 self.log.warn(f"Could not start Process because "
                               f"{self._acq_proc_lock.job} is already running")
+                return False, "Could not acquire lock"
+            if not acq_acquired:
+                self.log.warn(f"Could not start Process because "
+                              f"{self._lock.job} is holding the lock")
                 return False, "Could not acquire lock"
 
             session.set_status('running')
             self.log.info("Starting data acquisition for {}".format(self.agent.agent_address))
             previous_channel = None
+            last_release = time.time()
 
             self.take_data = True
             while self.take_data:
-                if self.fake_data:
 
+                # Relinquish sampling lock occasionally.
+                if time.time() - last_release > 1.:
+                    last_release = time.time()
+                    self._lock.release()
+                    time.sleep(.1)
+                    if not self._lock.acquire(timeout=10):
+                        self.log.warn(f"Failed to re-acquire sampling lock, "
+                                      f"currently held by {self._lock.job}.")
+                        continue
+
+                if self.fake_data:
                     data = {
                         'timestamp': time.time(),
                         'block_name': 'fake-data',
@@ -153,24 +169,16 @@ class LS372_Agent:
                     time.sleep(.1)
 
                 else:
+                    active_channel = self.module.get_active_channel()
 
-                    with self._lock_acquire('acq', 10.) as acquired:
-                        if not acquired:
-                            self.log.warn(f"Failed to re-acquire sampling lock, "
-                                          f"currently held by {self._lock.job}.")
-                            continue
-                        active_channel = self.module.get_active_channel()
-
-                        # The 372 reports the last updated measurement repeatedly
-                        # during the "pause change time", this results in several
-                        # stale datapoints being recorded. To get around this we
-                        # query the pause time and skip data collection during it
-                        # if the channel has changed (as it would if autoscan is
-                        # enabled.)
-                        if previous_channel is None:
-                            previous_channel = active_channel
-
-                        elif previous_channel != active_channel:
+                    # The 372 reports the last updated measurement repeatedly
+                    # during the "pause change time", this results in several
+                    # stale datapoints being recorded. To get around this we
+                    # query the pause time and skip data collection during it
+                    # if the channel has changed (as it would if autoscan is
+                    # enabled.)
+                    if previous_channel != active_channel:
+                        if previous_channel is not None:
                             pause_time = active_channel.get_pause()
                             self.log.debug("Pause time for {c}: {p}",
                                            c=active_channel.channel_num,
@@ -200,20 +208,20 @@ class LS372_Agent:
                                                t=total_time-i)
                                 time.sleep(1)
 
-                            # Track the last channel we measured
-                            previous_channel = self.module.get_active_channel()
+                        # Track the last channel we measured
+                        previous_channel = self.module.get_active_channel()
 
-                        data = {
-                            'timestamp': time.time(),
-                            'block_name': active_channel.name,
-                            'data': {}
-                        }
+                    data = {
+                        'timestamp': time.time(),
+                        'block_name': active_channel.name,
+                        'data': {}
+                    }
 
-                        # Collect both temperature and resistance values from each Channel
-                        data['data'][active_channel.name + ' T'] = \
-                            self.module.get_temp(unit='kelvin', chan=active_channel.channel_num)
-                        data['data'][active_channel.name + ' R'] = \
-                            self.module.get_temp(unit='ohms', chan=active_channel.channel_num)
+                    # Collect both temperature and resistance values from each Channel
+                    data['data'][active_channel.name + ' T'] = \
+                        self.module.get_temp(unit='kelvin', chan=active_channel.channel_num)
+                    data['data'][active_channel.name + ' R'] = \
+                        self.module.get_temp(unit='ohms', chan=active_channel.channel_num)
 
                 session.app.publish_to_feed('temperatures', data)
 
