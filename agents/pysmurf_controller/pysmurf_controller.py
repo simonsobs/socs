@@ -1,4 +1,4 @@
-from twisted.internet import reactor, protocol
+from twisted.internet import reactor, protocol, threads
 from twisted.python.failure import Failure
 from twisted.internet.error import ProcessDone, ProcessTerminated
 from twisted.internet.defer import inlineCallbacks, Deferred
@@ -151,7 +151,8 @@ class PysmurfController:
                 # causes problems...
                 logger = None
                 if isinstance(log, str):
-                    log_file = open(log, 'a')
+                    self.log.info("Logging output to file {}".format(log))
+                    log_file = yield threads.deferToThread(open, log, 'a')
                     logger = Logger(observer=FileLogObserver(log_file, log_formatter))
                 elif log:
                     # If log==True, use agent's logger
