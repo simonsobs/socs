@@ -16,10 +16,11 @@ class Column:
     def __str__(self):
         return " ".join([self.name, self.type, self.opts])
 
-
+TABLE_VERSION = 0
+table = f'pysmurf_files_v{TABLE_VERSION}'
 columns = [
     Column("id", "INT", opts="NOT NULL AUTO_INCREMENT PRIMARY KEY"),
-    Column("path", "VARCHAR(260)", opts="UNIQUE NOT NULL"),
+    Column("path", "VARCHAR(260)", opts="NOT NULL"),
     Column("type", "VARCHAR(32)", opts="NOT NULL"),
     Column("timestamp", "TIMESTAMP"),
     Column("format", "VARCHAR(32)"),
@@ -41,7 +42,6 @@ def add_entry(cur, entry):
     """
     Adds entry to table.
     """
-
     if not set(col_dict.keys()).issuperset(entry.keys()):
         raise RuntimeError(
             "Invalid file entry provided... \n"
@@ -52,8 +52,8 @@ def add_entry(cur, entry):
     vals = [entry[k] for k in keys]
     fmts = [col_dict[k].fmt for k in keys]
 
-    query = "INSERT INTO pysmurf_files ({}) VALUES ({})"\
-            .format(", ".join(keys), ", ".join(fmts))
+    query = "INSERT INTO {} ({}) VALUES ({})"\
+            .format(table, ", ".join(keys), ", ".join(fmts))
 
     cur.execute(query, tuple(vals))
 
@@ -71,39 +71,18 @@ def create_table(cur, update=True):
 
     cur.execute("SHOW TABLES;")
     table_names = [x[0] for x in cur.fetchall()]
-
-    if 'pysmurf_files' not in table_names:
-        print("Creating pysmurf_files table...")
+    if f'{table}' not in table_names:
+        print(f"Creating {table} table...")
         col_strings = [str(c) for c in columns]
-        query = "CREATE TABLE pysmurf_files ({});".format(", ".join(col_strings))
+        query = "CREATE TABLE {} ({});".format(table, ", ".join(col_strings))
 
         try:
             cur.execute(query)
-            print("Created table pysmurf_files")
+            print(f"Created table {table}")
         except mysql.connector.errors.ProgrammingError as e:
             print(e)
-    elif update:
-        print("Found pysmurf_files table. Calling update_columns")
-        update_columns(cur)
     else:
-        print("Found pysmurf_files table and not updating")
-
-
-def update_columns(cur):
-    """
-    Makes sure columns of existing table are up to date, and adds any that are
-    missing.
-    """
-    cur.execute("DESCRIBE pysmurf_files");
-    existing_cols = set([c[0] for c in cur.fetchall()])
-
-    try:
-        for c in columns:
-            if c.name not in existing_cols:
-                cur.execute("ALTER TABLE pysmurf_files ADD {}".format(str(c)))
-                print("Added column {}".format(c.name))
-    except mysql.connector.errors.ProgrammingError as e:
-        print(e)
+        print(f"Found table {table} table and not updating")
 
 
 def drop_table(cur):
@@ -111,9 +90,9 @@ def drop_table(cur):
     Drops pysmurf_files.
     """
     try:
-        cur.execute("DROP TABLE pysmurf_files;")
+        cur.execute(f"DROP TABLE {table};")
         con.commit()
-        print("pysmurf_files dropped.")
+        print(f"{table} dropped.")
     except mysql.connector.errors.ProgrammingError as e:
         print(e)
 

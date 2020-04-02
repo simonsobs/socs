@@ -78,7 +78,7 @@ class PysmurfMonitor(DatagramProtocol):
 
     def _add_file_callback(self, res, d):
         """Callback for when a file is successfully added to DB"""
-        self.log.info("Added {} to pysmurf_files".format(d['path']))
+        self.log.info("Added {} to {}".format(d['path'], pysmurf_files_manager.table))
 
     def _add_file_errback(self, failure: Failure, d):
         """Errback for when there is an exception when adding file to DB"""

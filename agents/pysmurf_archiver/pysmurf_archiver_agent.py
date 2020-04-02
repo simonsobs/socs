@@ -6,6 +6,7 @@ import subprocess
 from socs.util import get_db_connection, get_md5sum
 import binascii
 import datetime
+from socs.db.pysmurf_files_manager import table as pysmurf_table_name
 
 from twisted.enterprise import adbapi
 
@@ -40,7 +41,6 @@ def create_local_path(file, data_dir):
             Local pathname for file
     """
 
-    print(file['path'])
     filename = os.path.basename(file['path'])
 
     dt = file['timestamp']
@@ -163,7 +163,7 @@ class PysmurfArchiverAgent:
 
         cmd.append(new_path)
 
-        self.log.info(f"Running: {' '.join(cmd)}")
+        self.log.debug(f"Running: {' '.join(cmd)}")
 
         try:
             subprocess.check_output(cmd)
@@ -175,7 +175,7 @@ class PysmurfArchiverAgent:
         new_md5 = get_md5sum(new_path)
         if new_md5 != md5sum:
             os.remove(new_path)
-            self.log.error("{} copy failed. md5sums do not match.")
+            self.log.error("{file} copy failed. md5sums do not match.", file=old_path)
             return False
 
         self.log.debug(f"Successfully copied {old_path} to {new_path}")
@@ -198,9 +198,9 @@ class PysmurfArchiverAgent:
                 cur = con.cursor(dictionary=True)
 
                 query = """
-                    SELECT * FROM pysmurf_files 
-                    WHERE copied=0 AND instance_id IN ({})
-                """.format(", ".join(["%s" for _ in self.targets]))
+                    SELECT * FROM {} 
+                    WHERE copied=0 AND failed_copy_attempts<5 AND instance_id IN ({})
+                """.format(pysmurf_table_name, ", ".join(["%s" for _ in self.targets]))
 
                 cur.execute(query, self.targets)
 
@@ -216,16 +216,16 @@ class PysmurfArchiverAgent:
                     if self._copy_file(f['path'], new_path, md5sum=md5sum):
                         # If file copied successfully
                         self.log.debug("Successfully coppied file {}".format(f['path']))
-                        query = """
-                            UPDATE pysmurf_files SET path=%s, copied=1 
+                        query = f"""
+                            UPDATE {pysmurf_table_name} SET path=%s, copied=1 
                             WHERE id=%s
                         """
                         cur.execute(query, (new_path, f['id']))
                     else:
                         self.log.debug("Failed to copy {}".format(f['path']))
 
-                        query = """
-                            UPDATE pysmurf_files 
+                        query = f"""
+                            UPDATE {pysmurf_table_name} 
                             SET failed_copy_attempts = failed_copy_attempts + 1
                             WHERE id=%s
                         """
@@ -233,7 +233,7 @@ class PysmurfArchiverAgent:
 
                 con.commit()
 
-            time.sleep(10)
+            time.sleep(5)
 
         return True, "Stopped archiving data."
 
