@@ -70,7 +70,7 @@ class Keithley2230GAgent:
                     data = {
                         'timestamp': time.time(),
                         'block_name': 'output',
-                        'data': {}
+                        'data': data
                     }
 
                     for chan in [1,2,3]:
@@ -80,6 +80,10 @@ class Keithley2230GAgent:
                     # self.log.info(str(data))
                     # print(data)
                     self.agent.publish_to_feed('psu_output', data)
+                    
+                    # Allow this process to be queried to return current data
+                    session.data = data
+                    
                 else:
                     self.log.warn("Could not acquire in monitor_current")
 
@@ -139,6 +143,7 @@ class Keithley2230GAgent:
                 return False, "Could not acquire lock"
 
         return True, 'Initialized PSU.'
+        
 
 if __name__ == '__main__':
     parser = site_config.add_arguments()
