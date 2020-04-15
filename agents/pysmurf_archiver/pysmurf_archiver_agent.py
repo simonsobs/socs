@@ -29,8 +29,9 @@ def create_local_path(file, data_dir):
             /data/pysmurf/15647/tuning/1564799250_tuning_b1.txt
 
         In the case of duplicate datafiles being registered, the duplicates
-        will still be copied over but put into a `duplicates` sub_directory
-        with a timestamp before the filename, so that data isn't overwritten.
+        will still be copied over to the location `new_path_name.{i}` where
+        `i` is the next unique index.
+
 
         Arguments
         ---------
@@ -55,17 +56,19 @@ def create_local_path(file, data_dir):
                 f"{file['type']}"
              )
     new_path = os.path.join(subdir, filename)
-    if os.path.exists(new_path):
-        print(f"Warning! Trying to archive duplicate of {new_path}. ")
-        subdir = os.path.join(subdir, 'duplicates')
-        new_path = os.path.join(subdir,
-                                f'{int(time.time())}_{filename}')
-        print(f"Saving duplicate file to {new_path}")
+    unique_path = new_path
+    i = 1
+    while os.path.exists(unique_path):
+        unique_path = new_path + f'.{i}'
+        i += 1
+    if unique_path != new_path:
+        print(f"Warning! Trying to archive duplicate of {new_path}! "
+              f"Will be archived as {unique_path} instead.")
 
     if not os.path.exists(subdir):
         os.makedirs(subdir)
 
-    return new_path
+    return unique_path
 
 
 class PysmurfArchiverAgent:
