@@ -82,7 +82,7 @@ def create_table(cur, update=True):
         except mysql.connector.errors.ProgrammingError as e:
             print(e)
     else:
-        print(f"Found table {table} table and not updating")
+        print(f"Found table {table} and not updating")
 
 
 def drop_table(cur):
