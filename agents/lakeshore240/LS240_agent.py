@@ -81,6 +81,7 @@ class LS240_Agent:
 
         return True, 'Lakeshore module initialized.'
 
+
     def set_values(self, session, params=None):
         """set_values(params=None)
 
@@ -144,7 +145,7 @@ class LS240_Agent:
         if params is None:
             params = {}
 
-        with self.lock.acquire_timeout(0, job='set_values') as acquired:
+        with self.lock.acquire_timeout(timeout=2, job='set_values') as acquired:
             if not acquired:
                 self.log.warn("Could not start set_values because "
                               "{} is already running".format(self.lock.job))
@@ -207,7 +208,7 @@ class LS240_Agent:
             f_sample = self.f_sample
 
         sleep_time = 1/f_sample - 0.01
-
+        last_release = time.time()
         with self.lock.acquire_timeout(0, job='acq') as acquired:
             if not acquired:
                 self.log.warn("Could not start acq because {} is already running"
@@ -219,6 +220,13 @@ class LS240_Agent:
             self.take_data = True
 
             while self.take_data:
+                if time.time() - last_release > 1.:
+                    last_release = time.time()
+                    if not self.lock.release_and_acquire(timeout=10.):
+                        self.log.warn(f"Failed to re-acquire sampling lock, "
+                                      f"currently held by {self.lock.job}.")
+                        continue
+
                 data = {
                     'timestamp': time.time(),
                     'block_name': 'temps',
