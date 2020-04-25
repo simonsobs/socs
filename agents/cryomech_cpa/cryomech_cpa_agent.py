@@ -80,20 +80,67 @@ class PTC:
         """
 
         # Associations between keys and their location in rawData
+        # Original data as transmitted is high byte first, low word first
+        # We rearrange to do high byte first, high word first which is "big endian"
         keyloc = {"Operating State": [9, 10],
-                  "Pump State": [11, 12],
-                  "Warnings": [15, 16, 13, 14],
-                  "Alarms": [19, 20, 17, 18],
-                  "Coolant In": [22, 21, 24, 23],
-                  "Coolant Out": [26, 25, 28, 27],
-                  "Oil": [30, 29, 32, 31],
-                  "Helium": [34, 33, 36, 35],
-                  "Low Pressure": [38, 37, 40, 39],
-                  "Low Pressure Average": [42, 41, 44, 43],
-                  "High Pressure": [46, 45, 48, 47],
-                  "High Pressure Average": [50, 49, 52, 51],
-                  "Delta Pressure": [54, 53, 56, 55],
-                  "Motor Current": [58, 57, 60, 59]}
+            "Pump State": [11, 12],
+            "Warnings": [15, 16, 13, 14],
+            "Alarms": [19, 20, 17, 18],
+            "Coolant In": [23, 24, 21, 22],
+            "Coolant Out": [27, 28, 25, 26],
+            "Oil": [31, 32, 29, 30],
+            "Helium": [35, 36, 33, 34],
+            "Low Pressure": [39, 40, 37, 38],
+            "Low Pressure Average": [43, 44, 41, 42],
+            "High Pressure": [47, 48, 45, 46],
+            "High Pressure Average": [51, 52, 49, 50],
+            "Delta Pressure Average": [55, 56, 53, 54],
+            "Motor Current": [59, 60, 57, 58],
+            "Hours of Opperation": [63, 64, 61, 62],
+            "Pressure Unit": [65, 66],
+            "Temperature Unit": [67, 68],
+            "Serial Number": [69, 70]}
+
+        statuscodes = dict()
+        statuscodes["Operating State"] = {
+            0: "Idling - ready to start",
+            2: "Starting",
+            3: "Running",
+            5: "Stopping",
+            6: "Error Lockout",
+            7: "Error",
+            8: "Helium Cool Down",
+            9: "Power Related Error",
+            15: "Recovered from Error",
+        }
+        statuscodes["Compressor State"] = {0: "Off", 1: "On"}
+        statuscodes["Warning State"] = {
+            -2147483648: "No warnings",
+            0: "No warnings",
+            -1: "Coolant In Temp High",
+            -2: "Coolant In Temp Low",
+            -4: "Cooling Out Temp High",
+            -8: "Cooling Out Temp Low",
+            -16: "Oil Temp High",
+            -32: "Oil Temp Low",
+            -64: "Helium Temp High",
+            -128: "Helium Temp Low",
+            -256: "Low Pressure Low",
+            -512: "Low Pressure High",
+            -1024: "High Pressure High",
+            -2048: "High Pressure Low",
+            -4096: "Delta Pressure High",
+            -8192: "Delta Pressure Low",
+            -16384: "Motor Current Low",
+            -32768: "Three Phase Error",
+            -65536: "Power Supply Error",
+            -131072: "Static Pressure High",
+            -262144: "Static Pressure Low",
+            -524288: "Cold Head Motor Stall",
+        }
+        statuscodes["Alarm State"] = statuscodes["Warning State"]
+        statuscodes["Pressure Unit"] = {0: "psi", 1: "bar", 2: "kPa"}
+        statuscodes["Temperature Unit"] = {0: "F", 1: "C", 2: "K"}
 
         # Iterate through all keys and return the data in a usable format.
         # If there is an error in the string format, print the
@@ -112,19 +159,29 @@ class PTC:
                 wkrBytes = bytes([rawdata[loc] for loc in locs])
 
                 # three different data formats to unpack
-                if key in ["Operating State", "Pump State"]:
-                    state = int.from_bytes(wkrBytes, byteorder='big')
-                    data[key] = state
-
-                if key in ["Warnings", "Alarms"]:
-                    data[key] = int(''.join('{:02x}'.format(x)
-                                            for x in wkrBytes), 16)
-
-                if key in ["Coolant In", "Coolant Out", "Oil", "Helium",
-                           "Low Pressure", "Low Pressure Average",
-                           "High Pressure", "High Pressure Average",
-                           "Delta Pressure", "Motor Current"]:
-                    data[key] = struct.unpack('f', wkrBytes)[0]
+                # Big endian unsigned integer 16 bits
+                if key in [
+                    "Operating State",
+                    "Pump State",
+                    "Pressure Unit",
+                    "Temperature Unit",
+                    "Serial Number",
+                ]:
+                    state = struct.unpack(">H", wkrBytes)[0]
+                    try:
+                        data[key] = statuscodes[key][state]
+                    except:
+                        data[key] = state
+                # Big endian signed integer 32 bits
+                elif key in ["Warnings", "Alarms"]:
+                    state = struct.unpack(">i", wkrBytes)[0]
+                    try:
+                        data[key] = statuscodes[key][state]
+                    except:
+                        data[key] = state
+                # Big endian IEEE floating point
+                else:
+                    data[key] = struct.unpack(">f", wkrBytes)[0]
 
             data_flag = False
 
