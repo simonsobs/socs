@@ -83,13 +83,13 @@ class PTC:
         # Original data as transmitted is high byte first, low word first
         # We rearrange to do high byte first, high word first which is "big endian"
         keyloc = {"Operating State": [9, 10],
-            "Pump State": [11, 12],
-            "Warnings": [15, 16, 13, 14],
-            "Alarms": [19, 20, 17, 18],
-            "Coolant In": [23, 24, 21, 22],
-            "Coolant Out": [27, 28, 25, 26],
-            "Oil": [31, 32, 29, 30],
-            "Helium": [35, 36, 33, 34],
+            "Compressor State": [11, 12],
+            "Warning State": [15, 16, 13, 14],
+            "Alarm State": [19, 20, 17, 18],
+            "Coolant In Temp": [23, 24, 21, 22],
+            "Coolant Out Temp": [27, 28, 25, 26],
+            "Oil Temp": [31, 32, 29, 30],
+            "Helium Temp": [35, 36, 33, 34],
             "Low Pressure": [39, 40, 37, 38],
             "Low Pressure Average": [43, 44, 41, 42],
             "High Pressure": [47, 48, 45, 46],
@@ -162,7 +162,7 @@ class PTC:
                 # Big endian unsigned integer 16 bits
                 if key in [
                     "Operating State",
-                    "Pump State",
+                    "Compressor State",
                     "Pressure Unit",
                     "Temperature Unit",
                     "Serial Number",
@@ -173,7 +173,7 @@ class PTC:
                     except:
                         data[key] = state
                 # Big endian signed integer 32 bits
-                elif key in ["Warnings", "Alarms"]:
+                elif key in ["Warning State", "Alarm State"]:
                     state = struct.unpack(">i", wkrBytes)[0]
                     try:
                         data[key] = statuscodes[key][state]
