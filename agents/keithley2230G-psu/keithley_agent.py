@@ -70,7 +70,7 @@ class Keithley2230GAgent:
                     data = {
                         'timestamp': time.time(),
                         'block_name': 'output',
-                        'data': data
+                        'data': {}
                     }
 
                     for chan in [1,2,3]:
