@@ -179,7 +179,6 @@ class LabJackAgent:
                 self.agent.publish_to_feed('Sensors', data)
                 
                 # Allow this process to be queried to return current data
-                print("Added session data")
                 session.data = data
 
             self.agent.feeds['Sensors'].flush_buffer()

@@ -67,7 +67,7 @@ Example Client
 --------------
 Since labjack functionality is currently limited to acquiring data, which can 
 enabled on startup, users are likely to rarely need a client. This example
-shows the basic acqusition funcionality::
+shows the basic acquisition funcionality::
 
     #Initialize the labjack
     from ocs import matched_client
