@@ -32,10 +32,19 @@ available arguments::
          'arguments':[
            ['--ip-address', '10.10.10.150'],
            ['--num-channels', '13'],
+           ['--functions', '{
+           "Channel 1": ["1.3332*10**(2*v - 11)", "mBar"],
+           "Channel 2": ["2*10**(v - 5)", "mBar"]
+           }'], 
            ['--mode', 'acq'],
            ]},
 
-You should assign your LabJack a static IP, you'll need to know that here.
+You should assign your LabJack a static IP, you'll need to know that here. 
+The 'functions' argument is a dictionary that specifies functions and units
+to apply to the output voltages of certain channels. In this example 
+channels 1 and 2 will record pressure data by applying functions to the 
+voltage output 'v' of their respective channels. This data is published to 
+the feed in the same manner as the voltages. 
 
 Docker
 ``````
@@ -53,6 +62,32 @@ example docker-compose service configuration is shown here::
 
 Since the agent within the container needs to communicate with hardware on the
 host network you must use ``network_mode: "host"`` in your compose file.
+
+Example Client
+--------------
+Since labjack functionality is currently limited to acquiring data, which can 
+enabled on startup, users are likely to rarely need a client. This example
+shows the basic acqusition funcionality::
+
+    #Initialize the labjack
+    from ocs import matched_client
+    lj = matched_client.MatchedClient('labjack', args=[])
+    lj.init_labjack.start()
+    lj.init_labjack.wait()
+
+    #Start data acquisiton
+    status, msg, session = lj.acq.start()
+    print(session)
+
+    #Get the current data values 1 second after starting acquistion
+    time.sleep(1)
+    status, message, session = lj.acq.status()
+    print(session["data"])
+
+    #Stop acqusition
+    lj.acq.stop()
+    lj.acq.wait()
+
 
 Agent API
 ---------

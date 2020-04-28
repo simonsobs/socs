@@ -3,6 +3,8 @@ import time
 import struct
 import os
 from pymodbus.client.sync import ModbusTcpClient
+import numexpr
+import json 
 
 ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 if not ON_RTD:
@@ -74,7 +76,7 @@ def data_to_float32(data):
 
 # LabJack agent class
 class LabJackAgent:
-    def __init__(self, agent, ip_address, num_channels):
+    def __init__(self, agent, ip_address, num_channels, functions={}):
         self.active = True
         self.agent = agent
         self.log = agent.log
@@ -82,6 +84,7 @@ class LabJackAgent:
         self.ip_address = ip_address
         self.module = None
         self.sensors = ['Channel {}'.format(i+1) for i in range(num_channels)]
+        self.functions = functions
 
         self.initialized = False
         self.take_data = False
@@ -100,7 +103,7 @@ class LabJackAgent:
         """
         task to initialize labjack module
         """
-
+        
         if self.initialized:
             return True, "Already initialized module"
 
@@ -119,6 +122,11 @@ class LabJackAgent:
         session.add_message("Labjack initialized")
 
         self.initialized = True
+        
+        # Start data acquisition if requested in site-config
+        auto_acquire = params.get('auto_acquire', False)
+        if auto_acquire:
+            self.agent.start('acq')
 
         return True, 'LabJack module initialized.'
 
@@ -135,8 +143,8 @@ class LabJackAgent:
             params = {}
 
         f_sample = params.get('sampling_frequency', 2.5)
-        sleep_time = 1/f_sample - 0.01
-
+        sleep_time = 1/f_sample - 0.01            
+        
         with self.lock.acquire_timeout(0, job='acq') as acquired:
             if not acquired:
                 self.log.warn("Could not start acq because "
@@ -157,10 +165,22 @@ class LabJackAgent:
                 for i, sens in enumerate(self.sensors):
                     rr = self.module.read_input_registers(2*i, 2)
                     data['data'][sens + 'V'] = data_to_float32(rr.registers)
+                    
+                    #Apply conversion function if it exists
+                    if sens in self.functions.keys():
+                        v = data['data'][sens + 'V']
+                        conversion = self.functions[sens][0]
+                        units = self.functions[sens][1]
+                        data['data'][sens + ' ' + units] = \
+                        float(numexpr.evaluate(conversion))   
 
                 time.sleep(sleep_time)
 
                 self.agent.publish_to_feed('Sensors', data)
+                
+                # Allow this process to be queried to return current data
+                print("Added session data")
+                session.data = data
 
             self.agent.feeds['Sensors'].flush_buffer()
 
@@ -196,17 +216,25 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     site_config.reparse_args(args, 'LabJackAgent')
+    
+    init_params = False
+    if args.mode == 'acq':
+        init_params = {'auto_acquire': True}    
 
     ip_address = str(args.ip_address)
     num_channels = int(args.num_channels)
+    functions = json.loads(args.functions)
 
     agent, runner = ocs_agent.init_site_agent(args)
 
     sensors = LabJackAgent(agent,
                            ip_address=ip_address,
-                           num_channels=num_channels)
+                           num_channels=num_channels,
+                          functions=functions)
 
-    agent.register_task('init_labjack', sensors.init_labjack_task)
+    agent.register_task('init_labjack', 
+                        sensors.init_labjack_task, 
+                        startup=init_params)
     agent.register_process('acq', sensors.start_acq, sensors.stop_acq)
 
     runner.run(agent, auto_reconnect=True)
