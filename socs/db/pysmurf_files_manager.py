@@ -16,12 +16,12 @@ class Column:
     def __str__(self):
         return " ".join([self.name, self.type, self.opts])
 
-TABLE_VERSION = 0
+TABLE_VERSION = 1
 table = f'pysmurf_files_v{TABLE_VERSION}'
 columns = [
     Column("id", "INT", opts="NOT NULL AUTO_INCREMENT PRIMARY KEY"),
     Column("path", "VARCHAR(260)", opts="NOT NULL"),
-    Column("type", "VARCHAR(32)", opts="NOT NULL"),
+    Column("action", "VARCHAR(32)"),
     Column("timestamp", "TIMESTAMP"),
     Column("action_timestamp", "INT"),
     Column("format", "VARCHAR(32)"),
