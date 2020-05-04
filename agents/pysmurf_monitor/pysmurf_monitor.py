@@ -111,7 +111,7 @@ class PysmurfMonitor(DatagramProtocol):
 
             entry = {
                 'path':                 path,
-                'type':                 d['action'],
+                'action':               d['action'],
                 'timestamp':            datetime.datetime.utcfromtimestamp(d['timestamp']),
                 'action_timestamp':     d.get('action_ts'),
                 'format':               d['format'],

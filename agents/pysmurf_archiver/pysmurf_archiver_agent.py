@@ -50,7 +50,7 @@ def create_local_path(file, data_dir):
 
     dt = file['timestamp']
 
-    action = file['type']
+    action = file['action']
 
     # First tries to get action timestamp entry
     action_ts = file['action_timestamp']
@@ -239,7 +239,6 @@ class PysmurfArchiverAgent:
                     self.log.debug(f"Found {len(files)} uncopied files.")
 
                 for f in files:
-
                     new_path = create_local_path(f, self.data_dir)
 
                     md5sum = binascii.hexlify(f['md5sum']).decode()
