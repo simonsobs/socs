@@ -24,6 +24,10 @@ if not on_rtd:
     from ocs import ocs_agent, site_config
 
 
+#class SNMPTwister:
+
+
+
 class MeinbergM1000Agent:
     """Monitor the Meinberg LANTIME M1000 timing system via SNMP.
 
@@ -63,8 +67,11 @@ class MeinbergM1000Agent:
                                  record=True,
                                  buffer_time=1)
 
-    def run_thing(self, hostname):
-        # twisted
+
+        self.udp_transport = UdpTransportTarget((address, port))
+        self.snmp_engine = SnmpEngine()
+
+    def try2(self, hostname):
         def success(args, hostname):
             (errorStatus, errorIndex, varBinds) = args
         
@@ -78,39 +85,6 @@ class MeinbergM1000Agent:
 
             return varBinds
         
-        def failure(errorIndication, hostname):
-            print('%s failure: %s' % (hostname, errorIndication))
-        
-        
-        # noinspection PyUnusedLocal
-        def getSysDescr(hostname):
-            d = getCmd(SnmpEngine(),
-                       CommunityData('public', mpModel=0),
-                       UdpTransportTarget((hostname, 161)),
-                       ContextData(),
-                       ObjectType(ObjectIdentity('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockState', 1)))
-        
-            d.addCallback(success, hostname).addErrback(failure, hostname)
-        
-            return d
-
-        print(type(getSysDescr(hostname)))
-
-        return getSysDescr(hostname)
-
-
-    def try2(self, hostname):
-        def success(args, hostname):
-            (errorStatus, errorIndex, varBinds) = args
-        
-            if errorStatus:
-                print('%s: %s at %s' % (hostname,
-                                        errorStatus.prettyPrint(),
-                                        errorIndex and varBinds[int(errorIndex) - 1][0] or '?'))
-            else:
-                for varBind in varBinds:
-                    print(' = '.join([x.prettyPrint() for x in varBind]))
-        
         
         def failure(errorIndication, hostname):
             print('%s failure: %s' % (hostname, errorIndication))
@@ -118,9 +92,9 @@ class MeinbergM1000Agent:
         
         # noinspection PyUnusedLocal
         #def getSysDescr(hostname):
-        d = getCmd(SnmpEngine(),
-                   CommunityData('public', mpModel=0),
-                   UdpTransportTarget((hostname, 161)),
+        d = getCmd(self.snmp_engine,
+                   CommunityData('public', mpModel=0),  # SNMPv1
+                   self.udp_transport,
                    ContextData(),
                    ObjectType(ObjectIdentity('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockState', 1)))
         
@@ -144,7 +118,7 @@ class MeinbergM1000Agent:
 
         while self.is_streaming:
             result = yield self.try2('10.10.10.186')
-            #result = yield self.run_thing('10.10.10.186')
+            print(int(result[0][1]))
 
             #message = {
             #    'block_name': 'm1000',
@@ -157,38 +131,6 @@ class MeinbergM1000Agent:
             #session.app.publish_to_feed('m1000', message)
 
             yield dsleep(10)
-
-        # synchronous
-        # while self.is_streaming:
-        #     errorIndication, errorStatus, errorIndex, varBinds = next(
-        #         getCmd(SnmpEngine(),
-        #                CommunityData('public', mpModel=0),
-        #                UdpTransportTarget((self.address, self.port)),
-        #                ContextData(),
-        #                ObjectType(ObjectIdentity('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockState', 1)))
-        #     )
-
-        #     if errorIndication:
-        #         print(errorIndication)
-        #     elif errorStatus:
-        #         print('%s at %s' % (errorStatus.prettyPrint(),
-        #                             errorIndex and varBinds[int(errorIndex) - 1][0] or '?'))
-        #     else:
-        #         for varBind in varBinds:
-        #             print(' = '.join([x.prettyPrint() for x in varBind]))
-
-
-        #     message = {
-        #         'block_name': 'm1000',
-        #         'timestamp': time.time(),
-        #         'data': {
-        #             'mbgLtNgRefclockState': int(varBind[1])
-        #         }
-        #     }
-
-        #     session.app.publish_to_feed('m1000', message)
-
-        #     time.sleep(10)
 
         #self.log.info("Data directory set to {}".format(self.data_dir))
         #self.log.info("New file every {} seconds".format(self.time_per_file))
