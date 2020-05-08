@@ -24,7 +24,78 @@ if not on_rtd:
     from ocs import ocs_agent, site_config
 
 
-#class SNMPTwister:
+class SNMPTwister:
+    """Helper class for handling SNMP communication with twisted.
+
+    More information can be found in the pySNMP documentation. The
+    `SNMP Operations`_ page is particularly helpful for understanding the setup
+    of this object.
+
+    Note: This helper currently only supports SNMPv1.
+
+    Parameters
+    ----------
+    address : str
+        Address of the SNMP Agent to send GET/SET requests to
+    oid_list : list
+        List of high-level MIB Object OIDs. See `Specifying MIB Objects`_ for
+        more info
+    port : int
+        Associated port for SNMP communication. Default is 161
+
+    Attributes
+    ----------
+    snmp_engine : pysnmp.entity.engine.SnmpEngine
+        PySNMP engine
+    udp_transport : pysnmp.hlapi.twisted.transport.UdpTransportTarget
+        UDP transport for UDP over IPv4
+    oid_list : list
+        List of high-level MIB Object OIDs. See `Specifying MIB Objects`_ for
+        more info
+
+    .. _SNMP Operations:
+        http://snmplabs.com/pysnmp/docs/pysnmp-hlapi-tutorial.html
+    .. _Specifying MIB Objects:
+        http://snmplabs.com/pysnmp/docs/pysnmp-hlapi-tutorial.html#specifying-mib-object
+
+    """
+
+    def __init__(self, address, oid_list, port=161):
+        self.snmp_engine = SnmpEngine()
+        self.udp_transport = UdpTransportTarget((address, port))
+        self.oid_list = oid_list
+
+    def try2(self, hostname):
+        def success(args, hostname):
+            (errorStatus, errorIndex, varBinds) = args
+        
+            if errorStatus:
+                print('%s: %s at %s' % (hostname,
+                                        errorStatus.prettyPrint(),
+                                        errorIndex and varBinds[int(errorIndex) - 1][0] or '?'))
+            else:
+                for varBind in varBinds:
+                    print(' = '.join([x.prettyPrint() for x in varBind]))
+
+            return varBinds
+        
+        
+        def failure(errorIndication, hostname):
+            print('%s failure: %s' % (hostname, errorIndication))
+        
+        
+        # noinspection PyUnusedLocal
+        #def getSysDescr(hostname):
+        d = getCmd(self.snmp_engine,
+                   CommunityData('public', mpModel=0),  # SNMPv1
+                   self.udp_transport,
+                   ContextData(),
+                   *self.oid_list)
+        
+        d.addCallback(success, hostname).addErrback(failure, hostname)
+        
+        return d
+
 
 
 
@@ -67,40 +138,10 @@ class MeinbergM1000Agent:
                                  record=True,
                                  buffer_time=1)
 
+        self.mibs = [ObjectType(ObjectIdentity('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockState', 1)),
+                     ObjectType(ObjectIdentity('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockLeapSecondDate', 1))]
 
-        self.udp_transport = UdpTransportTarget((address, port))
-        self.snmp_engine = SnmpEngine()
-
-    def try2(self, hostname):
-        def success(args, hostname):
-            (errorStatus, errorIndex, varBinds) = args
-        
-            if errorStatus:
-                print('%s: %s at %s' % (hostname,
-                                        errorStatus.prettyPrint(),
-                                        errorIndex and varBinds[int(errorIndex) - 1][0] or '?'))
-            else:
-                for varBind in varBinds:
-                    print(' = '.join([x.prettyPrint() for x in varBind]))
-
-            return varBinds
-        
-        
-        def failure(errorIndication, hostname):
-            print('%s failure: %s' % (hostname, errorIndication))
-        
-        
-        # noinspection PyUnusedLocal
-        #def getSysDescr(hostname):
-        d = getCmd(self.snmp_engine,
-                   CommunityData('public', mpModel=0),  # SNMPv1
-                   self.udp_transport,
-                   ContextData(),
-                   ObjectType(ObjectIdentity('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockState', 1)))
-        
-        d.addCallback(success, hostname).addErrback(failure, hostname)
-        
-        return d
+        self.snmp = SNMPTwister(address, self.mibs, port)
 
     @inlineCallbacks
     def start_record(self, session, params=None):
@@ -117,7 +158,7 @@ class MeinbergM1000Agent:
         self.is_streaming = True
 
         while self.is_streaming:
-            result = yield self.try2('10.10.10.186')
+            result = yield self.snmp.try2('10.10.10.186')
             print(int(result[0][1]))
 
             #message = {
