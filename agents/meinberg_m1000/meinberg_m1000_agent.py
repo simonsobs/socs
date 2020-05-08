@@ -5,8 +5,15 @@ import time
 import argparse
 import txaio
 
-from pysnmp.hlapi import getCmd, SnmpEngine, CommunityData, UdpTransportTarget,\
-                         ContextData, ObjectType, ObjectIdentity
+from autobahn.twisted.util import sleep as dsleep
+from twisted.internet.defer import inlineCallbacks, Deferred
+from pysnmp.hlapi.twisted import getCmd, SnmpEngine, CommunityData, UdpTransportTarget,\
+                                 ContextData, ObjectType, ObjectIdentity
+
+# synchronus
+#from pysnmp.hlapi import getCmd, SnmpEngine, CommunityData, UdpTransportTarget,\
+#                         ContextData, ObjectType, ObjectIdentity
+
 #from socs.agent.smurf_recorder import FrameRecorder
 
 # For logging
@@ -56,6 +63,72 @@ class MeinbergM1000Agent:
                                  record=True,
                                  buffer_time=1)
 
+    def run_thing(self, hostname):
+        # twisted
+        def success(args, hostname):
+            (errorStatus, errorIndex, varBinds) = args
+        
+            if errorStatus:
+                print('%s: %s at %s' % (hostname,
+                                        errorStatus.prettyPrint(),
+                                        errorIndex and varBinds[int(errorIndex) - 1][0] or '?'))
+            else:
+                for varBind in varBinds:
+                    print(' = '.join([x.prettyPrint() for x in varBind]))
+
+            return varBinds
+        
+        def failure(errorIndication, hostname):
+            print('%s failure: %s' % (hostname, errorIndication))
+        
+        
+        # noinspection PyUnusedLocal
+        def getSysDescr(hostname):
+            d = getCmd(SnmpEngine(),
+                       CommunityData('public', mpModel=0),
+                       UdpTransportTarget((hostname, 161)),
+                       ContextData(),
+                       ObjectType(ObjectIdentity('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockState', 1)))
+        
+            d.addCallback(success, hostname).addErrback(failure, hostname)
+        
+            return d
+
+        print(type(getSysDescr(hostname)))
+
+        return getSysDescr(hostname)
+
+
+    def try2(self, hostname):
+        def success(args, hostname):
+            (errorStatus, errorIndex, varBinds) = args
+        
+            if errorStatus:
+                print('%s: %s at %s' % (hostname,
+                                        errorStatus.prettyPrint(),
+                                        errorIndex and varBinds[int(errorIndex) - 1][0] or '?'))
+            else:
+                for varBind in varBinds:
+                    print(' = '.join([x.prettyPrint() for x in varBind]))
+        
+        
+        def failure(errorIndication, hostname):
+            print('%s failure: %s' % (hostname, errorIndication))
+        
+        
+        # noinspection PyUnusedLocal
+        #def getSysDescr(hostname):
+        d = getCmd(SnmpEngine(),
+                   CommunityData('public', mpModel=0),
+                   UdpTransportTarget((hostname, 161)),
+                   ContextData(),
+                   ObjectType(ObjectIdentity('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockState', 1)))
+        
+        d.addCallback(success, hostname).addErrback(failure, hostname)
+        
+        return d
+
+    @inlineCallbacks
     def start_record(self, session, params=None):
         """start_record(params=None)
 
@@ -70,35 +143,52 @@ class MeinbergM1000Agent:
         self.is_streaming = True
 
         while self.is_streaming:
-            errorIndication, errorStatus, errorIndex, varBinds = next(
-                getCmd(SnmpEngine(),
-                       CommunityData('public', mpModel=0),
-                       UdpTransportTarget((self.address, self.port)),
-                       ContextData(),
-                       ObjectType(ObjectIdentity('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockState', 1)))
-            )
+            result = yield self.try2('10.10.10.186')
+            #result = yield self.run_thing('10.10.10.186')
 
-            if errorIndication:
-                print(errorIndication)
-            elif errorStatus:
-                print('%s at %s' % (errorStatus.prettyPrint(),
-                                    errorIndex and varBinds[int(errorIndex) - 1][0] or '?'))
-            else:
-                for varBind in varBinds:
-                    print(' = '.join([x.prettyPrint() for x in varBind]))
+            #message = {
+            #    'block_name': 'm1000',
+            #    'timestamp': time.time(),
+            #    'data': {
+            #        'mbgLtNgRefclockState': int(result[1])
+            #    }
+            #}
+
+            #session.app.publish_to_feed('m1000', message)
+
+            yield dsleep(10)
+
+        # synchronous
+        # while self.is_streaming:
+        #     errorIndication, errorStatus, errorIndex, varBinds = next(
+        #         getCmd(SnmpEngine(),
+        #                CommunityData('public', mpModel=0),
+        #                UdpTransportTarget((self.address, self.port)),
+        #                ContextData(),
+        #                ObjectType(ObjectIdentity('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockState', 1)))
+        #     )
+
+        #     if errorIndication:
+        #         print(errorIndication)
+        #     elif errorStatus:
+        #         print('%s at %s' % (errorStatus.prettyPrint(),
+        #                             errorIndex and varBinds[int(errorIndex) - 1][0] or '?'))
+        #     else:
+        #         for varBind in varBinds:
+        #             print(' = '.join([x.prettyPrint() for x in varBind]))
 
 
-            message = {
-                'block_name': 'm1000',
-                'timestamp': time.time(),
-                'data': {
-                    'mbgLtNgRefclockState': int(varBind[1])
-                }
-            }
+        #     message = {
+        #         'block_name': 'm1000',
+        #         'timestamp': time.time(),
+        #         'data': {
+        #             'mbgLtNgRefclockState': int(varBind[1])
+        #         }
+        #     }
 
-            session.app.publish_to_feed('m1000', message)
+        #     session.app.publish_to_feed('m1000', message)
 
-            time.sleep(10)
+        #     time.sleep(10)
 
         #self.log.info("Data directory set to {}".format(self.data_dir))
         #self.log.info("New file every {} seconds".format(self.time_per_file))
@@ -163,6 +253,6 @@ if __name__ == "__main__":
     agent.register_process("record",
                            listener.start_record,
                            listener.stop_record,
-                           startup=bool(args.auto_start))
+                           startup=bool(args.auto_start), blocking=False)
 
     runner.run(agent, auto_reconnect=True)
