@@ -42,7 +42,6 @@ class SNMPTwister:
         more info
     port : int
         Associated port for SNMP communication. Default is 161
-
     Attributes
     ----------
     snmp_engine : pysnmp.entity.engine.SnmpEngine
@@ -52,6 +51,8 @@ class SNMPTwister:
     oid_list : list
         List of high-level MIB Object OIDs. See `Specifying MIB Objects`_ for
         more info
+    log : txaio.tx.Logger
+        txaio logger object
 
     .. _SNMP Operations:
         http://snmplabs.com/pysnmp/docs/pysnmp-hlapi-tutorial.html
@@ -65,25 +66,25 @@ class SNMPTwister:
         self.udp_transport = UdpTransportTarget((address, port))
         self.oid_list = oid_list
 
-    def try2(self, hostname):
-        def success(args, hostname):
-            (errorStatus, errorIndex, varBinds) = args
-        
-            if errorStatus:
-                print('%s: %s at %s' % (hostname,
-                                        errorStatus.prettyPrint(),
-                                        errorIndex and varBinds[int(errorIndex) - 1][0] or '?'))
-            else:
-                for varBind in varBinds:
-                    print(' = '.join([x.prettyPrint() for x in varBind]))
+        self.log = txaio.make_logger()
 
-            return varBinds
-        
-        
-        def failure(errorIndication, hostname):
-            print('%s failure: %s' % (hostname, errorIndication))
-        
-        
+    def _success(self, args, hostname):
+        (errorStatus, errorIndex, varBinds) = args
+
+        if errorStatus:
+            self.log.error('%s: %s at %s' % (hostname,
+                                             errorStatus.prettyPrint(),
+                                             errorIndex and varBinds[int(errorIndex) - 1][0] or '?'))
+        else:
+            for varBind in varBinds:
+                self.log.debug(' = '.join([x.prettyPrint() for x in varBind]))
+
+        return varBinds
+
+    def _failure(self, errorIndication, hostname):
+        self.log.error('%s failure: %s' % (hostname, errorIndication))
+
+    def try2(self, hostname):
         # noinspection PyUnusedLocal
         #def getSysDescr(hostname):
         d = getCmd(self.snmp_engine,
@@ -91,9 +92,9 @@ class SNMPTwister:
                    self.udp_transport,
                    ContextData(),
                    *self.oid_list)
-        
-        d.addCallback(success, hostname).addErrback(failure, hostname)
-        
+
+        d.addCallback(self._success, hostname).addErrback(self._failure, hostname)
+
         return d
 
 
