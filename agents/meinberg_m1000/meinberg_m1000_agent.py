@@ -37,42 +37,48 @@ class SNMPTwister:
     ----------
     address : str
         Address of the SNMP Agent to send GET/SET requests to
-    oid_list : list
-        List of high-level MIB Object OIDs. See `Specifying MIB Objects`_ for
-        more info
     port : int
         Associated port for SNMP communication. Default is 161
+
     Attributes
     ----------
     snmp_engine : pysnmp.entity.engine.SnmpEngine
         PySNMP engine
+    address : str
+        Address of the SNMP Agent to send GET/SET requests to
     udp_transport : pysnmp.hlapi.twisted.transport.UdpTransportTarget
         UDP transport for UDP over IPv4
-    oid_list : list
-        List of high-level MIB Object OIDs. See `Specifying MIB Objects`_ for
-        more info
     log : txaio.tx.Logger
         txaio logger object
 
     .. _SNMP Operations:
         http://snmplabs.com/pysnmp/docs/pysnmp-hlapi-tutorial.html
-    .. _Specifying MIB Objects:
-        http://snmplabs.com/pysnmp/docs/pysnmp-hlapi-tutorial.html#specifying-mib-object
 
     """
 
-    def __init__(self, address, oid_list, port=161):
+    def __init__(self, address, port=161):
         self.snmp_engine = SnmpEngine()
+        self.address = address
         self.udp_transport = UdpTransportTarget((address, port))
-        self.oid_list = oid_list
-
         self.log = txaio.make_logger()
 
-    def _success(self, args, hostname):
+    def _success(self, args):
+        """Success callback for getCmd.
+
+        Taken from Twisted example for SNMPv1 from pySNMP documentation:
+        http://snmplabs.com/pysnmp/examples/hlapi/twisted/contents.html
+
+        Returns
+        -------
+        list
+            A sequence of ObjectType class instances representing MIB variables
+            returned in SNMP response.
+
+        """
         (errorStatus, errorIndex, varBinds) = args
 
         if errorStatus:
-            self.log.error('%s: %s at %s' % (hostname,
+            self.log.error('%s: %s at %s' % (self.address,
                                              errorStatus.prettyPrint(),
                                              errorIndex and varBinds[int(errorIndex) - 1][0] or '?'))
         else:
@@ -81,23 +87,37 @@ class SNMPTwister:
 
         return varBinds
 
-    def _failure(self, errorIndication, hostname):
-        self.log.error('%s failure: %s' % (hostname, errorIndication))
+    def _failure(self, errorIndication):
+        """Failure Errback for getCmd.
 
-    def try2(self, hostname):
-        # noinspection PyUnusedLocal
-        #def getSysDescr(hostname):
+        Taken from Twisted example for SNMPv1 from pySNMP documentation:
+        http://snmplabs.com/pysnmp/examples/hlapi/twisted/contents.html
+
+        """
+        self.log.error('%s failure: %s' % (self.address, errorIndication))
+
+    def get(self, oid_list):
+        """Issue a getCmd to get SNMP OID states.
+
+        Parameters
+        ----------
+        oid_list : list
+            List of high-level MIB Object OIDs. See `Specifying MIB Objects`_ for
+            more info
+
+        .. _Specifying MIB Objects:
+            http://snmplabs.com/pysnmp/docs/pysnmp-hlapi-tutorial.html#specifying-mib-object
+
+        """
         d = getCmd(self.snmp_engine,
                    CommunityData('public', mpModel=0),  # SNMPv1
                    self.udp_transport,
                    ContextData(),
-                   *self.oid_list)
+                   *oid_list)
 
-        d.addCallback(self._success, hostname).addErrback(self._failure, hostname)
+        d.addCallback(self._success).addErrback(self._failure)
 
         return d
-
-
 
 
 class MeinbergM1000Agent:
@@ -142,7 +162,15 @@ class MeinbergM1000Agent:
         self.mibs = [ObjectType(ObjectIdentity('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockState', 1)),
                      ObjectType(ObjectIdentity('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockLeapSecondDate', 1))]
 
-        self.snmp = SNMPTwister(address, self.mibs, port)
+        self.snmp = SNMPTwister(address, port)
+
+        self.mib_timings = [{"oid": ('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockState', 1), "interval": 60, "lastRead": None},
+                            {"oid": ('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockLeapSecondDate', 1), "interval": 60*60, "lastRead": None},
+                            {"oid": ('MBG-SNMP-LTNG-MIB', 'mbgLtNgNtpCurrentState', 0), "interval": 64, "lastRead": None},
+                            {"oid": ('MBG-SNMP-LTNG-MIB', 'mbgLtNgSysPsStatus', 1), "interval": 60, "lastRead": None},
+                            {"oid": ('MBG-SNMP-LTNG-MIB', 'mbgLtNgSysPsStatus', 2), "interval": 60, "lastRead": None},
+                            {"oid": ('MBG-SNMP-LTNG-MIB', 'mbgLtNgEthPortLinkState', 1), "interval": 60, "lastRead": None},
+                            {"oid": ('MBG-SNMP-LTNG-MIB', 'mbgLtNgPtpPortState', 1), "interval": 3, "lastRead": None}]
 
     @inlineCallbacks
     def start_record(self, session, params=None):
@@ -159,8 +187,25 @@ class MeinbergM1000Agent:
         self.is_streaming = True
 
         while self.is_streaming:
-            result = yield self.snmp.try2('10.10.10.186')
-            print(int(result[0][1]))
+            read_list = []
+            for mib in self.mib_timings:
+                if mib["lastRead"] is None:
+                    read_list.append(mib["oid"])
+                elif time.time() - mib["lastRead"] > mib["interval"]:
+                    read_list.append(mib["oid"])
+
+            mib_objects = []
+            for oid in read_list:
+                mib_objects.append(ObjectType(ObjectIdentity(*oid)))
+
+            result = yield self.snmp.get(mib_objects)
+            read_time = time.time()
+            for thing in result:
+                print(thing[0].prettyPrint(), thing[1])
+
+            for mib in self.mib_timings:
+                if mib['oid'] in read_list:
+                    mib['lastRead'] = read_time
 
             #message = {
             #    'block_name': 'm1000',
@@ -172,7 +217,7 @@ class MeinbergM1000Agent:
 
             #session.app.publish_to_feed('m1000', message)
 
-            yield dsleep(10)
+            yield dsleep(1)
 
         #self.log.info("Data directory set to {}".format(self.data_dir))
         #self.log.info("New file every {} seconds".format(self.time_per_file))
