@@ -6,15 +6,10 @@ import argparse
 import txaio
 
 from autobahn.twisted.util import sleep as dsleep
-from twisted.internet.defer import inlineCallbacks, Deferred
-from pysnmp.hlapi.twisted import getCmd, SnmpEngine, CommunityData, UdpTransportTarget,\
-                                 ContextData, ObjectType, ObjectIdentity
+from twisted.internet.defer import inlineCallbacks
+from pysnmp.hlapi.twisted import ObjectType, ObjectIdentity
 
-# synchronus
-#from pysnmp.hlapi import getCmd, SnmpEngine, CommunityData, UdpTransportTarget,\
-#                         ContextData, ObjectType, ObjectIdentity
-
-#from socs.agent.smurf_recorder import FrameRecorder
+from socs.snmp import SNMPTwister
 
 # For logging
 txaio.use_twisted()
@@ -22,108 +17,6 @@ txaio.use_twisted()
 on_rtd = os.environ.get('READTHEDOCS') == 'True'
 if not on_rtd:
     from ocs import ocs_agent, site_config
-
-
-class SNMPTwister:
-    """Helper class for handling SNMP communication with twisted.
-
-    More information can be found in the pySNMP documentation. The
-    `SNMP Operations`_ page is particularly helpful for understanding the setup
-    of this object.
-
-    Note: This helper currently only supports SNMPv1.
-
-    Parameters
-    ----------
-    address : str
-        Address of the SNMP Agent to send GET/SET requests to
-    port : int
-        Associated port for SNMP communication. Default is 161
-
-    Attributes
-    ----------
-    snmp_engine : pysnmp.entity.engine.SnmpEngine
-        PySNMP engine
-    address : str
-        Address of the SNMP Agent to send GET/SET requests to
-    udp_transport : pysnmp.hlapi.twisted.transport.UdpTransportTarget
-        UDP transport for UDP over IPv4
-    log : txaio.tx.Logger
-        txaio logger object
-
-    .. _SNMP Operations:
-        http://snmplabs.com/pysnmp/docs/pysnmp-hlapi-tutorial.html
-
-    """
-
-    def __init__(self, address, port=161):
-        self.snmp_engine = SnmpEngine()
-        self.address = address
-        self.udp_transport = UdpTransportTarget((address, port))
-        self.log = txaio.make_logger()
-
-    def _success(self, args):
-        """Success callback for getCmd.
-
-        Taken from Twisted example for SNMPv1 from pySNMP documentation:
-        http://snmplabs.com/pysnmp/examples/hlapi/twisted/contents.html
-
-        Returns
-        -------
-        list
-            A sequence of ObjectType class instances representing MIB variables
-            returned in SNMP response.
-
-        """
-        (errorStatus, errorIndex, varBinds) = args
-
-        if errorStatus:
-            self.log.error('%s: %s at %s' % (self.address,
-                                             errorStatus.prettyPrint(),
-                                             errorIndex and varBinds[int(errorIndex) - 1][0] or '?'))
-        else:
-            for varBind in varBinds:
-                self.log.debug(' = '.join([x.prettyPrint() for x in varBind]))
-
-        return varBinds
-
-    def _failure(self, errorIndication):
-        """Failure Errback for getCmd.
-
-        Taken from Twisted example for SNMPv1 from pySNMP documentation:
-        http://snmplabs.com/pysnmp/examples/hlapi/twisted/contents.html
-
-        """
-        self.log.error('%s failure: %s' % (self.address, errorIndication))
-
-    def get(self, oid_list):
-        """Issue a getCmd to get SNMP OID states.
-
-        Example
-        -------
-        snmp = SNMPTwister('localhost', 161)
-        snmp.get([ObjectType(ObjectIdentity('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockState', 1)),
-                  ObjectType(ObjectIdentity('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockLeapSecondDate', 1))])
-
-        Parameters
-        ----------
-        oid_list : list
-            List of high-level MIB Object OIDs. See `Specifying MIB Objects`_ for
-            more info
-
-        .. _Specifying MIB Objects:
-            http://snmplabs.com/pysnmp/docs/pysnmp-hlapi-tutorial.html#specifying-mib-object
-
-        """
-        d = getCmd(self.snmp_engine,
-                   CommunityData('public', mpModel=0),  # SNMPv1
-                   self.udp_transport,
-                   ContextData(),
-                   *oid_list)
-
-        d.addCallback(self._success).addErrback(self._failure)
-
-        return d
 
 
 class MeinbergM1000Agent:
@@ -194,14 +87,9 @@ class MeinbergM1000Agent:
         interval_groups = list(set([x['interval'] for x in self.mib_timings]))
 
         while self.is_streaming:
-            # TODO:
-            # Determine which result goes with which OID and group them
-            # into blocks based on the interval. Then publish separately.
-
             # Loop through interval groups and issue get commands for each
             # interval group, publishing to a block with the interval in the
             # name.
-
             for interval in interval_groups:
                 # Create list of OIDs to GET based on last time we checked them
                 get_list = []
@@ -248,10 +136,6 @@ class MeinbergM1000Agent:
 
                 result = []
                 yield dsleep(0.1)
-
-        #self.log.info("Data directory set to {}".format(self.data_dir))
-        #self.log.info("New file every {} seconds".format(self.time_per_file))
-        #self.log.info("Listening to {}".format(self.address))
 
         #while self.is_streaming:
         #    recorder.run()
