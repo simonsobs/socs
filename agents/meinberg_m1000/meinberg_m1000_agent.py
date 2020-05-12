@@ -56,8 +56,12 @@ class MeinbergM1000Agent:
 
         self.snmp = SNMPTwister(address, port)
 
+        agg_params = {
+            'frame_length': 10*60 #[sec]
+        }
         self.agent.register_feed('m1000',
                                  record=True,
+                                 agg_params=agg_params,
                                  buffer_time=1)
 
         self.mib_timings = [{"oid": ObjectType(ObjectIdentity('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockState', 1)), "interval": 60, "lastGet": None},
