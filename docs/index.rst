@@ -54,6 +54,12 @@ Simulator Reference  Simulators are used to mock software and hardware
     simulators/ls240_simulator
     simulators/smurf_stream_simulator
 
+.. toctree::
+    :caption: Developer Guide
+    :maxdepth: 2
+
+    developer/snmp
+
 Indices and tables
 ==================
 

@@ -75,11 +75,3 @@ Agent API
 
 .. autoclass:: agents.meinberg_m1000.meinberg_m1000_agent.MeinbergM1000Agent
     :members: start_record
-
-Developer Info
---------------
-If you are developing another SNMP monitoring agent, the SNMP + twisted
-interface is available for use and detailed here:
-
-.. autoclass:: socs.snmp.SNMPTwister
-    :members:
