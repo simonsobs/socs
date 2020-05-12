@@ -15,6 +15,8 @@ class SNMPTwister:
 
     Note: This helper currently only supports SNMPv1.
 
+    .. _SNMP Operations: http://snmplabs.com/pysnmp/docs/pysnmp-hlapi-tutorial.html
+
     Parameters
     ----------
     address : str
@@ -32,9 +34,6 @@ class SNMPTwister:
         UDP transport for UDP over IPv4
     log : txaio.tx.Logger
         txaio logger object
-
-    .. _SNMP Operations:
-        http://snmplabs.com/pysnmp/docs/pysnmp-hlapi-tutorial.html
 
     """
 
@@ -84,13 +83,13 @@ class SNMPTwister:
 
         Example
         -------
-        snmp = SNMPTwister('localhost', 161)
-        snmp.get([ObjectType(ObjectIdentity('MBG-SNMP-LTNG-MIB',
-                                            'mbgLtNgRefclockState',
-                                            1)),
-                  ObjectType(ObjectIdentity('MBG-SNMP-LTNG-MIB',
-                                            'mbgLtNgRefclockLeapSecondDate',
-                                            1))])
+        >>> snmp = SNMPTwister('localhost', 161)
+        >>> snmp.get([ObjectType(ObjectIdentity('MBG-SNMP-LTNG-MIB',
+                                                'mbgLtNgRefclockState',
+                                                1)),
+                      ObjectType(ObjectIdentity('MBG-SNMP-LTNG-MIB',
+                                                'mbgLtNgRefclockLeapSecondDate',
+                                                1))])
 
         Parameters
         ----------
@@ -98,8 +97,8 @@ class SNMPTwister:
             List of high-level MIB Object OIDs. See `Specifying MIB Objects`_ for
             more info
 
-        .. _Specifying MIB Objects:
-            http://snmplabs.com/pysnmp/docs/pysnmp-hlapi-tutorial.html#specifying-mib-object
+            .. _Specifying MIB Objects:
+               http://snmplabs.com/pysnmp/docs/pysnmp-hlapi-tutorial.html#specifying-mib-object
 
         """
         datagram = getCmd(self.snmp_engine,
