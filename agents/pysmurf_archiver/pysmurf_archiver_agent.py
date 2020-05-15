@@ -22,11 +22,11 @@ def create_local_path(file, data_dir):
 
         The file path will be:
 
-            data_dir/<5 ctime digits>/<file_type>/<file_name>
+            data_dir/<5 ctime digits>/<pub_id>/<action_timestamp>_<action>/<plots or outputs>
 
         E.g.
 
-            /data/pysmurf/15647/tuning/1564799250_tuning_b1.txt
+            /data/pysmurf/15647/crate1slot2/1564799250_tune_band/outputs/1564799250_tuning_b1.txt
 
         In the case of duplicate datafiles being registered, the duplicates
         will still be copied over to the location `new_path_name.{i}` where
