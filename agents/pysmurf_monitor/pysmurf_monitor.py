@@ -170,8 +170,8 @@ def make_parser(parser=None):
     pgroup.add_argument('--udp-port', type=int,
                         help="Port for upd-publisher")
     pgroup.add_argument('--create-table', type=bool,
-                        help="Specifies whether agent should create pysmurf_files"
-                             "table if none exist.", default=True)
+                        help="Specifies whether agent should create or update "
+                             "pysmurf_files table if non exists.", default=True)
 
     return parser
 
