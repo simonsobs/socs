@@ -32,19 +32,37 @@ available arguments::
          'arguments':[
            ['--ip-address', '10.10.10.150'],
            ['--num-channels', '13'],
-           ['--functions', '{
-           "Channel 1": ["1.3332*10**(2*v - 11)", "mBar"],
-           "Channel 2": ["2*10**(v - 5)", "mBar"]
-           }'], 
+           ['--function-file', 'labjack_functions.yml'],
            ['--mode', 'acq'],
            ]},
 
 You should assign your LabJack a static IP, you'll need to know that here. 
-The 'functions' argument is a dictionary that specifies functions and units
-to apply to the output voltages of certain channels. In this example 
-channels 1 and 2 will record pressure data by applying functions to the 
-voltage output 'v' of their respective channels. This data is published to 
-the feed in the same manner as the voltages. 
+The 'functions-file' argument specifies the labjack configuration file, 
+which is located in your OCS configuration directory. This allows analog 
+voltage inputs on the labjack to be converted to different units. Here is 
+an example labjack configuration file:
+
+    Channel 1:
+        user_defined: 'False'
+        type: "MKS390"
+
+    Channel 2: 
+        user_defined: 'False'
+        type: 'warm_therm'
+
+    Channel 3:
+        user_defined: 'True'
+        units: 'Ohms'
+        function: '(2.5-v)*10000/v'
+        
+In this example, Channels 1 and 2 (AIN1 and AIN2 on the labjack) are hooked
+up to the MKS390 pressure gauge and a thermistor in the SO-specified warm 
+thermometry setup, respectively. Since these are defined functions in the
+LabJackFunctions class, specifying the name of their method is all that is
+needed. Channel 3 shows how to define a custom function. In this case, 
+the user specifies the units and the function itself, which takes the 
+input voltage 'v' as the only argument.
+
 
 Docker
 ``````

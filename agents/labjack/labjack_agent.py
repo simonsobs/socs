@@ -5,6 +5,10 @@ import os
 from pymodbus.client.sync import ModbusTcpClient
 import numexpr
 import json 
+import yaml
+import csv
+from scipy.interpolate import interp1d
+import numpy as np
 
 ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 if not ON_RTD:
@@ -73,10 +77,73 @@ def data_to_int32(data):
 def data_to_float32(data):
     return struct.unpack("=f", struct.pack("=I", concatData(data)))[0]
 
+            
+
+class LabJackFunctions:
+    """
+    Labjack helper class to provide unit conversion from analog input voltage
+    """
+    def __init__(self):
+        pass
+    
+    def unit_conversion(self, v, function_info):
+        """
+        Given a voltage and function information from the 
+        labjack_config.yaml file, applies a unit conversion.
+        Returns the converted value and its units.
+        """
+
+        if function_info["user_defined"] == 'False':
+            function = getattr(self, function_info['type'])
+            return function(v)
+        
+        else:     
+            units = function_info['units']
+            value = float(numexpr.evaluate(function_info["function"])) 
+            return value, units
+        
+    def MKS390(self, v):
+        """
+        Conversion function for the MKS390 Micro-Ion ATM
+        Modular Vaccum Gauge. 
+        """
+        value = 1.3332*10**(2*v - 11)
+        units = 'mBar'
+        return value, units
+    
+    def warm_therm(self, v):
+        """
+        Conversion function for SO warm thermometry readout.
+        Voltage is converted to resistance using the LJTick, which
+        has a 2.5V supply and 10kOhm reference resistor. Resistance
+        is converted to degrees Celsius using the calibration curve 
+        for the thermistor, serial number GA10K4D25.        
+        """
+        #LJTick voltage to resistance conversion
+        R = (2.5-v)*10000/v 
+        
+        #Import the Ohms to Celsius cal curve and apply cubic
+        #interpolation to find the temperature
+        reader = csv.reader(open('GA10K4D25_cal_curve.txt'), 
+                            delimiter=' ')
+        lists = [el for el in [row for row in reader]]
+        T_cal = np.array([float(RT[0]) for RT in lists[1:]])
+        R_cal = np.array([float(RT[1]) for RT in lists[1:]])
+        T_cal = np.flip(T_cal)
+        R_cal = np.flip(R_cal)
+        RtoT = interp1d(R_cal, T_cal, kind='cubic')
+
+        value = float(RtoT(R))
+        units = 'C'
+        
+        return value, units
+ 
+        
+    
 
 # LabJack agent class
 class LabJackAgent:
-    def __init__(self, agent, ip_address, num_channels, functions={}):
+    def __init__(self, agent, ip_address, num_channels, function_file):
         self.active = True
         self.agent = agent
         self.log = agent.log
@@ -84,7 +151,18 @@ class LabJackAgent:
         self.ip_address = ip_address
         self.module = None
         self.sensors = ['Channel {}'.format(i+1) for i in range(num_channels)]
-        self.functions = functions
+        self.ljf = LabJackFunctions()
+        
+        #Load dictionary of unit conversion functions from yaml file. Assumes
+        # the file is in the $OCS_CONFIG_DIR directory
+        if function_file == 'None':
+            functions = {}
+        else:
+            cwd=os.environ['OCS_CONFIG_DIR']
+            function_file_path = os.path.join(os.environ['OCS_CONFIG_DIR'], 
+                                              function_file)
+            with open(function_file_path, 'r') as stream:
+                self.functions = yaml.safe_load(stream)
 
         self.initialized = False
         self.take_data = False
@@ -166,13 +244,12 @@ class LabJackAgent:
                     rr = self.module.read_input_registers(2*i, 2)
                     data['data'][sens + 'V'] = data_to_float32(rr.registers)
                     
-                    #Apply conversion function if it exists
+                    #Apply unit conversion function for this channel
                     if sens in self.functions.keys():
                         v = data['data'][sens + 'V']
-                        conversion = self.functions[sens][0]
-                        units = self.functions[sens][1]
-                        data['data'][sens + ' ' + units] = \
-                        float(numexpr.evaluate(conversion))   
+                        value, units = \
+                        self.ljf.unit_conversion(v,self.functions[sens]) 
+                        data['data'][sens + ' ' + units] = value
 
                 time.sleep(sleep_time)
 
@@ -205,6 +282,7 @@ def make_parser(parser=None):
 
     pgroup.add_argument('--ip-address')
     pgroup.add_argument('--num-channels', default='13')
+    pgroup.add_argument('--function-file', default='None')
 
     return parser
 
@@ -222,14 +300,14 @@ if __name__ == '__main__':
 
     ip_address = str(args.ip_address)
     num_channels = int(args.num_channels)
-    functions = json.loads(args.functions)
+    function_file = str(args.function_file)
 
     agent, runner = ocs_agent.init_site_agent(args)
 
     sensors = LabJackAgent(agent,
                            ip_address=ip_address,
                            num_channels=num_channels,
-                          functions=functions)
+                          function_file=function_file)
 
     agent.register_task('init_labjack', 
                         sensors.init_labjack_task, 
