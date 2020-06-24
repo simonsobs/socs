@@ -1,7 +1,6 @@
 import socket
 import numpy
 import struct
-import copy
 import time
 from collections import deque
 import select
@@ -12,27 +11,25 @@ from ocs.ocs_twisted import TimeoutLock
 
 # The number of datapoints in every encoder packet from the Arduino/Beaglebone
 COUNTER_INFO_LENGTH = 150
-# The size of the encoder packet from the Arduino (header + 3*150 datapoint information + 3 quadrature readout)
-COUNTER_PACKET_SIZE = 4 + 4 * COUNTER_INFO_LENGTH+8 * COUNTER_INFO_LENGTH + 12
+# The size of the encoder packet from the Arduino (header + 3*150 datapoint information + 1 quadrature readout)
+COUNTER_PACKET_SIZE = 4 + 4 * COUNTER_INFO_LENGTH+8 * COUNTER_INFO_LENGTH + 4
 # The size of the IRIG packet from the Arduino/Beaglebone
 IRIG_PACKET_SIZE = 132
 # The slit scaler value for rough HWP rotating frequency
 NUM_SLITS = 570
-# Maximum number of encoder counter queue
-MAX_COUNTER_QUEUE = 1000
 
 ### Definitions of utility functions ###
 
 # Converts the IRIG signal into sec/min/hours depending on the parameters
 def de_irig(val, base_shift=0):
-    return (((val >> (0+base_shift)) & 1) + 
-            ((val >> (1+base_shift)) & 1) * 2 + 
-            ((val >> (2+base_shift)) & 1) * 4 + 
-            ((val >> (3+base_shift)) & 1) * 8 + 
-            ((val >> (5+base_shift)) & 1) * 10 + 
-            ((val >> (6+base_shift)) & 1) * 20 + 
-            ((val >> (7+base_shift)) & 1) * 40 +
-            ((val >> (8+base_shift)) & 1) * 80
+    return (((val >> (0+base_shift)) & 1) 
+            + ((val >> (1+base_shift)) & 1) * 2
+            + ((val >> (2+base_shift)) & 1) * 4 
+            + ((val >> (3+base_shift)) & 1) * 8 
+            + ((val >> (5+base_shift)) & 1) * 10 
+            + ((val >> (6+base_shift)) & 1) * 20 
+            + ((val >> (7+base_shift)) & 1) * 40
+            + ((val >> (8+base_shift)) & 1) * 80
     )
         
 # Class which will parse the incoming packets from the BeagleboneBlack and store the data
@@ -40,7 +37,7 @@ class EncoderParser(object):
     # port: This must be the same as the localPort in the Arduino/Beaglebone code
     # read_chunk_size: This value shouldn't need to change
     
-    def __init__(self, beaglebone_port = 8080, read_chunk_size = 8196):
+    def __init__(self, beaglebone_port=8080, read_chunk_size=8196):
         # Creates three queues to hold the data from the encoder, IRIG, and quadrature respectively
         self.counter_queue = deque()
         self.irig_queue = deque()
@@ -90,7 +87,7 @@ class EncoderParser(object):
         if dhours < 0:
             dhours = dhours + 24
 
-        if (dmins < 0)or((dmins == 0)and(dsecs < 0)):
+        if (dmins < 0) or ((dmins == 0) and (dsecs < 0)):
             dmins = dmins + 60
             dhours = dhours - 1
 
@@ -99,7 +96,9 @@ class EncoderParser(object):
             dmins = dmins - 1
         
         # Print UTC time, run time, and current clock count of the Arduino
-        print("Current Time:",("%d:%d:%d"%(hours, mins, secs)),"Run Time",("%d:%d:%d"%(dhours, dmins, dsecs)), "Clock Count",edge)
+        print('Current Time:',('%d:%d:%d'%(hours, mins, secs)), \
+              'Run Time',('%d:%d:%d'%(dhours, dmins, dsecs)), \
+              'Clock Count',edge)
 
         # Set the current time in seconds
         self.current_time = secs + mins*60 + hours*3600
@@ -111,7 +110,7 @@ class EncoderParser(object):
     def check_data_length(self, start_index, size_of_read):
         if start_index + size_of_read > len(self.data):
             self.data = self.data[start_index:]
-            print("UH OH")
+            print('Invalid data size')
             return False
         else:
             return True
@@ -187,24 +186,19 @@ class EncoderParser(object):
     # Meathod to parse the Encoder Packet
     def parse_counter_info(self, data):
         # Convert the Encoder Packet structure into a numpy array
-        derter = numpy.array(struct.unpack('<' + 'III'*COUNTER_INFO_LENGTH + 'III', data))
+        derter = numpy.array(struct.unpack('<' + 'I'+ 'III'*COUNTER_INFO_LENGTH, data))
 
-        # [0-149] clock counts of 150 data points
-        # [150-299] corresponding clock overflow of the 150 data points (each overflow count
+        # [1-150] clock counts of 150 data points
+        # [151-300] corresponding clock overflow of the 150 data points (each overflow count
         # is equal to 2^16 clock counts)
-        # [300-449] corresponding absolute number of the 150 data points ((1, 2, 3, etc ...)
+        # [301-450] corresponding absolute number of the 150 data points ((1, 2, 3, etc ...)
         # or (150, 151, 152, etc ...) or (301, 302, 303, etc ...) etc ...)
-        # [450-452] Readout from the quadrature
+        # [0] Readout from the quadrature
 
-        # NOTE: These next two lines are only required if the data is going to be manipulated
-        # within this code and not just recorded
-    
-        # self.counter_queue = [[clock count array],[absolute number array]]
-        self.counter_queue.append(( derter[0:150] + (derter[150:300] << 32), derter[300:450]))
-        # self.quad_queue = [[quad input 2 array],[quad input 3 array],[quad input 4 array]]
-        #self.quad_queue.append((derter[450], derter[451], derter[452]))
-        ## it seems like numpy.int64 is not compatible in some system.
-        self.quad_queue.append((derter[450].item(), derter[451].item(), derter[452].item()))
+        self.quad_queue.append(derter[0].item())
+
+        # self.counter_queue = [[clock count array],[absolute number array], quad]
+        self.counter_queue.append(( derter[1:151] + (derter[151:301] << 32), derter[301:451]))
 
     # Meathod to parse the IRIG Packet
     def parse_irig_info(self, data):
@@ -260,56 +254,44 @@ class HWPBBBAgent:
 
         self.ep = EncoderParser()
 
-        self.data_counter = {'timestamps':[], 'block_name':'HWPEncoder_counter','data':{}}
-        self.lastdata_counter = self.data_counter
-
-    def publish_encoder(self):
-        counter_list = []
-        counter_index_list = []
-        while len(self.ep.counter_queue):
-            counter_data = self.ep.counter_queue.popleft()
-            counter_list += counter_data[0].tolist()
-            counter_index_list += counter_data[1].tolist()
-
-        if (len(counter_list)):
-            self.lastdata_counter = self.data_counter 
-            self.data_counter = {'timestamps':[], 'block_name':'HWPEncoder_counter','data':{}}
-            # This timestamps are 1-D counte_list length numpy array of the same timestamp of curren time
-            self.data_counter['timestamps'] = numpy.ones(len(counter_list)) * time.time()
-            self.data_counter['data']['counter'] = counter_list
-            self.data_counter['data']['counter_index'] = counter_index_list
-
-            data_quad = {'timestamps':[], 'block_name':'HWPEncoder_quad','data':{}}
-            quad_list = []
-            while len(self.ep.quad_queue):
-                quad_data = self.ep.quad_queue.popleft()
-                quad_list += quad_data
-            data_quad['timestamps'] = numpy.ones(len(quad_list)) * time.time()
-            data_quad['data']['quad'] = quad_list
-
-            self.agent.publish_to_feed('HWPEncoder_counter', self.data_counter)
-            self.agent.publish_to_feed('HWPEncoder_quad', data_quad)
-            self.agent.feeds['HWPEncoder_counter'].flush_buffer()
-            self.agent.feeds['HWPEncoder_quad'].flush_buffer()
-
     def start_acq(self, session, params):
         """Starts acquiring data.
         """
 
         with self.lock.acquire_timeout(timeout=0, job='acq') as acquired:
             if not acquired:
-                self.log.warn("Could not start acq because {} is already running".format(self.lock.job))
-                return False, "Could not acquire lock."
+                self.log.warn('Could not start acq because {} is already running'.format(self.lock.job))
+                return False, 'Could not acquire lock.'
 
             session.set_status('running')
 
             self.take_data = True
 
+            data_counter = {'timestamps':[], 'block_name':'HWPEncoder_counter','data':{}}
             data_irig = {'timestamp':time.time(), 'block_name':'HWPEncoder_irig','data':{}}
             while self.take_data:
                 self.ep.grab_and_parse_data()
                 while len(self.ep.irig_queue):
-                    self.publish_encoder()
+                    lastdata_counter = data_counter
+                    data_counter = {'timestamps':[], 'block_name':'HWPEncoder_counter','data':{}}
+                    counter_list = []
+                    counter_index_list = []
+                    while len(self.ep.counter_queue):
+                        counter_data = self.ep.counter_queue.popleft()
+                        counter_list += counter_data[0].tolist()
+                        counter_index_list += counter_data[1].tolist()
+                    # This timestamps are 1-D counte_list length numpy array of the same timestamp of curren time
+                    data_counter['timestamps'] = numpy.ones(len(counter_list)) * time.time()
+                    data_counter['data']['counter'] = counter_list
+                    data_counter['data']['counter_index'] = counter_index_list
+
+                    data_quad = {'timestamps':[], 'block_name':'HWPEncoder_quad','data':{}}
+                    quad_list = []
+                    while len(self.ep.quad_queue):
+                        quad_data = self.ep.quad_queue.popleft()
+                        quad_list.append(quad_data)
+                    data_quad['timestamps'] = numpy.ones(len(quad_list)) * time.time()
+                    data_quad['data']['quad'] = quad_list
 
                     irig_data = self.ep.irig_queue.popleft()
                     rising_edge_time = irig_data[0]
@@ -318,7 +300,7 @@ class HWPBBBAgent:
                     synch_pulse_clock_times = irig_data[3]
                     
                     lastdata_irig = data_irig
-                    data_irig = {'timestamp':time.time(), 'block_name':'HWPEncoder_irig','data':{}}
+                    data_irig = {'timestamp':time.time(), 'block_name':'HWPEncoder_irig', 'data':{}}
                     data_irig['data']['irig_time'] = irig_time
                     data_irig['data']['rising_edge_time'] = rising_edge_time
                     data_irig['data']['irig_sec'] = de_irig(irig_info[0], 1)
@@ -329,25 +311,27 @@ class HWPBBBAgent:
                     for i in range(10):
                         data_irig['data']['irig_synch_pulse_clock_times_%d'%i] = synch_pulse_clock_times[i]
                     # For rough estimation of HWP rotation frequency
-                    if 'rising_edge_time' in lastdata_irig['data'] and 'counter' in self.lastdata_counter['data'] and 'counter' in self.data_counter['data']:
+                    if 'rising_edge_time' in lastdata_irig['data'] and \
+                       'counter' in lastdata_counter['data'] and len(data_counter['data']['counter']):
+                        
                         dsec = data_irig['data']['irig_time'] - lastdata_irig['data']['irig_time']
                         dclock_sec = data_irig['data']['rising_edge_time'] - lastdata_irig['data']['rising_edge_time']
-
-                        dclock_counter = self.data_counter['data']['counter'][-1] - self.data_counter['data']['counter'][0]
-                        dindex_counter = self.data_counter['data']['counter_index'][-1]-self.data_counter['data']['counter_index'][0]
+                        dclock_counter = data_counter['data']['counter'][-1] - data_counter['data']['counter'][0]
+                        dindex_counter = data_counter['data']['counter_index'][-1] - data_counter['data']['counter_index'][0]
                         pulse_rate = dindex_counter / dclock_counter * dclock_sec / dsec
                         hwp_freq = pulse_rate / 2. / NUM_SLITS
                         print('pulse_rate', pulse_rate, hwp_freq)
                         data_irig['data']['approx_hwp_freq'] = hwp_freq
                     else:
-                        data_irig['data']['approx_hwp_freq'] = 0
-                        
-                    self.agent.publish_to_feed('HWPEncoder_irig', data_irig)
-                    self.agent.feeds['HWPEncoder_irig'].flush_buffer()
+                        data_irig['data']['approx_hwp_freq'] = 0.
 
-                # Even if IRIG-B is not available, publish only the counter data periodically
-                if len(self.ep.counter_queue) > MAX_COUNTER_QUEUE:
-                    self.publish_encoder()
+                    self.agent.publish_to_feed('HWPEncoder_counter', data_counter)
+                    self.agent.publish_to_feed('HWPEncoder_irig', data_irig)
+                    self.agent.publish_to_feed('HWPEncoder_quad', data_quad)
+
+                    self.agent.feeds['HWPEncoder_counter'].flush_buffer()
+                    self.agent.feeds['HWPEncoder_irig'].flush_buffer()
+                    self.agent.feeds['HWPEncoder_quad'].flush_buffer()
 
         return True, 'Acquisition exited cleanly.'
 
