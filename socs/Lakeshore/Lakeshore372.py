@@ -226,11 +226,11 @@ class LS372:
         msg_str = f'{message}\r\n'.encode()
 
         if '?' in message:
+            self.com.send(msg_str)
             # Try once, if we timeout, try again. Usually gets around single event glitches.
             for attempt in range(2):
                 try:
-                    self.com.send(msg_str)
-                    time.sleep(0.01)
+                    time.sleep(0.061)
                     resp = str(self.com.recv(4096), 'utf-8').strip()
                     break
                 except socket.timeout:
@@ -246,7 +246,7 @@ class LS372:
         if 'RDG' in message:
             time.sleep(0.1)  # Instrument sampling rate of 10 readings/s max (pg 34)
         else:
-            time.sleep(0.05)  # No comms for 50 ms after sending message
+            time.sleep(0.061)  # No comms for 61ms after sending message after trial & error (manual says50ms)
         return resp
 
     def get_id(self):
@@ -1202,8 +1202,7 @@ class Curve:
         resp = self.ls.msg(f"CRVPT? {self.curve_num},{index}").split(',')
         _units = float(resp[0])
         _temp = float(resp[1])
-        _curvature = float(resp[2])
-        return (_units, _temp, _curvature)
+        return (_units, _temp)
 
     def _set_data_point(self, index, units, kelvin, curvature=None):
         """Set a single data point with the CRVPT command.
@@ -1241,8 +1240,7 @@ class Curve:
             breakpoints.append(x)
 
         struct_array = np.array(breakpoints, dtype=[('units', 'f8'),
-                                                    ('temperature', 'f8'),
-                                                    ('curvature', 'f8')])
+                                                    ('temperature', 'f8')])
 
         self.breakpoints = struct_array
 
@@ -1295,7 +1293,39 @@ class Curve:
             self._set_data_point(point[0], point[1], point[2])
 
         # refresh curve attributes
-        return self.get_header()
+        self.get_header()
+        self._check_curve(_file)
+
+    def _check_curve(self, _file):
+        """After setting a data point for calibration curve,
+        use CRVPT? command from get_data_point() to check
+        that all points of calibration curve  were uploaded.
+        If not, re-upload points.
+
+        :param _file: calibration curve file
+        :type _file: str
+        """
+
+        with open(_file) as f:
+            content = f.readlines()
+
+        #skipping header info
+        values = []
+        for i in range(9, len(content)):
+            values.append(content[i].strip().split()) #data points that should have been uploaded
+        for j in range(1, 201):
+            try:
+                resp = self.get_data_point(j) #response from the 372
+                point = values[j-1]
+                units = float(resp[0])
+                temperature = float(resp[1])
+                assert units == float(point[1]), "Point number %s not uploaded"%point[0]
+                assert temperature == float(point[2]), "Point number %s not uploaded"%point[0]
+                print("Successfully uploaded %s, %s" %(units,temperature))
+            #if AssertionError, tell 372 to re-upload points
+            except AssertionError:
+                if units != float(point[1]):
+                    self.set_curve(_file)
 
     def delete_curve(self):
         """Delete the curve using the CRVDEL command.

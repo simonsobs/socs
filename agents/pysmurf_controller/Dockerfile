@@ -1,4 +1,7 @@
-FROM tidair/pysmurf:pr92
+FROM simonsobs/sodetlib:v0.0.1
+
+# Set locale
+ENV LANG C.UTF-8
 
 # Installs Jupyter requirements
 RUN pip3 install jupyter

@@ -52,6 +52,8 @@ class PysmurfMonitor(DatagramProtocol):
         self.agent: ocs_agent.OCSAgent = agent
         self.log = agent.log
 
+        self.agent.register_feed('pysmurf_session_data')
+
         self.create_table = bool(args.create_table)
 
         site, instance = self.agent.agent_address.split('.')
@@ -72,16 +74,16 @@ class PysmurfMonitor(DatagramProtocol):
         if db_host is not None:
             sql_config['host'] = db_host
 
-        self.dbpool = adbapi.ConnectionPool('mysql.connector', **sql_config)
+        self.dbpool = adbapi.ConnectionPool('mysql.connector', **sql_config, cp_reconnect=True)
 
     def _add_file_callback(self, res, d):
         """Callback for when a file is successfully added to DB"""
-        self.log.info("Added {} to pysmurf_files".format(d['path']))
+        self.log.info("Added {} to {}".format(d['path'], pysmurf_files_manager.table))
 
     def _add_file_errback(self, failure: Failure, d):
         """Errback for when there is an exception when adding file to DB"""
         self.log.error(f"ERROR!!! {d['path']} was not added to the database")
-        return failure
+        self.log.error(f"Failure:\n{failure}")
 
     def datagramReceived(self, _data, addr):
         """
@@ -99,20 +101,38 @@ class PysmurfMonitor(DatagramProtocol):
 
         if data['type'] in ['data_file']:
             self.log.info("New file: {fname}", fname=data['payload']['path'])
-            d = data['payload'].copy()
+            d = data['payload']
 
-            # Adds additional db info to dict
-            d['timestamp'] = datetime.datetime.utcfromtimestamp(d['timestamp'])
-            d['md5sum'] = get_md5sum(d['path'])
-            d['plot'] = int(d['plot'])
-            d['pub_id'] = data['id']
-            d['script_id'] = data['script']
+            site, instance = self.agent.agent_address.split('.')
 
-            d.update(self.base_file_info)
+            path = d['path']
+            if (d['format'] == 'npy') and (not d['path'].endswith('.npy')):
+                path += '.npy'
 
-            deferred = self.dbpool.runInteraction(pysmurf_files_manager.add_entry, d)
+            entry = {
+                'path':                 path,
+                'action':               d['action'],
+                'timestamp':            datetime.datetime.utcfromtimestamp(d['timestamp']),
+                'action_timestamp':     d.get('action_ts'),
+                'format':               d['format'],
+                'plot':                 int(d['plot']),
+                'site':                 site,
+                'pub_id':               data['id'],
+                'instance_id':          instance,
+                'copied':               0,
+                'failed_copy_attempts': 0,
+                'md5sum':               get_md5sum(d['path']),
+                'socs_version':         socs.__version__,
+            }
+
+            deferred = self.dbpool.runInteraction(pysmurf_files_manager.add_entry, entry)
             deferred.addErrback(self._add_file_errback, d)
             deferred.addCallback(self._add_file_callback, d)
+
+        elif data['type'] == "session_data":
+            self.agent.publish_to_feed(
+                "pysmurf_session_data", data, from_reactor=True
+            )
 
     def init(self, session, params=None):
         """
@@ -150,8 +170,8 @@ def make_parser(parser=None):
     pgroup.add_argument('--udp-port', type=int,
                         help="Port for upd-publisher")
     pgroup.add_argument('--create-table', type=bool,
-                        help="Specifies whether agent should create pysmurf_files"
-                             "table if none exist.", default=True)
+                        help="Specifies whether agent should create or update "
+                             "pysmurf_files table if non exists.", default=True)
 
     return parser
 

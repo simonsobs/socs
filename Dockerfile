@@ -2,15 +2,13 @@
 # A container setup with an installation of socs.
 
 # Use the ocs image as a base
-FROM simonsobs/ocs:v0.5.0-55-g5835feb
+FROM simonsobs/ocs:v0.6.0-1-g569b428
 
 # Copy the current directory contents into the container at /app
 COPY . /app/socs/
 
-WORKDIR /app/
+WORKDIR /app/socs/
 
 # Install socs
-RUN pip3 install -r socs/requirements.txt \
-    && pip3 install -e socs
-
-
+RUN pip3 install -r requirements.txt && \
+    pip3 install -e .

@@ -1,8 +1,11 @@
-from twisted.internet import reactor, protocol
+from twisted.internet import reactor, protocol, threads
 from twisted.python.failure import Failure
 from twisted.internet.error import ProcessDone, ProcessTerminated
-import sys
+from twisted.internet.defer import inlineCallbacks, Deferred
+from autobahn.twisted.util import sleep as dsleep
 from twisted.logger import Logger, FileLogObserver
+
+import sys
 from typing import Optional
 import time
 import os
@@ -58,10 +61,12 @@ class PysmurfScriptProtocol(protocol.ProcessProtocol):
 
     def processExited(self, status: Failure):
         """Called when process has exited."""
-        if self.log is not None:
-            self.log.info("Process ended: {reason}", reason=status)
 
-        self.end_status = status
+        rc = status.value.exitCode
+        if self.log is not None:
+            self.log.info("Process ended with exit code {rc}", rc=rc)
+
+        self.deferred.callback(rc)
 
 
 class PysmurfController:
@@ -93,9 +98,33 @@ class PysmurfController:
         self.prot = None
         self.protocol_lock = TimeoutLock()
 
-    def _run_script(self, script, args, log):
+        self.current_session = None
+
+        if args.monitor_id is not None:
+            self.agent.subscribe_on_start(
+                self._on_session_data,
+                'observatory.{}.feeds.pysmurf_session_data'.format(args.monitor_id),
+            )
+
+    def _on_session_data(self, _data):
+        data, feed = _data
+
+        if self.current_session is not None:
+            if data['id'] == os.environ.get("SMURFPUB_ID"):
+                if data['type'] == 'session_data':
+                    if isinstance(data['payload'], dict):
+                        self.current_session.data.update(data['payload'])
+                    else:
+                        self.log.warn("Session data not passed as a dict!! Skipping...")
+
+                elif data['type'] == 'session_log':
+                    if isinstance(data['payload'], str):
+                        self.current_session.add_message(data['payload'])
+
+    @inlineCallbacks
+    def _run_script(self, script, args, log, session):
         """
-        Runs a pysmurf control script. Run primarily from tasks in worker threads.
+        Runs a pysmurf control script. Can only run from the reactor.
 
         Arguments
         ----------
@@ -112,37 +141,44 @@ class PysmurfController:
 
         with self.protocol_lock.acquire_timeout(0, job=script) as acquired:
             if not acquired:
-                return False, "Process {} is already running".format(self.protocol_lock.job)
+                return False, "The requested script cannot be run because " \
+                              "script {} is already running".format(self.protocol_lock.job)
 
-            logger = None
-            if isinstance(log, str):
-                log_file = open(log, 'a')
-                logger = Logger(observer=FileLogObserver(log_file, log_formatter))
-            elif log:
-                # If log==True, use agent's logger
-                logger = self.log
+            self.current_session = session
+            try:
+                # IO  is not really safe from the reactor thread, so we possibly
+                # need to find another way to do this if people use it and it
+                # causes problems...
+                logger = None
+                if isinstance(log, str):
+                    self.log.info("Logging output to file {}".format(log))
+                    log_file = yield threads.deferToThread(open, log, 'a')
+                    logger = Logger(observer=FileLogObserver(log_file, log_formatter))
+                elif log:
+                    # If log==True, use agent's logger
+                    logger = self.log
 
-            self.prot = PysmurfScriptProtocol(script, log=logger)
-            python_exec = sys.executable
+                self.prot = PysmurfScriptProtocol(script, log=logger)
+                self.prot.deferred = Deferred()
+                python_exec = sys.executable
 
-            cmd = [python_exec, '-u', script] + args
-            self.log.info("{exec}, {cmd}", exec=python_exec, cmd=cmd)
+                cmd = [python_exec, '-u', script] + list(map(str, args))
 
-            reactor.callFromThread(
-                reactor.spawnProcess, self.prot, python_exec, cmd, env=os.environ
-            )
+                self.log.info("{exec}, {cmd}", exec=python_exec, cmd=cmd)
 
-            while self.prot.end_status is None:
-                time.sleep(1)
+                reactor.spawnProcess(self.prot, python_exec, cmd, env=os.environ)
 
-            end_status = self.prot.end_status
-            self.prot = None
+                rc = yield self.prot.deferred
 
-            if isinstance(end_status.value, ProcessDone):
-                return True, "Script has finished naturally"
-            elif isinstance(end_status.value, ProcessTerminated):
-                return False, "Script has been killed"
+                return (rc == 0), "Script has finished with exit code {}".format(rc)
 
+            finally:
+                # Sleep to allow any remaining messages to be put into the
+                # session var
+                yield dsleep(1.0)
+                self.current_session = None
+
+    @inlineCallbacks
     def run_script(self, session, params=None):
         """run(params=None)
 
@@ -161,9 +197,13 @@ class PysmurfController:
             You can pass the path to a logfile, True to use the agent's log,
             or False to not log at all.
         """
-        ok, msg = self._run_script(params['script'],
-                                   params.get('args', []),
-                                   params.get('log', True))
+
+        ok, msg = yield self._run_script(
+            params['script'],
+            params.get('args', []),
+            params.get('log', True),
+            session
+        )
 
         return ok, msg
 
@@ -174,6 +214,7 @@ class PysmurfController:
         self.prot.transport.signalProcess('KILL')
         return True, "Aborting process"
 
+    @inlineCallbacks
     def tune_squids(self, session, params=None):
         """
         Task to run /config/scripts/pysmurf/tune_squids.py
@@ -191,10 +232,11 @@ class PysmurfController:
         if params is None:
             params = {}
 
-        ok, msg = self._run_script(
+        ok, msg = yield self._run_script(
             '/config/scripts/pysmurf/tune_squids.py',
             params.get('args', []),
-            params.get('log', True)
+            params.get('log', True),
+            session
         )
 
         return ok, msg
@@ -209,6 +251,9 @@ def make_parser(parser=None):
 
     pgroup = parser.add_argument_group('Agent Config')
     pgroup.add_argument('--plugin', action='store_true')
+    pgroup.add_argument('--monitor-id', '-m', type=str,
+                        help="Instance id for pysmurf-monitor corresponding to "
+                             "this pysmurf instance.")
 
     return parser
 
@@ -225,8 +270,8 @@ if __name__ == '__main__':
     agent, runner = ocs_agent.init_site_agent(args)
     controller = PysmurfController(agent, args)
 
-    agent.register_task('run', controller.run_script)
-    agent.register_task('abort', controller.abort_script)
-    agent.register_task('tune_squids', controller.tune_squids)
+    agent.register_task('run', controller.run_script, blocking=False)
+    agent.register_task('abort', controller.abort_script, blocking=False)
+    agent.register_task('tune_squids', controller.tune_squids, blocking=False)
 
     runner.run(agent, auto_reconnect=True)
