@@ -20,15 +20,6 @@ class DLM:
         self.comm.settimeout(timeout)
         self.volt_prot = None
     
-    def get_data(self):
-        """
-        Gets the raw data from the ptc and returns it in a usable format. 
-        """
-        self.comm.sendall(self.buildRegistersQuery()) 
-        data = self.comm.recv(1024)
-        brd = self.breakdownReplyData(data)
-            
-        return brd    
     
     def send_msg(self, cmd):
         """
@@ -74,7 +65,16 @@ class DLM:
             print('Error: Over voltage already tripped')
             return
 
-class DLM_Agent:
+    def read_voltage(self):
+        """
+        Reads output  voltage
+        """
+        sendmsg(comm, 'SOUR:VOLT?')
+        msg = rec_msg(comm)
+        return msg
+
+
+class DLMAgent:
     '''
     TO DO:
     start_acq function
@@ -84,18 +84,58 @@ class DLM_Agent:
     '''
 
 
-    def __init__(self,agent,ip_address = 10.10.10.21, porti=9221, f_sample=2.5):
+    def __init__(self,agent,ip_address , port, f_sample=2.5):
         self.active = True
         self.agent= agent
         self.log = agent.log
         self.lock = TimeoutLock()
         self.f_sample = f_sample
         self.take_data = False
+        self.dlm = DLM(ip_address, int(port))
         agg_params = {'frame length':60, }
-        self.agent.register_feed('pressures',
+        self.agent.register_feed('voltages',
                                  record=True,
                                  agg_params=agg_params,
                                  buffer_time=1)
+
+    def start_acq(self, session, params=None):
+        
+        if params is None:
+            params = {}
+        
+        f_sample = params.get('sampling_frequency')
+        if f_sample is None:
+            f_sample = self.f_sample
+
+        sleep_time = 1./f_sample - 0.01
+        with self.lock.acquire_timeout(timeout=0, job='init') as acquired:
+            # Locking mechanism stops code from proceeding if no lock acquired
+            if not acquired:
+                self.log.warn("Could not start init because {} is already running".format(self.lock.job))
+                return False, "Could not acquire lock."
+
+            session.set_status('running')
+
+            self.take_data = True
+
+            while self.take_data:
+                data = {
+                    'timestamp': time.time(),
+                    'block_name': 'voltages',
+                    'data': {}
+                }
+                voltage_reading = self.dlm.read_voltage()
+                # Loop through all the channels on the device
+                data['data']["voltage"] = voltage_reading
+
+                self.agent.publish_to_feed('voltages', data)
+                time.sleep(sleep_time)
+
+            self.agents.feeds['voltages'].flush_buffer()
+        return True, 'Acquistion exited cleanly'
+
+
+
     def stop_act(self, session, params=None):
         '''
         End voltage data acquisition
@@ -120,9 +160,9 @@ if __name__ == '__main__':
 
     site_config.reparse_args(args, 'DLMAgent')
     agent, runner = ocs_agent.init_site_agent(args)
-    pfeiffer_agent = DLM_Agent(agent, args.ip_address, args.port)
+    DLM_agent = DLM_Agent(agent, args.ip_address, args.port)
     agent.register_process('acq', DLM_agent.start_acq,
-                           DLMr_agent.stop_acq, startup=True)
+                           DLM_agent.stop_acq, startup=True)
     agent.register_task('close', DLM_agent.stop_acq)
     runner.run(agent, auto_reconnect=True)
 
@@ -154,7 +194,7 @@ sendmsg(comm, 'SOUR:VOLT 2.0')
 sendmsg(comm, 'SOUR:VOLT?')
 
 msg = recmsg(comm)
-print(msg)
+print("msg",msg)
 
 sendmsg(comm, 'SOUR:CURR 0.0')
 sendmsg(comm, 'SOUR:VOLT 0.0')

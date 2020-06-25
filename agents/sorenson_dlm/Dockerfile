@@ -15,7 +15,7 @@ COPY . /app/socs/agents/sorenson-dlm/
 
 # Run agent on container startup
 
-ENTRYPOINT ["python3", "-u", "dlm__agent.py"]
+ENTRYPOINT ["python3", "-u", "dlm_agent.py"]
 
 CMD ["--site-hub=ws://sisock-crossbar:8001/ws", \
      "--site-http=http://sisock-crossbar:8001/call"]
