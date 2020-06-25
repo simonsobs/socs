@@ -69,8 +69,24 @@ class DLM:
         """
         Reads output  voltage
         """
-        sendmsg(comm, 'SOUR:VOLT?')
-        msg = rec_msg(comm)
+        sendmsg(self.comm, 'SOUR:VOLT?')
+        msg = rec_msg(self.comm)
+        return msg
+
+    def read_current(self):
+        """
+        Reads output current
+        """
+        sendmsg(self.comm, 'MEAS:CURR?')
+        msg = rec_msg(self.comm)
+        return msg
+
+    def sys_err_check(self):
+        """
+        Queries sytem error and returns error byte
+        """
+        sendmsg(self.comm, 'SYST:ERR?')
+        msg=rec_msg(self.comm)
         return msg
 
 
@@ -80,6 +96,9 @@ class DLMAgent:
     start_acq function
     set_voltage function
     set_voltage_protection function
+    set_current_fuction
+    set_current_and_voltage??? (simulatneously set current and voltage, not sure if needed)
+    
     ???
     '''
 
