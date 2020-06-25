@@ -74,6 +74,64 @@ class DLM:
             print('Error: Over voltage already tripped')
             return
 
+class DLM_Agent:
+    '''
+    TO DO:
+    start_acq function
+    set_voltage function
+    set_voltage_protection function
+    ???
+    '''
+
+
+    def __init__(self,agent,ip_address = 10.10.10.21, porti=9221, f_sample=2.5):
+        self.active = True
+        self.agent= agent
+        self.log = agent.log
+        self.lock = TimeoutLock()
+        self.f_sample = f_sample
+        self.take_data = False
+        agg_params = {'frame length':60, }
+        self.agent.register_feed('pressures',
+                                 record=True,
+                                 agg_params=agg_params,
+                                 buffer_time=1)
+    def stop_act(self, session, params=None):
+        '''
+        End voltage data acquisition
+        '''
+        if self.take_data:
+            self.take_data = False
+            self.power_supply.close()
+            return True, 'requested to stop taking data.'
+        else:
+            return False, 'acq is not currently running'
+
+
+
+if __name__ == '__main__':
+    parser = site_config.add_arguments()
+
+    pgroup = parser.add_argument_group('Agent Options')
+    pgroup.add_argument('--ip_address')
+    pgroup.add_argument('--port')
+
+    args = parser.parse_args()
+
+    site_config.reparse_args(args, 'DLMAgent')
+    agent, runner = ocs_agent.init_site_agent(args)
+    pfeiffer_agent = DLM_Agent(agent, args.ip_address, args.port)
+    agent.register_process('acq', DLM_agent.start_acq,
+                           DLMr_agent.stop_acq, startup=True)
+    agent.register_task('close', DLM_agent.stop_acq)
+    runner.run(agent, auto_reconnect=True)
+
+
+
+#The following would be good for a client script
+                  
+
+
 def sendmsg(s, cmd):
     msg = str(cmd) + '; OPC?\r\n'
     s.send(msg.encode('ASCII'))
