@@ -39,27 +39,27 @@ class DLM:
         """
         Sets the overvoltage protection
         """
-        send_msg(self, '*CLS')
-        send_msg(self, '*RST')
+        self.send_msg('*CLS')
+        self.send_msg('*RST')
         #TODO Figure out voltage formating: i.e. all voltage variables of the form 1.0? Also, check how DLM returns values and make sure check works
-        send_msg(self, 'SOUR:VOLT:PROT {}'.format(voltage))
+        self.send_msg('SOUR:VOLT:PROT {}'.format(voltage))
         
-        send_msg(self, 'SOUR:VOLT:PROT?')
-        ovp = rec_msg(self)
+        self.send_msg('SOUR:VOLT:PROT?')
+        ovp = self.rec_msg()
         if ovp != voltage:
             print("Error: Over voltage protection not set to requested value")
             return
         
-        send_msg(self, 'STAT:PROT:ENABLE 8')
-        send_msg(self, 'STAT:PROT:ENABLE?')
-        enb = rec_msg(self)
+        self.send_msg('STAT:PROT:ENABLE 8')
+        self.send_msg('STAT:PROT:ENABLE?')
+        enb = self.rec_msg()
         #TODO check that message returns string
         if enb != '8':
             print('Error: Over voltage protection failed to enable')
             return    
 
-        send_msg(self, 'STAT:PROT:EVENT?')
-        event = rec_msg(self)
+        self.send_msg('STAT:PROT:EVENT?')
+        event = self.rec_msg()
         #TODO check that message returns string
         if event != '0':
             print('Error: Over voltage already tripped')
@@ -69,24 +69,25 @@ class DLM:
         """
         Reads output  voltage
         """
-        sendmsg(self.comm, 'SOUR:VOLT?')
-        msg = rec_msg(self.comm)
+        self.send_msg('SOUR:VOLT?')
+        msg = self.rec_msg()
+        print(msg)
         return msg
 
     def read_current(self):
         """
         Reads output current
         """
-        sendmsg(self.comm, 'MEAS:CURR?')
-        msg = rec_msg(self.comm)
+        self.send_msg('MEAS:CURR?')
+        msg = self.rec_msg()
         return msg
 
     def sys_err_check(self):
         """
         Queries sytem error and returns error byte
         """
-        sendmsg(self.comm, 'SYST:ERR?')
-        msg=rec_msg(self.comm)
+        self.send_msg('SYST:ERR?')
+        msg = self.rec_msg()
         return msg
 
 
@@ -153,9 +154,23 @@ class DLMAgent:
             self.agents.feeds['voltages'].flush_buffer()
         return True, 'Acquistion exited cleanly'
 
+    def set_voltage(self, voltage = '1.0'):
+        """
+        Sets voltage of power supply:
+        Args:
+            volts (float): Voltage to set. Must be between 0 and 30.
+        """
+
+        with self.lock.acquire_timeout(1) as acquired:
+            if acquired:
+                self.dlm.send_msg('SOUR:VOLT {}'.format(voltage))
+            else:
+                return False, "Could not acquire lock"
+
+        return True, 'Set voltage to {}'.format(voltage)
 
 
-    def stop_act(self, session, params=None):
+    def stop_acq(self, session, params=None):
         '''
         End voltage data acquisition
         '''
@@ -179,9 +194,10 @@ if __name__ == '__main__':
 
     site_config.reparse_args(args, 'DLMAgent')
     agent, runner = ocs_agent.init_site_agent(args)
-    DLM_agent = DLM_Agent(agent, args.ip_address, args.port)
+    DLM_agent = DLMAgent(agent, args.ip_address, args.port)
     agent.register_process('acq', DLM_agent.start_acq,
-                           DLM_agent.stop_acq, startup=True)
+                           DLM_agent.stop_acq, startup=True)   
+    agent.register_task('set_voltage', DLM_agent.set_voltage)
     agent.register_task('close', DLM_agent.stop_acq)
     runner.run(agent, auto_reconnect=True)
 
@@ -190,7 +206,7 @@ if __name__ == '__main__':
 #The following would be good for a client script
                   
 
-
+"""
 def sendmsg(s, cmd):
     msg = str(cmd) + '; OPC?\r\n'
     s.send(msg.encode('ASCII'))
@@ -224,7 +240,7 @@ print(msg)
 
 
 comm.close()
-"""
+
 msg = '*CLS\n'
 #comm.send(msg.encode())
 comm.sendall(msg.encode('ASCII'))
