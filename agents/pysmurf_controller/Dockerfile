@@ -1,4 +1,4 @@
-FROM tidair/pysmurf-client:v4.0.0-rc19
+FROM simonsobs/sodetlib:v0.0.1
 
 # Set locale
 ENV LANG C.UTF-8

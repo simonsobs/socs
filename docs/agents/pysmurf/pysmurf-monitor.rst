@@ -41,16 +41,21 @@ The database is located in a MariaDB docker container running on the crossbar
 system. The database name is ``files``, and it is also used to index hk files
 written by the hk-aggregator.
 
-The table containing the pysmurf file info is called ``pysmurf_files``.
-The pysmurf monitor will create/update this table if it does not exist or if
-columns have been added, but you can also create, update, and drop this table
+The table containing the pysmurf file info is called ``pysmurf_files_v<VERSION>``
+where ``VERSION`` is the current iteration of the table.
+This version number will increment anytime the table schema is changed, so
+we don't lose information about old files.
+The pysmurf-monitor agent will create the newest version of the ``pysmurf_files``
+table automatically if it does not yet exist, but you can also create and drop this table
 outside of OCS using the ``socs.db.pysmurf_files_manager`` module by calling::
 
     python3 socs/db/pysmurf_files_manager.py create
 
 and entering the db password at the prompt.
 
-..  list-table:: Columns
+Below are the columns that exist in ``pysmurf_files_v1``:
+
+..  list-table:: ``pysmurf_files_v1`` columns
     :widths: 10 10 60
 
     * - path (required)
@@ -58,13 +63,19 @@ and entering the db password at the prompt.
       - Filepath. At first it is the path on the smurf-server, and
         once copied it is the path on the storage node.
 
-    * - type (required)
+    * - action
       - str
-      - Type of file. **E.g.** "tuning" or "config_snapshot"
+      - `Pysmurf action` corresponding to the file. All files with the same
+        action will be grouped together once archived.
 
     * - timestamp
       - datetime
       - Time at which file was written
+
+    * - action_timestamp
+      - int
+      - unix timestamp corresponding to the start of the pysmurf action.
+        This determines how files are grouped once archived.
 
     * - format
       - str

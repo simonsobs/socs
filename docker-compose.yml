@@ -56,9 +56,9 @@ services:
   # --------------------------------------------------------------------------
   # SMuRF timestream aggregator
   # --------------------------------------------------------------------------
-  ocs-timestream-aggregator:
-    image: "ocs-timestream-aggregator"
-    build: ./agents/timestream_aggregator/
+  ocs-smurf-recorder:
+    image: "ocs-smurf-recorder"
+    build: ./agents/smurf_recorder/
 
   # --------------------------------------------------------------------------
   # The Bluefors log tracking Agent
@@ -80,6 +80,20 @@ services:
   ocs-cryomech-cpa-agent:
     image: "ocs-cryomech-cpa-agent"
     build: ./agents/cryomech_cpa/
+
+  # --------------------------------------------------------------------------
+  # LabJack Agent
+  # --------------------------------------------------------------------------
+  ocs-labjack-agent:
+    image: "ocs-labjack-agent"
+    build: ./agents/labjack/
+    
+  # --------------------------------------------------------------------------
+  # Pfeiffer tpg366 agent
+  # --------------------------------------------------------------------------
+  ocs-pfeiffer-tpg366-agent:
+    image: "ocs-pfeiffer-tpg366-agent"
+    build: ./agents/pfeiffer_tpg366/
 
   # --------------------------------------------------------------------------
   # SOCS Simulators

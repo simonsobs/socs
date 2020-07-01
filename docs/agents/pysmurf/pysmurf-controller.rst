@@ -29,7 +29,7 @@ Example site-config entry::
 
       {'agent-class': 'PysmurfController',
        'instance-id': 'pysmurf-controller',
-       'arguments': []},
+       'arguments': [['--monitor-id', 'pysmurf-monitor']]},
 
 
 Pysmurf Publisher options
@@ -114,6 +114,55 @@ OCS client from my host computer::
 
 where my ``$OCS_CONFIG_DIR`` is mounted to ``/config`` in the docker.
 
+
+Passing Session Data
+---------------------
+
+Often you might want to take data from your pysmurf-script, and access it from
+ocs client script. This is now possible by using the smurf publisher.
+If you want to access the location of a smurf datafile,
+you can put the following into your pysmurf-script::
+
+    active_channels = S.which_on(0)
+    datafile = S.stream_data_on()
+    S.pub.publish({
+        'datafile': datafile, 'active_channels': active_channels
+    }, msgtype='session_data')
+
+Marking the publish call with ``msgtype='session_data'`` will make the
+pysmurf-monitor (if it exists) pass this data back to the pysmurf-controller. You can
+then view the data from the client by running ``status`` or ``wait`` to check the
+session data. For example, if the ``tune.py`` file publishes the datafile variable,
+you can run::
+
+    from ocs.matched_client import MatchedClient
+
+    controller = MatchedClient('pysmurf-controller', args=[])
+
+    script_path = '/config/scripts/pysmurf/tune.py'
+    controller.run.start(script=script_path))
+
+    ok, msg, sess = controller.run.wait()
+    print(sess['data'])
+
+    >> {
+        'datafile': '/data/smurf_data/20200316/1584401673/outputs/1584402020.dat',
+        'active_channels': [0,1,2,3,4]
+    }
+
+You can also use this to communicate pysmurf status info to the client. For
+instance you can run::
+
+    S.pub.publish({'status': 'Starting take_stream_data'}, msgtype='session_data')
+    datafile = S.take_stream_data(10) # Streams data for 10 seconds
+    S.pub.publish({
+        'status': 'Finished take_stream_data', 'datafile': datafile
+     }, msgtype='session_data')
+
+Then if you inspect the session object returned from ``controller.run.status()``
+you'll be able to check whether or not ``take_stream_data`` has finished or not.
+This can be extremely helpful to monitor progress in long-running pysmurf
+scripts from the ocs-web monitor.
 
 Agent API
 ---------------

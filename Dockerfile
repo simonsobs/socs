@@ -7,10 +7,8 @@ FROM simonsobs/ocs:v0.6.0-1-g569b428
 # Copy the current directory contents into the container at /app
 COPY . /app/socs/
 
-WORKDIR /app/
+WORKDIR /app/socs/
 
 # Install socs
-RUN pip3 install -r socs/requirements.txt \
-    && pip3 install -e socs
-
-
+RUN pip3 install -r requirements.txt && \
+    pip3 install -e .

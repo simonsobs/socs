@@ -40,10 +40,19 @@ example configuration is::
   ocs-LSA22YE:
     image: grumpy.physics.yale.edu/ocs-lakeshore372-agent:latest
     hostname: ocs-docker
+    network_mode: "host"
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
     command:
       - "--instance-id=LSA22YE"
+      - "--site-hub=ws://127.0.0.1:8001/ws"
+      - "--site-http=http://127.0.0.1:8001/call"
+
+.. note::
+    Since the 372 Agent container needs ``network_mode: "host"``, it must be
+    configured to connect to the crossbar server as if it was on the host
+    system. In this example the crossbar server is running on localhost,
+    ``127.0.0.1``, but on your network this may be different.
 
 To view the 372 temperatures data feed in the live monitor an accompanying
 data-feed server will need to be run. An example of this configuration is::
