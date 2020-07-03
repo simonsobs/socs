@@ -147,7 +147,14 @@ class LabJackAgent:
         self.lock = TimeoutLock()
         self.ip_address = ip_address
         self.module = None
-        self.sensors = ['Channel {}'.format(ch) for ch in active_channels]
+        print(f"Active channels is {active_channels}")
+
+        if active_channels == 'T7-all':
+            self.sensors = ['Channel {}'.format(i+1) for i in range(14)]
+        elif active_channels == 'T4-all':
+            self.sensors = ['Channel {}'.format(i+1) for i in range(12)]    
+        else:
+            self.sensors = ['Channel {}'.format(ch) for ch in active_channels]
         self.ljf = LabJackFunctions()
         self.sampling_frequency = sampling_frequency
 
@@ -281,7 +288,7 @@ def make_parser(parser=None):
 
     pgroup.add_argument('--ip-address')
     pgroup.add_argument('--active-channels',
-                        default=[str(i+1) for i in np.arange(13)])
+                        default='T7-all')
     pgroup.add_argument('--function-file', default='None')
     pgroup.add_argument('--sampling-frequency', default='2.5')
 
@@ -301,7 +308,7 @@ if __name__ == '__main__':
         init_params = {'auto_acquire': True}
 
     ip_address = str(args.ip_address)
-    active_channels = list(args.active_channels)
+    active_channels = args.active_channels
     function_file = str(args.function_file)
     sampling_frequency = float(args.sampling_frequency)
 

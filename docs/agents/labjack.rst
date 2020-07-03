@@ -31,16 +31,20 @@ available arguments::
          'instance-id': 'labjack',
          'arguments':[
            ['--ip-address', '10.10.10.150'],
-           ['--num-channels', '13'],
-           ['--function-file', 'labjack_functions.yml'],
+           ['--active-channels', ['1', '2', '3']],
+           ['--function-file', 'labjack-functions.yaml'],
            ['--mode', 'acq'],
+           ['--sampling_frequency', '700'],
            ]},
 
 You should assign your LabJack a static IP, you'll need to know that here. 
-The 'function-file' argument specifies the labjack configuration file, 
-which is located in your OCS configuration directory. This allows analog 
-voltage inputs on the labjack to be converted to different units. Here is 
-an example labjack configuration file::
+The 'active-channels' argument specifies the channels that will be read out.
+It can be a list, 'T7-all', or 'T4-all'. The latter two read out all 
+14 or 12 analog channels on the T7 and T4, respectively. The 'function-file' 
+argument specifies the labjack configuration file, which is located in your 
+OCS configuration directory. This allows analog voltage inputs on the labjack 
+to be converted to different units. Here is an example labjack configuration 
+file::
 
     Channel 1:
         user_defined: 'False'
