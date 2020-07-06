@@ -11,3 +11,5 @@ mysql-connector>=2.1.6
 # LabJack Agent
 pymodbus
 numexpr
+pyyaml
+scipy
