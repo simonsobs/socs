@@ -9,6 +9,7 @@ WORKDIR /app/socs/agents/labjack/
 
 ## Copy this agent into the app/agents directory
 COPY . .
+RUN pip3 install -r requirements.txt
 
 # Run registry on container startup
 ENTRYPOINT ["python3", "-u", "labjack_agent.py"]
