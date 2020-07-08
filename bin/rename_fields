@@ -1,0 +1,149 @@
+#!/usr/bin/env python3
+# Rename fields to valid names in recorded .g3 files. Also translate from HK v0 to HK v1.
+# Heavily based on the so3g.hk.translator.
+
+import os
+
+import so3g
+from so3g.hk.translator import HKTranslator
+from spt3g import core
+
+def _build_file_list(target):
+    """Build list of files to scan.
+
+    Parameters
+    ----------
+    target : str
+        File or directory to scan.
+
+    Returns
+    -------
+    list
+        List of full paths to files for scanning.
+
+    """
+    _file_list = []
+    if os.path.isfile(target):
+        _file_list.append(target)
+    elif os.path.isdir(target):
+        a = os.walk(target)
+        for root, _, _file in a:
+            for g3 in _file:
+                if g3[-2:] == "g3":
+                    _file_list.append(os.path.join(root, g3))
+
+    return _file_list
+
+def rename_fields(field_name):
+    """Rename invalid field names."""
+    # Agents requiring no changes.
+    # hwp_sim, keithley2230G-psu, pfeiffer_tpg366, pysmurf_archiver,
+    # pysmurf_controller, pysmurf monitor, smurf_recorder, smurf stream simulator,
+    # chwp Agent
+
+    # Agents that hardcode their fields:
+    # bluefors, cryomech_cpa
+    renames = {"hs-still": "hs_still",
+               "hs-mc": "hs_mc",
+               "Operating State": "Operating_State",
+               "Pump State": "Pump_State",
+               "Coolant In": "Coolant_In",
+               "Coolant Out": "Coolant_Out",
+               "Low Pressure": "Low_Pressure",
+               "Low Pressure Average": "Low_Pressure_Average",
+               "High Pressure": "High_Pressure",
+               "High Pressure Average": "High_Pressure_Average",
+               "Delta Pressure": "Delta_Pressure",
+               "Motor Current": "Motor_Current"}
+
+    if field_name in renames:
+        return renames[field_name]    
+
+    # Agents that dynamically build their field lists:
+    # labjack
+    # This is annoying one, can be any combination of "Channel" "1-14" and "Units", where units is user defined.
+    # Should rename via a str.replace(' ', '_')
+    
+    # Lakeshore 240
+    # This is just like the labjack, though channels/units are well defined, i.e. all "Channel" "1-8" "V" and "T".
+    # Still, we should just do the same as with the labjack.
+    
+    # Lakeshore 372
+    # Same as the Lakeshore 240, except "T" and "R", instead of "T" and "V" for units.
+
+    # 370 Agent
+    # Same as the 372 Agent. Not sure if in use yet.
+    if field_name[:7] == "Channel":
+        return field_name.replace(' ', '_')
+
+    return field_name
+
+# Other Agents
+# M1000 Agent
+# Probably lots of issues, not really in use yet, though some data did get
+# written to the Yale aggregator, but can probably be safely ignored/searched
+# for an deleted.
+
+class HKRenamer:
+    """Renames invalid field names. Changes here take into consideration
+    changes made to the Agents to fix the naming of fields and match those
+    changes.
+
+    """
+
+    def __init__(self):
+        pass
+
+    def Process(self, f):
+        if f.type == core.G3FrameType.EndProcessing:
+            return [f] 
+
+        if f.type != core.G3FrameType.Housekeeping:
+            return [f] 
+
+        # No difference in Session/Status for v0 -> v1.
+        if f.get('hkagg_type') != so3g.HKFrameType.data:
+            return [f] 
+
+        # Pop the data blocks out of the frame.
+        orig_blocks = f.pop('blocks')
+        f['blocks'] = core.G3VectorFrameObject()
+
+        # Now process the data blocks.
+        for block in orig_blocks:
+            new_block = core.G3TimesampleMap()
+            new_block.times = block.times
+            for k in block.keys():
+                v = block[k]
+                new_field = rename_fields(k)
+                # print(k, new_field)
+                new_block[new_field] = core.G3VectorDouble(v)
+            f['blocks'].append(new_block)
+        return [f] 
+
+    def __call__(self, *args, **kwargs):
+        return self.Process(*args, **kwargs)
+
+
+if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser(
+        usage='This program can be used to convert SO HK Frames to the '
+        'latest schema version.')
+    parser.add_argument('--output-directory', '-o')
+    parser.add_argument('files', nargs='+', help=
+                        "SO Housekeeping files to convert.")
+    args = parser.parse_args()
+
+    # Run me on a G3File containing a Housekeeping stream.
+    core.set_log_level(core.G3LogLevel.LOG_INFO)
+
+    print(f'Streaming to {args.output_directory}')
+    for f in args.files:
+        print(os.path.join(args.output_directory, os.path.basename(f)))
+        p = core.G3Pipeline()
+        p.Add(core.G3Reader(f))
+        p.Add(HKTranslator())
+        p.Add(HKRenamer())
+        p.Add(core.G3Writer(os.path.join(args.output_directory, os.path.basename(f))))
+        p.Run()
