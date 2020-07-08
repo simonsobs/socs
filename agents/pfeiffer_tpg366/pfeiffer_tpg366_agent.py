@@ -53,6 +53,7 @@ class Pfeiffer:
         self.comm.send(ENQ.encode())
         read_str = self.comm.recv(BUFF_SIZE).decode()
         pressure_str = read_str.split(',')[-1].split('\r')[0]
+        pressure = float(pressure_str)
         return pressure
 
     def read_pressure_all(self):
