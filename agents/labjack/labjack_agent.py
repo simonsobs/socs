@@ -150,11 +150,11 @@ class LabJackAgent:
         print(f"Active channels is {active_channels}")
 
         if active_channels == 'T7-all':
-            self.sensors = ['Channel {}'.format(i+1) for i in range(14)]
+            self.sensors = ['Channel_{}'.format(i+1) for i in range(14)]
         elif active_channels == 'T4-all':
-            self.sensors = ['Channel {}'.format(i+1) for i in range(12)]    
+            self.sensors = ['Channel_{}'.format(i+1) for i in range(12)]    
         else:
-            self.sensors = ['Channel {}'.format(ch) for ch in active_channels]
+            self.sensors = ['Channel_{}'.format(ch) for ch in active_channels]
         self.ljf = LabJackFunctions()
         self.sampling_frequency = sampling_frequency
 
@@ -253,7 +253,7 @@ class LabJackAgent:
                         v = data['data'][sens + 'V']
                         value, units = \
                             self.ljf.unit_conversion(v, self.functions[sens])
-                        data['data'][sens + ' ' + units] = value
+                        data['data'][sens + '_' + units] = value
 
                 time.sleep(sleep_time)
 
