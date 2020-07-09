@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# Rename fields to valid names in recorded .g3 files. Also translate from HK v0 to HK v1.
-# Heavily based on the so3g.hk.translator.
+# Rename fields to valid names in recorded .g3 files. Also translate from HK v0
+# to HK v1. This is heavily based on the so3g.hk.translator.
 
 import os
 
@@ -8,12 +8,13 @@ import so3g
 from so3g.hk.translator import HKTranslator
 from spt3g import core
 
+
 def rename_fields(field_name):
     """Rename invalid field names."""
     # Agents requiring no changes.
     # hwp_sim, keithley2230G-psu, pfeiffer_tpg366, pysmurf_archiver,
-    # pysmurf_controller, pysmurf monitor, smurf_recorder, smurf stream simulator,
-    # chwp Agent
+    # pysmurf_controller, pysmurf monitor, smurf_recorder, smurf stream
+    # simulator, chwp Agent
 
     # Agents that hardcode their fields:
     # bluefors, cryomech_cpa
@@ -26,7 +27,7 @@ def rename_fields(field_name):
                "Coolant In": "Coolant_In_Temp",
                "Coolant Out": "Coolant_Out_Temp",
                "Oil": "Oil_Temp",
-               "Helium", "Helium_Temp",
+               "Helium": "Helium_Temp",
                "Low Pressure": "Low_Pressure",
                "Low Pressure Average": "Low_Pressure_Average",
                "High Pressure": "High_Pressure",
@@ -35,19 +36,19 @@ def rename_fields(field_name):
                "Motor Current": "Motor_Current"}
 
     if field_name in renames:
-        return renames[field_name]    
+        return renames[field_name]
 
     # Agents that dynamically build their field lists:
     # labjack
     # This is a tricky one, field names can be any combination of "Channel"
     # "1-14" and "Units", where units is user defined. Should rename via a
     # str.replace(' ', '_')
-    
+
     # Lakeshore 240
     # This is just like the labjack, though channels/units are well defined,
     # i.e. all "Channel" "1-8" "V" and "T".  Still, we should just do the same
     # as with the labjack.
-    
+
     # Lakeshore 372
     # Same as the Lakeshore 240, except "T" and "R", instead of "T" and "V" for
     # units.
@@ -67,6 +68,7 @@ def rename_fields(field_name):
 # written to the Yale aggregator, but can probably be safely ignored/searched
 # for an deleted.
 
+
 class HKRenamer:
     """Renames invalid field names. Changes here take into consideration
     changes made to the Agents to fix the naming of fields and match those
@@ -78,14 +80,14 @@ class HKRenamer:
 
     def Process(self, f):
         if f.type == core.G3FrameType.EndProcessing:
-            return [f] 
+            return [f]
 
         if f.type != core.G3FrameType.Housekeeping:
-            return [f] 
+            return [f]
 
         # No difference in Session/Status for v0 -> v1.
         if f.get('hkagg_type') != so3g.HKFrameType.data:
-            return [f] 
+            return [f]
 
         # Pop the data blocks out of the frame.
         orig_blocks = f.pop('blocks')
@@ -101,7 +103,7 @@ class HKRenamer:
                 # print(k, new_field)
                 new_block[new_field] = core.G3VectorDouble(v)
             f['blocks'].append(new_block)
-        return [f] 
+        return [f]
 
     def __call__(self, *args, **kwargs):
         return self.Process(*args, **kwargs)
@@ -133,6 +135,7 @@ def _build_file_list(target):
 
     return _file_list
 
+
 def run_pipeline(input_file, output_file):
     """Method for the G3 Pipeline to demonstrate error in loop."""
     p = core.G3Pipeline()
@@ -142,14 +145,20 @@ def run_pipeline(input_file, output_file):
     p.Add(core.G3Writer(output_file))
     p.Run()
 
+
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(
-        usage='This program can be used to convert SO HK Frames to the '
-        'latest schema version.')
-    parser.add_argument('--output-directory', '-o')
-    parser.add_argument('target', nargs='+', help=
-                        "File or directory to process.")
+        description='This program is used to correct a selection of invalid '
+                    'field names in .g3 HK files written with SOCS Agents '
+                    'prior to the v0.1.0 release of SOCS. It will also '
+                    'simultaneously upgrade any HK v0 files to the HK v1 '
+                    'format.')
+    parser.add_argument('target', nargs='+',
+                        help="File or directory to process.")
+    parser.add_argument('--output-directory', '-o', default='./',
+                        help="Output directory for rewritten .g3 files. "
+                             "(default: ./)")
     args = parser.parse_args()
 
     # Run me on a G3File containing a Housekeeping stream.
@@ -157,16 +166,17 @@ if __name__ == '__main__':
 
     # Run on just a single file target, outputs directly to -o.
     if len(args.target) == 1 and os.path.isfile(args.target[0]):
-        print(f"Writing new version of {args.target} to {args.output_directory}")
         if not os.path.exists(args.output_directory):
             os.makedirs(args.output_directory)
-        run_pipeline(args.target, os.path.join(args.output_directory, os.path.basename(args.target[0])))
+
+        out_file = os.path.join(args.output_directory, os.path.basename(args.target[0]))
+        print(f"Writing new version of {args.target} to {out_file}")
+        run_pipeline(args.target, out_file)
     else:
         # args.target could be list of directories, say. Likely just one directory.
         for target in args.target:
             print(f"Processing all .g3 files in {target}...")
             file_list = _build_file_list(target)
-            # print(file_list)
 
             # For each file in the directory (and its subdirectories), run the pipeline.
             for _file in file_list:
