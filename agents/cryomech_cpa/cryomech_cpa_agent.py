@@ -80,20 +80,27 @@ class PTC:
         """
 
         # Associations between keys and their location in rawData
-        keyloc = {"Operating State": [9, 10],
-                  "Pump State": [11, 12],
-                  "Warnings": [15, 16, 13, 14],
-                  "Alarms": [19, 20, 17, 18],
-                  "Coolant In": [22, 21, 24, 23],
-                  "Coolant Out": [26, 25, 28, 27],
-                  "Oil": [30, 29, 32, 31],
-                  "Helium": [34, 33, 36, 35],
-                  "Low Pressure": [38, 37, 40, 39],
-                  "Low Pressure Average": [42, 41, 44, 43],
-                  "High Pressure": [46, 45, 48, 47],
-                  "High Pressure Average": [50, 49, 52, 51],
-                  "Delta Pressure": [54, 53, 56, 55],
-                  "Motor Current": [58, 57, 60, 59]}
+        # TODO: Does order of these lists matter?
+        keyloc = {"Operating_State": [9, 10],
+                  "Compressor_State": [11, 12],
+                  "Warning_State": [15, 16, 13, 14],
+                  "Alarm_State": [19, 20, 17, 18],
+                  "Coolant_In_Temp": [22, 21, 24, 23],
+                  "Coolant_Out_Temp": [26, 25, 28, 27],
+                  "Oil_Temp": [30, 29, 32, 31],
+                  "Helium_Temp": [34, 33, 36, 35],
+                  "Low_Pressure": [38, 37, 40, 39],
+                  "Low_Pressure_Average": [42, 41, 44, 43],
+                  "High_Pressure": [46, 45, 48, 47],
+                  "High_Pressure_Average": [50, 49, 52, 51],
+                  "Delta_Pressure_Average": [54, 53, 56, 55],
+                  "Motor_Current": [58, 57, 60, 59],
+                  "Hours_of_Opperation": [63, 64, 61, 62],
+                  "Pressure_Unit": [65, 66],
+                  "Temperature_Unit": [67, 68],
+                  "Serial_Number": [69, 70],
+                  "Model": [71, 72],
+                  "Software_Revision": [73, 74]}
 
         # Iterate through all keys and return the data in a usable format.
         # If there is an error in the string format, print the

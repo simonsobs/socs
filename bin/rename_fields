@@ -20,14 +20,18 @@ def rename_fields(field_name):
     renames = {"hs-still": "hs_still",
                "hs-mc": "hs_mc",
                "Operating State": "Operating_State",
-               "Pump State": "Pump_State",
-               "Coolant In": "Coolant_In",
-               "Coolant Out": "Coolant_Out",
+               "Pump State": "Compressor_State",
+               "Warnings": "Warning_State",
+               "Alarms": "Alarm_State",
+               "Coolant In": "Coolant_In_Temp",
+               "Coolant Out": "Coolant_Out_Temp",
+               "Oil": "Oil_Temp",
+               "Helium", "Helium_Temp",
                "Low Pressure": "Low_Pressure",
                "Low Pressure Average": "Low_Pressure_Average",
                "High Pressure": "High_Pressure",
                "High Pressure Average": "High_Pressure_Average",
-               "Delta Pressure": "Delta_Pressure",
+               "Delta Pressure": "Delta_Pressure_Average",
                "Motor Current": "Motor_Current"}
 
     if field_name in renames:
