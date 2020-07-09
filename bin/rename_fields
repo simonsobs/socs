@@ -8,32 +8,6 @@ import so3g
 from so3g.hk.translator import HKTranslator
 from spt3g import core
 
-def _build_file_list(target):
-    """Build list of files to scan.
-
-    Parameters
-    ----------
-    target : str
-        File or directory to scan.
-
-    Returns
-    -------
-    list
-        List of full paths to files for scanning.
-
-    """
-    _file_list = []
-    if os.path.isfile(target):
-        _file_list.append(target)
-    elif os.path.isdir(target):
-        a = os.walk(target)
-        for root, _, _file in a:
-            for g3 in _file:
-                if g3[-2:] == "g3":
-                    _file_list.append(os.path.join(root, g3))
-
-    return _file_list
-
 def rename_fields(field_name):
     """Rename invalid field names."""
     # Agents requiring no changes.
@@ -61,18 +35,23 @@ def rename_fields(field_name):
 
     # Agents that dynamically build their field lists:
     # labjack
-    # This is annoying one, can be any combination of "Channel" "1-14" and "Units", where units is user defined.
-    # Should rename via a str.replace(' ', '_')
+    # This is a tricky one, field names can be any combination of "Channel"
+    # "1-14" and "Units", where units is user defined. Should rename via a
+    # str.replace(' ', '_')
     
     # Lakeshore 240
-    # This is just like the labjack, though channels/units are well defined, i.e. all "Channel" "1-8" "V" and "T".
-    # Still, we should just do the same as with the labjack.
+    # This is just like the labjack, though channels/units are well defined,
+    # i.e. all "Channel" "1-8" "V" and "T".  Still, we should just do the same
+    # as with the labjack.
     
     # Lakeshore 372
-    # Same as the Lakeshore 240, except "T" and "R", instead of "T" and "V" for units.
+    # Same as the Lakeshore 240, except "T" and "R", instead of "T" and "V" for
+    # units.
 
     # 370 Agent
     # Same as the 372 Agent. Not sure if in use yet.
+
+    # All of the above are handled by:
     if field_name[:7] == "Channel":
         return field_name.replace(' ', '_')
 
@@ -90,7 +69,6 @@ class HKRenamer:
     changes.
 
     """
-
     def __init__(self):
         pass
 
@@ -125,25 +103,80 @@ class HKRenamer:
         return self.Process(*args, **kwargs)
 
 
+def _build_file_list(target):
+    """Build list of files to scan.
+
+    Parameters
+    ----------
+    target : str
+        File or directory to scan.
+
+    Returns
+    -------
+    list
+        List of full paths to files for scanning.
+
+    """
+    _file_list = []
+    if os.path.isfile(target):
+        _file_list.append(target)
+    elif os.path.isdir(target):
+        a = os.walk(target)
+        for root, _, _file in a:
+            for g3 in _file:
+                if g3[-2:] == "g3":
+                    _file_list.append(os.path.join(root, g3))
+
+    return _file_list
+
+def run_pipeline(input_file, output_file):
+    """Method for the G3 Pipeline to demonstrate error in loop."""
+    p = core.G3Pipeline()
+    p.Add(core.G3Reader(input_file))
+    p.Add(HKTranslator())
+    p.Add(HKRenamer())
+    p.Add(core.G3Writer(output_file))
+    p.Run()
+
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(
         usage='This program can be used to convert SO HK Frames to the '
         'latest schema version.')
     parser.add_argument('--output-directory', '-o')
-    parser.add_argument('files', nargs='+', help=
-                        "SO Housekeeping files to convert.")
+    parser.add_argument('target', nargs='+', help=
+                        "File or directory to process.")
     args = parser.parse_args()
 
     # Run me on a G3File containing a Housekeeping stream.
     core.set_log_level(core.G3LogLevel.LOG_INFO)
 
-    print(f'Streaming to {args.output_directory}')
-    for f in args.files:
-        print(os.path.join(args.output_directory, os.path.basename(f)))
-        p = core.G3Pipeline()
-        p.Add(core.G3Reader(f))
-        p.Add(HKTranslator())
-        p.Add(HKRenamer())
-        p.Add(core.G3Writer(os.path.join(args.output_directory, os.path.basename(f))))
-        p.Run()
+    # Run on just a single file target, outputs directly to -o.
+    if len(args.target) == 1 and os.path.isfile(args.target[0]):
+        print(f"Writing new version of {args.target} to {args.output_directory}")
+        if not os.path.exists(args.output_directory):
+            os.makedirs(args.output_directory)
+        run_pipeline(args.target, os.path.join(args.output_directory, os.path.basename(args.target[0])))
+    else:
+        # args.target could be list of directories, say. Likely just one directory.
+        for target in args.target:
+            print(f"Processing all .g3 files in {target}...")
+            file_list = _build_file_list(target)
+            # print(file_list)
+
+            # For each file in the directory (and its subdirectories), run the pipeline.
+            for _file in file_list:
+                # Remove target directory from path for output directory
+                out_partial_path = _file.strip(target)
+
+                # Build out the full path for output
+                output_file = os.path.join(args.output_directory, out_partial_path)
+
+                # Make sure the subdirectories in args.output_directory exist
+                output_directory = os.path.dirname(output_file)
+
+                if not os.path.exists(output_directory):
+                    os.makedirs(output_directory)
+
+                print(f"Writing new version of {_file} to {output_file}")
+                run_pipeline(_file, output_file)
