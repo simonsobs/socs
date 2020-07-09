@@ -236,7 +236,7 @@ class LogParser:
             regex = re.compile(rf'{pattern},([0-9\.\+\-E]+)')
             m = regex.search(new_line)
             if log_type == 'channels':
-                data_array[pattern] = int(m.group(1))
+                data_array[pattern.replace('-', '_')] = int(m.group(1))
             else:
                 data_array[pattern] = float(m.group(1))
 
