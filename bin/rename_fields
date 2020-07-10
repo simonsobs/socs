@@ -162,7 +162,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Run me on a G3File containing a Housekeeping stream.
-    core.set_log_level(core.G3LogLevel.LOG_INFO)
+    # core.set_log_level(core.G3LogLevel.LOG_INFO)
 
     # Run on just a single file target, outputs directly to -o.
     if len(args.target) == 1 and os.path.isfile(args.target[0]):
@@ -181,7 +181,7 @@ if __name__ == '__main__':
             # For each file in the directory (and its subdirectories), run the pipeline.
             for _file in file_list:
                 # Remove target directory from path for output directory
-                out_partial_path = _file.strip(target)
+                out_partial_path = _file.lstrip(target)
 
                 # Build out the full path for output
                 output_file = os.path.join(args.output_directory, out_partial_path)
