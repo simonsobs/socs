@@ -14,7 +14,7 @@ ENQ = '\x05'
 
 class Pfeiffer:
     """CLASS to control and retrieve data from the pfeiffer tpg366
-    pressure gauage controller
+    pressure gauge controller
 
 
     Args:
@@ -95,7 +95,7 @@ class PfeifferAgent:
         self.f_sample = f_sample
         self.take_data = False
         self.gauge = Pfeiffer(ip_address, int(port))
-        agg_params = {'frame length': 60, }
+        agg_params = {'frame_length': 60, }
 
         self.agent.register_feed('pressures',
                                  record=True,
