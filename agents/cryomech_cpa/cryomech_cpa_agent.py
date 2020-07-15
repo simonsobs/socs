@@ -48,6 +48,9 @@ class PTC:
         self.port = port
         self.fake_errors = fake_errors
 
+        self.model = None
+        self.serial = None
+
         self.comm = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.comm.connect((self.ip_address, self.port))  # connects to the PTC
         self.comm.settimeout(timeout)
@@ -73,14 +76,21 @@ class PTC:
         return query
 
     def breakdownReplyData(self, rawdata):
-        """
-        Take in raw ptc data, and return a dictionary.
-        The dictionary keys are the data labels,
-        the dictionary values are the data in floats or ints.
+        """Take in raw ptc data, and return a dictionary.
+
+        The dictionary keys are the data labels, the dictionary values are the
+        data in floats or ints.
+
+        Returns
+        -------
+        data_flag : bool
+            False if data is valid, True if output could not be interpretted.
+        data : dict
+            Data dictionary already formatted for passing to OCS Feed.
+
         """
 
         # Associations between keys and their location in rawData
-        # TODO: Does order of these lists matter?
         keyloc = {"Operating_State": [9, 10],
                   "Compressor_State": [11, 12],
                   "Warning_State": [15, 16, 13, 14],
@@ -95,7 +105,7 @@ class PTC:
                   "High_Pressure_Average": [50, 49, 52, 51],
                   "Delta_Pressure_Average": [54, 53, 56, 55],
                   "Motor_Current": [58, 57, 60, 59],
-                  "Hours_of_Opperation": [63, 64, 61, 62],
+                  "Hours_of_Operation": [63, 64, 61, 62],
                   "Pressure_Unit": [65, 66],
                   "Temperature_Unit": [67, 68],
                   "Serial_Number": [69, 70],
@@ -117,6 +127,11 @@ class PTC:
             for key in keyloc.keys():
                 locs = keyloc[key]
                 wkrBytes = bytes([rawdata[loc] for loc in locs])
+
+                # Unpack compressor info
+                if key in ["Model", "Serial_Number"]:
+                    # TODO: decode and update self.model, self.serial_number
+                    pass
 
                 # three different data formats to unpack
                 if key in ["Operating State", "Pump State"]:
@@ -206,6 +221,11 @@ class PTCAgent:
             # Establish connection to ptc
             self.ptc = PTC(self.ip_address, port=self.port,
                            fake_errors=self.fake_errors)
+
+            # Test connection and display identifying info
+            self.ptc.get_data()
+            print("PTC Model:", self.ptc.model)
+            print("PTC Serial Number:", self.ptc.serial)
 
         self.initialized = True
 
