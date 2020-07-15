@@ -8,6 +8,7 @@ import so3g
 from so3g.hk.translator import HKTranslator
 from spt3g import core
 
+from ocs.ocs_feed import Feed
 
 def rename_fields(field_name):
     """Rename invalid field names."""
@@ -100,6 +101,16 @@ class HKRenamer:
             for k in block.keys():
                 v = block[k]
                 new_field = rename_fields(k)
+
+                # Catch any still invalid names
+                try:
+                    valid_field = Feed.verify_data_field_string(new_field)
+                except ValueError:
+                    raise ValueError("An unexpected invalid field name, " +
+                                     f"'{new_field}', was encountered. Please " +
+                                     "report this field name as an issue to " +
+                                     "the socs repository.")
+
                 # print(k, new_field)
                 new_block[new_field] = core.G3VectorDouble(v)
             f['blocks'].append(new_block)
