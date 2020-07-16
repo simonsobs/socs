@@ -50,6 +50,7 @@ class PTC:
 
         self.model = None
         self.serial = None
+        self.software_revision = None
 
         self.comm = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.comm.connect((self.ip_address, self.port))  # connects to the PTC
@@ -95,16 +96,16 @@ class PTC:
                   "Compressor_State": [11, 12],
                   "Warning_State": [15, 16, 13, 14],
                   "Alarm_State": [19, 20, 17, 18],
-                  "Coolant_In_Temp": [22, 21, 24, 23],
-                  "Coolant_Out_Temp": [26, 25, 28, 27],
-                  "Oil_Temp": [30, 29, 32, 31],
-                  "Helium_Temp": [34, 33, 36, 35],
-                  "Low_Pressure": [38, 37, 40, 39],
-                  "Low_Pressure_Average": [42, 41, 44, 43],
-                  "High_Pressure": [46, 45, 48, 47],
-                  "High_Pressure_Average": [50, 49, 52, 51],
-                  "Delta_Pressure_Average": [54, 53, 56, 55],
-                  "Motor_Current": [58, 57, 60, 59],
+                  "Coolant_In_Temp": [23, 24, 21, 22],
+                  "Coolant_Out_Temp": [27, 28, 25, 26],
+                  "Oil_Temp": [31, 32, 29, 30],
+                  "Helium_Temp": [35, 36, 33, 34],
+                  "Low_Pressure": [39, 40, 37, 38],
+                  "Low_Pressure_Average": [43, 44, 41, 42],
+                  "High_Pressure": [47, 48, 45, 46],
+                  "High_Pressure_Average": [51, 52, 49, 50],
+                  "Delta_Pressure_Average": [55, 56, 53, 54],
+                  "Motor_Current": [59, 60, 57, 58],
                   "Hours_of_Operation": [63, 64, 61, 62],
                   "Pressure_Unit": [65, 66],
                   "Temperature_Unit": [67, 68],
@@ -128,25 +129,43 @@ class PTC:
                 locs = keyloc[key]
                 wkrBytes = bytes([rawdata[loc] for loc in locs])
 
-                # Unpack compressor info
-                if key in ["Model", "Serial_Number"]:
-                    # TODO: decode and update self.model, self.serial_number
-                    pass
-
-                # three different data formats to unpack
-                if key in ["Operating State", "Pump State"]:
-                    state = int.from_bytes(wkrBytes, byteorder='big')
+                # four different data formats to unpack
+                # Big endian unsigned integer 16 bits
+                if key in [
+                    "Operating_State",
+                    "Compressor_State",
+                    "Pressure_Unit",
+                    "Temperature_Unit",
+                    "Serial_Number",
+                ]:
+                    state = struct.unpack(">H", wkrBytes)[0]
+                    # Serial number is an attribute, not publishable data
+                    if key == "Serial_Number":
+                        self.serial = state
+                    else:
+                        data[key] = state
+                # 32bit signed integer which is actually stored as a
+                # 32bit IEEE float (silly)
+                elif key in ["Warning_State", "Alarm_State"]:
+                    state = int(struct.unpack(">f", wkrBytes)[0])
                     data[key] = state
-
-                if key in ["Warnings", "Alarms"]:
-                    data[key] = int(''.join('{:02x}'.format(x)
-                                            for x in wkrBytes), 16)
-
-                if key in ["Coolant In", "Coolant Out", "Oil", "Helium",
-                           "Low Pressure", "Low Pressure Average",
-                           "High Pressure", "High Pressure Average",
-                           "Delta Pressure", "Motor Current"]:
-                    data[key] = struct.unpack('f', wkrBytes)[0]
+                # 2 x 8-bit lookup tables.
+                elif key in ["Model"]:
+                    model_major = struct.unpack(
+                        ">B",  bytes([rawdata[locs[0]]]))[0]
+                    model_minor = struct.unpack(
+                        ">B", bytes([rawdata[locs[1]]]))[0]
+                    # Model is an attribute, not publishable data
+                    self.model = str(model_major) + "_" + str(model_minor)
+                elif key in ["Software_Revision"]:
+                    version_major = struct.unpack(
+                        ">B", bytes([rawdata[locs[0]]]))[0]
+                    version_minor = struct.unpack(
+                        ">B", bytes([rawdata[locs[1]]]))[0]
+                    self.software_revision = str(version_major) + "." + str(version_minor)
+                # 32 bit Big endian IEEE floating point
+                else:
+                    data[key] = struct.unpack(">f", wkrBytes)[0]
 
             data_flag = False
 
@@ -159,7 +178,8 @@ class PTC:
 
     def __del__(self):
         """
-        If the PTC class instance is destroyed, close the connection to the ptc.
+        If the PTC class instance is destroyed, close the connection to the 
+        ptc.
         """
         self.comm.close()
 
@@ -226,6 +246,7 @@ class PTCAgent:
             self.ptc.get_data()
             print("PTC Model:", self.ptc.model)
             print("PTC Serial Number:", self.ptc.serial)
+            print("Software Revision is:", self.ptc.software_revision)
 
         self.initialized = True
 
@@ -255,7 +276,8 @@ class PTCAgent:
 
             # Publish data, waiting 1/f_sample seconds in between calls.
             while self.take_data:
-                pub_data = {'timestamp': time.time(), 'block_name': 'ptc_status'}
+                pub_data = {'timestamp': time.time(), 
+                            'block_name': 'ptc_status'}
                 data_flag, data = self.ptc.get_data()
                 pub_data['data'] = data
                 # If there is an error in compressor output (data_flag = True),
