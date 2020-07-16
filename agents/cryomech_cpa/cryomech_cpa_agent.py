@@ -141,29 +141,14 @@ class PTC:
                     state = struct.unpack(">H", wkrBytes)[0]
                     # Serial number is an attribute, not publishable data
                     if key == "Serial_Number":
-                        try:
-                            self.serial = statuscodes[key][state]
-                        except:
-                            self.serial = state
+                        self.serial = state
                     else:
-                        try:
-                            data[key] = statuscodes[key][state]
-                        except:
-                            data[key] = state
+                        data[key] = state
                 # 32bit signed integer which is actually stored as a
                 # 32bit IEEE float (silly)
                 elif key in ["Warning_State", "Alarm_State"]:
                     state = int(struct.unpack(">f", wkrBytes)[0])
-                    try:
-                        data[key] = ""
-                        for status in statuscodes[key].keys():
-                            if (abs(state) & abs(status)):
-                                data[key] += statuscodes[key][status] + ":"
-                        if (not data[key]):
-                            data[key] = statuscodes[key][-0.0]
-                        data[key] = data[key].rstrip(":")
-                    except:
-                        data[key] = state
+                    data[key] = state
                 # 2 x 8-bit lookup tables.
                 elif key in ["Model"]:
                     model_major = struct.unpack(
@@ -171,11 +156,7 @@ class PTC:
                     model_minor = struct.unpack(
                         ">B", bytes([rawdata[locs[1]]]))[0]
                     # Model is an attribute, not publishable data
-                    try:
-                        self.model = statuscodes["Model Major"][model_major] +\
-                            statuscodes["Model Minor"][model_minor]
-                    except:
-                        self.model = str(model_major) + "_" + str(model_minor)
+                    self.model = str(model_major) + "_" + str(model_minor)
                 elif key in ["Software_Revision"]:
                     version_major = struct.unpack(
                         ">B", bytes([rawdata[locs[0]]]))[0]
