@@ -1,0 +1,207 @@
+#!/usr/bin/env python3
+# Rename fields to valid names in recorded .g3 files. Also translate from HK v0
+# to HK v1. This is heavily based on the so3g.hk.translator.
+
+import os
+
+import so3g
+from so3g.hk.translator import HKTranslator
+from spt3g import core
+
+from ocs.ocs_feed import Feed
+
+def rename_fields(field_name):
+    """Rename invalid field names."""
+    # Agents requiring no changes.
+    # hwp_sim, keithley2230G-psu, pfeiffer_tpg366, pysmurf_archiver,
+    # pysmurf_controller, pysmurf monitor, smurf_recorder, smurf stream
+    # simulator, chwp Agent
+
+    # Agents that hardcode their fields:
+    # bluefors, cryomech_cpa
+    renames = {"hs-still": "hs_still",
+               "hs-mc": "hs_mc",
+               "Operating State": "Operating_State",
+               "Pump State": "Compressor_State",
+               "Warnings": "Warning_State",
+               "Alarms": "Alarm_State",
+               "Coolant In": "Coolant_In_Temp",
+               "Coolant Out": "Coolant_Out_Temp",
+               "Oil": "Oil_Temp",
+               "Helium": "Helium_Temp",
+               "Low Pressure": "Low_Pressure",
+               "Low Pressure Average": "Low_Pressure_Average",
+               "High Pressure": "High_Pressure",
+               "High Pressure Average": "High_Pressure_Average",
+               "Delta Pressure": "Delta_Pressure_Average",
+               "Motor Current": "Motor_Current"}
+
+    if field_name in renames:
+        return renames[field_name]
+
+    # Agents that dynamically build their field lists:
+    # labjack
+    # This is a tricky one, field names can be any combination of "Channel"
+    # "1-14" and "Units", where units is user defined. Should rename via a
+    # str.replace(' ', '_')
+
+    # Lakeshore 240
+    # This is just like the labjack, though channels/units are well defined,
+    # i.e. all "Channel" "1-8" "V" and "T".  Still, we should just do the same
+    # as with the labjack.
+
+    # Lakeshore 372
+    # Same as the Lakeshore 240, except "T" and "R", instead of "T" and "V" for
+    # units.
+
+    # 370 Agent
+    # Same as the 372 Agent. Not sure if in use yet.
+
+    # All of the above are handled by:
+    if field_name[:7] == "Channel":
+        return field_name.replace(' ', '_')
+
+    return field_name
+
+# Other Agents
+# M1000 Agent
+# Probably lots of issues, not really in use yet, though some data did get
+# written to the Yale aggregator, but can probably be safely ignored/searched
+# for an deleted.
+
+
+class HKRenamer:
+    """Renames invalid field names. Changes here take into consideration
+    changes made to the Agents to fix the naming of fields and match those
+    changes.
+
+    """
+    def __init__(self):
+        pass
+
+    def Process(self, f):
+        if f.type == core.G3FrameType.EndProcessing:
+            return [f]
+
+        if f.type != core.G3FrameType.Housekeeping:
+            return [f]
+
+        # No difference in Session/Status for v0 -> v1.
+        if f.get('hkagg_type') != so3g.HKFrameType.data:
+            return [f]
+
+        # Pop the data blocks out of the frame.
+        orig_blocks = f.pop('blocks')
+        f['blocks'] = core.G3VectorFrameObject()
+
+        # Now process the data blocks.
+        for block in orig_blocks:
+            new_block = core.G3TimesampleMap()
+            new_block.times = block.times
+            for k in block.keys():
+                v = block[k]
+                new_field = rename_fields(k)
+
+                # Catch any still invalid names
+                try:
+                    valid_field = Feed.verify_data_field_string(new_field)
+                except ValueError:
+                    raise ValueError("An unexpected invalid field name, " +
+                                     f"'{new_field}', was encountered. Please " +
+                                     "report this field name as an issue to " +
+                                     "the socs repository.")
+
+                # print(k, new_field)
+                new_block[new_field] = core.G3VectorDouble(v)
+            f['blocks'].append(new_block)
+        return [f]
+
+    def __call__(self, *args, **kwargs):
+        return self.Process(*args, **kwargs)
+
+
+def _build_file_list(target):
+    """Build list of files to scan.
+
+    Parameters
+    ----------
+    target : str
+        File or directory to scan.
+
+    Returns
+    -------
+    list
+        List of full paths to files for scanning.
+
+    """
+    _file_list = []
+    if os.path.isfile(target):
+        _file_list.append(target)
+    elif os.path.isdir(target):
+        a = os.walk(target)
+        for root, _, _file in a:
+            for g3 in _file:
+                if g3[-2:] == "g3":
+                    _file_list.append(os.path.join(root, g3))
+
+    return _file_list
+
+
+def run_pipeline(input_file, output_file):
+    """Method for the G3 Pipeline to demonstrate error in loop."""
+    p = core.G3Pipeline()
+    p.Add(core.G3Reader(input_file))
+    p.Add(HKTranslator())
+    p.Add(HKRenamer())
+    p.Add(core.G3Writer(output_file))
+    p.Run()
+
+
+if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser(
+        description='This program is used to correct a selection of invalid '
+                    'field names in .g3 HK files written with SOCS Agents '
+                    'prior to the v0.1.0 release of SOCS. It will also '
+                    'simultaneously upgrade any HK v0 files to the HK v1 '
+                    'format.')
+    parser.add_argument('target', nargs='+',
+                        help="File or directory to process.")
+    parser.add_argument('--output-directory', '-o', default='./',
+                        help="Output directory for rewritten .g3 files. "
+                             "(default: ./)")
+    args = parser.parse_args()
+
+    # Run me on a G3File containing a Housekeeping stream.
+    # core.set_log_level(core.G3LogLevel.LOG_INFO)
+
+    # Run on just a single file target, outputs directly to -o.
+    if len(args.target) == 1 and os.path.isfile(args.target[0]):
+        if not os.path.exists(args.output_directory):
+            os.makedirs(args.output_directory)
+
+        out_file = os.path.join(args.output_directory, os.path.basename(args.target[0]))
+        print(f"Writing new version of {args.target} to {out_file}")
+        run_pipeline(args.target, out_file)
+    else:
+        # args.target could be list of directories, say. Likely just one directory.
+        for target in args.target:
+            print(f"Processing all .g3 files in {target}...")
+            file_list = _build_file_list(target)
+
+            # For each file in the directory (and its subdirectories), run the pipeline.
+            for _file in file_list:
+                # Remove target directory from path for output directory
+                out_partial_path = _file.lstrip(target)
+
+                # Build out the full path for output
+                output_file = os.path.join(args.output_directory, out_partial_path)
+
+                # Make sure the subdirectories in args.output_directory exist
+                output_directory = os.path.dirname(output_file)
+
+                if not os.path.exists(output_directory):
+                    os.makedirs(output_directory)
+
+                print(f"Writing new version of {_file} to {output_file}")
+                run_pipeline(_file, output_file)

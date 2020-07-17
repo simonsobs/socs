@@ -265,9 +265,10 @@ class LS372_Agent:
                     }
 
                     # Collect both temperature and resistance values from each Channel
-                    data['data'][active_channel.name + ' T'] = \
+                    channel_str = active_channel.name.replace(' ', '_')
+                    data['data'][channel_str + '_T'] = \
                         self.module.get_temp(unit='kelvin', chan=active_channel.channel_num)
-                    data['data'][active_channel.name + ' R'] = \
+                    data['data'][channel_str + '_R'] = \
                         self.module.get_temp(unit='ohms', chan=active_channel.channel_num)
 
                 session.app.publish_to_feed('temperatures', data)
