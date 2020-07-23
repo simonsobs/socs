@@ -3,12 +3,149 @@
 # to HK v1. This is heavily based on the so3g.hk.translator.
 
 import os
+import hashlib
+import logging
+import sqlite3
+
+from pathlib import Path
+from tqdm import tqdm
 
 import so3g
 from so3g.hk.translator import HKTranslator
 from spt3g import core
 
 from ocs.ocs_feed import Feed
+
+
+class RenamerRecord:
+    def __init__(self):
+        """A class to help keep a record of which files have already been
+        processed.
+
+        Within the DB the processed column has these values:
+            0 - unprocessed, this file hasn't been processed at all
+            1 - processed and successful, this file was successfully processed
+            2 - processed and failed, this file had some sort of error and needs addressing
+
+        """
+        self.db = self.connect_to_sqlite()
+        self._init_sqlitedb()
+
+    def connect_to_sqlite(self, path=None, db_file=".socs_rename_fields.db"):
+        """Connect to an SQLite database.
+
+        Parameters
+        ----------
+        path : str
+            Path to store db in. If None, the home directory is used.
+        db_file : str
+            basename for sqlite file
+
+        Returns
+        -------
+        sqlite3.Connection
+            Connection to sqlite3 database
+
+        """
+        if path is None:
+            path = str(Path.home())
+        else:
+            path = os.path.abspath(path)
+        full_path = os.path.join(path, db_file)
+        conn = sqlite3.connect(full_path)
+
+        return conn
+
+    def _init_sqlitedb(self):
+        """Initialize the sqlitedb after connection.
+
+        We call our table 'files'. You probably don't need to change this.
+
+        """
+        c = self.db.cursor()
+        c.execute("CREATE TABLE IF NOT EXISTS files (path TEXT UNIQUE, md5sum TEXT, processed INTEGER)")
+
+        self.db.commit()
+        c.close()
+
+    def add_unknown_files_to_db(self, filelist):
+        """Compares filelist to sqlite database. Insert files if they aren't
+        present. If an md5sum matches a file in the list and the path has
+        changed, the path will be updated.
+
+        Parameters
+        ----------
+        filelist : list
+            list of files to insert into database if they are missing
+
+        """
+        c = self.db.cursor()
+
+        for f in tqdm(filelist, desc="updating database"):
+            md5 = _md5sum(f)
+            c.execute("SELECT * from files WHERE md5sum=?", (md5, ))
+            result = c.fetchone()
+            if result is None:
+                logging.info(f"No match for {md5}, inserting into SQLiteDB")
+                c.execute("INSERT INTO files VALUES (?, ?, 0)", (f, md5))
+                self.db.commit()
+            elif result[0] != f:
+                logging.info(f"Path changed for hash {md5}, updating path to {f}")
+                c.execute("UPDATE files SET path=? WHERE md5sum=?", (f, md5))
+                self.db.commit()
+
+        c.close()
+
+    def get_unprocessed_files(self, filelist):
+        """Get any unprocessed files from the database that are in the
+        filelist.
+
+        Parameters
+        ----------
+        filelist : list
+            list of files to check if they are unprocessed
+
+        """
+        c = self.db.cursor()
+        c.execute("SELECT path from files WHERE processed=0")
+        to_process = c.fetchall()
+        c.close()
+
+        unprocessed_list = []
+        for path in to_process:
+            if path[0] in filelist:
+                unprocessed_list.append(path[0])
+
+        return unprocessed_list
+
+
+def _md5sum(path, blocksize=65536):
+    """Compute md5sum of a file.
+
+    References
+    ----------
+    - https://stackoverflow.com/questions/3431825/generating-an-md5-checksum-of-a-file
+
+    Parameters
+    ----------
+    path : str
+        Full path to file for which we want the md5
+    blocksize : int
+        blocksize we want to read the file in chunks of to avoid fitting the
+        whole file into memory. Defaults to 65536
+
+    Returns
+    -------
+    str
+        Hex string representing the md5sum of the file
+
+    """
+    hash_ = hashlib.md5()
+    with open(path, "rb") as f:
+        for block in iter(lambda: f.read(blocksize), b""):
+            hash_.update(block)
+    return hash_.hexdigest()
+
 
 def rename_fields(field_name):
     """Rename invalid field names."""
@@ -61,6 +198,10 @@ def rename_fields(field_name):
     if field_name[:7] == "Channel":
         return field_name.replace(' ', '_')
 
+    # M1000 Agent (still in development)
+    if field_name[:17] == "MBG-SNMP-LTNG-MIB":
+        return field_name.split("::")[1].split('.')[0]
+
     return field_name
 
 # Other Agents
@@ -104,7 +245,7 @@ class HKRenamer:
 
                 # Catch any still invalid names
                 try:
-                    valid_field = Feed.verify_data_field_string(new_field)
+                    Feed.verify_data_field_string(new_field)
                 except ValueError:
                     raise ValueError("An unexpected invalid field name, " +
                                      f"'{new_field}', was encountered. Please " +
@@ -170,18 +311,30 @@ if __name__ == '__main__':
     parser.add_argument('--output-directory', '-o', default='./',
                         help="Output directory for rewritten .g3 files. "
                              "(default: ./)")
+    parser.add_argument('--log', '-l', default='WARNING',
+                        help='Set loglevel.')
+    parser.add_argument('--logfile', '-f', default='rename_fields.log',
+                        help='Set the logfile.')
     args = parser.parse_args()
+
+    # Logging Configuration
+    numeric_level = getattr(logging, args.log.upper(), None)
+    if not isinstance(numeric_level, int):
+        raise ValueError('Invalid log level: %s' % args.log)
+    logging.basicConfig(filename=args.logfile, level=numeric_level)
 
     # Run me on a G3File containing a Housekeeping stream.
     # core.set_log_level(core.G3LogLevel.LOG_INFO)
 
     # Run on just a single file target, outputs directly to -o.
+    # Don't both recording or even checking if we've processed the file before.
+    # Allows debugging on single files easily.
     if len(args.target) == 1 and os.path.isfile(args.target[0]):
         if not os.path.exists(args.output_directory):
             os.makedirs(args.output_directory)
 
         out_file = os.path.join(args.output_directory, os.path.basename(args.target[0]))
-        print(f"Writing new version of {args.target} to {out_file}")
+        logging.info(f"Writing new version of {args.target} to {out_file}")
         run_pipeline(args.target, out_file)
     else:
         # args.target could be list of directories, say. Likely just one directory.
@@ -189,10 +342,17 @@ if __name__ == '__main__':
             print(f"Processing all .g3 files in {target}...")
             file_list = _build_file_list(target)
 
+            # Record of processed files.
+            record = RenamerRecord()
+            record.add_unknown_files_to_db(file_list)
+            unprocessed_files = record.get_unprocessed_files(file_list)
+
+            c = record.db.cursor()
+
             # For each file in the directory (and its subdirectories), run the pipeline.
-            for _file in file_list:
+            for _file in tqdm(unprocessed_files, desc="processing files"):
                 # Remove target directory from path for output directory
-                out_partial_path = _file.lstrip(target)
+                out_partial_path = _file.replace(target, '').lstrip('/')
 
                 # Build out the full path for output
                 output_file = os.path.join(args.output_directory, out_partial_path)
@@ -203,5 +363,17 @@ if __name__ == '__main__':
                 if not os.path.exists(output_directory):
                     os.makedirs(output_directory)
 
-                print(f"Writing new version of {_file} to {output_file}")
-                run_pipeline(_file, output_file)
+                logging.info(f"Writing new version of {_file} to {output_file}")
+                try:
+                    run_pipeline(_file, output_file)
+                    c.execute("UPDATE files SET processed=1 WHERE path=?", (_file,))
+                    record.db.commit()
+                except RuntimeError:
+                    c.execute("UPDATE files SET processed=2 WHERE path=?", (_file,))
+                    record.db.commit()
+                    logging.warning(f"{_file} failed to process, removing any output")
+                    os.remove(output_file)
+
+            c.close()
+
+    # TODO: Print all failed files that need addressing
