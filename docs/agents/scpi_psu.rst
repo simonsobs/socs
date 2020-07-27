@@ -1,20 +1,21 @@
 .. highlight:: rst
 
-.. _keithly_psu:
+.. _scpi_psu:
 
 ==================
-Keithly PSU Agent
+SCPI PSU Agent
 ==================
 
-This agent works for many power supplies, including the Keithly 2230G 
+This agent uses Standard Commands for Programmable Instruments (SCPI)
+It works for many power supplies, including the Keithley 2230G 
 and BK Precision 9130. It connects to the PSU over ethernet, and allows
 users to set current, voltage, and turn channels on/off. It also allows for 
 live monitoring of the PSU output. 
 
 .. argparse::
-    :filename: ../agents/keithley2230G-psu/keithley_agent.py
+    :filename: ../agents/scpi_psu/scpi_psu_agent.py
     :func: make_parser
-    :prog: python3 keithley_agent.py
+    :prog: python3 scpi_psu_agent.py
 
 
 Configuration File Examples
@@ -24,15 +25,15 @@ Agent in a docker container.
 
 ocs-config
 ``````````
-To configure the Keithly Agent we need to add a Keithly block to our ocs 
+To configure the SCPI PSU Agent we need to add a block to our ocs 
 configuration file. Here is an example configuration block using all of 
 the available arguments::
 
-      {'agent-class': 'Keithley2230G-PSU',
+      {'agent-class': 'ScpiPsuAgent',
         'instance-id': 'psuK',
         'arguments': [
           ['--ip-address', '10.10.10.5'],
-          ['--gpib-slot', '1'],
+          ['--gpib-slot', '1']
           ]},
 
 Most power supplies (including the Keithly 2230G and BK Precision 9130) 
@@ -42,11 +43,11 @@ configuration file. The IP address is then associated with the converter.
 
 Docker
 ``````
-The Keithly Agent should be configured to run in a Docker container.
+The SCPI PSU Agent should be configured to run in a Docker container.
 An example docker-compose service configuration is shown here::
 
   ocs-psuK:
-    image: simonsobs/ocs-psu-agent:latest
+    image: simonsobs/ocs-scpi-psu-agent:latest
     hostname: manny-docker
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
@@ -90,5 +91,5 @@ is running.::
 Agent API
 ---------
 
-.. autoclass:: agents.keithley2230G-psu.keithley_agent.Keithley2230GAgent
+.. autoclass:: agents.scpi_psu.scpi_psu_agent.ScpiPsuAgent
     :members: monitor_output, set_voltage, set_current, set_output

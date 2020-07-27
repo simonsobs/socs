@@ -1,15 +1,14 @@
 import time
 import os
 import socket
-
-from keithley_driver import psuInterface
+from socs.agent.scpi_psu_driver import psuInterface
 
 on_rtd = os.environ.get('READTHEDOCS') == 'True'
 if not on_rtd:
     from ocs import ocs_agent, site_config
     from ocs.ocs_twisted import TimeoutLock
 
-class Keithley2230GAgent:
+class ScpiPsuAgent:
     def __init__(self, agent, ip_address, gpib_slot):
         self.agent = agent
         self.log = agent.log
@@ -32,7 +31,7 @@ class Keithley2230GAgent:
                                  buffer_time=0)
 
     def init_psu(self, session, params=None):
-        """ Task to connect to Keithley power supply """
+        """ Task to connect to power supply """
 
         with self.lock.acquire_timeout(0) as acquired:
             if not acquired:
@@ -156,11 +155,11 @@ if __name__ == '__main__':
     # Parse comand line.
     args = parser.parse_args()
     # Interpret options in the context of site_config.
-    site_config.reparse_args(args, 'Keithley2230G-PSU')
+    site_config.reparse_args(args, 'ScpiPsuAgent')
 
     agent, runner = ocs_agent.init_site_agent(args)
 
-    p = Keithley2230GAgent(agent, args.ip_address, int(args.gpib_slot))
+    p = ScpiPsuAgent(agent, args.ip_address, int(args.gpib_slot))
 
     agent.register_task('init', p.init_psu)
     agent.register_task('set_voltage', p.set_voltage)
