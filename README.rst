@@ -12,17 +12,18 @@ SOCS - Simons Observatory Control System
 .. image:: https://coveralls.io/repos/github/simonsobs/socs/badge.svg?branch=travis
     :target: https://coveralls.io/github/simonsobs/socs?branch=travis
 
+.. image:: https://img.shields.io/badge/dockerhub-latest-blue
+    :target: https://hub.docker.com/r/simonsobs/ocs/tags
+
 Overview
 --------
 
 This repository, `SOCS`_, contains hardware control code for the
 Simons Observatory.  This code operates within the framework provided
-by `OCS`_.  People who liked OCS and SOCS also liked `Sisock`_, our
-time-domain data query system with grafana integration.
+by `OCS`_.
 
 .. _`OCS`: https://github.com/simonsobs/ocs/
 .. _SOCS: https://github.com/simonsobs/socs/
-.. _`SiSock`: https://github.com/simonsobs/sisock/
 
 Installation
 ------------
@@ -44,6 +45,40 @@ configured host if it does not already exist:
 See the `ocs docs`_ for more details.
 
 .. _`ocs docs`: https://ocs.readthedocs.io/en/latest/site_config.html
+
+Docker Images
+-------------
+Docker images for SOCS and each Agent are available on `Docker Hub`_. Official
+releases will be tagged with their release version, i.e. ``v0.1.0``. These are
+only built on release, and the ``latest`` tag will point to the latest of these
+released tags. These should be considered stable.
+
+Development images will be tagged with the latest released version tag, the
+number of commits ahead of that release, the latest commit hash, and the tag
+``-dev``, i.e.  ``v0.0.2-81-g9c10ba6-dev``. These get built on each commit to
+the ``develop`` branch, and are useful for testing and development, but should
+be considered unstable.
+
+.. _Docker Hub: https://hub.docker.com/u/simonsobs
+
+Documentation
+-------------
+The SOCS documentation can be built using sphinx once you have performed the
+installation::
+
+  cd docs/
+  make html
+
+You can then open ``docs/_build/html/index.html`` in your preferred web
+browser. You can also find a copy hosted on `Read the Docs`_.
+
+.. _Read the Docs: https://socs.readthedocs.io/en/latest/
+
+Contributing
+------------
+For guidelines on how to contribute to OCS see `CONTRIBUTING.rst`_.
+
+.. _CONTRIBUTING.rst: CONTRIBUTING.rst
 
 License
 --------
