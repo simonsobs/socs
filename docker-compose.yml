@@ -70,9 +70,9 @@ services:
   # --------------------------------------------------------------------------
   # Power Supply control Agent
   # --------------------------------------------------------------------------
-  ocs-psu-agent:
-    image: "ocs-psu-agent"
-    build: ./agents/keithley2230G-psu/
+  ocs-scpi-psu-agent:
+    image: "ocs-scpi-psu-agent"
+    build: ./agents/scpi_psu/
 
   # --------------------------------------------------------------------------
   # Cryomech CPA compressor log agent
