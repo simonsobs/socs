@@ -28,7 +28,13 @@ by `OCS`_.
 Installation
 ------------
 
-This code can be used directly from the source tree.
+To install SOCS, clone the repository and install with `pip`:
+
+.. code-block:: bash
+
+    git clone https://github.com/simonsobs/socs.git
+    cd socs/
+    pip3 install -r requirements.txt .
 
 In order for OCS tools to find these agents, you must add the full
 path to the agents directory, e.g. ``/home/simons/code/socs/agents/``,
