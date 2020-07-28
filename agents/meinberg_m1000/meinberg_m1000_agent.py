@@ -121,11 +121,16 @@ class MeinbergM1000Agent:
 
                     for thing in result:
                         try:
+                            # OID from SNMP GET
+                            oid = thing[0].prettyPrint()
+                            # Splits something like 'MBG-SNMP-LTNG-MIB::mbgLtNgRefclockState.1'
+                            valid_field = oid.split("::")[1].split('.')[0]
+
                             # TODO: Change to debug
-                            self.log.info("{oid} {value}",
-                                          oid=thing[0].prettyPrint(),
+                            self.log.info("{o} {value}",
+                                          o=oid,
                                           value=int(thing[1]))
-                            message['data'][thing[0].prettyPrint()] = int(thing[1])
+                            message['data'][valid_field] = int(thing[1])
                         except ValueError:
                             self.log.warn('{oid} is of type {_type}, not int', oid=thing[1], _type=type(thing[1]))
 
