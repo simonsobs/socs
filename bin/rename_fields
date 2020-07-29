@@ -376,4 +376,12 @@ if __name__ == '__main__':
 
             c.close()
 
-    # TODO: Print all failed files that need addressing
+    # Print failed files before finishing.
+    c = record.db.cursor()
+    c.execute("SELECT path FROM files WHERE processed=2")
+    failed_paths = c.fetchall()
+    c.close()
+
+    print("The following files failed to process:")
+    for path in failed_paths:
+        print(path[0])
