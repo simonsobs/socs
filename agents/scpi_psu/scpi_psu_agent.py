@@ -1,15 +1,16 @@
 import time
 import os
 import socket
-
-from keithley_driver import psuInterface
+import argparse
+from socs.agent.scpi_psu_driver import psuInterface
 
 on_rtd = os.environ.get('READTHEDOCS') == 'True'
 if not on_rtd:
     from ocs import ocs_agent, site_config
     from ocs.ocs_twisted import TimeoutLock
 
-class Keithley2230GAgent:
+
+class ScpiPsuAgent:
     def __init__(self, agent, ip_address, gpib_slot):
         self.agent = agent
         self.log = agent.log
@@ -32,7 +33,7 @@ class Keithley2230GAgent:
                                  buffer_time=0)
 
     def init_psu(self, session, params=None):
-        """ Task to connect to Keithley power supply """
+        """ Task to connect to power supply """
 
         with self.lock.acquire_timeout(0) as acquired:
             if not acquired:
@@ -73,13 +74,17 @@ class Keithley2230GAgent:
                         'data': {}
                     }
 
-                    for chan in [1,2,3]:
+                    for chan in [1, 2, 3]:
                         data['data']["Voltage_{}".format(chan)] = self.psu.getVolt(chan)
                         data['data']["Current_{}".format(chan)] = self.psu.getCurr(chan)
 
                     # self.log.info(str(data))
                     # print(data)
                     self.agent.publish_to_feed('psu_output', data)
+
+                    # Allow this process to be queried to return current data
+                    session.data = data
+
                 else:
                     self.log.warn("Could not acquire in monitor_current")
 
@@ -118,7 +123,7 @@ class Keithley2230GAgent:
         """
         with self.lock.acquire_timeout(1) as acquired:
             if acquired:
-                self.psu.setCurr(params['channel'],params['current'])
+                self.psu.setCurr(params['channel'], params['current'])
             else:
                 return False, "Could not acquire lock"
 
@@ -140,22 +145,36 @@ class Keithley2230GAgent:
 
         return True, 'Initialized PSU.'
 
-if __name__ == '__main__':
-    parser = site_config.add_arguments()
+
+def make_parser(parser=None):
+    """Build the argument parser for the Agent. Allows sphinx to automatically
+    build documentation based on this function.
+
+    """
+    if parser is None:
+        parser = argparse.ArgumentParser()
 
     # Add options specific to this agent.
     pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--ip-address')
     pgroup.add_argument('--gpib-slot')
 
-    # Parse comand line.
+    return parser
+
+
+if __name__ == '__main__':
+    site_parser = site_config.add_arguments()
+    parser = make_parser(site_parser)
+
+    # Get the parser to process the command line.
     args = parser.parse_args()
+
     # Interpret options in the context of site_config.
-    site_config.reparse_args(args, 'Keithley2230G-PSU')
+    site_config.reparse_args(args, 'ScpiPsuAgent')
 
     agent, runner = ocs_agent.init_site_agent(args)
 
-    p = Keithley2230GAgent(agent, args.ip_address, int(args.gpib_slot))
+    p = ScpiPsuAgent(agent, args.ip_address, int(args.gpib_slot))
 
     agent.register_task('init', p.init_psu)
     agent.register_task('set_voltage', p.set_voltage)
