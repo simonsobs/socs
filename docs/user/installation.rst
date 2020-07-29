@@ -7,11 +7,11 @@ To checkout SOCS, clone the repository and run `setup.py`::
 
   git clone https://github.com/simonsobs/socs.git
   cd socs/
-  python3 setup.py install
+  pip3 install -r requirements.txt .
 
 .. note::
     If you are expecting to develop socs code you should consider using
-    'develop' instead of 'install'.
+    the `-e` flag.
 
 .. note::
     If you would like to install for just the local user, throw the `--user`
