@@ -8,6 +8,7 @@ if not on_rtd:
     from ocs import ocs_agent, site_config
     from ocs.ocs_twisted import TimeoutLock
 
+
 class ScpiPsuAgent:
     def __init__(self, agent, ip_address, gpib_slot):
         self.agent = agent
@@ -72,17 +73,17 @@ class ScpiPsuAgent:
                         'data': {}
                     }
 
-                    for chan in [1,2,3]:
+                    for chan in [1, 2, 3]:
                         data['data']["Voltage_{}".format(chan)] = self.psu.getVolt(chan)
                         data['data']["Current_{}".format(chan)] = self.psu.getCurr(chan)
 
                     # self.log.info(str(data))
                     # print(data)
                     self.agent.publish_to_feed('psu_output', data)
-                    
+
                     # Allow this process to be queried to return current data
                     session.data = data
-                    
+
                 else:
                     self.log.warn("Could not acquire in monitor_current")
 
@@ -121,7 +122,7 @@ class ScpiPsuAgent:
         """
         with self.lock.acquire_timeout(1) as acquired:
             if acquired:
-                self.psu.setCurr(params['channel'],params['current'])
+                self.psu.setCurr(params['channel'], params['current'])
             else:
                 return False, "Could not acquire lock"
 
@@ -142,18 +143,31 @@ class ScpiPsuAgent:
                 return False, "Could not acquire lock"
 
         return True, 'Initialized PSU.'
-        
 
-if __name__ == '__main__':
-    parser = site_config.add_arguments()
+
+def make_parser(parser=None):
+    """Build the argument parser for the Agent. Allows sphinx to automatically
+    build documentation based on this function.
+
+    """
+    if parser is None:
+        parser = argparse.ArgumentParser()
 
     # Add options specific to this agent.
     pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--ip-address')
     pgroup.add_argument('--gpib-slot')
 
-    # Parse comand line.
+    return parser
+
+
+if __name__ == '__main__':
+    site_parser = site_config.add_arguments()
+    parser = make_parser(site_parser)
+
+    # Get the parser to process the command line.
     args = parser.parse_args()
+
     # Interpret options in the context of site_config.
     site_config.reparse_args(args, 'ScpiPsuAgent')
 
