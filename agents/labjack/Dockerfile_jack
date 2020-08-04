@@ -1,0 +1,27 @@
+# SOCS LabJack Agent
+# socs Agent container for running the LabJack Agent.
+
+# Use socs base image
+FROM socs:latest
+
+# Set the working directory to proper agent directory
+WORKDIR /app/socs/agents/labjack/
+
+## Copy this agent into the app/agents directory
+COPY . .
+RUN pip3 install -r requirements.txt
+
+# Install ljm module from labjack
+RUN apt-get update && apt-get install -y libusb-1.0 vim
+RUN ./ljm_install.sh
+#RUN tar -zvxf labjack_ljm_software_2019_07_16_x86_64.tar.gz 
+
+#RUN ./labjack_ljm_software_2019_07_16_x86_64/labjack_ljm_installer.run -- --no-restart-device-rules
+
+
+# Run registry on container startup
+ENTRYPOINT ["python3", "-u", "labjack_agent.py"]
+
+# Sensible default arguments
+CMD ["--site-hub=ws://sisock-crossbar:8001/ws", \
+     "--site-http=http://sisock-crossbar:8001/call"]
