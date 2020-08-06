@@ -315,6 +315,8 @@ if __name__ == '__main__':
                         help='Set loglevel.')
     parser.add_argument('--logfile', '-f', default='rename_fields.log',
                         help='Set the logfile.')
+    parser.add_argument('--skip-file-check', '-s', action='store_true',
+                        help='Skip file check step.')
     args = parser.parse_args()
 
     # Logging Configuration
@@ -344,7 +346,8 @@ if __name__ == '__main__':
 
             # Record of processed files.
             record = RenamerRecord()
-            record.add_unknown_files_to_db(file_list)
+            if not args.skip_file_check:
+                record.add_unknown_files_to_db(file_list)
             unprocessed_files = record.get_unprocessed_files(file_list)
 
             c = record.db.cursor()
@@ -372,6 +375,11 @@ if __name__ == '__main__':
                     c.execute("UPDATE files SET processed=2 WHERE path=?", (_file,))
                     record.db.commit()
                     logging.warning(f"{_file} failed to process, removing any output")
+                    os.remove(output_file)
+                except ValueError as e:
+                    c.execute("UPDATE files SET processed=2 WHERE path=?", (_file,))
+                    record.db.commit()
+                    logging.error(f"ValueError in {_file}. Removing any output. -- {e}")
                     os.remove(output_file)
 
             c.close()
