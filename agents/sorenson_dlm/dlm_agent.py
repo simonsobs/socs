@@ -1,5 +1,5 @@
 #script to log and control the Sorenson DLM power supply, for heaters
-
+#asdf
 import sys, os
 import binascii
 import time
@@ -71,7 +71,7 @@ class DLM:
         """
         self.send_msg('SOUR:VOLT?')
         msg = self.rec_msg()
-        print(msg)
+        #print(msg)
         return msg
 
     def read_current(self):
@@ -111,6 +111,7 @@ class DLMAgent:
         self.lock = TimeoutLock()
         self.f_sample = f_sample
         self.take_data = False
+        self.over_volt = 0
         self.dlm = DLM(ip_address, int(port))
         agg_params = {'frame length':60, }
         self.agent.register_feed('voltages',
@@ -145,30 +146,50 @@ class DLMAgent:
                     'data': {}
                 }
                 voltage_reading = self.dlm.read_voltage()
+                print('Voltage: {}'.format(voltage_reading))
                 # Loop through all the channels on the device
                 data['data']["voltage"] = voltage_reading
 
                 self.agent.publish_to_feed('voltages', data)
                 time.sleep(sleep_time)
 
-            self.agents.feeds['voltages'].flush_buffer()
+            self.agent.feeds['voltages'].flush_buffer()
         return True, 'Acquistion exited cleanly'
 
-    def set_voltage(self, voltage = '1.0'):
+    def set_voltage(self, session, params = None):
         """
         Sets voltage of power supply:
         Args:
-            volts (float): Voltage to set. Must be between 0 and 30.
+            volts (int): Voltage to set. 
         """
 
-        with self.lock.acquire_timeout(1) as acquired:
+        with self.lock.acquire_timeout(timeout = 0, job = 'init') as acquired:
             if acquired:
-                self.dlm.send_msg('SOUR:VOLT {}'.format(voltage))
+                if self.over_volt == 0:
+                    return False, 'Over voltage protection not set'
+                elif float(params['voltage'])>float(self.over_volt):
+                    return False, 'Voltage greater then over voltage protection'
+                else:
+                    self.dlm.send_msg('SOUR:VOLT {}'.format(params['voltage']))
             else:
                 return False, "Could not acquire lock"
 
-        return True, 'Set voltage to {}'.format(voltage)
+        return True, 'Set voltage to {}'.format(params['voltage'])
 
+    def set_over_volt(self, session, params=None):
+        """
+        Sets over voltage protection of power supply:
+        Args:
+            over_volt (int): Over voltage protection to set
+        """
+
+        with self.lock.acquire_timeout(timeout = 0, job = 'init') as acquired:
+            if acquired:
+                self.dlm.set_overv_prot(params['over_volt'])
+                self.over_volt = float(params['over_volt']) 
+            else:
+                return False, 'Could not acquire lock'
+        return True, 'Set over voltage protection to {}'.format(params['over_volt'])
 
     def stop_acq(self, session, params=None):
         '''
@@ -176,7 +197,7 @@ class DLMAgent:
         '''
         if self.take_data:
             self.take_data = False
-            self.power_supply.close()
+            #self.power_supply.close()
             return True, 'requested to stop taking data.'
         else:
             return False, 'acq is not currently running'
@@ -189,6 +210,7 @@ if __name__ == '__main__':
     pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--ip_address')
     pgroup.add_argument('--port')
+    pgroup.add_argument('--voltage')
 
     args = parser.parse_args()
 
@@ -199,6 +221,7 @@ if __name__ == '__main__':
                            DLM_agent.stop_acq, startup=True)   
     agent.register_task('set_voltage', DLM_agent.set_voltage)
     agent.register_task('close', DLM_agent.stop_acq)
+    agent.register_task('set_over_volt', DLM_agent.set_over_volt)
     runner.run(agent, auto_reconnect=True)
 
 
