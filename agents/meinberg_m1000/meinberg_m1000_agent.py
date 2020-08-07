@@ -57,7 +57,7 @@ class MeinbergM1000Agent:
         self.snmp = SNMPTwister(address, port)
 
         agg_params = {
-            'frame_length': 10*60 #[sec]
+            'frame_length': 10*60  # [sec]
         }
         self.agent.register_feed('m1000',
                                  record=True,
@@ -72,14 +72,11 @@ class MeinbergM1000Agent:
                             {"oid": ObjectType(ObjectIdentity('MBG-SNMP-LTNG-MIB', 'mbgLtNgNtpCurrentState', 0)), "interval": 64, "lastGet": None},
                             {"oid": ObjectType(ObjectIdentity('MBG-SNMP-LTNG-MIB', 'mbgLtNgPtpPortState', 1)), "interval": 3, "lastGet": None}]
 
-
     @inlineCallbacks
     def start_record(self, session, params=None):
         """start_record(params=None)
 
-        OCS Process to start recording SMuRF data. This Process uses
-        FrameRecorder, which deals with I/O, requiring this process to run in a
-        worker thread. Be sure to register with blocking=True.
+        OCS Process for fetching values from the M1000 via SNMP.
 
         """
         if params is None:
@@ -88,7 +85,7 @@ class MeinbergM1000Agent:
         self.is_streaming = True
 
         # Determine unique interval values
-        interval_groups = list(set([x['interval'] for x in self.mib_timings]))
+        interval_groups = list({x['interval'] for x in self.mib_timings})
 
         while self.is_streaming:
             # Loop through interval groups and issue get commands for each
@@ -119,20 +116,22 @@ class MeinbergM1000Agent:
                         'data': {}
                     }
 
-                    for thing in result:
+                    for item in result:
                         try:
                             # OID from SNMP GET
-                            oid = thing[0].prettyPrint()
-                            # Splits something like 'MBG-SNMP-LTNG-MIB::mbgLtNgRefclockState.1'
-                            valid_field = oid.split("::")[1].split('.')[0]
+                            oid = item[0].prettyPrint()
+                            # Makes something like 'MBG-SNMP-LTNG-MIB::mbgLtNgRefclockState.1'
+                            # look like 'mbgLtNgRefclockState_1'
+                            valid_field = oid.split("::")[1].replace('.', '_')
 
                             # TODO: Change to debug
                             self.log.info("{o} {value}",
                                           o=oid,
-                                          value=int(thing[1]))
-                            message['data'][valid_field] = int(thing[1])
+                                          value=int(item[1]))
+                            message['data'][valid_field] = int(item[1])
                         except ValueError:
-                            self.log.warn('{oid} is of type {_type}, not int', oid=thing[1], _type=type(thing[1]))
+                            self.log.warn('{oid} is of type {_type}, not int',
+                                          oid=item[1], _type=type(item[1]))
 
                     # Update lastGet time
                     for mib in self.mib_timings:
@@ -145,12 +144,6 @@ class MeinbergM1000Agent:
 
                 result = []
                 yield dsleep(0.1)
-
-        #while self.is_streaming:
-        #    recorder.run()
-
-        ## Explicitly clean up when done
-        #del recorder
 
         return True, "Finished Recording"
 
