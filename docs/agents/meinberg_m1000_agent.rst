@@ -23,9 +23,19 @@ the state of the device.
 The Meinberg M1000 Agent actively issues SNMP GET commands to request the
 status from several Object Identifiers (OIDs) specified by the Meinberg
 provided Management Information Base (MIB). We sample only a subset of the OIDs
-defined by the MIB, following recommendations from the M1000 manual. This MIB
-has been converted from the original .mib format to a .py format that is
-consumable via pysnmp and is provided by socs.
+defined by the MIB, following recommendations from the `M1000 manual
+<https://www.meinbergglobal.com/download/docs/manuals/english/ltos_6-24.pdf>`_.
+This MIB has been converted from the original .mib format to a .py format that
+is consumable via pysnmp and is provided by socs.
+
+Agent Fields
+````````````
+The fields returned by the Agent are built from the SNMP GET responses from the
+M1000. The field names consist of the OID name and the last value of the OID,
+which often serves as an index for duplicate pieces of hardware that share a
+OID string, i.e. redundant power supplies on the OID "mbgLtNgSysPsStatus". This
+results in field names such as "mbgLtNgSysPsStatus_0" and
+"mbgLtNgSysPsStatus_1".
 
 Configuration File Examples
 ---------------------------
