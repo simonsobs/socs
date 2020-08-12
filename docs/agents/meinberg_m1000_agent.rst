@@ -23,8 +23,7 @@ the state of the device.
 The Meinberg M1000 Agent actively issues SNMP GET commands to request the
 status from several Object Identifiers (OIDs) specified by the Meinberg
 provided Management Information Base (MIB). We sample only a subset of the OIDs
-defined by the MIB, following recommendations from the `M1000 manual
-<https://www.meinbergglobal.com/download/docs/manuals/english/ltos_6-24.pdf>`_.
+defined by the MIB, following recommendations from the `M1000 manual`_.
 This MIB has been converted from the original .mib format to a .py format that
 is consumable via pysnmp and is provided by socs.
 
@@ -36,6 +35,11 @@ which often serves as an index for duplicate pieces of hardware that share a
 OID string, i.e. redundant power supplies on the OID "mbgLtNgSysPsStatus". This
 results in field names such as "mbgLtNgSysPsStatus_0" and
 "mbgLtNgSysPsStatus_1".
+
+These queries mostly return integers which map to some state. For information
+about the states corresponding to these values we refer to the `M1000 manual`_.
+
+.. _M1000 manual: https://www.meinbergglobal.com/download/docs/manuals/english/ltos_6-24.pdf
 
 Configuration File Examples
 ---------------------------
@@ -55,8 +59,8 @@ using all of the available arguments::
                      ['--autostart', True]]},
 
 The ``--address`` argument should be the address of the M1000 on the network.
-This is the main network interface for the device, not the PTP interface, which
-differs.
+This is the main network interface for the device, not the PTP interface,
+which is different.
 
 Docker
 ``````

@@ -6,6 +6,7 @@ from pysnmp.hlapi.twisted import getCmd, SnmpEngine, CommunityData, UdpTransport
 # For logging
 txaio.use_twisted()
 
+
 class SNMPTwister:
     """Helper class for handling SNMP communication with twisted.
 
@@ -61,7 +62,7 @@ class SNMPTwister:
         if error_status:
             self.log.error('%s: %s at %s' % (self.address,
                                              error_status.prettyPrint(),
-                                             error_index and \
+                                             error_index and
                                              var_binds[int(error_index) - 1][0] or '?'))
         else:
             for var in var_binds:

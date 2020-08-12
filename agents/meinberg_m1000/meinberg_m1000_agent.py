@@ -124,10 +124,9 @@ class MeinbergM1000Agent:
                             # look like 'mbgLtNgRefclockState_1'
                             valid_field = oid.split("::")[1].replace('.', '_')
 
-                            # TODO: Change to debug
-                            self.log.info("{o} {value}",
-                                          o=oid,
-                                          value=int(item[1]))
+                            self.log.debug("{o} {value}",
+                                           o=oid,
+                                           value=int(item[1]))
                             message['data'][valid_field] = int(item[1])
                         except ValueError:
                             self.log.warn('{oid} is of type {_type}, not int',
@@ -138,8 +137,7 @@ class MeinbergM1000Agent:
                         if mib['oid'] in get_list:
                             mib['lastGet'] = read_time
 
-                    # TODO: Change to debug
-                    self.log.info("{msg}", msg=message)
+                    self.log.debug("{msg}", msg=message)
                     session.app.publish_to_feed('m1000', message)
 
                 result = []

@@ -1,15 +1,15 @@
-# SOCS SMuRF Recorder
+# SOCS Meinberg M1000 Agent
 
 # Use socs base image
 FROM socs:latest
 
-# Set the working directory to registry directory
+# Set the working directory
 WORKDIR /app/socs/agents/meinberg_m1000/
 #COPY . .
 COPY meinberg_m1000_agent.py .
 COPY mibs/ /usr/local/lib/python3.6/dist-packages/pysnmp/smi/mibs/
 
-# Run registry on container startup
+# Run agent on container startup
 ENTRYPOINT ["python3", "-u", "meinberg_m1000_agent.py"]
 
 # Default site-hub

@@ -9,7 +9,7 @@ Protocl (SNMP). SNMP is a standard protocol for collecting and organizing
 information about devices on the network.
 
 SNMP support is provided through the python module `pysnmp`_. pysnmp supports
-twisted as an I/O framework, which meshes nicely with OCS/SOCS. SOCS makes this
+twisted as an I/O framework, which integrates nicely with OCS/SOCS. SOCS makes this
 twisted interface for SNMP available via the SNMPTwister class.
 
 .. _pysnmp: http://snmplabs.com/pysnmp/contents.html
