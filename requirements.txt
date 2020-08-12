@@ -13,3 +13,6 @@ pymodbus
 numexpr
 pyyaml
 scipy
+
+# Docs
+sphinx_rtd_theme
