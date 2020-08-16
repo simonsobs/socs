@@ -1,0 +1,20 @@
+# SOCS LabJack Agent
+# socs Agent container for running the LabJack Agent.
+
+# Use socs base image
+FROM socs:latest
+
+# Set the working directory to proper agent directory
+WORKDIR /app/socs/agents/synacc/
+
+## Copy this agent into the app/agents directory
+COPY . .
+
+RUN pip3 install -r requirements.txt
+
+# Run registry on container startup
+ENTRYPOINT ["python3", "-u", "synacc.py"]
+
+# Sensible default arguments
+CMD ["--site-hub=ws://sisock-crossbar:8001/ws", \
+     "--site-http=http://sisock-crossbar:8001/call"]
