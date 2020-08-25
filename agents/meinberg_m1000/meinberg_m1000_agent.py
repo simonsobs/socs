@@ -175,7 +175,7 @@ def make_parser(parser=None):
     # Add options specific to this agent.
     pgroup = parser.add_argument_group("Agent Options")
     pgroup.add_argument("--auto-start", default=True, type=bool,
-                        help="Automatically start listening for data at " +
+                        help="Automatically start polling for data at " +
                         "Agent startup.")
     pgroup.add_argument("--address", help="Address to listen to.")
     pgroup.add_argument("--port", default=161,
