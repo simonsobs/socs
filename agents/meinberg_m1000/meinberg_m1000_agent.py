@@ -92,6 +92,9 @@ class MeinbergM1000Agent:
             # interval group, publishing to a block with the interval in the
             # name.
             for interval in interval_groups:
+                # SNMP GET response
+                result = []
+
                 # Create list of OIDs to GET based on last time we checked them
                 get_list = []
                 for mib in self.mib_timings:
@@ -140,7 +143,6 @@ class MeinbergM1000Agent:
                     self.log.debug("{msg}", msg=message)
                     session.app.publish_to_feed('m1000', message)
 
-                result = []
                 yield dsleep(0.1)
 
         return True, "Finished Recording"
