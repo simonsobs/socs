@@ -1,7 +1,7 @@
 import txaio
 
 from pysnmp.hlapi.twisted import getCmd, SnmpEngine, CommunityData, UdpTransportTarget,\
-                                 ContextData
+                                 ContextData, ObjectType, ObjectIdentity
 
 # For logging
 txaio.use_twisted()
@@ -92,16 +92,23 @@ class SNMPTwister:
                                                 'mbgLtNgRefclockLeapSecondDate',
                                                 1))])
 
+        >>> snmp = SNMPTwister('localhost', 161)
+        >>> snmp.get([('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockState', 1),
+                      ('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockLeapSecondDate', 1)])
+
         Parameters
         ----------
         oid_list : list
-            List of high-level MIB Object OIDs. See `Specifying MIB Objects`_ for
-            more info
+            List of high-level MIB Object OIDs. The list elements should either be
+            ObjectType, or tuples which define the OIDs, as shown in the
+            example above. See `Specifying MIB Objects`_ for more info.
 
             .. _Specifying MIB Objects:
                http://snmplabs.com/pysnmp/docs/pysnmp-hlapi-tutorial.html#specifying-mib-object
 
         """
+        oid_list = [ObjectType(ObjectIdentity(*x)) if isinstance(x, tuple) else x for x in oid_list]
+
         datagram = getCmd(self.snmp_engine,
                           CommunityData('public', mpModel=0),  # SNMPv1
                           self.udp_transport,

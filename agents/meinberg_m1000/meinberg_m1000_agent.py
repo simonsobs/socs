@@ -7,7 +7,6 @@ import txaio
 
 from autobahn.twisted.util import sleep as dsleep
 from twisted.internet.defer import inlineCallbacks
-from pysnmp.hlapi.twisted import ObjectType, ObjectIdentity
 
 from socs.snmp import SNMPTwister
 
@@ -44,6 +43,14 @@ class MeinbergM1000Agent:
         false stops the recording of data.
     log : txaio.tx.Logger
         txaio logger object, created by the OCSAgent
+    snmp : socs.snmp.SNMPTwister
+        snmp handler from SOCS
+    mib_timings : list
+        list of dicts describing the SNMP OIDs to check, and at which
+        intervals. Each dict contains the keys "oid", "interval", and
+        "lastGet". The corresponding values are of types tuple, integer, and
+        float, respectively. "lastGet" is initialized as None, since no SNMP
+        GET commands have been issued.
 
     """
 
@@ -64,13 +71,13 @@ class MeinbergM1000Agent:
                                  agg_params=agg_params,
                                  buffer_time=1)
 
-        self.mib_timings = [{"oid": ObjectType(ObjectIdentity('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockState', 1)), "interval": 60, "lastGet": None},
-                            {"oid": ObjectType(ObjectIdentity('MBG-SNMP-LTNG-MIB', 'mbgLtNgSysPsStatus', 1)), "interval": 60, "lastGet": None},
-                            {"oid": ObjectType(ObjectIdentity('MBG-SNMP-LTNG-MIB', 'mbgLtNgSysPsStatus', 2)), "interval": 60, "lastGet": None},
-                            {"oid": ObjectType(ObjectIdentity('MBG-SNMP-LTNG-MIB', 'mbgLtNgEthPortLinkState', 1)), "interval": 60, "lastGet": None},
-                            {"oid": ObjectType(ObjectIdentity('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockLeapSecondDate', 1)), "interval": 60*60, "lastGet": None},
-                            {"oid": ObjectType(ObjectIdentity('MBG-SNMP-LTNG-MIB', 'mbgLtNgNtpCurrentState', 0)), "interval": 64, "lastGet": None},
-                            {"oid": ObjectType(ObjectIdentity('MBG-SNMP-LTNG-MIB', 'mbgLtNgPtpPortState', 1)), "interval": 3, "lastGet": None}]
+        self.mib_timings = [{"oid": ('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockState', 1), "interval": 60, "lastGet": None},
+                            {"oid": ('MBG-SNMP-LTNG-MIB', 'mbgLtNgSysPsStatus', 1), "interval": 60, "lastGet": None},
+                            {"oid": ('MBG-SNMP-LTNG-MIB', 'mbgLtNgSysPsStatus', 2), "interval": 60, "lastGet": None},
+                            {"oid": ('MBG-SNMP-LTNG-MIB', 'mbgLtNgEthPortLinkState', 1), "interval": 60, "lastGet": None},
+                            {"oid": ('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockLeapSecondDate', 1), "interval": 60*60, "lastGet": None},
+                            {"oid": ('MBG-SNMP-LTNG-MIB', 'mbgLtNgNtpCurrentState', 0), "interval": 64, "lastGet": None},
+                            {"oid": ('MBG-SNMP-LTNG-MIB', 'mbgLtNgPtpPortState', 1), "interval": 3, "lastGet": None}]
 
     @inlineCallbacks
     def start_record(self, session, params=None):
