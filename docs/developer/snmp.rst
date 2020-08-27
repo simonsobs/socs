@@ -70,9 +70,9 @@ Initializing an SNMPTwister::
 
     snmp = SNMPTwister(address, port)
 
-    get_list = [ObjectType(ObjectIdentity('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockState', 1)),
-                ObjectType(ObjectIdentity('MBG-SNMP-LTNG-MIB', 'mbgLtNgSysPsStatus', 1)),
-                ObjectType(ObjectIdentity('MBG-SNMP-LTNG-MIB', 'mbgLtNgSysPsStatus', 2))]
+    get_list = [('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockState', 1),
+                ('MBG-SNMP-LTNG-MIB', 'mbgLtNgSysPsStatus', 1),
+                ('MBG-SNMP-LTNG-MIB', 'mbgLtNgSysPsStatus', 2)]
 
     result = yield snmp.get(get_list)
 
