@@ -376,8 +376,8 @@ class MeinbergM1000Agent:
                                  buffer_time=1)
 
     @inlineCallbacks
-    def start_record(self, session, params=None):
-        """start_record(params=None)
+    def start_acq(self, session, params=None):
+        """start_acq(params=None)
 
         OCS Process for fetching values from the M1000 via SNMP.
 
@@ -426,10 +426,10 @@ class MeinbergM1000Agent:
 
         return True, "Finished Recording"
 
-    def stop_record(self, session, params=None):
-        """stop_record(params=None)
+    def stop_acq(self, session, params=None):
+        """stop_acq(params=None)
 
-        Stop method associated with start_record process.
+        Stop method associated with start_acq process.
 
         """
         self.is_streaming = False
@@ -474,9 +474,9 @@ if __name__ == "__main__":
                                   address=args.address,
                                   port=int(args.port))
 
-    agent.register_process("record",
-                           listener.start_record,
-                           listener.stop_record,
+    agent.register_process("acq",
+                           listener.start_acq,
+                           listener.stop_acq,
                            startup=bool(args.auto_start), blocking=False)
 
     runner.run(agent, auto_reconnect=True)

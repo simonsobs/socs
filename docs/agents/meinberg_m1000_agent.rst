@@ -97,4 +97,4 @@ Agent API
 ---------
 
 .. autoclass:: agents.meinberg_m1000.meinberg_m1000_agent.MeinbergM1000Agent
-    :members: start_record
+    :members: start_acq
