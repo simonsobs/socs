@@ -198,7 +198,7 @@ class MeinbergSNMP:
             oid_value = oid_value.decode("utf-8")
 
         # I don't expect any other types at the moment, but just in case.
-        if not isinstance(oid_value, (int, bytes)):
+        if not isinstance(oid_value, (int, bytes, str)):
             self.log.error("{oid} is of unknown and unhandled type " +
                            "{oid_type}. Returning None.",
                            oid=oid, oid_type=type(oid_value))
