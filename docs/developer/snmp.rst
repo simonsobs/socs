@@ -57,14 +57,37 @@ An example which converted the MBG-SNMP-LTNG-MIB .mib file::
 
 Examples
 --------
+A standalone example::
 
-.. note::
+    from twisted.internet import reactor
+    from socs.snmp import SNMPTwister
+    
+    # Setup communication with M1000
+    snmp = SNMPTwister('10.10.10.186', 161)
+    
+    # Define OIDs to query
+    get_list = [('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockState', 1),
+                ('MBG-SNMP-LTNG-MIB', 'mbgLtNgSysPsStatus', 1),
+                ('MBG-SNMP-LTNG-MIB', 'mbgLtNgSysPsStatus', 2)]
+    
+    def printResult(x):
+        print(x)
+    
+    # Run the twisted SNMP GET and print the results
+    d = snmp.get(get_list)
+    d.addCallback(printResult)
+    
+    # Shut things down by asking the reactor to stop after 3 seconds
+    reactor.callLater(3, reactor.stop)
+    reactor.run()
 
-    These examples assume you're in the reactor context, i.e. running in an OCS
-    Agent non-blocking task or process. This primarily means we don't start the
-    reactor or any sort of runner ourselves.
+This will return something like the following::
 
-Initializing an SNMPTwister::
+    $ python3 snmp_twister_test.py
+    [ObjectType(ObjectIdentity(<ObjectName value object, tagSet <TagSet object, tags 0:0:6>, payload [1.3.6.1.4.1.5597.30.0.1.2.1.4.1]>), <Integer32 value object, tagSet <TagSet object, tags 0:0:2>, subtypeSpec <ConstraintsIntersection object, consts <ValueRangeConstraint object, consts -2147483648, 2147483647>, <ConstraintsUnion object, consts <SingleValueConstraint object, consts 0, 1, 2>>>, namedValues <NamedValues object, enums notAvailable=0, synchronized=1, notSynchronized=2>, payload [notSynchronized]>), ObjectType(ObjectIdentity(<ObjectName value object, tagSet <TagSet object, tags 0:0:6>, payload [1.3.6.1.4.1.5597...30.0.5.0.2.1.2.1]>), <Integer32 value object, tagSet <TagSet object, tags 0:0:2>, subtypeSpec <ConstraintsIntersection object, consts <ValueRangeConstraint object, consts -2147483648, 2147483647>, <ConstraintsUnion object, consts <SingleValueConstraint object, consts 0, 1, 2>>>, namedValues <NamedValues object, enums notAvailable=0, down=1, up=2>, payload [up]>), ObjectType(ObjectIdentity(<ObjectName value object, tagSet <TagSet object, tags 0:0:6>, payload [1.3.6.1.4.1.5597...30.0.5.0.2.1.2.2]>), <Integer32 value object, tagSet <TagSet object, tags 0:0:2>, subtypeSpec <ConstraintsIntersection object, consts <ValueRangeConstraint object, consts -2147483648, 2147483647>, <ConstraintsUnion object, consts <SingleValueConstraint object, consts 0, 1, 2>>>, namedValues <NamedValues object, enums notAvailable=0, down=1, up=2>, payload [up]>)]
+
+Within the context of an OCS Agent the call looks a bit different and will look
+more like::
 
     from socs.snmp import SNMPTwister
 
@@ -76,7 +99,8 @@ Initializing an SNMPTwister::
 
     result = yield snmp.get(get_list)
 
-For standalone examples, see the `pysnmp`_ documentation.
+See existing SNMP using agents, such as the Meinberg M1000 Agent for real world
+examples.
 
 API
 ---
