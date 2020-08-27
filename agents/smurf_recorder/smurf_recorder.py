@@ -61,11 +61,12 @@ class SmurfRecorder:
 
     """
 
-    def __init__(self, agent, time_per_file, data_dir, address="localhost",
-                 port=4536):
+    def __init__(self, agent, time_per_file, data_dir, stream_id,
+                 address="localhost", port=4536):
         self.agent = agent
         self.time_per_file = time_per_file
         self.data_dir = data_dir
+        self.stream_id = stream_id
         self.address = "tcp://{}:{}".format(address, port)
         self.is_streaming = False
         self.log = self.agent.log
@@ -88,7 +89,7 @@ class SmurfRecorder:
         self.is_streaming = True
 
         recorder = FrameRecorder(self.time_per_file, self.address,
-                                 self.data_dir)
+                                 self.data_dir, self.stream_id)
 
         while self.is_streaming:
             recorder.run()
@@ -129,6 +130,10 @@ def make_parser(parser=None):
                         help="Port to listen on.")
     pgroup.add_argument("--address", default="localhost",
                         help="Address to listen to.")
+    pgroup.add_argument('--stream-id', default='None',
+                        help="Stream id of recorded stream. If one is not " 
+                             "present in the G3Frames, this is the stream-id" 
+                             "that will be used to determine file paths.")
 
     return parser
 
@@ -137,19 +142,14 @@ if __name__ == "__main__":
     # Start logging
     txaio.start_logging(level=environ.get("LOGLEVEL", "info"))
 
-    # Get the default ocs agrument parser
-    site_parser = site_config.add_arguments()
-    parser = make_parser(site_parser)
-
-    # Parse commandline
-    args = parser.parse_args()
-
-    site_config.reparse_args(args, "SmurfRecorder")
+    parser = make_parser()
+    args = site_config.parse_args(agent_class='SmurfRecorder', parser=parser)
 
     agent, runner = ocs_agent.init_site_agent(args)
     listener = SmurfRecorder(agent,
                              int(args.time_per_file),
                              args.data_dir,
+                             args.stream_id,
                              address=args.address,
                              port=int(args.port))
 
