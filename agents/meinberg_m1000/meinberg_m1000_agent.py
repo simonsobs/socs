@@ -119,13 +119,7 @@ class MeinbergSNMP:
         # Determine unique interval values
         self.interval_groups = list({x['interval'] for x in self.mib_timings})
 
-    def dump_cache(self):
-        """Return the current cache. Should be used to pass cached values to session.data.
-
-        """
-        return self.oid_cache
-
-    def build_get_list(self, interval):
+    def _build_get_list(self, interval):
         """Create list of OIDs to GET based on last time we checked them.
 
         Intervals are defined in the mib_timings dictionary. If the interval
@@ -158,17 +152,169 @@ class MeinbergSNMP:
 
         return get_list
 
-    @inlineCallbacks
-    def get_intervals(self, session):
-        # Loop through interval groups and issue get commands for each
-        # interval group, publishing to a block with the interval in the
-        # name.
-        for interval in self.interval_groups:
-            # SNMP GET response
-            result = []
+    def _extract_oid_field_and_value(self, get_result):
+        """Extract field names and OID values from SNMP GET results.
 
+        The ObjectType objects returned from pysnmp interactions contain the
+        info we want to use for field names, specifically the OID and associated
+        integer for uniquely identifying duplicate OIDs, as well as the value of the
+        OID, which we want to save.
+
+        Here we use the prettyPrint() method to get the OID name, requiring
+        some string manipulation. We also just grab the hidden ._value
+        directly, as this seemed the cleanest way to get an actual value of a
+        normal type. Without doing this we get a pysnmp defined Integer32 or
+        DisplayString, which were akward to handle, particularly the
+        DisplayString.
+
+        Parameters
+        ----------
+        get_result : pysnmp.smi.rfc1902.ObjectType
+            Result from a pysnmp GET command.
+
+        Returns
+        -------
+        field_name : str
+            Field name for an OID, i.e. 'mbgLtNgRefclockState_1'
+        oid_value : int or str
+            Associated value for the OID. Returns None if not an int or str
+
+        """
+        # OID from SNMP GET
+        oid = get_result[0].prettyPrint()
+        # Makes something like 'MBG-SNMP-LTNG-MIB::mbgLtNgRefclockState.1'
+        # look like 'mbgLtNgRefclockState_1'
+        field_name = oid.split("::")[1].replace('.', '_')
+
+        # Grab OID value, mostly these are integers
+        oid_value = get_result[1]._value
+
+        self.log.debug("{o} {value}",
+                       o=field_name,
+                       value=oid_value)
+
+        # Decode string values
+        if isinstance(oid_value, bytes):
+            oid_value = oid_value.decode("utf-8")
+
+        # I don't expect any other types at the moment, but just in case.
+        if not isinstance(oid_value, (int, bytes)):
+            self.log.error("{oid} is of unknown and unhandled type " +
+                           "{oid_type}. Returning None.",
+                           oid=oid, oid_type=type(oid_value))
+            oid_value = None
+
+        return field_name, oid_value
+
+    def update_cache(self, get_result, time):
+        """Update the OID Value Cache.
+
+        The OID Value Cache is used to store each unique OID, the latest value,
+        the associated decoded string, and the last time the OID was queried from the
+        M1000.
+
+        The cache consists of a dictionary, with the unique OIDs as keys, and
+        another dictionary as the value. Each of these nested dictionaries contains the
+        OID values, description (decoded string), and last query time. An
+        example for a single OID::
+
+            {"mbgLtNgPtpPortState_1":
+                {"status": 3,
+                 "description": "disabled",
+                 "lastGet": 1598543397.689727}}
+
+        This method modifies self.oid_cache.
+
+        Parameters
+        ----------
+        get_result : pysnmp.smi.rfc1902.ObjectType
+            Result from a pysnmp GET command.
+        time : float
+            Timestamp for when the SNMP GET was issued.
+
+        """
+        for item in get_result:
+            field_name, oid_value = self._extract_oid_field_and_value(item)
+            if oid_value is None:
+                continue
+
+            # Update OID Cache for session.data
+            self.oid_cache[field_name] = {"status": oid_value}
+            oid_base_str = field_name.split('_')[0]
+            if oid_base_str in self.decoder:
+                self.oid_cache[field_name]["description"] = self.decoder[oid_base_str][oid_value]
+                self.oid_cache[field_name]["lastGet"] = time
+
+    def get_cache(self):
+        """Return the current cache. Should be used to pass cached values to
+        session.data. See MeinbergSNMP.update_cache() for a description of the cache
+        data structure.
+
+        Returns
+        -------
+        dict
+            The OID Value Cache, containing each OID, their latest status
+            value, description, and last updated time.
+
+        """
+        return self.oid_cache
+
+    def _build_message(self, interval, get_result, time):
+        """Built the message for publication on an OCS Feed.
+
+        For a given MIB timing interval, build a message for Feed publication.
+        Each interval contains only the OIDs that are sampled on the same timing
+        interval. We split by interval since the available fields cannot change
+        within a block over time.
+
+        Parameters
+        ----------
+        interval : int
+            Timing interval in seconds
+        get_result : pysnmp.smi.rfc1902.ObjectType
+            Result from a pysnmp GET command.
+        time : float
+            Timestamp for when the SNMP GET was issued.
+
+        Returns
+        -------
+        message : dict
+            OCS Feed formatted message for publishing
+
+        """
+        message = {
+            'block_name': f'm1000_{interval}',
+            'timestamp': time,
+            'data': {}
+        }
+
+        for item in get_result:
+            field_name, oid_value = self._extract_oid_field_and_value(item)
+
+            if oid_value is None:
+                continue
+
+            message['data'][field_name] = oid_value
+
+        return message
+
+    @inlineCallbacks
+    def run_snmp_get(self, session):
+        """Peform the main data acquisition steps, issuing SNMP GET commands
+        for each OID, depending on when we last queried them.
+
+        These steps are performed for each group of OIDs in the same timing
+        interval. We first build a list of OIDs to query. We then query them, update
+        the local cache which is passed to the session.data object, build an OCS
+        formatted message, and publish that message on the OCS Feed.
+
+        If no OID should be queried yet we continue, expecting the Agent to
+        handle any waiting that should be done between queries.
+
+        """
+        for interval in self.interval_groups:
             # Create list of OIDs to GET based on last time we checked them
-            get_list = self.build_get_list(interval)
+            get_list = self._build_get_list(interval)
 
             # empty if an interval of time hasn't passed since last GET
             if not get_list:
@@ -178,43 +324,8 @@ class MeinbergSNMP:
             result = yield self.snmp.get(get_list)
             read_time = time.time()
 
-            message = {
-                'block_name': f'm1000_{interval}',
-                'timestamp': read_time,
-                'data': {}
-            }
-
-            for item in result:
-                # OID from SNMP GET
-                oid = item[0].prettyPrint()
-                # Makes something like 'MBG-SNMP-LTNG-MIB::mbgLtNgRefclockState.1'
-                # look like 'mbgLtNgRefclockState_1'
-                field_name = oid.split("::")[1].replace('.', '_')
-
-                # Grab OID value, mostly these are integers
-                oid_value = item[1]._value
-
-                # Decode string values
-                if isinstance(oid_value, bytes):
-                    oid_value = oid_value.decode("utf-8")
-
-                if not isinstance(oid_value, (int, bytes)):
-                    self.log.error("{oid} is of unknown and unhandled type " +
-                                   "{oid_type}. This OID will not be recorded.",
-                                   oid=oid, oid_type=type(oid_value))
-                    continue
-
-                self.log.debug("{o} {value}",
-                               o=oid,
-                               value=oid_value)
-                message['data'][field_name] = oid_value
-
-                # Update OID Cache for session.data
-                self.oid_cache[field_name] = {"status": oid_value}
-                oid_base_str = field_name.split('_')[0]
-                if oid_base_str in self.decoder:
-                    self.oid_cache[field_name]["description"] = self.decoder[oid_base_str][oid_value]
-                    self.oid_cache[field_name]["lastGet"] = read_time
+            self.update_cache(result, read_time)
+            message = self._build_message(interval, result, read_time)
 
             # Update lastGet time
             for mib in self.mib_timings:
@@ -223,7 +334,7 @@ class MeinbergSNMP:
 
             self.log.debug("{msg}", msg=message)
             session.app.publish_to_feed('m1000', message)
-            session.data = self.dump_cache()
+            session.data = self.get_cache()
 
 
 class MeinbergM1000Agent:
@@ -300,7 +411,7 @@ class MeinbergM1000Agent:
                  "description": "up",
                  "lastGet": 1598543359.6326838}}
 
-        Note that session.data is populated within the self.meinberg.get_intervals() call.
+        Note that session.data is populated within the self.meinberg.run_snmp_get() call.
 
         """
         if params is None:
@@ -309,7 +420,7 @@ class MeinbergM1000Agent:
         self.is_streaming = True
 
         while self.is_streaming:
-            yield self.meinberg.get_intervals(session)
+            yield self.meinberg.run_snmp_get(session)
             self.log.debug("{data}", data=session.data)
             yield dsleep(0.1)
 

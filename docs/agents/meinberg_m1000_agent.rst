@@ -36,8 +36,11 @@ OID string, i.e. redundant power supplies on the OID "mbgLtNgSysPsStatus". This
 results in field names such as "mbgLtNgSysPsStatus_0" and
 "mbgLtNgSysPsStatus_1".
 
-These queries mostly return integers which map to some state. For information
-about the states corresponding to these values we refer to the `M1000 manual`_.
+These queries mostly return integers which map to some state. These integers
+get decoded into their corresponding string representations and stored in the
+OCS Agent Process' session.data object. For more details on this structure, see
+the Agent API below. For information about the states corresponding to these
+values we refer to the `M1000 manual`_.
 
 .. _M1000 manual: https://www.meinbergglobal.com/download/docs/manuals/english/ltos_6-24.pdf
 
@@ -83,6 +86,12 @@ example docker-compose service configuration is shown here::
 
 The ``LOGLEVEL`` environment variable can be used to set the log level for
 debugging. The default level is "info".
+
+MeinbergSNMP API
+----------------
+
+.. autoclass:: agents.meinberg_m1000.meinberg_m1000_agent.MeinbergSNMP
+    :members:
 
 Agent API
 ---------
