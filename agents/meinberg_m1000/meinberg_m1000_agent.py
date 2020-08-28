@@ -17,29 +17,6 @@ on_rtd = os.environ.get('READTHEDOCS') == 'True'
 if not on_rtd:
     from ocs import ocs_agent, site_config
 
-# Mapping of integer OID values to meaningful strings from M1000 manual
-meinberg_mib_decoder = {'mbgLtNgRefclockState': {0: "notAvailable",
-                                                 1: "synchronized",
-                                                 2: "notSynchronized"},
-                        'mbgLtNgNtpCurrentState': {0: "notAvailable",
-                                                   1: "notSynchronized",
-                                                   2: "synchronized"},
-                        'mbgLtNgSysPsStatus': {0: "notAvailable",
-                                               1: "down",
-                                               2: "up"},
-                        'mbgLtNgEthPortLinkState': {0: "notAvailable",
-                                                    1: "up"},
-                        'mbgLtNgPtpPortState': {0: "uninitialized",
-                                                1: "initializing",
-                                                2: "faulty",
-                                                3: "disabled",
-                                                4: "listening",
-                                                5: "preMaster",
-                                                6: "master",
-                                                7: "passive",
-                                                8: "uncalibrated",
-                                                9: "slave"}}
-
 
 class MeinbergSNMP:
     """Meinberg SNMP communicator. Handles communication with and decoding of
@@ -164,6 +141,8 @@ class MeinbergSNMP:
             Field name for an OID, i.e. 'mbgLtNgRefclockState_1'
         oid_value : int or str
             Associated value for the OID. Returns None if not an int or str
+        oid_description : str
+            String description of the OID value.
 
         """
         # OID from SNMP GET
@@ -174,6 +153,7 @@ class MeinbergSNMP:
 
         # Grab OID value, mostly these are integers
         oid_value = get_result[1]._value
+        oid_description = get_result[1].prettyPrint()
 
         self.log.debug("{o} {value}",
                        o=field_name,
@@ -190,7 +170,7 @@ class MeinbergSNMP:
                            oid=oid, oid_type=type(oid_value))
             oid_value = None
 
-        return field_name, oid_value
+        return field_name, oid_value, oid_description
 
     def update_cache(self, get_result, time):
         """Update the OID Value Cache.
@@ -220,17 +200,14 @@ class MeinbergSNMP:
 
         """
         for item in get_result:
-            field_name, oid_value = self._extract_oid_field_and_value(item)
+            field_name, oid_value, oid_description = self._extract_oid_field_and_value(item)
             if oid_value is None:
                 continue
 
             # Update OID Cache for session.data
             self.oid_cache[field_name] = {"status": oid_value}
             self.oid_cache[field_name]["lastGet"] = time
-            oid_base_str = field_name.split('_')[0]
-            if oid_base_str in meinberg_mib_decoder:
-                self.oid_cache[field_name]["description"] = \
-                    meinberg_mib_decoder[oid_base_str][oid_value]
+            self.oid_cache[field_name]["description"] = oid_description
 
     def get_cache(self):
         """Return the current cache. Should be used to pass cached values to
@@ -276,12 +253,13 @@ class MeinbergSNMP:
         }
 
         for item in get_result:
-            field_name, oid_value = self._extract_oid_field_and_value(item)
+            field_name, oid_value, oid_description = self._extract_oid_field_and_value(item)
 
             if oid_value is None:
                 continue
 
             message['data'][field_name] = oid_value
+            message['data'][field_name + "_description"] = oid_description
 
         return message
 
