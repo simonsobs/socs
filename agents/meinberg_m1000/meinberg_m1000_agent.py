@@ -18,12 +18,12 @@ if not on_rtd:
     from ocs import ocs_agent, site_config
 
 # Mapping of integer OID values to meaningful strings from M1000 manual
-REFCLOCKSTATE = {0: "refclock is not available",
+REFCLOCKSTATE = {0: "notAvailable",
                  1: "synchronized",
-                 2: "not synchronized"}
+                 2: "notSynchronized"}
 
-NTPCURRENTSTATE = {0: "not available",
-                   1: "not synchronized",
+NTPCURRENTSTATE = {0: "notAvailable",
+                   1: "notSynchronized",
                    2: "synchronized"}
 
 SYSPSSTATUS = {0: "notAvailable",
