@@ -18,31 +18,27 @@ if not on_rtd:
     from ocs import ocs_agent, site_config
 
 # Mapping of integer OID values to meaningful strings from M1000 manual
-REFCLOCKSTATE = {0: "notAvailable",
-                 1: "synchronized",
-                 2: "notSynchronized"}
-
-NTPCURRENTSTATE = {0: "notAvailable",
-                   1: "notSynchronized",
-                   2: "synchronized"}
-
-SYSPSSTATUS = {0: "notAvailable",
-               1: "down",
-               2: "up"}
-
-ETHPORTLINKSTATE = {0: "notAvailable",
-                    1: "up"}
-
-PTPPORTSTATE = {0: "uninitialized",
-                1: "initializing",
-                2: "faulty",
-                3: "disabled",
-                4: "listening",
-                5: "preMaster",
-                6: "master",
-                7: "passive",
-                8: "uncalibrated",
-                9: "slave"}
+meinberg_mib_decoder = {'mbgLtNgRefclockState': {0: "notAvailable",
+                                                 1: "synchronized",
+                                                 2: "notSynchronized"},
+                        'mbgLtNgNtpCurrentState': {0: "notAvailable",
+                                                   1: "notSynchronized",
+                                                   2: "synchronized"},
+                        'mbgLtNgSysPsStatus': {0: "notAvailable",
+                                               1: "down",
+                                               2: "up"},
+                        'mbgLtNgEthPortLinkState': {0: "notAvailable",
+                                                    1: "up"},
+                        'mbgLtNgPtpPortState': {0: "uninitialized",
+                                                1: "initializing",
+                                                2: "faulty",
+                                                3: "disabled",
+                                                4: "listening",
+                                                5: "preMaster",
+                                                6: "master",
+                                                7: "passive",
+                                                8: "uncalibrated",
+                                                9: "slave"}}
 
 
 class MeinbergSNMP:
@@ -64,9 +60,6 @@ class MeinbergSNMP:
         SNMP port to issue GETs to.
     snmp : socs.snmp.SNMPTwister
         snmp handler from SOCS
-    decoder : dict
-        dict to facilitate the decoding of integer OID values returned from
-        queries to the M1000
     mib_timings : list
         list of dicts describing the SNMP OIDs to check, and at which
         intervals. Each dict contains the keys "oid", "interval", and
@@ -83,13 +76,6 @@ class MeinbergSNMP:
         self.address = address
         self.port = port
         self.snmp = SNMPTwister(address, port)
-
-        # Decode OID States
-        self.decoder = {'mbgLtNgRefclockState': REFCLOCKSTATE,
-                        'mbgLtNgNtpCurrentState': NTPCURRENTSTATE,
-                        'mbgLtNgSysPsStatus': SYSPSSTATUS,
-                        'mbgLtNgEthPortLinkState': ETHPORTLINKSTATE,
-                        'mbgLtNgPtpPortState': PTPPORTSTATE}
 
         # OIDs and how often to query them
         self.mib_timings = [{"oid": ('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockState', 1),
@@ -242,8 +228,9 @@ class MeinbergSNMP:
             self.oid_cache[field_name] = {"status": oid_value}
             self.oid_cache[field_name]["lastGet"] = time
             oid_base_str = field_name.split('_')[0]
-            if oid_base_str in self.decoder:
-                self.oid_cache[field_name]["description"] = self.decoder[oid_base_str][oid_value]
+            if oid_base_str in meinberg_mib_decoder:
+                self.oid_cache[field_name]["description"] = \
+                    meinberg_mib_decoder[oid_base_str][oid_value]
 
     def get_cache(self):
         """Return the current cache. Should be used to pass cached values to
