@@ -240,10 +240,10 @@ class MeinbergSNMP:
 
             # Update OID Cache for session.data
             self.oid_cache[field_name] = {"status": oid_value}
+            self.oid_cache[field_name]["lastGet"] = time
             oid_base_str = field_name.split('_')[0]
             if oid_base_str in self.decoder:
                 self.oid_cache[field_name]["description"] = self.decoder[oid_base_str][oid_value]
-                self.oid_cache[field_name]["lastGet"] = time
 
     def get_cache(self):
         """Return the current cache. Should be used to pass cached values to
@@ -386,27 +386,30 @@ class MeinbergM1000Agent:
         the example here::
 
             >>> session.data
-            {"mbgLtNgPtpPortState_1":
+            {"mbgLtNgRefclockLeapSecondDate_1":
+                {"status": "not announced",
+                 "lastGet":1598626144.5365012},
+             "mbgLtNgPtpPortState_1":
                 {"status": 3,
                  "description": "disabled",
                  "lastGet": 1598543397.689727},
-            "mbgLtNgNtpCurrentState_0":
+             "mbgLtNgNtpCurrentState_0":
                 {"status": 1,
                  "description": "not synchronized",
                  "lastGet": 1598543363.289597},
-            "mbgLtNgRefclockState_1":
+             "mbgLtNgRefclockState_1":
                 {"status": 2,
                  "description": "not synchronized",
                  "lastGet": 1598543359.6326838},
-            "mbgLtNgSysPsStatus_1":
+             "mbgLtNgSysPsStatus_1":
                 {"status": 2,
                  "description": "up",
                  "lastGet": 1598543359.6326838},
-            "mbgLtNgSysPsStatus_2":
+             "mbgLtNgSysPsStatus_2":
                 {"status": 2,
                  "description": "up",
                  "lastGet": 1598543359.6326838},
-            "mbgLtNgEthPortLinkState_1":
+             "mbgLtNgEthPortLinkState_1":
                 {"status": 1,
                  "description": "up",
                  "lastGet": 1598543359.6326838}}
