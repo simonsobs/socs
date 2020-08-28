@@ -93,8 +93,14 @@ class SNMPTwister:
                                                 1))])
 
         >>> snmp = SNMPTwister('localhost', 161)
-        >>> snmp.get([('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockState', 1),
-                      ('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockLeapSecondDate', 1)])
+        >>> result = snmp.get([('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockState', 1),
+                               ('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockLeapSecondDate', 1)])
+        >>> # Simply printing the returned object shows a nice string
+        >>> print(result[0])
+        MBG-SNMP-LTNG-MIB::mbgLtNgRefclockState.1 = notSynchronized
+        >>> # The corresponding integer value is hidden within the returned object
+        >>> print(result[0][1]._value)
+        2
 
         Parameters
         ----------
@@ -105,6 +111,13 @@ class SNMPTwister:
 
             .. _Specifying MIB Objects:
                http://snmplabs.com/pysnmp/docs/pysnmp-hlapi-tutorial.html#specifying-mib-object
+
+        Returns
+        ------
+        twisted.internet.defer.Deferred
+            A Deferred which will callback with the var_binds list from
+            self._success. If successful, this will contain a list of ObjectType class
+            instances representing MIB variables returned in SNMP response.
 
         """
         oid_list = [ObjectType(ObjectIdentity(*x)) if isinstance(x, tuple) else x for x in oid_list]
