@@ -1,6 +1,24 @@
+"""OCS agent module to read the data from beagleboneblack for CHWP encoder
+
+Note
+----
+   This is confirmed to be work with the following versions of beagleboneblack software:
+   - currently hwpdaq branch in spt3g_software_sa repository: 731ff39
+   (sha256sum)
+   - Beaglebone_Encoder_DAQ.c: 9c775d240b24ac3c2f2ccb2d581f181be046a0a4eccb8525fd05222b09e97cd8
+   - Encoder_Detection.c: 1fd24e7c1627bafff1bfcf2d2c954e5e2981de01e5842ba35e5c035686fcdd3e
+   - IRIG_Detection.c: daaee6b7b0a163c703f78e3c90bcaf83dfdbbde45249ec9ef8e5cd2cf6a6f3ba
+   - Encoder1.bin: c8281525bdd0efae66aede7cffc3520ab719cfd67f6c2d7fd01509a4289a9d32
+   - Encoder2.bin: a6ed9d89e9cf26036bf1da9e7e2098da85bbfa6eb08d0caef1e3c40877dd5077
+   - IRIG1.bin: 7bc37b30a1759eb792f0db176bcd6080f9c3c7ec78ba2e1614166b2031416091
+   - IRIG2.bin: d206dd075f73c32684d8319c9ed19f019cc705a9f253725de085eb511b8c0a12
+
+"""
+
 import socket
 import struct
 import time
+import calendar
 from collections import deque
 import select
 import numpy
@@ -9,20 +27,39 @@ import numpy
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
-# The number of datapoints in every encoder packet from the Arduino/Beaglebone
-COUNTER_INFO_LENGTH = 150
-# The size of the encoder packet from the Arduino
-#    (header + 3*150 datapoint information + 1 quadrature readout)
+## These three values (COUNTER_INFO_LENGTH, COUNTER_PACKET_SIZE, IRIG_PACKET_SIZE)
+## should be consistent with the software on beaglebone.
+# The number of datapoints in every encoder packet from the Beaglebone
+COUNTER_INFO_LENGTH = 120
+# The size of the encoder packet from the beaglebone
+#    (header + 3*COUNTER_INFO_LENGTH datapoint information + 1 quadrature readout)
 COUNTER_PACKET_SIZE = 4 + 4 * COUNTER_INFO_LENGTH+8 * COUNTER_INFO_LENGTH + 4
-# The size of the IRIG packet from the Arduino/Beaglebone
+# The size of the IRIG packet from the Beaglebone
 IRIG_PACKET_SIZE = 132
+
 # The slit scaler value for rough HWP rotating frequency
 NUM_SLITS = 570
+# Number of encoder counter samples to publish at once
+NUM_ENCODER_TO_PUBLISH = 4200
 
 ### Definitions of utility functions ###
 
-# Converts the IRIG signal into sec/min/hours depending on the parameters
 def de_irig(val, base_shift=0):
+    """Converts the IRIG signal into sec/min/hours/day/year depending on the parameters
+
+    Parameters
+    ----------
+    val : int
+       raw IRIG bit info of each 100msec chunk
+    base_shift : int, optional
+       number of bit shifts. This should be 0 except for seccods
+
+    Returns
+    -------
+    int
+       Either of sec/min/hourds/day/year
+
+    """
     return (((val >> (0+base_shift)) & 1)
             + ((val >> (1+base_shift)) & 1) * 2
             + ((val >> (2+base_shift)) & 1) * 4
@@ -32,44 +69,113 @@ def de_irig(val, base_shift=0):
             + ((val >> (7+base_shift)) & 1) * 40
             + ((val >> (8+base_shift)) & 1) * 80)
 
-# Class which will parse the incoming packets from the BeagleboneBlack and store the data
+def count2time(counts, t_offset=0.):
+    """Quick etimation of time using Beagleboneblack clock counts
+
+    Parameters
+    ----------
+    counts : list of int
+       Beagleboneblack clock counter value
+    t_offset : int, optional
+       time offset in seconds
+
+    Returns
+    -------
+    list of float
+       Estimated time in seconds assuming the Beagleboneblack clock frequency is 200 MHz.
+       Without specifying t_offset, output is just the difference
+       from the first sample in the input list
+
+    """
+    t_array = numpy.array(counts, dtype=float) - counts[0]
+    # Assuming clock is 200MHz
+    t_array *= 5.e-9
+    t_array += t_offset
+
+    return t_array.tolist()
+
 class EncoderParser:
-    # port: This must be the same as the localPort in the Arduino/Beaglebone code
-    # read_chunk_size: This value shouldn't need to change
+    """Class which will parse the incoming packets from the BeagleboneBlack and store the data
+
+    Attributes
+    ----------
+    counter_queue : deque object
+       deque to store the encoder counter data
+    irig_queue : deque object
+       deque to store the IRIG data
+    is_start : int
+       Used for procedures that only run when data collection begins
+       Initialized to be 1, until the first IRIG parsing happens and set to 0
+    start_time : list of int
+       Will hold the time at which data collection started [hours, mins, secs]
+    current_time : int
+       Current unix timestamp in seconds parased from IRIG
+    sock : scoket.sock
+       a UDP socket to connect to the Beagleboneblack
+    data : str
+       String which will hold the raw data from the Beaglebone before it is parsed
+    read_chunk_size : int
+       Maximum data size to receive UDP packets in bytes
+
+   Parameters
+    ----------
+    beaglebone_port : int, optional
+       Port number to receive UDP packets from Beagleboneblack
+       This must be the same as the localPort in the Beaglebone code
+    read_chunk_size : int, optional
+       Maximum data size to receive UDP packets in bytes
+       read_chunk_size: This value shouldn't need to change
+
+    """
     def __init__(self, beaglebone_port=8080, read_chunk_size=8196):
-        # Creates three queues to hold the data from the encoder, IRIG, and quadrature respectively
+        # Creates twoe queues to hold the data from the encoder, IRIG, and quadrature respectively
         self.counter_queue = deque()
         self.irig_queue = deque()
-        self.quad_queue = deque()
 
         # Used for procedures that only run when data collection begins
         self.is_start = 1
         # Will hold the time at which data collection started [hours, mins, secs]
         self.start_time = [0, 0, 0]
-        # Will be continually updated with the UTC time in seconds
+        # Will be continually updated with unix in seconds
         self.current_time = 0
 
-        # Creates a UDP socket to connect to the Arduino/Beaglebone
+        # Creates a UDP socket to connect to the Beaglebone
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         # Binds the socket to a specific ip address and port
         # The ip address can be blank for accepting any UDP packet to the port
         self.sock.bind(('', beaglebone_port))
         #self.sock.setblocking(0)
 
-        # String which will hold the raw data from the Arduino/Beaglebone before it is parsed
+        # String which will hold the raw data from the Beaglebone before it is parsed
         self.data = ''
         self.read_chunk_size = read_chunk_size
 
-        # Keeps track of how many packets have been parsed
-        self.counter = 0
+    def pretty_print_irig_info(self, irig_info, edge, print_out=False):
+        """Takes the IRIG information, prints it to the screen, sets the current time,
+        and returns the current time
 
-    # Takes the IRIG information, prints it to the screen, sets the current time,
-    # and returns the current time
-    def pretty_print_irig_info(self, irig_info, edge):
+        Parameters
+        ----------
+        irig_info : list of int
+           IRIG bit info
+        edge : int
+           Clock count of rising edge of a reference marker bit
+        print_out : bool, optional
+           Set True to print out the parsed timestamp
+
+        Returns
+        -------
+        current_time : int
+           Current unix timestamp in seconds parased from IRIG
+
+        """
         # Calls self.de_irig() to get the sec/min/hour of the IRIG packet
         secs = de_irig(irig_info[0], 1)
         mins = de_irig(irig_info[1], 0)
         hours = de_irig(irig_info[2], 0)
+        day = de_irig(irig_info[3], 0) \
+              + de_irig(irig_info[4], 0) * 100
+        year = de_irig(irig_info[5], 0)
 
         # If it is the first time that the function is called then set self.start_time
         # to the current time
@@ -77,54 +183,83 @@ class EncoderParser:
             self.start_time = [hours, mins, secs]
             self.is_start = 0
 
-        # Find the sec/min/hour digit difference from the start time
-        dsecs = secs - self.start_time[2]
-        dmins = mins - self.start_time[1]
-        dhours = hours - self.start_time[0]
+        if print_out:
+            # Find the sec/min/hour digit difference from the start time
+            dsecs = secs - self.start_time[2]
+            dmins = mins - self.start_time[1]
+            dhours = hours - self.start_time[0]
 
-        # Corrections to make sure that dsecs/dmins/dhours are all positive
-        if dhours < 0:
-            dhours = dhours + 24
+            # Corrections to make sure that dsecs/dmins/dhours are all positive
+            if dhours < 0:
+                dhours = dhours + 24
 
-        if (dmins < 0) or ((dmins == 0) and (dsecs < 0)):
-            dmins = dmins + 60
-            dhours = dhours - 1
+            if (dmins < 0) or ((dmins == 0) and (dsecs < 0)):
+                dmins = dmins + 60
+                dhours = dhours - 1
 
-        if dsecs < 0:
-            dsecs = dsecs + 60
-            dmins = dmins - 1
+            if dsecs < 0:
+                dsecs = dsecs + 60
+                dmins = dmins - 1
 
-        # Print UTC time, run time, and current clock count of the Arduino
-        print('Current Time:', ('%d:%d:%d'%(hours, mins, secs)), \
-              'Run Time', ('%d:%d:%d'%(dhours, dmins, dsecs)), \
-              'Clock Count', edge)
+            # Print UTC time, run time, and current clock count of the beaglebone
+            print('Current Time:', ('%d:%d:%d'%(hours, mins, secs)), \
+                  'Run Time', ('%d:%d:%d'%(dhours, dmins, dsecs)), \
+                  'Clock Count', edge)
 
-        # Set the current time in seconds
-        self.current_time = secs + mins*60 + hours*3600
+        # Set the current time in seconds (changed to seconds from unix epoch)
+        #self.current_time = secs + mins*60 + hours*3600
+        st_time = time.strptime("%d %d %d:%d:%d"%(year, day, hours, mins, secs), \
+                                "%y %j %H:%M:%S")
+        self.current_time = calendar.timegm(st_time)
 
         return self.current_time
 
-    # Checks to make sure that self.data is the right size
-    # Return false if the wrong size, return true if the data is the right size
     def check_data_length(self, start_index, size_of_read):
+        """Checks to make sure that self.data is the right size
+        Return false if the wrong size, return true if the data is the right size
+
+        Parameters
+        ----------
+        start_index : int
+           first index of the data to read
+        size_of_read : int
+           data size to read in bytes
+
+        Returns
+        -------
+        bool
+           False if the current data size is smaller than the data size suggested by the header info
+
+        """
         if start_index + size_of_read > len(self.data):
             self.data = self.data[start_index:]
-            print('Invalid data size')
             return False
 
         return True
 
-    # Grabs self.data, determine what packet it corresponds to, parses the data
     def grab_and_parse_data(self):
+        """Grabs self.data, determine what packet it corresponds to, parses the data.
+        This is a while loop to look for an appropriate header in a packet from beaglebone.
+        Then, the data will be passed to an appropriate parsing method
+        and stored in either of counter_queue or irig_queue.
+        The detailed structure of the queues can be found in parse_counter_info/parse_irig_info.
+
+        If unexpected data length found, this will output some messages:
+           Error 0: data length is shorter than the header size (4 bytes)
+           Error 1: data length is shorter than the encoder counter info
+                    even though the encoder packet header is found.
+           Error 2: data length is shorter than the IRIG info
+                    even though the IRIG packet header is found.
+        """
         while True:
-            # If there is data from the socket attached to the Arduino then
+            # If there is data from the socket attached to the beaglebone then
             #     ready[0] = true
             # If not then continue checking for 2 seconds and if there is still no data
             #     ready[0] = false
             ready = select.select([self.sock], [], [], 2)
             if ready[0]:
-                # Add the data from the socket attached to the Arduino to the string self.data
-
+                # Add the data from the socket attached to the beaglebone
+                # to the self.data string
                 data = self.sock.recv(self.read_chunk_size)
                 if len(self.data) > 0:
                     self.data += data
@@ -139,7 +274,7 @@ class EncoderParser:
                         break
 
                     header = self.data[0:4]
-                    # Convert a structure value from the Arduino (header) to an int
+                    # Convert a structure value from the beaglebone (header) to an int
                     header = struct.unpack('<I', header)[0]
                     #print('header ', '0x%x'%header)
 
@@ -155,8 +290,8 @@ class EncoderParser:
                             break
                         # Call the meathod self.parse_counter_info() to parse the Encoder Packet
                         self.parse_counter_info(self.data[4 : COUNTER_PACKET_SIZE])
-                        # Increment self.counter to signify that an Encoder Packet has been parsed
-                        self.counter += 1
+                        if len(self.data) >= COUNTER_PACKET_SIZE:
+                            self.data = self.data[COUNTER_PACKET_SIZE:]
 
                     # IRIG
                     elif header == 0xcafe:
@@ -166,6 +301,8 @@ class EncoderParser:
                             break
                         # Call the meathod self.parse_irig_info() to parse the IRIG Packet
                         self.parse_irig_info(self.data[4 : IRIG_PACKET_SIZE])
+                        if len(self.data) >= IRIG_PACKET_SIZE:
+                            self.data = self.data[IRIG_PACKET_SIZE:]
 
                     # Error
                     # An Error Packet will be sent if there is a timing error in the
@@ -174,48 +311,86 @@ class EncoderParser:
                     # intended and that all the connections are made correctly
                     elif header == 0xe12a:
                         print('Packet Error')
+                        # Clear self.data
+                        self.data = ''
                     else:
                         print('Bad header')
+                        # Clear self.data
+                        self.data = ''
 
-                    # Clear self.data
-                    self.data = ''
-                    break
+                    if len(self.data) == 0:
+                        break
                 break
 
-            # If there is no data from the Arduino/beaglebone 'Looking for data ...' will print
-            # If you see this make sure that the Arduino has been set up properly
-            print('Looking for data ...')
+            # If there is no data from the beaglebone 'Looking for data ...' will print
+            # If you see this make sure that the beaglebone has been set up properly
+            # print('Looking for data ...')
 
-    # Meathod to parse the Encoder Packet
     def parse_counter_info(self, data):
+        """Method to parse the Encoder Packet and put them to counter_queue
+
+        Parameters
+        ----------
+        data : str
+           string for the encoder ounter info
+
+        Note:
+           'data' structure:
+           (Please note that '150' below might be replaced by COUNTER_INFO_LENGTH)
+           [0] Readout from the quadrature
+           [1-150] clock counts of 150 data points
+           [151-300] corresponding clock overflow of the 150 data points (each overflow count
+           is equal to 2^16 clock counts)
+           [301-450] corresponding absolute number of the 150 data points ((1, 2, 3, etc ...)
+           or (150, 151, 152, etc ...) or (301, 302, 303, etc ...) etc ...)
+
+           counter_queue structure:
+           counter_queue = [[64 bit clock counts],
+                            [clock count indicese incremented by every edge],
+                            quadrature,
+                            current system time]
+        """
+
         # Convert the Encoder Packet structure into a numpy array
         derter = numpy.array(struct.unpack('<' + 'I'+ 'III'*COUNTER_INFO_LENGTH, data))
 
-        # [1-150] clock counts of 150 data points
-        # [151-300] corresponding clock overflow of the 150 data points (each overflow count
-        # is equal to 2^16 clock counts)
-        # [301-450] corresponding absolute number of the 150 data points ((1, 2, 3, etc ...)
-        # or (150, 151, 152, etc ...) or (301, 302, 303, etc ...) etc ...)
-        # [0] Readout from the quadrature
+        # self.quad_queue.append(derter[0].item()) # merged to counter_queue
+        self.counter_queue.append((derter[1:COUNTER_INFO_LENGTH+1]\
+                                + (derter[COUNTER_INFO_LENGTH+1:2*COUNTER_INFO_LENGTH+1] << 32), \
+                                   derter[2*COUNTER_INFO_LENGTH+1:3*COUNTER_INFO_LENGTH+1], \
+                                   derter[0].item(), time.time()))
 
-        self.quad_queue.append(derter[0].item())
-
-        # self.counter_queue = [[clock count array],[absolute number array], quad]
-        self.counter_queue.append((derter[1:151] + (derter[151:301] << 32), derter[301:451]))
-
-    # Meathod to parse the IRIG Packet
     def parse_irig_info(self, data):
+        """Method to parse the IRIG Packet and put them to the irig_queue
+
+        Parameters
+        ----------
+        data : str
+           string for the IRIG info
+
+        Note
+        ----
+           'data' structure:
+           [0] clock count of the IRIG Packet which the UTC time corresponds to
+           [1] overflow count of initial rising edge
+           [2] binary encoding of the second data
+           [3] binary encoding of the minute data
+           [4] binary encoding of the hour data
+           [5-11] additional IRIG information which we do mot use
+           [12-21] synchronization pulse clock counts
+	   [22-31] overflow count at each synchronization pulse
+
+           irig_queue structure:
+           irig_queue = [Packet clock count,
+                         Packet UTC time in sec,
+                         [binary encoded IRIG data],
+                         [synch pulses clock counts],
+                         current system time]
+
+        """
+
         # Convert the IRIG Packet structure into a numpy array
         unpacked_data = struct.unpack('<L' + 'L' + 'L'*10 + 'L'*10 + 'L'*10, data)
-
-        # [0] clock count of the IRIG Packet which the UTC time corresponds to
-	# [1] overflow count of initial rising edge
-        # [2] binary encoding of the second data
-        # [3] binary encoding of the minute data
-        # [4] binary encoding of the hour data
-        # [5-11] additional IRIG information which we do mot use
-        # [12-21] synchronization pulse clock counts
-	# [22-31] overflow count at each synchronization pulse
 
         # Start of the packet clock count
 	#overflow.append(unpacked_data[1])
@@ -228,17 +403,29 @@ class EncoderParser:
         irig_time = self.pretty_print_irig_info(irig_info, rising_edge_time)
         # Stores synch pulse clock counts accounting for overflow of 32 bit counter
         synch_pulse_clock_times = (numpy.asarray(unpacked_data[12:22])
-                                   + (numpy.asarray(unpacked_data[22:]) << 32)).tolist()
+                                   + (numpy.asarray(unpacked_data[22:32]) << 32)).tolist()
 
         # self.irig_queue = [Packet clock count,Packet UTC time in sec,
-        #                    [binary encoded IRIG data],[synch pulses clock counts]]
-        self.irig_queue.append((rising_edge_time, irig_time, irig_info, synch_pulse_clock_times))
+        #                    [binary encoded IRIG data],[synch pulses clock counts],
+        #                    [current system time]]
+        self.irig_queue.append((rising_edge_time, irig_time, irig_info, \
+                                synch_pulse_clock_times, time.time()))
 
     def __del__(self):
         self.sock.close()
 
-# OCS agent for HWP encoder DAQ using Beaglebone Black
 class HWPBBBAgent:
+    """OCS agent for HWP encoder DAQ using Beaglebone Black
+
+    Attributes
+    ----------
+    rising_edge_count : int
+       clock count values for the rising edge of IRIG reference marker,
+       saved for calculating the beaglebone clock frequency
+    irig_time : int
+       unix timestamp from IRIG
+
+    """
 
     def __init__(self, agent_obj, port=8080):
         self.active = True
@@ -248,24 +435,24 @@ class HWPBBBAgent:
         self.port = port
         self.take_data = False
         self.initialized = False
+        # For clock count to time conversion
+        self.rising_edge_count = 0
+        self.irig_time = 0
 
-        # Defining feed for IRIG, quadrature and counter data
-        # because of they have different sampling rates.
         agg_params = {'frame_length': 60}
-        self.agent.register_feed('HWPEncoder_irig', record=True,
-                                 agg_params=agg_params, buffer_time=1)
-        self.agent.register_feed('HWPEncoder_quad', record=True,
-                                 agg_params=agg_params, buffer_time=1)
-        ## counter data are relatively high-sampling-rate data
-        agg_params_counter = {'frame_length': 1}
-        self.agent.register_feed('HWPEncoder_counter', record=True,
-                                 agg_params=agg_params_counter)
-
+        self.agent.register_feed('HWPEncoder', record=True,
+                                 agg_params=agg_params)
         self.parser = EncoderParser()
 
     def start_acq(self, session, params):
         """Starts acquiring data.
         """
+
+        counter_list = []
+        counter_index_list = []
+        quad_list = []
+        quad_counter_list = []
+        received_time_list = []
 
         with self.lock.acquire_timeout(timeout=0, job='acq') as acquired:
             if not acquired:
@@ -277,79 +464,93 @@ class HWPBBBAgent:
 
             self.take_data = True
 
-            data_counter = {'timestamps':[], 'block_name':'HWPEncoder_counter', 'data':{}}
-            data_irig = {'timestamp':time.time(), 'block_name':'HWPEncoder_irig', 'data':{}}
             while self.take_data:
+                # This is blocking until data are available
                 self.parser.grab_and_parse_data()
+
+                # IRIG data; normally every sec
                 while len(self.parser.irig_queue):
-                    lastdata_counter = data_counter
-                    data_counter = {'timestamps':[], 'block_name':'HWPEncoder_counter', 'data':{}}
-                    counter_list = []
-                    counter_index_list = []
-                    while len(self.parser.counter_queue):
-                        counter_data = self.parser.counter_queue.popleft()
-                        counter_list += counter_data[0].tolist()
-                        counter_index_list += counter_data[1].tolist()
-                    # This timestamps are 1-D counte_list length numpy array of
-                    # the same timestamp of curren time
-                    data_counter['timestamps'] = numpy.ones(len(counter_list)) * time.time()
-                    data_counter['data']['counter'] = counter_list
-                    data_counter['data']['counter_index'] = counter_index_list
-
-                    data_quad = {'timestamps':[], 'block_name':'HWPEncoder_quad', 'data':{}}
-                    quad_list = []
-                    while len(self.parser.quad_queue):
-                        quad_data = self.parser.quad_queue.popleft()
-                        quad_list.append(quad_data)
-                    data_quad['timestamps'] = numpy.ones(len(quad_list)) * time.time()
-                    data_quad['data']['quad'] = quad_list
-
                     irig_data = self.parser.irig_queue.popleft()
-                    rising_edge_time = irig_data[0]
+                    rising_edge_count = irig_data[0]
                     irig_time = irig_data[1]
                     irig_info = irig_data[2]
-                    synch_pulse_clock_times = irig_data[3]
-
-                    lastdata_irig = data_irig
-                    data_irig = {'timestamp':time.time(), 'block_name':'HWPEncoder_irig', 'data':{}}
-                    data_irig['data']['irig_time'] = irig_time
-                    data_irig['data']['rising_edge_time'] = rising_edge_time
-                    data_irig['data']['irig_sec'] = de_irig(irig_info[0], 1)
-                    data_irig['data']['irig_min'] = de_irig(irig_info[1], 0)
-                    data_irig['data']['irig_hour'] = de_irig(irig_info[2], 0)
-                    data_irig['data']['irig_day'] = de_irig(irig_info[3], 0) \
+                    synch_pulse_clock_counts = irig_data[3]
+                    sys_time = irig_data[4]
+                    data = {'timestamp':sys_time, 'block_name':'HWPEncoder_irig', 'data':{}}
+                    data['data']['irig_time'] = irig_time
+                    data['data']['rising_edge_count'] = rising_edge_count
+                    data['data']['irig_sec'] = de_irig(irig_info[0], 1)
+                    data['data']['irig_min'] = de_irig(irig_info[1], 0)
+                    data['data']['irig_hour'] = de_irig(irig_info[2], 0)
+                    data['data']['irig_day'] = de_irig(irig_info[3], 0) \
                                                     + de_irig(irig_info[4], 0) * 100
-                    data_irig['data']['irig_year'] = de_irig(irig_info[5], 0)
-                    for i in range(10):
-                        data_irig['data']['irig_synch_pulse_clock_times_%d'%i]\
-                            = synch_pulse_clock_times[i]
-                    # For rough estimation of HWP rotation frequency
-                    if 'rising_edge_time' in lastdata_irig['data'] and \
-                       'counter' in lastdata_counter['data'] and \
-                       len(data_counter['data']['counter']):
-                        dsec = data_irig['data']['irig_time'] \
-                               - lastdata_irig['data']['irig_time']
-                        dclock_sec = data_irig['data']['rising_edge_time'] \
-                                     - lastdata_irig['data']['rising_edge_time']
-                        dclock_counter = data_counter['data']['counter'][-1] \
-                                         - data_counter['data']['counter'][0]
-                        dindex_counter = data_counter['data']['counter_index'][-1] \
-                                         - data_counter['data']['counter_index'][0]
-                        pulse_rate = dindex_counter / dclock_counter * dclock_sec / dsec
+                    data['data']['irig_year'] = de_irig(irig_info[5], 0)
+                    # Beagleboneblack clock frequency measured by IRIG
+                    if self.rising_edge_count > 0:
+                        bbb_clock_freq = float(rising_edge_count - self.rising_edge_count) \
+                                         / (irig_time - self.irig_time)
+                    else:
+                        bbb_clock_freq = 0.
+                    data['data']['bbb_clock_freq'] = bbb_clock_freq
+
+                    self.agent.publish_to_feed('HWPEncoder', data)
+                    self.rising_edge_count = rising_edge_count
+                    self.irig_time = irig_time
+
+                    # saving clock counts for every refernce edge and every irig bit info
+                    data = {'timestamps':[], 'block_name':'HWPEncoder_irig_raw', 'data':{}}
+                    data['timestamps'] = sys_time + numpy.arange(10) * 0.1
+                    data['data']['irig_synch_pulse_clock_counts'] = synch_pulse_clock_counts
+                    data['data']['irig_info'] = irig_info
+                    self.agent.publish_to_feed('HWPEncoder', data)
+
+                ## Reducing the packet size, less frequent publishing
+                # Encoder data; packet coming rate = 570*2*2/150/4 ~ 4Hz packet at 2 Hz rotation
+                while len(self.parser.counter_queue):
+                    counter_data = self.parser.counter_queue.popleft()
+
+                    counter_list += counter_data[0].tolist()
+                    counter_index_list += counter_data[1].tolist()
+                    quad_data = counter_data[2]
+                    sys_time = counter_data[3]
+
+                    received_time_list.append(sys_time)
+                    quad_list.append(quad_data)
+                    quad_counter_list.append(counter_data[0][0])
+                    if len(counter_list) >= NUM_ENCODER_TO_PUBLISH:
+                        # Publishing quadratic data first
+                        data = {'timestamps':[], 'block_name':'HWPEncoder_quad', 'data':{}}
+                        data['timestamps'] = received_time_list
+                        data['data']['quad'] = quad_list
+                        self.agent.publish_to_feed('HWPEncoder', data)
+
+                        # Publishing counter data
+                        data = {'timestamps':[], 'block_name':'HWPEncoder_counter', 'data':{}}
+                        data['data']['counter'] = counter_list
+                        data['data']['counter_index'] = counter_index_list
+                        data['timestamps'] = count2time(counter_list, received_time_list[0])
+                        self.agent.publish_to_feed('HWPEncoder', data)
+
+                        # For rough estimation of HWP rotation frequency
+                        data = {'timestamp': received_time_list[0],
+                                'block_name':'HWPEncoder_freq', 'data':{}}
+                        dclock_counter = counter_list[-1] - counter_list[0]
+                        dindex_counter = counter_index_list[-1] - counter_index_list[0]
+                        # Assuming Beagleboneblack clock is 200 MHz
+                        pulse_rate = dindex_counter * 2.e8 / dclock_counter
                         hwp_freq = pulse_rate / 2. / NUM_SLITS
                         print('pulse_rate', pulse_rate, hwp_freq)
-                        data_irig['data']['approx_hwp_freq'] = hwp_freq
-                    else:
-                        data_irig['data']['approx_hwp_freq'] = 0.
+                        data['data']['approx_hwp_freq'] = hwp_freq
+                        self.agent.publish_to_feed('HWPEncoder', data)
 
-                    self.agent.publish_to_feed('HWPEncoder_counter', data_counter)
-                    self.agent.publish_to_feed('HWPEncoder_irig', data_irig)
-                    self.agent.publish_to_feed('HWPEncoder_quad', data_quad)
+                        # Initialize lists
+                        counter_list = []
+                        counter_index_list = []
+                        quad_list = []
+                        quad_counter_list = []
+                        received_time_list = []
 
-                    self.agent.feeds['HWPEncoder_counter'].flush_buffer()
-                    self.agent.feeds['HWPEncoder_irig'].flush_buffer()
-                    self.agent.feeds['HWPEncoder_quad'].flush_buffer()
-
+        self.agent.feeds['HWPEncoder'].flush_buffer()
         return True, 'Acquisition exited cleanly.'
 
     def stop_acq(self, session, params=None):
