@@ -32,7 +32,7 @@ def _create_dirname(start_time, data_dir, stream_id):
     data_dir : str
         Top level data directory for output
     stream_id : str
-        Stream id of colleciton
+        Stream id of collection
 
     Returns
     -------
