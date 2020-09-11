@@ -20,7 +20,7 @@ class FlowControl(Enum):
     CLEANSE = 3
 
 
-def _create_dirname(start_time, data_dir):
+def _create_dirname(start_time, data_dir, stream_id):
     """Create the file path for .g3 file output.
 
     Note: This will create directories if they don't exist already.
@@ -31,6 +31,8 @@ def _create_dirname(start_time, data_dir):
         Timestamp for start of data collection
     data_dir : str
         Top level data directory for output
+    stream_id : str
+        Stream id of collection
 
     Returns
     -------
@@ -39,7 +41,8 @@ def _create_dirname(start_time, data_dir):
 
     """
     sub_dir = os.path.join(data_dir,
-                           "{:.5}".format(str(start_time)))
+                           "{:.5}".format(str(start_time)),
+                           stream_id)
 
     # Create new dir for current day
     if not os.path.exists(sub_dir):
@@ -95,6 +98,8 @@ class FrameRecorder:
     data_dir : str
         Location to write data files to. Subdirectories will be created within
         this directory roughly corresponding to one day.
+    stream_id : str
+        Stream ID to use to determine file path if one is not found in frames.
 
     Attributes
     ----------
@@ -143,11 +148,12 @@ class FrameRecorder:
         also contain the tracked suffix.
 
     """
-    def __init__(self, file_duration, tcp_addr, data_dir):
+    def __init__(self, file_duration, tcp_addr, data_dir, stream_id):
         # Parameters
         self.time_per_file = file_duration
         self.address = tcp_addr
         self.data_dir = data_dir
+        self.stream_id = stream_id
         self.log = txaio.make_logger()
 
         # Reader/Writer
@@ -327,7 +333,15 @@ class FrameRecorder:
 
             # Only create new dir and basename if we've finished an acquisition
             if self.filename_suffix == 0:
-                self.dirname = _create_dirname(self.start_time, self.data_dir)
+                stream_id = self.stream_id
+                for f in self.frames:
+                    if f.get('sostream_id') is not None:
+                        stream_id = f['sostream_id']
+                        break
+
+                self.dirname = _create_dirname(self.start_time,
+                                               self.data_dir,
+                                               stream_id)
                 self.basename = int(self.start_time)
 
             suffix = "_{:03d}".format(self.filename_suffix)

@@ -72,6 +72,8 @@ class SmurfStreamSimulator:
         Port to send data over
     num_chans : int
         Number of channels to simulate
+    stream_id : str
+        Stream ID to put into G3Frames. Defaults to "stream_sim"
 
     Attributes
     ----------
@@ -95,12 +97,15 @@ class SmurfStreamSimulator:
         List of simulated channels to stream
 
     """
-    def __init__(self, agent, target_host="*", port=4536, num_chans=528):
+    def __init__(self, agent, target_host="*", port=4536, num_chans=528,
+                 stream_id='stream_sim'):
         self.agent = agent
         self.log = agent.log
         self.target_host = target_host
 
         self.port = port
+
+        self.stream_id = stream_id
 
         self.writer = None
         self.is_streaming = False
@@ -164,6 +169,7 @@ class SmurfStreamSimulator:
                 f = core.G3Frame(core.G3FrameType.Scan)
                 f['session_id'] = 0
                 f['frame_num'] = frame_num
+                f['sostream_id'] = self.stream_id
                 f['data'] = core.G3TimestreamMap()
 
                 for i, chan in enumerate(self.channels):
@@ -211,6 +217,7 @@ class SmurfStreamSimulator:
             f = core.G3Frame(core.G3FrameType.Observation)
             f['session_id'] = 0
             f['start_time'] = time.time()
+            f['sostream_id'] = self.stream_id
             self.writer.Process(f)
 
 
