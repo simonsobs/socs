@@ -45,6 +45,7 @@ Simulator Reference  Simulators are used to mock software and hardware
     agents/pysmurf/index
     agents/smurf_recorder
     agents/pfeiffer
+    agents/meinberg_m1000_agent
 
 .. toctree::
     :caption: Simulator Reference
@@ -52,6 +53,12 @@ Simulator Reference  Simulators are used to mock software and hardware
 
     simulators/ls240_simulator
     simulators/smurf_stream_simulator
+
+.. toctree::
+    :caption: Developer Guide
+    :maxdepth: 2
+
+    developer/snmp
 
 Indices and tables
 ==================
