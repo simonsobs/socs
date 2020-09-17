@@ -5,8 +5,15 @@ FROM socs:latest
 
 # Set the working directory
 WORKDIR /app/socs/agents/meinberg_m1000/
-#COPY . .
+
+# Copy in the Agent
 COPY meinberg_m1000_agent.py .
+
+# Avoid build error from successive COPY's
+# https://stackoverflow.com/a/62409523
+RUN true
+
+# Copy in the MIBS
 COPY mibs/ /usr/local/lib/python3.6/dist-packages/pysnmp/smi/mibs/
 
 # Run agent on container startup
