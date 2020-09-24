@@ -193,6 +193,29 @@ class LS240_Agent:
 
         Method to start data acquisition process.
 
+        The most recent data collected is stored in session.data in the
+        structure::
+
+            >>> session.data
+            {"fields":
+                {"Channel_1_T": 98.05,
+                 "Channel_1_V": 98.53,
+                 "Channel_2_T": 100.64,
+                 "Channel_2_V": 98.80,
+                 "Channel_3_T": 99.68,
+                 "Channel_3_V": 98.07,
+                 "Channel_4_T": 102.10,
+                 "Channel_4_V": 99.56,
+                 "Channel_5_T": 100.32,
+                 "Channel_5_V": 100.03,
+                 "Channel_6_T": 99.01,
+                 "Channel_6_V": 99.43,
+                 "Channel_7_T": 99.31,
+                 "Channel_7_V": 103.23,
+                 "Channel_8_T": 101.07,
+                 "Channel_8_V": 99.35},
+             "timestamp": 1600378490.197207}
+
         Args:
             sampling_frequency (float):
                 Sampling frequency for data collection. Defaults to 2.5 Hz
@@ -219,8 +242,9 @@ class LS240_Agent:
             self.take_data = True
 
             while self.take_data:
+                current_time = time.time()
                 data = {
-                    'timestamp': time.time(),
+                    'timestamp': current_time,
                     'block_name': 'temps',
                     'data': {}
                 }
@@ -231,6 +255,9 @@ class LS240_Agent:
                     data['data'][chan_string + '_V'] = chan.get_reading(unit='S')
 
                 self.agent.publish_to_feed('temperatures', data)
+
+                session.data = {'fields': data['data'],
+                                'timestamp': current_time}
 
                 time.sleep(sleep_time)
 
