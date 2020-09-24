@@ -11,7 +11,7 @@ WORKDIR /app/socs/agents/scpi_psu/
 COPY . .
 
 # Run agent on container startup
-ENTRYPOINT ["python3", "-u", "scpi_psu_agent.py"]
+ENTRYPOINT ["dumb-init", "python3", "-u", "scpi_psu_agent.py"]
 
 CMD ["--site-hub=ws://sisock-crossbar:8001/ws", \
      "--site-http=http://sisock-crossbar:8001/call"]

@@ -14,7 +14,7 @@ RUN apt-get install rsync -y
 RUN pip3 install -r requirements.txt
 
 # Run registry on container startup
-ENTRYPOINT ["python3", "-u", "pysmurf_archiver_agent.py"]
+ENTRYPOINT ["dumb-init", "python3", "-u", "pysmurf_archiver_agent.py"]
 
 CMD ["--site-hub=ws://sisock-crossbar:8001/ws", \
      "--site-http=http://sisock-crossbar:8001/call"]
