@@ -212,8 +212,7 @@ class LS372_Agent:
             previous_channel = None
             last_release = time.time()
 
-            # Returned in session.data
-            data_cache = {}
+            session.data = {"fields": {}}
 
             self.take_data = True
             while self.take_data:
@@ -293,15 +292,17 @@ class LS372_Agent:
                                                         chan=active_channel.channel_num)
                     res_reading = self.module.get_temp(unit='ohms',
                                                        chan=active_channel.channel_num)
+
+                    # For data feed
                     data['data'][channel_str + '_T'] = temp_reading
                     data['data'][channel_str + '_R'] = res_reading
 
+                    # For session.data
                     field_dict = {channel_str: {"T": temp_reading,
                                                 "R": res_reading,
                                                 "timestamp": current_time}}
 
-                    data_cache.update(field_dict)
-                    session.data = {'fields': data_cache}
+                    session.data['fields'].update(field_dict)
 
                 session.app.publish_to_feed('temperatures', data)
 
