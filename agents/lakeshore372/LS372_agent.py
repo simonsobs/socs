@@ -184,9 +184,13 @@ class LS372_Agent:
 
             >>> session.data
             {"fields":
-                {"Channel_01_T": 1.34,
-                 "Channel_01_R": 21234.02},
-             "timestamp": 1601919441.9610307}
+                {"Channel_05": {"T": 293.644, "R": 33.752, "timestamp": 1601924482.722671},
+                 "Channel_06": {"T": 0, "R": 1022.44, "timestamp": 1601924499.5258765},
+                 "Channel_08": {"T": 0, "R": 1026.98, "timestamp": 1601924494.8172355},
+                 "Channel_01": {"T": 293.41, "R": 108.093, "timestamp": 1601924450.9315426},
+                 "Channel_02": {"T": 293.701, "R": 30.7398, "timestamp": 1601924466.6130798}
+                }
+            }
 
         """
 
@@ -207,6 +211,9 @@ class LS372_Agent:
             self.log.info("Starting data acquisition for {}".format(self.agent.agent_address))
             previous_channel = None
             last_release = time.time()
+
+            # Returned in session.data
+            data_cache = {}
 
             self.take_data = True
             while self.take_data:
@@ -282,15 +289,22 @@ class LS372_Agent:
 
                     # Collect both temperature and resistance values from each Channel
                     channel_str = active_channel.name.replace(' ', '_')
-                    data['data'][channel_str + '_T'] = \
-                        self.module.get_temp(unit='kelvin', chan=active_channel.channel_num)
-                    data['data'][channel_str + '_R'] = \
-                        self.module.get_temp(unit='ohms', chan=active_channel.channel_num)
+                    temp_reading = self.module.get_temp(unit='kelvin',
+                                                        chan=active_channel.channel_num)
+                    res_reading = self.module.get_temp(unit='ohms',
+                                                       chan=active_channel.channel_num)
+                    data['data'][channel_str + '_T'] = temp_reading
+                    data['data'][channel_str + '_R'] = res_reading
+
+                    field_dict = {channel_str: {"T": temp_reading,
+                                                "R": res_reading,
+                                                "timestamp": current_time}}
+
+                    data_cache.update(field_dict)
+                    session.data = {'fields': data_cache}
 
                 session.app.publish_to_feed('temperatures', data)
 
-                session.data = {'fields': data['data'],
-                                'timestamp': current_time}
                 self.log.debug("{data}", data=session.data)
 
         return True, 'Acquisition exited cleanly.'
