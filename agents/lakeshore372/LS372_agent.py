@@ -291,6 +291,7 @@ class LS372_Agent:
 
                 session.data = {'fields': data['data'],
                                 'timestamp': current_time}
+                self.log.debug("{data}", data=session.data)
 
         return True, 'Acquisition exited cleanly.'
 
