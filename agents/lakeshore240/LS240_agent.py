@@ -233,8 +233,7 @@ class LS240_Agent:
 
             self.take_data = True
 
-            # Returned in session.data
-            data_cache = {}
+            session.data = {"fields": {}}
 
             while self.take_data:
                 current_time = time.time()
@@ -256,12 +255,11 @@ class LS240_Agent:
 
                     # For session.data
                     field_dict = {chan_string: {"T": temp_reading, "V": sensor_reading}}
-                    data_cache.update(field_dict)
+                    session.data['fields'].update(field_dict)
 
                 self.agent.publish_to_feed('temperatures', data)
 
-                session.data = {'fields': data_cache,
-                                'timestamp': current_time}
+                session.data.update({'timestamp': current_time})
 
                 time.sleep(sleep_time)
 
