@@ -198,23 +198,15 @@ class LS240_Agent:
 
             >>> session.data
             {"fields":
-                {"Channel_1_T": 98.05,
-                 "Channel_1_V": 98.53,
-                 "Channel_2_T": 100.64,
-                 "Channel_2_V": 98.80,
-                 "Channel_3_T": 99.68,
-                 "Channel_3_V": 98.07,
-                 "Channel_4_T": 102.10,
-                 "Channel_4_V": 99.56,
-                 "Channel_5_T": 100.32,
-                 "Channel_5_V": 100.03,
-                 "Channel_6_T": 99.01,
-                 "Channel_6_V": 99.43,
-                 "Channel_7_T": 99.31,
-                 "Channel_7_V": 103.23,
-                 "Channel_8_T": 101.07,
-                 "Channel_8_V": 99.35},
-             "timestamp": 1600378490.197207}
+                {"Channel_1": {"T": 99.26, "V": 99.42},
+                 "Channel_2": {"T": 99.54, "V": 101.06},
+                 "Channel_3": {"T": 100.11, "V":100.79},
+                 "Channel_4": {"T": 98.49, "V": 100.77},
+                 "Channel_5": {"T": 97.75, "V": 101.45},
+                 "Channel_6": {"T": 99.58, "V": 101.75},
+                 "Channel_7": {"T": 98.03, "V": 100.82},
+                 "Channel_8": {"T": 101.14, "V":101.01}},
+             "timestamp":1601925677.6914878}
 
         Args:
             sampling_frequency (float):
@@ -241,6 +233,9 @@ class LS240_Agent:
 
             self.take_data = True
 
+            # Returned in session.data
+            data_cache = {}
+
             while self.take_data:
                 current_time = time.time()
                 data = {
@@ -250,13 +245,22 @@ class LS240_Agent:
                 }
 
                 for chan in self.module.channels:
+                    # Read sensor on channel
                     chan_string = "Channel_{}".format(chan.channel_num)
-                    data['data'][chan_string + '_T'] = chan.get_reading(unit='K')
-                    data['data'][chan_string + '_V'] = chan.get_reading(unit='S')
+                    temp_reading = chan.get_reading(unit='K')
+                    sensor_reading = chan.get_reading(unit='S')
+
+                    # For data feed
+                    data['data'][chan_string + '_T'] = temp_reading
+                    data['data'][chan_string + '_V'] = sensor_reading
+
+                    # For session.data
+                    field_dict = {chan_string: {"T": temp_reading, "V": sensor_reading}}
+                    data_cache.update(field_dict)
 
                 self.agent.publish_to_feed('temperatures', data)
 
-                session.data = {'fields': data['data'],
+                session.data = {'fields': data_cache,
                                 'timestamp': current_time}
 
                 time.sleep(sleep_time)
