@@ -175,6 +175,21 @@ class LS372_Agent:
         return True, 'Lakeshore module initialized.'
 
     def start_acq(self, session, params=None):
+        """acq(params=None)
+
+        Method to start data acquisition process.
+
+        The most recent data collected is stored in session.data in the
+        structure::
+
+            >>> session.data
+            {"fields":
+                {"Channel_01_T": 1.34,
+                 "Channel_01_R": 21234.02},
+             "timestamp": 1601919441.9610307}
+
+        """
+
 
         with self._acq_proc_lock.acquire_timeout(timeout=0, job='acq') \
              as acq_acquired, \
@@ -258,8 +273,9 @@ class LS372_Agent:
                         # Track the last channel we measured
                         previous_channel = self.module.get_active_channel()
 
+                    current_time = time.time()
                     data = {
-                        'timestamp': time.time(),
+                        'timestamp': current_time,
                         'block_name': active_channel.name,
                         'data': {}
                     }
@@ -272,6 +288,9 @@ class LS372_Agent:
                         self.module.get_temp(unit='ohms', chan=active_channel.channel_num)
 
                 session.app.publish_to_feed('temperatures', data)
+
+                session.data = {'fields': data['data'],
+                                'timestamp': current_time}
 
         return True, 'Acquisition exited cleanly.'
 

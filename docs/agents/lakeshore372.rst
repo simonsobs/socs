@@ -99,7 +99,7 @@ Agent API
 ---------
 
 .. autoclass:: agents.lakeshore372.LS372_agent.LS372_Agent
-    :members: init_lakeshore_task
+    :members: init_lakeshore_task, start_acq
 
 Driver API
 ----------
