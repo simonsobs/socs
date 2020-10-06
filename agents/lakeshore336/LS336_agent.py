@@ -579,7 +579,7 @@ class LS336_Agent:
 
             # get channel
             channel = heater.get_input_channel()
-            channel_num = self.module.channels[channel].num
+            channel_num = int(self.module.channels[channel].num)
 
             # get current temp
             current_temp = np.round(float(self.module.get_kelvin(channel)), 4)
