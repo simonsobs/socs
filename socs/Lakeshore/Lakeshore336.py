@@ -301,7 +301,7 @@ class Channel:
 
         self.ls = ls
         self.input = _input
-        self.num = channel_lock[input]
+        self.num = channel_lock[self.input]
         self.get_input_type()
         self.get_input_curve()
         self.get_input_name()
