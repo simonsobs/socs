@@ -678,9 +678,8 @@ def make_parser(parser = None):
                         help='The upper bound on temperature differences for stability check')
     pgroup.add_argument('--window', type=float, default=600., 
                         help='The lookback time on temperature differences for stability check')
-    pgroup.add_argument('--auto-acquire', type=bool, default=True,
+    pgroup.add_argument('--auto-acquire', type=bool, default=False,
                         help='Automatically start data acquisition on startup')
-
     return parser 
 
 if __name__ == '__main__':
