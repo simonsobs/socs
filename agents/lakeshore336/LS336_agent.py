@@ -59,6 +59,8 @@ class LS336_Agent:
             Contains optional parameters passed at Agent instantiation, by default None.
             Only parameter here is auto_acquire, by default False.
         '''
+        if params is None: params = {}
+
         # test if this agent is already running
         if self.initialized:
             self.log.info('Lakeshore already initialized, returning...')
@@ -92,6 +94,8 @@ class LS336_Agent:
             Contains optional parameters passed at Agent instantiation, by default None.
             Only parameter is 'f_sample', by default 0.1.
         '''
+        if params is None: params = {}
+
         # get sampling frequency
         f_sample = params.get('f_sample')
         if f_sample is None: 
@@ -167,6 +171,7 @@ class LS336_Agent:
 
     def stop_acq(self, session, params = {}):
         '''Stops acq process.'''
+        if params is None: params = {}
 
         if self.take_data:
             self.take_data = False
