@@ -50,7 +50,7 @@ class LS336_Agent:
             buffer_time = 1
         )
 
-    def init_lakeshore_task(self, session, params = None):
+    def init_lakeshore_task(self, session, params = {}):
         '''Initialize the physical lakeshore module
 
         Parameters
@@ -59,8 +59,6 @@ class LS336_Agent:
             Contains optional parameters passed at Agent instantiation, by default None.
             Only parameter here is auto_acquire, by default False.
         '''
-        if params is None: params = {}
-        
         # test if this agent is already running
         if self.initialized:
             self.log.info('Lakeshore already initialized, returning...')
@@ -85,7 +83,7 @@ class LS336_Agent:
 
         return True, 'Lakeshore module initialized'
 
-    def start_acq(self, session, params = None):
+    def start_acq(self, session, params = {}):
         '''Begins recording of data to frames.
 
         Parameters
@@ -167,7 +165,7 @@ class LS336_Agent:
                 
         return True, 'Acquisition exited cleanly'
 
-    def stop_acq(self, session, params = None):
+    def stop_acq(self, session, params = {}):
         '''Stops acq process.'''
 
         if self.take_data:
