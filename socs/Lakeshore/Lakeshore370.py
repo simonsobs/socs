@@ -253,11 +253,6 @@ class LS370:
         else:
             time.sleep(0.1)  # No comms for 100ms after sending message (manual says50ms)
 
-        #for line in traceback.format_stack():
-        #    print(line.strip())
-
-        print(msg_str)
-        print(resp)
         return resp
 
     def get_id(self):
@@ -281,7 +276,7 @@ class LS370:
         else:
             c = chan
 
-        channel = self.chan_num2Channel(c)
+        channel = self.chan_num2channel(c)
 
         assert unit.lower() in ['ohms', 'kelvin']
 
@@ -315,7 +310,7 @@ class LS370:
         self.autoscan = bool(autoscan)
 
     def enable_autoscan(self):
-        """Enable the autoscan feature of the Lakeshore 372.
+        """Enable the autoscan feature of the Lakeshore 370.
 
         Will query active channel to pass already selected channel to SCAN
         command.
@@ -325,7 +320,7 @@ class LS370:
         self.autoscan = True
 
     def disable_autoscan(self):
-        """Disable the autoscan feature of the Lakeshore 372.
+        """Disable the autoscan feature of the Lakeshore 370.
 
         Will query active channel to pass already selected channel to SCAN
         command.
@@ -334,7 +329,7 @@ class LS370:
         self.msg('SCAN {},{}'.format(active_channel.channel_num, 0))
         self.autoscan = False
 
-    def chan_num2Channel(self, channel_number):
+    def chan_num2channel(self, channel_number):
         """Return a Channel Object from LS370.channels by associated Channel number
 
         :param channel_number: Number associated with Channel to be returned
@@ -355,7 +350,7 @@ class LS370:
         """
         resp = self.msg("SCAN?")
         channel_number = int(resp.split(',')[0])
-        return self.chan_num2Channel(channel_number)
+        return self.chan_num2channel(channel_number)
 
     def set_active_channel(self, channel):
         """Set the active scanner channel.
@@ -381,10 +376,10 @@ class LS370:
 
 
 class Channel:
-    """Lakeshore 372 Channel Object
+    """Lakeshore 370 Channel Object
 
     :param ls: Lakeshore unit for communication
-    :type ls: LS372 Object
+    :type ls: LS370 Object
     :param channel_num: The channel number (1-8 or 1-16 depending on scanner
                         type)
     :type channel_num: int
@@ -1703,7 +1698,7 @@ class Heater:
             _range = "On"
 
         resp = self.ls.msg(f"HTRRNG {heater_range_lock[_range]}").strip()
-
+        
         # refresh self.heater value with RANGE? query
         self.get_heater_range()
 
