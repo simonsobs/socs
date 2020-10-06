@@ -96,8 +96,11 @@ class LS336_Agent:
         '''
         # get sampling frequency
         f_sample = params.get('f_sample')
-        if f_sample is None: t_sample = self.t_sample
-        else: self.t_sample = 1/f_sample - 0.01
+        if f_sample is None: 
+            t_sample = self.t_sample
+        else: 
+            t_sample = 1/f_sample - 0.01
+            self.t_sample = t_sample
         
         with self.lock.acquire_timeout(job = 'acq', timeout = 3) as acquired:
             if not acquired:
@@ -153,7 +156,7 @@ class LS336_Agent:
                 self.agent.publish_to_feed('heaters', heaters_message) 
 
                 # finish sample
-                self.log.debug(f'Sleeping for {np.round(t_sample)} seconds...')                   
+                self.log.debug(f'Sleeping for {np.round(self.t_sample)} seconds...')                   
 
                 # release and reacquire lock between data acquisition
                 self.lock.release()
@@ -432,11 +435,12 @@ class LS336_Agent:
     def servo_to_temperature(self, session, params):
         '''A wrapper for setting the heater setpoint. Performs sanity checks on heater
         configuration before publishing setpoint:
-            1. checks control mode of heater (close loop)
+            1. checks control mode of heater (closed loop)
             2. checks units of input channel (kelvin)
             3. resets setpoint to current temperature with ramp off
             4. sets ramp on to 0.1K/min rate
             5. checks setpoint does not exceed input channel T_limit
+            6. sets setpoint to commanded value
 
         Parameters
         ----------
