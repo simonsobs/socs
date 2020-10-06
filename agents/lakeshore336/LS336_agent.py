@@ -147,10 +147,10 @@ class LS336_Agent:
 
                 for i, heater in enumerate(self.module.heaters.values()):
                     heater_str = heater.output_name.replace(' ', '_')
-                    heaters_message['data'][heater_str + '_Percent'] = heater.get_heater_percent()
+                    heaters_message['data'][heater_str + '_Percent'] = float(heater.get_heater_percent())
                     heaters_message['data'][heater_str + '_Range'] = heater.get_heater_range()
-                    heaters_message['data'][heater_str + '_Max_Current'] = heater.get_max_current()
-                    heaters_message['data'][heater_str + '_Setpoint'] = heater.get_setpoint()
+                    heaters_message['data'][heater_str + '_Max_Current'] = float(heater.get_max_current())
+                    heaters_message['data'][heater_str + '_Setpoint'] = float(heater.get_setpoint())
 
                 # publish to feed
                 self.agent.publish_to_feed('heaters', heaters_message) 
