@@ -142,8 +142,8 @@ class LS370_Agent:
             return True, "Already initialized"
 
         with self._lock.acquire_timeout(job='init') as acquired1, \
-             self._acq_proc_lock.acquire_timeout(timeout=0., job='init') \
-             as acquired2:
+        self._acq_proc_lock.acquire_timeout(timeout=0., job='init') \
+        as acquired2:
             if not acquired1:
                 self.log.warn(f"Could not start init because "
                               f"{self._lock.job} is already running")
@@ -309,7 +309,9 @@ class LS370_Agent:
             if heater_string.lower() == 'sample':
                 heater = self.module.sample_heater
             elif heater_string.lower() == 'still':   #TODO: add still heater class to driver
-                heater = self.module.still_heater
+                #heater = self.module.still_heater
+                self.log.warn(f"{heater_string} heater not yet implemented in this agent, please modify client")
+
 
             current_range = heater.get_heater_range()
 
@@ -541,7 +543,9 @@ class LS370_Agent:
             session.set_status('running')
 
             if params['heater'].lower() == 'still':
-                self.module.still_heater.set_mode(params['mode']) #TODO: add still heater to driver
+                #self.module.still_heater.set_mode(params['mode']) #TODO: add still heater to driver
+                self.log.warn(f"{params['heater']} heater not yet implemented in this agent,
+                            please modify client")
             if params['heater'].lower() == 'sample':
                 self.module.sample_heater.set_mode(params['mode'])
             self.log.info("Set {} output mode to {}".format(params['heater'], params['mode']))
@@ -577,7 +581,9 @@ class LS370_Agent:
             display = params.get('display', None)
 
             if heater == 'still':  #TODO: add still heater to driver
-                self.module.still_heater.set_heater_output(output, display_type=display)
+                #self.module.still_heater.set_heater_output(output, display_type=display)
+                self.log.warn(f"{heater_string} heater not yet implemented in this agent,
+                            please modify client")
             if heater.lower() == 'sample':
                 self.log.info("display: {}\toutput: {}".format(display, output))
                 self.module.sample_heater.set_heater_output(output, display_type=display)
@@ -604,7 +610,7 @@ def make_parser(parser=None):
 
     # Add options specific to this agent.
     pgroup = parser.add_argument_group('Agent Options')
-    pgroup.add_argument('--port')
+    pgroup.add_argument('--port', type=str, help='Full path to USB node for the lakeshore, e.g. "/dev/ttyUSB0"')
     pgroup.add_argument('--serial-number')
     pgroup.add_argument('--mode')
     pgroup.add_argument('--fake-data', type=int, default=0,
