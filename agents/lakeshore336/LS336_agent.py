@@ -670,7 +670,8 @@ def make_parser(parser = None):
     # Add options specific to this agent.
     pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--serial-number')
-    pgroup.add_argument('--port')
+    pgroup.add_argument('--port', type=str,
+                        help="Path to USB node for the lakeshore")
     pgroup.add_argument('--f-sample', type=float, default=0.1, 
                         help='The frequency of data acquisition')
     pgroup.add_argument('--wait', type=float, default=1.0, 
