@@ -193,6 +193,21 @@ class LS240_Agent:
 
         Method to start data acquisition process.
 
+        The most recent data collected is stored in session.data in the
+        structure::
+
+            >>> session.data
+            {"fields":
+                {"Channel_1": {"T": 99.26, "V": 99.42},
+                 "Channel_2": {"T": 99.54, "V": 101.06},
+                 "Channel_3": {"T": 100.11, "V":100.79},
+                 "Channel_4": {"T": 98.49, "V": 100.77},
+                 "Channel_5": {"T": 97.75, "V": 101.45},
+                 "Channel_6": {"T": 99.58, "V": 101.75},
+                 "Channel_7": {"T": 98.03, "V": 100.82},
+                 "Channel_8": {"T": 101.14, "V":101.01}},
+             "timestamp":1601925677.6914878}
+
         Args:
             sampling_frequency (float):
                 Sampling frequency for data collection. Defaults to 2.5 Hz
@@ -218,19 +233,33 @@ class LS240_Agent:
 
             self.take_data = True
 
+            session.data = {"fields": {}}
+
             while self.take_data:
+                current_time = time.time()
                 data = {
-                    'timestamp': time.time(),
+                    'timestamp': current_time,
                     'block_name': 'temps',
                     'data': {}
                 }
 
                 for chan in self.module.channels:
+                    # Read sensor on channel
                     chan_string = "Channel_{}".format(chan.channel_num)
-                    data['data'][chan_string + '_T'] = chan.get_reading(unit='K')
-                    data['data'][chan_string + '_V'] = chan.get_reading(unit='S')
+                    temp_reading = chan.get_reading(unit='K')
+                    sensor_reading = chan.get_reading(unit='S')
+
+                    # For data feed
+                    data['data'][chan_string + '_T'] = temp_reading
+                    data['data'][chan_string + '_V'] = sensor_reading
+
+                    # For session.data
+                    field_dict = {chan_string: {"T": temp_reading, "V": sensor_reading}}
+                    session.data['fields'].update(field_dict)
 
                 self.agent.publish_to_feed('temperatures', data)
+
+                session.data.update({'timestamp': current_time})
 
                 time.sleep(sleep_time)
 
