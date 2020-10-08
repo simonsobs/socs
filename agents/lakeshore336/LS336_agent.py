@@ -35,16 +35,9 @@ class LS336_Agent:
 
         agg_params = {'frame_length': 10*60} # sec
         
-        # separate feeds for thermometry and control data
+        # combined feed for thermometry and control data
         self.agent.register_feed(
             'temperatures',
-            record = True,
-            agg_params = agg_params,
-            buffer_time = 1
-        )
-
-        self.agent.register_feed(
-            'heaters',
             record = True,
             agg_params = agg_params,
             buffer_time = 1
@@ -113,7 +106,7 @@ class LS336_Agent:
 
             # initialize recent temps array
             # shape is N_points x 4, where N_points is 1 hour / t_sample rounded up
-            self.recent_temps = np.full((int(np.ceil(3600 / self.t_sample)), 4), -1)
+            self.recent_temps = np.full((int(np.ceil(3600 / self.t_sample)), 4), -1.0)
 
             # acquire data from Lakeshore
             self.take_data = True
@@ -133,9 +126,9 @@ class LS336_Agent:
                     temperatures_message['data'][channel_str + '_T'] = temps[i]
                     temperatures_message['data'][channel_str + '_V'] = voltages[i]
 
-                    # append to recent temps array
-                    self.recent_temps = np.roll(self.recent_temps, 1, axis = 0)
-                    self.recent_temps[0] = temps
+                # append to recent temps array
+                self.recent_temps = np.roll(self.recent_temps, 1, axis = 0)
+                self.recent_temps[0] = temps
 
                 # publish to feed
                 self.agent.publish_to_feed('temperatures', temperatures_message)
@@ -155,7 +148,7 @@ class LS336_Agent:
                     heaters_message['data'][heater_str + '_Setpoint'] = float(heater.get_setpoint())
 
                 # publish to feed
-                self.agent.publish_to_feed('heaters', heaters_message) 
+                self.agent.publish_to_feed('temperatures', heaters_message) 
 
                 # finish sample
                 self.log.debug(f'Sleeping for {np.round(self.t_sample)} seconds...')                   
@@ -297,7 +290,7 @@ class LS336_Agent:
 
             # set heater resistance
             _ = heater.get_heater_resistance_setting()
-            if params['resistance'] == heater.res:
+            if params['resistance'] == heater.resistance:
                 print('Current heater resistance matches commanded value. Proceeding unchanged')
             else:
                 heater.set_heater_resistance(params['resistance'])
@@ -403,6 +396,41 @@ class LS336_Agent:
 
         return True, f"Set {heater.output_name} input channel to {params['input']}"
 
+    def set_setpoint(self, session, params):
+        '''Sets the setpoint of the heater control loop, after first turning ramp off.
+
+        Parameters
+        ----------
+        params : dict
+            Contains parameters 'setpoint' (not optional), 'heater' (optional, default '2'),
+            and 'wait' (optional, default 1).
+        '''
+        with self.lock.acquire_timeout(job = 'set_setpoint', timeout = 3) as acquired:
+            if not acquired:
+                print(f"Lock could not be acquired because it is held by {self.lock.job}")
+                return False, 'Could not acquire lock'
+
+            session.set_status('running')
+            
+            # get heater
+            heater_key = params.get('heater', '2') # default to 50W output
+            heater = self.module.heaters[heater_key]
+
+            # set setpoint
+            current_setpoint = heater.get_setpoint()
+            if params['setpoint'] == current_setpoint:
+                print('Current setpoint matches commanded value. Proceeding unchanged')
+            else:
+                heater.set_ramp_on_off('off')
+                heater.set_setpoint(params['setpoint'])
+                time.sleep(params.get('wait', self.wait))
+
+            session.add_message(f"Turned ramp off and set {heater.output_name} \
+                setpoint to {params['setpoint']}")
+
+        return True, f"Turned ramp off and set {heater.output_name} \
+                setpoint to {params['setpoint']}"
+
     def set_T_limit(self, session, params):
         '''Sets the input T limit for use in control.
 
@@ -493,11 +521,10 @@ class LS336_Agent:
             heater.set_ramp_on_off('off')
             heater.set_setpoint(current_temp)
 
-            # check ramp settings
-            if heater.get_ramp_on_off() != 'on' and heater.get_ramp_rate() != 0.1:
-                session.add_message(f'Turning ramp on and setting rate to 0.1K/min')
-                heater.set_ramp_on_off('on')
-                heater.set_ramp_rate(0.1)
+            # reset ramp settings
+            session.add_message(f'Turning ramp on and setting rate to 0.1K/min')
+            heater.set_ramp_on_off('on')
+            heater.set_ramp_rate(0.1)
 
             # make sure not exceeding channel T limit
             T_limit = self.module.channels[channel].get_T_limit()
@@ -582,14 +609,14 @@ class LS336_Agent:
 
             # get channel
             channel = heater.get_input_channel()
-            channel_num = int(self.module.channels[channel].num)
+            channel_num = self.module.channels[channel].num
 
             # get current temp
             current_temp = np.round(float(self.module.get_kelvin(channel)), 4)
 
             # check if recent temps and current temps are within threshold
             recent_temps = self.recent_temps[:num_idxs, channel_num-1]
-            recent_temps = recent_temps.concatenate((np.array([current_temp]), recent_temps))
+            recent_temps = np.concatenate((np.array([current_temp]), recent_temps))
 
             setpoint = float(heater.get_setpoint())
             session.add_message(f'Maximum absolute difference in recent temps is {np.max(np.abs(recent_temps - setpoint))}K')
@@ -600,6 +627,8 @@ class LS336_Agent:
 
             else:
                 print('Servo temps are not yet stable')
+
+            time.sleep(params.get('wait', self.wait))
         
         return False, f'Servo temperature is not stable within {threshold}K of setpoint'
             
@@ -631,6 +660,8 @@ class LS336_Agent:
             resp = query()
             session.data[params['attribute']] = resp
 
+            time.sleep(params.get('wait', self.wait))
+
         return True, f"Retrieved {channel.input_name} {params['attribute']}"
 
     def get_heater_attribute(self, session, params):
@@ -661,6 +692,8 @@ class LS336_Agent:
             resp = query()
             session.data[params['attribute']] = resp
 
+            time.sleep(params.get('wait', self.wait))
+
         return True, f"Retrieved {heater.output_name} {params['attribute']}"
 
 def make_parser(parser = None):
@@ -683,7 +716,7 @@ def make_parser(parser = None):
                         help='The upper bound on temperature differences for stability check')
     pgroup.add_argument('--window', type=float, default=600., 
                         help='The lookback time on temperature differences for stability check')
-    pgroup.add_argument('--auto-acquire', type=bool, default=False,
+    pgroup.add_argument('--auto-acquire', type=bool, default=True,
                         help='Automatically start data acquisition on startup')
     return parser 
 
@@ -717,6 +750,7 @@ if __name__ == '__main__':
     agent.register_task('set_mode', lake_agent.set_mode)
     agent.register_task('set_pid', lake_agent.set_pid)
     agent.register_task('set_T_limit', lake_agent.set_T_limit)
+    agent.register_task('set_setpoint', lake_agent.set_setpoint)
     agent.register_task('servo_to_temperature', lake_agent.servo_to_temperature)
     agent.register_task('check_temperature_stability', lake_agent.check_temperature_stability)
     agent.register_task('get_channel_attribute', lake_agent.get_channel_attribute)

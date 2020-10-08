@@ -301,7 +301,7 @@ class Channel:
 
         self.ls = ls
         self.input = _input
-        self.num = channel_lock[self.input]
+        self.num = int(channel_lock[self.input])
         self.get_input_type()
         self.get_input_curve()
         self.get_input_name()
@@ -966,7 +966,7 @@ class Heater:
 
         resp = self.get_heater_setup()
         if current in max_current_lock:
-            resp[1] = str(current)
+            resp[1] = max_current_lock[current]
             self.max_current = current
         else: 
             resp[1] = '0'
