@@ -619,6 +619,10 @@ class LS336_Agent:
             recent_temps = self.recent_temps[:num_idxs, channel_num-1]
             recent_temps = np.concatenate((np.array([current_temp]), recent_temps))
 
+            # get static setpoint if None
+            if self.static_setpoint is None:
+                self.static_setpoint = float(heater.get_setpoint())
+
             setpoint = self.static_setpoint # avoids ramp bug, i.e. want to compare to commanded setpoint not mid-ramp setpoint
             session.add_message(f'Maximum absolute difference in recent temps is {np.max(np.abs(recent_temps - setpoint))}K')
             
