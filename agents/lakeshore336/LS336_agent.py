@@ -539,16 +539,16 @@ class LS336_Agent:
             else:
                 session.add_message(f"Setting {heater.output_name} setpoint to {params['temperature']}")
                 heater.set_setpoint(params['temperature'])
-                self.static_setpoint = params['setpoint'] # static setpoint used in temp stability check to avoid ramping bug
+                self.static_setpoint = params['temperature'] # static setpoint used in temp stability check to avoid ramping bug
 
                 # if transport, restart control loop when setpoint first crossed
                 if params.get('transport', False):
 
-                    current_sign = np.sign(params['temperature'] - current_temp) # check when this flips
+                    starting_sign = np.sign(params['temperature'] - current_temp) # check when this flips
                     transporting = True
 
                     while transporting:
-                        current_temp = np.round(float(self.module.get_kelvin(channel.input)), 4)
+                        current_temp = np.round(float(self.module.get_kelvin(channel)), 4)
                         current_sign = np.sign(params['temperature'] - current_temp) # check when this flips
                         
                         # release and reacquire lock between data acquisition
