@@ -32,6 +32,7 @@ class LS336_Agent:
         self.threshold = threshold
         self.window = window
         self.recent_temps = None
+        self.static_setpoint = None
 
         agg_params = {'frame_length': 10*60} # sec
         
@@ -423,13 +424,12 @@ class LS336_Agent:
             else:
                 heater.set_ramp_on_off('off')
                 heater.set_setpoint(params['setpoint'])
+                self.static_setpoint = params['setpoint'] # static setpoint used in temp stability check to avoid ramping bug
                 time.sleep(params.get('wait', self.wait))
 
-            session.add_message(f"Turned ramp off and set {heater.output_name} \
-                setpoint to {params['setpoint']}")
+            session.add_message(f"Turned ramp off and set {heater.output_name} setpoint to {params['setpoint']}")
 
-        return True, f"Turned ramp off and set {heater.output_name} \
-                setpoint to {params['setpoint']}"
+        return True, f"Turned ramp off and set {heater.output_name} setpoint to {params['setpoint']}"
 
     def set_T_limit(self, session, params):
         '''Sets the input T limit for use in control.
@@ -469,15 +469,15 @@ class LS336_Agent:
             1. checks control mode of heater (closed loop)
             2. checks units of input channel (kelvin)
             3. resets setpoint to current temperature with ramp off
-            4. sets ramp on to 0.1K/min rate
+            4. sets ramp on to specified rate
             5. checks setpoint does not exceed input channel T_limit
             6. sets setpoint to commanded value
 
         Parameters
         ----------
         params : dict
-            Contains parameters 'temperature' (not optional), 'heater' (optional, default '2'),
-            'wait' (optional, default 1), and 'transport'.
+            Contains parameters 'temperature' (not optional), 'ramp' (optional, default 0.1), 
+            'heater' (optional, default '2'), 'wait' (optional, default 1), and 'transport' (optional, default False)..
 
         Notes
         -----
@@ -522,9 +522,10 @@ class LS336_Agent:
             heater.set_setpoint(current_temp)
 
             # reset ramp settings
-            session.add_message(f'Turning ramp on and setting rate to 0.1K/min')
+            ramp = params.get('ramp', 0.1)
+            session.add_message(f'Turning ramp on and setting rate to {ramp}K/min')
             heater.set_ramp_on_off('on')
-            heater.set_ramp_rate(0.1)
+            heater.set_ramp_rate(ramp)
 
             # make sure not exceeding channel T limit
             T_limit = self.module.channels[channel].get_T_limit()
@@ -538,12 +539,12 @@ class LS336_Agent:
             else:
                 session.add_message(f"Setting {heater.output_name} setpoint to {params['temperature']}")
                 heater.set_setpoint(params['temperature'])
+                self.static_setpoint = params['setpoint'] # static setpoint used in temp stability check to avoid ramping bug
 
                 # if transport, restart control loop when setpoint first crossed
                 if params.get('transport', False):
 
-                    starting_temp = np.round(float(self.module.get_kelvin(channel.input)), 4)
-                    starting_sign = np.sign(params['temperature'] - starting_temp) # check when this flips
+                    current_sign = np.sign(params['temperature'] - current_temp) # check when this flips
                     transporting = True
 
                     while transporting:
@@ -618,10 +619,10 @@ class LS336_Agent:
             recent_temps = self.recent_temps[:num_idxs, channel_num-1]
             recent_temps = np.concatenate((np.array([current_temp]), recent_temps))
 
-            setpoint = float(heater.get_setpoint())
+            setpoint = self.static_setpoint # avoids ramp bug, i.e. want to compare to commanded setpoint not mid-ramp setpoint
             session.add_message(f'Maximum absolute difference in recent temps is {np.max(np.abs(recent_temps - setpoint))}K')
             
-            if np.all(np.abs(recent_temps - setpoint < threshold)):
+            if np.all(np.abs(recent_temps - setpoint) < threshold):
                 session.add_message(f'Recent temps are within {threshold}K of setpoint')
                 return True, f'Servo temperature is stable within {threshold}K of setpoint'
 
