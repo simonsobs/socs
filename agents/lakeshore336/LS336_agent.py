@@ -543,7 +543,8 @@ class LS336_Agent:
 
                 # if transport, restart control loop when setpoint first crossed
                 if params.get('transport', False):
-
+                            
+                    current_range = heater.get_heater_range()
                     starting_sign = np.sign(params['temperature'] - current_temp) # check when this flips
                     transporting = True
 
@@ -563,8 +564,8 @@ class LS336_Agent:
 
                             # cycle control loop
                             session.add_message(f'Transport complete, restarting control loop at provided setpoint')
-                            current_range = heater.get_heater_range()
                             heater.set_heater_range('off')
+                            time.sleep(1)
                             heater.set_heater_range(current_range)
 
                 time.sleep(params.get('wait', self.wait))
