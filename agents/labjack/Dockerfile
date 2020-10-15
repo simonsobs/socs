@@ -24,7 +24,7 @@ RUN pip3 install --no-cache-dir https://labjack.com/sites/default/files/software
 
 
 # Run registry on container startup
-ENTRYPOINT ["python3", "-u", "labjack_agent.py"]
+ENTRYPOINT ["dumb-init", "python3", "-u", "labjack_agent.py"]
 
 # Sensible default arguments
 CMD ["--site-hub=ws://sisock-crossbar:8001/ws", \

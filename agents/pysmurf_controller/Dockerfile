@@ -31,7 +31,7 @@ WORKDIR /app/socs/agents/pysmurf_controller
 COPY . .
 RUN pip3 install -r requirements.txt
 
-ENTRYPOINT ["python3", "-u", "pysmurf_controller.py"]
+ENTRYPOINT ["dumb-init", "python3", "-u", "pysmurf_controller.py"]
 
 # Sensible defaults for setup with sisock
 CMD ["--site-hub=ws://sisock-crossbar:8001/ws", \
