@@ -13,7 +13,7 @@ import time
 
 class LS336_Agent:
 
-    def __init__(self, agent, sn, port, f_sample = 0.1, wait = 1, threshold = 0.1, window = 600):
+    def __init__(self, agent, sn, port, f_sample = 0.1, wait = 1, threshold = 0.1, window = 900):
         self.agent = agent
         self.sn = sn
         self.port = port
@@ -477,13 +477,19 @@ class LS336_Agent:
         ----------
         params : dict
             Contains parameters 'temperature' (not optional), 'ramp' (optional, default 0.1), 
-            'heater' (optional, default '2'), 'wait' (optional, default 1), and 'transport' (optional, default False)..
+            'heater' (optional, default '2'), 'wait' (optional, default 1),
+            'transport' (optional, default False), and 'transport_offset' (optional, default 0).
 
         Notes
         -----
         If param 'transport' is provided and True, the control loop restarts when the setpoint
         is first reached. This is useful for loads with long time cooling times or time constants
         to help minimize over/undershoot.
+
+        If param 'transport' is provided and True, and 'transport_offset' is provided and positive,
+        and the setpoint is higher than the current temperature, then the control loop will restart 
+        when the setpoint - transport_offset is first reached. This is useful to avoid  a "false positive"
+        temperature stability check too shortly after transport completes.
         '''
         # get sampling frequency
         t_sample = self.t_sample
@@ -545,12 +551,19 @@ class LS336_Agent:
                 if params.get('transport', False):
                             
                     current_range = heater.get_heater_range()
-                    starting_sign = np.sign(params['temperature'] - current_temp) # check when this flips
+                    starting_sign = np.sign(params['temperature'] - current_temp)
                     transporting = True
+
+                    # if we are raising temp, allow possibility of stopping transport at a cooler temp
+                    T_offset = 0
+                    if starting_sign > 0:
+                        T_offset = params.get('transport_offset', 0)
+                        if T_offset < 0:
+                            return False, f'Transport offset temperature cannot be negative'
 
                     while transporting:
                         current_temp = np.round(float(self.module.get_kelvin(channel)), 4)
-                        current_sign = np.sign(params['temperature'] - current_temp) # check when this flips
+                        current_sign = np.sign(params['temperature'] - T_offset - current_temp) # check when this flips
                         
                         # release and reacquire lock between data acquisition
                         self.lock.release()
@@ -565,7 +578,7 @@ class LS336_Agent:
                             # cycle control loop
                             session.add_message(f'Transport complete, restarting control loop at provided setpoint')
                             heater.set_heater_range('off')
-                            time.sleep(1)
+                            time.sleep(1) # necessary for prev command to register in ls336 firmware for some reason
                             heater.set_heater_range(current_range)
 
                 time.sleep(params.get('wait', self.wait))
@@ -578,7 +591,7 @@ class LS336_Agent:
         Parameters
         ----------
         params : dict
-            Contains parameters 'threshold' (optiona, default 0.1), 'window' (option, default 600),
+            Contains parameters 'threshold' (optiona, default 0.1), 'window' (option, default 900),
             'heater' (optional, default '2'), and 'wait' (optional, default 1).
 
         Notes
