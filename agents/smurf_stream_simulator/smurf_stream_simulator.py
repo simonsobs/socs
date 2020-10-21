@@ -176,7 +176,7 @@ class SmurfStreamSimulator:
                     ts = core.G3Timestream([chan.read() for t in times])
                     ts.start = core.G3Time(frame_start * core.G3Units.sec)
                     ts.stop = core.G3Time(frame_stop * core.G3Units.sec)
-                    f['data'][str(i)] = ts
+                    f['data'][f"r{i:04}"] = ts
 
                 self.writer.Process(f)
                 self.log.info("Writing frame...")

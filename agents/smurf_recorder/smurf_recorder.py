@@ -58,11 +58,15 @@ class SmurfRecorder:
         false stops the recording of data.
     log : txaio.tx.Logger
         txaio logger object, created by the OCSAgent
-
+    target_rate : float
+        Target sampling rate for monitored channels.
+    monitored_channels : list
+        Readout channels to monitor. Incoming data for these channels will be
+        downsampled and published to an OCS feed.
     """
 
     def __init__(self, agent, time_per_file, data_dir, stream_id,
-                 address="localhost", port=4536):
+                 address="localhost", port=4536, target_rate=10):
         self.agent = agent
         self.time_per_file = time_per_file
         self.data_dir = data_dir
@@ -70,6 +74,38 @@ class SmurfRecorder:
         self.address = "tcp://{}:{}".format(address, port)
         self.is_streaming = False
         self.log = self.agent.log
+        self.target_rate = target_rate
+        self.monitored_channels = []
+
+        self.agent.register_feed('detectors', record=True)
+
+    def set_monitored_channels(self, session, params=None):
+        """Sets channels that the recorder should monitor.
+
+        Args
+        -----
+        channels : list, required
+            List of channel numbers to be monitored.
+        """
+        if params is None:
+            params = {}
+
+        self.monitored_channels =  params['channels']
+        return True, f"Set monitored channels to {self.monitored_channels}"
+
+    def set_target_rate(self, session, params=None):
+        """Sets the target sample rate for monitored channels.
+
+        Args
+        -----
+        target_rate : float, required
+            Target rate after downsampling for monitored channels in Hz.
+        """
+        if params is None:
+            params = {}
+
+        self.target_rate = params['target_rate']
+        return True, f"Set target sampling rate to {self.target_rate}"
 
     def start_record(self, session, params=None):
         """start_record(params=None)
@@ -89,10 +125,16 @@ class SmurfRecorder:
         self.is_streaming = True
 
         recorder = FrameRecorder(self.time_per_file, self.address,
-                                 self.data_dir, self.stream_id)
+                                 self.data_dir, self.stream_id,
+                                 self.target_rate)
 
         while self.is_streaming:
+            recorder.monitored_channels = self.monitored_channels
+            recorder.target_rate = self.target_rate
             recorder.run()
+            for k, v in recorder.stream_data.items():
+                if v['timestamps']:
+                    self.agent.publish_to_feed('detectors', v)
 
         # Explicitly clean up when done
         del recorder
@@ -131,9 +173,13 @@ def make_parser(parser=None):
     pgroup.add_argument("--address", default="localhost",
                         help="Address to listen to.")
     pgroup.add_argument('--stream-id', default='None',
-                        help="Stream id of recorded stream. If one is not " 
-                             "present in the G3Frames, this is the stream-id" 
+                        help="Stream id of recorded stream. If one is not "
+                             "present in the G3Frames, this is the stream-id"
                              "that will be used to determine file paths.")
+    pgroup.add_argument('--target-rate', default=10, type=float,
+                       help="Target rate for monitored readout channels in "
+                            "Hz. This willl be the rate that detector data is "
+                            "streamed to an OCS feed")
 
     return parser
 
@@ -151,11 +197,16 @@ if __name__ == "__main__":
                              args.data_dir,
                              args.stream_id,
                              address=args.address,
-                             port=int(args.port))
+                             port=int(args.port),
+                             target_rate=args.target_rate)
 
     agent.register_process("record",
                            listener.start_record,
                            listener.stop_record,
                            startup=bool(args.auto_start))
+    agent.register_task('set_monitored_channels',
+                        listener.set_monitored_channels)
+    agent.register_task('set_target_rate', listener.set_target_rate)
+
 
     runner.run(agent, auto_reconnect=True)
