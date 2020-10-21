@@ -157,7 +157,7 @@ class FrameRecorder:
         the values will have the structure required by the OCS_Feed.
     """
     def __init__(self, file_duration, tcp_addr, data_dir, stream_id,
-                 target_rate):
+                 target_rate=10):
         # Parameters
         self.time_per_file = file_duration
         self.address = tcp_addr

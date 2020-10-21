@@ -126,7 +126,7 @@ class SmurfRecorder:
 
         recorder = FrameRecorder(self.time_per_file, self.address,
                                  self.data_dir, self.stream_id,
-                                 self.target_rate)
+                                 target_rate=self.target_rate)
 
         while self.is_streaming:
             recorder.monitored_channels = self.monitored_channels
