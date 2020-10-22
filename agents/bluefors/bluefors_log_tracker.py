@@ -132,7 +132,8 @@ class LogParser:
                                     'cpaerr', 'cpatempwi', 'cpatempwo', 'cpatempo',
                                     'cpatemph', 'cpalp', 'cpalpa', 'cpahp', 'cpahpa',
                                     'cpadp', 'cpacurrent', 'cpahours', 'cpapscale',
-                                    'cpatscale', 'cpasn', 'cpamodel'],
+                                    'cpatscale', 'cpasn', 'cpamodel',
+                                    'ctrl_pres_ok', 'ctr_pressure_ok'],
                          'heater': ["a1_u", "a1_r_lead", "a1_r_htr", "a2_u",
                                     "a2_r_lead", "a2_r_htr", "htr", "htr_range"]}
 
