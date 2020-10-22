@@ -99,7 +99,7 @@ services:
   # Synaccess power strip agent
   # --------------------------------------------------------------------------
   ocs-synaccess-agent:
-    image: "ocs-synaccess-agent:"
+    image: "ocs-synaccess-agent"
     build: ./agents/synacc/
 
   # --------------------------------------------------------------------------
