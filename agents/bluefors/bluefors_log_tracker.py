@@ -128,11 +128,12 @@ class LogParser:
                                     'tc400errorcode_2', 'tc400ovtempelec_2',
                                     'tc400ovtemppump_2', 'tc400setspdatt_2',
                                     'tc400pumpaccel_2', 'tc400commerr_2',
+                                    'nxdsf', 'nxdsct', 'nxdst', 'nxdsbs', 'nxdstrs',
                                     'ctrl_pres', 'cpastate', 'cparun', 'cpawarn',
                                     'cpaerr', 'cpatempwi', 'cpatempwo', 'cpatempo',
                                     'cpatemph', 'cpalp', 'cpalpa', 'cpahp', 'cpahpa',
                                     'cpadp', 'cpacurrent', 'cpahours', 'cpapscale',
-                                    'cpatscale', 'cpasn', 'cpamodel',
+                                    'cpascale', 'cpatscale', 'cpasn', 'cpamodel',
                                     'ctrl_pres_ok', 'ctr_pressure_ok'],
                          'heater': ["a1_u", "a1_r_lead", "a1_r_htr", "a2_u",
                                     "a2_r_lead", "a2_r_htr", "htr", "htr_range"]}
