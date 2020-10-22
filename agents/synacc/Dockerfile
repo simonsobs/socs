@@ -1,5 +1,4 @@
-# SOCS LabJack Agent
-# socs Agent container for running the LabJack Agent.
+# SOCS Synaccess Agent, used to run the Synaccess power strip
 
 # Use socs base image
 FROM socs:latest

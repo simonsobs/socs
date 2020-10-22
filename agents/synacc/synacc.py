@@ -9,8 +9,16 @@ if not on_rtd:
     from ocs.ocs_twisted import TimeoutLock
 
 
-class SynAccAgent:
+class SynaccessAgent:
     def __init__(self, agent, ip_address, username, password):
+        """
+        Initializes the class variables
+
+        Args:
+            ip_address(str): IP Address for the agent.
+            username(str): username credential to login to strip
+            password(str): password credential to login to strip
+        """
         self.agent = agent
         self.lock = TimeoutLock()
         self.ip_address = ip_address
@@ -46,6 +54,13 @@ class SynAccAgent:
                 return False, "Could not acquire lock"
 
     def set_outlet(self, session, params=None):
+        """
+        Sets a particular outlet to on/off
+
+        Args:
+            outlet (int): the outlet that we are changing the state of
+            on (bool): the new state
+        """
         with self.lock.acquire_timeout(1) as acquired:
             if acquired:
                 if params['on']:
@@ -62,6 +77,14 @@ class SynAccAgent:
                 return False, "Could not acquire lock"
 
     def set_all(self, session, params=None):
+        """
+
+        Sets all outlets to on/off
+
+        Args:
+            on (bool): the new state
+
+        """
         with self.lock.acquire_timeout(1) as acquired:
             if acquired:
                 on = "0"
@@ -103,10 +126,10 @@ if __name__ == '__main__':
 
     agent, runner = ocs_agent.init_site_agent(args)
 
-    p = SynAccAgent(agent,
-                    ip_address=args.ip_address,
-                    username=args.username,
-                    password=args.password)
+    p = SynaccessAgent(agent,
+                       ip_address=args.ip_address,
+                       username=args.username,
+                       password=args.password)
     agent.register_task('get_status', p.get_status, startup={})
     agent.register_task('reboot', p.reboot)
     agent.register_task('set_outlet', p.set_outlet)

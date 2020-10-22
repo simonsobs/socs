@@ -94,6 +94,13 @@ services:
   ocs-pfeiffer-tpg366-agent:
     image: "ocs-pfeiffer-tpg366-agent"
     build: ./agents/pfeiffer_tpg366/
+    
+  # --------------------------------------------------------------------------
+  # Synaccess power strip agent
+  # --------------------------------------------------------------------------
+  ocs-synaccess-agent:
+    image: "ocs-synaccess-agent:"
+    build: ./agents/synacc/
 
   # --------------------------------------------------------------------------
   # SOCS Simulators
@@ -105,3 +112,11 @@ services:
   ocs-lakeshore240-simulator:
     image: "ocs-lakeshore240-simulator"
     build: ./simulators/lakeshore240/
+    
+  # --------------------------------------------------------------------------
+  # Lakeshore240 Simulator
+  # --------------------------------------------------------------------------
+  ocs-lakeshore240-simulator:
+    image: "ocs-lakeshore240-simulator"
+    build: ./simulators/lakeshore240/
+

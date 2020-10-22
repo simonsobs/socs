@@ -3,9 +3,9 @@
 .. _synacc:
 
 ==================
-SynAcc Agent
+Synaccess Agent
 ==================
-The SynAcc Agent interfaces with the power strip over ethernet to control 
+The Synaccess Agent interfaces with the power strip over ethernet to control 
 different outlets as well as get their status. 
 
 .. argparse::
@@ -21,11 +21,11 @@ Agent in a docker container.
 
 ocs-config
 ``````````
-To configure the SynAcc Agent we need to add a SynAcc Agent block to our ocs 
+To configure the Synaccess Agent we need to add a Synaccess Agent block to our ocs 
 configuration file. Here is an example configuration block using all of the 
 available arguments::
 
-       {'agent-class': 'SynAccAgent',
+       {'agent-class': 'SynaccessAgent',
         'instance-id': 'synacc',
         'arguments':[
           ['--ip-address', '10.10.10.8'],
@@ -35,11 +35,11 @@ available arguments::
 
 Docker
 ``````
-The SynAcc Agent should be configured to run in a Docker container.
+The Synaccess Agent should be configured to run in a Docker container.
 An example docker-compose service configuration is shown here::
 
   ocs-synacc:
-    image: synacc-img
+    image: simonsobs/ocs-synaccess-agent
     hostname: ocs-docker
     network_mode: "host"
     volumes:
@@ -78,5 +78,5 @@ Below is an example client to control outlets::
 Agent API
 ---------
 
-.. autoclass:: agents.synacc.synacc.SynAccAgent
+.. autoclass:: agents.synacc.synacc.SynaccessAgent
     :members: get_status, reboot, set_outlet, set_all
