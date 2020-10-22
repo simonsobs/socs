@@ -86,9 +86,13 @@ class SmurfRecorder:
         -----
         channels : list, required
             List of channel numbers to be monitored.
+            A maximum of 6 channels can be monitored at a time.
         """
         if params is None:
             params = {}
+
+        if len(params['channels']) > 6:
+            return False, "Cannot monitor more than 6 channels"
 
         self.monitored_channels =  params['channels']
         return True, f"Set monitored channels to {self.monitored_channels}"
@@ -100,9 +104,13 @@ class SmurfRecorder:
         -----
         target_rate : float, required
             Target rate after downsampling for monitored channels in Hz.
+            Max target rate is 10 Hz.
         """
         if params is None:
             params = {}
+
+        if params['target_rate'] > 10:
+            return False, "Max target rate is 10 Hz"
 
         self.target_rate = params['target_rate']
         return True, f"Set target sampling rate to {self.target_rate}"
