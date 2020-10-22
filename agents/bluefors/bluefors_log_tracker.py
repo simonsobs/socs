@@ -237,6 +237,11 @@ class LogParser:
         for pattern in self.patterns[log_type]:
             regex = re.compile(rf'{pattern},([0-9\.\+\-E]+)')
             m = regex.search(new_line)
+
+            # skip patterns that don't exist in this log
+            if not m:
+                continue
+
             if log_type == 'channels':
                 data_array[pattern.replace('-', '_')] = int(m.group(1))
             else:
