@@ -151,7 +151,7 @@ class FrameRecorder:
         be stored in ``stream_data`` after each ``run`` function call.
     target_rate : float
         Target sampling rate for monitored channels in Hz.
-    scan_data : dict
+    stream_data : dict
         Data containing downsampled timestream data from the monitored. This
         dict will have the channel name (such as ``r0012``) as the key, and
         the values will have the structure required by the OCS_Feed.

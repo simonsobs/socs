@@ -84,9 +84,9 @@ class SmurfRecorder:
 
         Args
         -----
-        channels : list, required
-            List of channel numbers to be monitored.
-            A maximum of 6 channels can be monitored at a time.
+        channels : List[Int], required
+            List of channel numbers (integers between 0 and 2048) to be
+            monitored. A maximum of 6 channels can be monitored at a time.
         """
         if params is None:
             params = {}
@@ -213,8 +213,9 @@ if __name__ == "__main__":
                            listener.stop_record,
                            startup=bool(args.auto_start))
     agent.register_task('set_monitored_channels',
-                        listener.set_monitored_channels)
-    agent.register_task('set_target_rate', listener.set_target_rate)
+                        listener.set_monitored_channels, blocking=False)
+    agent.register_task('set_target_rate', listener.set_target_rate,
+                        blocking=False)
 
 
     runner.run(agent, auto_reconnect=True)
