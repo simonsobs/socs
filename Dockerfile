@@ -2,7 +2,7 @@
 # A container setup with an installation of socs.
 
 # Use the ocs image as a base
-FROM simonsobs/ocs:v0.7.0-37-g488bc7c-dev
+FROM simonsobs/ocs:v0.7.1
 
 # Copy the current directory contents into the container at /app
 COPY . /app/socs/
