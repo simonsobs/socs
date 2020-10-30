@@ -69,7 +69,7 @@ configs documentation for more details.
 The following tasks are registered for the LS240 agent.
 
 .. autoclass:: agents.lakeshore240.LS240_agent.LS240_Agent
-    :members: init_lakeshore_task, set_values, upload_cal_curve, acq
+    :members: init_lakeshore_task, set_values, upload_cal_curve, acq, start_acq
 
 Out of the box, the Lakeshore 240 channels are not enabled or configured
 to correctly measure thermometers. To enable, you can use the ``set_values`` task
@@ -101,7 +101,7 @@ Docker container. An example configuration is::
   ocs-LSA24MA:
     image: grumpy.physics.yale.edu/ocs-lakeshore240-agent:latest
     depends_on:
-      - "sisock-crossbar"
+      - "crossbar"
     devices:
       - "/dev/LSA24MA:/dev/LSA24MA"
     hostname: nuc-docker
@@ -109,8 +109,8 @@ Docker container. An example configuration is::
       - ${OCS_CONFIG_DIR}:/config:ro
     command:
       - "--instance-id=LSA24MA"
-      - "--site-hub=ws://sisock-crossbar:8001/ws"
-      - "--site-http=http://sisock-crossbar:8001/call"
+      - "--site-hub=ws://crossbar:8001/ws"
+      - "--site-http=http://crossbar:8001/call"
 
 The serial number will need to be updated in your configuration. The hostname
 should also match your configured host in your OCS configuration file. The

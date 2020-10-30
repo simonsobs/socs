@@ -152,7 +152,7 @@ class LabJackAgent:
         if active_channels == 'T7-all':
             self.sensors = ['Channel_{}'.format(i+1) for i in range(14)]
         elif active_channels == 'T4-all':
-            self.sensors = ['Channel_{}'.format(i+1) for i in range(12)]    
+            self.sensors = ['Channel_{}'.format(i+1) for i in range(12)]
         else:
             self.sensors = ['Channel_{}'.format(ch) for ch in active_channels]
         self.ljf = LabJackFunctions()
@@ -167,6 +167,7 @@ class LabJackAgent:
                                               function_file)
             with open(function_file_path, 'r') as stream:
                 self.functions = yaml.safe_load(stream)
+                print(f"Applying conversion functions: {self.functions}")
 
         self.initialized = False
         self.take_data = False

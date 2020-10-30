@@ -40,26 +40,27 @@ available arguments::
 You should assign your LabJack a static IP, you'll need to know that here. 
 The 'active-channels' argument specifies the channels that will be read out.
 It can be a list, 'T7-all', or 'T4-all'. The latter two read out all 
-14 or 12 analog channels on the T7 and T4, respectively. The 'function-file' 
+14 or 12 analog channels on the T7 and T4, respectively. 'sampling_frequency'
+is in Hz, and has been tested sucessfully up to about 700 Hz. The 'function-file' 
 argument specifies the labjack configuration file, which is located in your 
 OCS configuration directory. This allows analog voltage inputs on the labjack 
 to be converted to different units. Here is an example labjack configuration 
 file::
 
-    Channel 1:
+    Channel_1:
         user_defined: 'False'
         type: "MKS390"
 
-    Channel 2: 
+    Channel_2: 
         user_defined: 'False'
         type: 'warm_therm'
 
-    Channel 3:
+    Channel_3:
         user_defined: 'True'
         units: 'Ohms'
         function: '(2.5-v)*10000/v'
         
-In this example, Channels 1 and 2 (AIN1 and AIN2 on the labjack) are hooked
+In this example, Channels 1 and 2 (AIN0 and AIN1 on the labjack) are hooked
 up to the MKS390 pressure `gauge`_ and a `thermistor`_ from the SO-specified
 warm thermometry setup, respectively. Since these are defined functions in the
 LabJackFunctions class, specifying the name of their method is all that is
@@ -100,7 +101,7 @@ shows the basic acquisition funcionality::
     lj.init_labjack.wait()
 
     #Start data acquisiton
-    status, msg, session = lj.acq.start()
+    status, msg, session = lj.acq.start(sampling_frequency=10)
     print(session)
 
     #Get the current data values 1 second after starting acquistion

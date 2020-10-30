@@ -20,7 +20,7 @@ class FlowControl(Enum):
     CLEANSE = 3
 
 
-def _create_dirname(start_time, data_dir):
+def _create_dirname(start_time, data_dir, stream_id):
     """Create the file path for .g3 file output.
 
     Note: This will create directories if they don't exist already.
@@ -31,6 +31,8 @@ def _create_dirname(start_time, data_dir):
         Timestamp for start of data collection
     data_dir : str
         Top level data directory for output
+    stream_id : str
+        Stream id of collection
 
     Returns
     -------
@@ -39,7 +41,8 @@ def _create_dirname(start_time, data_dir):
 
     """
     sub_dir = os.path.join(data_dir,
-                           "{:.5}".format(str(start_time)))
+                           "{:.5}".format(str(start_time)),
+                           stream_id)
 
     # Create new dir for current day
     if not os.path.exists(sub_dir):
@@ -95,6 +98,8 @@ class FrameRecorder:
     data_dir : str
         Location to write data files to. Subdirectories will be created within
         this directory roughly corresponding to one day.
+    stream_id : str
+        Stream ID to use to determine file path if one is not found in frames.
 
     Attributes
     ----------
@@ -141,13 +146,23 @@ class FrameRecorder:
     basename : str
         The basename of the file currently being used. The actual file will
         also contain the tracked suffix.
-
+    monitored_channels : list
+        List of readout channels to be monitored. Data from these channels will
+        be stored in ``stream_data`` after each ``run`` function call.
+    target_rate : float
+        Target sampling rate for monitored channels in Hz.
+    stream_data : dict
+        Data containing downsampled timestream data from the monitored. This
+        dict will have the channel name (such as ``r0012``) as the key, and
+        the values will have the structure required by the OCS_Feed.
     """
-    def __init__(self, file_duration, tcp_addr, data_dir):
+    def __init__(self, file_duration, tcp_addr, data_dir, stream_id,
+                 target_rate=10):
         # Parameters
         self.time_per_file = file_duration
         self.address = tcp_addr
         self.data_dir = data_dir
+        self.stream_id = stream_id
         self.log = txaio.make_logger()
 
         # Reader/Writer
@@ -165,6 +180,10 @@ class FrameRecorder:
         self.start_time = None
         self.dirname = None
         self.basename = None
+
+        self.monitored_channels = []
+        self.target_rate = target_rate
+        self.stream_data = {}
 
     def __del__(self):
         """Clean up by closing out the file once writing is complete."""
@@ -327,7 +346,15 @@ class FrameRecorder:
 
             # Only create new dir and basename if we've finished an acquisition
             if self.filename_suffix == 0:
-                self.dirname = _create_dirname(self.start_time, self.data_dir)
+                stream_id = self.stream_id
+                for f in self.frames:
+                    if f.get('sostream_id') is not None:
+                        stream_id = f['sostream_id']
+                        break
+
+                self.dirname = _create_dirname(self.start_time,
+                                               self.data_dir,
+                                               stream_id)
                 self.basename = int(self.start_time)
 
             suffix = "_{:03d}".format(self.filename_suffix)
@@ -412,7 +439,36 @@ class FrameRecorder:
         """
         self.read_frames()
         self.check_for_frame_gap(10)
+        self.read_stream_data()
         if self.frames:
             self.create_new_file()
             self.write_frames_to_file()
             self.split_acquisition()
+
+    def read_stream_data(self):
+        """Reads stream data from ``self.frames``, downsamples it, and stores
+        it in ``self.stream_data``.
+        """
+        chan_keys = [f'r{c:04}' for c in self.monitored_channels]
+        self.stream_data = {
+            k: {'timestamps': [], 'block_name': k, 'data': {k:[]}}
+            for k in chan_keys
+        }
+
+        for frame in self.frames:
+            if frame.type != core.G3FrameType.Scan:
+                continue
+            ds_factor = (frame['data'].sample_rate/core.G3Units.Hz) \
+                        // self.target_rate
+            ds_factor = max(int(ds_factor), 1)
+            times = [
+                t.time / core.G3Units.s
+                for t in frame['data'].times()[::ds_factor]
+            ]
+            for key in chan_keys:
+                data = frame['data'].get(key)
+                if data is None:
+                    continue
+                self.stream_data[key]['timestamps'].extend(times)
+                self.stream_data[key]['data'][key].extend(list(data[::ds_factor]))
+

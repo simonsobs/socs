@@ -13,3 +13,10 @@ pymodbus
 numexpr
 pyyaml
 scipy
+
+# Meinberg M1000
+pysnmp
+pysmi
+
+# Docs
+sphinx_rtd_theme

@@ -128,11 +128,13 @@ class LogParser:
                                     'tc400errorcode_2', 'tc400ovtempelec_2',
                                     'tc400ovtemppump_2', 'tc400setspdatt_2',
                                     'tc400pumpaccel_2', 'tc400commerr_2',
+                                    'nxdsf', 'nxdsct', 'nxdst', 'nxdsbs', 'nxdstrs',
                                     'ctrl_pres', 'cpastate', 'cparun', 'cpawarn',
                                     'cpaerr', 'cpatempwi', 'cpatempwo', 'cpatempo',
                                     'cpatemph', 'cpalp', 'cpalpa', 'cpahp', 'cpahpa',
                                     'cpadp', 'cpacurrent', 'cpahours', 'cpapscale',
-                                    'cpatscale', 'cpasn', 'cpamodel'],
+                                    'cpascale', 'cpatscale', 'cpasn', 'cpamodel',
+                                    'ctrl_pres_ok', 'ctr_pressure_ok'],
                          'heater': ["a1_u", "a1_r_lead", "a1_r_htr", "a2_u",
                                     "a2_r_lead", "a2_r_htr", "htr", "htr_range"]}
 
@@ -235,6 +237,11 @@ class LogParser:
         for pattern in self.patterns[log_type]:
             regex = re.compile(rf'{pattern},([0-9\.\+\-E]+)')
             m = regex.search(new_line)
+
+            # skip patterns that don't exist in this log
+            if not m:
+                continue
+
             if log_type == 'channels':
                 data_array[pattern.replace('-', '_')] = int(m.group(1))
             else:
