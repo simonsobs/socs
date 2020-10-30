@@ -10,5 +10,5 @@ COPY . .
 ENTRYPOINT ["dumb-init", "python3", "-u", "smurf_stream_simulator.py"]
 
 
-CMD ["--site-hub=ws://sisock-crossbar:8001/ws", \
-     "--site-http=http://sisock-crossbar:8001/call"]
+CMD ["--site-hub=ws://crossbar:8001/ws", \
+     "--site-http=http://crossbar:8001/call"]
