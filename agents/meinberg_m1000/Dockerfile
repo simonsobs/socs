@@ -20,5 +20,5 @@ COPY mibs/ /usr/local/lib/python3.6/dist-packages/pysnmp/smi/mibs/
 ENTRYPOINT ["dumb-init", "python3", "-u", "meinberg_m1000_agent.py"]
 
 # Default site-hub
-CMD ["--site-hub=ws://sisock-crossbar:8001/ws", \
-     "--site-http=http://sisock-crossbar:8001/call"]
+CMD ["--site-hub=ws://crossbar:8001/ws", \
+     "--site-http=http://crossbar:8001/call"]

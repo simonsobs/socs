@@ -15,5 +15,5 @@ RUN pip3 install -r requirements.txt
 ENTRYPOINT ["python3", "-u", "synacc.py"]
 
 # Sensible default arguments
-CMD ["--site-hub=ws://sisock-crossbar:8001/ws", \
-     "--site-http=http://sisock-crossbar:8001/call"]
+CMD ["--site-hub=ws://crossbar:8001/ws", \
+     "--site-http=http://crossbar:8001/call"]
