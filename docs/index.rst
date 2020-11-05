@@ -38,14 +38,15 @@ Simulator Reference  Simulators are used to mock software and hardware
 
     agents/bluefors_agent
     agents/cryomech_cpa
-    agents/scpi_psu
     agents/labjack
     agents/lakeshore240
     agents/lakeshore372
-    agents/pysmurf/index
-    agents/smurf_recorder
-    agents/pfeiffer
     agents/meinberg_m1000_agent
+    agents/pfeiffer
+    agents/pysmurf/index
+    agents/scpi_psu
+    agents/smurf_recorder
+    agents/synacc
 
 .. toctree::
     :caption: Simulator Reference
