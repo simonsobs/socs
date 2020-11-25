@@ -461,6 +461,9 @@ class FrameRecorder:
             ds_factor = (frame['data'].sample_rate/core.G3Units.Hz) \
                         // self.target_rate
             ds_factor = max(int(ds_factor), 1)
+            n_samples = frame['data'].n_samples
+            if 1 < n_samples <= ds_factor:
+                ds_factor = n_samples - 1
             times = [
                 t.time / core.G3Units.s
                 for t in frame['data'].times()[::ds_factor]
