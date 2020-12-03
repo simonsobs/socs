@@ -1,15 +1,12 @@
 #!/usr/bin/python3
-#contributors: zatkins, bkoopman, sbhimani
+# contributors: zatkins, bkoopman, sbhimani
 
 import math
 import numpy as np
 import serial
 
-import time 
+import time
 import sys
-
-# proxy for agent
-sys.path.append('/home/zatkins/repos/stslab/testbed')
 
 # helper dicts
 sensor_key = {
@@ -20,20 +17,20 @@ sensor_key = {
     '4': 'thermocouple',
     '5': 'capacitance'
 }
-sensor_lock = {v:k for k, v in sensor_key.items()}
+sensor_lock = {v: k for k, v in sensor_key.items()}
 
 units_key = {
     '1': 'kelvin',
     '2': 'celsius',
     '3': 'sensor'
 }
-units_lock = {v:k for k, v in units_key.items()}
+units_lock = {v: k for k, v in units_key.items()}
 
 tempco_key = {
     '1': 'negative',
     '2': 'positive'
 }
-tempco_lock = {v:k for k, v in tempco_key.items()}
+tempco_lock = {v: k for k, v in tempco_key.items()}
 
 format_key = {
     '1': "mV/K (linear)",
@@ -41,17 +38,17 @@ format_key = {
     '3': "Ohm/K (linear)",
     '4': "log Ohm/K (linear)"
 }
-format_lock = {v:k for k, v in format_key.items()}
+format_lock = {v: k for k, v in format_key.items()}
 
 output_modes_key = {
-    '0': 'off', 
-    '1': 'closed loop', 
-    '2': 'zone', 
-    '3': 'open loop', 
-    '4': 'monitor out', 
+    '0': 'off',
+    '1': 'closed loop',
+    '2': 'zone',
+    '3': 'open loop',
+    '4': 'monitor out',
     '5': 'Warm up'
 }
-output_modes_lock = {v.lower():k for k, v in output_modes_key.items()}
+output_modes_lock = {v.lower(): k for k, v in output_modes_key.items()}
 
 channel_key = {
     '0': 'none',
@@ -60,13 +57,13 @@ channel_key = {
     '3': 'C',
     '4': 'D'
 }
-channel_lock = {v:k for k,v in channel_key.items()}
+channel_lock = {v: k for k, v in channel_key.items()}
 
 heater_display_key = {
     '1': 'current',
     '2': 'power'
 }
-heater_display_lock = {v:k for k,v in heater_display_key.items()}
+heater_display_lock = {v: k for k, v in heater_display_key.items()}
 
 max_current_key = {
     '0': 'User',
@@ -75,7 +72,7 @@ max_current_key = {
     '3': 1.141,
     '4': 2
 }
-max_current_lock = {v:k for k, v in max_current_key.items()}
+max_current_lock = {v: k for k, v in max_current_key.items()}
 
 heater_range_key = {
     "0": "off",
@@ -83,22 +80,27 @@ heater_range_key = {
     "2": "medium",
     "3": "high"
 }
-heater_range_lock = {v:k for k, v in heater_range_key.items()}
+heater_range_lock = {v: k for k, v in heater_range_key.items()}
 
 ramp_key = {
     '0': 'off',
     '1': 'on'
 }
-ramp_lock = {v:k for k,v in ramp_key.items()}
+ramp_lock = {v: k for k, v in ramp_key.items()}
 
 # main class - Lakeshore 336 driver
-class LS336:
-    '''
-    Implements a lakeshore 336 box to interface with client scripts. Only contains locally relevant information; namely, port parameters. The state of the device is not stored locally to avoid the potential for inconsistent information. Device status can always be accessed (accurately) through a msg.    
-    '''
-    #Constructor and instance variables
 
-    def __init__(self, port, timeout = 1.0):
+
+class LS336:
+    """
+    Implements a lakeshore 336 box to interface with client scripts.
+    Only contains locally relevant information; namely, port parameters.
+    The state of the device is not stored locally to avoid the potential for inconsistent information.
+    Device status can always be accessed (accurately) through a msg.    
+    """
+    # Constructor and instance variables
+
+    def __init__(self, port, timeout=1.0):
 
         # LS336 defaults
         self.baud = 57600
@@ -106,45 +108,47 @@ class LS336:
         self.parity = serial.PARITY_ODD
         self.stopbits = serial.STOPBITS_ONE
         self.term = '\r\n'
-        self.std_delay = 0.06
 
         self.port = port
         self.timeout = timeout
-        self.comm = serial.Serial(self.port, self.baud, self.bytesize, self.parity, self.stopbits, timeout)
+        self.comm = serial.Serial(
+            self.port, self.baud, self.bytesize, self.parity, self.stopbits, timeout)
         self.comm.close()
 
         self.id = self.get_id()
-        print(self.id) #print idenfitication information to see if working
+        print(self.id)  # print idenfitication information to see if working
 
         # Get Channels
-        inps = ['A','B','C','D']
-        self.channels = {inp:Channel(self, inp) for inp in inps}
+        inps = ['A', 'B', 'C', 'D']
+        self.channels = {inp: Channel(self, inp) for inp in inps}
 
         # Get Heaters
         htrs = ['1', '2']
-        self.heaters = {out:Heater(self, out) for out in htrs}
+        self.heaters = {out: Heater(self, out) for out in htrs}
 
-    #Instance methods
+    # Instance methods
 
-    def msg(self, cmd, delay = None):
-        r'''
-        msgs character string cmd to port comm, including commands and queries.
+    def msg(self, cmd, delay=0.1):
+        r"""
+        Sends character string cmd to the device port, including commands and queries.
 
         Parameters
         ------
-        comm : serial.Serial object
-            The port on the local machine attached to the device. See pyserial documentation. Must be configured according to the lakeshore manual.
-
         cmd : string
-            The character sequence to send to the device. Must be in the device proprietary library, available in the lakeshore manual.
+            The character sequence to send to the device. Must be in the device proprietary
+            library, availablein the lakeshore manual.
 
         delay : float or int
-            After writing, the function will lock out the kernel for delay seconds. Within a script, this prevents too many cmds being written to the device too quickly.
+            After writing, the function will lock out the kernel for delay seconds.
+            Within a script, this prevents too many cmds being written to the device too quickly.
 
-        term : str
-            Terminating character sequence appended to cmd. Indicates end of message.
-        '''
-        if not delay: delay = self.std_delay
+        Returns
+        ------
+        out : str
+            If cmd is a query (ie, contains '?'), returns the device response. Otherwise returns ''.
+        """
+
+        assert delay > 0.05, 'msg delay must be greater than 50ms'
 
         cmd = cmd + self.term
         bcmd = cmd.encode()
@@ -152,81 +156,48 @@ class LS336:
         if not self.comm.is_open:
             self.comm.open()
         self.comm.write(bcmd)
-        
-        time.sleep(delay)
 
         out = ''
-
         if '?' in cmd:
             out = self.read()
 
         self.comm.close()
-        return out 
+        time.sleep(delay)
 
-    def read(self, size = None, delay = None):
-        r'''
+        return out
+
+    def read(self, size=None):
+        r"""
         Reads data from the device attached to port comm. Implemented via pyserial 'read_until' command: reads until receives '\n'; every lakeshore response terminates with '\r\n'.
 
         Parameters
         ------
         comm : serial.Serial object
             The port on the local machine attached to the device. See pyserial documentation. Must be configured according to the lakeshore manual.
-        
+
         size : int, optional
             Number of bytes to read. If provided, may be less than full message length.
-        
+
         Returns
         ------
         out : str
             Message from lakeshore device.
-        '''        
-        if not delay: delay = self.std_delay
-      
+        """
+
         if not self.comm.is_open:
             self.comm.open()
-        
-        out = self.comm.read_until(size = size).strip().decode()
+
+        out = self.comm.read_until(size=size).strip().decode()
         self.comm.close()
 
-        time.sleep(delay)
-
-        return out
-
-    def read_size(self, size = 256, delay = None):
-        r'''
-        Reads data from the device attached to port comm. Implemented via pyserial 'read' command: reads until receives size bytes.
-
-        Parameters
-        ------
-        comm : serial.Serial object
-            The port on the local machine attached to the device. See pyserial documentation. Must be configured according to the lakeshore manual.
-        
-        size : int, optional
-            Number of bytes to read. If provided, may be less than full message length.
-        
-        Returns
-        ------
-        out : str
-            Message from lakeshore device.
-        '''       
-        if not delay: delay = self.std_delay
- 
-        if not self.comm.is_open:
-            self.comm.open()
-        
-        out = self.comm.read(size = size).strip().decode()
-        self.comm.close()
-        
-        time.sleep(delay)
-        
         return out
 
     def get_id(self):
-        '''Get identification information of the Lakeshore module'''
+        """Get identification information of the Lakeshore module"""
         return self.msg('*IDN?')
 
     def get_kelvin(self, inp):
-        '''Return a temperature reading of the specified input ('A', 'B', 'C', or 'D')
+        """Return a temperature reading of the specified input ('A', 'B', 'C', or 'D')
         or '0' for all inputs
 
         Parameters
@@ -236,21 +207,26 @@ class LS336:
 
         Returns
         -------
-        str
-            plain text of temperature reading
+        array or float
+            array of four floats if input is '0', float otherwise of temperature reading
 
         Raises
         ------
         ValueError
             Invalid input channel arguments
-        '''
+        """
         if inp not in ['0', 'A', 'B', 'C', 'D']:
             raise ValueError(f'invalid input in msg_kelvin: {inp}')
 
-        return self.msg(f'KRDG? {inp}')
-        
+        resp = self.msg(f'KRDG? {inp}')
+
+        if inp == '0':
+            return np.array(np.char.split(resp, sep=',').item()).astype(float)  # casts to array of floats
+        else:
+            return float(resp)
+
     def get_sensor(self, inp):
-        '''Return a sensor reading of the specified input ('A', 'B', 'C', or 'D')
+        """Return a sensor reading of the specified input ('A', 'B', 'C', or 'D')
         or '0' for all inputs
 
         Parameters
@@ -260,47 +236,53 @@ class LS336:
 
         Returns
         -------
-        str
-            plain text of temperature reading
+        array or float
+            array of four floats if input is '0', float otherwise of sensor reading
 
         Raises
         ------
         ValueError
             Invalid input channel arguments
-        '''     
+        """
         if inp not in ['0', 'A', 'B', 'C', 'D']:
             raise ValueError(f'invalid input in msg_sensor: {inp}')
 
-        return self.msg(f'SRDG? {inp}')
+        resp = self.msg(f'SRDG? {inp}')
 
-    def get_heater_range(self, htr):
-        return self.heaters[htr].get_heater_range()
+        if inp == '0':
+            return np.array(np.char.split(resp, sep=',').item()).astype(float)  # casts to array of floats
+        else:
+            return float(resp)
 
-    def get_max_current(self, htr):
-        return self.heaters[htr].get_max_current()
+    # def get_heater_range(self, htr):
+    #     return self.heaters[htr].get_heater_range()
 
-    def get_heater_percent(self, htr):
-        return self.heaters[htr].get_heater_percent()
+    # def get_max_current(self, htr):
+    #     return self.heaters[htr].get_max_current()
 
-    def get_setpoint(self, htr):
-        return self.heaters[htr].get_setpoint()
+    # def get_heater_percent(self, htr):
+    #     return self.heaters[htr].get_heater_percent()
+
+    # def get_setpoint(self, htr):
+    #     return self.heaters[htr].get_setpoint()
+
 
 class Channel:
 
-    def __init__(self, ls, _input):
-        '''Channel class for LS336
+    def __init__(self, ls, inp):
+        """Channel class for LS336
 
         Parameters
         ----------
         ls : LS336 object
             The parent LS336 device
-        _input : str
+        inp : str
             The channel we are building ('A', 'B', 'C', or 'D')
-        '''
-        assert _input in ['A', 'B', 'C', 'D']
+        """
+        assert inp in ['A', 'B', 'C', 'D']
 
         self.ls = ls
-        self.input = _input
+        self.input = inp
         self.num = int(channel_lock[self.input])
         self.get_input_type()
         self.get_input_curve()
@@ -308,7 +290,7 @@ class Channel:
         self.get_T_limit()
 
     def get_input_type(self):
-        '''Return sensor metadata, <sensor type>, <autorange>, <range>,
+        """Return sensor metadata, <sensor type>, <autorange>, <range>,
         <compensation>, and <units>. For diodes, only sensor type and 
         units are relevant.
 
@@ -316,7 +298,7 @@ class Channel:
         -------
         list
             <sensor type>, <autorange>, <range>, <compensation>, and <units>
-        '''
+        """
         resp = self.ls.msg(f'INTYPE? {self.input}').split(',')
 
         self.sensor_type = sensor_key[resp[0]]
@@ -328,7 +310,7 @@ class Channel:
         return resp
 
     def _set_input_type(self, params):
-        '''Assign sensor metadata, <sensor type>, <autorange>, <range>,
+        """Assign sensor metadata, <sensor type>, <autorange>, <range>,
         <compensation>, and <units>. For diodes, only sensor type and 
         units are relevant.
 
@@ -336,7 +318,7 @@ class Channel:
         ----------
         params : list
             <sensor type>, <autorange>, <range>, <compensation>, and <units>
-        '''
+        """
         assert len(params) == 5
 
         reply = [str(self.input)]
@@ -346,19 +328,19 @@ class Channel:
         return self.ls.msg(f"INTYPE {param_str}")
 
     def get_sensor_type(self):
-        '''Get the sensor type of the channel in plain text'''
+        """Get the sensor type of the channel in plain text"""
         self.get_input_type()
         return self.sensor_type
 
     def set_sensor_type(self, type):
-        '''Set the sensor type on the channel
+        """Set the sensor type on the channel
 
         Parameters
         ----------
         type : str
             Sensor type must be in 'Disabled', 'Diode', 'Platinum RTD',
             'NTC RTD', 'Thermocouple', 'Capacitance'
-        '''
+        """
         assert type.lower() in sensor_lock
 
         resp = self.get_input_type()
@@ -367,18 +349,18 @@ class Channel:
         return self._set_input_type(resp)
 
     def get_units(self):
-        '''Get the channel preferred units as plain text'''
+        """Get the channel preferred units as plain text"""
         self.get_input_type()
         return self.units
 
     def set_units(self, units):
-        '''Set the channel preferred units
+        """Set the channel preferred units
 
         Parameters
         ----------
         unit : str
             Channel preferred units must be in 'Kelvin', 'Celsius, 'Sensor
-        '''
+        """
         assert units.lower() in units_lock
 
         resp = self.get_input_type()
@@ -387,38 +369,38 @@ class Channel:
         return self._set_input_type(resp)
 
     def get_input_name(self):
-        '''Get the name of the channel shown on front display
+        """Get the name of the channel shown on front display
 
         Returns
         -------
         str
             The channel name for display purposes
-        '''
+        """
         resp = self.ls.msg(f'INNAME? {self.input}').strip()
         self.input_name = resp
         return self.input_name
 
     def set_input_name(self, name):
-        '''Set the name of the channel shown on front display
+        """Set the name of the channel shown on front display
 
         Parameters
         ----------
         name : str
             The channel name for display purposes. Only send the first 15 characters
-        '''
+        """
         name = name[:15]
         self.input_name = name
         resp = self.ls.msg(f'INNAME {self.input},{name}')
         return resp
 
     def get_input_curve(self):
-        '''Return the curve number of the curve assigned to this channel'''
+        """Return the curve number of the curve assigned to this channel"""
         resp = self.ls.msg(f'INCRV? {self.input}').strip()
         self.input_curve = int(resp)
         return self.input_curve
 
     def set_input_curve(self, curve_num):
-        '''Set the curve number of the curve assigned to this channel'''
+        """Set the curve number of the curve assigned to this channel"""
         assert curve_num in range(1, 60)
 
         self.input_curve = curve_num
@@ -426,26 +408,29 @@ class Channel:
         return resp
 
     def get_T_limit(self):
-        '''Return the temperature limit above which control outputs assigned this channel
-        shut off'''
+        """Return the temperature limit above which control outputs assigned this channel
+        shut off"""
         resp = self.ls.msg(f'TLIMIT? {self.input}')
         self.T_limit = float(resp)
         return self.T_limit
 
     def set_T_limit(self, limit):
-        '''Set the temperature limit above which control outputs assigned this channel
-        shut off'''
+        """Set the temperature limit above which control outputs assigned this channel
+        shut off"""
         self.T_limit = limit
         resp = self.ls.msg(f'TLIMIT {self.input},{self.T_limit}')
         return resp
 
 # Curve class copied from socs/Lakeshore372.py on 2020/08/21
+
+
 class Curve:
     """Calibration Curve class for the LS336."""
+
     def __init__(self, ls, curve_num):
         self.ls = ls
         self.curve_num = curve_num
-        self.get_header()  
+        self.get_header()
 
     def get_header(self):
         """Get curve header description.
@@ -571,7 +556,7 @@ class Curve:
         :rtype: str
         """
         self.get_header()
-        return self.limit
+        return float(self.limit)
 
     def set_limit(self, limit):
         """Set the curve temperature limit with the CRVHDR command.
@@ -634,7 +619,8 @@ class Curve:
         :returns: response from the CRVPT command
         :rtype: str
         """
-        resp = self.ls.msg(f"CRVPT {self.curve_num}, {index}, {units}, {kelvin}")
+        resp = self.ls.msg(
+            f"CRVPT {self.curve_num}, {index}, {units}, {kelvin}")
 
         return resp
 
@@ -659,15 +645,20 @@ class Curve:
             with open(_file, 'w') as f:
                 f.write('Curve Name:\t' + self.name + '\r\n')
                 f.write('Serial Number:\t' + self.serial_number + '\r\n')
-                f.write('Data Format:\t' + format_lock[self.format] + f'\t({self.format})\r\n')
-                f.write('SetPoint Limit:\t%s\t(Kelvin)\r\n' % '%0.4f' % np.max(self.breakpoints['temperature']))
-                f.write('Temperature coefficient:\t' + tempco_lock[self.coefficient] + f' ({self.coefficient})\r\n')
-                f.write('Number of Breakpoints:\t%s\r\n' % len(self.breakpoints))
+                f.write('Data Format:\t' +
+                        format_lock[self.format] + f'\t({self.format})\r\n')
+                f.write('SetPoint Limit:\t%s\t(Kelvin)\r\n' % '%0.4f' %
+                        np.max(self.breakpoints['temperature']))
+                f.write('Temperature coefficient:\t' +
+                        tempco_lock[self.coefficient] + f' ({self.coefficient})\r\n')
+                f.write('Number of Breakpoints:\t%s\r\n' %
+                        len(self.breakpoints))
                 f.write('\r\n')
                 f.write('No.\tUnits\tTemperature (K)\r\n')
                 f.write('\r\n')
                 for idx, point in enumerate(self.breakpoints):
-                    f.write('%s\t%s %s\r\n' % (idx+1, '%0.5f' % point['units'], '%0.4f' % point['temperature']))
+                    f.write('%s\t%s %s\r\n' % (idx+1, '%0.5f' %
+                                               point['units'], '%0.4f' % point['temperature']))
 
         return self.breakpoints
 
@@ -686,7 +677,8 @@ class Curve:
             if i < 2 or i > 4:
                 header.append(content[i].strip().split(":", 1)[1].strip())
             else:
-                header.append(content[i].strip().split(":", 1)[1].strip().split("(", 1)[0].strip())
+                header.append(content[i].strip().split(":", 1)[
+                              1].strip().split("(", 1)[0].strip())
 
         # Skip to the V and T values in the file and strip them of tabs, newlines, etc
         values = []
@@ -694,12 +686,12 @@ class Curve:
             values.append(content[i].strip().split())
 
         self.delete_curve()  # remove old curve first, so old breakpoints don't remain
-        time.sleep(1) # necessary to make work
+        time.sleep(1)  # necessary to make work
 
         self._set_header(header[:-1])  # ignore num of breakpoints
 
         for point in values:
-            print("uploading %s"%point)
+            print("uploading %s" % point)
             self._set_data_point(point[0], point[1], point[2])
 
         # refresh curve attributes
@@ -718,21 +710,24 @@ class Curve:
         with open(_file) as f:
             content = f.readlines()
 
-        #skipping header info
+        # skipping header info
         values = []
         for i in range(9, len(content)):
-            values.append(content[i].strip().split()) #data points that should have been uploaded
-    
+            # data points that should have been uploaded
+            values.append(content[i].strip().split())
+
         for j in range(1, len(values)+1):
             try:
-                resp = self.get_data_point(j) #response from the 336
+                resp = self.get_data_point(j)  # response from the 336
                 point = values[j-1]
                 units = float(resp[0])
                 temperature = float(resp[1])
-                assert units == float(point[1]), "Point number %s not uploaded"%point[0]
-                assert temperature == float(point[2]), "Point number %s not uploaded"%point[0]
-                print("Successfully uploaded %s, %s" %(units,temperature))
-            #if AssertionError, tell 336 to re-upload points
+                assert units == float(
+                    point[1]), "Point number %s not uploaded" % point[0]
+                assert temperature == float(
+                    point[2]), "Point number %s not uploaded" % point[0]
+                print("Successfully uploaded %s, %s" % (units, temperature))
+            # if AssertionError, tell 336 to re-upload points
             except AssertionError:
                 if units != float(point[1]):
                     self.set_curve(_file)
@@ -746,9 +741,9 @@ class Curve:
         # self.get_header()
         return resp
 
-    def soft_cal(self, std, points, delay = 1):
-        '''Executes SCAL command using the data in points_str.
-        Note this overmsgs the current breakpoints!
+    def soft_cal(self, std, points, delay=1):
+        """Executes SCAL command using the data in points_str.
+        Note this overwrites the current breakpoints!
 
         Parameters
         ----------
@@ -756,26 +751,32 @@ class Curve:
             Standard curve number to base the SoftCal on
         points : list
             List of T1,U1,T2,U2,T3,U3 values
-        '''
+        """
         assert len(points) == 6
         points_str = ','.join(points)
 
-        resp = self.ls.msg(f'SCAL {std},{self.curve_num},{self.serial_number},{points_str}', delay = delay)
+        resp = self.ls.msg(
+            f'SCAL {std},{self.curve_num},{self.serial_number},{points_str}', delay=delay)
         self.get_header()
         return resp
-        
+
     def __str__(self):
         string = "-" * 50 + "\n"
         string += "Curve %d: %s\n" % (self.curve_num, self.name)
         string += "-" * 50 + "\n"
         string += "  %-30s\t%r\n" % ("Serial Number:", self.serial_number)
-        string += "  %-30s\t%s (%s)\n" % ("Format :", format_lock[self.format], self.format)
+        string += "  %-30s\t%s (%s)\n" % ("Format :",
+                                          format_lock[self.format], self.format)
         string += "  %-30s\t%s\n" % ("Temperature Limit:", self.limit)
-        string += "  %-30s\t%s\n" % ("Temperature Coefficient:", self.coefficient)
+        string += "  %-30s\t%s\n" % ("Temperature Coefficient:",
+                                     self.coefficient)
 
         return string
 
 # Heater class copied from socs/Lakeshore372.py on 2020/08/25
+# code modified for LS336 thereafter
+
+
 class Heater:
 
     def __init__(self, ls, output):
@@ -785,12 +786,12 @@ class Heater:
         :param output: the heater output we want to control, 1 = 100W, 2 = 50W
         :type output: int
         """
-        assert int(output) in [1, 2] 
+        assert int(output) in [1, 2]
 
         self.ls = ls
         self.output = output
         self.output_name = f'Heater {output}'
-        
+
         self.get_output_mode()
         self.get_heater_setup()
         self.get_heater_range()
@@ -841,7 +842,8 @@ class Heater:
         :type mode: str
         :returns: the response from the OUTMODE command
         """
-        assert mode.lower() in output_modes_lock.keys(), f"{mode} not a valid mode"
+        assert mode.lower() in output_modes_lock.keys(
+        ), f"{mode} not a valid mode"
 
         resp = self.get_output_mode()
         resp[0] = output_modes_lock[mode.lower()]
@@ -856,16 +858,16 @@ class Heater:
         self.get_output_mode()
         return self.input
 
-    def set_input_channel(self, _input):
+    def set_input_channel(self, inp):
         """Set the control channel with the OUTMODE command.
-        :param _input: specifies which input or channel to control from
-        :type _input: str or int
+        :param inp: specifies which input or channel to control from
+        :type inp: str or int
         """
-        assert _input in channel_lock, f"{_input} not a valid input/channel"
+        assert inp in channel_lock, f"{inp} not a valid input/channel"
 
         resp = self.get_output_mode()
-        resp[1] = channel_lock[str(_input)]
-        self.input = str(_input)
+        resp[1] = channel_lock[str(inp)]
+        self.input = str(inp)
         return self._set_output_mode(resp)
 
     def get_powerup(self):
@@ -882,14 +884,15 @@ class Heater:
                         after power cycle. True for on after powerup
         :type powerup: bool
         """
-        assert powerup in [True, False], f"{powerup} not valid powerup parameter"
-    
+        assert powerup in [
+            True, False], f"{powerup} not valid powerup parameter"
+
         resp = self.get_output_mode()
         set_powerup = str(int(powerup))
         resp[2] = set_powerup
         self.powerup = set_powerup
         return self._set_output_mode(resp)
-    
+
     def get_heater_setup(self):
         """Gets Heater setup params with the HTRSET? command.
         :return resp: List of values that have been returned from the Lakeshore.
@@ -925,21 +928,23 @@ class Heater:
         return self.ls.msg("HTRSET {}".format(param_str))
 
     def get_heater_resistance_setting(self):
-        '''Get the "setting" of the heater resistance, which can only be 25 or 50 Ohms
-        '''
+        """Get the "setting" of the heater resistance, which can only be 25 or 50 Ohms
+        """
         self.get_heater_setup()
         return self.resistance_setting
 
     def set_heater_resistance(self, res):
-        '''Sets the correct heater setting depending on the actual load resistance
+        """Sets the correct heater setting depending on the actual load resistance
 
         Parameters
         ----------
         res : int or float
             Actual resistance of load being powered
-        '''
-        if res < 50: setting = 1  # 25 Ohm
-        elif res >= 50: setting = 2 # 50 Ohm
+        """
+        if res < 50:
+            setting = 1  # 25 Ohm
+        elif res >= 50:
+            setting = 2  # 50 Ohm
         self.resistance = res
 
         resp = self.get_heater_setup()
@@ -948,27 +953,30 @@ class Heater:
         return self._set_heater_setup(resp)
 
     def get_max_current(self):
-        '''Get the limiting current of the heater. Either set by "max current"
+        """Get the limiting current of the heater. Either set by "max current"
         if user max current not on, or user max current if user max current on.
 
         Returns
         -------
         float
             Limiting heater current
-        '''
+        """
         self.get_heater_setup()
-        if self.max_current == 'User': return self.max_user_current
-        else: return self.max_current
+        if self.max_current == 'User':
+            return self.max_user_current
+        else:
+            return self.max_current
 
     def set_max_current(self, current):
         assert current <= 2, f'Current {current} is too high (>2 A)'
-        current = math.floor(1000*current)/1000 #round down to 3 decimal places
+        # round down to 3 decimal places
+        current = math.floor(1000*current)/1000
 
         resp = self.get_heater_setup()
         if current in max_current_lock:
             resp[1] = max_current_lock[current]
             self.max_current = current
-        else: 
+        else:
             resp[1] = '0'
             self.max_current = 'User'
             resp[2] = str(current)
@@ -976,13 +984,13 @@ class Heater:
         return self._set_heater_setup(resp)
 
     def get_heater_display(self):
-        '''Get whether heater displays in % of full current or power
+        """Get whether heater displays in % of full current or power
 
         Returns
         -------
         str
             Display unit (% of current or % of power)
-        '''
+        """
         self.get_heater_setup()
         return self.display
 
@@ -991,7 +999,8 @@ class Heater:
         :param display: Display mode for heater. Can either be 'current' or 'power'.
         :type display: string
         """
-        assert display.lower() in heater_display_lock.keys(), f"{display} is not a valid display"
+        assert display.lower() in heater_display_lock.keys(
+        ), f"{display} is not a valid display"
 
         resp = self.get_heater_setup()
         resp[3] = heater_display_lock[display.lower()]
@@ -999,25 +1008,27 @@ class Heater:
         return self._set_heater_setup(resp)
 
     def get_manual_out(self):
-        '''Return the % of full current or power depending on heater display, if set by MOUT
+        """Return the % of full current or power depending on heater display, if set by MOUT
 
         Returns
         -------
         float
             the % of full current or power depending on heater display
-        '''
+        """
         resp = self.ls.msg("MOUT? {}".format(self.output))
         return float(resp)
 
     def set_manual_out(self, percent):
-        '''Set the % of full current or power depending on heater display, with MOUT
+        """Set the % of full current or power depending on heater display, with MOUT
 
         Parameters
         ----------
         percent : int or float
             the % of full current or power depending on heater display
-        '''
-        assert 100*percent == int(100*percent), "Percent value cannot have more than 2 decimal places"
+        """
+        assert 100 * \
+            percent == int(
+                100*percent), "Percent value cannot have more than 2 decimal places"
 
         resp = self.ls.msg(f'MOUT {self.output},{percent}')
         return resp
@@ -1031,12 +1042,12 @@ class Heater:
         self.range = heater_range_key[resp]
         return self.range
 
-    def set_heater_range(self, _range):
+    def set_heater_range(self, rng):
         """Set heater range with RANGE command.
-        :param _range: heater range
-        :type _range: str in 'Off','Low','Medium','High'
+        :param rng: heater range
+        :type rng: str in 'Off','Low','Medium','High'
         """
-        _range = _range.lower()
+        _range = rng.lower()
         assert _range in heater_range_lock.keys(), 'Not a valid heater Range'
 
         self.range = heater_range_lock[_range]
@@ -1044,20 +1055,20 @@ class Heater:
         return resp
 
     def get_setpoint(self):
-        '''Return the setpoint in control loop sensor units'''
+        """Return the setpoint in control loop sensor units"""
         resp = self.ls.msg(f"SETP? {self.output}")
-        self.setpoint = resp
+        self.setpoint = float(resp)
         return self.setpoint
 
     def set_setpoint(self, value):
-        '''Set the setpoint of the control loop in sensor units 
+        """Set the setpoint of the control loop in sensor units 
 
         Parameters
         ----------
         value : int or float
             The setpoint. Units depend on the preferred sensor units.
-        '''
-        self.setpoint = value
+        """
+        self.setpoint = float(value)
         resp = self.ls.msg(f"SETP {self.output},{value}")
         return resp
 
@@ -1095,26 +1106,26 @@ class Heater:
         return resp
 
     def get_ramp(self):
-        '''Return list of params <on/off>, <rate value> for RAMP? msg
+        """Return list of params <on/off>, <rate value> for RAMP? msg
 
         Returns
         -------
         list
             <on/off>, <rate value> for RAMP? msg
-        '''
+        """
         resp = self.ls.msg(f'RAMP? {self.output}').split(',')
         self.ramp_enabled = ramp_key[resp[0]]
         self.ramp_rate = float(resp[1])
         return resp
 
     def _set_ramp(self, params):
-        '''Set the RAMP params <on/off>, <rate value>
+        """Set the RAMP params <on/off>, <rate value>
 
         Parameters
         ----------
         params : list
             <on/off>, <rate value>
-        '''
+        """
         assert len(params) == 2
 
         reply = [str(self.output)]
@@ -1125,18 +1136,18 @@ class Heater:
         return resp
 
     def get_ramp_on_off(self):
-        '''Get string indicating ramp 'on' or 'off' '''
+        """Get string indicating ramp 'on' or 'off' """
         self.get_ramp()
         return self.ramp_enabled
 
     def set_ramp_on_off(self, on_off):
-        '''Turn ramp on or off
+        """Turn ramp on or off
 
         Parameters
         ----------
         on_off : str
             Either 'on' to enable ramp or 'off' to disable ramp
-        '''
+        """
         assert on_off.lower() in ramp_lock
 
         resp = self.get_ramp()
@@ -1145,18 +1156,18 @@ class Heater:
         return self._set_ramp(resp)
 
     def get_ramp_rate(self):
-        '''Returns ramp rate in K/min'''
+        """Returns ramp rate in K/min"""
         self.get_ramp()
         return self.ramp_rate
 
     def set_ramp_rate(self, rate):
-        '''Set ramp rate of changes in setpoint, in K/min
+        """Set ramp rate of changes in setpoint, in K/min
 
         Parameters
         ----------
         rate : int or float
             Absolute value of setpoint rate of change, from 0.1 to 100 K/min
-        '''
+        """
         assert rate >= 0.1 and rate <= 100
 
         resp = self.get_ramp()
@@ -1165,31 +1176,30 @@ class Heater:
         return self._set_ramp(resp)
 
     def get_ramp_status(self):
-        '''Return a string indicating whether or not the setpoint
-        is currently ramping'''
+        """Return a string indicating whether or not the setpoint
+        is currently ramping"""
         resp = self.ls.msg(f'RAMPST? {self.output}')
         ramp_stat_dict = {'0': 'Not ramping', '1': 'Ramping'}
         self.ramp_status = ramp_stat_dict[resp]
         return self.ramp_status
 
     def get_heater_percent(self):
-        '''Return the current heater output level in %'''
+        """Return the current heater output level in %"""
         resp = self.ls.msg(f'HTR? {self.output}')
         self.percent = float(resp)
         return self.percent
 
 # Do stuff
 
+
 if __name__ == '__main__':
 
     # Initialize device
 
-    box = LS336('/dev/ttyUSB0')
+    port = sys.argv[1]
+    ls = LS336(port)
 
     # Ask basic questions
-    
-    print('Comm Active:', box.comm.is_open)
-    print(box.msg('*IDN?'))
-    print(box.get_kelvin('0'))
-    box.comm.close()
-    print('Comm Active:', box.comm.is_open)
+
+    print('Comm Active:', ls.comm.is_open)
+    print('Lakeshore Initialized, SN:', ls.msg('*IDN?'))
