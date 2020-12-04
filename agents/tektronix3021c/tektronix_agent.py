@@ -1,5 +1,5 @@
 """Michael Randall
-	mrandall@ucsd.edu"""
+mrandall@ucsd.edu"""
 
 import time
 import os
@@ -12,13 +12,26 @@ if not on_rtd:
     from ocs import ocs_agent, site_config
     from ocs.ocs_twisted import TimeoutLock
 
+
 class TektronixAWGAgent:
     def __init__(self, agent, ip_address, gpib_slot):
+        """
+        Tektronix3021c Agent Initializer
+
+        params:
+            ip_address (string): the IP address of the gpib to ethernet
+            controller connected to the function generator.
+
+            gpib_slot (int): the gpib address currently set
+            on the function generator.
+        """
+
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
 
         self.job = None
+
         self.ip_address = ip_address
         self.gpib_slot = gpib_slot
         self.monitor = False
@@ -28,10 +41,9 @@ class TektronixAWGAgent:
         agg_params = {
             'frame_length': 60,
         }
-        self.agent.register_feed('AWG',
+        self.agent.register_feed('awg',
                                  record=True,
                                  agg_params=agg_params)
-
 
     def init_awg(self, session, params=None):
         """ Task to connect to Tektronix AWG """
@@ -43,60 +55,97 @@ class TektronixAWGAgent:
             try:
                 self.awg = tektronixInterface(self.ip_address, self.gpib_slot)
                 self.idn = self.awg.identify()
+
             except socket.timeout as e:
-                self.log.error("Tektronix AWG timed out during connect")
+                self.log.error("""Tektronix AWG
+                               timed out during connect -> {}""".format(e))
                 return False, "Timeout"
+
             self.log.info("Connected to AWG: {}".format(self.idn))
 
         return True, 'Initialized AWG.'
-
 
     def set_frequency(self, session, params=None):
         """
         Sets frequency of function generator:
 
         Args:
-            frequency (float): Frequency to set. Must be between 0 and 25,000,000
+            frequency (float): Frequency to set in Hz.
+            Must be between 0 and 25,000,000.
         """
 
         with self.lock.acquire_timeout(1) as acquired:
             if acquired:
-                freq = params['frequency']
-                self.awg.setFreq(freq)
-                
-                data = {'timestamp': time.time(),
-                       'block_name': "AWG_frequency",
-                        'data': {'AWG_frequency': freq}
-                       }
-                self.agent.publish_to_feed('AWG', data)
-                
+                freq = params.get("frequency")
+
+                try:
+                    float(freq)
+
+                except ValueError as e:
+                    return False, """Frequency must
+                                    be a float or int -> {}""".format(e)
+
+                except TypeError as e:
+                    return False, """Frequency must
+                                    not be of NoneType -> {}""".format(e)
+
+                if 0 < freq < 25E6:
+                    self.awg.setFreq(freq)
+
+                    data = {'timestamp': time.time(),
+                            'block_name': "AWG_frequency",
+                            'data': {'AWG_frequency': freq}
+                            }
+                    self.agent.publish_to_feed('awg', data)
+
+                else:
+                    return False, """Invalid input:
+                        Frequency must be between 0 and 25,000,000 Hz"""
+
             else:
                 return False, "Could not acquire lock"
 
-        return True, 'Set frequency {}'.format(params)
+        return True, 'Set frequency {} Hz'.format(params)
 
     def set_amplitude(self, session, params=None):
         """
         Sets current of power supply:
 
         Args:
-            Amplitude (float): Peak to Peak voltage to set. Must be between 0 and 10.
+            amplitude (float): Peak to Peak voltage to set.
+            Must be between 0 and 10.
         """
         with self.lock.acquire_timeout(1) as acquired:
             if acquired:
-                amp = params['amplitude']
-                self.awg.setAmp(amp)
-                
-                data = {'timestamp': time.time(),
-                       'block_name': "AWG_amplitude",
-                        'data': {'AWG_amplitude': amp}
-                       }
-                self.agent.publish_to_feed('AWG', data)
-                
+                amp = params.get('amplitude')
+                try:
+                    float(amp)
+
+                except ValueError as e:
+                    return False, """Amplitude must be
+                                    a float or int -> {}""".format(e)
+
+                except TypeError as e:
+                    return False, """Amplitude must not be
+                                    of NoneType -> {}""".format(e)
+
+                if 0 < amp < 10:
+                    self.awg.setAmp(amp)
+
+                    data = {'timestamp': time.time(),
+                            'block_name': "AWG_amplitude",
+                            'data': {'AWG_amplitude': amp}
+                            }
+                    self.agent.publish_to_feed('awg', data)
+
+                else:
+                    return False, """Amplitude must be
+                                    between 0 and 10 Volts peak to peak"""
+
             else:
                 return False, "Could not acquire lock"
 
-        return True, 'Set amplitude to {} '.format(params)
+        return True, 'Set amplitude to {} Vpp'.format(params)
 
     def set_output(self, session, params=None):
         """
@@ -107,24 +156,37 @@ class TektronixAWGAgent:
         """
         with self.lock.acquire_timeout(1) as acquired:
             if acquired:
-                state = params['state']
+                state = params.get("state")
+
+                try:
+                    bool(state)
+
+                except ValueError as e:
+                    return False, "State must be a boolean -> {}".format(e)
+
+                except TypeError as e:
+                    return False, """State must not
+                                    be of NoneType -> {}""".format(e)
+
                 self.awg.setOutput(state)
-                
+
                 data = {'timestamp': time.time(),
-                       'block_name': "AWG_output",
+                        'block_name': "AWG_output",
                         'data': {'AWG_output': int(state)}
-                       }
-                self.agent.publish_to_feed('AWG', data)
-                
+                        }
+                self.agent.publish_to_feed('awg', data)
+
             else:
                 return False, "Could not acquire lock"
 
-        return True, 'Initialized AWG.'
+        return True, 'Set Output to {}.'.format(params)
+
 
 if __name__ == '__main__':
     parser = site_config.add_arguments()
 
     # Add options specific to this agent.
+
     pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--ip-address')
     pgroup.add_argument('--gpib-slot')
@@ -138,7 +200,7 @@ if __name__ == '__main__':
 
     p = TektronixAWGAgent(agent, args.ip_address, int(args.gpib_slot))
 
-    agent.register_task('init', p.init_awg)
+    agent.register_task('init', p.init_awg, startup=True)
     agent.register_task('set_frequency', p.set_frequency)
     agent.register_task('set_amplitude', p.set_amplitude)
     agent.register_task('set_output', p.set_output)
