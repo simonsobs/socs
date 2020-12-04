@@ -34,6 +34,14 @@ connection will need to be reestablished in the next iteration of the loop.
 This should be fine, as long as we do not enter a state where many connections
 are made in succession.
 
+G3Files will be written to the path::
+
+    <data_dir>/<5 ctime digits>/<stream-id>/filename
+
+The recorder will attempt to read the stream-id from the G3Frames, however
+if no stream-id is present, the stream-id passed in the site arguments will
+be used.
+
 The recorder will write the frames to file with file names and location based
 on the timestamp when the acquisition was started (i.e. the first frame was
 written.) Files will be at most "time-per-file" long, which is configurable but
@@ -75,7 +83,8 @@ using all of the available arguments::
                      ['--time-per-file', '600'],
                      ['--data-dir', '/data/'],
                      ['--port', '50000'],
-                     ['--address', 'smurf-stream-sim']]},
+                     ['--address', 'smurf-stream-sim'],
+                     ['--stream-id', 'crate1slot2']]},
 
 A few things to keep in mind. The ``--data-dir`` is the directory within the
 container, the default is probably fine, but can be changed if needed, you'll

@@ -1,4 +1,4 @@
-FROM tidair/pysmurf-client:v4.0.0
+FROM simonsobs/sodetlib:v0.0.1
 
 # Set locale
 ENV LANG C.UTF-8
@@ -31,8 +31,8 @@ WORKDIR /app/socs/agents/pysmurf_controller
 COPY . .
 RUN pip3 install -r requirements.txt
 
-ENTRYPOINT ["python3", "-u", "pysmurf_controller.py"]
+ENTRYPOINT ["dumb-init", "python3", "-u", "pysmurf_controller.py"]
 
 # Sensible defaults for setup with sisock
-CMD ["--site-hub=ws://sisock-crossbar:8001/ws", \
-     "--site-http=http://sisock-crossbar:8001/call"]
+CMD ["--site-hub=ws://crossbar:8001/ws", \
+     "--site-http=http://crossbar:8001/call"]

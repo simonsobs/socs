@@ -36,7 +36,7 @@ the available arguments::
           ['--gpib-slot', '1']
           ]},
 
-Most power supplies (including the Keithly 2230G and BK Precision 9130) 
+Most power supplies (including the Keithley 2230G and BK Precision 9130) 
 have GPIB ports rather than ethernet ports. Therefore a GPIB-to-ethernet
 converter is required, and the gpib slot must be specified in the ocs
 configuration file. The IP address is then associated with the converter.
@@ -48,7 +48,7 @@ An example docker-compose service configuration is shown here::
 
   ocs-psuK:
     image: simonsobs/ocs-scpi-psu-agent:latest
-    hostname: manny-docker
+    hostname: ocs-docker
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
     command:

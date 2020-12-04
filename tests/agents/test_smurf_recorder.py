@@ -11,7 +11,7 @@ from spt3g import core
 @pytest.fixture
 def frame_recorder(tmpdir):
     p = tmpdir.mkdir("data")
-    record = FrameRecorder(10, "tcp://127.0.0.1:4536", p)
+    record = FrameRecorder(10, "tcp://127.0.0.1:4536", p, 'test_id')
     return record
 
 

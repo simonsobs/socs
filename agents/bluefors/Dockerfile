@@ -11,7 +11,7 @@ WORKDIR /app/socs/agents/bluefors/
 COPY . .
 
 # Run registry on container startup
-ENTRYPOINT ["python3", "-u", "bluefors_log_tracker.py"]
+ENTRYPOINT ["dumb-init", "python3", "-u", "bluefors_log_tracker.py"]
 
 # Sensible default instance-id
 CMD ["--instance-id=bluefors"]

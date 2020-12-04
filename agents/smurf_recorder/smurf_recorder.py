@@ -58,17 +58,62 @@ class SmurfRecorder:
         false stops the recording of data.
     log : txaio.tx.Logger
         txaio logger object, created by the OCSAgent
-
+    target_rate : float
+        Target sampling rate for monitored channels.
+    monitored_channels : list
+        Readout channels to monitor. Incoming data for these channels will be
+        downsampled and published to an OCS feed.
     """
 
-    def __init__(self, agent, time_per_file, data_dir, address="localhost",
-                 port=4536):
+    def __init__(self, agent, time_per_file, data_dir, stream_id,
+                 address="localhost", port=4536, target_rate=10):
         self.agent = agent
         self.time_per_file = time_per_file
         self.data_dir = data_dir
+        self.stream_id = stream_id
         self.address = "tcp://{}:{}".format(address, port)
         self.is_streaming = False
         self.log = self.agent.log
+        self.target_rate = target_rate
+        self.monitored_channels = []
+
+        self.agent.register_feed('detectors', record=True)
+
+    def set_monitored_channels(self, session, params=None):
+        """Sets channels that the recorder should monitor.
+
+        Args
+        -----
+        channels : List[Int], required
+            List of channel numbers (integers between 0 and 2048) to be
+            monitored. A maximum of 6 channels can be monitored at a time.
+        """
+        if params is None:
+            params = {}
+
+        if len(params['channels']) > 6:
+            return False, "Cannot monitor more than 6 channels"
+
+        self.monitored_channels =  params['channels']
+        return True, f"Set monitored channels to {self.monitored_channels}"
+
+    def set_target_rate(self, session, params=None):
+        """Sets the target sample rate for monitored channels.
+
+        Args
+        -----
+        target_rate : float, required
+            Target rate after downsampling for monitored channels in Hz.
+            Max target rate is 10 Hz.
+        """
+        if params is None:
+            params = {}
+
+        if params['target_rate'] > 10:
+            return False, "Max target rate is 10 Hz"
+
+        self.target_rate = params['target_rate']
+        return True, f"Set target sampling rate to {self.target_rate}"
 
     def start_record(self, session, params=None):
         """start_record(params=None)
@@ -88,10 +133,16 @@ class SmurfRecorder:
         self.is_streaming = True
 
         recorder = FrameRecorder(self.time_per_file, self.address,
-                                 self.data_dir)
+                                 self.data_dir, self.stream_id,
+                                 target_rate=self.target_rate)
 
         while self.is_streaming:
+            recorder.monitored_channels = self.monitored_channels
+            recorder.target_rate = self.target_rate
             recorder.run()
+            for k, v in recorder.stream_data.items():
+                if v['timestamps']:
+                    self.agent.publish_to_feed('detectors', v)
 
         # Explicitly clean up when done
         del recorder
@@ -129,6 +180,14 @@ def make_parser(parser=None):
                         help="Port to listen on.")
     pgroup.add_argument("--address", default="localhost",
                         help="Address to listen to.")
+    pgroup.add_argument('--stream-id', default='None',
+                        help="Stream id of recorded stream. If one is not "
+                             "present in the G3Frames, this is the stream-id"
+                             "that will be used to determine file paths.")
+    pgroup.add_argument('--target-rate', default=10, type=float,
+                       help="Target rate for monitored readout channels in "
+                            "Hz. This willl be the rate that detector data is "
+                            "streamed to an OCS feed")
 
     return parser
 
@@ -137,25 +196,26 @@ if __name__ == "__main__":
     # Start logging
     txaio.start_logging(level=environ.get("LOGLEVEL", "info"))
 
-    # Get the default ocs agrument parser
-    site_parser = site_config.add_arguments()
-    parser = make_parser(site_parser)
-
-    # Parse commandline
-    args = parser.parse_args()
-
-    site_config.reparse_args(args, "SmurfRecorder")
+    parser = make_parser()
+    args = site_config.parse_args(agent_class='SmurfRecorder', parser=parser)
 
     agent, runner = ocs_agent.init_site_agent(args)
     listener = SmurfRecorder(agent,
                              int(args.time_per_file),
                              args.data_dir,
+                             args.stream_id,
                              address=args.address,
-                             port=int(args.port))
+                             port=int(args.port),
+                             target_rate=args.target_rate)
 
     agent.register_process("record",
                            listener.start_record,
                            listener.stop_record,
                            startup=bool(args.auto_start))
+    agent.register_task('set_monitored_channels',
+                        listener.set_monitored_channels, blocking=False)
+    agent.register_task('set_target_rate', listener.set_target_rate,
+                        blocking=False)
+
 
     runner.run(agent, auto_reconnect=True)
