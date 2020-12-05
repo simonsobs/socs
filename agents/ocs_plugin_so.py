@@ -16,6 +16,6 @@ for n,f in [
         ('BlueforsAgent', 'bluefors/bluefors_log_tracker.py'),
         ('HWPSimulatorAgent', 'hwp_sim/hwp_simulator_agent.py'),
         ('CryomechCPAAgent', 'cryomech_cpa/cryomech_cpa_agent.py'),
-        ('WeatherMonitorAgent', 'weather_agent/weather_monitor_agent.py')
+        ('VantagePro2Agent', 'vantagePro2_agent/vantage_pro2_agent.py')
 ]:
     ocs.site_config.register_agent_class(n, os.path.join(root, f))
