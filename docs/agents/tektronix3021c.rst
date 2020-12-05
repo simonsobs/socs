@@ -71,7 +71,7 @@ is running.::
     psuK.set_frequency.wait()
     
     #Set AWG peak to peak voltage
-    psuK.set_amplitude.start(amplitude=30)
+    psuK.set_amplitude.start(amplitude=5)
     psuK.set_amplitude.wait()
     
     #Set AWG on/off
