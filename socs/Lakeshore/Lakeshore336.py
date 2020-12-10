@@ -3,11 +3,7 @@
 
 import math
 import numpy as np
-<<<<<<< HEAD
 import socket
-=======
-import serial
->>>>>>> 0dab62c5b6678348e1da0a06c1272faecf608ff0
 
 import time
 import sys
@@ -74,11 +70,7 @@ max_current_key = {
     '1': .707,
     '2': 1.,
     '3': 1.141,
-<<<<<<< HEAD
     '4': 2.
-=======
-    '4': 2
->>>>>>> 0dab62c5b6678348e1da0a06c1272faecf608ff0
 }
 max_current_lock = {v: k for k, v in max_current_key.items()}
 
@@ -108,7 +100,6 @@ class LS336:
     """
     # Constructor and instance variables
 
-<<<<<<< HEAD
     def __init__(self, ip, timeout=10):
 
         # LS336 defaults
@@ -117,23 +108,6 @@ class LS336:
         self.com.settimeout(timeout)
 
         self.timeout = timeout
-=======
-    def __init__(self, port, timeout=1.0):
-
-        # LS336 defaults
-        self.baud = 57600
-        self.bytesize = serial.SEVENBITS
-        self.parity = serial.PARITY_ODD
-        self.stopbits = serial.STOPBITS_ONE
-        self.term = '\r\n'
-
-        self.port = port
-        self.timeout = timeout
-        self.comm = serial.Serial(
-            self.port, self.baud, self.bytesize, self.parity, self.stopbits, timeout)
-        self.comm.close()
-
->>>>>>> 0dab62c5b6678348e1da0a06c1272faecf608ff0
         self.id = self.get_id()
         print(self.id)  # print idenfitication information to see if working
 
@@ -147,7 +121,6 @@ class LS336:
 
     # Instance methods
 
-<<<<<<< HEAD
     # copied from Lakeshore372 driver on 2020/12/09, modified end-of-method sleep to 0.1s in all cases
     def msg(self, message):
         """Send message to the Lakeshore 336 over ethernet.
@@ -178,82 +151,18 @@ class LS336:
                     resp = str(self.com.recv(4096), 'utf-8').strip()
                     break
                 except socket.timeout:
-                    print("Warning: Caught timeout waiting for response to '%s', trying again " \
-                          "before giving up"%message)
+                    print("Warning: Caught timeout waiting for response to '%s', trying again "
+                          "before giving up" % message)
                     if attempt == 1:
-                        raise RuntimeError('Query response to Lakeshore timed out after two ' \
+                        raise RuntimeError('Query response to Lakeshore timed out after two '
                                            'attempts. Check connection.')
         else:
             self.com.send(msg_str)
             resp = ''
 
-        time.sleep(0.1)  # No comms for 100ms after sending message (manual says50ms)
+        # No comms for 100ms after sending message (manual says50ms)
+        time.sleep(0.1)
         return resp
-=======
-    def msg(self, cmd, delay=0.1):
-        r"""
-        Sends character string cmd to the device port, including commands and queries.
-
-        Parameters
-        ------
-        cmd : string
-            The character sequence to send to the device. Must be in the device proprietary
-            library, availablein the lakeshore manual.
-
-        delay : float or int
-            After writing, the function will lock out the kernel for delay seconds.
-            Within a script, this prevents too many cmds being written to the device too quickly.
-
-        Returns
-        ------
-        out : str
-            If cmd is a query (ie, contains '?'), returns the device response. Otherwise returns ''.
-        """
-
-        assert delay > 0.05, 'msg delay must be greater than 50ms'
-
-        cmd = cmd + self.term
-        bcmd = cmd.encode()
-
-        if not self.comm.is_open:
-            self.comm.open()
-        self.comm.write(bcmd)
-
-        out = ''
-        if '?' in cmd:
-            out = self.read()
-
-        self.comm.close()
-        time.sleep(delay)
-
-        return out
-
-    def read(self, size=None):
-        r"""
-        Reads data from the device attached to port comm. Implemented via pyserial 'read_until' command: reads until receives '\n'; every lakeshore response terminates with '\r\n'.
-
-        Parameters
-        ------
-        comm : serial.Serial object
-            The port on the local machine attached to the device. See pyserial documentation. Must be configured according to the lakeshore manual.
-
-        size : int, optional
-            Number of bytes to read. If provided, may be less than full message length.
-
-        Returns
-        ------
-        out : str
-            Message from lakeshore device.
-        """
-
-        if not self.comm.is_open:
-            self.comm.open()
-
-        out = self.comm.read_until(size=size).strip().decode()
-        self.comm.close()
-
-        return out
->>>>>>> 0dab62c5b6678348e1da0a06c1272faecf608ff0
 
     def get_id(self):
         """Get identification information of the Lakeshore module"""
@@ -284,12 +193,8 @@ class LS336:
         resp = self.msg(f'KRDG? {inp}')
 
         if inp == '0':
-<<<<<<< HEAD
             # casts to array of floats
             return np.array(np.char.split(resp, sep=',').item()).astype(float)
-=======
-            return np.array(np.char.split(resp, sep=',').item()).astype(float)  # casts to array of floats
->>>>>>> 0dab62c5b6678348e1da0a06c1272faecf608ff0
         else:
             return float(resp)
 
@@ -318,12 +223,8 @@ class LS336:
         resp = self.msg(f'SRDG? {inp}')
 
         if inp == '0':
-<<<<<<< HEAD
             # casts to array of floats
             return np.array(np.char.split(resp, sep=',').item()).astype(float)
-=======
-            return np.array(np.char.split(resp, sep=',').item()).astype(float)  # casts to array of floats
->>>>>>> 0dab62c5b6678348e1da0a06c1272faecf608ff0
         else:
             return float(resp)
 
@@ -1267,19 +1168,10 @@ class Heater:
 
 if __name__ == '__main__':
 
-<<<<<<< HEAD
     # Initialize device from CLI
-=======
-    # Initialize device
->>>>>>> 0dab62c5b6678348e1da0a06c1272faecf608ff0
 
     port = sys.argv[1]
     ls = LS336(port)
 
     # Ask basic questions
-
-<<<<<<< HEAD
-=======
-    print('Comm Active:', ls.comm.is_open)
->>>>>>> 0dab62c5b6678348e1da0a06c1272faecf608ff0
     print('Lakeshore Initialized, SN:', ls.msg('*IDN?'))
