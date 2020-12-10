@@ -123,7 +123,7 @@ class LS336:
 
     # copied from Lakeshore372 driver on 2020/12/09, modified end-of-method sleep to 0.1s in all cases
     def msg(self, message):
-        """Send message to the Lakeshore 372 over ethernet.
+        """Send message to the Lakeshore 336 over ethernet.
 
         If we're asking for something from the Lakeshore (indicated by a ? in
         the message string), then we will attempt to ask twice before giving up
@@ -132,7 +132,7 @@ class LS336:
         Parameters
         ----------
         message : str
-            Message string as described in the Lakeshore 372 manual.
+            Message string as described in the Lakeshore 336 manual.
 
         Returns
         -------
