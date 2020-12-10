@@ -14,10 +14,10 @@ import time
 
 class LS336_Agent:
 
-    def __init__(self, agent, sn, port, f_sample=0.1, wait=1, threshold=0.1, window=900):
+    def __init__(self, agent, sn, ip, f_sample=0.1, wait=1, threshold=0.1, window=900):
         self.agent = agent
         self.sn = sn
-        self.port = port
+        self.ip = ip
         self.f_sample = f_sample
         self.t_sample = 1/self.f_sample - 0.01
         assert self.t_sample < 7200, \
@@ -74,7 +74,7 @@ class LS336_Agent:
             session.set_status('running')
 
             # get lakeshore
-            self.module = LS336(self.port)
+            self.module = LS336(self.ip)
             session.add_message(
                 f'Lakeshore initialized with ID: {self.module.id}')
 
@@ -805,8 +805,8 @@ def make_parser(parser=None):
     # Add options specific to this agent.
     pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--serial-number')
-    pgroup.add_argument('--port', type=str,
-                        help="Path to USB node for the lakeshore")
+    pgroup.add_argument('--ip-address', type=str,
+                        help="IP address for the lakeshore")
     pgroup.add_argument('--f-sample', type=float, default=0.1,
                         help='The frequency of data acquisition')
     pgroup.add_argument('--wait', type=float, default=1.0,
@@ -838,7 +838,7 @@ if __name__ == '__main__':
     agent, runner = ocs_agent.init_site_agent(args)
 
     # Pass the new agent session to the agent class
-    lake_agent = LS336_Agent(agent, args.serial_number, args.port, args.f_sample,
+    lake_agent = LS336_Agent(agent, args.serial_number, args.ip_address, args.f_sample,
                              args.wait, args.threshold, args.window)
 
     # Register tasks (name, agent_function)
