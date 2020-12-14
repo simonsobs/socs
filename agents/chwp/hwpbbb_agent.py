@@ -5,13 +5,24 @@ Note
    This is confirmed to be work with the following versions of beagleboneblack software:
    - currently hwpdaq branch in spt3g_software_sa repository: 731ff39
    (sha256sum)
-   - Beaglebone_Encoder_DAQ.c: 9c775d240b24ac3c2f2ccb2d581f181be046a0a4eccb8525fd05222b09e97cd8
-   - Encoder_Detection.c: 1fd24e7c1627bafff1bfcf2d2c954e5e2981de01e5842ba35e5c035686fcdd3e
-   - IRIG_Detection.c: daaee6b7b0a163c703f78e3c90bcaf83dfdbbde45249ec9ef8e5cd2cf6a6f3ba
    - Encoder1.bin: c8281525bdd0efae66aede7cffc3520ab719cfd67f6c2d7fd01509a4289a9d32
    - Encoder2.bin: a6ed9d89e9cf26036bf1da9e7e2098da85bbfa6eb08d0caef1e3c40877dd5077
    - IRIG1.bin: 7bc37b30a1759eb792f0db176bcd6080f9c3c7ec78ba2e1614166b2031416091
    - IRIG2.bin: d206dd075f73c32684d8319c9ed19f019cc705a9f253725de085eb511b8c0a12
+
+Data feeds
+----------
+HWPEncoder:
+   counter_sub: subsampled counter values, first index of counter array 
+   counter_overflow_sub: 
+   counter_index_sub:
+
+HWPEncoder_full: separated feed for full-sample HWP encoder data, 
+                 for saving in the influxdb databases
+   counter: 
+   counter_overflow: 
+   counter_index: 
+
 
 """
 
@@ -41,6 +52,10 @@ IRIG_PACKET_SIZE = 132
 NUM_SLITS = 570
 # Number of encoder counter samples to publish at once
 NUM_ENCODER_TO_PUBLISH = 4200
+# Seconds to publish encoder data even before reaching NUM_ENCODER_TO_PUBLISH
+SEC_ENCODER_TO_PUBLISH = 10
+# Subsampling facot for the encoder counter data to influxdb
+NUM_SUBSAMPLE = 500
 
 ### Definitions of utility functions ###
 
@@ -313,6 +328,10 @@ class EncoderParser:
                         print('Packet Error')
                         # Clear self.data
                         self.data = ''
+                    elif header == 0x1234:
+                        print('Received timeout packet.')
+                        # Clear self.data
+                        self.data = ''
                     else:
                         print('Bad header')
                         # Clear self.data
@@ -461,12 +480,16 @@ class HWPBBBAgent:
         agg_params = {'frame_length': 60}
         self.agent.register_feed('HWPEncoder', record=True,
                                  agg_params=agg_params)
+        agg_params = {'frame_length': 60, 'exclude_influx': True}
+        self.agent.register_feed('HWPEncoder_full', record=True,
+                                 agg_params=agg_params)
         self.parser = EncoderParser()
 
     def start_acq(self, session, params):
         """Starts acquiring data.
         """
 
+        time_encoder_published = 0
         counter_list = []
         counter_index_list = []
         quad_list = []
@@ -534,11 +557,11 @@ class HWPBBBAgent:
                     data = {'timestamps':[], 'block_name':'HWPEncoder_irig_raw', 'data':{}}
                     # 0.09: time difference in seconds b/w reference marker and the first index marker
                     data['timestamps'] = sys_time + 0.09 + numpy.arange(10) * 0.1
-                    data['data']['irig_synch_pulse_clock_time'] = irig_time + 0.09 + numpy.arange(10) * 0.1
+                    data['data']['irig_synch_pulse_clock_time'] = list(irig_time + 0.09 + numpy.arange(10) * 0.1)
                     data['data']['irig_synch_pulse_clock_counts'] = synch_pulse_clock_counts
                     ## Temporary until the 64bit support is available
                     data['data']['irig_synch_pulse_clock_counts_overlow'] = irig_data[6]
-                    data['data']['irig_info'] = irig_info
+                    data['data']['irig_info'] = list(irig_info)
                     self.agent.publish_to_feed('HWPEncoder', data)
 
                 ## Reducing the packet size, less frequent publishing
@@ -559,27 +582,37 @@ class HWPBBBAgent:
                     received_time_list.append(sys_time)
                     quad_list.append(quad_data)
                     quad_counter_list.append(counter_data[0][0])
-                    if len(counter_list) >= NUM_ENCODER_TO_PUBLISH:
+                    ct = time.time()
+                    if len(counter_list) >= NUM_ENCODER_TO_PUBLISH \
+                       or (len(counter_list) and (ct - time_encoder_published) > SEC_ENCODER_TO_PUBLISH):
                         # Publishing quadratic data first
                         data = {'timestamps':[], 'block_name':'HWPEncoder_quad', 'data':{}}
                         data['timestamps'] = received_time_list
                         data['data']['quad'] = quad_list
                         self.agent.publish_to_feed('HWPEncoder', data)
 
-                        # Publishing counter data
+                        # Publishing counter data (full sampled data will not be recorded in influxdb)
                         data = {'timestamps':[], 'block_name':'HWPEncoder_counter', 'data':{}}
                         data['data']['counter'] = counter_list
                         data['data']['counter_index'] = counter_index_list
                         ## Temporary until the 64bit support is available
                         data['data']['counter_overflow'] = counter_overflow_list
-                        
+
                         ## Temporary until the 64bit support is available
                         #data['timestamps'] = count2time(counter_list, received_time_list[0])
                         counter_list_np = numpy.array(counter_list, dtype=numpy.uint32).astype(numpy.uint64)
-                        counter_list_np += numpy.left_shift(numpy.array(counter_overflow_list, dtype=numpy.uint32).astype(numpy.uint64), 32)
+                        counter_list_np += numpy.left_shift(numpy.array(counter_overflow_list, \
+                                                                        dtype=numpy.uint32).astype(numpy.uint64), 32)
                         data['timestamps'] = count2time(counter_list_np, received_time_list[0])
+                        self.agent.publish_to_feed('HWPEncoder_full', data)
 
-                        self.agent.publish_to_feed('HWPEncoder', data)
+                        ## Subsampled data for influxdb display
+                        data_subsampled = {'block_name':'HWPEncoder_counter_sub', 'data':{}}
+                        data_subsampled['timestamps'] = numpy.array(data['timestamps'])[::NUM_SUBSAMPLE].tolist()
+                        data_subsampled['data']['counter_sub'] = numpy.array(counter_list)[::NUM_SUBSAMPLE].tolist()
+                        data_subsampled['data']['counter_index_sub'] = numpy.array(counter_index_list)[::NUM_SUBSAMPLE].tolist()
+                        data_subsampled['data']['counter_overflow_sub'] = numpy.array(counter_overflow_list)[::NUM_SUBSAMPLE].tolist()
+                        self.agent.publish_to_feed('HWPEncoder', data_subsampled)
 
                         # For rough estimation of HWP rotation frequency
                         data = {'timestamp': received_time_list[0],
@@ -593,8 +626,16 @@ class HWPBBBAgent:
                         # Assuming Beagleboneblack clock is 200 MHz
                         pulse_rate = dindex_counter * 2.e8 / dclock_counter
                         hwp_freq = pulse_rate / 2. / NUM_SLITS
+
+                        diff_counter = numpy.diff(counter_list_np)
+                        diff_index = numpy.diff(counter_index_list)
+
                         print('pulse_rate', pulse_rate, hwp_freq)
                         data['data']['approx_hwp_freq'] = hwp_freq
+                        data['data']['diff_counter_mean'] = numpy.mean(diff_counter)
+                        data['data']['diff_index_mean'] = numpy.mean(diff_index)
+                        data['data']['diff_counter_std'] = numpy.std(diff_counter)
+                        data['data']['diff_index_std'] = numpy.std(diff_index)
                         self.agent.publish_to_feed('HWPEncoder', data)
 
                         # Initialize lists
@@ -605,6 +646,8 @@ class HWPBBBAgent:
                         received_time_list = []
                         ## Temporary until the 64bit support is available
                         counter_overflow_list = []
+
+                        time_encoder_published = ct
 
         self.agent.feeds['HWPEncoder'].flush_buffer()
         return True, 'Acquisition exited cleanly.'
