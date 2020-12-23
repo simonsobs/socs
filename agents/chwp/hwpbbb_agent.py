@@ -13,17 +13,41 @@ Note
 Data feeds
 ----------
 HWPEncoder:
-   counter_sub: subsampled counter values, first index of counter array 
-   counter_overflow_sub: 
-   counter_index_sub:
+   (HWPEncoder_counter_sub)
+   counter_sub: subsampled counter values [::NUM_SUBSAMPLE]
+   counter_index_sub: subsampled index counter values
 
-HWPEncoder_full: separated feed for full-sample HWP encoder data, 
-                 for saving in the influxdb databases
-   counter: 
-   counter_overflow: 
-   counter_index: 
+   (HWPEncoder_freq)
+   approx_hwp_freq: approximate estimate of hwp rotation frequency
+   diff_counter_mean: mean of diff(counter)
+   diff_index_mean: mean of diff(counter_index)
+   diff_counter_std: std of diff(counter)
+   diff_index_std: std of diff(counter_index)
 
+   (HWPEncoder_quad)
+   quad: quadrature data
 
+   (HWPEncoder_irig)
+   irig_time: decoded time in second since the unix epoch
+   rising_edge_cont: BBB clcok count values 
+                     for the IRIG on-time reference marker risinge edge
+   irig_sec: seconds decoded from IRIG-B
+   irig_min: minutes decoded from IRIG-B
+   irig_hour: hours decoded from IRIG-B
+   irig_day: days decoded from IRIG-B
+   irig_year: years decoded from IRIG-B
+   bbb_clock_freq: BBB clock frequency estimate using IRIG-B
+
+   (HWPEncoder_irig_raw)
+   irig_synch_pulse_clock_time: reference marker time in sec
+   irig_synch_pulse_clock_counts: clock counts for reference markers
+   irig_info: IRIG bit info
+
+HWPEncoder_full: separated feed for full-sample HWP encoder data,
+                 not to be included in influxdb database
+   (HWPEncoder_counter)
+   counter: BBB counter values for encoder signal edges
+   counter_index: index numbers for detected edges by BBB
 """
 
 import socket
@@ -32,7 +56,7 @@ import time
 import calendar
 from collections import deque
 import select
-import numpy
+import numpy as np
 
 ## Required by OCS
 from ocs import ocs_agent, site_config
@@ -102,8 +126,8 @@ def count2time(counts, t_offset=0.):
        from the first sample in the input list
 
     """
-    t_array = numpy.array(counts, dtype=float) - counts[0]
-    # Assuming clock is 200MHz
+    t_array = np.array(counts, dtype=float) - counts[0]
+    # Assuming BBB clock is 200MHz
     t_array *= 5.e-9
     t_array += t_offset
 
@@ -371,18 +395,13 @@ class EncoderParser:
         """
 
         # Convert the Encoder Packet structure into a numpy array
-        derter = numpy.array(struct.unpack('<' + 'I'+ 'III'*COUNTER_INFO_LENGTH, data))
+        derter = np.array(struct.unpack('<' + 'I'+ 'III'*COUNTER_INFO_LENGTH, data))
 
         # self.quad_queue.append(derter[0].item()) # merged to counter_queue
-        ## Temporary until the 64bit support is available
-        #self.counter_queue.append((derter[1:COUNTER_INFO_LENGTH+1]\
-        #                        + (derter[COUNTER_INFO_LENGTH+1:2*COUNTER_INFO_LENGTH+1] << 32), \
-        #                           derter[2*COUNTER_INFO_LENGTH+1:3*COUNTER_INFO_LENGTH+1], \
-        #                           derter[0].item(), time.time()))
-        self.counter_queue.append((derter[1:COUNTER_INFO_LENGTH+1], \
+        self.counter_queue.append((derter[1:COUNTER_INFO_LENGTH+1]\
+                                + (derter[COUNTER_INFO_LENGTH+1:2*COUNTER_INFO_LENGTH+1] << 32), \
                                    derter[2*COUNTER_INFO_LENGTH+1:3*COUNTER_INFO_LENGTH+1], \
-                                   derter[0].item(), time.time(), \
-                                   derter[COUNTER_INFO_LENGTH+1:2*COUNTER_INFO_LENGTH+1]))
+                                   derter[0].item(), time.time()))
 
     def parse_irig_info(self, data):
         """Method to parse the IRIG Packet and put them to the irig_queue
@@ -420,10 +439,7 @@ class EncoderParser:
 	#overflow.append(unpacked_data[1])
         #print "overflow: ", overflow
 
-        ## Temporary until the 64bit support is available
-        #rising_edge_time = unpacked_data[0] + (unpacked_data[1] << 32)
-        rising_edge_time = int(numpy.int32(unpacked_data[0]))
-        rising_edge_time_overflow = int(numpy.int32(unpacked_data[1]))
+        rising_edge_time = unpacked_data[0] + (unpacked_data[1] << 32)
 
         # Stores IRIG time data
         irig_info = unpacked_data[2:12]
@@ -432,22 +448,14 @@ class EncoderParser:
         irig_time = self.pretty_print_irig_info(irig_info, rising_edge_time)
 
         # Stores synch pulse clock counts accounting for overflow of 32 bit counter
-        ## Temporary until the 64bit support is available
-        #synch_pulse_clock_times = (numpy.asarray(unpacked_data[12:22])
-        #                           + (numpy.asarray(unpacked_data[22:32]) << 32)).tolist()
-        synch_pulse_clock_times = numpy.asarray(unpacked_data[12:22], dtype=numpy.int32).tolist()
-        synch_pulse_clock_times_overflow = numpy.asarray(unpacked_data[22:32], dtype=numpy.int32).tolist()
+        synch_pulse_clock_times = (np.asarray(unpacked_data[12:22])
+                                   + (np.asarray(unpacked_data[22:32]) << 32)).tolist()
 
         # self.irig_queue = [Packet clock count,Packet UTC time in sec,
         #                    [binary encoded IRIG data],[synch pulses clock counts],
         #                    [current system time]]
-        ## Temporary until the 64bit support is available
-        #self.irig_queue.append((rising_edge_time, irig_time, irig_info, \
-        #                        synch_pulse_clock_times, time.time()))
         self.irig_queue.append((rising_edge_time, irig_time, irig_info, \
-                                synch_pulse_clock_times, time.time(), \
-                                rising_edge_time_overflow, \
-                                synch_pulse_clock_times_overflow))
+                                synch_pulse_clock_times, time.time()))
 
     def __del__(self):
         self.sock.close()
@@ -495,8 +503,6 @@ class HWPBBBAgent:
         quad_list = []
         quad_counter_list = []
         received_time_list = []
-        ## Temporary until the 64bit support is available
-        counter_overflow_list = []
 
         with self.lock.acquire_timeout(timeout=0, job='acq') as acquired:
             if not acquired:
@@ -529,38 +535,27 @@ class HWPBBBAgent:
                     data['data']['irig_day'] = de_irig(irig_info[3], 0) \
                                                     + de_irig(irig_info[4], 0) * 100
                     data['data']['irig_year'] = de_irig(irig_info[5], 0)
-                    ## Temporary until the 64bit support is available
-                    rising_edge_count_overflow = irig_data[5]
-                    data['data']['rising_edge_count_overflow'] = rising_edge_count_overflow
 
                     # Beagleboneblack clock frequency measured by IRIG
-                    ## Temporary until the 64bit support is available
-                    #if self.rising_edge_count > 0:
-                    if numpy.uint32(self.rising_edge_count)>0:
-                        ## Temporary until the 64bit support is available
-                        #bbb_clock_freq = float(rising_edge_count - self.rising_edge_count) \
-                        #                 / (irig_time - self.irig_time)
-                        bbb_clock_freq = int(numpy.uint32(rising_edge_count)) - int(numpy.uint32(self.rising_edge_count))
-                        bbb_clock_freq += numpy.uint64(rising_edge_count_overflow - self.rising_edge_count_overflow)*2**32
-                        bbb_clock_freq = float(bbb_clock_freq) / (irig_time - self.irig_time)
+                    if self.rising_edge_count > 0:
+                        bbb_clock_freq = float(rising_edge_count - self.rising_edge_count) \
+                                         / (irig_time - self.irig_time)
                     else:
                         bbb_clock_freq = 0.
                     data['data']['bbb_clock_freq'] = bbb_clock_freq
-                    
+
                     self.agent.publish_to_feed('HWPEncoder', data)
                     self.rising_edge_count = rising_edge_count
                     self.irig_time = irig_time
-                    ## Temporary until the 64bit support is available
-                    self.rising_edge_count_overflow = rising_edge_count_overflow
 
                     # saving clock counts for every refernce edge and every irig bit info
                     data = {'timestamps':[], 'block_name':'HWPEncoder_irig_raw', 'data':{}}
-                    # 0.09: time difference in seconds b/w reference marker and the first index marker
-                    data['timestamps'] = sys_time + 0.09 + numpy.arange(10) * 0.1
-                    data['data']['irig_synch_pulse_clock_time'] = list(irig_time + 0.09 + numpy.arange(10) * 0.1)
+                    # 0.09: time difference in seconds b/w reference marker and
+                    #       the first index marker
+                    data['timestamps'] = sys_time + 0.09 + np.arange(10) * 0.1
+                    data['data']['irig_synch_pulse_clock_time'] = list(irig_time + 0.09 + \
+                                                                       np.arange(10) * 0.1)
                     data['data']['irig_synch_pulse_clock_counts'] = synch_pulse_clock_counts
-                    ## Temporary until the 64bit support is available
-                    data['data']['irig_synch_pulse_clock_counts_overlow'] = irig_data[6]
                     data['data']['irig_info'] = list(irig_info)
                     self.agent.publish_to_feed('HWPEncoder', data)
 
@@ -569,13 +564,9 @@ class HWPBBBAgent:
                 while len(self.parser.counter_queue):
                     counter_data = self.parser.counter_queue.popleft()
 
-                    ## Temporary until the 64bit support is available
-                    #counter_list += counter_data[0].tolist()
-                    #counter_index_list += counter_data[1].tolist()
-                    counter_list += counter_data[0].astype(numpy.int32).tolist()
-                    counter_index_list += counter_data[1].astype(numpy.int32).tolist()
-                    counter_overflow_list += counter_data[4].astype(numpy.int32).tolist()
-                    
+                    counter_list += counter_data[0].tolist()
+                    counter_index_list += counter_data[1].tolist()
+
                     quad_data = counter_data[2]
                     sys_time = counter_data[3]
 
@@ -584,58 +575,51 @@ class HWPBBBAgent:
                     quad_counter_list.append(counter_data[0][0])
                     ct = time.time()
                     if len(counter_list) >= NUM_ENCODER_TO_PUBLISH \
-                       or (len(counter_list) and (ct - time_encoder_published) > SEC_ENCODER_TO_PUBLISH):
+                       or (len(counter_list) \
+                           and (ct - time_encoder_published) > SEC_ENCODER_TO_PUBLISH):
                         # Publishing quadratic data first
                         data = {'timestamps':[], 'block_name':'HWPEncoder_quad', 'data':{}}
                         data['timestamps'] = received_time_list
                         data['data']['quad'] = quad_list
                         self.agent.publish_to_feed('HWPEncoder', data)
 
-                        # Publishing counter data (full sampled data will not be recorded in influxdb)
+                        # Publishing counter data
+                        # (full sampled data will not be recorded in influxdb)
                         data = {'timestamps':[], 'block_name':'HWPEncoder_counter', 'data':{}}
                         data['data']['counter'] = counter_list
                         data['data']['counter_index'] = counter_index_list
-                        ## Temporary until the 64bit support is available
-                        data['data']['counter_overflow'] = counter_overflow_list
 
-                        ## Temporary until the 64bit support is available
-                        #data['timestamps'] = count2time(counter_list, received_time_list[0])
-                        counter_list_np = numpy.array(counter_list, dtype=numpy.uint32).astype(numpy.uint64)
-                        counter_list_np += numpy.left_shift(numpy.array(counter_overflow_list, \
-                                                                        dtype=numpy.uint32).astype(numpy.uint64), 32)
-                        data['timestamps'] = count2time(counter_list_np, received_time_list[0])
+                        data['timestamps'] = count2time(counter_list, received_time_list[0])
                         self.agent.publish_to_feed('HWPEncoder_full', data)
 
                         ## Subsampled data for influxdb display
                         data_subsampled = {'block_name':'HWPEncoder_counter_sub', 'data':{}}
-                        data_subsampled['timestamps'] = numpy.array(data['timestamps'])[::NUM_SUBSAMPLE].tolist()
-                        data_subsampled['data']['counter_sub'] = numpy.array(counter_list)[::NUM_SUBSAMPLE].tolist()
-                        data_subsampled['data']['counter_index_sub'] = numpy.array(counter_index_list)[::NUM_SUBSAMPLE].tolist()
-                        data_subsampled['data']['counter_overflow_sub'] = numpy.array(counter_overflow_list)[::NUM_SUBSAMPLE].tolist()
+                        data_subsampled['timestamps'] = np.array(data['timestamps'])\
+                                                        [::NUM_SUBSAMPLE].tolist()
+                        data_subsampled['data']['counter_sub'] = np.array(counter_list)\
+                                                                 [::NUM_SUBSAMPLE].tolist()
+                        data_subsampled['data']['counter_index_sub'] = np.array(counter_index_list)\
+                                                                       [::NUM_SUBSAMPLE].tolist()
                         self.agent.publish_to_feed('HWPEncoder', data_subsampled)
 
                         # For rough estimation of HWP rotation frequency
                         data = {'timestamp': received_time_list[0],
                                 'block_name':'HWPEncoder_freq', 'data':{}}
-                        ## Temporary until the 64bit support is available
-                        #dclock_counter = counter_list[-1] - counter_list[0]
-                        dclock_counter = int(numpy.uint32(counter_list[-1])) - int(numpy.uint32(counter_list[0]))
-                        dclock_counter += (counter_overflow_list[-1] - counter_overflow_list[0])<<32
-
+                        dclock_counter = counter_list[-1] - counter_list[0]
                         dindex_counter = counter_index_list[-1] - counter_index_list[0]
                         # Assuming Beagleboneblack clock is 200 MHz
                         pulse_rate = dindex_counter * 2.e8 / dclock_counter
                         hwp_freq = pulse_rate / 2. / NUM_SLITS
 
-                        diff_counter = numpy.diff(counter_list_np)
-                        diff_index = numpy.diff(counter_index_list)
+                        diff_counter = np.diff(counter_list)
+                        diff_index = np.diff(counter_index_list)
 
                         print('pulse_rate', pulse_rate, hwp_freq)
                         data['data']['approx_hwp_freq'] = hwp_freq
-                        data['data']['diff_counter_mean'] = numpy.mean(diff_counter)
-                        data['data']['diff_index_mean'] = numpy.mean(diff_index)
-                        data['data']['diff_counter_std'] = numpy.std(diff_counter)
-                        data['data']['diff_index_std'] = numpy.std(diff_index)
+                        data['data']['diff_counter_mean'] = np.mean(diff_counter)
+                        data['data']['diff_index_mean'] = np.mean(diff_index)
+                        data['data']['diff_counter_std'] = np.std(diff_counter)
+                        data['data']['diff_index_std'] = np.std(diff_index)
                         self.agent.publish_to_feed('HWPEncoder', data)
 
                         # Initialize lists
@@ -644,8 +628,6 @@ class HWPBBBAgent:
                         quad_list = []
                         quad_counter_list = []
                         received_time_list = []
-                        ## Temporary until the 64bit support is available
-                        counter_overflow_list = []
 
                         time_encoder_published = ct
 
