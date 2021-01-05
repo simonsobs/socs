@@ -2,7 +2,6 @@ import argparse
 import time
 import struct
 import os
-from labjack import ljm
 import numexpr
 import yaml
 import csv
@@ -11,6 +10,7 @@ import numpy as np
 
 ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 if not ON_RTD:
+    from labjack import ljm
     from ocs import ocs_agent, site_config
     from ocs.ocs_twisted import TimeoutLock
 
