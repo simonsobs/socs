@@ -3,6 +3,7 @@ from enum import Enum
 
 import time
 import txaio
+import numpy as np
 
 # For logging
 txaio.use_twisted()
@@ -439,7 +440,12 @@ class FrameRecorder:
         """
         self.read_frames()
         self.check_for_frame_gap(10)
-        self.read_stream_data()
+        if len(self.monitored_channels) > 0:
+            try:
+                self.read_stream_data()
+            except Exception as e:
+                self.log.warn("Exception thrown when reading stream data:\n{e}", e=e)
+
         if self.frames:
             self.create_new_file()
             self.write_frames_to_file()
@@ -460,6 +466,8 @@ class FrameRecorder:
                 continue
             ds_factor = (frame['data'].sample_rate/core.G3Units.Hz) \
                         // self.target_rate
+            if np.isnan(ds_factor):
+                continue
             ds_factor = max(int(ds_factor), 1)
             n_samples = frame['data'].n_samples
             if 1 < n_samples <= ds_factor:
