@@ -67,13 +67,17 @@ labjack configuration file::
         
 In this example, channels AIN0 and AIN1 are hooked up to the MKS390 pressure 
 `gauge`_ and a `thermistor`_ from the SO-specified warm thermometry setup, 
-respectively. Since these are defined functions in theLabJackFunctions class, 
+respectively. Since these are defined functions in the LabJackFunctions class, 
 specifying the name of their method is all that is needed. AIN2 shows how to 
 define a custom function. In this case, the user specifies the units and the 
 function itself, which takes the input voltage 'v' as the only argument.
 
 .. _gauge: https://www.mksinst.com/f/390-micro-ion-atm-modular-vacuum-gauge
 .. _thermistor: https://docs.rs-online.com/c868/0900766b8142cdef.pdf
+
+.. note:: 
+    The (lower-case) letter 'v' must be used when writing user-defined 
+    functions. No other variable will be parsed correctly.
 
 Docker
 ``````

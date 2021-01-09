@@ -89,6 +89,10 @@ class LabJackFunctions:
         Given a voltage array and function information from the
         labjack_config.yaml file, applies a unit conversion.
         Returns the converted value and its units.
+        Args:
+            v_array (numpy array): The voltages to be converted.
+            function_info (dict): Specifies the type of function.
+                If custom, also gives the function.
         """
         if function_info["user_defined"] == 'False':
             function = getattr(self, function_info['type'])
@@ -308,8 +312,8 @@ class LabJackAgent:
                     'data': {},
                     'timestamp': timestamps[0]
                 }
-                for key in data['data'].keys():
-                    data_downsampled['data'][key] = data['data'][key][0]
+                for key, value in data['data'].items():
+                    data_downsampled['data'][key] = value[0]
                 self.agent.publish_to_feed('sensors_downsampled', data_downsampled)
                 session.data = data_downsampled
 
