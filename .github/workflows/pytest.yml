@@ -35,4 +35,4 @@ jobs:
 
     - name: Test documentation build
       run: |
-        docker run --rm socs sh -c "make -C docs/ html"
+        docker run --rm -e READTHEDOCS=True socs sh -c "make -C docs/ html"

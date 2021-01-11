@@ -22,7 +22,6 @@ RUN ./labjack_ljm_minimal_2020_03_30_x86_64/labjack_ljm_installer.run -- --no-re
 
 RUN pip3 install --no-cache-dir https://labjack.com/sites/default/files/software/Python_LJM_2019_04_03.zip
 
-
 # Run registry on container startup
 ENTRYPOINT ["dumb-init", "python3", "-u", "labjack_agent.py"]
 

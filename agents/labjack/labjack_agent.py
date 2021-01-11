@@ -2,7 +2,6 @@ import argparse
 import time
 import struct
 import os
-from pymodbus.client.sync import ModbusTcpClient
 import numexpr
 import yaml
 import csv
@@ -11,6 +10,7 @@ import numpy as np
 
 ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 if not ON_RTD:
+    from labjack import ljm
     from ocs import ocs_agent, site_config
     from ocs.ocs_twisted import TimeoutLock
 
@@ -84,32 +84,38 @@ class LabJackFunctions:
     def __init__(self):
         pass
 
-    def unit_conversion(self, v, function_info):
+    def unit_conversion(self, v_array, function_info):
         """
-        Given a voltage and function information from the
+        Given a voltage array and function information from the
         labjack_config.yaml file, applies a unit conversion.
         Returns the converted value and its units.
+        Args:
+            v_array (numpy array): The voltages to be converted.
+            function_info (dict): Specifies the type of function.
+                If custom, also gives the function.
         """
-
         if function_info["user_defined"] == 'False':
             function = getattr(self, function_info['type'])
-            return function(v)
+            return function(v_array)
 
+        # Custom function evaluation
         else:
             units = function_info['units']
-            value = float(numexpr.evaluate(function_info["function"]))
-            return value, units
+            new_values = []
+            for v in v_array:
+                new_values.append(float(numexpr.evaluate(function_info["function"])))
+            return new_values, units
 
-    def MKS390(self, v):
+    def MKS390(self, v_array):
         """
         Conversion function for the MKS390 Micro-Ion ATM
         Modular Vaccum Gauge.
         """
-        value = 1.3332*10**(2*v - 11)
+        value = 1.3332*10**(2*v_array - 11)
         units = 'mBar'
         return value, units
 
-    def warm_therm(self, v):
+    def warm_therm(self, v_array):
         """
         Conversion function for SO warm thermometry readout.
         Voltage is converted to resistance using the LJTick, which
@@ -118,7 +124,7 @@ class LabJackFunctions:
         for the thermistor model, serial number 10K4D25.
         """
         # LJTick voltage to resistance conversion
-        R = (2.5-v)*10000/v
+        R = (2.5-v_array)*10000/v_array
 
         # Import the Ohms to Celsius cal curve and apply cubic
         # interpolation to find the temperature
@@ -129,12 +135,17 @@ class LabJackFunctions:
         R_cal = np.array([float(RT[1]) for RT in lists[1:]])
         T_cal = np.flip(T_cal)
         R_cal = np.flip(R_cal)
-        RtoT = interp1d(R_cal, T_cal, kind='cubic')
+        try:
+            RtoT = interp1d(R_cal, T_cal, kind='cubic')
+            values = RtoT(R)
 
-        value = float(RtoT(R))
+        except ValueError:
+            print('Temperature outside thermometer range')
+            values = -1000 + np.zeros(len(R))
+
         units = 'C'
 
-        return value, units
+        return values, units
 
 
 # LabJack agent class
@@ -147,16 +158,16 @@ class LabJackAgent:
         self.lock = TimeoutLock()
         self.ip_address = ip_address
         self.module = None
-        print(f"Active channels is {active_channels}")
-
-        if active_channels == 'T7-all':
-            self.sensors = ['Channel_{}'.format(i+1) for i in range(14)]
-        elif active_channels == 'T4-all':
-            self.sensors = ['Channel_{}'.format(i+1) for i in range(12)]
-        else:
-            self.sensors = ['Channel_{}'.format(ch) for ch in active_channels]
         self.ljf = LabJackFunctions()
         self.sampling_frequency = sampling_frequency
+
+        # Labjack channels to read
+        if active_channels == 'T7-all':
+            self.chs = ['AIN{}'.format(i) for i in range(14)]
+        elif active_channels == 'T4-all':
+            self.chs = ['AIN{}'.format(i) for i in range(12)]
+        else:
+            self.chs = active_channels
 
         # Load dictionary of unit conversion functions from yaml file. Assumes
         # the file is in the $OCS_CONFIG_DIR directory
@@ -167,18 +178,30 @@ class LabJackAgent:
                                               function_file)
             with open(function_file_path, 'r') as stream:
                 self.functions = yaml.safe_load(stream)
+                if self.functions is None:
+                    self.functions = {}
                 print(f"Applying conversion functions: {self.functions}")
 
         self.initialized = False
         self.take_data = False
 
-        # Register feed
+        # Register main feed. Exclude influx due to potentially high scan rate
         agg_params = {
             'frame_length': 60,
+            'exclude_influx': True
         }
-        self.agent.register_feed('Sensors',
+        self.agent.register_feed('sensors',
                                  record=True,
                                  agg_params=agg_params,
+                                 buffer_time=1)
+
+        # Register downsampled feed for influx.
+        agg_params_downsampled = {
+            'frame_length': 60
+        }
+        self.agent.register_feed('sensors_downsampled',
+                                 record=True,
+                                 agg_params=agg_params_downsampled,
                                  buffer_time=1)
 
     # Task functions
@@ -197,10 +220,13 @@ class LabJackAgent:
                 return False, "Could not acquire lock."
 
             session.set_status('starting')
-
-            self.module = ModbusTcpClient(str(self.ip_address))
-
-        print("Initialized labjack module")
+            # Connect with the labjack
+            self.handle = ljm.openS("ANY", "ANY", self.ip_address)
+            info = ljm.getHandleInfo(self.handle)
+            print("\nOpened LabJack of type: %i, Connection type: %i,\n"
+                  "Serial number: %i, IP address: %s, Port: %i" %
+                  (info[0], info[1], info[2],
+                   ljm.numberToIP(info[3]), info[4]))
 
         session.add_message("Labjack initialized")
 
@@ -225,8 +251,13 @@ class LabJackAgent:
         if params is None:
             params = {}
 
-        f_sample = params.get('sampling_frequency', self.sampling_frequency)
-        sleep_time = 1/f_sample
+        # Setup streaming parameters. Data is collected and published in
+        # blocks at 1 Hz or the scan rate, whichever is less.
+        scan_rate_input = params.get('sampling_frequency',
+                                     self.sampling_frequency)
+        scans_per_read = max(1, int(scan_rate_input))
+        num_chs = len(self.chs)
+        ch_addrs = ljm.namesToAddresses(num_chs, self.chs)[0]
 
         with self.lock.acquire_timeout(0, job='acq') as acquired:
             if not acquired:
@@ -235,35 +266,62 @@ class LabJackAgent:
                 return False, "Could not acquire lock."
 
             session.set_status('running')
-
             self.take_data = True
 
+            # Start the data stream. Use the scan rate returned by the stream,
+            # which should be the same as the input scan rate.
+            scan_rate = ljm.eStreamStart(self.handle, scans_per_read, num_chs,
+                                         ch_addrs, scan_rate_input)
+            print(f"\nStream started with a scan rate of {scan_rate} Hz.")
+
+            cur_time = time.time()
             while self.take_data:
                 data = {
-                    'timestamp': time.time(),
                     'block_name': 'sens',
                     'data': {}
                 }
 
-                for i, sens in enumerate(self.sensors):
-                    rr = self.module.read_input_registers(2*i, 2)
-                    data['data'][sens + 'V'] = data_to_float32(rr.registers)
+                # Query the labjack
+                raw_output = ljm.eStreamRead(self.handle)
+                output = raw_output[0]
+
+                # Data comes in form ['AIN0_1', 'AIN1_1', 'AIN0_2', ...]
+                for i, ch in enumerate(self.chs):
+                    ch_output = output[i::num_chs]
+                    data['data'][ch + 'V'] = ch_output
 
                     # Apply unit conversion function for this channel
-                    if sens in self.functions.keys():
-                        v = data['data'][sens + 'V']
-                        value, units = \
-                            self.ljf.unit_conversion(v, self.functions[sens])
-                        data['data'][sens + '_' + units] = value
+                    if ch in self.functions.keys():
+                        new_ch_output, units = \
+                            self.ljf.unit_conversion(np.array(ch_output),
+                                                     self.functions[ch])
+                        data['data'][ch + units] = list(new_ch_output)
 
-                time.sleep(sleep_time)
+                # The labjack outputs at exactly the scan rate but doesn't
+                # generate timestamps. So create them here.
+                timestamps = [cur_time+i/scan_rate for i in range(scans_per_read)]
+                cur_time += scans_per_read/scan_rate
+                data['timestamps'] = timestamps
 
-                self.agent.publish_to_feed('Sensors', data)
+                self.agent.publish_to_feed('sensors', data)
 
-                # Allow this process to be queried to return current data
-                session.data = data
+                # Publish to the downsampled data feed only the first
+                # timestamp and data point for each channel.
+                data_downsampled = {
+                    'block_name': 'sens',
+                    'data': {},
+                    'timestamp': timestamps[0]
+                }
+                for key, value in data['data'].items():
+                    data_downsampled['data'][key] = value[0]
+                self.agent.publish_to_feed('sensors_downsampled', data_downsampled)
+                session.data = data_downsampled
 
-            self.agent.feeds['Sensors'].flush_buffer()
+            # Flush buffer and stop the data stream
+            self.agent.feeds['sensors'].flush_buffer()
+            self.agent.feeds['sensors_downsampled'].flush_buffer()
+            ljm.eStreamStop(self.handle)
+            print("Data stream stopped")
 
         return True, 'Acquisition exited cleanly.'
 
