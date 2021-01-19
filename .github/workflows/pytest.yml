@@ -31,7 +31,7 @@ jobs:
         pip install coveralls
         coverage combine
         coverage report
-        coveralls
+        coveralls --service=github
 
     - name: Test documentation build
       run: |
