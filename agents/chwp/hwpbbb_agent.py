@@ -491,7 +491,7 @@ class HWPBBBAgent:
         agg_params = {'frame_length': 60, 'exclude_influx': True}
         self.agent.register_feed('HWPEncoder_full', record=True,
                                  agg_params=agg_params)
-        self.parser = EncoderParser()
+        self.parser = EncoderParser(beaglebone_port=self.port)
 
     def start_acq(self, session, params):
         """Starts acquiring data.
@@ -648,11 +648,12 @@ class HWPBBBAgent:
 if __name__ == '__main__':
     parser = site_config.add_arguments()
     pgroup = parser.add_argument_group('Agent Options')
+    pgroup.add_argument('--port', default=8080)
     args = parser.parse_args()
 
     site_config.reparse_args(args, 'HWPBBBAgent')
     agent, runner = ocs_agent.init_site_agent(args)
-    hwp_bbb_agent = HWPBBBAgent(agent)
+    hwp_bbb_agent = HWPBBBAgent(agent, port=args.port)
     agent.register_process('acq', hwp_bbb_agent.start_acq, hwp_bbb_agent.stop_acq, startup=True)
 
     runner.run(agent, auto_reconnect=True)
