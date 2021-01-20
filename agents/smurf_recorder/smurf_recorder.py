@@ -219,5 +219,4 @@ if __name__ == "__main__":
     agent.register_task('set_target_rate', listener.set_target_rate,
                         blocking=False)
 
-
     runner.run(agent, auto_reconnect=True)
