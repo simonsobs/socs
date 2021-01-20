@@ -13,6 +13,7 @@ import argparse
 from twisted.enterprise import adbapi
 
 from socs.util import get_md5sum
+from ocs.agent.aggregator import Provider
 
 on_rtd = os.environ.get('READTHEDOCS') == 'True'
 if not on_rtd:
@@ -98,6 +99,7 @@ class PysmurfMonitor(DatagramProtocol):
             (host, port) of the sender.
         """
         data = json.loads(_data)
+        pub_id = data['id']
 
         if data['type'] in ['data_file']:
             self.log.info("New file: {fname}", fname=data['payload']['path'])
@@ -133,6 +135,32 @@ class PysmurfMonitor(DatagramProtocol):
             self.agent.publish_to_feed(
                 "pysmurf_session_data", data, from_reactor=True
             )
+
+        # Handles published metadata from the streamer
+        # Currently Pysmurf uses the "general" message type so we have to
+        # use the pub-id to notify, but we should change this in pysmurf.
+        elif pub_id.startswith("STREAMER:"):
+            self.log.debug("Received Metadata: {payload}", payload=data['payload'])
+            stream_id = pub_id.split(':')[1]
+            if '=' not in data['payload']:
+                self.log.warn("Could not extract key, val pair from message: {msg}",
+                              msg=data['payload'])
+                return
+            key, val = data['payload'].split('=')
+            key = Provider._enforce_field_name_rules(key)
+            try:
+                # Attempts to convert to float since smurf doesn't send any
+                # type info...
+                val = float(val)
+            except ValueError:
+                pass
+            feed_name = f'{stream_id}_meta'
+            if feed_name not in self.agent.feeds:
+                self.agent.register_feed(feed_name, record=True, buffer_time=0)
+            feed_data = {'block_name': key,
+                         'timestamp': data['time'],
+                         'data': {key: val}}
+            self.agent.publish_to_feed(feed_name, feed_data, from_reactor=True)
 
     def init(self, session, params=None):
         """
