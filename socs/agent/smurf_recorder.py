@@ -4,6 +4,8 @@ from enum import Enum
 import time
 import txaio
 import numpy as np
+import sys
+import socket
 
 # For logging
 txaio.use_twisted()
@@ -19,6 +21,19 @@ class FlowControl(Enum):
     START = 1
     END = 2
     CLEANSE = 3
+
+
+def check_port(host, port, timeout=10):
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.settimeout(timeout)
+    s.setblocking(1)
+    try:
+        s.connect((host, port))
+        return True
+    except socket.error as error:
+        return False
+    finally:
+        s.close()
 
 
 def _create_dirname(start_time, data_dir, stream_id):
@@ -162,6 +177,8 @@ class FrameRecorder:
         # Parameters
         self.time_per_file = file_duration
         self.address = tcp_addr
+        self.host, self.port = self.address[6:].split(':')
+        self.port = int(self.port)
         self.data_dir = data_dir
         self.stream_id = stream_id
         self.log = txaio.make_logger()
@@ -169,6 +186,7 @@ class FrameRecorder:
         # Reader/Writer
         self.reader = None
         self.writer = None
+        self.data_received = False
 
         # Attributes
         self.frames = []
@@ -210,12 +228,16 @@ class FrameRecorder:
 
         """
         reader = None
-        try:
-            reader = core.G3Reader(self.address,
-                                   timeout=timeout)
-            self.log.info("G3Reader connection established")
-        except RuntimeError:
-            self.log.error("G3Reader could not connect.")
+
+        if (check_port(self.host, self.port)):
+            try:
+                reader = core.G3Reader(self.address,
+                                       timeout=0)
+                self.log.debug("G3Reader connection to {addr} established!",
+                              addr=self.address)
+            except RuntimeError:
+                self.log.error("G3Reader could not connect.")
+
 
         # Prevent rapid connection attempts
         if self.last_connection_time is not None:
@@ -275,13 +297,20 @@ class FrameRecorder:
 
             # Discard all flow control frames
             self.frames = [x for x in self.frames if 'sostream_flowcontrol' not in x]
-
+            # Discard Pipeline info frame
+            self.frames = [x for x in self.frames
+                           if x.type != core.G3FrameType.PipelineInfo]
+            if self.frames and not self.data_received:
+                self.data_received = True
+                self.log.info("Frames received from {addr}", addr=self.address)
             return
         else:
-            self.log.debug("Could not read frames. Connection " +
-                           "timed out, or G3NetworkSender offline. " +
-                           "Cleaning up...")
+            if self.data_received:
+                self.log.info("Could not read frames. Connection " +
+                               "timed out, or G3NetworkSender offline. " +
+                               "Cleaning up...")
             self.close_file()
+            self.data_received = False
             self.reader = None
 
     def check_for_frame_gap(self, gap_size=5):
