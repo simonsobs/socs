@@ -222,6 +222,7 @@ class PysmurfArchiverAgent:
         it'll increment the `failed_copy_attempts` counter.
         """
         self.running = True
+        session.set_status('running')
         while self.running:
 
             with get_db_connection(**self.sql_config) as con:
@@ -268,6 +269,7 @@ class PysmurfArchiverAgent:
 
     def stop(self, session, params=None):
         """ Stopper for run process """
+        session.set_status('stopping')
         self.running = False
 
 
