@@ -232,7 +232,7 @@ class FrameRecorder:
         if (check_port(self.host, self.port)):
             try:
                 reader = core.G3Reader(self.address,
-                                       timeout=0)
+                                       timeout=timeout)
                 self.log.debug("G3Reader connection to {addr} established!",
                               addr=self.address)
             except RuntimeError:
