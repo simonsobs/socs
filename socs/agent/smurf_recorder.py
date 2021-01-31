@@ -4,7 +4,6 @@ from enum import Enum
 import time
 import txaio
 import numpy as np
-import sys
 import socket
 
 # For logging
@@ -23,14 +22,29 @@ class FlowControl(Enum):
     CLEANSE = 3
 
 
-def check_port(host, port, timeout=10):
+def check_port(addr):
+    """
+    This function checks if socket port is currently open on a host. This can
+    be used to check if the smurf-streamer has created it's G3NetworkSender
+    object without attempting to create a G3Reader. This function is
+    non-blocking and should return immediately.
+
+    Parameters
+    ----------
+    addr: str
+        Address describing the port to connect to. For example:
+        ``tcp://localhost:4532``
+    """
+    host, port = addr.split('//')[-1].split(':')
+    port = int(port)
+
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.settimeout(timeout)
-    s.setblocking(1)
+    s.setblocking(True)
+    s.settimeout(0.0)
     try:
         s.connect((host, port))
         return True
-    except socket.error as error:
+    except socket.error:
         return False
     finally:
         s.close()
@@ -133,6 +147,8 @@ class FrameRecorder:
         G3Reader object to read the frames from the G3NetworkSender.
     writer : spt3g.core.G3Writer
         G3Writer for writing the frames to disk.
+    data_received : bool
+        Whether data has been received by the current instance of the G3Reader.
     frames : list
         List of frames that have been read from the network. Gets cleared after
         writing to file.
@@ -177,8 +193,6 @@ class FrameRecorder:
         # Parameters
         self.time_per_file = file_duration
         self.address = tcp_addr
-        self.host, self.port = self.address[6:].split(':')
-        self.port = int(self.port)
         self.data_dir = data_dir
         self.stream_id = stream_id
         self.log = txaio.make_logger()
@@ -229,15 +243,14 @@ class FrameRecorder:
         """
         reader = None
 
-        if (check_port(self.host, self.port)):
+        if (check_port(self.address)):
             try:
                 reader = core.G3Reader(self.address,
                                        timeout=timeout)
                 self.log.debug("G3Reader connection to {addr} established!",
-                              addr=self.address)
+                               addr=self.address)
             except RuntimeError:
                 self.log.error("G3Reader could not connect.")
-
 
         # Prevent rapid connection attempts
         if self.last_connection_time is not None:
@@ -302,13 +315,14 @@ class FrameRecorder:
                            if x.type != core.G3FrameType.PipelineInfo]
             if self.frames and not self.data_received:
                 self.data_received = True
-                self.log.info("Frames received from {addr}", addr=self.address)
+                self.log.info("Started receiving frames from {addr}",
+                              addr=self.address)
             return
         else:
             if self.data_received:
                 self.log.info("Could not read frames. Connection " +
-                               "timed out, or G3NetworkSender offline. " +
-                               "Cleaning up...")
+                              "timed out, or G3NetworkSender offline. " +
+                              "Cleaning up...")
             self.close_file()
             self.data_received = False
             self.reader = None
