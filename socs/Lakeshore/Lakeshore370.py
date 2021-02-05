@@ -229,29 +229,28 @@ class LS370:
 
         """
         msg_str = f'{message}\r\n'.encode()
+        self.com.write(msg_str)
+        resp = ''
 
         if '?' in message:
-            self.com.write(msg_str)
-            # Try once, if we timeout, try again. Usually gets around single event glitches.
-            for attempt in range(2):
-                time.sleep(.061)
-                resp = str(self.com.read_until(), 'utf-8').strip()
-                if resp is None or resp is '':
-                    print("Warning: Caught timeout waiting for response to '%s', trying again " \
-                          "before giving up"%message)
-                    if attempt == 1:
-                        raise RuntimeError('Query response to Lakeshore timed out after two ' \
-                                           'attempts. Check connection.')
-                else:
-                    break
-        else:
-            self.com.write(msg_str)
-            resp = ''
+            resp = str(self.com.read_until(), 'utf-8').strip()
 
-        if 'RDG' in message:
-            time.sleep(0.1)  # Instrument sampling rate of 10 readings/s max (pg 2-8)
-        else:
-            time.sleep(0.1)  # No comms for 100ms after sending message (manual says50ms)
+            # Try a few times, if we timeout, try again.
+            try_count = 3
+            while resp == '':
+                if try_count == 0:
+                    break
+                
+                print(f"Warning: Caught timeout waiting for response to {message}, waiting 1s and " \
+                          "trying again {try_count} more time(s) before giving up")
+                time.sleep(1)
+
+                # retry comms
+                self.com.write(msg_str)
+                resp = str(self.com.read_until(), 'utf-8').strip()
+                try_count -= 1
+
+        time.sleep(0.1)  # No comms for 100ms after sending message (manual says 50ms)
 
         return resp
 
@@ -1428,11 +1427,11 @@ class Heater:
         """
         assert len(params) == 6
 
-        self.ls.msg(f'CMODE {output_modes_lock[params.pop(0)]}')
+        self.ls.msg(f'CMODE {params.pop(0)}')
         self.ls.msg(f'CPOL {params.pop(0)}')
         
-        reply = params.append(heater_display_lock[self.display], heater_range_lock[self.rng_limit],
-                str(self.resistance))
+        reply = params + [heater_display_lock[self.display], heater_range_lock[self.rng_limit],
+                str(self.resistance)]
 
         param_str = ','.join(reply)
         return self.ls.msg(f"CSET {param_str}")
@@ -1468,8 +1467,7 @@ class Heater:
         """
         assert len(params) == 3
 
-        reply = [self.input, self.filter, units_lock[self.units], self.delay]
-        [reply.append(x) for x in params]
+        reply = [self.input, self.filter, units_lock[self.units], self.delay] + params
         param_str = ','.join(reply)
         return self.ls.msg("CSET {}".format(param_str))
 
