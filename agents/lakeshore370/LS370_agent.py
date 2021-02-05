@@ -8,11 +8,8 @@ import threading
 from contextlib import contextmanager
 
 from socs.Lakeshore.Lakeshore370 import LS370
-
-ON_RTD = os.environ.get('READTHEDOCS') == 'True'
-if not ON_RTD:
-    from ocs import ocs_agent, site_config
-    from ocs.ocs_twisted import TimeoutLock
+from ocs import ocs_agent, site_config
+from ocs.ocs_twisted import TimeoutLock
 
 
 class YieldingLock:
@@ -258,17 +255,22 @@ class LS370_Agent:
                         # Track the last channel we measured
                         previous_channel = self.module.get_active_channel()
 
+                    # Setup feed dictionary
+                    channel_str = active_channel.name.replace(' ', '_')
                     data = {
                         'timestamp': time.time(),
-                        'block_name': active_channel.name,
+                        'block_name': channel_str,
                         'data': {}
                     }
 
                     # Collect both temperature and resistance values from each Channel
-                    data['data'][active_channel.name + ' T'] = \
+                    data['data'][channel_str + '_T'] = \
                         self.module.get_temp(unit='kelvin', chan=active_channel.channel_num)
-                    data['data'][active_channel.name + ' R'] = \
+                    data['data'][channel_str + '_R'] = \
                         self.module.get_temp(unit='ohms', chan=active_channel.channel_num)
+
+                    # Courtesy in case active channel has not changed
+                    time.sleep(0.1)
 
                 session.app.publish_to_feed('temperatures', data)
 
@@ -339,7 +341,7 @@ class LS370_Agent:
 
             session.set_status('running')
 
-            self.module.chan_num2Channel(params['channel']).set_excitation_mode(params['mode'])
+            self.module.chan_num2channel(params['channel']).set_excitation_mode(params['mode'])
             session.add_message(f'post message in agent for Set channel {params["channel"]} excitation mode to {params["mode"]}')
             print(f'print statement in agent for Set channel {params["channel"]} excitation mode to {params["mode"]}')
 
@@ -360,12 +362,12 @@ class LS370_Agent:
 
             session.set_status('running')
 
-            current_excitation = self.module.chan_num2Channel(params['channel']).get_excitation()
+            current_excitation = self.module.chan_num2channel(params['channel']).get_excitation()
 
             if params['value'] == current_excitation:
                 print(f'Channel {params["channel"]} excitation already set to {params["value"]}')
             else:
-                self.module.chan_num2Channel(params['channel']).set_excitation(params['value'])
+                self.module.chan_num2channel(params['channel']).set_excitation(params['value'])
                 session.add_message(f'Set channel {params["channel"]} excitation to {params["value"]}')
                 print(f'Set channel {params["channel"]} excitation to {params["value"]}')
 
@@ -438,7 +440,8 @@ class LS370_Agent:
     def servo_to_temperature(self, session, params):
         """Servo to temperature passed into params.
 
-        :param params: dict with "temperature" Heater.set_setpoint() in units of K
+        :param params: dict with "temperature" Heater.set_setpoint() in units of K, and
+            "channel" as an integer (optional)
         :type params: dict
         """
         with self._lock.acquire_timeout(job='servo_to_temperature') as acquired:
@@ -458,6 +461,11 @@ class LS370_Agent:
             if self.module.get_autoscan() is True:
                 session.add_message(f'Autoscan is enabled, disabling for PID control on dedicated channel.')
                 self.module.disable_autoscan()
+
+            # Check to see if we passed an input channel, and if so change to it
+            if params.get("channel", False) is not False:
+                session.add_message(f'Changing heater input channel to {params.get("channel")}')
+                self.module.sample_heater.set_input_channel(params.get("channel"))
 
             # Check we're scanning same channel expected by heater for control.
             if self.module.get_active_channel().channel_num != int(self.module.sample_heater.input):
@@ -544,8 +552,7 @@ class LS370_Agent:
 
             if params['heater'].lower() == 'still':
                 #self.module.still_heater.set_mode(params['mode']) #TODO: add still heater to driver
-                self.log.warn(f"{params['heater']} heater not yet implemented in this agent,
-                            please modify client")
+                self.log.warn(f"{params['heater']} heater not yet implemented in this agent, please modify client")
             if params['heater'].lower() == 'sample':
                 self.module.sample_heater.set_mode(params['mode'])
             self.log.info("Set {} output mode to {}".format(params['heater'], params['mode']))
@@ -582,8 +589,7 @@ class LS370_Agent:
 
             if heater == 'still':  #TODO: add still heater to driver
                 #self.module.still_heater.set_heater_output(output, display_type=display)
-                self.log.warn(f"{heater_string} heater not yet implemented in this agent,
-                            please modify client")
+                self.log.warn(f"{heater} heater not yet implemented in this agent, please modify client")
             if heater.lower() == 'sample':
                 self.log.info("display: {}\toutput: {}".format(display, output))
                 self.module.sample_heater.set_heater_output(output, display_type=display)
@@ -599,6 +605,69 @@ class LS370_Agent:
             session.app.publish_to_feed('temperatures', data)
 
         return True, "Set {} display to {}, output to {}".format(heater, display, output)
+
+    def get_channel_attribute(self, session, params):
+        '''Gets an arbitrary channel attribute, stored in the session.data dict
+
+        Parameters
+        ----------
+        params : dict
+            Contains parameters 'attribute' (not optional), 'channel' (optional, default 'A'),
+            and 'wait' (optional, default 1).
+        '''
+        with self._lock.acquire_timeout(job = f"get_{params['attribute']}", timeout = 3) as acquired:
+            if not acquired:
+                print(f"Lock could not be acquired because it is held by {self._lock.job}")
+                return False, 'Could not acquire lock'
+
+            session.set_status('running')
+            
+            # get channel
+            channel_key = int(params.get('channel', 1)) # default to input 1
+            channel = self.module.chan_num2channel(channel_key)
+
+            # check that attribute is a valid channel method
+            if getattr(channel, f"get_{params['attribute']}", False) is not False:
+                query = getattr(channel, f"get_{params['attribute']}")
+
+            # get attribute
+            resp = query()
+            session.data[params['attribute']] = resp
+
+            time.sleep(.1)
+
+        return True, f"Retrieved {channel.name} {params['attribute']}"
+
+    def get_heater_attribute(self, session, params):
+        '''Gets an arbitrary heater attribute, stored in the session.data dict
+
+        Parameters
+        ----------
+        params : dict
+            Contains parameters 'attribute' (not optional), 'heater' (optional, default '2'),
+            and 'wait' (optional, default 1).
+        '''
+        with self._lock.acquire_timeout(job = f"get_{params['attribute']}", timeout = 3) as acquired:
+            if not acquired:
+                print(f"Lock could not be acquired because it is held by {self._lock.job}")
+                return False, 'Could not acquire lock'
+
+            session.set_status('running')
+            
+            # get heater
+            heater = self.module.sample_heater
+
+            # check that attribute is a valid heater method
+            if getattr(heater, f"get_{params['attribute']}", False) is not False:
+                query = getattr(heater, f"get_{params['attribute']}")
+
+            # get attribute
+            resp = query()
+            session.data[params['attribute']] = resp
+
+            time.sleep(.1)
+
+        return True, f"Retrieved sample heater {params['attribute']}"
 
 def make_parser(parser=None):
     """Build the argument parser for the Agent. Allows sphinx to automatically
@@ -672,6 +741,8 @@ if __name__ == '__main__':
     agent.register_task('check_temperature_stability', lake_agent.check_temperature_stability)
     agent.register_task('set_output_mode', lake_agent.set_output_mode)
     agent.register_task('set_heater_output', lake_agent.set_heater_output)
+    agent.register_task('get_channel_attribute', lake_agent.get_channel_attribute)
+    agent.register_task('get_heater_attribute', lake_agent.get_heater_attribute)
     agent.register_process('acq', lake_agent.start_acq, lake_agent.stop_acq)
 
     runner.run(agent, auto_reconnect=True)

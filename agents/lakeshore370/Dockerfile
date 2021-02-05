@@ -11,7 +11,7 @@ WORKDIR /app/socs/agents/lakeshore370/
 COPY . .
 
 # Run registry on container startup
-ENTRYPOINT ["python3", "-u", "LS370_agent.py"]
+ENTRYPOINT ["dumb-init", "python3", "-u", "LS370_agent.py"]
 
 # Sensible default arguments
 CMD ["--site-hub=ws://sisock-crossbar:8001/ws", \
