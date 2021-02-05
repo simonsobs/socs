@@ -10,3 +10,5 @@ changed self.module.get_active_channel().set_units('kelvin') to self.module.samp
 changed parser arg --ip-address to --port
 
 throughout, changed references from LS372 to LS370, ip address to port etc.
+
+removed OTD block at beginning of agent
