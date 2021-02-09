@@ -11,6 +11,7 @@ import numpy as np
 ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 if not ON_RTD:
     from labjack import ljm
+    from labjack.ljm.ljm import LJMError
     from ocs import ocs_agent, site_config
     from ocs.ocs_twisted import TimeoutLock
 
@@ -270,8 +271,14 @@ class LabJackAgent:
 
             # Start the data stream. Use the scan rate returned by the stream,
             # which should be the same as the input scan rate.
-            scan_rate = ljm.eStreamStart(self.handle, scans_per_read, num_chs,
-                                         ch_addrs, scan_rate_input)
+            try:
+                scan_rate = ljm.eStreamStart(self.handle, scans_per_read, num_chs,
+                                             ch_addrs, scan_rate_input)
+            except LJMError: #in case the stream is running
+                print("Stopping previous stream")
+                ljm.eStreamStop(self.handle) 
+                scan_rate = ljm.eStreamStart(self.handle, scans_per_read, num_chs,
+                                             ch_addrs, scan_rate_input)
             print(f"\nStream started with a scan rate of {scan_rate} Hz.")
 
             cur_time = time.time()
