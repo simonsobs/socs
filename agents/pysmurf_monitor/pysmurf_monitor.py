@@ -121,7 +121,7 @@ class PysmurfMonitor(DatagramProtocol):
                 'instance_id':          instance,
                 'copied':               0,
                 'failed_copy_attempts': 0,
-                'md5sum':               get_md5sum(d['path']),
+                'md5sum':               get_md5sum(path),
                 'socs_version':         socs.__version__,
             }
 
