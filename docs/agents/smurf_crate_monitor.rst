@@ -21,12 +21,6 @@ manager over ssh through the python subprocess package and then runs the
 command 'clia sensordata' and parses its output to identify all of the available 
 sensors then stream and publish them.
 
-.. argparse::
-    :filename: ../agents/smurf_crate_monitor/smurf_crate_monitor.py
-    :func: make_parser
-    :prog: python3 smurf_crate_monitor.py
-
-
 Configuration File Examples
 ---------------------------
 Below are configuration examples for the ocs config file and for running the
