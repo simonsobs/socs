@@ -2,9 +2,9 @@
 
 .. _smurf_crate_monitor:
 
-=============
+=========================
 Smurf Crate Monitor Agent
-=============
+=========================
 
 The SMuRF readout system uses Advanced Telecommunications Computing Architecture 
 (ATCA) crates for powering and communicating between boards and the site networking
@@ -22,7 +22,7 @@ command 'clia sensordata' and parses its output to identify all of the available
 sensors then stream and publish them.
 
 .. argparse::
-    :filename: ../agents/smurf_crate_mointor/smurf_crate_monitor.py
+    :filename: ../agents/smurf_crate_monitor/smurf_crate_monitor.py
     :func: make_parser
     :prog: python3 smurf_crate_monitor.py
 
