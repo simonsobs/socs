@@ -1666,6 +1666,19 @@ class Heater:
                 print("Still heater output must be between 0 and 100%")
                 return False
 
+    def get_sample_heater_output(self):
+        """Get sample heater output in percent of current or in actual power,
+        depending on the heater output selection.
+
+        :return: Sample heater output percentage.
+
+        """
+        # Sample Heater
+        if self.output == 0:
+            resp = self.ls.msg("HTR?")
+
+        return float(resp)
+
     def get_heater_setup(self):
         """Gets Heater setup params with the HTRSET? command.
 

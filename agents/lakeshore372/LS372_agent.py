@@ -317,6 +317,20 @@ class LS372_Agent:
 
                 session.app.publish_to_feed('temperatures', data)
 
+                # Sample Heater
+                heater = self.module.sample_heater
+                hout = heater.get_sample_heater_output()
+
+                current_time = time.time()
+                htr_data = {
+                    'timestamp': current_time,
+                    'block_name': "heaters",
+                    'data': {}
+                }
+                htr_data['data']['sample_heater_output'] = hout
+
+                session.app.publish_to_feed('temperatures', htr_data)
+
                 self.log.debug("{data}", data=session.data)
 
         return True, 'Acquisition exited cleanly.'
