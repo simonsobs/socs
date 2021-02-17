@@ -72,6 +72,10 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
 
+autodoc_mock_imports = ['spt3g', 'so3g', 'labjack']
+from unittest import mock
+for m in autodoc_mock_imports:
+    sys.modules[m] = mock.Mock()
 
 # -- Options for HTML output -------------------------------------------------
 
@@ -170,6 +174,4 @@ texinfo_documents = [
 
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = True
-
-
 

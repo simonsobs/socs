@@ -4,8 +4,9 @@ mrandall@ucsd.edu"""
 import time
 import os
 import socket
+import argparse
 
-from tektronix_driver import tektronixInterface
+from socs.agent.tektronix3021c_driver import tektronixInterface
 
 on_rtd = os.environ.get('READTHEDOCS') == 'True'
 if not on_rtd:
@@ -182,23 +183,26 @@ class TektronixAWGAgent:
         return True, 'Set Output to {}.'.format(params)
 
 
-if __name__ == '__main__':
-    parser = site_config.add_arguments()
-
-    # Add options specific to this agent.
+def make_parser(parser=None):
+    if parser is None:
+        parser = argparse.ArgumentParser()
 
     pgroup = parser.add_argument_group('Agent Options')
-    pgroup.add_argument('--ip-address')
-    pgroup.add_argument('--gpib-slot')
+    pgroup.add_argument('--ip-address', type=str,
+                        help="IP address of tektronix device")
+    pgroup.add_argument('--gpib-slot', type=int,
+                        help="GPIB slot of tektronix device")
+    return parser
 
-    # Parse comand line.
-    args = parser.parse_args()
-    # Interpret options in the context of site_config.
-    site_config.reparse_args(args, 'Tektronix AWG')
+
+if __name__ == '__main__':
+
+    parser = make_parser()
+    args = site_config.parse_args(agent_class="Tektronix AWG", parser=parser)
 
     agent, runner = ocs_agent.init_site_agent(args)
 
-    p = TektronixAWGAgent(agent, args.ip_address, int(args.gpib_slot))
+    p = TektronixAWGAgent(agent, args.ip_address, args.gpib_slot)
 
     agent.register_task('init', p.init_awg, startup=True)
     agent.register_task('set_frequency', p.set_frequency)

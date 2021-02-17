@@ -2,9 +2,9 @@
 
 .. _tektronix3021c:
 
-==================
+===================
 Tektronix AWG Agent
-==================
+===================
 
 This agent uses Standard Commands for Programmable Instruments (SCPI)
 It works for many function generators, including the Tektronix3021c.
