@@ -39,7 +39,7 @@ class psuInterface(GpibInterface):
         '''
         self.setChan(ch)
         self.enable(ch)
-        if type(out) == str:
+        if isinstance(out, str):
             self.write('CHAN:OUTP '+out)
         elif out:
             self.write('CHAN:OUTP ON')
