@@ -32,7 +32,7 @@ class PrologixInterface:
         return self.read()
 
 
-class GpibInterface(PrologixInterface):
+class GPIBInterface(PrologixInterface):
     def __init__(self, ip_address, gpibAddr):
         super().__init__(ip_address)
         self.gpibAddr = gpibAddr
