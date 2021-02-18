@@ -6,7 +6,7 @@ import os
 import socket
 import argparse
 
-from socs.agent.tektronix3021c_driver import tektronixInterface
+from socs.agent.tektronix3021c_driver import TektronixInterface
 
 on_rtd = os.environ.get('READTHEDOCS') == 'True'
 if not on_rtd:
@@ -53,7 +53,7 @@ class TektronixAWGAgent:
                 return False, "Could not acquire lock"
 
             try:
-                self.awg = tektronixInterface(self.ip_address, self.gpib_slot)
+                self.awg = TektronixInterface(self.ip_address, self.gpib_slot)
                 self.idn = self.awg.identify()
 
             except socket.timeout as e:
@@ -90,7 +90,7 @@ class TektronixAWGAgent:
                                     not be of NoneType -> {}""".format(e)
 
                 if 0 < freq < 25E6:
-                    self.awg.setFreq(freq)
+                    self.awg.set_freq(freq)
 
                     data = {'timestamp': time.time(),
                             'block_name': "AWG_frequency_cmd",
@@ -130,7 +130,7 @@ class TektronixAWGAgent:
                                     of NoneType -> {}""".format(e)
 
                 if 0 < amp < 10:
-                    self.awg.setAmp(amp)
+                    self.awg.set_amp(amp)
 
                     data = {'timestamp': time.time(),
                             'block_name': "AWG_amplitude_cmd",
@@ -168,7 +168,7 @@ class TektronixAWGAgent:
                     return False, """State must not
                                     be of NoneType -> {}""".format(e)
 
-                self.awg.setOutput(state)
+                self.awg.set_output(state)
 
                 data = {'timestamp': time.time(),
                         'block_name': "AWG_output_cmd",

@@ -4,12 +4,12 @@
 from socs.agent.prologix_interface import GpibInterface
 
 
-class tektronixInterface(GpibInterface):
-    def setFreq(self, freq):
+class TektronixInterface(GpibInterface):
+    def set_freq(self, freq):
         self.write('SOUR:FREQ {:.3f}\n'.format(freq))
 
-    def setAmp(self, amp):
+    def set_amp(self, amp):
         self.write('SOUR:VOLT {:.3f}\n'.format(amp))
 
-    def setOutput(self, state):
+    def set_output(self, state):
         self.write('OUTP:STAT {:.0f}\n'.format(state))
