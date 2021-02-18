@@ -15,18 +15,17 @@ if not on_rtd:
 
 
 class TektronixAWGAgent:
-    def __init__(self, agent, ip_address, gpib_slot):
-        """
-        Tektronix3021c Agent Initializer
+    """Tektronix3021c Agent.
 
-        params:
-            ip_address (string): the IP address of the gpib to ethernet
+    Args:
+        ip_address (string): the IP address of the gpib to ethernet
             controller connected to the function generator.
 
-            gpib_slot (int): the gpib address currently set
+        gpib_slot (int): the gpib address currently set
             on the function generator.
-        """
 
+    """
+    def __init__(self, agent, ip_address, gpib_slot):
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
