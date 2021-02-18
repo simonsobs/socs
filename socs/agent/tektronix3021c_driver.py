@@ -1,7 +1,7 @@
 """Michael Randall
     mrandall@ucsd.edu"""
 
-from socs.agent.prologixInterface import GpibInterface
+from socs.agent.prologix_interface import GpibInterface
 
 
 class tektronixInterface(GpibInterface):

@@ -8,10 +8,10 @@ class PrologixInterface:
         self.ip = ip
         self.escape_string = escape_string
         self.sock = None
-        self.connSocket()
+        self.conn_socket()
         self.configure()
 
-    def connSocket(self):
+    def conn_socket(self):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.connect((self.ip, 1234))
         self.sock.settimeout(5)

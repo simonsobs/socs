@@ -1,5 +1,5 @@
 # Tucker Elleflot
-from socs.agent.prologixInterface import GpibInterface
+from socs.agent.prologix_interface import GpibInterface
 
 
 class psuInterface(GpibInterface):
