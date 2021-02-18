@@ -38,7 +38,7 @@ class GpibInterface(PrologixInterface):
         self.gpibAddr = gpibAddr
 
     def write(self, msg):
-        self.sock.write('++addr ' + str(self.gpibAddr))
+        super().write('++addr ' + str(self.gpibAddr))
         super().write(msg)
 
     def identify(self):
