@@ -93,8 +93,8 @@ class TektronixAWGAgent:
                     self.awg.setFreq(freq)
 
                     data = {'timestamp': time.time(),
-                            'block_name': "AWG_frequency",
-                            'data': {'AWG_frequency': freq}
+                            'block_name': "AWG_frequency_cmd",
+                            'data': {'AWG_frequency_cmd': freq}
                             }
                     self.agent.publish_to_feed('awg', data)
 
@@ -133,8 +133,8 @@ class TektronixAWGAgent:
                     self.awg.setAmp(amp)
 
                     data = {'timestamp': time.time(),
-                            'block_name': "AWG_amplitude",
-                            'data': {'AWG_amplitude': amp}
+                            'block_name': "AWG_amplitude_cmd",
+                            'data': {'AWG_amplitude_cmd': amp}
                             }
                     self.agent.publish_to_feed('awg', data)
 
@@ -171,8 +171,8 @@ class TektronixAWGAgent:
                 self.awg.setOutput(state)
 
                 data = {'timestamp': time.time(),
-                        'block_name': "AWG_output",
-                        'data': {'AWG_output': int(state)}
+                        'block_name': "AWG_output_cmd",
+                        'data': {'AWG_output_cmd': int(state)}
                         }
                 self.agent.publish_to_feed('awg', data)
 
