@@ -1,8 +1,8 @@
 # Tucker Elleflot
-from socs.agent.prologix_interface import GPIBInterface
+from socs.agent.prologix_interface import GpibInterface
 
 
-class psuInterface(GPIBInterface):
+class psuInterface(GpibInterface):
     def __init__(self, ip_address, gpibAddr, verbose=False):
         super().__init__(ip_address, gpibAddr)
         self.verbose = verbose
