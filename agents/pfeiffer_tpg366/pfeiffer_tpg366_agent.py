@@ -34,6 +34,26 @@ class Pfeiffer:
         self.comm.connect((self.ip_address, self.port))
         self.comm.settimeout(timeout)
 
+    def channel_power(self):
+        '''
+        Function to check the power status of a given channel
+
+        Args:
+            None
+        Returns:
+            print statement warning about channels being off
+        '''
+        msg = 'SEN\r\n'
+        self.comm.send(msg.encode())
+        status = self.comm.recv(BUFF_SIZE).decode()
+        self.comm.send(ENQ.encode())
+        read_str = self.comm.recv(BUFF_SIZE).decode()
+        power_str = read_str.split('\r')
+        power_states = np.array(power_str[0].split(','), dtype=int)
+        if any(chan == 0 for chan in power_states):
+            print("Something is off!")
+        return
+
     def read_pressure(self, ch_no):
         """
         Function to measure the pressure of one given channel
@@ -48,7 +68,6 @@ class Pfeiffer:
         """
         msg = 'PR%d\r\n' % ch_no
         self.comm.send(msg.encode())
-        # Can use this to catch exemptions, for troubleshooting
         status = self.comm.recv(BUFF_SIZE).decode()
         self.comm.send(ENQ.encode())
         read_str = self.comm.recv(BUFF_SIZE).decode()
@@ -74,10 +93,15 @@ class Pfeiffer:
         self.comm.send(ENQ.encode())
         read_str = self.comm.recv(BUFF_SIZE).decode()
         pressure_str = read_str.split('\r')[0]
-        #gauge_states = pressure_str.split(',')[::2]
-        #gauge_states = np.array(gauge_states, dtype=int)
+        gauge_states = pressure_str.split(',')[::2]
+        gauge_states = np.array(gauge_states, dtype=int)
         pressures = pressure_str.split(',')[1::2]
         pressures = [float(p) for p in pressures]
+        if any(state != 0 for state in gauge_states):
+            index = np.where(gauge_states != 0)
+            for j in range(len(index[0])):
+                channel = np.int(index[0][j])
+                pressures[channel] = 0.
         return pressures
 
     def close(self):
@@ -109,7 +133,6 @@ class PfeifferAgent:
 
         Args:
             sampling_frequency- defaults to 2.5 Hz
-
         """
         if params is None:
             params = {}
@@ -136,6 +159,7 @@ class PfeifferAgent:
                     'block_name': 'pressures',
                     'data': {}
                 }
+                self.gauge.channel_power()
                 pressure_array = self.gauge.read_pressure_all()
                 # Loop through all the channels on the device
                 for channel in range(len(pressure_array)):
