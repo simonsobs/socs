@@ -21,6 +21,11 @@ manager over ssh through the python subprocess package and then runs the
 command 'clia sensordata' and parses its output to identify all of the available 
 sensors then stream and publish them.
 
+.. argparse::
+    :filename: ../agents/smurf_crate_monitor/smurf_crate_monitor.py
+    :func: make_parser
+    :prog: python3 smurf_crate_monitor.py    
+
 Configuration File Examples
 ---------------------------
 Below are configuration examples for the ocs config file and for running the
@@ -44,12 +49,13 @@ be root as user and then the ip address will depend on your setup of the
 shelf manager at your site. The '192.168.1.2' address is the default address
 setup during the instructions laid out in the 'smurfsetup' instructions on
 the simons wiki for so testing institutions. You should make sure that you
-can ssh from the computer the docker will run on to the shelf manager directly.
-Additionally in order to connect through the docker you will need to setup
-ssh keys with the ocs-user following these steps:
+can ssh from the computer the docker container will run on to the shelf
+manager directly. Additionally in order to connect through the docker
+container you will need to setup ssh keys with the ocs-user following these
+steps:
 
 1. Make sure ocs-user has a ssh key generated. See
-   http://simonsobservatory.wikidot.com/~ssh-permissions for more info
+   http://simonsobservatory.wikidot.com/daq:smurf-ssh-permissions for more info
 
 2. Switch to ocs user using 'sudo su ocs'
 
@@ -58,8 +64,7 @@ ssh keys with the ocs-user following these steps:
 4. Copy ocs-user ssh key using 'ssh-copy-id'
 
 You also need to add the ocs-base anchor and mount the home directory of 
-the ocs-user in your 'docker-compose' file, see the docker section of the
-docs for an example.
+the ocs-user in your 'docker-compose' file, see below for an example.
 
 The second argument, 'crate-id', is just an identifier for your feed names
 to distinguish between identical sensors on different crates.
@@ -78,7 +83,7 @@ example docker-compose service configuration is shown here::
       - ${OCS_CONFIG_DIR}:/config
       - /home/ocs:/home/ocs
     command:
-      - "--instance-id=smurf-crate-monitor"
+      - "--instance-id=crate1-monitor"
 
 An example of the 'ocs-base' anchor is shown here::
   
@@ -89,7 +94,6 @@ An example of the 'ocs-base' anchor is shown here::
     LOGLEVEL: debug
   volumes:
     - ${OCS_CONFIG_DIR}:/config
-    - /data:/data
  
 Agent API
 ---------
