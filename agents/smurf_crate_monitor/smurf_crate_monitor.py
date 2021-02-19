@@ -1,10 +1,14 @@
-from ocs import ocs_agent, site_config
+import os
 import time
 import argparse
 import numpy as np
 import subprocess
 import txaio
 txaio.use_twisted()
+
+ON_RTD = os.environ.get('READTHEDOCS') == 'True'
+if not ON_RTD:
+    from ocs import ocs_agent, site_config
 
 
 def get_sensors(shm_addr):
