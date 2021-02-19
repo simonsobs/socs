@@ -45,6 +45,7 @@ Simulator Reference  Simulators are used to mock software and hardware
     agents/pfeiffer
     agents/pysmurf/index
     agents/scpi_psu
+    agents/smurf_crate_monitor
     agents/smurf_recorder
     agents/synacc
 
