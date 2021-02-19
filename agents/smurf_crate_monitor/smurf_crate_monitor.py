@@ -6,8 +6,6 @@ import subprocess
 import txaio
 txaio.use_twisted()
 
-LOG = txaio.make_logger()
-
 
 def get_sensors(shm_addr):
     """ 
@@ -270,6 +268,7 @@ def make_parser(parser=None):
 
 
 if __name__ == '__main__':
+    LOG = txaio.make_logger()
     parser = make_parser()
     args = site_config.parse_args(agent_class='CrateAgent',
                                   parser=parser)
