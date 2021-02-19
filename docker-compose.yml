@@ -109,6 +109,13 @@ services:
     image: "ocs-meinberg-m1000-agent"
     build: ./agents/meinberg_m1000/
 
+  # -------------------------------------------------------------------------
+  # SMuRF Crate Monitor
+  # -------------------------------------------------------------------------
+  ocs-smurf-crate-monitor:
+    image: "ocs-smurf-crate-monitor"
+    build: ./agents/smurf_crate_monitor/
+
   # --------------------------------------------------------------------------
   # SOCS Simulators
   # --------------------------------------------------------------------------
@@ -125,5 +132,4 @@ services:
   # --------------------------------------------------------------------------
   ocs-lakeshore240-simulator:
     image: "ocs-lakeshore240-simulator"
-    build: ./simulators/lakeshore240/
-
+    build: ./simulators/lakeshore240/    
