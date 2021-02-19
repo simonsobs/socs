@@ -5,8 +5,9 @@ import argparse
 import numpy as np
 import subprocess
 
+
 class SmurfCrateMonitor:
-    def __init__(self, agent, crate_id,shm_addr):
+    def __init__(self, agent, crate_id, shm_addr):
         self.agent = agent
         self.log = agent.log
         self.shm_addr = shm_addr
@@ -16,57 +17,55 @@ class SmurfCrateMonitor:
             'frame_length': 10*60
         }
         print('registering')
-        self.agent.register_feed(f'{crate_id}_sensors',
+        self.agent.register_feed('smurf_sensors',
                                  record=True,
                                  agg_params=agg_params,
                                  buffer_time=0.)
-                                 
-    def get_sensors(self, session, shm_addr):
+
+    def get_sensors(self, shm_addr):
         """ 
-        Runs a command on the shelf manager that returns a list of all 
-        of the avialable sensors to stdout. Uses subprocess module to 
-        read stdout and identify the ipmb address and sensor id for all 
-        sensors which are Threshold type as opposed to discrete type, 
+        Runs a command on the shelf manager that returns a list of all
+        of the avialable sensors to stdout. Uses subprocess module to
+        read stdout and identify the ipmb address and sensor id for all
+        sensors which are Threshold type as opposed to discrete type,
         which are alarms.
-        
         Args:
             shm_addr (str):
                 Address used to connect to shelf manager ex. root@192.168.1.2
-        
         Returns:
             ipmbs (str list):
                 List of Intelligent Platform Management Bus (IPMB) addresses
             sensids (str list):
                 List of sensor identification names, same length as ipmbs list.
         """
-        #SSH to shelf manager
+        # SSH to shelf manager
         cmd = ['ssh', f'{shm_addr}\n']
-        #Send command to shelf manager
-        cmd += ['clia','sensordata\n']
-        
-        #Intialize output data
+        # Send command to shelf manager
+        cmd += ['clia', 'sensordata\n']
+        # Intialize output data
         ipmbs = []
         sensids = []
         masksens = []
         check_sense = False
 
-        #Send command to ssh and run command on shelf
+        # Send command to ssh and run command on shelf
         ssh = subprocess.Popen(cmd,
-                           shell=False,
-                           stdout=subprocess.PIPE,
-                           stderr=subprocess.PIPE)
-        #Readback shelfmanager standard out
+                               shell=False,
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE)
+        # Readback shelfmanager standard out
         result = ssh.stdout.readlines()
-        #Parse readback data line by line unless empty
+        # Parse readback data line by line unless empty
         if result == []:
             error = ssh.stderr.readlines()
-            print(sys.stderr, "ERROR: %s" % error)
+            print("ERROR: %s" % error)
         else:
             for r in result:
                 if ': LUN' in r.decode('utf-8'):
                     check_sense = True
                     ipmbs.append(r.decode('utf-8').split(': LUN')[0])
-                    sensids.append(r.decode('utf-8').split('(')[-1].split(')')[0])
+                    sname = r.decode('utf-8').split('(')[-1].split(')')[0]
+                    sensids.append(sname)
                     continue
                 if check_sense:
                     if 'Threshold' in r.decode('utf-8'):
@@ -79,11 +78,10 @@ class SmurfCrateMonitor:
         masksens = np.asarray(masksens)
         return ipmbs[masksens], sensids[masksens]
 
-    def get_channel_names(self, session, ipmbs):
+    def get_channel_names(self, ipmbs):
         """
-        Converts ipmb addresses to human readable names based on the 
+        Converts ipmb addresses to human readable names based on the
         definitions of ipmb addresses in the ATCA manuals.
-        
         Args:
             ipmbs (str list):
                 List of Intelligent Platform Management Bus (IPMB) addresses
@@ -99,22 +97,21 @@ class SmurfCrateMonitor:
             if ipmb == 'fe':
                 chan_names[i] = 'pwr_mgmt'
                 continue
-            slot = int('0x'+ipmb,16)//2-64
+            slot = int('0x'+ipmb, 16)//2-64
             if slot == 1:
                 chan_names[i] = 'switch'
                 continue
             chan_names[i] = f'slot{slot}'
         return chan_names
-    
-    def get_data_dict(self, session,shm_addr,ipmbs, sensids,chan_names,
-                        crate_id):
+
+    def get_data_dict(self, shm_addr, ipmbs, sensids, chan_names,
+                      crate_id):
         """
         Given a list of ipmb addresses, sensor ids, and channel names,
         the shelf manager is queeried and the current sensor values for
-        the provided list of sensors is read. The values are then 
-        output in a dictionary in the format needed to publish to 
+        the provided list of sensors is read. The values are then
+        output in a dictionary in the format needed to publish to
         influxdb.
-        
         Args:
             shm_addr (str):
                 Address used to connect to shelf manager ex. root@192.168.1.2
@@ -129,21 +126,21 @@ class SmurfCrateMonitor:
         Returns:
             data_dict (dict):
                 Dict with structure, {data : value} collects the output
-                of all of the sensors passed into the fuction. Ensures the 
+                of all of the sensors passed into the fuction. Ensures the
                 keys match the influxdb feedname requirements
         """
         data_dict = {}
-        cmd = ['ssh', f'{shm_addr}\n', 'clia','sensordata\n']
+        cmd = ['ssh', f'{shm_addr}\n', 'clia', 'sensordata\n']
         ssh = subprocess.Popen(cmd,
-                       shell=False,
-                       stdout=subprocess.PIPE,
-                       stderr=subprocess.PIPE)
+                               shell=False,
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE)
         result = ssh.stdout.readlines()
         if result == []:
             error = ssh.stderr.readlines()
-            print(sys.stderr, "ERROR: %s" % error)
+            print("ERROR: %s" % error)
         else:
-            for ipmb, sensid, chan_name in zip(ipmbs,sensids,chan_names):
+            for ipmb, sensid, chan_name in zip(ipmbs, sensids, chan_names):
                 sense_chan = False
                 for r in result:
                     if ipmb in r.decode('utf-8'):
@@ -153,24 +150,23 @@ class SmurfCrateMonitor:
                     if sense_chan:
                         if 'Processed data:' in r.decode('utf-8'):
                             sid = sensid.strip('"')
-                            sid = sid.replace(" ","_")
-                            sid = sid.replace(":","")
-                            sid = sid.replace("+","")
-                            sid = sid.replace(".","p")
+                            sid = sid.replace(" ", "_")
+                            sid = sid.replace(":", "")
+                            sid = sid.replace("+", "")
+                            sid = sid.replace(".", "p")
                             line = r.strip().decode("utf-8")
                             if line.split(':')[-1].split(' ')[0] == '':
-                                value = float(line.split(':')[-1].split(' ')[1])
+                                val = float(line.split(':')[-1].split(' ')[1])
                             else:
-                                value = float(line.split(':')[-1].split(' ')[0])
-                            data_dict[f'{crate_id}_{chan_name}_{sid}'] = value
+                                val = float(line.split(':')[-1].split(' ')[0])
+                            data_dict[f'{crate_id}_{chan_name}_{sid}'] = val
                             sense_chan = False
         return data_dict
-        
-    def init_data_stream(self, session, shm_addr):
+
+    def init_data_stream(self, shm_addr):
         """
         Wrapper for get_sensors and get_channel_names which generates
         the list of sensors to use in datastreaming.
-        
         Args:
             shm_addr (str):
                 Address used to connect to shelf manager ex. root@192.168.1.2
@@ -182,25 +178,25 @@ class SmurfCrateMonitor:
             chan_names (str list):
                 List of human readable names for each IPMB address.
         """
-        ipmbs, sensids = self.get_sensors(session,shm_addr)
-        chan_names = self.get_channel_names(session, ipmbs)
+        ipmbs, sensids = self.get_sensors(shm_addr)
+        chan_names = self.get_channel_names(ipmbs)
         return ipmbs, sensids, chan_names
-        
+
     def init_crate(self, session, params=None):
         """
         Run at the startup of the docker to check that you can successfully
-        ssh to the crate and run a command. If it runs successfully then 
+        ssh to the crate and run a command. If it runs successfully then
         you should see the home directory of the shelf manager printed to
         the docker logs and the data acquisition process to start, if not
         you will see an error in the logs and acquistion won't start.
         """
         print(self.shm_addr)
-        cmd = ['ssh', f'{self.shm_addr}\n','pwd\n']
+        cmd = ['ssh', f'{self.shm_addr}\n', 'pwd\n']
         print(cmd)
         ssh = subprocess.Popen(cmd,
-                       shell=False,
-                       stdout=subprocess.PIPE,
-                       stderr=subprocess.PIPE)
+                               shell=False,
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE)
         result = ssh.stdout.readlines()
         print(result)
         if result == []:
@@ -211,39 +207,39 @@ class SmurfCrateMonitor:
             print('Successfully ssh-d into shelf')
             self.agent.start('acq')
             return True, 'Crate Initialized'
-        
+
     def start_acq(self, session, params=None):
-        """Starts acquiring data, hardcoded for one data point every 30
-        seconds because we intend for this to be very low rate data."""
+        """
+        Starts acquiring data, hardcoded for one data point every 30
+        seconds because we intend for this to be very low rate data.
+        """
         print('Started acquisition')
-        ipmbs, sensids, chan_names = self.init_data_stream(session = session,
-                                                        shm_addr = self.shm_addr)
+        shm_addr = self.shm_addr
+        ipmbs, sensids, chan_names = self.init_data_stream(shm_addr=shm_addr)
         print('Got sensor names')
         self.take_data = True
         while self.take_data:
-            print('Take Data = True')
             for _ in range(30):
-				if not self.take_data:
-					break
-				time.sleep(1)
-            datadict = self.get_data_dict(session = session, 
-                                            shm_addr = self.shm_addr,
-                                            ipmbs = ipmbs, 
-                                            sensids = sensids, 
-                                            chan_names = chan_names,
-                                            crate_id = self.crate_id)
-            print('Collected Data Packet')
+                if not self.take_data:
+                    break
+                time.sleep(1)
+            datadict = self.get_data_dict(shm_addr=self.shm_addr,
+                                          ipmbs=ipmbs,
+                                          sensids=sensids,
+                                          chan_names=chan_names,
+                                          crate_id=self.crate_id)
             data = {
                     'timestamp': time.time(),
                     'block_name': f'smurf_{self.crate_id}',
                     'data': datadict
                     }
-            self.agent.publish_to_feed(f'{self.crate_id}_sensors',data)
-            print('Published Data Packet')
+            self.agent.publish_to_feed('smurf_sensors', data)
         return True, 'Acquisition exited cleanly'
-    
-    def stop_acq(self,session,params=None):
-        """Stops acquiring data if the dpcler os stopped."""
+
+    def stop_acq(self, session, params=None):
+        """
+        Stops acquiring data if the dpcler os stopped.
+        """
         if self.take_data:
             self.take_data = False
             return True, 'requested to stop taking data.'
@@ -257,18 +253,16 @@ if __name__ == '__main__':
     parser.add_argument('--crate-id')
     args = site_config.parse_args(agent_class='CrateAgent',
                                   parser=parser)
-                               
     startup = True
-    
     agent, runner = ocs_agent.init_site_agent(args)
     shm_addr = args.shm_addr
     crate_id = args.crate_id
 
-    smurfcrate = SmurfCrateMonitor(agent,crate_id,shm_addr)
-    
+    smurfcrate = SmurfCrateMonitor(agent, crate_id, shm_addr)
+
     agent.register_task('init_crate', smurfcrate.init_crate,
-                            startup = startup)
-    agent.register_process('acq', smurfcrate.start_acq, 
-                            smurfcrate.stop_acq)
-    
+                        startup=startup)
+    agent.register_process('acq', smurfcrate.start_acq,
+                           smurfcrate.stop_acq)
+
     runner.run(agent, auto_reconnect=True)

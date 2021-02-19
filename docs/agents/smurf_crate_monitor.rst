@@ -33,7 +33,7 @@ to our site configuration file. Here is an example configuration block using
 all of the available arguments::
 
         {'agent-class': 'CrateAgent',
-         'instance-id': 'smurf-crate-monitor',
+         'instance-id': 'crate1-monitor',
          'arguments':[
            ['--shm-addr', 'root@192.168.1.2'],
            ['--crate-id', 'crate1'],
@@ -66,20 +66,31 @@ to distinguish between identical sensors on different crates.
 
 Docker
 ``````
-The LabJack Agent should be configured to run in a Docker container. An
+The SMuRF Crate Agent should be configured to run in a Docker container. An
 example docker-compose service configuration is shown here::
-	
-	ocs-smurf-crate-monitor:
-	<<: *ocs-base
-	image: ocs-smurf-crate-monitor:latest
-	hostname: adaq1-docker
-	network_mode: "host"
-	volumes:
-	  - ${OCS_CONFIG_DIR}:/config
-	  - /home/ocs:/home/ocs
-	command:
-	  - "--instance-id=smurf-crate-monitor"
 
+  ocs-smurf-crate-monitor:
+    <<: *ocs-base
+    image: ocs-smurf-crate-monitor:latest
+    hostname: adaq1-docker
+    network_mode: "host"
+    volumes:
+      - ${OCS_CONFIG_DIR}:/config
+      - /home/ocs:/home/ocs
+    command:
+      - "--instance-id=smurf-crate-monitor"
+
+An example of the 'ocs-base' anchor is shown here::
+  
+  x-ocs-base: &ocs-base
+  hostname: adaq1-docker
+  user: "9000"
+  environment:
+    LOGLEVEL: debug
+  volumes:
+    - ${OCS_CONFIG_DIR}:/config
+    - /data:/data
+ 
 Agent API
 ---------
 
