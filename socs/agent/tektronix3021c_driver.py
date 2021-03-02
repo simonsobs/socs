@@ -1,10 +1,10 @@
 """Michael Randall
     mrandall@ucsd.edu"""
 
-from socs.agent.prologix_interface import GpibInterface
+from socs.agent.prologix_interface import PrologixInterface
 
 
-class TektronixInterface(GpibInterface):
+class TektronixInterface(PrologixInterface):
     def set_freq(self, freq):
         self.write('SOUR:FREQ {:.3f}\n'.format(freq))
 
