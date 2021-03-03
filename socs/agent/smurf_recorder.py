@@ -22,34 +22,6 @@ class FlowControl(Enum):
     CLEANSE = 3
 
 
-def check_port(addr):
-    """
-    This function checks if socket port is currently open on a host. This can
-    be used to check if the smurf-streamer has created it's G3NetworkSender
-    object without attempting to create a G3Reader. This function is
-    non-blocking and should return immediately.
-
-    Parameters
-    ----------
-    addr: str
-        Address describing the port to connect to. For example:
-        ``tcp://localhost:4532``
-    """
-    host, port = addr.split('//')[-1].split(':')
-    port = int(port)
-
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.setblocking(True)
-    s.settimeout(0.0)
-    try:
-        s.connect((host, port))
-        return True
-    except socket.error:
-        return False
-    finally:
-        s.close()
-
-
 def _create_dirname(start_time, data_dir, stream_id):
     """Create the file path for .g3 file output.
 
@@ -243,14 +215,13 @@ class FrameRecorder:
         """
         reader = None
 
-        if (check_port(self.address)):
-            try:
-                reader = core.G3Reader(self.address,
-                                       timeout=timeout)
-                self.log.debug("G3Reader connection to {addr} established!",
-                               addr=self.address)
-            except RuntimeError:
-                self.log.error("G3Reader could not connect.")
+        try:
+            reader = core.G3Reader(self.address,
+                                   timeout=timeout)
+            self.log.debug("G3Reader connection to {addr} established!",
+                           addr=self.address)
+        except RuntimeError:
+            self.log.error("G3Reader could not connect.")
 
         # Prevent rapid connection attempts
         if self.last_connection_time is not None:
