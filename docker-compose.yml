@@ -96,6 +96,13 @@ services:
     build: ./agents/pfeiffer_tpg366/
 
   # --------------------------------------------------------------------------
+  # CHWP Encoder BBB agent
+  # --------------------------------------------------------------------------
+  ocs-hwpbbb-agent:
+    image: "ocs-hwpbbb-agent"
+    build: ./agents/chwp/
+
+  # --------------------------------------------------------------------------
   # SOCS Simulators
   # --------------------------------------------------------------------------
 
@@ -105,3 +112,4 @@ services:
   ocs-lakeshore240-simulator:
     image: "ocs-lakeshore240-simulator"
     build: ./simulators/lakeshore240/
+
