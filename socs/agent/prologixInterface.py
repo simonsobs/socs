@@ -1,12 +1,11 @@
 import socket as socket
 
-DEFAULT_IP = '192.168.1.3'
 DEFAULT_ESCAPE = 'xYzZyX'
 
 
 class prologixInterface:
 
-    def __init__(self, ip=DEFAULT_IP, escapeString=DEFAULT_ESCAPE):
+    def __init__(self, ip, escapeString=DEFAULT_ESCAPE):
         self.ip = ip
         self.escapeString = escapeString
         #self.gpibAddr = gpibAddr

@@ -70,9 +70,9 @@ services:
   # --------------------------------------------------------------------------
   # Power Supply control Agent
   # --------------------------------------------------------------------------
-  ocs-psu-agent:
-    image: "ocs-psu-agent"
-    build: ./agents/keithley2230G-psu/
+  ocs-scpi-psu-agent:
+    image: "ocs-scpi-psu-agent"
+    build: ./agents/scpi_psu/
 
   # --------------------------------------------------------------------------
   # Cryomech CPA compressor log agent
@@ -94,6 +94,20 @@ services:
   ocs-pfeiffer-tpg366-agent:
     image: "ocs-pfeiffer-tpg366-agent"
     build: ./agents/pfeiffer_tpg366/
+    
+  # --------------------------------------------------------------------------
+  # Synaccess power strip agent
+  # --------------------------------------------------------------------------
+  ocs-synaccess-agent:
+    image: "ocs-synaccess-agent"
+    build: ./agents/synacc/
+
+  # --------------------------------------------------------------------------
+  # Meinberg M1000
+  # --------------------------------------------------------------------------
+  ocs-meinberg-m1000-agent:
+    image: "ocs-meinberg-m1000-agent"
+    build: ./agents/meinberg_m1000/
 
   # --------------------------------------------------------------------------
   # CHWP Encoder BBB agent
@@ -106,6 +120,13 @@ services:
   # SOCS Simulators
   # --------------------------------------------------------------------------
 
+  # --------------------------------------------------------------------------
+  # Lakeshore240 Simulator
+  # --------------------------------------------------------------------------
+  ocs-lakeshore240-simulator:
+    image: "ocs-lakeshore240-simulator"
+    build: ./simulators/lakeshore240/
+    
   # --------------------------------------------------------------------------
   # Lakeshore240 Simulator
   # --------------------------------------------------------------------------

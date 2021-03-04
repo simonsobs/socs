@@ -1,0 +1,395 @@
+#!/usr/bin/env python3
+# Rename fields to valid names in recorded .g3 files. Also translate from HK v0
+# to HK v1. This is heavily based on the so3g.hk.translator.
+
+import os
+import hashlib
+import logging
+import sqlite3
+
+from pathlib import Path
+from tqdm import tqdm
+
+import so3g
+from so3g.hk.translator import HKTranslator
+from spt3g import core
+
+from ocs.ocs_feed import Feed
+
+
+class RenamerRecord:
+    def __init__(self):
+        """A class to help keep a record of which files have already been
+        processed.
+
+        Within the DB the processed column has these values:
+            0 - unprocessed, this file hasn't been processed at all
+            1 - processed and successful, this file was successfully processed
+            2 - processed and failed, this file had some sort of error and needs addressing
+
+        """
+        self.db = self.connect_to_sqlite()
+        self._init_sqlitedb()
+
+    def connect_to_sqlite(self, path=None, db_file=".socs_rename_fields.db"):
+        """Connect to an SQLite database.
+
+        Parameters
+        ----------
+        path : str
+            Path to store db in. If None, the home directory is used.
+        db_file : str
+            basename for sqlite file
+
+        Returns
+        -------
+        sqlite3.Connection
+            Connection to sqlite3 database
+
+        """
+        if path is None:
+            path = str(Path.home())
+        else:
+            path = os.path.abspath(path)
+        full_path = os.path.join(path, db_file)
+        conn = sqlite3.connect(full_path)
+
+        return conn
+
+    def _init_sqlitedb(self):
+        """Initialize the sqlitedb after connection.
+
+        We call our table 'files'. You probably don't need to change this.
+
+        """
+        c = self.db.cursor()
+        c.execute("CREATE TABLE IF NOT EXISTS files (path TEXT UNIQUE, md5sum TEXT, processed INTEGER)")
+
+        self.db.commit()
+        c.close()
+
+    def add_unknown_files_to_db(self, filelist):
+        """Compares filelist to sqlite database. Insert files if they aren't
+        present. If an md5sum matches a file in the list and the path has
+        changed, the path will be updated.
+
+        Parameters
+        ----------
+        filelist : list
+            list of files to insert into database if they are missing
+
+        """
+        c = self.db.cursor()
+
+        for f in tqdm(filelist, desc="updating database"):
+            md5 = _md5sum(f)
+            c.execute("SELECT * from files WHERE md5sum=?", (md5, ))
+            result = c.fetchone()
+            if result is None:
+                logging.info(f"No match for {md5}, inserting into SQLiteDB")
+                c.execute("INSERT INTO files VALUES (?, ?, 0)", (f, md5))
+                self.db.commit()
+            elif result[0] != f:
+                logging.info(f"Path changed for hash {md5}, updating path to {f}")
+                c.execute("UPDATE files SET path=? WHERE md5sum=?", (f, md5))
+                self.db.commit()
+
+        c.close()
+
+    def get_unprocessed_files(self, filelist):
+        """Get any unprocessed files from the database that are in the
+        filelist.
+
+        Parameters
+        ----------
+        filelist : list
+            list of files to check if they are unprocessed
+
+        """
+        c = self.db.cursor()
+        c.execute("SELECT path from files WHERE processed=0")
+        to_process = c.fetchall()
+        c.close()
+
+        unprocessed_list = []
+        for path in to_process:
+            if path[0] in filelist:
+                unprocessed_list.append(path[0])
+
+        return unprocessed_list
+
+
+def _md5sum(path, blocksize=65536):
+    """Compute md5sum of a file.
+
+    References
+    ----------
+    - https://stackoverflow.com/questions/3431825/generating-an-md5-checksum-of-a-file
+
+    Parameters
+    ----------
+    path : str
+        Full path to file for which we want the md5
+    blocksize : int
+        blocksize we want to read the file in chunks of to avoid fitting the
+        whole file into memory. Defaults to 65536
+
+    Returns
+    -------
+    str
+        Hex string representing the md5sum of the file
+
+    """
+    hash_ = hashlib.md5()
+    with open(path, "rb") as f:
+        for block in iter(lambda: f.read(blocksize), b""):
+            hash_.update(block)
+    return hash_.hexdigest()
+
+
+def rename_fields(field_name):
+    """Rename invalid field names."""
+    # Agents requiring no changes.
+    # hwp_sim, keithley2230G-psu, pfeiffer_tpg366, pysmurf_archiver,
+    # pysmurf_controller, pysmurf monitor, smurf_recorder, smurf stream
+    # simulator, chwp Agent
+
+    # Agents that hardcode their fields:
+    # bluefors, cryomech_cpa
+    renames = {"hs-still": "hs_still",
+               "hs-mc": "hs_mc",
+               "Operating State": "Operating_State",
+               "Pump State": "Compressor_State",
+               "Warnings": "Warning_State",
+               "Alarms": "Alarm_State",
+               "Coolant In": "Coolant_In_Temp",
+               "Coolant Out": "Coolant_Out_Temp",
+               "Oil": "Oil_Temp",
+               "Helium": "Helium_Temp",
+               "Low Pressure": "Low_Pressure",
+               "Low Pressure Average": "Low_Pressure_Average",
+               "High Pressure": "High_Pressure",
+               "High Pressure Average": "High_Pressure_Average",
+               "Delta Pressure": "Delta_Pressure_Average",
+               "Motor Current": "Motor_Current"}
+
+    if field_name in renames:
+        return renames[field_name]
+
+    # Agents that dynamically build their field lists:
+    # labjack
+    # This is a tricky one, field names can be any combination of "Channel"
+    # "1-14" and "Units", where units is user defined. Should rename via a
+    # str.replace(' ', '_')
+
+    # Lakeshore 240
+    # This is just like the labjack, though channels/units are well defined,
+    # i.e. all "Channel" "1-8" "V" and "T".  Still, we should just do the same
+    # as with the labjack.
+
+    # Lakeshore 372
+    # Same as the Lakeshore 240, except "T" and "R", instead of "T" and "V" for
+    # units.
+
+    # 370 Agent
+    # Same as the 372 Agent. Not sure if in use yet.
+
+    # All of the above are handled by:
+    if field_name[:7] == "Channel":
+        return field_name.replace(' ', '_')
+
+    # M1000 Agent (still in development)
+    if field_name[:17] == "MBG-SNMP-LTNG-MIB":
+        return field_name.split("::")[1].split('.')[0]
+
+    return field_name
+
+# Other Agents
+# M1000 Agent
+# Probably lots of issues, not really in use yet, though some data did get
+# written to the Yale aggregator, but can probably be safely ignored/searched
+# for an deleted.
+
+
+class HKRenamer:
+    """Renames invalid field names. Changes here take into consideration
+    changes made to the Agents to fix the naming of fields and match those
+    changes.
+
+    """
+    def __init__(self):
+        pass
+
+    def Process(self, f):
+        if f.type == core.G3FrameType.EndProcessing:
+            return [f]
+
+        if f.type != core.G3FrameType.Housekeeping:
+            return [f]
+
+        # No difference in Session/Status for v0 -> v1.
+        if f.get('hkagg_type') != so3g.HKFrameType.data:
+            return [f]
+
+        # Pop the data blocks out of the frame.
+        orig_blocks = f.pop('blocks')
+        f['blocks'] = core.G3VectorFrameObject()
+
+        # Now process the data blocks.
+        for block in orig_blocks:
+            new_block = core.G3TimesampleMap()
+            new_block.times = block.times
+            for k in block.keys():
+                v = block[k]
+                new_field = rename_fields(k)
+
+                # Catch any still invalid names
+                try:
+                    Feed.verify_data_field_string(new_field)
+                except ValueError:
+                    raise ValueError("An unexpected invalid field name, " +
+                                     f"'{new_field}', was encountered. Please " +
+                                     "report this field name as an issue to " +
+                                     "the socs repository.")
+
+                # print(k, new_field)
+                new_block[new_field] = core.G3VectorDouble(v)
+            f['blocks'].append(new_block)
+        return [f]
+
+    def __call__(self, *args, **kwargs):
+        return self.Process(*args, **kwargs)
+
+
+def _build_file_list(target):
+    """Build list of files to scan.
+
+    Parameters
+    ----------
+    target : str
+        File or directory to scan.
+
+    Returns
+    -------
+    list
+        List of full paths to files for scanning.
+
+    """
+    _file_list = []
+    if os.path.isfile(target):
+        _file_list.append(target)
+    elif os.path.isdir(target):
+        a = os.walk(target)
+        for root, _, _file in a:
+            for g3 in _file:
+                if g3[-2:] == "g3":
+                    _file_list.append(os.path.join(root, g3))
+
+    return _file_list
+
+
+def run_pipeline(input_file, output_file):
+    """Method for the G3 Pipeline to demonstrate error in loop."""
+    p = core.G3Pipeline()
+    p.Add(core.G3Reader(input_file))
+    p.Add(HKTranslator())
+    p.Add(HKRenamer())
+    p.Add(core.G3Writer(output_file))
+    p.Run()
+
+
+if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser(
+        description='This program is used to correct a selection of invalid '
+                    'field names in .g3 HK files written with SOCS Agents '
+                    'prior to the v0.1.0 release of SOCS. It will also '
+                    'simultaneously upgrade any HK v0 files to the HK v1 '
+                    'format.')
+    parser.add_argument('target', nargs='+',
+                        help="File or directory to process.")
+    parser.add_argument('--output-directory', '-o', default='./',
+                        help="Output directory for rewritten .g3 files. "
+                             "(default: ./)")
+    parser.add_argument('--log', '-l', default='WARNING',
+                        help='Set loglevel.')
+    parser.add_argument('--logfile', '-f', default='rename_fields.log',
+                        help='Set the logfile.')
+    parser.add_argument('--skip-file-check', '-s', action='store_true',
+                        help='Skip file check step.')
+    args = parser.parse_args()
+
+    # Logging Configuration
+    numeric_level = getattr(logging, args.log.upper(), None)
+    if not isinstance(numeric_level, int):
+        raise ValueError('Invalid log level: %s' % args.log)
+    logging.basicConfig(filename=args.logfile, level=numeric_level)
+
+    # Run me on a G3File containing a Housekeeping stream.
+    # core.set_log_level(core.G3LogLevel.LOG_INFO)
+
+    # Run on just a single file target, outputs directly to -o.
+    # Don't both recording or even checking if we've processed the file before.
+    # Allows debugging on single files easily.
+    if len(args.target) == 1 and os.path.isfile(args.target[0]):
+        if not os.path.exists(args.output_directory):
+            os.makedirs(args.output_directory)
+
+        out_file = os.path.join(args.output_directory, os.path.basename(args.target[0]))
+        logging.info(f"Writing new version of {args.target} to {out_file}")
+        run_pipeline(args.target, out_file)
+    else:
+        # args.target could be list of directories, say. Likely just one directory.
+        for target in args.target:
+            print(f"Processing all .g3 files in {target}...")
+            file_list = _build_file_list(target)
+
+            # Record of processed files.
+            record = RenamerRecord()
+            if not args.skip_file_check:
+                record.add_unknown_files_to_db(file_list)
+            unprocessed_files = record.get_unprocessed_files(file_list)
+
+            c = record.db.cursor()
+
+            # For each file in the directory (and its subdirectories), run the pipeline.
+            for _file in tqdm(unprocessed_files, desc="processing files"):
+                # Remove target directory from path for output directory
+                out_partial_path = _file.replace(target, '').lstrip('/')
+
+                # Build out the full path for output
+                output_file = os.path.join(args.output_directory, out_partial_path)
+
+                # Make sure the subdirectories in args.output_directory exist
+                output_directory = os.path.dirname(output_file)
+
+                if not os.path.exists(output_directory):
+                    os.makedirs(output_directory)
+
+                logging.info(f"Writing new version of {_file} to {output_file}")
+                try:
+                    run_pipeline(_file, output_file)
+                    c.execute("UPDATE files SET processed=1 WHERE path=?", (_file,))
+                    record.db.commit()
+                except RuntimeError:
+                    c.execute("UPDATE files SET processed=2 WHERE path=?", (_file,))
+                    record.db.commit()
+                    logging.warning(f"{_file} failed to process, removing any output")
+                    os.remove(output_file)
+                except ValueError as e:
+                    c.execute("UPDATE files SET processed=2 WHERE path=?", (_file,))
+                    record.db.commit()
+                    logging.error(f"ValueError in {_file}. Removing any output. -- {e}")
+                    os.remove(output_file)
+
+            c.close()
+
+    # Print failed files before finishing.
+    c = record.db.cursor()
+    c.execute("SELECT path FROM files WHERE processed=2")
+    failed_paths = c.fetchall()
+    c.close()
+
+    print("The following files failed to process:")
+    for path in failed_paths:
+        print(path[0])

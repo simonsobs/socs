@@ -38,13 +38,14 @@ Simulator Reference  Simulators are used to mock software and hardware
 
     agents/bluefors_agent
     agents/cryomech_cpa
-    agents/keithley-psu
+    agents/scpi_psu
     agents/labjack
     agents/lakeshore240
     agents/lakeshore372
     agents/pysmurf/index
     agents/smurf_recorder
     agents/pfeiffer
+    agents/meinberg_m1000_agent
 
 .. toctree::
     :caption: Simulator Reference
@@ -52,6 +53,12 @@ Simulator Reference  Simulators are used to mock software and hardware
 
     simulators/ls240_simulator
     simulators/smurf_stream_simulator
+
+.. toctree::
+    :caption: Developer Guide
+    :maxdepth: 2
+
+    developer/snmp
 
 Indices and tables
 ==================
