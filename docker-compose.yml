@@ -124,6 +124,13 @@ services:
     build: ./agents/tektronix3021c/
 
   # --------------------------------------------------------------------------
+  # CHWP Encoder BBB agent
+  # --------------------------------------------------------------------------
+  ocs-hwpbbb-agent:
+    image: "ocs-hwpbbb-agent"
+    build: ./agents/chwp/
+
+  # --------------------------------------------------------------------------
   # SOCS Simulators
   # --------------------------------------------------------------------------
 
@@ -133,10 +140,3 @@ services:
   ocs-lakeshore240-simulator:
     image: "ocs-lakeshore240-simulator"
     build: ./simulators/lakeshore240/
-    
-  # --------------------------------------------------------------------------
-  # Lakeshore240 Simulator
-  # --------------------------------------------------------------------------
-  ocs-lakeshore240-simulator:
-    image: "ocs-lakeshore240-simulator"
-    build: ./simulators/lakeshore240/    
