@@ -29,7 +29,7 @@ HWPEncoder:
 
    (HWPEncoder_irig)
    irig_time: decoded time in second since the unix epoch
-   rising_edge_cont: BBB clcok count values 
+   rising_edge_cont: BBB clcok count values
                      for the IRIG on-time reference marker risinge edge
    irig_sec: seconds decoded from IRIG-B
    irig_min: minutes decoded from IRIG-B
@@ -247,9 +247,13 @@ class EncoderParser:
 
         # Set the current time in seconds (changed to seconds from unix epoch)
         #self.current_time = secs + mins*60 + hours*3600
-        st_time = time.strptime("%d %d %d:%d:%d"%(year, day, hours, mins, secs), \
-                                "%y %j %H:%M:%S")
-        self.current_time = calendar.timegm(st_time)
+        try:
+            st_time = time.strptime("%d %d %d:%d:%d"%(year, day, hours, mins, secs), \
+                                    "%y %j %H:%M:%S")
+            self.current_time = calendar.timegm(st_time)
+        except ValueError:
+            print('Invalid IRIG-B timestamp:', year, day, hours, mins, secs)
+            self.current_time = -1
 
         return self.current_time
 
@@ -537,7 +541,7 @@ class HWPBBBAgent:
                     data['data']['irig_year'] = de_irig(irig_info[5], 0)
 
                     # Beagleboneblack clock frequency measured by IRIG
-                    if self.rising_edge_count > 0:
+                    if self.rising_edge_count > 0 and irig_time > 0:
                         bbb_clock_freq = float(rising_edge_count - self.rising_edge_count) \
                                          / (irig_time - self.irig_time)
                     else:
