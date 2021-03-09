@@ -7,10 +7,13 @@ import yaml
 import csv
 from scipy.interpolate import interp1d
 import numpy as np
+import txaio
+txaio.use_twisted()
 
 ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 if not ON_RTD:
     from labjack import ljm
+    from labjack.ljm.ljm import LJMError
     from ocs import ocs_agent, site_config
     from ocs.ocs_twisted import TimeoutLock
 
@@ -82,7 +85,7 @@ class LabJackFunctions:
     Labjack helper class to provide unit conversion from analog input voltage
     """
     def __init__(self):
-        pass
+        self.log = txaio.make_logger()
 
     def unit_conversion(self, v_array, function_info):
         """
@@ -140,7 +143,7 @@ class LabJackFunctions:
             values = RtoT(R)
 
         except ValueError:
-            print('Temperature outside thermometer range')
+            self.log.error('Temperature outside thermometer range')
             values = -1000 + np.zeros(len(R))
 
         units = 'C'
@@ -180,7 +183,7 @@ class LabJackAgent:
                 self.functions = yaml.safe_load(stream)
                 if self.functions is None:
                     self.functions = {}
-                print(f"Applying conversion functions: {self.functions}")
+                self.log.info(f"Applying conversion functions: {self.functions}")
 
         self.initialized = False
         self.take_data = False
@@ -223,10 +226,10 @@ class LabJackAgent:
             # Connect with the labjack
             self.handle = ljm.openS("ANY", "ANY", self.ip_address)
             info = ljm.getHandleInfo(self.handle)
-            print("\nOpened LabJack of type: %i, Connection type: %i,\n"
-                  "Serial number: %i, IP address: %s, Port: %i" %
-                  (info[0], info[1], info[2],
-                   ljm.numberToIP(info[3]), info[4]))
+            self.log.info("\nOpened LabJack of type: %i, Connection type: %i,\n"
+                          "Serial number: %i, IP address: %s, Port: %i" %
+                          (info[0], info[1], info[2],
+                           ljm.numberToIP(info[3]), info[4]))
 
         session.add_message("Labjack initialized")
 
@@ -270,9 +273,16 @@ class LabJackAgent:
 
             # Start the data stream. Use the scan rate returned by the stream,
             # which should be the same as the input scan rate.
-            scan_rate = ljm.eStreamStart(self.handle, scans_per_read, num_chs,
-                                         ch_addrs, scan_rate_input)
-            print(f"\nStream started with a scan rate of {scan_rate} Hz.")
+            try:
+                scan_rate = ljm.eStreamStart(self.handle, scans_per_read, num_chs,
+                                             ch_addrs, scan_rate_input)
+            except LJMError as e:  # in case the stream is running
+                self.log.error(e)
+                self.log.error("Stopping previous stream and starting new one")
+                ljm.eStreamStop(self.handle)
+                scan_rate = ljm.eStreamStart(self.handle, scans_per_read, num_chs,
+                                             ch_addrs, scan_rate_input)
+            self.log.info(f"\nStream started with a scan rate of {scan_rate} Hz.")
 
             cur_time = time.time()
             while self.take_data:
@@ -321,7 +331,7 @@ class LabJackAgent:
             self.agent.feeds['sensors'].flush_buffer()
             self.agent.feeds['sensors_downsampled'].flush_buffer()
             ljm.eStreamStop(self.handle)
-            print("Data stream stopped")
+            self.log.info("Data stream stopped")
 
         return True, 'Acquisition exited cleanly.'
 
@@ -355,6 +365,9 @@ def make_parser(parser=None):
 
 
 if __name__ == '__main__':
+    # Start logging
+    txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
+
     site_parser = site_config.add_arguments()
     parser = make_parser(site_parser)
 
