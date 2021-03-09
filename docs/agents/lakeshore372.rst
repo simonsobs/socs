@@ -54,23 +54,6 @@ example configuration is::
     system. In this example the crossbar server is running on localhost,
     ``127.0.0.1``, but on your network this may be different.
 
-To view the 372 temperatures data feed in the live monitor an accompanying
-data-feed server will need to be run. An example of this configuration is::
-
-  sisock-LSA22YE:
-    image: grumpy.physics.yale.edu/sisock-data-feed-server:latest
-    environment:
-        TARGET: LSA22YE # match to instance-id of agent to monitor, used for data feed subscription
-        NAME: 'LSA22YE' # will appear in sisock a front of field name
-        DESCRIPTION: "LS372 with two ROXes for calibration."
-        FEED: "temperatures"
-    logging:
-      options:
-        max-size: "20m"
-        max-file: "10"
-
-For additional configuration see the sisock data-feed-server documentation.
-
 .. note::
     The serial numbers here will need to be updated for your device.
 
