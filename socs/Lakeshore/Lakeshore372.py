@@ -181,10 +181,12 @@ class LS372:
                    index 0 corresponding to the control channel, 'A'
     """
     def __init__(self, ip, timeout=10, num_channels=16):
-        self.com = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.com.connect((ip, 7777))
-        self.com.settimeout(timeout)
+        self.ip = ip
+        self.timeout = timeout
+        self.com = None
         self.num_channels = num_channels
+
+        self._establish_socket_connection(ip, timeout)
 
         self.id = self.get_id()
         self.autoscan = self.get_autoscan()
@@ -204,6 +206,11 @@ class LS372:
 
         self.sample_heater = Heater(self, 0)
         self.still_heater = Heater(self, 2)
+
+    def _establish_socket_connection(self):
+        self.com = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.com.connect((self.ip, 7777))
+        self.com.settimeout(self.timeout)
 
     def msg(self, message):
         """Send message to the Lakeshore 372 over ethernet.
@@ -226,7 +233,12 @@ class LS372:
         msg_str = f'{message}\r\n'.encode()
 
         if '?' in message:
-            self.com.send(msg_str)
+            try:
+                self.com.send(msg_str)
+            except BrokenPipeError as e:
+                print(e)
+                print("Re-establishing connection to device")
+                self.com = self._establish_socket_connection()
             # Try once, if we timeout, try again. Usually gets around single event glitches.
             for attempt in range(2):
                 try:
@@ -239,8 +251,17 @@ class LS372:
                     if attempt == 1:
                         raise RuntimeError('Query response to Lakeshore timed out after two ' \
                                            'attempts. Check connection.')
+                except ConnectionResetError as e:
+                    print(e)
+                    print("Re-establishing connection to device")
+                    self.com = self._establish_socket_connection()
         else:
-            self.com.send(msg_str)
+            try:
+                self.com.send(msg_str)
+            except BrokenPipeError as e:
+                print(e)
+                print("Re-establishing connection to device")
+                self.com = self._establish_socket_connection()
             resp = ''
 
         if 'RDG' in message:
