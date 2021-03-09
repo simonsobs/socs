@@ -86,7 +86,6 @@ class LabJackFunctions:
     """
     def __init__(self):
         self.log = txaio.make_logger()
-        pass
 
     def unit_conversion(self, v_array, function_info):
         """
@@ -228,9 +227,9 @@ class LabJackAgent:
             self.handle = ljm.openS("ANY", "ANY", self.ip_address)
             info = ljm.getHandleInfo(self.handle)
             self.log.info("\nOpened LabJack of type: %i, Connection type: %i,\n"
-                  "Serial number: %i, IP address: %s, Port: %i" %
-                  (info[0], info[1], info[2],
-                   ljm.numberToIP(info[3]), info[4]))
+                          "Serial number: %i, IP address: %s, Port: %i" %
+                          (info[0], info[1], info[2],
+                           ljm.numberToIP(info[3]), info[4]))
 
         session.add_message("Labjack initialized")
 
@@ -277,10 +276,10 @@ class LabJackAgent:
             try:
                 scan_rate = ljm.eStreamStart(self.handle, scans_per_read, num_chs,
                                              ch_addrs, scan_rate_input)
-            except LJMError as e: #in case the stream is running
+            except LJMError as e:  # in case the stream is running
                 self.log.error(e)
                 self.log.error("Stopping previous stream and starting new one")
-                ljm.eStreamStop(self.handle) 
+                ljm.eStreamStop(self.handle)
                 scan_rate = ljm.eStreamStart(self.handle, scans_per_read, num_chs,
                                              ch_addrs, scan_rate_input)
             self.log.info(f"\nStream started with a scan rate of {scan_rate} Hz.")
@@ -366,6 +365,9 @@ def make_parser(parser=None):
 
 
 if __name__ == '__main__':
+    # Start logging
+    txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
+
     site_parser = site_config.add_arguments()
     parser = make_parser(site_parser)
 
