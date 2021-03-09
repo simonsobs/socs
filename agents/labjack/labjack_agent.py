@@ -7,6 +7,8 @@ import yaml
 import csv
 from scipy.interpolate import interp1d
 import numpy as np
+import txaio
+txaio.use_twisted()
 
 ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 if not ON_RTD:
@@ -83,6 +85,7 @@ class LabJackFunctions:
     Labjack helper class to provide unit conversion from analog input voltage
     """
     def __init__(self):
+        self.log = txaio.make_logger()
         pass
 
     def unit_conversion(self, v_array, function_info):
@@ -141,7 +144,7 @@ class LabJackFunctions:
             values = RtoT(R)
 
         except ValueError:
-            print('Temperature outside thermometer range')
+            self.log.error('Temperature outside thermometer range')
             values = -1000 + np.zeros(len(R))
 
         units = 'C'
@@ -181,7 +184,7 @@ class LabJackAgent:
                 self.functions = yaml.safe_load(stream)
                 if self.functions is None:
                     self.functions = {}
-                print(f"Applying conversion functions: {self.functions}")
+                self.log.info(f"Applying conversion functions: {self.functions}")
 
         self.initialized = False
         self.take_data = False
@@ -224,7 +227,7 @@ class LabJackAgent:
             # Connect with the labjack
             self.handle = ljm.openS("ANY", "ANY", self.ip_address)
             info = ljm.getHandleInfo(self.handle)
-            print("\nOpened LabJack of type: %i, Connection type: %i,\n"
+            self.log.info("\nOpened LabJack of type: %i, Connection type: %i,\n"
                   "Serial number: %i, IP address: %s, Port: %i" %
                   (info[0], info[1], info[2],
                    ljm.numberToIP(info[3]), info[4]))
@@ -274,12 +277,13 @@ class LabJackAgent:
             try:
                 scan_rate = ljm.eStreamStart(self.handle, scans_per_read, num_chs,
                                              ch_addrs, scan_rate_input)
-            except LJMError: #in case the stream is running
-                print("Stopping previous stream")
+            except LJMError as e: #in case the stream is running
+                self.log.error(e)
+                self.log.error("Stopping previous stream and starting new one")
                 ljm.eStreamStop(self.handle) 
                 scan_rate = ljm.eStreamStart(self.handle, scans_per_read, num_chs,
                                              ch_addrs, scan_rate_input)
-            print(f"\nStream started with a scan rate of {scan_rate} Hz.")
+            self.log.info(f"\nStream started with a scan rate of {scan_rate} Hz.")
 
             cur_time = time.time()
             while self.take_data:
@@ -328,7 +332,7 @@ class LabJackAgent:
             self.agent.feeds['sensors'].flush_buffer()
             self.agent.feeds['sensors_downsampled'].flush_buffer()
             ljm.eStreamStop(self.handle)
-            print("Data stream stopped")
+            self.log.info("Data stream stopped")
 
         return True, 'Acquisition exited cleanly.'
 
