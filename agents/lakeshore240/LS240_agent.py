@@ -249,21 +249,28 @@ class LS240_Agent:
                     try:
                         temp_reading = chan.get_reading(unit='K')
                         sensor_reading = chan.get_reading(unit='S')
-
-                        # For data feed
-                        data['data'][chan_string + '_T'] = temp_reading
-                        data['data'][chan_string + '_V'] = sensor_reading
-
-                        # For session.data
-                        field_dict = {chan_string: {"T": temp_reading, "V": sensor_reading}}
-                        session.data['fields'].update(field_dict)
-
-                        self.agent.publish_to_feed('temperatures', data)
-
-                        session.data.update({'timestamp': current_time})
                     
                     except:
-                        print("Error: potentially serial error again")
+                        print("ERROR in getting reading")
+                        print("Waiting 20 seconds and re-initializing connection")
+                        time.sleep(20)
+                        temp_reading = 0
+                        sensor_reading = 0
+
+                        self.agent.start('init_lakeshore')
+                        self.agent.wait('init_lakeshore')
+
+                    # For data feed
+                    data['data'][chan_string + '_T'] = temp_reading
+                    data['data'][chan_string + '_V'] = sensor_reading
+
+                    # For session.data
+                    field_dict = {chan_string: {"T": temp_reading, "V": sensor_reading}}
+                    session.data['fields'].update(field_dict)
+
+                self.agent.publish_to_feed('temperatures', data)
+
+                session.data.update({'timestamp': current_time})
 
                 time.sleep(sleep_time)
 
