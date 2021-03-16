@@ -246,20 +246,24 @@ class LS240_Agent:
                 for chan in self.module.channels:
                     # Read sensor on channel
                     chan_string = "Channel_{}".format(chan.channel_num)
-                    temp_reading = chan.get_reading(unit='K')
-                    sensor_reading = chan.get_reading(unit='S')
+                    try:
+                        temp_reading = chan.get_reading(unit='K')
+                        sensor_reading = chan.get_reading(unit='S')
 
-                    # For data feed
-                    data['data'][chan_string + '_T'] = temp_reading
-                    data['data'][chan_string + '_V'] = sensor_reading
+                        # For data feed
+                        data['data'][chan_string + '_T'] = temp_reading
+                        data['data'][chan_string + '_V'] = sensor_reading
 
-                    # For session.data
-                    field_dict = {chan_string: {"T": temp_reading, "V": sensor_reading}}
-                    session.data['fields'].update(field_dict)
+                        # For session.data
+                        field_dict = {chan_string: {"T": temp_reading, "V": sensor_reading}}
+                        session.data['fields'].update(field_dict)
 
-                self.agent.publish_to_feed('temperatures', data)
+                        self.agent.publish_to_feed('temperatures', data)
 
-                session.data.update({'timestamp': current_time})
+                        session.data.update({'timestamp': current_time})
+                    
+                    except:
+                        print("Error: potentially serial error again")
 
                 time.sleep(sleep_time)
 
