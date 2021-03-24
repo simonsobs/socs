@@ -38,7 +38,7 @@ The Lakeshore 372 Agent should be configured to run in a Docker container. An
 example configuration is::
 
   ocs-LSA22YE:
-    image: grumpy.physics.yale.edu/ocs-lakeshore372-agent:latest
+    image: simonsobs/ocs-lakeshore372-agent:latest
     hostname: ocs-docker
     network_mode: "host"
     volumes:
