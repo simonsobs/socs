@@ -59,8 +59,10 @@ import select
 import numpy as np
 
 ## Required by OCS
-from ocs import ocs_agent, site_config
-from ocs.ocs_twisted import TimeoutLock
+ON_RTD = os.environ.get('READTHEDOCS') == 'True'
+if not ON_RTD:
+    from ocs import ocs_agent, site_config
+    from ocs.ocs_twisted import TimeoutLock
 
 ## These three values (COUNTER_INFO_LENGTH, COUNTER_PACKET_SIZE, IRIG_PACKET_SIZE)
 ## should be consistent with the software on beaglebone.
