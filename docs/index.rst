@@ -37,6 +37,7 @@ Simulator Reference  Simulators are used to mock software and hardware
     :maxdepth: 2
 
     agents/bluefors_agent
+    agents/chwp_encoder
     agents/cryomech_cpa
     agents/labjack
     agents/lakeshore240
