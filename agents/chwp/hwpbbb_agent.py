@@ -427,7 +427,7 @@ class EncoderParser:
            [4] binary encoding of the hour data
            [5-11] additional IRIG information which we do mot use
            [12-21] synchronization pulse clock counts
-	   [22-31] overflow count at each synchronization pulse
+           [22-31] overflow count at each synchronization pulse
 
            irig_queue structure:
            irig_queue = [Packet clock count,
@@ -442,7 +442,7 @@ class EncoderParser:
         unpacked_data = struct.unpack('<L' + 'L' + 'L'*10 + 'L'*10 + 'L'*10, data)
 
         # Start of the packet clock count
-	#overflow.append(unpacked_data[1])
+        #overflow.append(unpacked_data[1])
         #print "overflow: ", overflow
 
         rising_edge_time = unpacked_data[0] + (unpacked_data[1] << 32)
