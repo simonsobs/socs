@@ -1,5 +1,4 @@
-# comment here...
-# 
+# CHWP Agent
 
 # Use socs base image
 FROM socs:latest
@@ -11,10 +10,10 @@ WORKDIR /app/socs/agents/chwp/
 COPY . .
 
 # Run registry on container startup
-ENTRYPOINT ["python3", "-u", "hwpbbb_agent.py"]
+ENTRYPOINT ["dumb-init", "python3", "-u", "hwpbbb_agent.py"]
 
 # Sensible default arguments
-CMD ["--site-hub=ws://sisock-crossbar:8001/ws", \
-     "--site-http=http://sisock-crossbar:8001/call"]
+CMD ["--site-hub=ws://crossbar:8001/ws", \
+     "--site-http=http://crossbar:8001/call"]
 
 EXPOSE 8080/udp
