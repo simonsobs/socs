@@ -6,14 +6,14 @@
 CHWP Encoder BBB Agent
 ======================
 
-The optical encoder signals of he CHWP are captured by Beaglebone Black (BBB)
-boards with the IRIG-B timng reference.
+The optical encoder signals of the CHWP are captured by Beaglebone Black (BBB)
+boards with the IRIG-B timing reference.
 This agent receives and decodes UDP packets from BBB and publishes the data
 feeds.
 
 Configuration File Examples
 ---------------------------
-Below are useful configurations examples for the relevent OCS files and for 
+Below are useful configurations examples for the relevant OCS files and for 
 running the agent in a docker container.
 
 ocs-config
@@ -42,7 +42,7 @@ the setting on the BBB side.
 Docker
 ``````
 The CHWP BBB agent can be run via a Docker container. The following is an 
-example of what to insest into your institution's docker-compose file.
+example of what to insert into your institution's docker-compose file.
 This again is an example to run multiple agents::
 
   ocs-hwpbbb-agent-HBA0:

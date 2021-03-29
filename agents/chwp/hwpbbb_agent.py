@@ -57,10 +57,14 @@ import calendar
 from collections import deque
 import select
 import numpy as np
+import txaio
+txaio.use_twisted()
 
 ## Required by OCS
-from ocs import ocs_agent, site_config
-from ocs.ocs_twisted import TimeoutLock
+ON_RTD = os.environ.get('READTHEDOCS') == 'True'
+if not ON_RTD:
+    from ocs import ocs_agent, site_config
+    from ocs.ocs_twisted import TimeoutLock
 
 ## These three values (COUNTER_INFO_LENGTH, COUNTER_PACKET_SIZE, IRIG_PACKET_SIZE)
 ## should be consistent with the software on beaglebone.
@@ -189,6 +193,8 @@ class EncoderParser:
         self.data = ''
         self.read_chunk_size = read_chunk_size
 
+        self.log = txaio.make_logger()
+
     def pretty_print_irig_info(self, irig_info, edge, print_out=False):
         """Takes the IRIG information, prints it to the screen, sets the current time,
         and returns the current time
@@ -252,7 +258,7 @@ class EncoderParser:
                                     "%y %j %H:%M:%S")
             self.current_time = calendar.timegm(st_time)
         except ValueError:
-            print('Invalid IRIG-B timestamp:', year, day, hours, mins, secs)
+            self.log.error(f'Invalid IRIG-B timestamp: {year} {day} {hours} {mins} {secs}')
             self.current_time = -1
 
         return self.current_time
@@ -313,7 +319,7 @@ class EncoderParser:
                     # Check to make sure that there is at least 1 int in the packet
                     # The first int in every packet should be the header
                     if not self.check_data_length(0, 4):
-                        print('Error 0')
+                        self.log.error('Error 0')
                         break
 
                     header = self.data[0:4]
@@ -329,7 +335,7 @@ class EncoderParser:
                     if header == 0x1eaf:
                         # Make sure the data is the correct length for an Encoder Packet
                         if not self.check_data_length(0, COUNTER_PACKET_SIZE):
-                            print('Error 1')
+                            self.log.error('Error 1')
                             break
                         # Call the meathod self.parse_counter_info() to parse the Encoder Packet
                         self.parse_counter_info(self.data[4 : COUNTER_PACKET_SIZE])
@@ -340,7 +346,7 @@ class EncoderParser:
                     elif header == 0xcafe:
                         # Make sure the data is the correct length for an IRIG Packet
                         if not self.check_data_length(0, IRIG_PACKET_SIZE):
-                            print('Error 2')
+                            self.log.error('Error 2')
                             break
                         # Call the meathod self.parse_irig_info() to parse the IRIG Packet
                         self.parse_irig_info(self.data[4 : IRIG_PACKET_SIZE])
@@ -353,15 +359,15 @@ class EncoderParser:
                     # If you see 'Packet Error' check to make sure the IRIG is functioning as
                     # intended and that all the connections are made correctly
                     elif header == 0xe12a:
-                        print('Packet Error')
+                        self.log.error('Packet Error')
                         # Clear self.data
                         self.data = ''
                     elif header == 0x1234:
-                        print('Received timeout packet.')
+                        self.log.error('Received timeout packet.')
                         # Clear self.data
                         self.data = ''
                     else:
-                        print('Bad header')
+                        self.log.error('Bad header')
                         # Clear self.data
                         self.data = ''
 
@@ -425,7 +431,7 @@ class EncoderParser:
            [4] binary encoding of the hour data
            [5-11] additional IRIG information which we do mot use
            [12-21] synchronization pulse clock counts
-	   [22-31] overflow count at each synchronization pulse
+           [22-31] overflow count at each synchronization pulse
 
            irig_queue structure:
            irig_queue = [Packet clock count,
@@ -440,7 +446,7 @@ class EncoderParser:
         unpacked_data = struct.unpack('<L' + 'L' + 'L'*10 + 'L'*10 + 'L'*10, data)
 
         # Start of the packet clock count
-	#overflow.append(unpacked_data[1])
+        #overflow.append(unpacked_data[1])
         #print "overflow: ", overflow
 
         rising_edge_time = unpacked_data[0] + (unpacked_data[1] << 32)
@@ -618,7 +624,7 @@ class HWPBBBAgent:
                         diff_counter = np.diff(counter_list)
                         diff_index = np.diff(counter_index_list)
 
-                        print('pulse_rate', pulse_rate, hwp_freq)
+                        self.log.info(f'pulse_rate {pulse_rate} {hwp_freq}')
                         data['data']['approx_hwp_freq'] = hwp_freq
                         data['data']['diff_counter_mean'] = np.mean(diff_counter)
                         data['data']['diff_index_mean'] = np.mean(diff_index)
