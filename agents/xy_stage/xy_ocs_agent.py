@@ -17,9 +17,11 @@ class XY_Agent:
     Args: name
           ip_addr -- IP address where RPi server is running
           port    -- Port the RPi Server is listening on
+          mode    -- 'acq': Start data acquisition on initialize
+          samp    -- default sampling frequency in Hz
     """
 
-    def __init__(self, agent, ip_addr, port):
+    def __init__(self, agent, ip_addr, port, mode=None, samp=2):
         
         self.ip_addr = ip_addr
         self.port = port
@@ -32,6 +34,12 @@ class XY_Agent:
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
+         
+        if mode == 'acq':
+            self.auto_acq = True
+        else:
+            self.auto_acq = False
+        self.sampling_frequency = float(samp)
 
         ### register the position feeds
         agg_params = {
@@ -72,6 +80,8 @@ class XY_Agent:
                     pass
         # This part is for the record and to allow future calls to proceed, so does not require the lock
         self.initialized = True
+        if self.auto_acq:
+            self.agent.start('acq')
         return True, 'XY Stages Initialized.'
 
     def move_x_cm(self, session, params):
@@ -85,7 +95,6 @@ class XY_Agent:
                 return False
             self.xy_stage.move_x_cm( params['distance'], params['velocity'])
         
-        self.lock.release()
         time.sleep(1)
         while True:
             ## data acquisition updates the moving field if it is running
@@ -93,12 +102,12 @@ class XY_Agent:
                 with self.lock.acquire_timeout(timeout=3, job='move_x_cm') as acquired:
                     if not acquired:
                         self.log.warn(f"Could not check because lock held by {self.lock.job}")
-                        return False
+                        return False, "Could not acquire lock"
                     self.is_moving = self.xy_stage.moving
-                self.lock.release()
+            
             if not self.is_moving:
                 break
-        return True
+        return True, "X Move Complete"
 
     def move_y_cm(self, session, params):
         """
@@ -108,10 +117,9 @@ class XY_Agent:
         with self.lock.acquire_timeout(timeout=3, job='move_y_cm') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start y move because lock held by {self.lock.job}")
-                return False
+                return False, "could not acquire lock"
             self.xy_stage.move_y_cm( params['distance'], params['velocity'])
         
-        self.lock.release()
         time.sleep(1)
         while True:
             ## data acquisition updates the moving field if it is running
@@ -119,12 +127,11 @@ class XY_Agent:
                 with self.lock.acquire_timeout(timeout=3, job='move_y_cm') as acquired:
                     if not acquired:
                         self.log.warn(f"Could not check for move because lock held by {self.lock.job}")
-                        return False
+                        return False, "could not acquire lock"
                     self.is_moving = self.xy_stage.moving
-                self.lock.release()
             if not self.is_moving:
                 break
-        return True
+        return True, "Y Move Complete"
 
  
     def set_position(self, session, params):
@@ -134,16 +141,19 @@ class XY_Agent:
         with self.lock.acquire_timeout(timeout=3, job='set_position') as acquired:
             if not acquired:
                 self.log.warn(f"Could not set position because lock held by {self.lock.job}")
-                return False
+                return False, "Could not acquire lock"
                         
             self.xy_stage.position = params['position']
+        return True, "Position Updated"
 
-    def start_acq(self, session, params):
+    def start_acq(self, session, params=None):
         """
-        params: dict: {`sample_rate': float, sampling rate in Hz}
+        params: dict: {`sampling_frequency': float, sampling rate in Hz}
         """
-        pass    
-        f_sample = params.get('sampling_rate', 2)
+        if params is None:
+            params = {}
+
+        f_sample = params.get('sampling_frequency', self.sampling_frequency)
         sleep_time = 1/f_sample - 0.1
         if not self.initialized:
             self.init_xy_stage_task(session)
@@ -153,7 +163,7 @@ class XY_Agent:
                 self.log.warn("Could not start acq because {} is already running".format(self.lock.job))
                 return False, "Could not acquire lock."
 
-            self.log.info("Starting Data Acquisition for XY Stages")
+            self.log.info(f"Starting Data Acquisition for XY Stages at {f_sample} Hz")
             session.set_status('running')
             self.take_data = True
             last_release = time.time()
@@ -162,7 +172,7 @@ class XY_Agent:
                 if time.time()-last_release > 1.:
                     if not self.lock.release_and_acquire(timeout=10):
                         self.log.warn(f"Could not re-acquire lock now held by {self.lock.job}.")
-                        return False
+                        return False, "could not re-acquire lock"
                 
                 data = {'timestamp':time.time(), 'block_name':'positions','data':{}}
                 pos = self.xy_stage.position
@@ -218,11 +228,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     # Interpret options in the context of site_config.
-    ## I don't really know if I need this
     site_config.reparse_args(args, 'XY_StageAgent')
     agent, runner = ocs_agent.init_site_agent(args)
 
-    xy_agent = XY_Agent(agent, args.ip_address, args.port)
+    xy_agent = XY_Agent(agent, args.ip_address, args.port, args.mode, args.sampling_frequency)
 
     agent.register_task('init_xy_stage', xy_agent.init_xy_stage_task)
     agent.register_task('move_x_cm', xy_agent.move_x_cm)
