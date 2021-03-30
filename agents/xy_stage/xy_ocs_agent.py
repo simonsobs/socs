@@ -3,13 +3,15 @@ import argparse
 import time
 import txaio
 
+import numpy as np
+
 ## yes I shouldn't have named that module agent
 from xy_agent.xy_connect import XY_Stage
 
 ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 if not ON_RTD:
     from ocs import ocs_agent, site_config
-    from ocs.ocs_twisted import TimeoutLock
+    from ocs.ocs_twisted import TimeoutLock, Pacemaker
 
 class XY_Agent:
     """
@@ -78,7 +80,8 @@ class XY_Agent:
                 print("XY Stages Initialized")
             except ValueError:
                     pass
-        # This part is for the record and to allow future calls to proceed, so does not require the lock
+        # This part is for the record and to allow future calls to proceed,
+        # so does not require the lock
         self.initialized = True
         if self.auto_acq:
             self.agent.start('acq')
@@ -153,8 +156,10 @@ class XY_Agent:
         if params is None:
             params = {}
 
+        
         f_sample = params.get('sampling_frequency', self.sampling_frequency)
-        sleep_time = 1/f_sample - 0.1
+        pm = Pacemaker(f_sample, quantize=True)
+
         if not self.initialized:
             self.init_xy_stage_task(session)
         
@@ -174,7 +179,8 @@ class XY_Agent:
                         self.log.warn(f"Could not re-acquire lock now held by {self.lock.job}.")
                         return False, "could not re-acquire lock"
                     last_release = time.time()
-                
+                pm.sleep()
+
                 data = {'timestamp':time.time(), 'block_name':'positions','data':{}}
                 pos = self.xy_stage.position
                 self.is_moving = self.xy_stage.moving
@@ -183,7 +189,7 @@ class XY_Agent:
                 data['data']['y'] = pos[1] 
                 self.agent.publish_to_feed('positions',data)
                 self.agent.feeds['positions'].flush_buffer()
-                time.sleep(sleep_time)
+                time.sleep(np.random.uniform(0,1./f_sample))
 
         return True, 'Acquisition exited cleanly.'
     
