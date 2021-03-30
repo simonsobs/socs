@@ -173,6 +173,7 @@ class XY_Agent:
                     if not self.lock.release_and_acquire(timeout=10):
                         self.log.warn(f"Could not re-acquire lock now held by {self.lock.job}.")
                         return False, "could not re-acquire lock"
+                    last_release = time.time()
                 
                 data = {'timestamp':time.time(), 'block_name':'positions','data':{}}
                 pos = self.xy_stage.position
