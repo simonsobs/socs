@@ -189,8 +189,7 @@ class XY_Agent:
                 data['data']['y'] = pos[1] 
                 self.agent.publish_to_feed('positions',data)
                 self.agent.feeds['positions'].flush_buffer()
-                time.sleep(np.random.uniform(0,1./f_sample))
-
+                
         return True, 'Acquisition exited cleanly.'
     
     def stop_acq(self, session, params=None):
