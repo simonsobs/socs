@@ -153,7 +153,7 @@ class LATRt_XY_Agent:
     def start_acq(self, session, params=None):
         """
         params: 
-            dict: {`sampling_frequency': float, sampling rate in Hz}
+            dict: {'sampling_frequency': float, sampling rate in Hz}
         """
         if params is None:
             params = {}

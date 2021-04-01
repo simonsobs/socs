@@ -2,9 +2,9 @@
 
 .. _latrt_xy_stage:
 
-==================
+=====================
 LATRt XY Stage Agent
-==================
+=====================
 
 This agent is used to communicate with the XY Stages used in the LATRt lab.
 These stages are run off a Raspberry Pi connected to some custom electronics
@@ -12,12 +12,12 @@ boards for communicating with the stages.
 
 Since control of these stages need to be accessible inside and outside OCS,
 their drivers are shared `here
-<https://github.com/kmharrington/xy_stage_control>`. 
+<https://github.com/kmharrington/xy_stage_control>`_. 
 
 .. argparse::
-    :filename: ../agents/xy_stage/xy_ocs_agent.py
+    :filename: ../agents/xy_stage/xy_latrt_agent.py
     :func: make_parser
-    :prog: python3 xy_ocs_agent.py
+    :prog: python3 xy_latrt_agent.py
 
 
 Configuration File Examples
