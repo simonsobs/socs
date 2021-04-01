@@ -3,24 +3,24 @@ import argparse
 import time
 import txaio
 
-import numpy as np
-
-## yes I shouldn't have named that module agent
-from xy_agent.xy_connect import XY_Stage
 
 ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 if not ON_RTD:
     from ocs import ocs_agent, site_config
     from ocs.ocs_twisted import TimeoutLock, Pacemaker
 
-class XY_Agent:
+    ## yes I shouldn't have named that module agent
+    from xy_agent.xy_connect import XY_Stage
+
+class LATRt_XY_Agent:
     """
     Agent for connecting to the LATRt XY Stages
-    Args: name
-          ip_addr -- IP address where RPi server is running
-          port    -- Port the RPi Server is listening on
-          mode    -- 'acq': Start data acquisition on initialize
-          samp    -- default sampling frequency in Hz
+    
+    Args: 
+        ip_addr: IP address where RPi server is running
+        port: Port the RPi Server is listening on
+        mode: 'acq': Start data acquisition on initialize
+        samp: default sampling frequency in Hz
     """
 
     def __init__(self, agent, ip_addr, port, mode=None, samp=2):
@@ -51,15 +51,15 @@ class XY_Agent:
         self.agent.register_feed('positions',
                                  record = True,
                                  agg_params = agg_params,
-                                 buffer_time = 1)
+                                 buffer_time = 0)
     
     def init_xy_stage_task(self, session, params=None):
         """init_xy_stage_task(params=None)
         Perform first time setup for communivation with XY stages.
+
         Args:
             params (dict): Parameters dictionary for passing parameters to
                 task.
-        Parameters:
         """
 
         if params is None:
@@ -73,13 +73,11 @@ class XY_Agent:
                 return False, "Could not acquire lock."
             # Run the function you want to run
             self.log.debug("Lock Acquired Connecting to Stages")
-            try:
-                self.xy_stage = XY_Stage(self.ip_addr, self.port)
-                self.xy_stage.init_stages()
-        
-                print("XY Stages Initialized")
-            except ValueError:
-                    pass
+            
+            self.xy_stage = XY_Stage(self.ip_addr, self.port)
+            self.xy_stage.init_stages()
+            print("XY Stages Initialized")
+            
         # This part is for the record and to allow future calls to proceed,
         # so does not require the lock
         self.initialized = True
@@ -89,14 +87,15 @@ class XY_Agent:
 
     def move_x_cm(self, session, params):
         """
-        params: dict: { 'distance': float, 'velocity':float < 1.2}
+        params: 
+            dict: { 'distance': float, 'velocity':float < 1.2}
         """
 
         with self.lock.acquire_timeout(timeout=3, job='move_x_cm') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start x move because lock held by {self.lock.job}")
                 return False
-            self.xy_stage.move_x_cm( params['distance'], params['velocity'])
+            self.xy_stage.move_x_cm( params.get('distance',0), params.get('velocity',1))
         
         time.sleep(1)
         while True:
@@ -114,14 +113,15 @@ class XY_Agent:
 
     def move_y_cm(self, session, params):
         """
-        params: dict: { 'distance': float, 'velocity':float < 1.2}
+        params: 
+            dict: { 'distance': float, 'velocity':float < 1.2}
         """
 
         with self.lock.acquire_timeout(timeout=3, job='move_y_cm') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start y move because lock held by {self.lock.job}")
                 return False, "could not acquire lock"
-            self.xy_stage.move_y_cm( params['distance'], params['velocity'])
+            self.xy_stage.move_y_cm( params.get('distance',0), params.get('velocity',1))
         
         time.sleep(1)
         while True:
@@ -139,7 +139,8 @@ class XY_Agent:
  
     def set_position(self, session, params):
         """
-        params: dict: {'position': (float, float)}
+        params: 
+            dict: {'position': (float, float)}
         """
         with self.lock.acquire_timeout(timeout=3, job='set_position') as acquired:
             if not acquired:
@@ -151,7 +152,8 @@ class XY_Agent:
 
     def start_acq(self, session, params=None):
         """
-        params: dict: {`sampling_frequency': float, sampling rate in Hz}
+        params: 
+            dict: {`sampling_frequency': float, sampling rate in Hz}
         """
         if params is None:
             params = {}
@@ -160,8 +162,8 @@ class XY_Agent:
         f_sample = params.get('sampling_frequency', self.sampling_frequency)
         pm = Pacemaker(f_sample, quantize=True)
 
-        if not self.initialized:
-            self.init_xy_stage_task(session)
+        if not self.initialized or self.xy_stage is None:
+            raise Exception("Connection to XY Stages not initialized")
         
         with self.lock.acquire_timeout(timeout=0, job='acq') as acquired:
             if not acquired:
@@ -187,14 +189,15 @@ class XY_Agent:
 
                 data['data']['x'] = pos[0]
                 data['data']['y'] = pos[1] 
+
                 self.agent.publish_to_feed('positions',data)
-                self.agent.feeds['positions'].flush_buffer()
-                
+
         return True, 'Acquisition exited cleanly.'
     
     def stop_acq(self, session, params=None):
         """
-        params: dict: {}
+        params: 
+            dict: {}
         """
         if self.take_data:
             self.take_data = False
@@ -213,7 +216,8 @@ def make_parser(parser=None):
     pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--ip-address')
     pgroup.add_argument('--port')
-
+    pgroup.add_argument('--mode')
+    pgroup.add_argument('--sampling_frequency')
     return parser
 
 
@@ -237,7 +241,7 @@ if __name__ == '__main__':
     site_config.reparse_args(args, 'XY_StageAgent')
     agent, runner = ocs_agent.init_site_agent(args)
 
-    xy_agent = XY_Agent(agent, args.ip_address, args.port, args.mode, args.sampling_frequency)
+    xy_agent = LATRt_XY_Agent(agent, args.ip_address, args.port, args.mode, args.sampling_frequency)
 
     agent.register_task('init_xy_stage', xy_agent.init_xy_stage_task)
     agent.register_task('move_x_cm', xy_agent.move_x_cm)
