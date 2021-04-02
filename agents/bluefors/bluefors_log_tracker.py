@@ -437,7 +437,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Interpret options in the context of site_config.
-    site_config.reparse_args(args, 'BlueforsAgent')
+    site_config.parse_args(agent_class='BlueforsAgent', parser=parser)
     print('I am following logs located at : %s' % args.log_directory)
 
     agent, runner = ocs_agent.init_site_agent(args)

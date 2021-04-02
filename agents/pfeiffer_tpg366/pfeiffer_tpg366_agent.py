@@ -168,7 +168,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    site_config.reparse_args(args, 'PfeifferAgent')
+    site_config.parse_args(agent_class='PfeifferAgent', parser=parser)
     agent, runner = ocs_agent.init_site_agent(args)
     pfeiffer_agent = PfeifferAgent(agent, args.ip_address, args.port)
     agent.register_process('acq', pfeiffer_agent.start_acq,

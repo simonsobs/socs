@@ -328,7 +328,7 @@ def main():
     args = parser.parse_args()
 
     # Interpret options in the context of site_config.
-    site_config.reparse_args(args, 'CryomechCPAAgent')
+    site_config.parse_args(agent_class='CryomechCPAAgent', parser=parser)
     print('I am in charge of device with serial number: %s' % args.serial_number)
 
     # Automatically acquire data if requested (default)

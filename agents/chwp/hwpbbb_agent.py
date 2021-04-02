@@ -661,7 +661,7 @@ if __name__ == '__main__':
     pgroup.add_argument('--port', default=8080)
     args = parser.parse_args()
 
-    site_config.reparse_args(args, 'HWPBBBAgent')
+    site_config.parse_args(agent_class='HWPBBBAgent', parser=parser)
     agent, runner = ocs_agent.init_site_agent(args)
     hwp_bbb_agent = HWPBBBAgent(agent, port=args.port)
     agent.register_process('acq', hwp_bbb_agent.start_acq, hwp_bbb_agent.stop_acq, startup=True)

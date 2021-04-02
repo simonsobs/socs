@@ -360,7 +360,7 @@ if __name__ == '__main__':
     parser = make_parser(site_parser)
 
     args = parser.parse_args()
-    site_config.reparse_args(args, 'SmurfStreamSimulator')
+    site_config.parse_args(agent_class='SmurfStreamSimulator', parser=parser)
 
     agent, runner = ocs_agent.init_site_agent(args)
     sim = SmurfStreamSimulator(agent, target_host=args.target_host,

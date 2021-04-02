@@ -435,7 +435,7 @@ if __name__ == "__main__":
     # Parse commandline
     args = parser.parse_args()
 
-    site_config.reparse_args(args, "MeinbergM1000Agent")
+    site_config.parse_args(agent_class="MeinbergM1000Agent", parser=parser)
 
     agent, runner = ocs_agent.init_site_agent(args)
     listener = MeinbergM1000Agent(agent,

@@ -170,7 +170,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Interpret options in the context of site_config.
-    site_config.reparse_args(args, 'ScpiPsuAgent')
+    site_config.parse_args(agent_class='ScpiPsuAgent', parser=parser)
 
     agent, runner = ocs_agent.init_site_agent(args)
 
