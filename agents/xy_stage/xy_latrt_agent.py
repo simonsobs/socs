@@ -12,7 +12,7 @@ if not ON_RTD:
     ## yes I shouldn't have named that module agent
     from xy_agent.xy_connect import XY_Stage
 
-class LATRt_XY_Agent:
+class LATRtXYAgent:
     """
     Agent for connecting to the LATRt XY Stages
     
@@ -241,7 +241,7 @@ if __name__ == '__main__':
     site_config.reparse_args(args, 'XY_StageAgent')
     agent, runner = ocs_agent.init_site_agent(args)
 
-    xy_agent = LATRt_XY_Agent(agent, args.ip_address, args.port, args.mode, args.sampling_frequency)
+    xy_agent = LATRtXYAgent(agent, args.ip_address, args.port, args.mode, args.sampling_frequency)
 
     agent.register_task('init_xy_stage', xy_agent.init_xy_stage_task)
     agent.register_task('move_x_cm', xy_agent.move_x_cm)
