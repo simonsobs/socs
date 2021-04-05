@@ -31,7 +31,7 @@ To configure the LATRt XY Stage Agent we need to add a block to our ocs
 configuration file. Here is an example configuration block using all of 
 the available arguments::
 
-      {'agent-class': 'LATRt_XY_StageAgent',
+      {'agent-class': 'LATRtXYStageAgent',
         'instance-id': 'XYWing',
         'arguments': [
           ['--ip-address', '192.168.10.15'],
@@ -68,5 +68,5 @@ is running.::
 Agent API
 ---------
 
-.. autoclass:: agents.xy_stage.xy_latrt_agent.LATRt_XY_Agent
+.. autoclass:: agents.xy_stage.xy_latrt_agent.LATRtXYAgent
     :members: init_xy_stage_task, move_x_cm, move_y_cm, set_position, start_acq, stop_acq 
