@@ -229,16 +229,12 @@ if __name__ == '__main__':
     # Start logging
     txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
 
-    # Get the default ocs argument parser.
-    site_parser = site_config.add_arguments()
+    parser = make_parser()
 
-    parser = make_parser(site_parser)
-
-    # Parse comand line.
-    args = parser.parse_args()
-    
     # Interpret options in the context of site_config.
-    site_config.reparse_args(args, 'XY_StageAgent')
+    args = site_config.parse_args(agent_class = 'LATRtXYAgent', parser=parser)
+    
+
     agent, runner = ocs_agent.init_site_agent(args)
 
     xy_agent = LATRtXYAgent(agent, args.ip_address, args.port, args.mode, args.sampling_frequency)
