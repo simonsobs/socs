@@ -142,6 +142,8 @@ class SmurfStreamSimulator:
 
         frame_rate = params.get('frame_rate', 1.)
         sample_rate = params.get('sample_rate', 10.)
+        if params.get('static_data', False):
+            self.log.info("Using static dataframes")
 
         frame_num = 0
         self.running_in_background = True
@@ -177,15 +179,20 @@ class SmurfStreamSimulator:
                 f['sostream_id'] = self.stream_id
                 f['data'] = core.G3TimestreamMap()
 
-                for i, chan in enumerate(self.channels):
-                    if params.get('static_data', False):
-                        ts = core.G3Timestream([chan.read() for t in times])
-                    else:
-                        self.log.info("Using static dataframe...")
-                        ts = static_data
+                if params.get('static_data', False):
+                    # Send exact same data to each channel
+                    ts = static_data
                     ts.start = core.G3Time(frame_start * core.G3Units.sec)
                     ts.stop = core.G3Time(frame_stop * core.G3Units.sec)
-                    f['data'][f"r{i:04}"] = ts
+                    for i, chan in enumerate(self.channels):
+                        f['data'][f"r{i:04}"] = ts
+                else:
+                    # Generate new, random data for each channel
+                    for i, chan in enumerate(self.channels):
+                        ts = core.G3Timestream([chan.read() for t in times])
+                        ts.start = core.G3Time(frame_start * core.G3Units.sec)
+                        ts.stop = core.G3Time(frame_stop * core.G3Units.sec)
+                        f['data'][f"r{i:04}"] = ts
 
                 self.writer.Process(f)
                 self.log.info("Writing frame...")
