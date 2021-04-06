@@ -68,5 +68,5 @@ is running.::
 Agent API
 ---------
 
-.. autoclass:: agents.xy_stage.xy_latrt_agent.LATRtXYAgent
+.. autoclass:: agents.xy_stage.xy_latrt_agent.LATRtXYStageAgent
     :members: init_xy_stage_task, move_x_cm, move_y_cm, set_position, start_acq, stop_acq 
