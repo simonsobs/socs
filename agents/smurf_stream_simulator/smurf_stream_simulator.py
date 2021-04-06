@@ -129,6 +129,9 @@ class SmurfStreamSimulator:
             Defaults to 1 frame pers sec.
         sample_rate : float, optional
             Sample rate [Hz] for each channel. Defaults to 10 Hz.
+        static_data : bool, optional
+            If True, send the same Timestream always, else generate random
+            data. Defaults to False
 
         """
         if params is None:
@@ -145,6 +148,8 @@ class SmurfStreamSimulator:
 
         # Control flags FIFO stack to keep Writer single threaded
         self.flags = deque([FlowControl.START])
+
+        static_data = core.G3Timestream(np.arange(0, 1, 1/sample_rate).tolist())
 
         while self.running_in_background:
             # Send START frame
@@ -173,7 +178,11 @@ class SmurfStreamSimulator:
                 f['data'] = core.G3TimestreamMap()
 
                 for i, chan in enumerate(self.channels):
-                    ts = core.G3Timestream([chan.read() for t in times])
+                    if params.get('static_data', False):
+                        ts = core.G3Timestream([chan.read() for t in times])
+                    else:
+                        self.log.info("Using static dataframe...")
+                        ts = static_data
                     ts.start = core.G3Time(frame_start * core.G3Units.sec)
                     ts.stop = core.G3Time(frame_stop * core.G3Units.sec)
                     f['data'][f"r{i:04}"] = ts
