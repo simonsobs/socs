@@ -1,0 +1,5 @@
+On the nanten-db conda environment, install like:
+
+  pip install .
+
+Do not use setup.py install without old-and-unmanageable.

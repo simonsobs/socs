@@ -1,0 +1,42 @@
+# Using "DataSets.StatusGeneral8100"
+Time                           : 224.621073245612
+Year                           : 2020
+Azimuth Mode                   : 'Preset'
+Azimuth commanded position     : 240.0
+Azimuth current position       : 240.0
+Azimuth current velocity       : 0.0
+Azimuth average position error : 0.0
+Azimuth peak position error    : 0.0
+Azimuth computer disabled      : 'No Fault'
+Azimuth axis disabled          : 'No Fault'
+Azimuth axis in stop           : False
+Azimuth brakes released        : True
+Azimuth axis in stow position  : False
+Azimuth stow pins - status     : 'All Retracted'
+Azimuth stop at LCP            : False
+Azimuth power on               : True
+Azimuth CCW limit              : 'No Fault'
+Azimuth CW limit               : 'No Fault'
+Azimuth summary fault          : 'No Fault'
+Elevation Mode                 : 'Preset'
+Elevation commanded position   : 60.0
+Elevation current position     : 60.0
+Elevation current velocity     : 0.0
+Elevation average position error : 0.0
+Elevation peak position error  : 0.0
+Elevation computer disabled    : 'No Fault'
+Elevation axis disabled        : 'No Fault'
+Elevation axis in stop         : False
+Elevation brakes released      : True
+Elevation axis in stow position : False
+Elevation stow pins - status   : 'All Retracted'
+Elevation stop at LCP          : False
+Elevation power on             : True
+Elevation CCW limit            : 'No Fault'
+Elevation CW limit             : 'No Fault'
+Elevation summary fault        : 'No Fault'
+PCU Operation                  : 'No Fault'
+AT Lock On                     : False
+Remote                         : True
+Qty of free program track stack positions : 9999
+

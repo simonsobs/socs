@@ -1,0 +1,37 @@
+# Site configuration for a fake observatory.
+hub:
+
+  wamp_server: ws://localhost:8001/ws
+  wamp_http: http://localhost:8001/call
+  wamp_realm: debug_realm
+  address_root: observatory
+  registry_address: observatory.registry
+
+hosts:
+
+  nanten-db: {
+    'crossbar': {'config-dir': '/home/simons/dot_crossbar'},
+    'log-dir': '/home/simons/ocs_logs',
+    'agent-paths': [
+        '/home/simons/code/ocs/agents/',
+        '/home/simons/code/vertex-acu-agent/agent/',
+        ],
+    'agent-instances': [
+      {'agent-class': 'HostMaster',
+       'instance-id': 'hm1',
+       'arguments': []},
+      {'agent-class': 'RegistryAgent',
+       'instance-id': 'registry',
+       'arguments': []},
+      {'agent-class': 'AggregatorAgent',
+       'instance-id': 'agg1',
+       'arguments': [['--initial-state', 'record'],
+                     ['--data-dir', '/home/simons/ocs/ocs_data']]},
+#      {'agent-class': 'FakeDataAgent',
+#       'instance-id': 'data1',
+#       'arguments': []},
+      {'agent-class': 'ACUAgent',
+       'instance-id': 'acu1',
+       'arguments': []},
+    ]
+  }

@@ -1,0 +1,325 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>ACU Interfaces &mdash; SOCS-ACU 0.0.1 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Frameworks Overview" href="frameworks.html" />
+    <link rel="prev" title="aculib - class reference" href="aculib.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="index.html" class="icon icon-home"> SOCS-ACU
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.0.1
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="aculib.html">aculib - class reference</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">ACU Interfaces</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#references">References</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#the-http-interface-s">The http interface(s)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#value-plugin">Value Plugin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#command-plugin">Command Plugin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#write-plugin">Write Plugin</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="frameworks.html">Frameworks Overview</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">SOCS-ACU</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+      <li>ACU Interfaces</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/acu.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="acu-interfaces">
+<h1>ACU Interfaces<a class="headerlink" href="#acu-interfaces" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="references">
+<h2>References<a class="headerlink" href="#references" title="Permalink to this headline">¶</a></h2>
+<p>ACU ICD 2.0</p>
+</div>
+<div class="section" id="the-http-interface-s">
+<h2>The http interface(s)<a class="headerlink" href="#the-http-interface-s" title="Permalink to this headline">¶</a></h2>
+<p>The ACU has a few different basic kinds of HTTP interface, called
+<em>Plugins</em>.  The main command and monitoring interfaces use the
+following Plugins:</p>
+<ul class="simple">
+<li><p>Values</p></li>
+<li><p>Command</p></li>
+<li><p>Write</p></li>
+<li><p>UploadPtStack</p></li>
+<li><p>GetPtStack</p></li>
+</ul>
+<p>Other Plugins, more useful during development / debugging:</p>
+<ul class="simple">
+<li><p>Documentation - Returns various descriptions of a module; see ICD.</p></li>
+<li><p>Meta (no parameters) - returns data structure information that can
+be used to parse results from the Values plugin; see ICD.</p></li>
+<li><p>Version (no parameters) - returns version codes for various ACU
+internals.</p></li>
+<li><p>List (no parameters) - returns a list of valid module identifiers.</p></li>
+</ul>
+<p>The interfaces make use of either the GET or POST type of HTTP
+requests.  Both of these have “Parameters”, passed through the URL.
+Additionally POST has “Data”, passed through the message body.</p>
+<div class="section" id="value-plugin">
+<h3>Value Plugin<a class="headerlink" href="#value-plugin" title="Permalink to this headline">¶</a></h3>
+<p>Parameters:</p>
+<ul class="simple">
+<li><p>Identifier (e.g. <code class="docutils literal notranslate"><span class="pre">Antenna.SkyAxes.Elevation</span></code>)</p></li>
+<li><p>Type - optional (default is <cite>Actual</cite>) - one of:</p>
+<ul>
+<li><p><cite>Actual</cite> - Returns the actual (current) values.</p></li>
+<li><p><cite>Target</cite> - Returns the target values.</p></li>
+<li><p><cite>Parameter</cite> - Returns the parameters.</p></li>
+</ul>
+</li>
+<li><p>Format - optional (default is a system config param?) - one of:</p>
+<ul>
+<li><p><cite>ASCII</cite></p></li>
+<li><p><cite>Binary</cite></p></li>
+<li><p><cite>HTML</cite></p></li>
+<li><p><cite>JSON</cite></p></li>
+<li><p><cite>SSV</cite></p></li>
+<li><p><cite>XML</cite></p></li>
+</ul>
+</li>
+</ul>
+<p>HTTP encoding is via GET:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>/Values?identifier={Identifier}&amp;type={Type}&amp;format={Format}
+</pre></div>
+</div>
+<p>Returns:</p>
+<ul class="simple">
+<li><p>HTTP 200 (ok) and the data in the requested format.</p></li>
+<li><p>HTTP 204 (No Content) and no content in the case of invalid
+Identifier or Type.</p></li>
+<li><p>HTTP 400 (Bad Request) and no data in the case of invalid Format.</p></li>
+</ul>
+</div>
+<div class="section" id="command-plugin">
+<h3>Command Plugin<a class="headerlink" href="#command-plugin" title="Permalink to this headline">¶</a></h3>
+<p>Parameters:</p>
+<ul class="simple">
+<li><p>Identifier (e.g. <code class="docutils literal notranslate"><span class="pre">DataSets.CmdAzElPositionTransfer</span></code>)</p></li>
+<li><p>Command (e.g. <code class="docutils literal notranslate"><span class="pre">Set</span> <span class="pre">Azimuth</span></code>)</p></li>
+<li><p>Parameter (e.g. <code class="docutils literal notranslate"><span class="pre">61.00</span></code>).  Note that multiple parameters are
+joined with a pipe, <code class="docutils literal notranslate"><span class="pre">|</span></code>, e.g. <code class="docutils literal notranslate"><span class="pre">61.00|76.50</span></code>.</p></li>
+</ul>
+<p>HTTP encoding is via GET:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>/Command?identifier={Identifier}&amp;command={Command}&amp;parameter={Parameter}
+</pre></div>
+</div>
+<p>Returns:</p>
+<ul>
+<li><p>In successful cases returns HTTP code 200 (OK) and text: <code class="docutils literal notranslate"><span class="pre">OK,</span>
+<span class="pre">Command</span> <span class="pre">executed.</span></code></p></li>
+<li><p>In some error cases returns HTTP code 200 (OK) and error text:
+<code class="docutils literal notranslate"><span class="pre">Failed:</span> <span class="pre">Invalid/Unknown</span> <span class="pre">value!</span></code>
+- This has been seen to occur in cases where the Identifier or</p>
+<blockquote>
+<div><p>Parameter are invalid.</p>
+</div></blockquote>
+</li>
+<li><p>In some error cases returns HTTP code 200 (OK) and error text:
+<code class="docutils literal notranslate"><span class="pre">Failed:</span> <span class="pre">Unknown</span> <span class="pre">command!</span></code>
+- This has been seen to occur in cases where the Command is invalid.</p></li>
+</ul>
+</div>
+<div class="section" id="write-plugin">
+<h3>Write Plugin<a class="headerlink" href="#write-plugin" title="Permalink to this headline">¶</a></h3>
+<p>Parameters:</p>
+<ul class="simple">
+<li><p>Identifier (e.g. <code class="docutils literal notranslate"><span class="pre">DataSets.CmdAzElPositionTransfer</span></code>)</p></li>
+</ul>
+<p>HTTP encoding is via POST:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>/Write?identifier={Identifier}
+</pre></div>
+</div>
+<p>The POST Data payload is binary-encoded data specific to the DataSet.
+For example, for DataSets.CmdAzElPositionTransfer, the structure
+consists of two double-precision floats, for AZ and EL in that order.</p>
+<p>Returns: ?</p>
+</div>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="frameworks.html" class="btn btn-neutral float-right" title="Frameworks Overview" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="aculib.html" class="btn btn-neutral float-left" title="aculib - class reference" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2018-2020, Simons Observatory DAQ Group
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>
