@@ -18,11 +18,65 @@ the labratory computer via usb cable and data is sent though that connection.
 Description
 -----------
 Out of the box, one just needs to connect the weather station to the 
-Vantage Pro2 monitor, and the monitor to the lab computer via usb. As long as
-the Vantage Pro2 monitor is on, the intitialize and data acquisition tasks 
-should work "out of the box", as it where.
+Vantage Pro2 monitor, and the monitor to the lab computer via usb.
 
-The Vantage Pro2 monitor and weather station records 
+The Vantage Pro2 monitor and weather station records many different
+types of weather data:
+
+-Barometer trend: the current 3 hour barometer trend. 
+        -60 = Falling rapidly
+        -20 = Falling slowly
+          0 = Steady
+         20 = Rising slowly
+         60 = Rising rapidly
+         80 = No trend available
+         Any other value = The VantagePro2 does not have the 3 hours
+         of data needed to determine the barometer trend.
+-Barometer: Current barometer reading (Hg/1000)
+-Inside Temperature: Temperatue in Fahrenheit (up to 10th of a degree)
+-Inside Humidity: Relative humidity in percent
+-Outside Temperature: Temperature in Fahrenheit (up to 10th of a degree)
+-Wind Speed: Wind speed in miles per hour
+-10 min average wind speed: 10 minute average wind speed in miles per hour
+-Wind Direction: From 1-360 degrees
+          0 = No wind direction data
+         90 = East
+        180 = South
+        270 = West
+        360 = North
+Extra Temperatures: VantagePro2 can read temperature from up to 7 extra
+        temperature stations. However, they come with a -90 degree fahrenheit
+        offset. So, a value of 0 means 0-90= -90 degrees fahrenheit.
+Soil Temperatures: Four soil temperature sensors, in the same format as the
+        extra temperatures format listed above.
+Leaf Temperatures: Four leaf temperature sensors, in the same format as the 
+        extra temperatures format listed above.
+Outside Humidity: Relativie humidity in percent
+Extra Humidities: Realtive humidity in percent for 7 humidity stations
+Rain Rate: Number of rain clicks (mm per hour)
+UV: "Unit is in UV index"
+Solar Radiation: Units in watt/meter^2
+Storm Rain: Stored in 100th of an inch
+Start Date of Current storm: Gives month, date, and year (offset by 2000)
+Day Rain: Number of rain clicks (0.1in or 0.2mm)/hour in the past day
+Month Rain: Number of rain clicks (0.1in or 0.2mm)/hour in the past month
+Year Rain: Number of rain clicks (0.1in or 0.2mm)/hour in the past year
+Day ET: 1000th of an inch
+Month ET: 1000th of an inch
+Year ET: 1000th of an inch
+Soil Moistures: In centibar, supports 4 soil sensors
+Leaf Wetnesses: Scale from 0-15. Supports 4 leaf sensors
+         0 = Very dry
+        15 = Very wet
+Inside Alarms: Currently active inside alarms
+Rain Alarms: Currently active rain alarms
+Outside Alarms: Currently active outside alarms
+Outside Humidity Alarms: Currently active humidity alarms
+Extra Temp/Hum Alarms: Currently active extra temperature/humidity alarms
+Soil & Leaf Alarms: Currently active soil/leaf alarms
+Console Battery Voltage: Voltage = ((Data x 300)/512)/100.0
+Time of Sunrise: Time is stored as hour x 100 + min 
+Time of Sunset: Time is stored as hour x 100 + min
 
 Configuration File Examples
 ---------------------------
@@ -31,23 +85,32 @@ Agent in a docker container.
 
 ocs-config
 ``````````
-To configure the Vantage Pro2 Agent we need to add a VantagePro2Agent block to our ocs
-configuration file. Here is an example configuration block using all of the
-available arguments::
+To configure the Vantage Pro2 Agent we need to add a VantagePro2Agent block to
+our ocs configuration file. Here is an example configuration block,
+where we do not specify the port.
+Note: One should first add the serial number of the VantagePro 2 device
+to the udev file and create SYMLINK. Serial Number can be found by runnning
+dmesg into the command line. Here, we use the serial number as 'VP23'::
 
      {'agent-class': 'VantagePro2Agent',
        'instance-id': 'vantagepro2agent',
-       'arguments': [['--port', '/dev/ttyUSB0'],
-                     ['--mode', 'acq'],
-                     ['--freq', '2']]},
+       'arguments': [['--mode', 'acq'],
+                     ['--serial-number', 'VP23'],
+                     ['--sample-freq', '0.5']]},
    
-You should know the port, or usb connection, that the Vantage Pro2 is connected to.
-Assign that location to the '--port' argument.
+An example block of the udev rules file for the VantagePro 2 follows::
 
-Note, the '--freq' argument specifies the sample frequency that the Vantage Pro2 
-Monitor collects weather data. The Vantage Pro2 and weather station can sample weather
-data at a maximum sample frequency of 1/2 Hz. The user can define lower 
-sample frequencies if they so desire.  
+        SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", 
+                SYMLINK="VP23"
+
+
+The agent will attempt to find the port that the Vantage Pro2 is connected to
+based on the serial number.
+
+Note the '--freq' argument specifies the sample frequency that the Vantage Pro2
+Monitor collects weather data. The Vantage Pro2 and weather station can
+sample weathervdata at a maximum sample frequency of 0.5 Hz.
+The user can define slower sample frequencies if they so desire.
 
 Docker
 ``````
@@ -57,21 +120,12 @@ example docker-compose service configuration is shown here::
   ocs-vantage-pro2:
     build: /socs/agents/vantagePro2_agent
 
-    environment:
-      TARGET: VantagePro2Agent
-      NAME: 'Vantage Pro2'
-      DESCRIPTION: "Vantage Pro2 Weather Station Monitor"
-      FEED: "weather_data"
     volumes:
-      - ./:/config:ro
+      - ${OCS_CONFIG_DIR}:/config:ro
     command:
       - "--instance-id=vantagepro2agent"
       - "--site-hub=ws://sisock-crossbar:8001/ws"
       - "--site-http=http://sisock-crossbar:8001/call"
-    devices:
-      - "/dev/ttyUSB0:/dev/ttyUSB0"
-
-Where the device location is listed under "devices:"
 
 Agent API
 ---------

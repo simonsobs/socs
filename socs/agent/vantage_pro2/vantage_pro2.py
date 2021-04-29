@@ -163,6 +163,67 @@ class VantagePro2:
             User should read Vantage Pro Serial Communication Reference Manual
             for the format of the loop data packet.
             Specifically for units of data!
+
+            -Barometer trend: the current 3 hour barometer trend.
+                    -60 = Falling rapidly
+                    -20 = Falling slowly
+                    0 = Steady
+                    20 = Rising slowly
+                    60 = Rising rapidly
+                    80 = No trend available
+                    Any other value = The VantagePro2 does not have the 3 hours
+                    of data needed to determine the barometer trend.
+            -Barometer: Current barometer reading (Hg/1000)
+            -Inside Temperature: Temperatue in Fahrenheit (10th of a degree)
+            -Inside Humidity: Relative humidity in percent
+            -Outside Temperature: Temperature in Fahrenheit (10th of a degree)
+            -Wind Speed: Wind speed in miles per hour
+            -10 min average wind speed: 10 minute average wind speed in mph
+            -Wind Direction: From 1-360 degrees
+                    0 = No wind direction data
+                    90 = East
+                    180 = South
+                    270 = West
+                    360 = North
+            Extra Temperatures: Temperature from up to 7 extra temperature
+                stations.
+            Soil Temperatures: Four soil temperature sensors, in the same
+                format as the extra temperatures format listed above.
+            Leaf Temperatures: Four leaf temperature sensors, in the same
+                format as the extra temperatures format listed above.
+            Outside Humidity: Relativie humidity in percent
+            Extra Humidities: Realtive humidity in percent for 7 humidity
+                 stations
+            Rain Rate: Number of rain clicks (0.1in or 0.2mm) per hour
+            UV: "Unit is in UV index"
+            Solar Radiation: Units in watt/meter^2
+            Storm Rain: Stored in 100th of an inch
+            Start Date of Current storm: Gives month, date,
+                and year (offset by 2000)
+            Day Rain: Number of rain clicks (0.1in or 0.2mm)/hour
+                in the past day
+            Month Rain: Number of rain clicks (0.1in or 0.2mm)/hour
+                in the past month
+            Year Rain: Number of rain clicks (0.1in or 0.2mm)/hour
+                in the past year
+            Day ET: 1000th of an inch
+            Month ET: 1000th of an inch
+            Year ET: 1000th of an inch
+            Soil Moistures: In centibar, supports 4 soil sensors
+            Leaf Wetnesses: Scale from 0-15. Supports 4 leaf sensors
+                    0 = Very dry
+                    15 = Very wet
+            Inside Alarms: Currently active inside alarms
+            Rain Alarms: Currently active rain alarms
+            Outside Alarms: Currently active outside alarms
+            Outside Humidity Alarms: Currently active humidity alarms
+            Extra Temp/Hum Alarms: Currently active extra
+                temperature/humidity alarms
+            Soil & Leaf Alarms: Currently active soil/leaf alarms
+            Console Battery Voltage: Voltage
+            Time of Sunrise: Time is stored as hour x 100 + min
+            Time of Sunset: Time is stored as hour x 100 + min
+
         """
 
         info = b''
@@ -179,9 +240,6 @@ class VantagePro2:
 
         loop_data = {}
         byte_data = struct.unpack('=5b3h1b1h2B1H23b1h1b9h25b1h2b2h2c1h', info)
-        loop_data['L'] = byte_data[0]
-        loop_data['O'] = byte_data[1]
-        loop_data['O1'] = byte_data[2]
         loop_data['bar_trend'] = byte_data[3]
         loop_data['packet_type'] = byte_data[4]
         loop_data['next_record'] = byte_data[5]
@@ -216,7 +274,7 @@ class VantagePro2:
         loop_data['extra_hum5'] = byte_data[34]
         loop_data['extra_hum6'] = byte_data[35]
         loop_data['rain_rate'] = byte_data[36]
-        loop_data['uv'] = byte_data[37]
+        loop_data['UV'] = byte_data[37]
         loop_data['solar_rad'] = byte_data[38]
         loop_data['storm_rain'] = byte_data[39] / 100.0
         loop_data['storm_start'] = byte_data[40]
@@ -260,16 +318,13 @@ class VantagePro2:
         # CRC check, data must be sent byte by byte
         pure_data = struct.unpack('=99b', info)
         self.crc_check(pure_data)
-        del loop_data['L']
-        del loop_data['O']
-        del loop_data['O1']
-        
+
         return loop_data
 
     def weather_daq(self):
         """
-            Issues "LOOP <loops>" command to weather station, and unpacks
-            the data to daq{}.
+            Issues "LOOP 1"(which samples weather data) command
+            to weather station, and unpacks the data.
         """
 
         # Startup and issue loop command
