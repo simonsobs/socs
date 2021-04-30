@@ -1,0 +1,16 @@
+#!/bin/bash
+
+NAME=$1
+PORT=$2
+{
+	sleep 0.5
+	echo "*W0C83"
+	sleep 0.5
+	echo "*W01400000"
+	sleep 0.5
+	echo "*R01"
+	sleep 0.5
+	echo "*Z02"
+	sleep 0.5
+} | telnet $NAME $PORT > output.txt
+

@@ -1,0 +1,19 @@
+#!/bin/bash
+
+NAME=$1
+PORT=$2
+
+P_VALUE=$3
+I_VALUE=$4
+D_VALUE=$5
+{
+	sleep 0.5
+	echo "*W17$P_VALUE"
+	sleep 0.5
+	echo "*W18$I_VALUE"
+	sleep 0.5
+	echo "*W19$D_VALUE"
+	sleep 0.5
+	echo "*Z02"
+	sleep 0.5
+} | telnet $NAME $PORT > output.txt
