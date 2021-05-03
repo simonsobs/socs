@@ -41,6 +41,7 @@ Simulator Reference  Simulators are used to mock software and hardware
     agents/cryomech_cpa
     agents/labjack
     agents/lakeshore240
+    agents/lakeshore370
     agents/lakeshore372
     agents/latrt_xy_stage
     agents/meinberg_m1000_agent

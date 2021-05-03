@@ -1348,7 +1348,7 @@ class Curve:
 
         :returns: the response from the CRVDEL command
         :rtype: str
-        3"""
+        """
         resp = self.ls.msg(f"CRVDEL {self.curve_num}")
         self.get_header()
         return resp
@@ -1399,7 +1399,7 @@ class Heater:
         """Query the heater mode using the CMODE?, CPOL?, CSET? commands.
 
         :returns: 6-tuple with output mode, polarity, input channel, 
-        unfiltered/filtered, heater units (kelvin, ohms), and autoscanning delay time.
+            unfiltered/filtered, heater units (kelvin, ohms), and autoscanning delay time.
         :rtype: tuple
         """
         _mode = self.ls.msg('CMODE?')
