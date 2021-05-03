@@ -101,8 +101,8 @@ class FTSMirrorAgent:
     Agent for connecting to the FTS mirror control
 
     Args:
-        ip_addr: IP address where RPi server is running
-        port: Port the RPi Server is listening on
+        ip_addr: IP address of Motion Controller
+        port: Port of Motion Controller
         mode: 'acq': Start data acquisition on initialize
         samp: default sampling frequency in Hz
  
@@ -111,7 +111,7 @@ class FTSMirrorAgent:
     def __init__(self, agent, ip_addr, port, mode=None, samp=2):
 
         self.ip_addr = ip_addr
-        self.port = port
+        self.port = int(port)
 
         self.stage = None
         self.initialized = False
