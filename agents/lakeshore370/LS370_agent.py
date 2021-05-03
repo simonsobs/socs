@@ -112,7 +112,7 @@ class LS370_Agent:
         self.agent = agent
         # Registers temperature feeds
         agg_params = {
-            'frame_length': 10*60 #[sec]
+            'frame_length': 10*60  # [sec]
         }
         self.agent.register_feed('temperatures',
                                  record=True,
@@ -162,7 +162,7 @@ class LS370_Agent:
             else:
                 self.module = LS370(self.port)
                 print("Initialized Lakeshore module: {!s}".format(self.module))
-                session.add_message("Lakeshore initilized with ID: %s"%self.module.id)
+                session.add_message("Lakeshore initilized with ID: %s" % self.module.id)
 
                 self.thermometers = [channel.name for channel in self.module.channels]
 
@@ -237,11 +237,11 @@ class LS370_Agent:
 
                             # Check user set dwell time isn't too long
                             if self.dwell_time_delay > dwell_time:
-                                self.log.warn("WARNING: User set dwell_time_delay of " + \
-                                              "{delay} s is larger than channel " + \
-                                              "dwell time of {chan_time} s. If " + \
-                                              "you are autoscanning this will " + \
-                                              "cause no data to be collected. " + \
+                                self.log.warn("WARNING: User set dwell_time_delay of " +
+                                              "{delay} s is larger than channel " +
+                                              "dwell time of {chan_time} s. If " +
+                                              "you are autoscanning this will " +
+                                              "cause no data to be collected. " +
                                               "Reducing dwell time delay to {s} s.",
                                               delay=self.dwell_time_delay,
                                               chan_time=dwell_time,
@@ -313,10 +313,9 @@ class LS370_Agent:
             heater_string = params.get('heater', 'sample')
             if heater_string.lower() == 'sample':
                 heater = self.module.sample_heater
-            elif heater_string.lower() == 'still':   #TODO: add still heater class to driver
-                #heater = self.module.still_heater
+            elif heater_string.lower() == 'still':  # TODO: add still heater class to driver
+                # heater = self.module.still_heater
                 self.log.warn(f"{heater_string} heater not yet implemented in this agent, please modify client")
-
 
             current_range = heater.get_heater_range()
 
@@ -457,12 +456,12 @@ class LS370_Agent:
 
             # Check we're in correct control mode for servo.
             if self.module.sample_heater.mode != 'Closed Loop':
-                session.add_message(f'Changing control to Closed Loop mode for servo.')
+                session.add_message('Changing control to Closed Loop mode for servo.')
                 self.module.sample_heater.set_mode("Closed Loop")
 
             # Check we aren't autoscanning.
             if self.module.get_autoscan() is True:
-                session.add_message(f'Autoscan is enabled, disabling for PID control on dedicated channel.')
+                session.add_message('Autoscan is enabled, disabling for PID control on dedicated channel.')
                 self.module.disable_autoscan()
 
             # Check to see if we passed an input channel, and if so change to it
@@ -472,17 +471,17 @@ class LS370_Agent:
 
             # Check we're scanning same channel expected by heater for control.
             if self.module.get_active_channel().channel_num != int(self.module.sample_heater.input):
-                session.add_message(f'Changing active channel to expected heater control input')
+                session.add_message('Changing active channel to expected heater control input')
                 self.module.set_active_channel(int(self.module.sample_heater.input))
 
             # Check we're setup to take correct units.
             if self.module.sample_heater.units != 'kelvin':
-                session.add_message(f'Setting preferred units to Kelvin on heater control.')
+                session.add_message('Setting preferred units to Kelvin on heater control.')
                 self.module.sample_heater.set_units('kelvin')
 
             # Make sure we aren't servoing too high in temperature.
             if params["temperature"] > 1:
-                return False, f'Servo temperature is set above 1K. Aborting.'
+                return False, 'Servo temperature is set above 1K. Aborting.'
 
             self.module.sample_heater.set_setpoint(params["temperature"])
 
@@ -522,14 +521,14 @@ class LS370_Agent:
 
             if np.abs(mean - setpoint) < params['threshold']:
                 print("passed threshold")
-                session.add_message(f'Setpoint Difference: ' + str(mean - setpoint))
+                session.add_message('Setpoint Difference: ' + str(mean - setpoint))
                 session.add_message(f'Average is within {params["threshold"]} K threshold. Proceeding with calibration.')
 
                 return True, f"Servo temperature is stable within {params['threshold']} K"
 
             else:
                 print("we're in the else")
-                #adjust_heater(t,rest)
+                # adjust_heater(t,rest)
 
         return False, f"Temperature not stable within {params['threshold']}."
 
@@ -554,7 +553,7 @@ class LS370_Agent:
             session.set_status('running')
 
             if params['heater'].lower() == 'still':
-                #self.module.still_heater.set_mode(params['mode']) #TODO: add still heater to driver
+                # self.module.still_heater.set_mode(params['mode']) #TODO: add still heater to driver
                 self.log.warn(f"{params['heater']} heater not yet implemented in this agent, please modify client")
             if params['heater'].lower() == 'sample':
                 self.module.sample_heater.set_mode(params['mode'])
@@ -590,8 +589,8 @@ class LS370_Agent:
 
             display = params.get('display', None)
 
-            if heater == 'still':  #TODO: add still heater to driver
-                #self.module.still_heater.set_heater_output(output, display_type=display)
+            if heater == 'still':  # TODO: add still heater to driver
+                # self.module.still_heater.set_heater_output(output, display_type=display)
                 self.log.warn(f"{heater} heater not yet implemented in this agent, please modify client")
             if heater.lower() == 'sample':
                 self.log.info("display: {}\toutput: {}".format(display, output))
@@ -618,15 +617,15 @@ class LS370_Agent:
             Contains parameters 'attribute' (not optional), 'channel' (optional, default 'A'),
             and 'wait' (optional, default 1).
         '''
-        with self._lock.acquire_timeout(job = f"get_{params['attribute']}", timeout = 3) as acquired:
+        with self._lock.acquire_timeout(job=f"get_{params['attribute']}", timeout=3) as acquired:
             if not acquired:
                 print(f"Lock could not be acquired because it is held by {self._lock.job}")
                 return False, 'Could not acquire lock'
 
             session.set_status('running')
-            
+
             # get channel
-            channel_key = int(params.get('channel', 1)) # default to input 1
+            channel_key = int(params.get('channel', 1))
             channel = self.module.chan_num2channel(channel_key)
 
             # check that attribute is a valid channel method
@@ -650,13 +649,13 @@ class LS370_Agent:
             Contains parameters 'attribute' (not optional), 'heater' (optional, default '2'),
             and 'wait' (optional, default 1).
         '''
-        with self._lock.acquire_timeout(job = f"get_{params['attribute']}", timeout = 3) as acquired:
+        with self._lock.acquire_timeout(job=f"get_{params['attribute']}", timeout=3) as acquired:
             if not acquired:
                 print(f"Lock could not be acquired because it is held by {self._lock.job}")
                 return False, 'Could not acquire lock'
 
             session.set_status('running')
-            
+
             # get heater
             heater = self.module.sample_heater
 
@@ -671,6 +670,7 @@ class LS370_Agent:
             time.sleep(.1)
 
         return True, f"Retrieved sample heater {params['attribute']}"
+
 
 def make_parser(parser=None):
     """Build the argument parser for the Agent. Allows sphinx to automatically
@@ -700,6 +700,7 @@ def make_parser(parser=None):
                         help='Automatically start data acquisition on startup')
 
     return parser
+
 
 if __name__ == '__main__':
     # For logging
