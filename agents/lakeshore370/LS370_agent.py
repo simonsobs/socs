@@ -8,8 +8,11 @@ import threading
 from contextlib import contextmanager
 
 from socs.Lakeshore.Lakeshore370 import LS370
-from ocs import ocs_agent, site_config
-from ocs.ocs_twisted import TimeoutLock
+
+ON_RTD = os.environ.get('READTHEDOCS') == 'True'
+if not ON_RTD:
+    from ocs import ocs_agent, site_config
+    from ocs.ocs_twisted import TimeoutLock
 
 
 class YieldingLock:
