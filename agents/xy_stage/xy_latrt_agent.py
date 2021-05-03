@@ -26,7 +26,7 @@ class LATRtXYStageAgent:
     def __init__(self, agent, ip_addr, port, mode=None, samp=2):
         
         self.ip_addr = ip_addr
-        self.port = port
+        self.port = int(port)
         
         self.xy_stage = None
         self.initialized = False
@@ -191,7 +191,7 @@ class LATRtXYStageAgent:
                 data['data']['y'] = pos[1] 
 
                 self.agent.publish_to_feed('positions',data)
-
+                session.data.update( data['data'] )
         return True, 'Acquisition exited cleanly.'
     
     def stop_acq(self, session, params=None):
