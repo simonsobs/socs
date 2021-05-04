@@ -131,6 +131,7 @@ class LS370_Agent:
         Parameters:
             auto_acquire (bool, optional): Default is False. Starts data
                 acquisition after initialization if True.
+            force (bool, optional): Force re-initialize the lakeshore if True.
 
         """
 
@@ -175,6 +176,11 @@ class LS370_Agent:
         return True, 'Lakeshore module initialized.'
 
     def start_acq(self, session, params=None):
+        """acq(params=None)
+
+        Method to start data acquisition process.
+
+        """
 
         with self._acq_proc_lock.acquire_timeout(timeout=0, job='acq') \
              as acq_acquired, \
@@ -294,9 +300,10 @@ class LS370_Agent:
         Adjust the heater range for servoing cryostat. Wait for a specified
         amount of time after the change.
 
-        :param params: dict with 'range', 'wait' keys
+        :param params: dict with 'heater', 'range', 'wait' keys
         :type params: dict
 
+        heater - which heater to set range for, 'sample' by default (and the only implemented one)
         range - the heater range value to change to
         wait - time in seconds after changing the heater value to wait, allows
                the servo to adjust to the new heater range, typical value of
@@ -609,14 +616,33 @@ class LS370_Agent:
         return True, "Set {} display to {}, output to {}".format(heater, display, output)
 
     def get_channel_attribute(self, session, params):
-        '''Gets an arbitrary channel attribute, stored in the session.data dict
+        """Gets an arbitrary channel attribute, stored in the session.data dict
 
         Parameters
         ----------
         params : dict
-            Contains parameters 'attribute' (not optional), 'channel' (optional, default 'A'),
-            and 'wait' (optional, default 1).
-        '''
+            Contains parameters 'attribute' (not optional), 'channel' (optional, default '1').
+
+        Channel attributes stored in the session.data object are in the structure::
+
+            >>> session.data
+            {"calibration_curve": 21,
+             "dwell": 3,
+             "excitation": 6.32e-6,
+             "excitation_mode": "voltage",
+             "excitation_power": 2.0e-15,
+             "kelvin_reading": 100.0e-3,
+             "pause": 3,
+             "reading_status": ["T.UNDER"]
+             "resistance_range": 2.0e-3,
+             "resistance_reading": 10.0e3,
+             "temperature_coefficient": "negative",
+            }
+
+        Note: Only attribute called with this method will be populated for the
+        given channel. This example shows all available attributes.
+
+        """
         with self._lock.acquire_timeout(job=f"get_{params['attribute']}", timeout=3) as acquired:
             if not acquired:
                 print(f"Lock could not be acquired because it is held by {self._lock.job}")
@@ -641,14 +667,31 @@ class LS370_Agent:
         return True, f"Retrieved {channel.name} {params['attribute']}"
 
     def get_heater_attribute(self, session, params):
-        '''Gets an arbitrary heater attribute, stored in the session.data dict
+        """Gets an arbitrary heater attribute, stored in the session.data dict
 
         Parameters
         ----------
         params : dict
-            Contains parameters 'attribute' (not optional), 'heater' (optional, default '2'),
-            and 'wait' (optional, default 1).
-        '''
+            Contains parameters 'attribute'.
+
+        Heater attributes stored in the session.data object are in the structure::
+
+            >>> session.data
+            {"heater_range": 1e-3,
+             "heater_setup": ["current", 1e-3, 120],
+             "input_channel": 6,
+             "manual_out": 0.0,
+             "mode": "Closed Loop",
+             "pid": (80, 10, 0),
+             "setpoint": 100e-3,
+             "still_output", 10.607,
+             "units": "kelvin",
+            }
+
+        Note: Only the attribute called with this method will be populated,
+        this example just shows all available attributes.
+
+        """
         with self._lock.acquire_timeout(job=f"get_{params['attribute']}", timeout=3) as acquired:
             if not acquired:
                 print(f"Lock could not be acquired because it is held by {self._lock.job}")

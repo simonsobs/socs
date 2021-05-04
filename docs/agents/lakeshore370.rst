@@ -26,7 +26,8 @@ configuration block::
   {'agent-class': 'Lakeshore370Agent',
    'instance-id': 'LSA22YG',
    'arguments': [['--serial-number', 'LSA22YG'],
-                 ['--port', '/dev/ttyUSB1']]},
+                 ['--port', '/dev/ttyUSB1'],
+                 ['--dwell-time-delay', 0]]},
 
 Each device requires configuration under 'agent-instances'. See the OCS site
 configs documentation for more details.
@@ -40,25 +41,21 @@ example configuration is::
   ocs-LSA22YE:
     image: simonsobs/ocs-lakeshore370-agent
     hostname: ocs-docker
-    network_mode: "host"
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
     devices:
       - "/dev/ttyUSB1:/dev/ttyUSB1"
     command:
       - "--instance-id=LSA22YE"
-      - "--site-hub=ws://127.0.0.1:8001/ws"
-      - "--site-http=http://127.0.0.1:8001/call"
-
-.. note::
-    Since the 370 Agent container needs ``network_mode: "host"``, it must be
-    configured to connect to the crossbar server as if it was on the host
-    system. In this example the crossbar server is running on localhost,
-    ``127.0.0.1``, but on your network this may be different.
+      - "--site-hub=ws://crossbar:8001/ws"
+      - "--site-http=http://crossbar:8001/call"
 
 .. note::
     The serial numbers here will need to be updated for your device.
 
+.. note::
+    The device path may differ on your machine, and if only using the ttyUSB
+    value as shown here, is not guaranteed to be static.
 
 Direct Communication
 --------------------
