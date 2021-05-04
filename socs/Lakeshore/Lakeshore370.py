@@ -387,12 +387,12 @@ class Channel:
         self.ls = ls
         self.channel_num = channel_num
         self.enabled = False
-        self.get_input_channel_parameter()
-        self.get_input_setup()
+        self._get_input_channel_parameter()
+        self._get_input_setup()
         self.name = f'Channel {channel_num}'
         #self.tlimit = self.get_temperature_limit()
 
-    def get_input_channel_parameter(self):
+    def _get_input_channel_parameter(self):
         """Run Input Channel Parameter Query
 
         ::
@@ -430,7 +430,7 @@ class Channel:
 
         Parameters should be <disabled/enabled>, <dwell>, <pause>, <curve
         number>, <tempco>. Will determine <input/channel> from attributes. This
-        allows us to use output from get_input_channel_parameters directly, as
+        allows us to use output from _get_input_channel_parameters directly, as
         it doesn't return <input/channel>.
 
         :param params: INSET parameters
@@ -446,7 +446,7 @@ class Channel:
         param_str = ','.join(reply)
         return self.ls.msg(f"INSET {param_str}")
 
-    def get_input_setup(self):
+    def _get_input_setup(self):
         """Run Resistance Range Query, storing results in human readable format.
 
         ::
@@ -537,7 +537,7 @@ class Channel:
         :returns: excitation mode, 'current' or 'voltage'
         :rtype: str
         """
-        resp = self.get_input_setup()
+        resp = self._get_input_setup()
         self.mode = mode_key[resp[0]]
         return self.mode
 
@@ -554,7 +554,7 @@ class Channel:
         """
         assert excitation_mode in ['voltage', 'current']
 
-        resp = self.get_input_setup()
+        resp = self._get_input_setup()
         resp[0] = mode_lock[excitation_mode]
 
         self.mode = mode_key[resp[0]]
@@ -567,7 +567,7 @@ class Channel:
         :returns: excitation value in volts or amps, depending on mode
         :rtype: float
         """
-        resp = self.get_input_setup()
+        resp = self._get_input_setup()
         _mode = resp[0]
         _excitation = resp[1]
 
@@ -596,14 +596,14 @@ class Channel:
 
         closest_value = min(excitation_lock, key=lambda x: abs(x-excitation_value))
 
-        resp = self.get_input_setup()
+        resp = self._get_input_setup()
         resp[1] = str(excitation_lock[closest_value])
 
         return self._set_input_setup(resp)
 
     def enable_autorange(self):
         """Enable auto range for channel via RDGRNG command."""
-        resp = self.get_input_setup()
+        resp = self._get_input_setup()
         #order of resp args switch for range, autorange in LS370
         resp[3] = '1'     
 
@@ -616,7 +616,7 @@ class Channel:
 
     def disable_autorange(self):
         """Disable auto range for channel via RDGRNG command."""
-        resp = self.get_input_setup()
+        resp = self._get_input_setup()
         resp[3] = '0'
 
         #all LS370 channels respond to this command
@@ -649,7 +649,7 @@ class Channel:
 
         _range = get_closest_resistance_range(resistance_range)
 
-        resp = self.get_input_setup()
+        resp = self._get_input_setup()
 
         #order of range, autorange switched in LS370
         resp[2] = str(range_lock[_range])
@@ -662,7 +662,7 @@ class Channel:
         :returns: resistance range in Ohms
         :rtype: float
         """
-        resp = self.get_input_setup()
+        resp = self._get_input_setup()
         _range = resp[2]
         self.range = range_key[int(_range)]
         return self.range
@@ -673,7 +673,7 @@ class Channel:
         :returns: state of excitation
         :rtype: str
         """
-        resp = self.get_input_setup()
+        resp = self._get_input_setup()
         resp[4] = '0'
 
         #all LS370 channels respond to this command
@@ -689,7 +689,7 @@ class Channel:
         :returns: state of excitation
         :rtype: str
         """
-        resp = self.get_input_setup()
+        resp = self._get_input_setup()
         resp[4] = '1'
 
         #all LS370 channels respond to this command
@@ -721,7 +721,7 @@ class Channel:
 #        """
 #        assert units.lower() in ['kelvin', 'ohms']
 #
-#        resp = self.get_input_setup()
+#        resp = self._get_input_setup()
 #        resp[5] = units_lock[units.lower()]
 #        return self._set_input_setup(resp)
 #
@@ -731,7 +731,7 @@ class Channel:
 #        :returns: preferred units
 #        :rtype: str
 #        """
-#        resp = self.get_input_setup()
+#        resp = self._get_input_setup()
 #        _units = resp[5]
 #        self.units = units_key[_units]
 #
@@ -743,7 +743,7 @@ class Channel:
         :returns: response from self._set_input_channel_parameter()
         :rtype: str
         """
-        resp = self.get_input_channel_parameter()
+        resp = self._get_input_channel_parameter()
         resp[0] = '1'
         self.enabled = True
         return self._set_input_channel_parameter(resp)
@@ -754,7 +754,7 @@ class Channel:
         :returns: response from self._set_input_channel_parameter()
         :rtype: str
         """
-        resp = self.get_input_channel_parameter()
+        resp = self._get_input_channel_parameter()
         resp[0] = '0'
         self.enabled = False
         return self._set_input_channel_parameter(resp)
@@ -770,7 +770,7 @@ class Channel:
         """
         assert dwell in range(1, 201), "Dwell must be 1 to 200 sec"
 
-        resp = self.get_input_channel_parameter()
+        resp = self._get_input_channel_parameter()
         resp[1] = str(dwell)  # seconds
         self.dwell = dwell  # seconds
         return self._set_input_channel_parameter(resp)
@@ -781,7 +781,7 @@ class Channel:
         :returns: the dwell time in seconds
         :rtype: int
         """
-        resp = self.get_input_channel_parameter()
+        resp = self._get_input_channel_parameter()
         self.dwell = int(resp[1])
         return self.dwell
 
@@ -796,7 +796,7 @@ class Channel:
         """
         assert pause in range(3, 201), "Pause must be 3 to 200 sec"
 
-        resp = self.get_input_channel_parameter()
+        resp = self._get_input_channel_parameter()
         resp[2] = str(pause)  # seconds
         self.pause = pause  # seconds
         return self._set_input_channel_parameter(resp)
@@ -807,7 +807,7 @@ class Channel:
         :returns: the pause time in seconds
         :rtype: int
         """
-        resp = self.get_input_channel_parameter()
+        resp = self._get_input_channel_parameter()
         self.pause = int(resp[2])  # seconds
         return self.pause
 
@@ -821,7 +821,7 @@ class Channel:
         """
         assert curve_number in range(0, 60), "Curve number must from 0 to 59"
 
-        resp = self.get_input_channel_parameter()
+        resp = self._get_input_channel_parameter()
         resp[3] = str(curve_number)
         self.curve_num = self.get_calibration_curve()
         return self._set_input_channel_parameter(resp)
@@ -832,7 +832,7 @@ class Channel:
         :returns: curve number in use for the channel
         :rtype: int
         """
-        resp = self.get_input_channel_parameter()
+        resp = self._get_input_channel_parameter()
         self.curve_num = int(resp[3])
         return self.curve_num
 
@@ -849,7 +849,7 @@ class Channel:
         """
         assert coefficient in ['positive', 'negative']
 
-        resp = self.get_input_channel_parameter()
+        resp = self._get_input_channel_parameter()
         resp[4] = tempco_lock[coefficient]
         self.tempco = coefficient
         return self._set_input_channel_parameter(resp)
@@ -859,7 +859,7 @@ class Channel:
 
         :returns: temperature coefficient
         """
-        resp = self.get_input_channel_parameter()
+        resp = self._get_input_channel_parameter()
         self.tempco = tempco_key[resp[4]]
         return self.tempco
 
@@ -1391,11 +1391,11 @@ class Heater:
         self.rng_limit = None
         self.display = None
 
-        self.get_output_mode()
+        self._get_output_mode()
         self.get_heater_range()
         self.get_heater_setup()
 
-    def get_output_mode(self):
+    def _get_output_mode(self):
         """Query the heater mode using the CMODE?, CPOL?, CSET? commands.
 
         :returns: 6-tuple with output mode, polarity, input channel, 
@@ -1477,7 +1477,7 @@ class Heater:
         :returns: The output mode
         :rtype: str
         """
-        self.get_output_mode()
+        self._get_output_mode()
         return self.mode
 
     def set_mode(self, mode):
@@ -1491,7 +1491,7 @@ class Heater:
         # TODO: Make assertions check specific output and it's validity in mode selection
         assert mode.lower() in output_modes_lock.keys(), f"{mode} not a valid mode"
 
-        resp = self.get_output_mode()
+        resp = self._get_output_mode()
         resp[0] = output_modes_lock[mode.lower()]
         self.mode = mode
         return self._set_output_mode(resp)
@@ -1506,7 +1506,7 @@ class Heater:
         :returns: The control channel
         :rtype: str
         """
-        self.get_output_mode()
+        self._get_output_mode()
         return self.input
 
     def set_input_channel(self, _input):
@@ -1518,7 +1518,7 @@ class Heater:
         #ZA fixed to range(1, 17) from range(17). deleted 'A'
         assert int(_input) in range(1, 17), f"{_input} not a valid input/channel"
 
-        resp = self.get_output_mode()
+        resp = self._get_output_mode()
         resp[2] = str(_input)
         self.input = str(_input)
         return self._set_output_mode(resp)
@@ -1572,7 +1572,7 @@ class Heater:
         :returns: units, either 'kelvin' or 'ohms'
         :rtype: str
         """
-        self.get_output_mode()
+        self._get_output_mode()
         return self.units
 
     def set_units(self, units):
@@ -1583,7 +1583,7 @@ class Heater:
         """
         assert units.lower() in units_lock.keys(), f"{units} not a valid unit"
 
-        resp = self.get_output_mode()
+        resp = self._get_output_mode()
         resp[4] = units_lock[units.lower()]
         self.units = units.lower()
         return self._set_output_mode(resp)
