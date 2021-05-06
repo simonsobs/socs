@@ -687,12 +687,7 @@ class LS372_Agent:
             self.log.info("Current still output is {}".format(still_output))
 
             session.set_status('running')
-
-            data = {'timestamp': time.time(),
-                    'block_name': 'still_heater_still_out',
-                    'data': {'still_heater_still_out': still_output}
-                    }
-            session.app.publish_to_feed('temperatures', data)
+            session.data = {"still_heater_still_out": still_output}
 
         return True, "Current still output is {}".format(still_output)
 
