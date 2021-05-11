@@ -1,0 +1,21 @@
+#!/bin/bash
+
+NAME=$1
+PORT=$2
+DIR=$3
+
+if [[ $DIR -eq 1 ]]
+then
+	{
+		sleep 0.5
+		echo "*W02401388"
+		sleep 0.5
+	} | telnet $NAME $PORT > output.txt
+elif [[ $DIR -eq 0 ]]
+then
+	{
+		sleep 0.5
+		echo "*W02400000"
+		sleep 0.5
+	} | telnet $NAME $PORT > output.txt
+fi
