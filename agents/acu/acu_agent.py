@@ -1,15 +1,16 @@
-import time, threading
+import time
 import numpy as np
-import ocs
+#import ocs
 import pickle
 import struct
-import datetime, calendar
+import datetime
+import calendar
 import soaculib as aculib
 import scan_helpers as sh
 from soaculib.twisted_backend import TwistedHttpBackend
 
 from twisted.internet import reactor, protocol
-from twisted.internet.defer import inlineCallbacks, Deferred
+from twisted.internet.defer import inlineCallbacks
 import twisted.web.client as tclient
 from autobahn.twisted.util import sleep as dsleep
 from ocs import ocs_agent, site_config
@@ -261,6 +262,7 @@ class ACUAgent:
                              'block_name': 'ACU_error',
                              'data': errormsg
                             }
+                self.agent.publish_to_feed('acu_error', acu_error)
                 yield dsleep(1)
 
 #            session.data = j
