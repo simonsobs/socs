@@ -635,7 +635,8 @@ class LS372_Agent:
                                     
     def set_still_output(self, session, params=None):
         """
-        Set the still output on the still heater. This is different than the manual output on the still heater. Use set_heater_output() for that.
+        Set the still output on the still heater. This is different than the manual output
+        on the still heater. Use set_heater_output() for that.
 
         :param params: dict with "output" parameter
         :type params: dict
@@ -671,8 +672,12 @@ class LS372_Agent:
         """
         Gets the current still output on the still heater.
 
-        :param params: dict
-        :type params: dict
+        This task has no useful parameters.
+
+        The still heater output is stored in the session.data
+        object in the format::
+
+          {"still_heater_still_out": 9.628}
 
         """
 
