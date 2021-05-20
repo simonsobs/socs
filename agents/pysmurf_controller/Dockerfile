@@ -1,4 +1,4 @@
-FROM simonsobs/sodetlib:v0.0.1
+FROM simonsobs/sodetlib:v0.1.0
 
 # Set locale
 ENV LANG C.UTF-8

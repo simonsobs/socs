@@ -87,7 +87,6 @@ outline is:
 - Install ocs and socs
 - Configure your ocs-config file and perform the associated setup
 - Start the Bluefors agent and command it to acquire data via an OCS client
-- Create a sisock-data-feed-server container for live monitoring
 
 Configuration File Examples
 ---------------------------
@@ -111,7 +110,7 @@ Docker
 Example docker-compose configuration::
 
   ocs-bluefors:
-    image: grumpy.physics.yale.edu/ocs-bluefors-agent:latest
+    image: simonsobs/ocs-bluefors-agent:latest
     hostname: ocs-docker
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro

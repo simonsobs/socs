@@ -136,6 +136,7 @@ class SmurfRecorder:
                                  self.data_dir, self.stream_id,
                                  target_rate=self.target_rate)
 
+        session.set_status('running')
         while self.is_streaming:
             recorder.monitored_channels = self.monitored_channels
             recorder.target_rate = self.target_rate
@@ -156,6 +157,7 @@ class SmurfRecorder:
 
         """
         self.is_streaming = False
+        session.set_status('stopping')
         return True, "Stopping Recording"
 
 
@@ -216,6 +218,5 @@ if __name__ == "__main__":
                         listener.set_monitored_channels, blocking=False)
     agent.register_task('set_target_rate', listener.set_target_rate,
                         blocking=False)
-
 
     runner.run(agent, auto_reconnect=True)

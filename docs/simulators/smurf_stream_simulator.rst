@@ -32,7 +32,8 @@ using all of the available arguments::
        'instance-id': 'smurf-stream',
        'arguments': [['--auto-start', True],
                      ['--port', '50000'],
-                     ['--num_chans', '528']]},
+                     ['--num_chans', '528'],
+                     ['--stream-id', 'stream_sim']]},
 
 Docker
 ``````
@@ -42,6 +43,8 @@ docker-compose service configuration is shown here::
   smurf-stream-sim:
     image: simonsobs/smurf-stream-sim
     hostname: ocs-docker
+    ports:
+      - "50000:50000"
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
 

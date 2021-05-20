@@ -7,7 +7,7 @@ import txaio
 import threading
 from contextlib import contextmanager
 
-from socs.Lakeshore.Lakeshore372 import LS372
+from socs.Lakeshore.Lakeshore370 import LS370
 
 ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 if not ON_RTD:
@@ -68,12 +68,12 @@ class YieldingLock:
             yield result
 
 
-class LS372_Agent:
-    """Agent to connect to a single Lakeshore 372 device.
+class LS370_Agent:
+    """Agent to connect to a single Lakeshore 370 device.
 
     Args:
         name (ApplicationSession): ApplicationSession for the Agent.
-        ip (str): IP Address for the 372 device.
+        port (str): Serial port for the 370 device, e.g. '/dev/ttyUSB2'
         fake_data (bool, optional): generates random numbers without connecting
             to LS if True.
         dwell_time_delay (int, optional): Amount of time, in seconds, to
@@ -84,7 +84,7 @@ class LS372_Agent:
             ensures at least one second of data collection at the end of a scan.
 
     """
-    def __init__(self, agent, name, ip, fake_data=False, dwell_time_delay=0):
+    def __init__(self, agent, name, port, fake_data=False, dwell_time_delay=0):
 
         # self._acq_proc_lock is held for the duration of the acq Process.
         # Tasks that require acq to not be running, at all, should use
@@ -99,7 +99,7 @@ class LS372_Agent:
         self._lock = YieldingLock(default_timeout=5)
 
         self.name = name
-        self.ip = ip
+        self.port = port
         self.fake_data = fake_data
         self.dwell_time_delay = dwell_time_delay
         self.module = None
@@ -112,7 +112,7 @@ class LS372_Agent:
         self.agent = agent
         # Registers temperature feeds
         agg_params = {
-            'frame_length': 10*60 #[sec]
+            'frame_length': 10*60  # [sec]
         }
         self.agent.register_feed('temperatures',
                                  record=True,
@@ -122,7 +122,7 @@ class LS372_Agent:
     def init_lakeshore_task(self, session, params=None):
         """init_lakeshore_task(params=None)
 
-        Perform first time setup of the Lakeshore 372 communication.
+        Perform first time setup of the Lakeshore 370 communication.
 
         Args:
             params (dict): Parameters dictionary for passing parameters to
@@ -131,6 +131,7 @@ class LS372_Agent:
         Parameters:
             auto_acquire (bool, optional): Default is False. Starts data
                 acquisition after initialization if True.
+            force (bool, optional): Force re-initialize the lakeshore if True.
 
         """
 
@@ -142,8 +143,8 @@ class LS372_Agent:
             return True, "Already initialized"
 
         with self._lock.acquire_timeout(job='init') as acquired1, \
-             self._acq_proc_lock.acquire_timeout(timeout=0., job='init') \
-             as acquired2:
+        self._acq_proc_lock.acquire_timeout(timeout=0., job='init') \
+        as acquired2:
             if not acquired1:
                 self.log.warn(f"Could not start init because "
                               f"{self._lock.job} is already running")
@@ -160,9 +161,9 @@ class LS372_Agent:
                 session.add_message("No initialization since faking data")
                 self.thermometers = ["thermA", "thermB"]
             else:
-                self.module = LS372(self.ip)
+                self.module = LS370(self.port)
                 print("Initialized Lakeshore module: {!s}".format(self.module))
-                session.add_message("Lakeshore initilized with ID: %s"%self.module.id)
+                session.add_message("Lakeshore initilized with ID: %s" % self.module.id)
 
                 self.thermometers = [channel.name for channel in self.module.channels]
 
@@ -179,21 +180,7 @@ class LS372_Agent:
 
         Method to start data acquisition process.
 
-        The most recent data collected is stored in session.data in the
-        structure::
-
-            >>> session.data
-            {"fields":
-                {"Channel_05": {"T": 293.644, "R": 33.752, "timestamp": 1601924482.722671},
-                 "Channel_06": {"T": 0, "R": 1022.44, "timestamp": 1601924499.5258765},
-                 "Channel_08": {"T": 0, "R": 1026.98, "timestamp": 1601924494.8172355},
-                 "Channel_01": {"T": 293.41, "R": 108.093, "timestamp": 1601924450.9315426},
-                 "Channel_02": {"T": 293.701, "R": 30.7398, "timestamp": 1601924466.6130798}
-                }
-            }
-
         """
-
 
         with self._acq_proc_lock.acquire_timeout(timeout=0, job='acq') \
              as acq_acquired, \
@@ -211,8 +198,6 @@ class LS372_Agent:
             self.log.info("Starting data acquisition for {}".format(self.agent.agent_address))
             previous_channel = None
             last_release = time.time()
-
-            session.data = {"fields": {}}
 
             self.take_data = True
             while self.take_data:
@@ -239,7 +224,7 @@ class LS372_Agent:
                 else:
                     active_channel = self.module.get_active_channel()
 
-                    # The 372 reports the last updated measurement repeatedly
+                    # The 370 reports the last updated measurement repeatedly
                     # during the "pause change time", this results in several
                     # stale datapoints being recorded. To get around this we
                     # query the pause time and skip data collection during it
@@ -258,11 +243,11 @@ class LS372_Agent:
 
                             # Check user set dwell time isn't too long
                             if self.dwell_time_delay > dwell_time:
-                                self.log.warn("WARNING: User set dwell_time_delay of " + \
-                                              "{delay} s is larger than channel " + \
-                                              "dwell time of {chan_time} s. If " + \
-                                              "you are autoscanning this will " + \
-                                              "cause no data to be collected. " + \
+                                self.log.warn("WARNING: User set dwell_time_delay of " +
+                                              "{delay} s is larger than channel " +
+                                              "dwell time of {chan_time} s. If " +
+                                              "you are autoscanning this will " +
+                                              "cause no data to be collected. " +
                                               "Reducing dwell time delay to {s} s.",
                                               delay=self.dwell_time_delay,
                                               chan_time=dwell_time,
@@ -279,34 +264,24 @@ class LS372_Agent:
                         # Track the last channel we measured
                         previous_channel = self.module.get_active_channel()
 
-                    current_time = time.time()
+                    # Setup feed dictionary
+                    channel_str = active_channel.name.replace(' ', '_')
                     data = {
-                        'timestamp': current_time,
-                        'block_name': active_channel.name,
+                        'timestamp': time.time(),
+                        'block_name': channel_str,
                         'data': {}
                     }
 
                     # Collect both temperature and resistance values from each Channel
-                    channel_str = active_channel.name.replace(' ', '_')
-                    temp_reading = self.module.get_temp(unit='kelvin',
-                                                        chan=active_channel.channel_num)
-                    res_reading = self.module.get_temp(unit='ohms',
-                                                       chan=active_channel.channel_num)
+                    data['data'][channel_str + '_T'] = \
+                        self.module.get_temp(unit='kelvin', chan=active_channel.channel_num)
+                    data['data'][channel_str + '_R'] = \
+                        self.module.get_temp(unit='ohms', chan=active_channel.channel_num)
 
-                    # For data feed
-                    data['data'][channel_str + '_T'] = temp_reading
-                    data['data'][channel_str + '_R'] = res_reading
-
-                    # For session.data
-                    field_dict = {channel_str: {"T": temp_reading,
-                                                "R": res_reading,
-                                                "timestamp": current_time}}
-
-                    session.data['fields'].update(field_dict)
+                    # Courtesy in case active channel has not changed
+                    time.sleep(0.1)
 
                 session.app.publish_to_feed('temperatures', data)
-
-                self.log.debug("{data}", data=session.data)
 
         return True, 'Acquisition exited cleanly.'
 
@@ -325,9 +300,10 @@ class LS372_Agent:
         Adjust the heater range for servoing cryostat. Wait for a specified
         amount of time after the change.
 
-        :param params: dict with 'range', 'wait' keys
+        :param params: dict with 'heater', 'range', 'wait' keys
         :type params: dict
 
+        heater - which heater to set range for, 'sample' by default (and the only implemented one)
         range - the heater range value to change to
         wait - time in seconds after changing the heater value to wait, allows
                the servo to adjust to the new heater range, typical value of
@@ -344,8 +320,9 @@ class LS372_Agent:
             heater_string = params.get('heater', 'sample')
             if heater_string.lower() == 'sample':
                 heater = self.module.sample_heater
-            elif heater_string.lower() == 'still':
-                heater = self.module.still_heater
+            elif heater_string.lower() == 'still':  # TODO: add still heater class to driver
+                # heater = self.module.still_heater
+                self.log.warn(f"{heater_string} heater not yet implemented in this agent, please modify client")
 
             current_range = heater.get_heater_range()
 
@@ -373,7 +350,7 @@ class LS372_Agent:
 
             session.set_status('running')
 
-            self.module.channels[params['channel']].set_excitation_mode(params['mode'])
+            self.module.chan_num2channel(params['channel']).set_excitation_mode(params['mode'])
             session.add_message(f'post message in agent for Set channel {params["channel"]} excitation mode to {params["mode"]}')
             print(f'print statement in agent for Set channel {params["channel"]} excitation mode to {params["mode"]}')
 
@@ -394,12 +371,12 @@ class LS372_Agent:
 
             session.set_status('running')
 
-            current_excitation = self.module.channels[params['channel']].get_excitation()
+            current_excitation = self.module.chan_num2channel(params['channel']).get_excitation()
 
             if params['value'] == current_excitation:
                 print(f'Channel {params["channel"]} excitation already set to {params["value"]}')
             else:
-                self.module.channels[params['channel']].set_excitation(params['value'])
+                self.module.chan_num2channel(params['channel']).set_excitation(params['value'])
                 session.add_message(f'Set channel {params["channel"]} excitation to {params["value"]}')
                 print(f'Set channel {params["channel"]} excitation to {params["value"]}')
 
@@ -428,7 +405,7 @@ class LS372_Agent:
 
     def set_active_channel(self, session, params):
         """
-        Set the active channel on the LS372.
+        Set the active channel on the LS370.
 
         :param params: dict with "channel" number
         :type params: dict
@@ -449,7 +426,7 @@ class LS372_Agent:
 
     def set_autoscan(self, session, params):
         """
-        Sets autoscan on the LS372.
+        Sets autoscan on the LS370.
         :param params: dict with "autoscan" value
         """
         with self._lock.acquire_timeout(job='set_autoscan') as acquired:
@@ -472,7 +449,8 @@ class LS372_Agent:
     def servo_to_temperature(self, session, params):
         """Servo to temperature passed into params.
 
-        :param params: dict with "temperature" Heater.set_setpoint() in unites of K
+        :param params: dict with "temperature" Heater.set_setpoint() in units of K, and
+            "channel" as an integer (optional)
         :type params: dict
         """
         with self._lock.acquire_timeout(job='servo_to_temperature') as acquired:
@@ -485,27 +463,32 @@ class LS372_Agent:
 
             # Check we're in correct control mode for servo.
             if self.module.sample_heater.mode != 'Closed Loop':
-                session.add_message(f'Changing control to Closed Loop mode for servo.')
+                session.add_message('Changing control to Closed Loop mode for servo.')
                 self.module.sample_heater.set_mode("Closed Loop")
 
             # Check we aren't autoscanning.
             if self.module.get_autoscan() is True:
-                session.add_message(f'Autoscan is enabled, disabling for PID control on dedicated channel.')
+                session.add_message('Autoscan is enabled, disabling for PID control on dedicated channel.')
                 self.module.disable_autoscan()
+
+            # Check to see if we passed an input channel, and if so change to it
+            if params.get("channel", False) is not False:
+                session.add_message(f'Changing heater input channel to {params.get("channel")}')
+                self.module.sample_heater.set_input_channel(params.get("channel"))
 
             # Check we're scanning same channel expected by heater for control.
             if self.module.get_active_channel().channel_num != int(self.module.sample_heater.input):
-                session.add_message(f'Changing active channel to expected heater control input')
+                session.add_message('Changing active channel to expected heater control input')
                 self.module.set_active_channel(int(self.module.sample_heater.input))
 
             # Check we're setup to take correct units.
-            if self.module.get_active_channel().units != 'kelvin':
-                session.add_message(f'Setting preferred units to Kelvin on heater control input.')
-                self.module.get_active_channel().set_units('kelvin')
+            if self.module.sample_heater.units != 'kelvin':
+                session.add_message('Setting preferred units to Kelvin on heater control.')
+                self.module.sample_heater.set_units('kelvin')
 
             # Make sure we aren't servoing too high in temperature.
             if params["temperature"] > 1:
-                return False, f'Servo temperature is set above 1K. Aborting.'
+                return False, 'Servo temperature is set above 1K. Aborting.'
 
             self.module.sample_heater.set_setpoint(params["temperature"])
 
@@ -545,14 +528,14 @@ class LS372_Agent:
 
             if np.abs(mean - setpoint) < params['threshold']:
                 print("passed threshold")
-                session.add_message(f'Setpoint Difference: ' + str(mean - setpoint))
+                session.add_message('Setpoint Difference: ' + str(mean - setpoint))
                 session.add_message(f'Average is within {params["threshold"]} K threshold. Proceeding with calibration.')
 
                 return True, f"Servo temperature is stable within {params['threshold']} K"
 
             else:
                 print("we're in the else")
-                #adjust_heater(t,rest)
+                # adjust_heater(t,rest)
 
         return False, f"Temperature not stable within {params['threshold']}."
 
@@ -577,7 +560,8 @@ class LS372_Agent:
             session.set_status('running')
 
             if params['heater'].lower() == 'still':
-                self.module.still_heater.set_mode(params['mode'])
+                # self.module.still_heater.set_mode(params['mode']) #TODO: add still heater to driver
+                self.log.warn(f"{params['heater']} heater not yet implemented in this agent, please modify client")
             if params['heater'].lower() == 'sample':
                 self.module.sample_heater.set_mode(params['mode'])
             self.log.info("Set {} output mode to {}".format(params['heater'], params['mode']))
@@ -595,9 +579,6 @@ class LS372_Agent:
         output - Specifies heater output value.
                     If display is set to "Current" or heater is "still", can be any number between 0 and 100.
                     If display is set to "Power", can be any number between 0 and the maximum allowed power.
-        
-        Note that for the still heater this sets the still heater manual output, NOT the still heater still output.
-        Use set_still_output() instead to set the still output.
 
         display (opt)- Specifies heater display type. Can be "Current" or "Power".
                         If None, heater display is not reset before setting output.
@@ -615,8 +596,9 @@ class LS372_Agent:
 
             display = params.get('display', None)
 
-            if heater == 'still':
-                self.module.still_heater.set_heater_output(output, display_type=display)
+            if heater == 'still':  # TODO: add still heater to driver
+                # self.module.still_heater.set_heater_output(output, display_type=display)
+                self.log.warn(f"{heater} heater not yet implemented in this agent, please modify client")
             if heater.lower() == 'sample':
                 self.log.info("display: {}\toutput: {}".format(display, output))
                 self.module.sample_heater.set_heater_output(output, display_type=display)
@@ -632,69 +614,106 @@ class LS372_Agent:
             session.app.publish_to_feed('temperatures', data)
 
         return True, "Set {} display to {}, output to {}".format(heater, display, output)
-                                    
-    def set_still_output(self, session, params=None):
+
+    def get_channel_attribute(self, session, params):
+        """Gets an arbitrary channel attribute, stored in the session.data dict
+
+        Parameters
+        ----------
+        params : dict
+            Contains parameters 'attribute' (not optional), 'channel' (optional, default '1').
+
+        Channel attributes stored in the session.data object are in the structure::
+
+            >>> session.data
+            {"calibration_curve": 21,
+             "dwell": 3,
+             "excitation": 6.32e-6,
+             "excitation_mode": "voltage",
+             "excitation_power": 2.0e-15,
+             "kelvin_reading": 100.0e-3,
+             "pause": 3,
+             "reading_status": ["T.UNDER"]
+             "resistance_range": 2.0e-3,
+             "resistance_reading": 10.0e3,
+             "temperature_coefficient": "negative",
+            }
+
+        Note: Only attribute called with this method will be populated for the
+        given channel. This example shows all available attributes.
+
         """
-        Set the still output on the still heater. This is different than the manual output
-        on the still heater. Use set_heater_output() for that.
-
-        :param params: dict with "output" parameter
-        :type params: dict
-
-        output - Specifies still heater output value.
-                    Can be any number between 0 and 100.
-
-        """
-
-        with self._lock.acquire_timeout(job='set_still_output') as acquired:
+        with self._lock.acquire_timeout(job=f"get_{params['attribute']}", timeout=3) as acquired:
             if not acquired:
-                self.log.warn(f"Could not start Task because "
-                              f"{self._lock.job} is already running")
-                return False, "Could not acquire lock"
-
-            output = params['output']
-
-            self.module.still_heater.set_still_output(output)
-
-            self.log.info("Set still output to {}".format(output))
+                print(f"Lock could not be acquired because it is held by {self._lock.job}")
+                return False, 'Could not acquire lock'
 
             session.set_status('running')
 
-            data = {'timestamp': time.time(),
-                    'block_name': 'still_heater_still_out',
-                    'data': {'still_heater_still_out': output}
-                    }
-            session.app.publish_to_feed('temperatures', data)
+            # get channel
+            channel_key = int(params.get('channel', 1))
+            channel = self.module.chan_num2channel(channel_key)
 
-        return True, "Set still output to {}".format(output)
-        
-    def get_still_output(self, session, params=None):
+            # check that attribute is a valid channel method
+            if getattr(channel, f"get_{params['attribute']}", False) is not False:
+                query = getattr(channel, f"get_{params['attribute']}")
+
+            # get attribute
+            resp = query()
+            session.data[params['attribute']] = resp
+
+            time.sleep(.1)
+
+        return True, f"Retrieved {channel.name} {params['attribute']}"
+
+    def get_heater_attribute(self, session, params):
+        """Gets an arbitrary heater attribute, stored in the session.data dict
+
+        Parameters
+        ----------
+        params : dict
+            Contains parameters 'attribute'.
+
+        Heater attributes stored in the session.data object are in the structure::
+
+            >>> session.data
+            {"heater_range": 1e-3,
+             "heater_setup": ["current", 1e-3, 120],
+             "input_channel": 6,
+             "manual_out": 0.0,
+             "mode": "Closed Loop",
+             "pid": (80, 10, 0),
+             "setpoint": 100e-3,
+             "still_output", 10.607,
+             "units": "kelvin",
+            }
+
+        Note: Only the attribute called with this method will be populated,
+        this example just shows all available attributes.
+
         """
-        Gets the current still output on the still heater.
-
-        This task has no useful parameters.
-
-        The still heater output is stored in the session.data
-        object in the format::
-
-          {"still_heater_still_out": 9.628}
-
-        """
-
-        with self._lock.acquire_timeout(job='get_still_output') as acquired:
+        with self._lock.acquire_timeout(job=f"get_{params['attribute']}", timeout=3) as acquired:
             if not acquired:
-                self.log.warn(f"Could not start Task because "
-                              f"{self._lock.job} is already running")
-                return False, "Could not acquire lock"
-
-            still_output = self.module.still_heater.get_still_output()
-
-            self.log.info("Current still output is {}".format(still_output))
+                print(f"Lock could not be acquired because it is held by {self._lock.job}")
+                return False, 'Could not acquire lock'
 
             session.set_status('running')
-            session.data = {"still_heater_still_out": still_output}
 
-        return True, "Current still output is {}".format(still_output)
+            # get heater
+            heater = self.module.sample_heater
+
+            # check that attribute is a valid heater method
+            if getattr(heater, f"get_{params['attribute']}", False) is not False:
+                query = getattr(heater, f"get_{params['attribute']}")
+
+            # get attribute
+            resp = query()
+            session.data[params['attribute']] = resp
+
+            time.sleep(.1)
+
+        return True, f"Retrieved sample heater {params['attribute']}"
+
 
 def make_parser(parser=None):
     """Build the argument parser for the Agent. Allows sphinx to automatically
@@ -706,7 +725,7 @@ def make_parser(parser=None):
 
     # Add options specific to this agent.
     pgroup = parser.add_argument_group('Agent Options')
-    pgroup.add_argument('--ip-address')
+    pgroup.add_argument('--port', type=str, help='Full path to USB node for the lakeshore, e.g. "/dev/ttyUSB0"')
     pgroup.add_argument('--serial-number')
     pgroup.add_argument('--mode')
     pgroup.add_argument('--fake-data', type=int, default=0,
@@ -724,6 +743,7 @@ def make_parser(parser=None):
                         help='Automatically start data acquisition on startup')
 
     return parser
+
 
 if __name__ == '__main__':
     # For logging
@@ -747,12 +767,12 @@ if __name__ == '__main__':
         init_params = {'auto_acquire': True}
 
     # Interpret options in the context of site_config.
-    site_config.reparse_args(args, 'Lakeshore372Agent')
+    site_config.reparse_args(args, 'Lakeshore370Agent')
     print('I am in charge of device with serial number: %s' % args.serial_number)
 
     agent, runner = ocs_agent.init_site_agent(args)
 
-    lake_agent = LS372_Agent(agent, args.serial_number, args.ip_address,
+    lake_agent = LS370_Agent(agent, args.serial_number, args.port,
                              fake_data=args.fake_data,
                              dwell_time_delay=args.dwell_time_delay)
 
@@ -768,8 +788,8 @@ if __name__ == '__main__':
     agent.register_task('check_temperature_stability', lake_agent.check_temperature_stability)
     agent.register_task('set_output_mode', lake_agent.set_output_mode)
     agent.register_task('set_heater_output', lake_agent.set_heater_output)
-    agent.register_task('set_still_output', lake_agent.set_still_output)
-    agent.register_task('get_still_output', lake_agent.get_still_output)
+    agent.register_task('get_channel_attribute', lake_agent.get_channel_attribute)
+    agent.register_task('get_heater_attribute', lake_agent.get_heater_attribute)
     agent.register_process('acq', lake_agent.start_acq, lake_agent.stop_acq)
 
     runner.run(agent, auto_reconnect=True)

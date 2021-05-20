@@ -3,6 +3,8 @@ from enum import Enum
 
 import time
 import txaio
+import numpy as np
+import socket
 
 # For logging
 txaio.use_twisted()
@@ -117,6 +119,8 @@ class FrameRecorder:
         G3Reader object to read the frames from the G3NetworkSender.
     writer : spt3g.core.G3Writer
         G3Writer for writing the frames to disk.
+    data_received : bool
+        Whether data has been received by the current instance of the G3Reader.
     frames : list
         List of frames that have been read from the network. Gets cleared after
         writing to file.
@@ -168,6 +172,7 @@ class FrameRecorder:
         # Reader/Writer
         self.reader = None
         self.writer = None
+        self.data_received = False
 
         # Attributes
         self.frames = []
@@ -209,10 +214,12 @@ class FrameRecorder:
 
         """
         reader = None
+
         try:
             reader = core.G3Reader(self.address,
                                    timeout=timeout)
-            self.log.info("G3Reader connection established")
+            self.log.debug("G3Reader connection to {addr} established!",
+                           addr=self.address)
         except RuntimeError:
             self.log.error("G3Reader could not connect.")
 
@@ -274,13 +281,21 @@ class FrameRecorder:
 
             # Discard all flow control frames
             self.frames = [x for x in self.frames if 'sostream_flowcontrol' not in x]
-
+            # Discard Pipeline info frame
+            self.frames = [x for x in self.frames
+                           if x.type != core.G3FrameType.PipelineInfo]
+            if self.frames and not self.data_received:
+                self.data_received = True
+                self.log.info("Started receiving frames from {addr}",
+                              addr=self.address)
             return
         else:
-            self.log.debug("Could not read frames. Connection " +
-                           "timed out, or G3NetworkSender offline. " +
-                           "Cleaning up...")
+            if self.data_received:
+                self.log.info("Could not read frames. Connection " +
+                              "timed out, or G3NetworkSender offline. " +
+                              "Cleaning up...")
             self.close_file()
+            self.data_received = False
             self.reader = None
 
     def check_for_frame_gap(self, gap_size=5):
@@ -439,7 +454,12 @@ class FrameRecorder:
         """
         self.read_frames()
         self.check_for_frame_gap(10)
-        self.read_stream_data()
+        if len(self.monitored_channels) > 0:
+            try:
+                self.read_stream_data()
+            except Exception as e:
+                self.log.warn("Exception thrown when reading stream data:\n{e}", e=e)
+
         if self.frames:
             self.create_new_file()
             self.write_frames_to_file()
@@ -460,7 +480,12 @@ class FrameRecorder:
                 continue
             ds_factor = (frame['data'].sample_rate/core.G3Units.Hz) \
                         // self.target_rate
+            if np.isnan(ds_factor):
+                continue
             ds_factor = max(int(ds_factor), 1)
+            n_samples = frame['data'].n_samples
+            if 1 < n_samples <= ds_factor:
+                ds_factor = n_samples - 1
             times = [
                 t.time / core.G3Units.s
                 for t in frame['data'].times()[::ds_factor]
