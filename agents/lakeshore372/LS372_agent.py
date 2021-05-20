@@ -6,6 +6,7 @@ import numpy as np
 import txaio
 import threading
 from contextlib import contextmanager
+from twisted.internet import reactor
 
 from socs.Lakeshore.Lakeshore372 import LS372
 
@@ -160,7 +161,13 @@ class LS372_Agent:
                 session.add_message("No initialization since faking data")
                 self.thermometers = ["thermA", "thermB"]
             else:
-                self.module = LS372(self.ip)
+                try:
+                    self.module = LS372(self.ip)
+                except ConnectionError:
+                    self.log.error("Could not connect to the LS372. Exiting.")
+                    reactor.callFromThread(reactor.stop)
+                    return False, 'Lakeshore initialized failed'
+
                 print("Initialized Lakeshore module: {!s}".format(self.module))
                 session.add_message("Lakeshore initilized with ID: %s"%self.module.id)
 
