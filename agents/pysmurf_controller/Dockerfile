@@ -3,7 +3,6 @@ FROM simonsobs/sodetlib:v0.2.0-23-g90fd9f2
 WORKDIR /app
 
 # SOCS installation
-RUN pip3 install cryptography==3.3.2
 RUN git clone https://github.com/simonsobs/socs.git \
     && pip3 install -r socs/requirements.txt \
     && pip3 install -e socs
