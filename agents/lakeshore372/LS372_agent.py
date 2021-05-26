@@ -166,7 +166,11 @@ class LS372_Agent:
                 except ConnectionError:
                     self.log.error("Could not connect to the LS372. Exiting.")
                     reactor.callFromThread(reactor.stop)
-                    return False, 'Lakeshore initialized failed'
+                    return False, 'Lakeshore initialization failed'
+                except Exception as e:
+                    self.log.error(f"Unhandled exception encountered: {e}")
+                    reactor.callFromThread(reactor.stop)
+                    return False, 'Lakeshore initialization failed'
 
                 print("Initialized Lakeshore module: {!s}".format(self.module))
                 session.add_message("Lakeshore initilized with ID: %s"%self.module.id)
