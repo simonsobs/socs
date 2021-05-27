@@ -161,8 +161,10 @@ class FTSMirrorAgent:
                 return False, "Could not acquire lock."
             # Run the function you want to run
             self.log.debug("Lock Acquired Connecting to Stages")
-            self.stage = FTSStage(self.ip_addr, self.port)
-
+            try:
+                self.stage = FTSStage(self.ip_addr, self.port)
+            except:
+                return False, "FTS Stage Initialization Failed"
         # This part is for the record and to allow future calls to proceed,
         # so does not require the lock
         self.initialized = True
@@ -176,32 +178,39 @@ class FTSMirrorAgent:
 
         with self.lock.acquire_timeout(timeout=3, job='home') as acquired:
             if not acquired:
-                self.log.warn(f"Could not start home because lock held by" \
-                                "{self.lock.job}")
+                self.log.warn("Could not start home because lock held by" \
+                               f"{self.lock.job}")
                 return False, "Could not get lock"
             self.stage.home()
 
         return True, "Homing Complete"
     
-    def move_to(self, session, params):
+    def move_to(self, session, params=None):
         """Move to absolute position relative to stage center (in mm)
 
         params: {'position':float between -74.8 and 74.8}
         """
-    
+        if params is None:
+            return False, "No Position Given"
+        if 'position' not in params:
+            return False, "No Position Given"
+
         with self.lock.acquire_timeout(timeout=3, job='move') as acquired:
             if not acquired:
-                self.log.warn(f"Could not start move because lock held by" \
-                                "{self.lock.job}")
+                self.log.warn("Could not start move because lock held by" \
+                               f"{self.lock.job}")
                 return False, "Could not get lock"
-            self.stage.move_to( params.get('position') )
+            return self.stage.move_to( params.get('position') )
 
-        return True, "Move Complete"
+        return False, "Move did not complete correctly?"
     
     def start_acq(self, session, params=None):
         """
         params:
             dict: {'sampling_frequency': float, sampling rate in Hz}
+
+        The most recent position data is stored in session.data in the format::
+            {"position":{"pos" : mirror position  }
         """
         if params is None:
             params = {}
@@ -215,12 +224,12 @@ class FTSMirrorAgent:
 
         with self.lock.acquire_timeout(timeout=0, job='acq') as acquired:
             if not acquired:
-                self.log.warn("Could not start acq because {} is already" \
-                            "running".format(self.lock.job))
+                self.log.warn(f"Could not start acq because {self.lock.job} " \
+                            "is already running")
                 return False, "Could not acquire lock."
 
-            self.log.info(f"Starting Data Acquisition for FTS Mirror at" \
-                            "{f_sample} Hz")
+            self.log.info("Starting Data Acquisition for FTS Mirror at" \
+                           f"{f_sample} Hz")
             session.set_status('running')
             self.take_data = True
             last_release = time.time()
@@ -228,8 +237,8 @@ class FTSMirrorAgent:
             while self.take_data:
                 if time.time()-last_release > 1.:
                     if not self.lock.release_and_acquire(timeout=20):
-                        self.log.warn(f"Could not re-acquire lock now held by" \
-                                      "{self.lock.job}.")
+                        self.log.warn("Could not re-acquire lock now held by" \
+                                      f"{self.lock.job}.")
                         return False, "could not re-acquire lock"
                     last_release = time.time()
                 pm.sleep()
@@ -239,10 +248,11 @@ class FTSMirrorAgent:
                     'block_name':'position',
                     'data':{}}
                 success, pos = self.stage.get_position()
-                
-                data['data']['pos'] = pos
-
-                self.agent.publish_to_feed('position',data)
+                if not success:
+                    self.log.info("stage.get_position call failed")
+                else:
+                    data['data']['pos'] = pos
+                    self.agent.publish_to_feed('position',data)
 
         return True, 'Acquisition exited cleanly.'
 
