@@ -7,7 +7,8 @@ import numpy as np
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 import time
-
+import txaio
+txaio.use_twisted()
 BUFF_SIZE = 128
 ENQ = '\x05'
 
@@ -33,15 +34,16 @@ class Pfeiffer:
         self.comm = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.comm.connect((self.ip_address, self.port))
         self.comm.settimeout(timeout)
+        self.log =  txaio.make_logger()
 
     def channel_power(self):
         '''
-        Function to check the power status of a given channel
+        Function to check the power status of all channels
 
         Args:
             None
         Returns:
-            print statement warning about channels being off
+            None
         '''
         msg = 'SEN\r\n'
         self.comm.send(msg.encode())
@@ -50,9 +52,11 @@ class Pfeiffer:
         read_str = self.comm.recv(BUFF_SIZE).decode()
         power_str = read_str.split('\r')
         power_states = np.array(power_str[0].split(','), dtype=int)
-        if any(chan == 0 for chan in power_states):
-            print("Something is off!")
-        return
+        print(power_states)
+        if any(chan != 2 for chan in power_states):
+            channel_states = [index+1 for index, state in enumerate(power_states) if state !=2]
+            self.log.info("The following channels are off:",channel_states)
+            print("The following channels are off:",channel_states)
 
     def read_pressure(self, ch_no):
         """
@@ -99,9 +103,8 @@ class Pfeiffer:
         pressures = [float(p) for p in pressures]
         if any(state != 0 for state in gauge_states):
             index = np.where(gauge_states != 0)
-            for j in range(len(index[0])):
-                channel = np.int(index[0][j])
-                pressures[channel] = 0.
+            for j in index[0]:
+                pressures[j] = 0. 
         return pressures
 
     def close(self):
@@ -184,6 +187,9 @@ class PfeifferAgent:
 
 
 if __name__ == '__main__':
+    # Start logging
+    #txaio.start_logging(level=Pfeiffer.get("LOGLEVEL", "info"))
+    
     parser = site_config.add_arguments()
 
     pgroup = parser.add_argument_group('Agent Options')
