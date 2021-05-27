@@ -122,6 +122,13 @@ services:
   ocs-tektronix3021c-agent:
     image: "ocs-tektronix3021c-agent"
     build: ./agents/tektronix3021c/
+    
+  # --------------------------------------------------------------------------
+  # Pfeiffer Turbo Controller
+  # --------------------------------------------------------------------------
+  ocs-pfeiffer-tc400-agent:
+    image: "ocs-pfeiffer-tc400-agent"
+    build: ./agents/pfeiffer_tc400/
 
   # --------------------------------------------------------------------------
   # SOCS Simulators

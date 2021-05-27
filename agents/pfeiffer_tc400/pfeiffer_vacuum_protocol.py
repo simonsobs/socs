@@ -1,9 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[1]:
-
-
 # pfeiffer_vacuum_protocol - Python interface to Pfeiffer vacuum gauges
 # Copyright (C) 2020 Christopher M. Pierce (contact@chris-pierce.com)
 #
@@ -168,10 +162,3 @@ def write_correction_value(s, addr, val):
 
     if(rdata != data):
         raise ValueError("invalid acknowledgment from gauge")
-
-
-# In[ ]:
-
-
-
-

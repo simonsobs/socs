@@ -2,7 +2,9 @@ import time
 import os
 import socket
 import argparse
-from Pfeiffer_Turbo_Controller_Driver import Pfeiffer_Turbo_Controller
+from pfeiffer_tc400_driver import PfeifferTC400
+import txaio
+from os import environ
 
 on_rtd = os.environ.get('READTHEDOCS') == 'True'
 if not on_rtd:
@@ -10,7 +12,18 @@ if not on_rtd:
     from ocs.ocs_twisted import TimeoutLock
 
 
-class PfeifferTurboControllerAgent:
+class PfeifferTC400Agent:
+    """Agent to connect to a pfeiffer tc400 electronic drive unit controlling a 
+    turbo pump via a serial-to-ethernet converter.
+    
+    Parameters
+    ----------
+        ip_address (str): IP address for the serial-to-ethernet converter
+        port_number (int): Serial-to-ethernet converter port
+        turbo_address (int): An internal address used to communicate between the 
+            power supplies and the tc400. Found on the front screen of the power 
+            supplies.
+    """
     def __init__(self, agent, ip_address, port_number, turbo_address):
         self.agent = agent
         self.log = agent.log
@@ -34,37 +47,53 @@ class PfeifferTurboControllerAgent:
                                  buffer_time=0)
 
     def init_turbo(self, session, params=None):
-        """ Task to connect to the turbo controller"""
+        """ Task to connect to the turbo controller
+        
+        Parameters
+        ----------
+        auto_acquire: bool, optional
+            Default is False. Starts data acquisition after initialization if True.
+        """
 
         with self.lock.acquire_timeout(0) as acquired:
             if not acquired:
                 return False, "Could not acquire lock"
 
             try:
-                self.turbo = Pfeiffer_Turbo_Controller(self.ip_address, self.port_number, self.turbo_address)
+                self.turbo = PfeifferTC400(self.ip_address, self.port_number, self.turbo_address)
                 #self.idn = self.psu.identify()
             except socket.timeout as e:
-                self.log.error("Turbo Controller timed out during connect")
+                self.log.error(f"Turbo Controller timed out during connect with error {e}")
                 return False, "Timeout"
             self.log.info("Connected to turbo controller")
             
                                   
         # Start data acquisition if requested in site-config
         auto_acquire = params.get('auto_acquire', False)
-        print(f"auto acquire is {auto_acquire}")
         if auto_acquire:
             self.agent.start('acq')
 
         return True, 'Initialized Turbo Controller.'
 
     def monitor_turbo(self, session, params=None):
-        """
-            Process to continuously monitor turbo motor temp and rotation speed and
-            send info to aggregator.
+        """Process to continuously monitor turbo motor temp and rotation speed and
+        send info to aggregator.
 
-            Args:
-                wait (float, optional):
-                    time to wait between measurements [seconds].
+        Parameters
+        ----------
+        wait: float, optional
+            time to wait between measurements [seconds]. Default=1s.
+
+        The session.data object stores the most recent published values 
+        in a dictionary. For example:
+        session.data={
+                'timestamp': 1598626144.5365012,
+                'block_name': 'turbo_output',
+                'data': {
+                    "Turbo_Motor_Temp": 40.054,
+                    "Rotation_Speed": 823.655,
+                    "turbo_error_code": 0}
+                }
         """
         if params is None:
             params = {}
@@ -85,12 +114,12 @@ class PfeifferTurboControllerAgent:
                     try:    
                         data['data']["Turbo_Motor_Temp"] = self.turbo.get_turbo_motor_temperature()
                         data['data']["Rotation_Speed"] = self.turbo.get_turbo_actual_rotation_speed()
+                        data['data']['error_code'] = self.turbo.get_turbo_error_code()
                     
                     except ValueError as e:
-                        self.log.error(e)
+                        self.log.error(f"Error in collecting data: {e}")
+                        continue
                         
-                    # self.log.info(str(data))
-                    # print(data)
                     self.agent.publish_to_feed('pfeiffer_turbo', data)
 
                     # Allow this process to be queried to return current data
@@ -116,51 +145,37 @@ class PfeifferTurboControllerAgent:
 
         with self.lock.acquire_timeout(1) as acquired:
             if acquired:
-                self.turbo.ready_turbo()
+                ready = self.turbo.ready_turbo()
+                if not ready:
+                    return False, "Setting to ready state failed"
                 time.sleep(1)
-                self.turbo.turn_turbo_motor_on()
+                on = self.turbo.turn_turbo_motor_on()
+                if not on:
+                    return False, "Turbo unable to be turned on"
             else:
                 return False, "Could not acquire lock"
 
-        return True, 'Turned Turbo Motor On.'
+        return True, 'Turned turbo on'
     
     def turn_turbo_off(self, session, params=None):
         """Turns the turbo off."""
 
         with self.lock.acquire_timeout(1) as acquired:
             if acquired:
-                self.turbo.turn_turbo_motor_off()
+                off = self.turbo.turn_turbo_motor_off()
+                if not off:
+                    return False, "Turbo unable to be turned off"
                 time.sleep(1)
                 self.turbo.unready_turbo()
+                if not unready:
+                    return False, "Setting to ready state failed"
             else:
                 return False, "Could not acquire lock"
 
-        return True, 'Turned Turbo Motor Off.'
+        return True, 'Turned turbo off'
                           
-    def get_turbo_error_code(self, session, params=None):
-        """
-        Gets the turbos error code (if there is one) and publishes the code.
-        """
-        with self.lock.acquire_timeout(1) as acquired:
-            if acquired:
-    
-                error_code = self.turbo.get_turbo_error_code()
-
-                data = {'timestamp': time.time(),
-                        'block_name': "turbo_error_code",
-                        'data': {'turbo_error_code': int(error_code)}
-                        }
-                self.agent.publish_to_feed('pfeiffer_turbo', data)
-                session.data = data
-
-            else:
-                return False, "Could not acquire lock"
-
-        return True, f"error is {error_code}"
-
     def acknowledge_turbo_errors(self, session, params=None):
-        """
-        Sends an acknowledgment of the error code to the turbo.
+        """Sends an acknowledgment of the error code to the turbo.
         """
         with self.lock.acquire_timeout(1) as acquired:
             if acquired:
@@ -169,21 +184,36 @@ class PfeifferTurboControllerAgent:
                 return False, "Could not acquire lock"
 
         return True, 'Acknowledged Turbo Errors.'
-
-if __name__ == '__main__':
-    parser = site_config.add_arguments()
+    
+def make_parser(parser=None):
+    """Build the argument parser for the Agent. Allows sphinx to automatically
+    build documentation based on this function.
+    """
+    if parser is None:
+        parser = argparse.ArgumentParser()
 
     # Add options specific to this agent.
-
     pgroup = parser.add_argument_group('Agent Options')
-    pgroup.add_argument('--ip-address')
-    pgroup.add_argument('--port-number')
-    pgroup.add_argument('--turbo-address')
+    pgroup.add_argument('--ip-address', type=str, help="serial-to-ethernet"+
+                        "converter ip address")
+    pgroup.add_argument('--port-number', type=int, help="Serial-to-ethernet"+
+                        "converter port")
+    pgroup.add_argument('--turbo-address', type=int, help="Internal address"+
+                       "used by power supplies")
+    pgroup.add_argument('--mode', type=str, help="Set to acq to run acq on"+
+                       "startup")
 
-    # Parse comand line.
-    args = parser.parse_args()
-    # Interpret options in the context of site_config.
-    site_config.reparse_args(args, 'Pfeiffer Turbo Controller')
+    return parser
+
+if __name__ == '__main__':
+    # Start logging
+    txaio.start_logging(level=environ.get("LOGLEVEL", "info"))
+    
+    parser = site_config.add_arguments()
+
+    # Get the default ocs agrument parser
+    parser = make_parser()
+    args = site_config.parse_args(agent_class='PfeifferTC400Agent', parser=parser)
                           
     init_params = False
     if args.mode == 'acq':
@@ -191,15 +221,14 @@ if __name__ == '__main__':
 
     agent, runner = ocs_agent.init_site_agent(args)
 
-    p = PfeifferTurboControllerAgent(agent, 
-                                     args.ip_address, 
-                                     int(args.port_number), 
-                                     int(args.turbo_address))
+    p = PfeifferTC400Agent(agent,
+                           args.ip_address, 
+                           int(args.port_number), 
+                           int(args.turbo_address))
 
     agent.register_task('init', p.init_turbo, startup=init_params)
     agent.register_task('turn_turbo_on', p.turn_turbo_on)
     agent.register_task('turn_turbo_off', p.turn_turbo_off)
-    agent.register_task('get_turbo_error_code', p.get_turbo_error_code)
     agent.register_task('acknowledge_turbo_errors', p.acknowledge_turbo_errors)
     agent.register_process('acq', p.monitor_turbo, p.stop_monitoring)
                           
