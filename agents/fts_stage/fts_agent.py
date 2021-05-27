@@ -61,6 +61,7 @@ class FTSStage:
     def home(self):
         self.send('HOME X\n')
         time.sleep(0.1)
+        ## block until homing is complete
         return self.read()
     
     def get_position(self):
@@ -184,8 +185,11 @@ class FTSMirrorAgent:
                 self.log.warn("Could not start home because lock held by" \
                                f"{self.lock.job}")
                 return False, "Could not get lock"
-            self.stage.home()
-
+            try:
+                self.stage.home()
+            except Exception as e:
+                self.log.error(f"Homing Failed: {e}")
+                return False, "Homing Failed"
         return True, "Homing Complete"
     
     def move_to(self, session, params=None):
