@@ -31,6 +31,16 @@ class LogTracker:
         log_dir : str
             Top level log directory
 
+        Attributes
+        ----------
+        log_dir : str
+            Top level log directory
+        date : datetime.date
+            Today's date. Used to determine the active log directory
+        file_objects : dict
+            A dictionary with filenames as keys, and open file objects as
+            values
+
         """
         self.log_dir = log_dir
         self.date = datetime.date.fromtimestamp(time.time())
