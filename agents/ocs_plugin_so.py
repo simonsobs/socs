@@ -8,7 +8,7 @@ import ocs
 import os
 root = os.path.abspath(os.path.split(__file__)[0])
 
-for n,f in [
+for n, f in [
         ('Lakeshore372Agent', 'lakeshore372/LS372_agent.py'),
         ('Lakeshore370Agent', 'lakeshore370/LS370_agent.py'),
         ('Lakeshore240Agent', 'lakeshore240/LS240_agent.py'),
@@ -18,5 +18,6 @@ for n,f in [
         ('HWPSimulatorAgent', 'hwp_sim/hwp_simulator_agent.py'),
         ('CryomechCPAAgent', 'cryomech_cpa/cryomech_cpa_agent.py'),
         ('LATRtXYStageAgent', 'xy_stage/xy_latrt_agent.py'),
+        ('VantagePro2Agent', 'vantagePro2_agent/vantage_pro2_agent.py')
 ]:
     ocs.site_config.register_agent_class(n, os.path.join(root, f))

@@ -52,6 +52,7 @@ Simulator Reference  Simulators are used to mock software and hardware
     agents/smurf_recorder
     agents/synacc
     agents/tektronix3021c
+    agents/vantage_pro2
 
 .. toctree::
     :caption: Simulator Reference
