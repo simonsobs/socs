@@ -4,8 +4,7 @@ import glob
 import re
 import datetime
 import txaio
-
-from os import environ
+import os
 
 from ocs import ocs_agent, site_config
 
@@ -38,8 +37,25 @@ class LogTracker:
         date : datetime.date
             Today's date. Used to determine the active log directory
         file_objects : dict
-            A dictionary with filenames as keys, and open file objects as
-            values
+            A dictionary with filenames as keys, and another dict as the value.
+            Each of these sub-dictionaries has two keys, "file_object", and
+            "stat_results", with the open file object, and os.stat results as
+            values, respectively. For example::
+
+                {'CH6 T 21-05-27.log':
+                    {'file_object': <_io.TextIOWrapper name='CH6 T 21-05-27.log' mode='r' encoding='UTF-8'>,
+                    'stat_results': os.stat_result(st_mode=33188,
+                                                   st_ino=1456748,
+                                                   st_dev=65024,
+                                                   st_nlink=1,
+                                                   st_uid=1000,
+                                                   st_gid=1000,
+                                                   st_size=11013,
+                                                   st_atime=1622135813,
+                                                   st_mtime=1622135813,
+                                                   st_ctime=1622135813)
+                    }
+                }
 
         """
         self.log_dir = log_dir
@@ -69,7 +85,8 @@ class LogTracker:
         """
         if filename not in self.file_objects.keys():
             print("{} not yet open, opening...".format(filename))
-            self.file_objects[filename] = open(filename, 'r')
+            self.file_objects[filename] = {"file_object": open(filename, 'r'),
+                                           "stat_results": os.stat(filename)}
         else:
             pass
 
@@ -102,12 +119,12 @@ class LogTracker:
             self._open_file(_file)
 
         for k, v in self.file_objects.items():
-            v.readlines()
+            v['file_object'].readlines()
 
     def close_all_files(self):
         """Close all the files tracked by the LogTracker."""
         for k, v in self.file_objects.items():
-            v.close()
+            v['file_object'].close()
             print("Closed file: {}".format(k))
 
         self.file_objects = {}
@@ -318,7 +335,7 @@ class LogParser:
         for k, v in self.log_tracker.file_objects.items():
             log_type, log_name = self.identify_log(k)
 
-            new = v.readline()
+            new = v['file_object'].readline()
             if new == '':
                 continue
 
@@ -363,7 +380,7 @@ class BlueforsAgent:
 
         # Registers bluefors feed
         agg_params = {
-            'frame_length': float(environ.get("FRAME_LENGTH", 10*60))  # [sec]
+            'frame_length': float(os.environ.get("FRAME_LENGTH", 10*60))  # [sec]
         }
         self.log.debug("frame_length set to {length}",
                        length=agg_params['frame_length'])
@@ -434,7 +451,7 @@ class BlueforsAgent:
 
 if __name__ == '__main__':
     # Start logging
-    txaio.start_logging(level=environ.get("LOGLEVEL", "info"))
+    txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
 
     # Get the default ocs argument parser.
     parser = site_config.add_arguments()
