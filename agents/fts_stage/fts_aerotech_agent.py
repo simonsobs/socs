@@ -10,7 +10,7 @@ if not ON_RTD:
     from ocs import ocs_agent, site_config
     from ocs.ocs_twisted import TimeoutLock, Pacemaker
 
-class FTSStage:
+class FTSAerotechStage:
     """
     Class for connecting to the FTS mirror controller
 
@@ -98,7 +98,7 @@ class FTSStage:
 
     
 
-class FTSMirrorAgent:
+class FTSAerotechAgent:
     """
     Agent for connecting to the FTS mirror control
 
@@ -164,7 +164,7 @@ class FTSMirrorAgent:
             # Run the function you want to run
             self.log.debug("Lock Acquired Connecting to Stages")
             try:
-                self.stage = FTSStage(self.ip_addr, self.port)
+                self.stage = FTSAerotechStage(self.ip_addr, self.port)
             except Exception as e:
                 self.log.error(f"Error while connecting to FTS: {e}")
                 reactor.callFromThread(reactor.stop)
@@ -303,12 +303,12 @@ if __name__ == '__main__':
     parser = make_parser()
 
     # Interpret options in the context of site_config.
-    args = site_config.parse_args(agent_class = 'FTSMirrorAgent',
+    args = site_config.parse_args(agent_class = 'FTSAerotechAgent',
             parser=parser)
 
     agent, runner = ocs_agent.init_site_agent(args)
 
-    fts_agent = FTSMirrorAgent(agent, args.ip_address, args.port, 
+    fts_agent = FTSAerotechAgent(agent, args.ip_address, args.port, 
                                 args.mode, args.sampling_frequency)
 
     agent.register_task('init_stage', fts_agent.init_stage_task)

@@ -3,16 +3,16 @@
 .. _fts_stage:
 
 =====================
-FTS Agent
+FTS Aerotech Agent
 =====================
 
 This agent is used to communicate with the FTS mirror stage for two FTSs with
 Aerotech motion controllers. 
 
 .. argparse::
-    :filename: ../agents/fts_stage/fts_agent.py
+    :filename: ../agents/fts_stage/fts_aerotech_agent.py
     :func: make_parser
-    :prog: python3 fts_agent.py
+    :prog: python3 fts_aerotech_agent.py
 
 
 Configuration File Examples
@@ -26,7 +26,7 @@ To configure the FTS Agent we need to add a block to our ocs
 configuration file. Here is an example configuration block using all of 
 the available arguments::
 
-      {'agent-class': 'FTSMirrorAgent',
+      {'agent-class': 'FTSAerotechAgent',
         'instance-id': 'Falcon',
         'arguments': [
           ['--ip-address', '192.168.10.13'],
@@ -60,5 +60,5 @@ is running.::
 Agent API
 ---------
 
-.. autoclass:: agents.fts_stage.fts_agent.FTSMirrorAgent
+.. autoclass:: agents.fts_stage.fts_aerotech_agent.FTSAerotechAgent
     :members: init_stage_task, home, move_to, start_acq, stop_acq 
