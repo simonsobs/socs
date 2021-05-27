@@ -3,6 +3,7 @@ import os
 import time
 import txaio
 import argparse
+from twisted.internet import reactor
 
 ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 if not ON_RTD:
@@ -163,7 +164,9 @@ class FTSMirrorAgent:
             self.log.debug("Lock Acquired Connecting to Stages")
             try:
                 self.stage = FTSStage(self.ip_addr, self.port)
-            except:
+            except Exception as e:
+                self.log.error(f"Error while connecting to FTS: {e}")
+                reactor.callFromThread(reactor.stop)
                 return False, "FTS Stage Initialization Failed"
         # This part is for the record and to allow future calls to proceed,
         # so does not require the lock
