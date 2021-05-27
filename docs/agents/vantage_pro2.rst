@@ -100,19 +100,19 @@ where we do not specify the port.
 Note: One should first add the serial number of the VantagePro 2 device
 to the udev file and create SYMLINK. 
 The Vendor ID is "10c4" and the Prodcut ID is "ea60" for the Vantage Pro2. 
-Here, we associate the vendor and product ID's with the SYMLINK 'VP23'. 
-So, we're setting the serial number argument as 'VP23'::
+Here, we associate the vendor and product ID's with the SYMLINK 'VP2'. 
+So, we're setting the serial number argument as 'VP2'::
 
      {'agent-class': 'VantagePro2Agent',
        'instance-id': 'vantagepro2agent',
        'arguments': [['--mode', 'acq'],
-                     ['--serial-number', 'VP23'],
+                     ['--serial-number', 'VP2'],
                      ['--sample-freq', '0.5']]},
    
 An example block of the udev rules file for the VantagePro 2 follows::
 
         SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", 
-                SYMLINK="VP23"
+                SYMLINK="VP2"
 
 
 The agent will attempt to find the port that the Vantage Pro2 is connected to
