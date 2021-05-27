@@ -72,7 +72,8 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
 
-autodoc_mock_imports = ['spt3g', 'so3g', 'labjack']
+autodoc_mock_imports = ['spt3g', 'so3g', 'labjack', 'ocs', 'ocs.agent',
+                        'ocs.agent.aggregator']
 from unittest import mock
 for m in autodoc_mock_imports:
     sys.modules[m] = mock.Mock()
