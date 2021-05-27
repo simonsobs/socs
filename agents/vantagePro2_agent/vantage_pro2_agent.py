@@ -18,11 +18,13 @@ class VantagePro2Agent:
     """Agent to connect to single VantagePro2 Weather Monitor Device.
 
     Args:
-         -sample_freq (double): frequency (Hz) at which the weather monitor
-         samples data. Can not be faster than 0.5 Hz. This value is converted
-         to period (sec) for time.wait(seconds)
-         -port (string): usb port that the weather monitor is connected to.
-         The monitor will communicate via this port.
+        sample_freq (double):
+             frequency (Hz) at which the weather monitor samples data. Can not
+             be faster than 0.5 Hz. This value is converted to period (sec) for
+             time.wait(seconds)
+        port (string):
+             usb port that the weather monitor is connected to.  The monitor
+             will communicate via this port.
     """
     # change port argument when I figure out how to generalize it!
     def __init__(self, agent, port="/dev/ttyUSB0", sample_freq=0.5):

@@ -27,14 +27,15 @@ The Vantage Pro2 monitor and weather station records many different
 types of weather data:
 
 - Barometer trend, the current 3 hour barometer trend. 
- - -60 = Falling rapidly
- - -20 = Falling slowly
- - 0 = Steady
- - 20 = Rising slowly
- - 60 = Rising rapidly
- - 80 = No trend available
- - Any other value = The VantagePro2 does not have the 3 hours of data needed 
-   to determine the barometer trend.
+
+  - -60 = Falling rapidly
+  - -20 = Falling slowly
+  - 0 = Steady
+  - 20 = Rising slowly
+  - 60 = Rising rapidly
+  - 80 = No trend available
+  - Any other value = The VantagePro2 does not have the 3 hours of data needed 
+    to determine the barometer trend.
 
 - Barometer: Current barometer reading (Hg/1000)
 - Inside Temperature: Temperatue in Fahrenheit (up to 10th of a degree)
@@ -43,11 +44,12 @@ types of weather data:
 - Wind Speed: Wind speed in miles per hour
 - 10 min average wind speed: 10 minute average wind speed in miles per hour
 - Wind Direction: From 1-360 degrees
- - 0 = No wind direction data
- - 90 = East
- - 180 = South
- - 270 = West
- - 360 = North
+
+  - 0 = No wind direction data
+  - 90 = East
+  - 180 = South
+  - 270 = West
+  - 360 = North
 
 - Extra Temperatures: VantagePro2 can read temperature from up to 7 extra 
   temperature stations. However, they are offset by negative 90 degrees fahrenheit. 
@@ -71,8 +73,9 @@ types of weather data:
 - Year ET: 1000th of an inch
 - Soil Moistures: In centibar, supports 4 soil sensors
 - Leaf Wetnesses: Scale from 0-15. Supports 4 leaf sensors
- - 0 = Very dry
- - 15 = Very wet
+
+  - 0 = Very dry
+  - 15 = Very wet
 
 - Inside Alarms: Currently active inside alarms
 - Rain Alarms: Currently active rain alarms
@@ -132,8 +135,8 @@ example docker-compose service configuration is shown here::
       - ${OCS_CONFIG_DIR}:/config:ro
     command:
       - "--instance-id=vantagepro2agent"
-      - "--site-hub=ws://sisock-crossbar:8001/ws"
-      - "--site-http=http://sisock-crossbar:8001/call"
+      - "--site-hub=ws://crossbar:8001/ws"
+      - "--site-http=http://crossbar:8001/call"
 
 Agent API
 ---------
