@@ -137,29 +137,33 @@ class PysmurfMonitor(DatagramProtocol):
             )
 
         # Handles published metadata from the streamer
-        # Currently Pysmurf uses the "general" message type so we have to
-        # use the pub-id to notify, but we should change this in pysmurf.
-        elif pub_id.startswith("STREAMER:"):
+        elif data['type'] == "metadata":
             self.log.debug("Received Metadata: {payload}", payload=data['payload'])
-            stream_id = pub_id.split(':')[1]
-            if '=' not in data['payload']:
-                self.log.warn("Could not extract key, val pair from message: {msg}",
-                              msg=data['payload'])
-                return
-            key, val = data['payload'].split('=')
-            key = Provider._enforce_field_name_rules(key)
-            try:
-                # Attempts to convert to float since smurf doesn't send any
-                # type info...
-                val = float(val)
-            except ValueError:
-                pass
+
+            # streamer publisher-id looks like `STREAMER:<stream-id>`
+            if ':' in pub_id:
+                stream_id = pub_id.split(':')[1]
+            else:
+                # This is so that this still works before people update to the
+                # version of the stream fuction where the pub-id is set
+                # properly. In this case the stream-id will be something like
+                # "unidentified"
+                stream_id = pub_id
+
+            path = data['payload']['path']
+            val = data['payload']['value']
+            val_type = data['payload']['type']
+
+            field_name = Provider._enforce_field_name_rules(path)
             feed_name = f'{stream_id}_meta'
+
             if feed_name not in self.agent.feeds:
                 self.agent.register_feed(feed_name, record=True, buffer_time=0)
-            feed_data = {'block_name': key,
+
+            feed_data = {'block_name': field_name,
                          'timestamp': data['time'],
-                         'data': {key: val}}
+                         'data': {field_name: val}}
+
             self.agent.publish_to_feed(feed_name, feed_data, from_reactor=True)
 
     def init(self, session, params=None):
