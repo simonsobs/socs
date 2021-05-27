@@ -206,7 +206,11 @@ class LabJackAgent:
                                  record=True,
                                  agg_params=agg_params_downsampled,
                                  buffer_time=1)
-
+        self.agent.register_feed('registers',
+                                 record = True,
+                                 agg_params = {'frame_length':10*60},
+                                 buffer_time = 0.)
+        
     # Task functions
     def init_labjack_task(self, session, params=None):
         """
@@ -237,9 +241,12 @@ class LabJackAgent:
 
         # Start data acquisition if requested in site-config
         auto_acquire = params.get('auto_acquire', False)
+        auto_acquire_reg = params.get('auto_acquire_reg',False)
+        
         if auto_acquire:
             self.agent.start('acq')
-
+        if auto_acquire_reg:
+            self.agent.start('acq_reg')
         return True, 'LabJack module initialized.'
 
     def start_acq(self, session, params=None):
@@ -342,6 +349,104 @@ class LabJackAgent:
         else:
             return False, 'acq is not currently running'
 
+    def start_acq_reg(self, session, params=None):
+        """
+        Task to start data acquisition when you want to read out
+        non-standard registers. In particular the custom registers
+        labjack has built for reading out thermocouples. Maximum is
+        about 2.5 Hz but is set by the register read time which is 
+        estimated at the beginning of the acq_reg setup step.
+
+        Args:
+            sampling_frequency (float):
+                Sampling frequency for data collection. Defaults to 2.5 Hz
+                Maximum set by the register read time. Will reset to lower
+                rate if faster than possible read time.
+
+        """
+        if params is None:
+            params = {}
+        #Determine the read time latency to set the max allowable 
+        #sampling rate by reading the register 100 times in a row 
+        #and recording the time it takes to read each time. Then
+        #setting the max sample rate to be 50mS greater than the median
+        #of the time it took to read.
+        num_chs = len(self.chs)
+        times = []
+        for i in range(100):
+            times.append(time.time())
+            ljm.eReadNames(self.handle,num_chs,self.chs)[0]
+        read_dt = np.round(np.median(np.diff(times)),2)+0.05
+        max_fsamp = 1/read_dt
+        # Setup streaming parameters. Data is collected and published in
+        # blocks at 1 Hz or the scan rate, whichever is less.
+        scan_rate_input = params.get('sampling_frequency',
+                                     self.sampling_frequency)
+        #Warn user that they input too fast of a sample rate and set
+        #to maximum allowable.
+        if scan_rate_input > max_fsamp:
+            self.log.warn(f'Sampling rate {scan_rate_input} exceeds'
+                          'allowable range for register read mode'
+                          'if you want to sample faster please use'
+                          'standard acquire mode and do not read out '
+                          'any non-standard channels. Setting sampling'
+                          f'rate to maximum = {max_fsamp} Hz')
+            scan_rate_input = max_fsamp
+            scan_rate_dt = 0
+        else:
+            scan_rate_dt = (1/scan_rate_input) - read_dt
+            
+        scans_per_read = max(1, int(scan_rate_input))
+        with self.lock.acquire_timeout(0, job='acq') as acquired:
+            if not acquired:
+                self.log.warn("Could not start acq because "
+                              "{} is already running".format(self.lock.job))
+                return False, "Could not acquire lock."
+
+            session.set_status('running')
+            self.take_data = True
+
+            while self.take_data:
+                data = {
+                    'block_name': 'reg',
+                    'data': {}
+                }
+
+                # Get a timestamp
+                timestamp = time.time()
+                # Query the labjack
+                output = ljm.eReadNames(self.handle,num_chs,self.chs)
+
+                # Data comes in form ['reg1', 'reg2', 'reg3', ...]
+                # where regn are the registers in your active_channels
+                # list in your site config file.
+                for i, ch in enumerate(self.chs):
+                    ch_output = output[i]
+                    data['data'][ch] = ch_output
+
+                    # Apply unit conversion function for this channel
+                    if ch in self.functions.keys():
+                        new_ch_output, units = \
+                            self.ljf.unit_conversion(ch_output,
+                                                     self.functions[ch])
+                        data['data'][ch + units] = new_ch_output
+
+                data['timestamp'] = timestamp
+                self.agent.publish_to_feed('registers', data)
+                time.sleep(scan_rate_dt)
+
+            # Flush buffer and stop the data stream
+            self.agent.feeds['registers'].flush_buffer()
+            ljm.close(self.handle)
+            self.log.info("Data stream stopped")
+        return True, 'Acquisition exited cleanly.'
+
+    def stop_acq_reg(self, session, params=None):
+        if self.take_data:
+            self.take_data = False
+            return True, 'requested to stop taking data.'
+        else:
+            return False, 'acq is not currently running'
 
 def make_parser(parser=None):
     """
@@ -378,6 +483,8 @@ if __name__ == '__main__':
     init_params = False
     if args.mode == 'acq':
         init_params = {'auto_acquire': True}
+    if args.mode == 'acq_reg':
+        init_params = {'auto_acquire_reg': True}
 
     ip_address = str(args.ip_address)
     active_channels = args.active_channels
@@ -396,5 +503,6 @@ if __name__ == '__main__':
                         sensors.init_labjack_task,
                         startup=init_params)
     agent.register_process('acq', sensors.start_acq, sensors.stop_acq)
-
+    agent.register_process('acq_reg', sensors.start_acq_reg,
+                           sensors.stop_acq_reg)
     runner.run(agent, auto_reconnect=True)
