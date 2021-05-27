@@ -154,6 +154,13 @@ class LATRtXYStageAgent:
         """
         params: 
             dict: {'sampling_frequency': float, sampling rate in Hz}
+
+        The most recent positions are stored in the session.data object in the
+        format: 
+            {"positions":
+                {"x": x position in cm,
+                 "y": y position in cm}
+            }
         """
         if params is None:
             params = {}
