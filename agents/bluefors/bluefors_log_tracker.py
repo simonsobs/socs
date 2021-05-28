@@ -110,6 +110,21 @@ class LogTracker:
             self.date = new_date
             self.open_all_logs()
 
+    def reopen_file(self, filename):
+        """If a file is already open and a new inode is detected, reopen the
+        file. Returns the last line of the file.
+
+        Parameters
+        ----------
+        filename : str
+            Full path to filename to open
+
+        """
+        self.file_objects[filename] = {"file_object": open(filename, 'r'),
+                                       "stat_results": os.stat(filename)}
+        lines = self.file_objects[filename]["file_object"].readlines()
+        return lines[-1]
+
     def open_all_logs(self):
         """Open today's logs and move to end of files."""
         file_list = self._build_file_list()
@@ -335,7 +350,12 @@ class LogParser:
         for k, v in self.log_tracker.file_objects.items():
             log_type, log_name = self.identify_log(k)
 
-            new = v['file_object'].readline()
+            if os.stat(k).st_ino != v['stat_results'].st_ino:
+                LOG.info("New inode found, reopening...")
+                new = self.log_tracker.reopen_file(k)
+                print(k, new)
+            else:
+                new = v['file_object'].readline()
             if new == '':
                 continue
 
