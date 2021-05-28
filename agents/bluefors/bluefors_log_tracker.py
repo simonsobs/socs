@@ -415,7 +415,7 @@ class BlueforsAgent:
         self.agent.register_feed('bluefors',
                                  record=True,
                                  agg_params=agg_params,
-                                 buffer_time=1)
+                                 )
 
     def try_set_job(self, job_name):
         print(self.job, job_name)
