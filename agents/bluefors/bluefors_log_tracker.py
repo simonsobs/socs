@@ -353,7 +353,7 @@ class LogParser:
             if os.stat(k).st_ino != v['stat_results'].st_ino:
                 LOG.info("New inode found, reopening...")
                 new = self.log_tracker.reopen_file(k)
-                print(k, new)
+                LOG.debug("File: {f}, Line: {l}", f=k, l=new)
             else:
                 new = v['file_object'].readline()
             if new == '':
@@ -377,7 +377,15 @@ class LogParser:
 
             if data is not None:
                 LOG.debug("Data: {d}", d=data)
-                app_session.app.publish_to_feed('bluefors', data)
+                # If the file was reopened due to an inode change we don't know
+                # if the last line is recent enough to be worth publishing. Check
+                stale_limit = 1  # minute
+                if (time.time() - data['timestamp']) < stale_limit*60:
+                    app_session.app.publish_to_feed('bluefors', data)
+                else:
+                    LOG.warn("Not publishing stale data. Make sure your log " +
+                             "file sync is done at a rate faster than once ever " +
+                             "{x} minutes.", x=stale_limit)
 
 
 class BlueforsAgent:
