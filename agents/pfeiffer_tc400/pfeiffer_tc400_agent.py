@@ -2,7 +2,6 @@ import time
 import os
 import socket
 import argparse
-from pfeiffer_tc400_driver import PfeifferTC400
 import txaio
 from os import environ
 
@@ -10,19 +9,20 @@ on_rtd = os.environ.get('READTHEDOCS') == 'True'
 if not on_rtd:
     from ocs import ocs_agent, site_config
     from ocs.ocs_twisted import TimeoutLock
+    from pfeiffer_tc400_driver import PfeifferTC400
 
 
 class PfeifferTC400Agent:
-    """Agent to connect to a pfeiffer tc400 electronic drive unit controlling a 
+    """Agent to connect to a pfeiffer tc400 electronic drive unit controlling a
     turbo pump via a serial-to-ethernet converter.
-    
+
     Parameters
     ----------
         ip_address (str): IP address for the serial-to-ethernet converter
         port_number (int): Serial-to-ethernet converter port
-        turbo_address (int): An internal address used to communicate between the 
-            power supplies and the tc400. Found on the front screen of the power 
-            supplies.
+        turbo_address (int): An internal address used to communicate between
+            the power supplies and the tc400. Found on the front screen of
+            the power supplies.
     """
     def __init__(self, agent, ip_address, port_number, turbo_address):
         self.agent = agent
@@ -48,11 +48,12 @@ class PfeifferTC400Agent:
 
     def init_turbo(self, session, params=None):
         """ Task to connect to the turbo controller
-        
+
         Parameters
         ----------
         auto_acquire: bool, optional
-            Default is False. Starts data acquisition after initialization if True.
+            Default is False. Starts data acquisition after initialization
+            if True.
         """
 
         with self.lock.acquire_timeout(0) as acquired:
@@ -60,14 +61,15 @@ class PfeifferTC400Agent:
                 return False, "Could not acquire lock"
 
             try:
-                self.turbo = PfeifferTC400(self.ip_address, self.port_number, self.turbo_address)
-                #self.idn = self.psu.identify()
+                self.turbo = PfeifferTC400(self.ip_address,
+                                           self.port_number,
+                                           self.turbo_address)
             except socket.timeout as e:
-                self.log.error(f"Turbo Controller timed out during connect with error {e}")
+                self.log.error("Turbo Controller timed out" +
+                               f"during connect with error {e}")
                 return False, "Timeout"
             self.log.info("Connected to turbo controller")
-            
-                                  
+
         # Start data acquisition if requested in site-config
         auto_acquire = params.get('auto_acquire', False)
         if auto_acquire:
@@ -84,7 +86,7 @@ class PfeifferTC400Agent:
         wait: float, optional
             time to wait between measurements [seconds]. Default=1s.
 
-        The session.data object stores the most recent published values 
+        The session.data object stores the most recent published values
         in a dictionary. For example:
         session.data={
                 'timestamp': 1598626144.5365012,
@@ -110,16 +112,16 @@ class PfeifferTC400Agent:
                         'block_name': 'turbo_output',
                         'data': {}
                     }
-                    
-                    try:    
+
+                    try:
                         data['data']["Turbo_Motor_Temp"] = self.turbo.get_turbo_motor_temperature()
                         data['data']["Rotation_Speed"] = self.turbo.get_turbo_actual_rotation_speed()
                         data['data']['error_code'] = self.turbo.get_turbo_error_code()
-                    
+
                     except ValueError as e:
                         self.log.error(f"Error in collecting data: {e}")
                         continue
-                        
+
                     self.agent.publish_to_feed('pfeiffer_turbo', data)
 
                     # Allow this process to be queried to return current data
@@ -156,7 +158,7 @@ class PfeifferTC400Agent:
                 return False, "Could not acquire lock"
 
         return True, 'Turned turbo on'
-    
+
     def turn_turbo_off(self, session, params=None):
         """Turns the turbo off."""
 
@@ -166,14 +168,14 @@ class PfeifferTC400Agent:
                 if not off:
                     return False, "Turbo unable to be turned off"
                 time.sleep(1)
-                self.turbo.unready_turbo()
+                unready = self.turbo.unready_turbo()
                 if not unready:
                     return False, "Setting to ready state failed"
             else:
                 return False, "Could not acquire lock"
 
         return True, 'Turned turbo off'
-                          
+
     def acknowledge_turbo_errors(self, session, params=None):
         """Sends an acknowledgment of the error code to the turbo.
         """
@@ -184,7 +186,8 @@ class PfeifferTC400Agent:
                 return False, "Could not acquire lock"
 
         return True, 'Acknowledged Turbo Errors.'
-    
+
+
 def make_parser(parser=None):
     """Build the argument parser for the Agent. Allows sphinx to automatically
     build documentation based on this function.
@@ -194,27 +197,29 @@ def make_parser(parser=None):
 
     # Add options specific to this agent.
     pgroup = parser.add_argument_group('Agent Options')
-    pgroup.add_argument('--ip-address', type=str, help="serial-to-ethernet"+
+    pgroup.add_argument('--ip-address', type=str, help="serial-to-ethernet" +
                         "converter ip address")
-    pgroup.add_argument('--port-number', type=int, help="Serial-to-ethernet"+
+    pgroup.add_argument('--port-number', type=int, help="Serial-to-ethernet" +
                         "converter port")
-    pgroup.add_argument('--turbo-address', type=int, help="Internal address"+
-                       "used by power supplies")
-    pgroup.add_argument('--mode', type=str, help="Set to acq to run acq on"+
-                       "startup")
+    pgroup.add_argument('--turbo-address', type=int, help="Internal address" +
+                        "used by power supplies")
+    pgroup.add_argument('--mode', type=str, help="Set to acq to run acq on" +
+                        "startup")
 
     return parser
+
 
 if __name__ == '__main__':
     # Start logging
     txaio.start_logging(level=environ.get("LOGLEVEL", "info"))
-    
+
     parser = site_config.add_arguments()
 
     # Get the default ocs agrument parser
     parser = make_parser()
-    args = site_config.parse_args(agent_class='PfeifferTC400Agent', parser=parser)
-                          
+    args = site_config.parse_args(agent_class='PfeifferTC400Agent',
+                                  parser=parser)
+
     init_params = False
     if args.mode == 'acq':
         init_params = {'auto_acquire': True}
@@ -222,8 +227,8 @@ if __name__ == '__main__':
     agent, runner = ocs_agent.init_site_agent(args)
 
     p = PfeifferTC400Agent(agent,
-                           args.ip_address, 
-                           int(args.port_number), 
+                           args.ip_address,
+                           int(args.port_number),
                            int(args.turbo_address))
 
     agent.register_task('init', p.init_turbo, startup=init_params)
@@ -231,5 +236,5 @@ if __name__ == '__main__':
     agent.register_task('turn_turbo_off', p.turn_turbo_off)
     agent.register_task('acknowledge_turbo_errors', p.acknowledge_turbo_errors)
     agent.register_process('acq', p.monitor_turbo, p.stop_monitoring)
-                          
+
     runner.run(agent, auto_reconnect=True)
