@@ -118,6 +118,24 @@ Example docker-compose configuration::
     environment:
       LOGLEVEL: "info"
       FRAME_LENGTH: 600
+      STALE_TIME: 2
 
 Depending on how you are running your containers it might be easier to hard
 code the `OCS_CONFIG_DIR` environment variable.
+
+Environment Variables
+^^^^^^^^^^^^^^^^^^^^^
+There are several environment variables that can be used to configure the
+Bluefors Agent container.
+
++--------------+----------------------------------------------------------------+
+| Variable     | Description                                                    |
++==============+================================================================+
+| LOGLEVEL     | Verbosity of the logs.                                         |
++--------------+----------------------------------------------------------------+
+| FRAME_LENGTH | .g3 frame length.                                              |
++--------------+----------------------------------------------------------------+
+| STALE_TIME   | Time limit (in minutes)for newly opened files to be published  |
+|              | to feeds. Data older than this time when read will not be      |
+|              | published.                                                     |
++--------------+----------------------------------------------------------------+

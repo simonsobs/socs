@@ -337,7 +337,7 @@ class LogParser:
         # If nothing matches return None
         return (None, None)
 
-    def read_and_publish_logs(self, app_session):
+    def read_and_publish_logs(self, app_session, stale_time=2):
         """Read a new line from each log file if there is one, and publish its
         contents to the app_session's feed.
 
@@ -345,6 +345,11 @@ class LogParser:
         ----------
         app_session : ocs.ocs_agent.OpSession
             session from the ocs_agent, used to publish to bluefors feed
+        stale_time : int
+            Time in minutes which represents how fresh data in the bluefors
+            logs must be when we open them in order to publish to OCS. This
+            ensures we don't reopen a file much later than when they were
+            collected and publish "stale" data to the OCS live HK system.
 
         """
         for k, v in self.log_tracker.file_objects.items():
@@ -379,13 +384,12 @@ class LogParser:
                 LOG.debug("Data: {d}", d=data)
                 # If the file was reopened due to an inode change we don't know
                 # if the last line is recent enough to be worth publishing. Check
-                stale_limit = 1  # minute
-                if (time.time() - data['timestamp']) < stale_limit*60:
+                if (time.time() - data['timestamp']) < stale_time*60:
                     app_session.app.publish_to_feed('bluefors', data)
                 else:
                     LOG.warn("Not publishing stale data. Make sure your log " +
                              "file sync is done at a rate faster than once ever " +
-                             "{x} minutes.", x=stale_limit)
+                             "{x} minutes.", x=stale_time)
 
 
 class BlueforsAgent:
@@ -460,7 +464,8 @@ class BlueforsAgent:
             self.log_tracker.check_open_files()
 
             # Check for new lines and publish to feed
-            parser.read_and_publish_logs(session)
+            stale_time = os.environ.get("STALE_TIME", 2)
+            parser.read_and_publish_logs(session, stale_time)
 
             time.sleep(0.01)
 
