@@ -441,6 +441,9 @@ class BlueforsAgent:
         # Create file objects for all logs in today's directory
         self.log_tracker.open_all_logs()
 
+        # Setup the Parser object with tracking info
+        parser = LogParser(self.log_tracker)
+
         while True:
             with self.lock:
                 if self.job == '!acq':
@@ -455,9 +458,6 @@ class BlueforsAgent:
 
             # Ensure all the logs we want are open
             self.log_tracker.check_open_files()
-
-            # Pass tracking information to parser class
-            parser = LogParser(self.log_tracker)
 
             # Check for new lines and publish to feed
             parser.read_and_publish_logs(session)
