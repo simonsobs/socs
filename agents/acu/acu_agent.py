@@ -234,6 +234,7 @@ class ACUAgent:
         tfn_key = {'None':0,
                    'False':0,
                    'True':1}
+        char_replace = [' ', '-', ':', '(', ')', '+', ',', '/']
         while self.jobs['monitor'] == 'run':
             now = time.time()
 
@@ -266,8 +267,12 @@ class ACUAgent:
 
 #            session.data = j
             for (key, value) in session.data.items():
+                ocs_key = key
+                for char in char_replace:
+                    ocs_key = ocs_key.replace(char, '_')
+                ocs_key = ocs_key.replace('24V', 'V24')
 #                ocs_key = key.replace(' ','_').replace('-','_').replace(':','_').replace('(','_').replace(')','_').replace('24V','V24')
-                ocs_key = key.replace(' ','_').replace('+','_').replace(',','_').replace('/','_').replace('-','_').replace(':','_').replace('(','_').replace(')','_').replace('24V','V24')
+#                ocs_key = key.replace(' ','_').replace('+','_').replace(',','_').replace('/','_').replace('-','_').replace(':','_').replace('(','_').replace(')','_').replace('24V','V24')
                 if key in summary_params:
                     self.data['status']['summary'][ocs_key] = value
                     if key == 'Azimuth mode':
@@ -383,13 +388,17 @@ class ACUAgent:
         Params:
             az (float): destination angle for the azimuthal axis
             el (float): destination angle for the elevation axis
+            wait (float): amount of time to wait for motion to end
         """
         ok, msg = self.try_set_job('control')
         if not ok:
             return ok, msg
         az = params.get('az')
         el = params.get('el')
-        wait_for_motion = params.get('wait')
+        if params.get('wait'):
+            wait_for_motion = params.get('wait')
+        else:
+            wait_for_motion = 1.
         current_az = round(self.data['broadcast']['Azimuth_Corrected'],4)
         current_el = round(self.data['broadcast']['Elevation_Corrected'],4)
         publish_dict = {'Start_Azimuth': current_az,
