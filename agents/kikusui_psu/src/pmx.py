@@ -4,7 +4,7 @@ import serial as sr
 import sys as sy
 import os
 
-# CHWP Control modules
+# Communication modules
 this_dir = os.path.dirname(__file__)
 sy.path.append(os.path.join(
     this_dir, "..", "..","..", "MOXA"))
@@ -41,6 +41,22 @@ class PMX:
             pass
         return
 
+    def check_connect(self):
+        try:
+            if not self.using_tcp :
+                self.ser.inWaiting()
+            else  :
+                self.clean_serial()
+                self.ser.write(str.encode("OUTP?\n\r"))
+                self.wait()
+                val = (self.ser.readline().strip())
+                val = int(val)
+                pass
+        except Exception as e:
+            msg = 'Could not connect to the PMX serial! | Error: "{}"'.format(e)
+            return msg, False
+        return 'Successfully connect to the PMX serial.', True
+
     def check_voltage(self):
         """ Check the voltage """
         self.clean_serial()
@@ -48,20 +64,17 @@ class PMX:
             self.ser.write(str.encode("MEAS:VOLT?\n\r"))
             self.wait()
             val = (self.ser.readline().strip())
-            if len(val)>0 : 
-                break
-                #try :
-                #    val  = float(val)
-                #except ValueError:
-                #    continue
-                #else :
-                #    break
-                pass
+            if len(val)>0 : break
             pass
-        #val = float(self.ser.readline())
-        val = float(val)
-        msg = "Measured voltage = %.3f V" % (val)
-        print(msg)
+        try :
+            val = float(val)
+            msg = "Measured voltage = %.3f V" % (val)
+            #print(msg)
+        except  ValueError:
+            msg = 'WARNING! Could not get correct voltage value! | Response = "%s"' % (val)
+            val = -999
+            print(msg)
+            pass
         return msg, val
 
     def check_current(self):
@@ -71,20 +84,17 @@ class PMX:
             self.ser.write(str.encode("MEAS:CURR?\n\r"))
             self.wait()
             val = (self.ser.readline().strip())
-            if len(val)>0 : 
-                break
-                #try :
-                #    val  = float(val)
-                #except ValueError:
-                #    continue
-                #else :
-                #    break
-                #pass
+            if len(val)>0 : break
             pass
-        #val = float(self.ser.readline())
-        val = float(val)
-        msg = "Measured current = %.3f A" % (val)
-        print(msg)
+        try :
+            val = float(val)
+            msg = "Measured current = %.3f A" % (val)
+            #print(msg)
+        except  ValueError:
+            msg = 'WARNING! Could not get correct current value! | Response = "%s"' % (val)
+            val = -999
+            print(msg)
+            pass
         return msg, val
 
     def check_voltage_current(self):
@@ -99,6 +109,58 @@ class PMX:
 #        print(msg)
         return msg, voltage, current
 
+    def check_voltagesetting(self):
+        """ Check the voltage setting """
+        self.clean_serial()
+        for i in range(10):
+            self.ser.write(str.encode("VOLT?\n\r"))
+            self.wait()
+            val = (self.ser.readline().strip())
+            if len(val)>0 : break
+            pass
+        try :
+            val = float(val)
+            msg = "Voltage setting = %.3f V" % (val)
+            #print(msg)
+        except  ValueError:
+            msg = 'WARNING! Could not get correct voltage-setting value! | Response = "%s"' % (val)
+            val = -999
+            print(msg)
+            pass
+        return msg, val
+
+    def check_currentsetting(self):
+        """ Check the current setting """
+        self.clean_serial()
+        for i in range(10):
+            self.ser.write(str.encode("CURR?\n\r"))
+            self.wait()
+            val = (self.ser.readline().strip())
+            if len(val)>0 : break
+            pass
+        try :
+            val = float(val)
+            msg = "Current setting = %.3f A" % (val)
+            #print(msg)
+        except  ValueError:
+            msg = 'WARNING! Could not get correct current-setting value! | Response = "%s"' % (val)
+            val = -999
+            print(msg)
+            pass
+        return msg, val
+
+    def check_voltage_current_setting(self):
+        """ Check both the voltage and current setting """
+        self.clean_serial()
+        voltage = self.check_voltagesetting()[1]
+        current = self.check_currentsetting()[1]
+        msg = (
+            "Voltage setting = %.3f V\n"
+            "Current setting = %.3f A\n"
+            % (voltage, current))
+        #print(msg)
+        return msg, voltage, current
+
     def check_output(self):
         """ Return the output status """
         self.clean_serial()
@@ -108,14 +170,20 @@ class PMX:
             val = (self.ser.readline().strip())
             if len(val)>0 : break
             pass
-        val = int(val)
+        try :
+            val = int(val)
+        except  ValueError:
+            msg = 'WARNING! Could not get correct output value! | Response = "%s"' % (val)
+            val = -999
+            print(msg)
+            return msg, val
         if val == 0:
             msg = "Measured output state = OFF"
         elif val == 1:
             msg = "Measured output state = ON"
         else:
             msg = "Failed to measure output..."
-        print(msg)
+        #print(msg)
         return msg, val
 
     def set_voltage(self, val, silent=False):

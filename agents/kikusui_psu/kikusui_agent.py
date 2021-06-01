@@ -25,8 +25,61 @@ class KikusuiAgent:
         agg_params = {'frame_length': 60}
         self.agent.register_feed('kikusui_psu', record = True, agg_params = agg_params)
 
-        self.PMX = pm.PMX(tcp_ip = self.kikusui_ip, tcp_port = self.kikusui_port, timeout = 0.5)
+        try :
+            self.PMX = pm.PMX(tcp_ip = self.kikusui_ip, tcp_port = self.kikusui_port, timeout = 0.5)
+        except Exception as e:
+            self.log.warn('Could not connect to serial converter! | Error = "%s"' % e)
+            self.PMX = None
+            pass
+
+        if not self.PMX is None : self.cmd = cm.Command(self.PMX)
+        else :                    self.cmd = None
+        pass
+
+    def __check_connect(self):
+        if self.PMX is None :
+            msg = 'No connection to the KIKUSUI power supply. | Error = "PMX is None"'
+            self.log.warn(msg)
+            return False, msg
+        else :
+            msg, ret = self.PMX.check_connect()
+            if not ret :
+                msg = 'No connection to the KIKUSUI power supply. | Error = "%s"' %  msg
+                self.log.warn(msg)
+                return False, msg
+            pass
+        return True, 'Connection is OK.'
+
+
+    def __reconnect(self):
+        self.log.warn('Trying to reconnect...')
+        # reconnect
+        try :
+            if self.PMX : del self.PMX
+            if self.cmd : del self.cmd
+            self.PMX = pm.PMX(tcp_ip = self.kikusui_ip, tcp_port = self.kikusui_port, timeout = 0.5)
+        except Exception as e:
+            msg = 'Could not reconnect to the KIKUSUI power supply! | Error: %s' % e
+            self.log.warn(msg)
+            self.PMX = None
+            self.cmd = None
+            return False, msg
+        # reinitialize cmd
         self.cmd = cm.Command(self.PMX)
+        ret, msg = self.__check_connect()
+        if ret :
+            msg = 'Successfully reconnected to the KIKUSUI power supply!'
+            self.log.info(msg)
+            return True, msg
+        else :
+            msg = 'Failed to reconnect to the KIKUSUI power supply!'
+            self.log.warn(msg)
+            if self.PMX : del self.PMX
+            if self.cmd : del self.cmd
+            self.PMX = None
+            self.cmd = None
+            return False, msg
+
  
     def set_on(self, session, params = None):
         with self.lock.acquire_timeout(0, job = 'set_on') as acquired:
@@ -90,6 +143,11 @@ class KikusuiAgent:
                               .format(self.lock.job))
                 return False, 'Could not acquire lock'
 
+            # check connection
+            ret, msg = self.__check_connect()
+            if not ret :
+                return False, msg 
+
             v_val = None
             c_val = None
             s_val = None
@@ -125,23 +183,36 @@ class KikusuiAgent:
             
             if not self.switching:
                 self.switching2 = True;
-                v_msg, v_val = self.cmd.user_input('V?')
-                i_msg, i_val = self.cmd.user_input('C?')
-                s_msg, s_val = self.cmd.user_input('O?')
+                # check connection
+                ret, msg = self.__check_connect()
+                if not ret :
+                    msg = 'Could not connect to the KIKUSUI power supply!'
+                    v_val, i_val, vs_val, is_val = 0., 0., 0., 0.
+                    s_val = -1 # -1 means Not connected.
+                    # try to reconnect
+                    #ret, msg = self.__reconnect()
+                else :
+                    v_msg, v_val = self.cmd.user_input('V?')
+                    i_msg, i_val = self.cmd.user_input('C?')
+                    vs_msg,vs_val= self.cmd.user_input('VS?')
+                    is_msg,is_val= self.cmd.user_input('CS?')
+                    s_msg, s_val = self.cmd.user_input('O?')
+                    pass
                 self.switching2 = False;
-
                 data['data']['kikusui_volt'] = v_val
                 data['data']['kikusui_curr'] = i_val
+                data['data']['kikusui_voltset'] = vs_val
+                data['data']['kikusui_currset'] = is_val
                 data['data']['kikusui_status'] = s_val
+                self.agent.publish_to_feed('kikusui_psu', data)
             else:
                 #data['data']['kikusui_volt'] = 0
                 #data['data']['kikusui_curr'] = 0
                 #data['data']['kikusui_status'] = 0
-                time.sleep(1)
-                continue
+                pass
 
-            self.agent.publish_to_feed('kikusui_psu', data)
-            time.sleep(1)
+            time.sleep(1) # DAQ interval
+            pass # End of while loop
 
         self.agent.feeds['kikusui_feed'].flush_buffer()
         return True, 'Acqusition exited cleanly'

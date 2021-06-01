@@ -1,7 +1,7 @@
 # Built-in python modules
 import sys as sy
 
-# CHWP Control modules
+# KIKUSUI-power-suuply control modules
 import src.pmx as pmx
 
 
@@ -26,6 +26,9 @@ class Command:
             "check_v": "V?",
             "check_c": "C?",
             "check_vc": "VC?",
+            "check_vs": "VS?",
+            "check_cs": "CS?",
+            "check_vcs": "VCS?",
             "check_out": "O?",
             "set_v": "V",
             "set_c": "C",
@@ -43,6 +46,9 @@ class Command:
             "Check output voltage = '%s'\n"
             "Check output current = '%s'\n"
             "Check output voltage and current = '%s'\n"
+            "Check voltage setting = '%s'\n"
+            "Check current setting = '%s'\n"
+            "Check voltage and current setting = '%s'\n"
             "Check output state = '%s'\n"
             "Set output voltage = '%s' [setting]\n"
             "Set output current = '%s' [setting]\n"
@@ -56,6 +62,9 @@ class Command:
                self._cmds["check_v"],
                self._cmds["check_c"],
                self._cmds["check_vc"],
+               self._cmds["check_vs"],
+               self._cmds["check_cs"],
+               self._cmds["check_vcs"],
                self._cmds["check_out"],
                self._cmds["set_v"],
                self._cmds["set_c"],
@@ -87,6 +96,15 @@ class Command:
             # Check voltage and current
             elif cmd == self._cmds["check_vc"]:
                 return self._PMX.check_voltage_current()
+            # Check voltage setting
+            elif cmd == self._cmds["check_vs"]:
+                return self._PMX.check_voltagesetting()
+            # Check current setting
+            elif cmd == self._cmds["check_cs"]:
+                return self._PMX.check_currentsetting()
+            # Check voltage and current
+            elif cmd == self._cmds["check_vcs"]:
+                return self._PMX.check_voltage_current_setting()
             # Check output state
             elif cmd == self._cmds["check_out"]:
                 return self._PMX.check_output()
