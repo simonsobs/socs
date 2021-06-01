@@ -30,12 +30,15 @@ class ACUAgent:
         self.jobs = {
             'monitor': 'idle',
             'broadcast': 'idle',
-            'control': 'idle', # shared by go_to, go_to_3rd_axis, run_track_fromfile
+            'control': 'idle', # shared by go_to, go_to_3rd_axis, run_specified_scan, generate_scan
             }
 
         self.acu_config = aculib.guess_config(acu_config)
         self.base_url = self.acu_config['base_url']
         self.sleeptime = self.acu_config['motion_waittime']
+        self.udp = self.acu_config['streams']['main']
+        self.udp_ext = self.acu_config['streams']['ext']
+        self.status = self.acu_config['streams']['status'] 
 
         self.log = agent.log
 
@@ -76,23 +79,23 @@ class ACUAgent:
         agg_params = {'frame_length':60}
         self.agent.register_feed('acu_status_summary',
                                  record=True,
-                                 agg_params=agg_params,
+                                 agg_params={'frame_length':60, 'exclude_influx'=True},
                                  buffer_time=1)
         self.agent.register_feed('acu_status_full',
                                  record=True,
-                                 agg_params=agg_params,
+                                 agg_params={'frame_length':60, 'exclude_influx'=True},
                                  buffer_time=1)
         self.agent.register_feed('acu_status_influx',
                                  record=True,
-                                 agg_params=agg_params,
+                                 agg_params={'frame_length':60, 'exclude_aggregator'=True},
                                  buffer_time=1)
         self.agent.register_feed('acu_udp_stream',
                                  record=True,
-                                 agg_params=agg_params,
+                                 agg_params={'frame_length':60, 'exclude_influx'=True},
                                  buffer_time=1)
         self.agent.register_feed('acu_broadcast_influx',
                                  record=False,
-                                 agg_params=agg_params,
+                                 agg_params={'frame_length':60, 'exclude_aggregator'=True},
                                  buffer_time=1)
         self.agent.register_feed('acu_health_check',
                                  record=True,
@@ -110,7 +113,6 @@ class ACUAgent:
         agent.register_task('run_specified_scan', self.run_specified_scan, blocking=False)
         agent.register_task('set_boresight', self.set_boresight, blocking=False)
         agent.register_task('stop_and_clear', self.stop_and_clear, blocking=False)
-#        agent.register_task('generate_scan', self.generate_scan, blocking=False)
 
     # Operation management.  This agent has several Processes that
     # must be able to alone or simultaneously.  The state of each is
@@ -129,9 +131,6 @@ class ACUAgent:
             if not acquired:
                 print(f"Lock could not be acquried because it is held by {self.lock.job}")
                 return False
-       # with self.lock:
-       #     if self.jobs.get(job_name, 'idle') != 'idle':
-       #         return (False, 'Conflict: "%s" is already running.' % job_name)
             # Set running.
             self.jobs[job_name] = 'run'
             return (True, 'ok')
