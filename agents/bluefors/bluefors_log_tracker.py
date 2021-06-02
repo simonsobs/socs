@@ -146,7 +146,7 @@ class LogTracker:
 
 
 class LogParser:
-    def __init__(self, tracker):
+    def __init__(self, tracker, mode="follow", stale_time=2):
         """Log Parsing helper class.
 
         Knows the internal formats for each log type. Used to loop over all
@@ -156,6 +156,18 @@ class LogParser:
         ----------
         tracker : LogTracker
             log tracker that contains paths and file objects to parse
+        mode : str
+            Operating mode for the log tracker. Either "follow" or "poll",
+            defaulting to "follow". In "follow" mode the Tracker will read the
+            next line in the file if able to. In "poll" mode stats about the
+            file are used to determine if it was updated since the last read,
+            and if it has been the file is reopened to get the last line. This
+            is more I/O intensive, but is useful in certain configurations.
+        stale_time : int
+            Time in minutes which represents how fresh data in the bluefors
+            logs must be when we open them in order to publish to OCS. This
+            ensures we don't reopen a file much later than when they were
+            collected and publish "stale" data to the OCS live HK system.
 
         """
         self.log_tracker = tracker
@@ -179,6 +191,8 @@ class LogParser:
                                     'ctrl_pres_ok', 'ctr_pressure_ok'],
                          'heater': ["a1_u", "a1_r_lead", "a1_r_htr", "a2_u",
                                     "a2_r_lead", "a2_r_htr", "htr", "htr_range"]}
+        self.mode = mode
+        self.stale_time = stale_time
 
     @staticmethod
     def timestamp_from_str(time_string):
@@ -337,7 +351,7 @@ class LogParser:
         # If nothing matches return None
         return (None, None)
 
-    def read_and_publish_logs(self, app_session, mode="follow", stale_time=2):
+    def read_and_publish_logs(self, app_session):
         """Read a new line from each log file if there is one, and publish its
         contents to the app_session's feed.
 
@@ -345,24 +359,12 @@ class LogParser:
         ----------
         app_session : ocs.ocs_agent.OpSession
             session from the ocs_agent, used to publish to bluefors feed
-        mode : str
-            Operating mode for the log tracker. Either "follow" or "poll",
-            defaulting to "follow". In "follow" mode the Tracker will read the
-            next line in the file if able to. In "poll" mode stats about the
-            file are used to determine if it was updated since the last read,
-            and if it has been the file is reopened to get the last line. This
-            is more I/O intensive, but is useful in certain configurations.
-        stale_time : int
-            Time in minutes which represents how fresh data in the bluefors
-            logs must be when we open them in order to publish to OCS. This
-            ensures we don't reopen a file much later than when they were
-            collected and publish "stale" data to the OCS live HK system.
 
         """
         for k, v in self.log_tracker.file_objects.items():
             log_type, log_name = self.identify_log(k)
 
-            if os.stat(k).st_ino != v['stat_results'].st_ino and mode=="poll":
+            if os.stat(k).st_ino != v['stat_results'].st_ino and self.mode == "poll":
                 LOG.debug("New inode found, reopening...")
                 new = self.log_tracker.reopen_file(k)
                 LOG.debug("File: {f}, Line: {l}", f=k, l=new)
@@ -370,7 +372,7 @@ class LogParser:
             # nextline didn't reliably work, nor does watching the inode. We'll
             # also check modification times, which maybe we should just do
             # instead of the inode check...
-            elif os.stat(k).st_mtime > v['stat_results'].st_mtime and mode=="poll":
+            elif os.stat(k).st_mtime > v['stat_results'].st_mtime and self.mode == "poll":
                 LOG.debug("Modification detected, reopening...")
                 new = self.log_tracker.reopen_file(k)
                 LOG.debug("File: {f}, Line: {l}", f=k, l=new)
@@ -399,12 +401,12 @@ class LogParser:
                 LOG.debug("Data: {d}", d=data)
                 # If the file was reopened due to an inode change we don't know
                 # if the last line is recent enough to be worth publishing. Check
-                if (time.time() - data['timestamp']) < int(stale_time)*60:
+                if (time.time() - data['timestamp']) < int(self.stale_time)*60:
                     app_session.app.publish_to_feed('bluefors', data)
                 else:
                     LOG.warn("Not publishing stale data. Make sure your log " +
                              "file sync is done at a rate faster than once ever " +
-                             "{x} minutes.", x=stale_time)
+                             "{x} minutes.", x=self.stale_time)
 
 
 class BlueforsAgent:
@@ -460,12 +462,12 @@ class BlueforsAgent:
         # Create file objects for all logs in today's directory
         self.log_tracker.open_all_logs()
 
-        # Setup the Parser object with tracking info
-        parser = LogParser(self.log_tracker)
-
         # Determine parser configuration
         stale_time = os.environ.get("STALE_TIME", 2)
         mode = os.environ.get("MODE", "follow")
+
+        # Setup the Parser object with tracking info
+        parser = LogParser(self.log_tracker, mode, stale_time)
 
         while True:
             with self.lock:
@@ -483,7 +485,7 @@ class BlueforsAgent:
             self.log_tracker.check_open_files()
 
             # Check for new lines and publish to feed
-            parser.read_and_publish_logs(session, mode, stale_time)
+            parser.read_and_publish_logs(session)
 
             time.sleep(0.01)
 
