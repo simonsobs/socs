@@ -399,7 +399,7 @@ class LogParser:
                 LOG.debug("Data: {d}", d=data)
                 # If the file was reopened due to an inode change we don't know
                 # if the last line is recent enough to be worth publishing. Check
-                if (time.time() - data['timestamp']) < stale_time*60:
+                if (time.time() - data['timestamp']) < int(stale_time)*60:
                     app_session.app.publish_to_feed('bluefors', data)
                 else:
                     LOG.warn("Not publishing stale data. Make sure your log " +
