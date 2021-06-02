@@ -337,7 +337,7 @@ class LogParser:
         # If nothing matches return None
         return (None, None)
 
-    def read_and_publish_logs(self, app_session, stale_time=2):
+    def read_and_publish_logs(self, app_session, mode="follow", stale_time=2):
         """Read a new line from each log file if there is one, and publish its
         contents to the app_session's feed.
 
@@ -345,6 +345,13 @@ class LogParser:
         ----------
         app_session : ocs.ocs_agent.OpSession
             session from the ocs_agent, used to publish to bluefors feed
+        mode : str
+            Operating mode for the log tracker. Either "follow" or "poll",
+            defaulting to "follow". In "follow" mode the Tracker will read the
+            next line in the file if able to. In "poll" mode stats about the
+            file are used to determine if it was updated since the last read,
+            and if it has been the file is reopened to get the last line. This
+            is more I/O intensive, but is useful in certain configurations.
         stale_time : int
             Time in minutes which represents how fresh data in the bluefors
             logs must be when we open them in order to publish to OCS. This
@@ -355,8 +362,16 @@ class LogParser:
         for k, v in self.log_tracker.file_objects.items():
             log_type, log_name = self.identify_log(k)
 
-            if os.stat(k).st_ino != v['stat_results'].st_ino:
-                LOG.info("New inode found, reopening...")
+            if os.stat(k).st_ino != v['stat_results'].st_ino and mode=="poll":
+                LOG.debug("New inode found, reopening...")
+                new = self.log_tracker.reopen_file(k)
+                LOG.debug("File: {f}, Line: {l}", f=k, l=new)
+            # In a situation with a samba share mounted via sshfs, reading the
+            # nextline didn't reliably work, nor does watching the inode. We'll
+            # also check modification times, which maybe we should just do
+            # instead of the inode check...
+            elif os.stat(k).st_mtime > v['stat_results'].st_mtime and mode=="poll":
+                LOG.debug("Modification detected, reopening...")
                 new = self.log_tracker.reopen_file(k)
                 LOG.debug("File: {f}, Line: {l}", f=k, l=new)
             else:
@@ -448,6 +463,10 @@ class BlueforsAgent:
         # Setup the Parser object with tracking info
         parser = LogParser(self.log_tracker)
 
+        # Determine parser configuration
+        stale_time = os.environ.get("STALE_TIME", 2)
+        mode = os.environ.get("MODE", "follow")
+
         while True:
             with self.lock:
                 if self.job == '!acq':
@@ -464,8 +483,7 @@ class BlueforsAgent:
             self.log_tracker.check_open_files()
 
             # Check for new lines and publish to feed
-            stale_time = os.environ.get("STALE_TIME", 2)
-            parser.read_and_publish_logs(session, stale_time)
+            parser.read_and_publish_logs(session, mode, stale_time)
 
             time.sleep(0.01)
 

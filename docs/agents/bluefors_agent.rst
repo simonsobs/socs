@@ -131,6 +131,7 @@ Example docker-compose configuration::
       LOGLEVEL: "info"
       FRAME_LENGTH: 600
       STALE_TIME: 2
+      MODE: "follow"
 
 Depending on how you are running your containers it might be easier to hard
 code the `OCS_CONFIG_DIR` environment variable.
@@ -147,7 +148,30 @@ Bluefors Agent container.
 +--------------+----------------------------------------------------------------+
 | FRAME_LENGTH | .g3 frame length.                                              |
 +--------------+----------------------------------------------------------------+
-| STALE_TIME   | Time limit (in minutes)for newly opened files to be published  |
+| MODE         | File tracking mode, either "follow" or "poll", defaulting to   |
+|              | "poll". In "follow" mode the Tracker will read the next line   |
+|              | in the file if able to. In "poll" mode stats about the file    |
+|              | are used to determine if it was updated since the last read,   |
+|              | and if it has been the file is reopened to get the last line.  |
+|              | This is more I/O intensive, but is useful in certain           |
+|              | configurations.                                                |
++--------------+----------------------------------------------------------------+
+| STALE_TIME   | Time limit (in minutes) for newly opened files to be published |
 |              | to feeds. Data older than this time when read will not be      |
 |              | published.                                                     |
 +--------------+----------------------------------------------------------------+
+
+Agent API
+---------
+
+.. autoclass:: agents.bluefors.bluefors_log_tracker.BlueforsAgent
+    :members:
+
+Supporting API
+--------------
+
+.. autoclass:: agents.bluefors.bluefors_log_tracker.LogTracker
+    :members:
+
+.. autoclass:: agents.bluefors.bluefors_log_tracker.LogParser
+    :members:
