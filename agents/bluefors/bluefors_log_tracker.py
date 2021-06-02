@@ -22,42 +22,42 @@ LOG = txaio.make_logger()
 
 
 class LogTracker:
-    def __init__(self, log_dir):
-        """Log Tracking helper class. Always tracks current date's logs.
+    """Log Tracking helper class. Always tracks current date's logs.
 
-        Parameters
-        ----------
-        log_dir : str
-            Top level log directory
+    Parameters
+    ----------
+    log_dir : str
+        Top level log directory
 
-        Attributes
-        ----------
-        log_dir : str
-            Top level log directory
-        date : datetime.date
-            Today's date. Used to determine the active log directory
-        file_objects : dict
-            A dictionary with filenames as keys, and another dict as the value.
-            Each of these sub-dictionaries has two keys, "file_object", and
-            "stat_results", with the open file object, and os.stat results as
-            values, respectively. For example::
+    Attributes
+    ----------
+    log_dir : str
+        Top level log directory
+    date : datetime.date
+        Today's date. Used to determine the active log directory
+    file_objects : dict
+        A dictionary with filenames as keys, and another dict as the value.
+        Each of these sub-dictionaries has two keys, "file_object", and
+        "stat_results", with the open file object, and os.stat results as
+        values, respectively. For example::
 
-                {'CH6 T 21-05-27.log':
-                    {'file_object': <_io.TextIOWrapper name='CH6 T 21-05-27.log' mode='r' encoding='UTF-8'>,
-                    'stat_results': os.stat_result(st_mode=33188,
-                                                   st_ino=1456748,
-                                                   st_dev=65024,
-                                                   st_nlink=1,
-                                                   st_uid=1000,
-                                                   st_gid=1000,
-                                                   st_size=11013,
-                                                   st_atime=1622135813,
-                                                   st_mtime=1622135813,
-                                                   st_ctime=1622135813)
-                    }
+            {'CH6 T 21-05-27.log':
+                {'file_object': <_io.TextIOWrapper name='CH6 T 21-05-27.log' mode='r' encoding='UTF-8'>,
+                'stat_results': os.stat_result(st_mode=33188,
+                                               st_ino=1456748,
+                                               st_dev=65024,
+                                               st_nlink=1,
+                                               st_uid=1000,
+                                               st_gid=1000,
+                                               st_size=11013,
+                                               st_atime=1622135813,
+                                               st_mtime=1622135813,
+                                               st_ctime=1622135813)
                 }
+            }
 
-        """
+    """
+    def __init__(self, log_dir):
         self.log_dir = log_dir
         self.date = datetime.date.fromtimestamp(time.time())
         self.file_objects = {}
@@ -146,30 +146,30 @@ class LogTracker:
 
 
 class LogParser:
+    """Log Parsing helper class.
+
+    Knows the internal formats for each log type. Used to loop over all
+    logs tracked by a LogTracker and publish their contents to an OCS Feed.
+
+    Parameters
+    ----------
+    tracker : LogTracker
+        log tracker that contains paths and file objects to parse
+    mode : str
+        Operating mode for the log tracker. Either "follow" or "poll",
+        defaulting to "follow". In "follow" mode the Tracker will read the
+        next line in the file if able to. In "poll" mode stats about the
+        file are used to determine if it was updated since the last read,
+        and if it has been the file is reopened to get the last line. This
+        is more I/O intensive, but is useful in certain configurations.
+    stale_time : int
+        Time in minutes which represents how fresh data in the bluefors
+        logs must be when we open them in order to publish to OCS. This
+        ensures we don't reopen a file much later than when they were
+        collected and publish "stale" data to the OCS live HK system.
+
+    """
     def __init__(self, tracker, mode="follow", stale_time=2):
-        """Log Parsing helper class.
-
-        Knows the internal formats for each log type. Used to loop over all
-        logs tracked by a LogTracker and publish their contents to an OCS Feed.
-
-        Parameters
-        ----------
-        tracker : LogTracker
-            log tracker that contains paths and file objects to parse
-        mode : str
-            Operating mode for the log tracker. Either "follow" or "poll",
-            defaulting to "follow". In "follow" mode the Tracker will read the
-            next line in the file if able to. In "poll" mode stats about the
-            file are used to determine if it was updated since the last read,
-            and if it has been the file is reopened to get the last line. This
-            is more I/O intensive, but is useful in certain configurations.
-        stale_time : int
-            Time in minutes which represents how fresh data in the bluefors
-            logs must be when we open them in order to publish to OCS. This
-            ensures we don't reopen a file much later than when they were
-            collected and publish "stale" data to the OCS live HK system.
-
-        """
         self.log_tracker = tracker
         self.patterns = {'channels': ['v11', 'v2', 'v1', 'turbo1', 'v12', 'v3', 'v10',
                                       'v14', 'v4', 'v13', 'compressor', 'v15', 'v5',
