@@ -42,6 +42,7 @@ Simulator Reference  Simulators are used to mock software and hardware
     agents/fts_agent
     agents/labjack
     agents/lakeshore240
+    agents/lakeshore370
     agents/lakeshore372
     agents/latrt_xy_stage
     agents/meinberg_m1000_agent
@@ -52,6 +53,7 @@ Simulator Reference  Simulators are used to mock software and hardware
     agents/smurf_recorder
     agents/synacc
     agents/tektronix3021c
+    agents/vantage_pro2
 
 .. toctree::
     :caption: Simulator Reference
