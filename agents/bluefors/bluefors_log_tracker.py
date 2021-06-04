@@ -4,8 +4,7 @@ import glob
 import re
 import datetime
 import txaio
-
-from os import environ
+import os
 
 from ocs import ocs_agent, site_config
 
@@ -23,15 +22,42 @@ LOG = txaio.make_logger()
 
 
 class LogTracker:
+    """Log Tracking helper class. Always tracks current date's logs.
+
+    Parameters
+    ----------
+    log_dir : str
+        Top level log directory
+
+    Attributes
+    ----------
+    log_dir : str
+        Top level log directory
+    date : datetime.date
+        Today's date. Used to determine the active log directory
+    file_objects : dict
+        A dictionary with filenames as keys, and another dict as the value.
+        Each of these sub-dictionaries has two keys, "file_object", and
+        "stat_results", with the open file object, and os.stat results as
+        values, respectively. For example::
+
+            {'CH6 T 21-05-27.log':
+                {'file_object': <_io.TextIOWrapper name='CH6 T 21-05-27.log' mode='r' encoding='UTF-8'>,
+                'stat_results': os.stat_result(st_mode=33188,
+                                               st_ino=1456748,
+                                               st_dev=65024,
+                                               st_nlink=1,
+                                               st_uid=1000,
+                                               st_gid=1000,
+                                               st_size=11013,
+                                               st_atime=1622135813,
+                                               st_mtime=1622135813,
+                                               st_ctime=1622135813)
+                }
+            }
+
+    """
     def __init__(self, log_dir):
-        """Log Tracking helper class. Always tracks current date's logs.
-
-        Parameters
-        ----------
-        log_dir : str
-            Top level log directory
-
-        """
         self.log_dir = log_dir
         self.date = datetime.date.fromtimestamp(time.time())
         self.file_objects = {}
@@ -59,7 +85,8 @@ class LogTracker:
         """
         if filename not in self.file_objects.keys():
             print("{} not yet open, opening...".format(filename))
-            self.file_objects[filename] = open(filename, 'r')
+            self.file_objects[filename] = {"file_object": open(filename, 'r'),
+                                           "stat_results": os.stat(filename)}
         else:
             pass
 
@@ -83,6 +110,21 @@ class LogTracker:
             self.date = new_date
             self.open_all_logs()
 
+    def reopen_file(self, filename):
+        """If a file is already open and a new inode is detected, reopen the
+        file. Returns the last line of the file.
+
+        Parameters
+        ----------
+        filename : str
+            Full path to filename to open
+
+        """
+        self.file_objects[filename] = {"file_object": open(filename, 'r'),
+                                       "stat_results": os.stat(filename)}
+        lines = self.file_objects[filename]["file_object"].readlines()
+        return lines[-1]
+
     def open_all_logs(self):
         """Open today's logs and move to end of files."""
         file_list = self._build_file_list()
@@ -92,30 +134,42 @@ class LogTracker:
             self._open_file(_file)
 
         for k, v in self.file_objects.items():
-            v.readlines()
+            v['file_object'].readlines()
 
     def close_all_files(self):
         """Close all the files tracked by the LogTracker."""
         for k, v in self.file_objects.items():
-            v.close()
+            v['file_object'].close()
             print("Closed file: {}".format(k))
 
         self.file_objects = {}
 
 
 class LogParser:
-    def __init__(self, tracker):
-        """Log Parsing helper class.
+    """Log Parsing helper class.
 
-        Knows the internal formats for each log type. Used to loop over all
-        logs tracked by a LogTracker and publish their contents to an OCS Feed.
+    Knows the internal formats for each log type. Used to loop over all
+    logs tracked by a LogTracker and publish their contents to an OCS Feed.
 
-        Parameters
-        ----------
-        tracker : LogTracker
-            log tracker that contains paths and file objects to parse
+    Parameters
+    ----------
+    tracker : LogTracker
+        log tracker that contains paths and file objects to parse
+    mode : str
+        Operating mode for the log tracker. Either "follow" or "poll",
+        defaulting to "follow". In "follow" mode the Tracker will read the
+        next line in the file if able to. In "poll" mode stats about the
+        file are used to determine if it was updated since the last read,
+        and if it has been the file is reopened to get the last line. This
+        is more I/O intensive, but is useful in certain configurations.
+    stale_time : int
+        Time in minutes which represents how fresh data in the bluefors
+        logs must be when we open them in order to publish to OCS. This
+        ensures we don't reopen a file much later than when they were
+        collected and publish "stale" data to the OCS live HK system.
 
-        """
+    """
+    def __init__(self, tracker, mode="follow", stale_time=2):
         self.log_tracker = tracker
         self.patterns = {'channels': ['v11', 'v2', 'v1', 'turbo1', 'v12', 'v3', 'v10',
                                       'v14', 'v4', 'v13', 'compressor', 'v15', 'v5',
@@ -137,6 +191,8 @@ class LogParser:
                                     'ctrl_pres_ok', 'ctr_pressure_ok'],
                          'heater': ["a1_u", "a1_r_lead", "a1_r_htr", "a2_u",
                                     "a2_r_lead", "a2_r_htr", "htr", "htr_range"]}
+        self.mode = mode
+        self.stale_time = stale_time
 
     @staticmethod
     def timestamp_from_str(time_string):
@@ -308,7 +364,20 @@ class LogParser:
         for k, v in self.log_tracker.file_objects.items():
             log_type, log_name = self.identify_log(k)
 
-            new = v.readline()
+            if os.stat(k).st_ino != v['stat_results'].st_ino and self.mode == "poll":
+                LOG.debug("New inode found, reopening...")
+                new = self.log_tracker.reopen_file(k)
+                LOG.debug("File: {f}, Line: {l}", f=k, l=new)
+            # In a situation with a samba share mounted via sshfs, reading the
+            # nextline didn't reliably work, nor does watching the inode. We'll
+            # also check modification times, which maybe we should just do
+            # instead of the inode check...
+            elif os.stat(k).st_mtime > v['stat_results'].st_mtime and self.mode == "poll":
+                LOG.debug("Modification detected, reopening...")
+                new = self.log_tracker.reopen_file(k)
+                LOG.debug("File: {f}, Line: {l}", f=k, l=new)
+            else:
+                new = v['file_object'].readline()
             if new == '':
                 continue
 
@@ -330,7 +399,14 @@ class LogParser:
 
             if data is not None:
                 LOG.debug("Data: {d}", d=data)
-                app_session.app.publish_to_feed('bluefors', data)
+                # If the file was reopened due to an inode change we don't know
+                # if the last line is recent enough to be worth publishing. Check
+                if (time.time() - data['timestamp']) < int(self.stale_time)*60:
+                    app_session.app.publish_to_feed('bluefors', data)
+                else:
+                    LOG.warn("Not publishing stale data. Make sure your log " +
+                             "file sync is done at a rate faster than once ever " +
+                             "{x} minutes.", x=self.stale_time)
 
 
 class BlueforsAgent:
@@ -353,14 +429,14 @@ class BlueforsAgent:
 
         # Registers bluefors feed
         agg_params = {
-            'frame_length': float(environ.get("FRAME_LENGTH", 10*60))  # [sec]
+            'frame_length': float(os.environ.get("FRAME_LENGTH", 10*60))  # [sec]
         }
         self.log.debug("frame_length set to {length}",
                        length=agg_params['frame_length'])
         self.agent.register_feed('bluefors',
                                  record=True,
                                  agg_params=agg_params,
-                                 buffer_time=1)
+                                 )
 
     def try_set_job(self, job_name):
         print(self.job, job_name)
@@ -386,6 +462,13 @@ class BlueforsAgent:
         # Create file objects for all logs in today's directory
         self.log_tracker.open_all_logs()
 
+        # Determine parser configuration
+        stale_time = os.environ.get("STALE_TIME", 2)
+        mode = os.environ.get("MODE", "follow")
+
+        # Setup the Parser object with tracking info
+        parser = LogParser(self.log_tracker, mode, stale_time)
+
         while True:
             with self.lock:
                 if self.job == '!acq':
@@ -400,9 +483,6 @@ class BlueforsAgent:
 
             # Ensure all the logs we want are open
             self.log_tracker.check_open_files()
-
-            # Pass tracking information to parser class
-            parser = LogParser(self.log_tracker)
 
             # Check for new lines and publish to feed
             parser.read_and_publish_logs(session)
@@ -424,7 +504,7 @@ class BlueforsAgent:
 
 if __name__ == '__main__':
     # Start logging
-    txaio.start_logging(level=environ.get("LOGLEVEL", "info"))
+    txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
 
     # Get the default ocs argument parser.
     parser = site_config.add_arguments()
