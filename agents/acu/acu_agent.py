@@ -598,11 +598,6 @@ class ACUAgent:
         else:
             return False, 'Not enough information to scan'
         print('all_lines generated')
-        if testing:
-            upload_dir = '/home/simons/code/vertex-acu-agent/test_clients/test_uploads/'
-            with open(upload_dir + 'upload_'+str(time.time())+'.pkl','wb') as f:
-                pickle.dump(all_lines,f)
-            f.close()
         yield self.acu.mode('ProgramTrack')
         print('mode is now ProgramTrack')
         group_size = 120
