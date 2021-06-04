@@ -38,7 +38,6 @@ class ACUAgent:
         self.sleeptime = self.acu_config['motion_waittime']
         self.udp = self.acu_config['streams']['main']
         self.udp_ext = self.acu_config['streams']['ext']
-        self.status = self.acu_config['streams']['status'] 
 
         self.log = agent.log
 
@@ -79,23 +78,23 @@ class ACUAgent:
         agg_params = {'frame_length':60}
         self.agent.register_feed('acu_status_summary',
                                  record=True,
-                                 agg_params={'frame_length':60, 'exclude_influx'=True},
+                                 agg_params={'frame_length':60, 'exclude_influx':True},
                                  buffer_time=1)
         self.agent.register_feed('acu_status_full',
                                  record=True,
-                                 agg_params={'frame_length':60, 'exclude_influx'=True},
+                                 agg_params={'frame_length':60, 'exclude_influx':True},
                                  buffer_time=1)
         self.agent.register_feed('acu_status_influx',
                                  record=True,
-                                 agg_params={'frame_length':60, 'exclude_aggregator'=True},
+                                 agg_params={'frame_length':60, 'exclude_aggregator':True},
                                  buffer_time=1)
         self.agent.register_feed('acu_udp_stream',
                                  record=True,
-                                 agg_params={'frame_length':60, 'exclude_influx'=True},
+                                 agg_params={'frame_length':60, 'exclude_influx':True},
                                  buffer_time=1)
         self.agent.register_feed('acu_broadcast_influx',
                                  record=False,
-                                 agg_params={'frame_length':60, 'exclude_aggregator'=True},
+                                 agg_params={'frame_length':60, 'exclude_aggregator':True},
                                  buffer_time=1)
         self.agent.register_feed('acu_health_check',
                                  record=True,
@@ -265,14 +264,11 @@ class ACUAgent:
                 self.agent.publish_to_feed('acu_error', acu_error)
                 yield dsleep(1)
 
-#            session.data = j
             for (key, value) in session.data.items():
                 ocs_key = key
                 for char in char_replace:
                     ocs_key = ocs_key.replace(char, '_')
                 ocs_key = ocs_key.replace('24V', 'V24')
-#                ocs_key = key.replace(' ','_').replace('-','_').replace(':','_').replace('(','_').replace(')','_').replace('24V','V24')
-#                ocs_key = key.replace(' ','_').replace('+','_').replace(',','_').replace('/','_').replace('-','_').replace(':','_').replace('(','_').replace(')','_').replace('24V','V24')
                 if key in summary_params:
                     self.data['status']['summary'][ocs_key] = value
                     if key == 'Azimuth mode':
@@ -281,7 +277,6 @@ class ACUAgent:
                         self.data['status']['summary']['Elevation_mode_num'] = mode_key[value]
                 else:
                     self.data['status']['full_status'][ocs_key] = str(value)
-#            print(self.data['status']['full_status'])
             influx_status = {}
             for v in self.data['status']['full_status']:
                 try:
@@ -289,7 +284,6 @@ class ACUAgent:
                 except ValueError:
                     influx_status[str(v) + '_influx'] = tfn_key[self.data['status']['full_status'][v]]
             self.data['status']['summary']['ctime'] = self.timecode(self.data['status']['summary']['Time'])
-            #print(self.data['status']['summary'])
             acustatus_summary = {'timestamp': self.data['status']['summary']['ctime'],
                                  'block_name': 'ACU_summary_output', 
                                  'data': self.data['status']['summary']
@@ -349,6 +343,25 @@ class ACUAgent:
                 latest_el_raw = process_data[5]
                 session.data = {'sample_rate':sample_rate, 'latest_az':latest_az, 'latest_el':latest_el, 'latest_az_raw':latest_az_raw, 'latest_el_raw':latest_el_raw}
                 #print('UDP sample rate is %.1f Hz' % sample_rate)
+                pd0 = process_data[0]
+                pd0_gday = (pd0[0]-1) * 86400
+                pd0_sec = pd0[1]
+                pd0_data_ctime = gyear + pd0_gday + pd0_sec
+                pd0_azimuth_corrected = pd0[2]
+                pd0_azimuth_raw = pd0[4]
+                pd0_elevation_corrected = pd0[3]
+                pd0_elevation_raw = pd0[5]
+                bcast_first = {'Time':pd0_data_ctime,
+                               'Azimuth_Corrected':pd0_azimuth_corrected,
+                               'Azimuth_Raw':pd0_azimuth_raw,
+                               'Elevation_Corrected':pd0_elevation_corrected,
+                               'Elevation_Raw':pd0_elevation_raw,
+                               }
+                acu_broadcast_influx = {'timestamp':bcast_first['Time'],
+                                        'block_name':'ACU_position',
+                                        'data':bcast_first,
+                                       }
+                self.agent.publish_to_feed('acu_broadcast_influx', acu_broadcast_influx)
                 for d in process_data:
                     gday = (d[0]-1) * 86400
                     sec = d[1]
@@ -456,7 +469,7 @@ class ACUAgent:
 
     @inlineCallbacks
     def set_boresight(self, session, params=None):
-        """TASK set_boresight''
+        """TASK set_boresight
 
         Moves the telescope to a particular third-axis angle.
 
@@ -480,6 +493,12 @@ class ACUAgent:
 
     @inlineCallbacks
     def stop_and_clear(self, session, params=None):
+        """TASK stop_and_clear
+
+        Changes the azimuth and elevation modes to Stop and clears
+        points uploaded to the stack.
+ 
+        """
         ok, msg = self.try_set_job('control')
         if not ok:
            # return ok, msg
