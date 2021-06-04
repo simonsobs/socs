@@ -586,54 +586,6 @@ class ACUAgent:
                         'Preset_Elevation': 0,
                         'Upload_Lines':[]}
 
-        # Check whether the telescope is already at the point
-#        mdata = self.data['status']['summary']
-#        current_az = round(mdata['Azimuth_current_position'],4)
-#        current_el = round(mdata['Elevation_current_position'],4)
-        # If already there, skip the go_to step
-#        print(current_az, current_el)
-#        if current_az == start_az and current_el == start_el:
-#            print('Already at start position')
-        # If not, run a go_to
-#        else:
-#            yield self.acu.go_to(start_az, start_el)
-#            yield dsleep(5)
-#            azel_modes = (mdata['Azimuth_mode'],mdata['Elevation_mode'])
-#            while azel_modes == ('Preset','Preset'):
-#                while mdata['Azimuth_current_velocity']==0.0 and mdata['Elevation_current_velocity']==0.0:
-#                    yield dsleep(5)
-#                    mdata = self.data['status']['summary']
-#                moving = True
-#                while moving:
-#                    mdata = self.data['status']['summary']
-#                    azel_modes = (mdata['Azimuth_mode'],mdata['Elevation_mode'])
-#                    ve = round(mdata['Elevation_current_velocity'],2)
-#                    va = round(mdata['Azimuth_current_velocity'],2)
-#                    if (ve != 0.0) or (va != 0.0):
-#                        moving = True
-#                        print(moving)
-#                        yield dsleep(1)
-#                    else:
-#                        moving = False
-#                        print(moving)
-#                        yield dsleep(10)
-#                        mdata = self.data['status']['summary']
-#                        azel_modes = (mdata['Azimuth_mode'],mdata['Elevation_mode'])
-#                        pe = round(mdata['Elevation_current_position'],2)
-#                        pa = round(mdata['Azimuth_current_position'],2)
-#                        if pe != start_el or pa != start_az:
-#                            yield self.acu.stop()
-#                            print('Stopped before reaching commanded point!')
-#                            return False, 'Something went wrong!'
-#                        modes = (mdata['Azimuth_mode'], mdata['Elevation_mode'])
-#                        if modes != ('Preset','Preset'):
-#                           return False, 'Fault triggered (not Preset)!'
-#                        yield self.acu.stop()
-#                        yield dsleep(0.5)
-#                        mdata = self.data['status']['summary']
-#                        azel_modes = (mdata['Azimuth_mode'],mdata['Elevation_mode'])
-#                        print('Mode is now '+str(azel_modes))
-#
         # Follow the scan in ProgramTrack mode, then switch to Stop mode
         if scantype == 'linear_turnaround_sameends':
             all_lines = sh.write_lines(times, azs, els, vas, ves, azflags, elflags)
