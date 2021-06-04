@@ -526,6 +526,7 @@ class ACUAgent:
         Params:
             scantype (str): the type of scan information you are uploading. Options are
                             'from_file', 'linear_1dir', or 'linear_turnaround'.
+            testing (bool): True/False for testing (as opposed to observation)
         Optional params:
             filename (str): full path to desired numpy file. File contains an array
                             of three lists ([list(times), list(azimuths), list(elevations)]).
@@ -538,6 +539,8 @@ class ACUAgent:
                            Applies to scantype 'linear_1dir' and 'linear_turnaround'.
             acc (float): acceleration of the turnaround for a linear velocity scan with a 
                          turnaround. Applies to scantype 'linear_turnaround'.
+            ntimes (int): number of times the platform traverses between azimuth endpoints 
+                          for a 'linear_turnaround' scan.
         """
         ok, msg = self.try_set_job('control')
         if not ok:
