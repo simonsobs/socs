@@ -1,6 +1,6 @@
 .. highlight:: rst
 
-.. _fts_stage:
+.. _fts_aerotech_stage:
 
 =====================
 FTS Aerotech Agent
@@ -10,7 +10,7 @@ This agent is used to communicate with the FTS mirror stage for two FTSs with
 Aerotech motion controllers. 
 
 .. argparse::
-    :filename: ../agents/fts_stage/fts_aerotech_agent.py
+    :filename: ../agents/fts_aerotech_stage/fts_aerotech_agent.py
     :func: make_parser
     :prog: python3 fts_aerotech_agent.py
 
@@ -60,5 +60,5 @@ is running.::
 Agent API
 ---------
 
-.. autoclass:: agents.fts_stage.fts_aerotech_agent.FTSAerotechAgent
+.. autoclass:: agents.fts_aerotech_stage.fts_aerotech_agent.FTSAerotechAgent
     :members: init_stage_task, home, move_to, start_acq, stop_acq 

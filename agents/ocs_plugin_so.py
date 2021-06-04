@@ -17,6 +17,6 @@ for n,f in [
         ('HWPSimulatorAgent', 'hwp_sim/hwp_simulator_agent.py'),
         ('CryomechCPAAgent', 'cryomech_cpa/cryomech_cpa_agent.py'),
         ('LATRtXYStageAgent', 'xy_stage/xy_latrt_agent.py'),
-        ('FTSAerotechAgent', 'fts_stage/fts_aerotech_agent.py'),
+        ('FTSAerotechAgent', 'fts_aerotech_stage/fts_aerotech_agent.py'),
 ]:
     ocs.site_config.register_agent_class(n, os.path.join(root, f))
