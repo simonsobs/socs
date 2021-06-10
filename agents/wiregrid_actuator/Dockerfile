@@ -1,8 +1,9 @@
-# SOCS AWG Agent
-# socs Agent container for interacting with AWG over GPIB to Ethernet
-# converts.
+# SOCS Wire-Grid Actuator Agent
+# socs Agent container for controlling the actuator of wire grid loader 
+# This agent should be run in the beaglebone in the electronics box for wire grid loader.
 
 # Use socs base image
+#!! This agents should be build from OCS image build in "arm" OS
 #FROM socs:latest
 FROM ocs:latest
 
@@ -12,11 +13,7 @@ WORKDIR /app/socs/agents/wiregrid_actuator/
 ## Copy this agent into the app/agents directory
 COPY . .
 
-#RUN pip3 install -r requirements.txt
-RUN apt-get install -y python3-pip && \
-    python3 -m pip install --upgrade pip && \
-    python3 -m pip install -r requirements.txt
-
+RUN python3 -m pip install -r requirements.txt
 
 # Run agent on container startup
 ENTRYPOINT ["dumb-init", "python3", "-u", "wiregrid_actuator.py"]

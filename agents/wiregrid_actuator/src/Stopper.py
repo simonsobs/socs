@@ -43,19 +43,61 @@ class Stopper:
             ret =  self.onoffs;
         elif isinstance(pinname, list): 
             if not all([(pinname0 in self.pinnames) for pinname0 in pinname ]) :
-                print('ERROR! There is no GPIO pin names.');
-                print('    Assigned pin names = {}'.format(self.pinnames));
-                print('    Asked pin names    = {}'.format(pinname));
+                print('Stopper:get_onoff(): ERROR! There is no GPIO pin names.');
+                print('Stopper:get_onoff():     Assigned pin names = {}'.format(self.pinnames));
+                print('Stopper:get_onoff():     Asked pin names    = {}'.format(pinname));
                 return -1;
             ret =  [ self.onoffs(self.pinDict[pinname0]) for pinname0 in pinname ];
         else :
             if not (pinname in self.pinnames) :
-                print('ERROR! There is no GPIO pin name of {}.'.format(pinname));
-                print('    Assigned pin names = {}'.format(self.pinnames));
+                print('Stopper:get_onoff(): ERROR! There is no GPIO pin name of {}.'.format(pinname));
+                print('Stopper:get_onoff():     Assigned pin names = {}'.format(self.pinnames));
                 return -1;
             ret =  self.onoffs(self.pinDict[pinname]);
             pass;
         return ret;
+
+    def get_pinname(self, pinname) :
+        pinnames = [];
+        if pinname is None : 
+            pinnames = self.pinnames;
+        elif isinstance(pinname, list):
+            if not all([(pinname0 in self.pinnames) for pinname0 in pinname ]) :
+                print('Stopper:get_pinname(): ERROR! There is pin names.');
+                print('Stopper:get_pinname():     Assigned pin names = {}'.format(self.pinnames));
+                print('Stopper:get_pinname():     Asked pin names    = {}'.format(pinname));
+                return -1;
+            pinnames = pinname;
+        else :
+            if not (pinname in self.pinnames) :
+                print('Stopper:get_pinname(): ERROR! There is no pin name \"{}\".'.format(pinname));
+                print('Stopper:get_pinname():     Assigned pin names = {}'.format(self.pinnames));
+                return -1;
+        return pinnames;
+
+    def get_label(self, pinname) :
+        indices = [];
+        if pinname is None :
+            return self.pinlabels;
+        elif isinstance(pinname, list):
+            if not all([(pinname0 in self.pinnames) for pinname0 in pinname ]) :
+                print('Stopper:get_label(): ERROR! There is pin names.');
+                print('Stopper:get_label():     Assigned pin names = {}'.format(self.pinnames));
+                print('Stopper:get_label():     Asked pin names    = {}'.format(pinname));
+                return -1;
+            indices = [ self.pinIndex[pinname0] for pinname0 in pinname ];
+        else :
+            if not (pinname in self.pinnames) :
+                print('Stopper:get_label(): ERROR! There is no pin name \"{}\".'.format(pinname));
+                print('Stopper:get_label():     Assigned pin names = {}'.format(self.pinnames));
+                return -1;
+            indices = [self.pinIndex[pinname]];
+            pass;
+        print('Stopper:get_label(): pin indices = {}'.format(indices));
+        return [ self.pinlabels[index] for index in indices ];
+
+
+
 
     # Set ON/OFF of the pinname
     # pinname is a string of pin name or list of pin names
