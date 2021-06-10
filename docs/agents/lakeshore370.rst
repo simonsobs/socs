@@ -1,31 +1,32 @@
 .. highlight:: rst
 
-.. _lakeshore372:
+.. _lakeshore370:
 
 =============
-Lakeshore 372
+Lakeshore 370
 =============
 
-The Lakeshore 372 (LS372) units are used for 100 mK and 1K thermometer readout.
-Basic functionality to interface and control an LS372 is provided by the
-``socs.Lakeshore.Lakeshore372.py`` module.
+The Lakeshore 370 (LS370) units are an older version of the Lakshore 372, used
+for 100 mK and 1K thermometer readout.  Basic functionality to interface and
+control an LS370 is provided by the
+``socs.Lakeshore.Lakeshore370.py`` module.
 
 .. argparse::
-    :filename: ../agents/lakeshore372/LS372_agent.py
+    :filename: ../agents/lakeshore370/LS370_agent.py
     :func: make_parser
-    :prog: python3 LS372_agent.py
+    :prog: python3 LS370_agent.py
 
 OCS Configuration
 -----------------
 
-To configure your Lakeshore 372 for use with OCS you need to add a
-Lakeshore372Agent block to your ocs configuration file. Here is an example
+To configure your Lakeshore 370 for use with OCS you need to add a
+Lakeshore370Agent block to your ocs configuration file. Here is an example
 configuration block::
 
-  {'agent-class': 'Lakeshore372Agent',
+  {'agent-class': 'Lakeshore370Agent',
    'instance-id': 'LSA22YG',
    'arguments': [['--serial-number', 'LSA22YG'],
-                 ['--ip-address', '10.10.10.2'],
+                 ['--port', '/dev/ttyUSB1'],
                  ['--dwell-time-delay', 0]]},
 
 Each device requires configuration under 'agent-instances'. See the OCS site
@@ -34,39 +35,37 @@ configs documentation for more details.
 Docker Configuration
 --------------------
 
-The Lakeshore 372 Agent should be configured to run in a Docker container. An
+The Lakeshore 370 Agent should be configured to run in a Docker container. An
 example configuration is::
 
   ocs-LSA22YE:
-    image: simonsobs/ocs-lakeshore372-agent:latest
+    image: simonsobs/ocs-lakeshore370-agent
     hostname: ocs-docker
-    network_mode: "host"
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
+    devices:
+      - "/dev/ttyUSB1:/dev/ttyUSB1"
     command:
       - "--instance-id=LSA22YE"
-      - "--site-hub=ws://127.0.0.1:8001/ws"
-      - "--site-http=http://127.0.0.1:8001/call"
-
-.. note::
-    Since the 372 Agent container needs ``network_mode: "host"``, it must be
-    configured to connect to the crossbar server as if it was on the host
-    system. In this example the crossbar server is running on localhost,
-    ``127.0.0.1``, but on your network this may be different.
+      - "--site-hub=ws://crossbar:8001/ws"
+      - "--site-http=http://crossbar:8001/call"
 
 .. note::
     The serial numbers here will need to be updated for your device.
 
+.. note::
+    The device path may differ on your machine, and if only using the ttyUSB
+    value as shown here, is not guaranteed to be static.
 
 Direct Communication
 --------------------
 Direct communication with the Lakeshore can be achieved without OCS, using the
-``Lakeshore372.py`` module in ``socs/socs/Lakeshore/``. From that directory,
+``Lakeshore370.py`` module in ``socs/socs/Lakeshore/``. From that directory,
 you can run a script like::
 
-    from Lakeshore372 import LS372
+    from Lakeshore370 import LS370
 
-    ls = LS372('10.10.10.2')
+    ls = LS370('/dev/ttyUSB1')
 
 You can use the API detailed on this page to then interact with the Lakeshore.
 Each Channel is given a Channel object in ``ls.channels``. You can query the
@@ -81,8 +80,8 @@ please file a Github issue.
 Agent API
 ---------
 
-.. autoclass:: agents.lakeshore372.LS372_agent.LS372_Agent
-    :members:
+.. autoclass:: agents.lakeshore370.LS370_agent.LS370_Agent
+    :members: init_lakeshore_task, start_acq
 
 Driver API
 ----------
@@ -94,5 +93,5 @@ For the API all methods should start with one of the following:
     * enable - enable a boolean parameter (i.e. enable_autoscan)
     * disable - disbale a boolean parameter (i.e. disable_channel)
 
-.. automodule:: socs.Lakeshore.Lakeshore372
+.. automodule:: socs.Lakeshore.Lakeshore370
     :members:
