@@ -140,3 +140,12 @@ services:
   ocs-lakeshore240-simulator:
     image: "ocs-lakeshore240-simulator"
     build: ./simulators/lakeshore240/
+
+  # --------------------------------------------------------------------------
+  # KIKUSUI power supply agent
+  # --------------------------------------------------------------------------
+  ocs-kikusui-agent:
+    image: "ocs-kikusui-agent"
+    build: ./agents/kikusui_psu/
+
+
