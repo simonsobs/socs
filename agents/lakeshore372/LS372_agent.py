@@ -132,6 +132,8 @@ class LS372_Agent:
         Parameters:
             auto_acquire (bool, optional): Default is False. Starts data
                 acquisition after initialization if True.
+            acq_params (dict, optional): Params to pass to acq process if
+                auto_acquire is True.
 
         """
 
@@ -181,7 +183,7 @@ class LS372_Agent:
 
         # Start data acquisition if requested
         if params.get('auto_acquire', False):
-            self.agent.start('acq')
+            self.agent.start('acq', params.get('acq_params', None))
 
         return True, 'Lakeshore module initialized.'
 
@@ -202,6 +204,11 @@ class LS372_Agent:
                  "Channel_02": {"T": 293.701, "R": 30.7398, "timestamp": 1601924466.6130798}
                 }
             }
+
+        Parameters:
+            sample_heater (bool, optional): Default is False. Will record
+                values from the sample heater, typically used to servo a DR if
+                True.
 
         """
 
@@ -317,21 +324,22 @@ class LS372_Agent:
 
                 session.app.publish_to_feed('temperatures', data)
 
-                # Sample Heater
-                heater = self.module.sample_heater
-                hout = heater.get_sample_heater_output()
-
-                current_time = time.time()
-                htr_data = {
-                    'timestamp': current_time,
-                    'block_name': "heaters",
-                    'data': {}
-                }
-                htr_data['data']['sample_heater_output'] = hout
-
-                session.app.publish_to_feed('temperatures', htr_data)
-
                 self.log.debug("{data}", data=session.data)
+
+                if params.get("sample_heater", False):
+                    # Sample Heater
+                    heater = self.module.sample_heater
+                    hout = heater.get_sample_heater_output()
+
+                    current_time = time.time()
+                    htr_data = {
+                        'timestamp': current_time,
+                        'block_name': "heaters",
+                        'data': {}
+                    }
+                    htr_data['data']['sample_heater_output'] = hout
+
+                    session.app.publish_to_feed('temperatures', htr_data)
 
         return True, 'Acquisition exited cleanly.'
 
@@ -747,6 +755,8 @@ def make_parser(parser=None):
                               collection at the end of a scan.")
     pgroup.add_argument('--auto-acquire', type=bool, default=True,
                         help='Automatically start data acquisition on startup')
+    pgroup.add_argument('--sample-heater', type=bool, default=False,
+                        help='Record sample heater output during acquisition.')
 
     return parser
 
@@ -769,7 +779,8 @@ if __name__ == '__main__':
     # Automatically acquire data if requested (default)
     init_params = False
     if args.auto_acquire:
-        init_params = {'auto_acquire': True}
+        init_params = {'auto_acquire': True,
+                       'acq_params': {'sample_heater': args.sample_heater}}
 
     # Interpret options in the context of site_config.
     site_config.reparse_args(args, 'Lakeshore372Agent')
