@@ -4,6 +4,7 @@
 
 import socket
 import numpy as np
+from os import environ
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 import time
@@ -11,8 +12,7 @@ import txaio
 txaio.use_twisted()
 BUFF_SIZE = 128
 ENQ = '\x05'
-
-
+LOG = txaio.make_logger()
 class Pfeiffer:
     """CLASS to control and retrieve data from the pfeiffer tpg366
     pressure gauge controller
@@ -28,14 +28,13 @@ class Pfeiffer:
        close closes the socket
     """
     def __init__(self, ip_address, port, timeout=10,
-                 f_sample=2.5):
+                 f_sample=1.):
         self.ip_address = ip_address
         self.port = port
         self.comm = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.comm.connect((self.ip_address, self.port))
         self.comm.settimeout(timeout)
         self.log =  txaio.make_logger()
-
     def channel_power(self):
         '''
         Function to check the power status of all channels
@@ -52,11 +51,28 @@ class Pfeiffer:
         read_str = self.comm.recv(BUFF_SIZE).decode()
         power_str = read_str.split('\r')
         power_states = np.array(power_str[0].split(','), dtype=int)
-        print(power_states)
         if any(chan != 2 for chan in power_states):
             channel_states = [index+1 for index, state in enumerate(power_states) if state !=2]
-            self.log.info("The following channels are off:",channel_states)
-            print("The following channels are off:",channel_states)
+            LOG.info("The following channels are off:{}".format(channel_states))
+        return channel_states
+
+    def check_channel_stage_changes(self, old_state):
+        '''
+        Function to check whether a channel has been turned off and on. 
+        Args:
+            old_state: The last known record of channel states
+        '''
+        msg = 'SEN\r\n'
+        self.comm.send(msg.encode())
+        status = self.comm.recv(BUFF_SIZE).decode()
+        self.comm.send(ENQ.encode())
+        read_str = self.comm.recv(BUFF_SIZE).decode()
+        power_str = read_str.split('\r')
+        power_states = np.array(power_str[0].split(','), dtype=int)
+        if any(chan != 2 for chan in power_states):
+                channel_states = [index+1 for index, state in enumerate(power_states) if state !=2]
+        if channel_states != old_state:
+            print("Something changed!")
 
     def read_pressure(self, ch_no):
         """
@@ -114,7 +130,7 @@ class Pfeiffer:
 
 class PfeifferAgent:
 
-    def __init__(self, agent, ip_address, port, f_sample=2.5):
+    def __init__(self, agent, ip_address, port, f_sample=1.):
         self.active = True
         self.agent = agent
         self.log = agent.log
@@ -123,7 +139,6 @@ class PfeifferAgent:
         self.take_data = False
         self.gauge = Pfeiffer(ip_address, int(port))
         agg_params = {'frame_length': 60, }
-
         self.agent.register_feed('pressures',
                                  record=True,
                                  agg_params=agg_params,
@@ -155,7 +170,6 @@ class PfeifferAgent:
             session.set_status('running')
 
             self.take_data = True
-
             while self.take_data:
                 data = {
                     'timestamp': time.time(),
@@ -163,6 +177,7 @@ class PfeifferAgent:
                     'data': {}
                 }
                 self.gauge.channel_power()
+                self.gauge.check_channel_stage_changes(self.gauge.channel_power())
                 pressure_array = self.gauge.read_pressure_all()
                 # Loop through all the channels on the device
                 for channel in range(len(pressure_array)):
@@ -187,9 +202,9 @@ class PfeifferAgent:
 
 
 if __name__ == '__main__':
-    # Start logging
-    #txaio.start_logging(level=Pfeiffer.get("LOGLEVEL", "info"))
     
+    # Start logging
+    txaio.start_logging(level=environ.get("LOGLEVEL", "info"))
     parser = site_config.add_arguments()
 
     pgroup = parser.add_argument_group('Agent Options')
