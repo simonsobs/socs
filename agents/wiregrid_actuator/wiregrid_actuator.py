@@ -20,7 +20,7 @@ import limitswitch_config
 import stopper_config
 
 class WiregridActuatorAgent:
-    def __init__(self, agent, actuator_dev='/dev/ttyUSB0', interval_time=1, verbose=0):
+    def __init__(self, agent, actuator_dev='/dev/ttyUSB0', interval_time=1, sleep=0.10, verbose=0):
         self.agent = agent
         self.log   = agent.log
         self.lock    = TimeoutLock()
@@ -28,13 +28,14 @@ class WiregridActuatorAgent:
         self.controlling = False
         self.actuator_dev  = actuator_dev
         self.interval_time = float(interval_time)
+        self.sleep  = sleep
         self.verbose       = verbose
 
         agg_params = {'frame_length': 60}
         self.agent.register_feed('WGActuator', record = True, agg_params = agg_params)
         
         try:
-            self.actuator    = Actuator(self.actuator_dev, verbose=self.verbose)
+            self.actuator    = Actuator(self.actuator_dev, sleep=self.sleep, verbose=self.verbose)
         except Exception as e:
             msg = 'Failed to initialize Actuator instance! | Error = "actuator is None"'
             self.log.warn(msg)
@@ -67,7 +68,7 @@ class WiregridActuatorAgent:
         # reconnect
         try :
             if self.actuator : del self.actuator
-            self.actuator    = Actuator(self.actuator_dev, verbose=self.verbose)
+            self.actuator    = Actuator(self.actuator_dev, sleep=self.sleep, verbose=self.verbose)
         except Exception as e:
             msg = 'Failed to initialize Actuator! | Error: %s' % e
             self.log.warn(msg)
@@ -169,12 +170,12 @@ class WiregridActuatorAgent:
                 return False
             # check limitswitch
             LSL1,LSR1 = self.limitswitch.get_onoff(pinname=['LSL1','LSR1'])
+            print('LSL1,LSR1',LSL1,LSR1);
             if LSL1==1 or LSR1==1 :
                 self.log.error('ERROR!: The limitswitch on motor side is NOT OFF after moving forward without stopper.')
                 self.log.error('ERROR!: --> STOP')
                 return False
             # power off stopper
-            self.log.error('ERROR!: Stopper set_alloff() --> STOP')
             if self.stopper.set_alloff() < 0 : 
                 self.log.error('ERROR!: Stopper set_alloff() --> STOP')
                 return  False
@@ -557,6 +558,8 @@ def make_parser(parser = None):
                         help='')
     pgroup.add_argument('--actuator-dev', dest='actuator_dev', type=str, default='/dev/ttyUSB0',
                         help='')
+    pgroup.add_argument('--sleep', dest='sleep', type=float, default=0.10,
+                        help='sleep time for every actuator command')
     pgroup.add_argument('--verbose', dest='verbose', type=int, default=0,
                         help='')
     return parser
@@ -571,9 +574,10 @@ if __name__ == '__main__':
     agent, runner = ocs_agent.init_site_agent(args)
     interval_time = args.interval_time
     actuator_dev  = args.actuator_dev
+    sleep         = args.sleep
     #print('interval_time = {} (type={})'.format(interval_time, type(interval_time)))
     #print('actuator_dev  = {} (type={})'.format(actuator_dev , type(actuator_dev)))
-    actuator_agent = WiregridActuatorAgent(agent, actuator_dev, interval_time, verbose=args.verbose)
+    actuator_agent = WiregridActuatorAgent(agent, actuator_dev, interval_time, sleep=sleep, verbose=args.verbose)
     agent.register_task('check_limitswitch', actuator_agent.check_limitswitch)
     agent.register_task('check_stopper', actuator_agent.check_stopper)
     agent.register_task('insert', actuator_agent.insert)

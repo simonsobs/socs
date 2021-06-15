@@ -10,7 +10,7 @@ class Actuator:
     The Actuator object is for writing commands and reading stats of the actuator via serial communication.
     """
 
-    def __init__(self, devfile='/dev/ttyUSB0', sleep=0.05, verbose=0):
+    def __init__(self, devfile='/dev/ttyUSB0', sleep=0.10, verbose=0):
         self.devfile = devfile;
         self.sleep   = sleep;
         self.STOP    = False; # This will become True in emergency stop.
@@ -68,7 +68,7 @@ class Actuator:
     def getStatus(self, doSleep=True) :
         res = self.getresponse('?', doSleep).replace('\r','').replace('\n','/').strip();
         if self.verbose>0 : print('Actuator:getStatus() : response to \"?\" = \"{}\"'.format(res));
-        status = (res.split('<')[-1].split('>')[0]).split('|')[0];
+        status = (res.split('<')[-1].split('>')[0]).split('|')[0].split(':')[0];
         if self.verbose>0 : print('Actuator:getStatus() : status = \"{}\"'.format(status));
         if len(status)==0 :
             print('Actuator:getStatus() : Error! Could not get status!');
@@ -111,7 +111,7 @@ class Actuator:
         if self.verbose>0 : print('Actuator:hold() : Hold the actuator');
         while True :
             self.sendCommand('!');
-            if self.getStatus(doSleep=True) != 'Hold' : break;
+            if self.getStatus(doSleep=True) == 'Hold' : break;
             pass;
         return 0;
 
@@ -132,7 +132,11 @@ class Actuator:
         while True :
             if self.ser.in_waiting==0 : break ; # if buffer is empty, reading is finished.
             else :
-                line = self.ser.readline().decode();
+                try:
+                    line = self.ser.readline().decode();
+                except Exception as e:
+                    print('Failed to readline from actuator! | Error = "%s"' % e)
+                    continue;
                 lines += line;
                 pass;
             pass;
