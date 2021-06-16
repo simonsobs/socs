@@ -8,6 +8,7 @@ import calendar
 import soaculib as aculib
 import scan_helpers as sh
 from soaculib.twisted_backend import TwistedHttpBackend
+from argparse import ArgumentParser
 
 from twisted.internet import reactor, protocol
 from twisted.internet.defer import inlineCallbacks
@@ -15,6 +16,21 @@ import twisted.web.client as tclient
 from autobahn.twisted.util import sleep as dsleep
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
+
+def timecode(self, acutime):
+    """
+    Takes the time code produced by the ACU status stream and returns
+    a ctime.
+
+    Args:
+        acutime (float): The time recorded by the ACU status stream, 
+                         corresponding to the fractional day of the year
+    """
+    sec_of_day = (acutime-1)*60*60*24
+    year = datetime.datetime.now().year
+    gyear = calendar.timegm(time.strptime(str(year), '%Y'))
+    comptime = gyear+sec_of_day
+    return comptime
 
 class ACUAgent:
     """
@@ -167,21 +183,6 @@ class ACUAgent:
                 return False
             self.jobs[job_name] = 'idle'
 
-    def timecode(self, acutime):
-        """
-        Takes the time code produced by the ACU status stream and returns
-        a ctime.
-
-        Args:
-            acutime (float): The time recorded by the ACU status stream, 
-                             corresponding to the fractional day of the year
-        """
-        sec_of_day = (acutime-1)*60*60*24
-        year = datetime.datetime.now().year
-        gyear = calendar.timegm(time.strptime(str(year), '%Y'))
-        comptime = gyear+sec_of_day
-        return comptime
-
     #
     # The Operations
     #
@@ -283,7 +284,7 @@ class ACUAgent:
                     influx_status[str(v) + '_influx'] = float(self.data['status']['full_status'][v])
                 except ValueError:
                     influx_status[str(v) + '_influx'] = tfn_key[self.data['status']['full_status'][v]]
-            self.data['status']['summary']['ctime'] = self.timecode(self.data['status']['summary']['Time'])
+            self.data['status']['summary']['ctime'] = timecode(self.data['status']['summary']['Time'])
             acustatus_summary = {'timestamp': self.data['status']['summary']['ctime'],
                                  'block_name': 'ACU_summary_output', 
                                  'data': self.data['status']['summary']
@@ -329,7 +330,7 @@ class ACUAgent:
                     offset += FMT_LEN
         handler = reactor.listenUDP(int(UDP_PORT), MonitorUDP())
         while self.jobs['broadcast'] == 'run':
-            if len(udp_data):
+            if udp_data:
                 self.health_check['broadcast'] = True
                 process_data = udp_data[:200]
                # print(process_data)
@@ -697,27 +698,12 @@ class ACUAgent:
 
 def add_agent_args(parser_in=None):
     if parser_in is None:
-        from argparse import ArgumentParser as A
-        parser_in = A()
+        parser_in = argparse.ArgumentParser()
     pgroup = parser_in.add_argument_group('Agent Options')
     pgroup.add_argument("--acu_config", default="guess")
     return parser_in        
 
 if __name__ == '__main__':
-    # Get the default ocs argument parser.
-#    parser = site_config.add_arguments()
-
-    # Add options specific to this agent.
-#    pgroup = parser.add_argument_group('Agent Options')
-#    pgroup.add_argument('--acu_config', default='guess')
-#    pgroup.add_argument('--url', default='http://192.168.1.110:8100/')
-
-    # Parse comand line.
-#    args = parser.parse_args()
-
-    # Interpret options in the context of site_config.
-#    site_config.reparse_args(args, 'ACUAgent')
-
     parser = add_agent_args()
     args = site_config.parse_args(agent_class='ACUAgent', parser=parser)
 
