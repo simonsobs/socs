@@ -144,7 +144,7 @@ class ACUAgent:
         """
         with self.lock.acquire_timeout(timeout=1.0, job=job_name) as acquired:
             if not acquired:
-                print(f"Lock could not be acquried because it is held by {self.lock.job}")
+                self.log.warn(f"Lock could not be acquried because it is held by {self.lock.job}")
                 return False
             # Set running.
             self.jobs[job_name] = 'run'
@@ -159,7 +159,7 @@ class ACUAgent:
         """
         with self.lock.acquire_timeout(timeout=1.0, job=job_name) as acquired:
             if not acquired:
-                print(f"Lock could not be acquired because it is held by {self.lock.job}")
+                self.log.warn(f"Lock could not be acquired because it is held by {self.lock.job}")
                 return False
             self.jobs[job_name] = 'stop'             
 #            state = self.jobs.get(job_name, 'idle')
@@ -179,7 +179,7 @@ class ACUAgent:
         """
         with self.lock.acquire_timeout(timeout=1.0, job=job_name) as acquired:
             if not acquired:
-                print(f"Lock could not be acquried because it is held by {self.lock.job}")
+                self.log.warn(f"Lock could not be acquried because it is held by {self.lock.job}")
                 return False
             self.jobs[job_name] = 'idle'
 
@@ -239,7 +239,7 @@ class ACUAgent:
             now = time.time()
 
             if now > report_t + report_period:
-                print('Responses ok at %.3f Hz' % (n_ok / (now - report_t)))
+                self.log.info('Responses ok at %.3f Hz' % (n_ok / (now - report_t)))
                 self.health_check['status'] = True
                 report_t = now
                 n_ok = 0
@@ -253,11 +253,10 @@ class ACUAgent:
                 j = yield self.acu.http.Values('DataSets.StatusCCATDetailed8100')
                 n_ok += 1
                 session.data = j
-#                print(j)
             except Exception as e:
                 # Need more error handling here...
                 errormsg = {'aculib_error_message': str(e)}
-                print(errormsg)
+                self.log.error(errormsg)
                 acu_error = {'timestamp':time.time(),
                              'block_name': 'ACU_error',
                              'data': errormsg
@@ -333,7 +332,6 @@ class ACUAgent:
             if udp_data:
                 self.health_check['broadcast'] = True
                 process_data = udp_data[:200]
-               # print(process_data)
                 udp_data = udp_data[200:]
                 year = datetime.datetime.now().year
                 gyear = calendar.timegm(time.strptime(str(year), '%Y'))
@@ -343,7 +341,6 @@ class ACUAgent:
                 latest_az_raw = process_data[4]
                 latest_el_raw = process_data[5]
                 session.data = {'sample_rate':sample_rate, 'latest_az':latest_az, 'latest_el':latest_el, 'latest_az_raw':latest_az_raw, 'latest_el_raw':latest_el_raw}
-                #print('UDP sample rate is %.1f Hz' % sample_rate)
                 pd0 = process_data[0]
                 pd0_gday = (pd0[0]-1) * 86400
                 pd0_sec = pd0[1]
@@ -377,7 +374,6 @@ class ACUAgent:
                                               'Elevation_Corrected':elevation_corrected,
                                               'Elevation_Raw':elevation_raw,
                                              }
-                #    print(self.data['broadcast'])
                     acu_udp_stream = {'timestamp':self.data['broadcast']['Time'],
                                       'block_name':'ACU_position',
                                       'data':self.data['broadcast']
@@ -428,18 +424,18 @@ class ACUAgent:
                      }
         self.agent.publish_to_feed('acu_upload', acu_upload)
         # Check whether the telescope is already at the point
-        print('Checking current position')
+        self.log.info('Checking current position')
         if current_az == az and current_el == el:
-            print('Already positioned at %.2f, %.2f' %(current_az, current_el))
+            self.log.info('Already positioned at %.2f, %.2f' %(current_az, current_el))
             self.set_job_done('control')
             return True, 'Pointing completed'
         yield self.acu.stop()
-        print('Stopped')
+        self.log.info('Stopped')
         yield dsleep(0.1)
         yield self.acu.go_to(az, el)
         mdata = self.data['status']['summary']
         # Wait for telescope to start moving
-        print('Moving to commanded position')
+        self.log.info('Moving to commanded position')
         while mdata['Azimuth_current_velocity']==0.0 and mdata['Elevation_current_velocity']==0.0:
             yield dsleep(wait_for_motion)
             mdata = self.data['status']['summary']
@@ -458,7 +454,7 @@ class ACUAgent:
                 pa = round(mdata['Azimuth_current_position'],2)
                 if pe != el or pa != az:
                     yield self.acu.stop()
-                    print('Stopped before reaching commanded point!')
+                    self.log.warn('Stopped before reaching commanded point!')
                     return False, 'Something went wrong!'
                 modes = (mdata['Azimuth_mode'], mdata['Elevation_mode'])
                 if modes != ('Preset','Preset'):
@@ -506,13 +502,13 @@ class ACUAgent:
             self.set_job_done('control')
             yield dsleep(0.1)
             self.try_set_job('control')
-        print('try_set_job ok')
+        self.log.info('try_set_job ok')
         yield self.acu.stop()
-        print('Stop called')
+        self.log.info('Stop called')
         yield dsleep(5)
         yield self.acu.http.Command('DataSets.CmdTimePositionTransfer', 'Clear Stack')
         yield dsleep(0.1)
-        print('Cleared stack.')
+        self.log.info('Cleared stack.')
         self.set_job_done('control')
         return True, 'Job completed'
         
@@ -546,7 +542,7 @@ class ACUAgent:
         ok, msg = self.try_set_job('control')
         if not ok:
             return ok, msg
-        print('try_set_job ok')
+        self.log.info('try_set_job ok')
         scantype = params.get('scantype')
         testing = params.get('testing')
         if scantype == 'from_file':
@@ -562,7 +558,7 @@ class ACUAgent:
             times = np.linspace(0.0, total_time, total_time*10)
         elif scantype == 'linear_turnaround_sameends':
             #from parameters, generate the full set of scan points
-            print(scantype)
+            self.log.info('scantype is' + str(scantype))
             azpts = params.get('azpts')
             el = params.get('el')
             azvel = params.get('azvel')
@@ -572,11 +568,11 @@ class ACUAgent:
 
         # Switch to Stop mode and clear the stack
         yield self.acu.stop()
-        print('Stop called')
+        self.log.info('Stop called')
         yield dsleep(5)
         yield self.acu.http.Command('DataSets.CmdTimePositionTransfer', 'Clear Stack')
         yield dsleep(0.1)
-        print('Cleared stack.')
+        self.log.info('Cleared stack.')
 
         # Move to the starting position for the scan and then switch to Stop mode
         start_az = azs[0]
@@ -598,9 +594,9 @@ class ACUAgent:
         # Other scan types not yet implemented, so break
         else:
             return False, 'Not enough information to scan'
-        print('all_lines generated')
+        self.log.info('all_lines generated')
         yield self.acu.mode('ProgramTrack')
-        print('mode is now ProgramTrack')
+        self.log.info('mode is now ProgramTrack')
         group_size = 120
         while len(all_lines):
             upload_lines = all_lines[:group_size]
@@ -617,8 +613,8 @@ class ACUAgent:
                           'data':upload_publish_dict
                          }
             self.agent.publish_to_feed('acu_upload', acu_upload)
-            print('Uploaded a group')
-        print('No more lines to upload')
+            self.log.info('Uploaded a group')
+        self.log.info('No more lines to upload')
         current_az = round(self.data['broadcast']['Azimuth_Corrected'],4)
         current_el = round(self.data['broadcast']['Elevation_Corrected'],4)
         while current_az != azs[-1] or current_el != els[-1]:
@@ -656,7 +652,7 @@ class ACUAgent:
         ok, msg = self.try_set_job('control')
         if not ok:
             return ok, msg
-        print('try_set_job ok')
+        self.log.info('try_set_job ok')
 #        scantype = params.get('scantype')
         scantype = 'linear'
         stop_iter = params.get('stop_iter')
@@ -668,11 +664,11 @@ class ACUAgent:
         el_endpoint2 = params.get('el_endpoint2')
         el_speed = params.get('el_speed')
 
-        print(scantype)
+        self.log.info('scantype is ' + str(scantype))
 
         yield self.acu.stop()
         if scantype != 'linear':
-            print('Scan type not supported')
+            self.log.warn('Scan type not supported')
             return False
         g = sh.generate(stop_iter, az_endpoint1, az_endpoint2, az_speed, acc, el_endpoint1, el_endpoint2, el_speed)
         self.acu.mode('ProgramTrack')
@@ -685,8 +681,6 @@ class ACUAgent:
                 text = ''.join(upload_lines)
                 current_lines = current_lines[group_size:]
                 free_positions = self.data['status']['summary']['Qty_of_free_program_track_stack_positions']
-                print('free_positions = '+str(free_positions))
-           # print('Uploaded a group')
                 while free_positions < 5099:
                     yield dsleep(0.1)
                     free_positions = self.data['status']['summary']['Qty_of_free_program_track_stack_positions']
