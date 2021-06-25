@@ -9,22 +9,24 @@ Pfeiffer TC400
 The Pfeiffer TC400 agent is an OCS Agent which controls the 
 Pfeiffer TC400 electronic drive unit, which control the turbos used 
 for the bluefors DR. The communcation is done over serial, and should be 
-integrated into OCS using a serial-to-ethernet  converter. 
+integrated into OCS using a serial-to-ethernet converter.
 
 .. argparse::
     :filename: ../agents/pfeiffer_tc400/pfeiffer_tc400_agent.py
     :func: make_parser
     :prog: python3 pfeiffer_tc400_agent.py
 
-serial configuration
-````````````````````
-baudrate=9600
-data bits=8
-stop bits=1
-parity=None
-Flow control=RTS/CTS
-FIFO=Enable
-Interface=RS-485-2-Wire
+Serial Configuration
+--------------------
+::
+
+    baudrate=9600
+    data bits=8
+    stop bits=1
+    parity=None
+    Flow control=RTS/CTS
+    FIFO=Enable
+    Interface=RS-485-2-Wire
 
 Configuration File Examples
 ---------------------------
@@ -100,4 +102,10 @@ Agent API
 ---------
 
 .. autoclass:: agents.pfeiffer_tc400.pfeiffer_tc400_agent.PfeifferTC400Agent
-    :members: init, turn_turbo_on, turn_turbo_off, acknowledge_turbo_errors, acq
+    :members: init_turbo, turn_turbo_on, turn_turbo_off, acknowledge_turbo_errors, start_acq
+
+Driver API
+----------
+
+.. autoclass:: agents.pfeiffer_tc400.pfeiffer_tc400_driver.PfeifferTC400
+    :members:

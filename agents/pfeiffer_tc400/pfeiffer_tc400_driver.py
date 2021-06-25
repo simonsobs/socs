@@ -26,7 +26,7 @@ class PfeifferTC400:
 
     Attributes
     ----------
-        ser: int
+        ser: serial.Serial Object
             The TCP connection with the Moxa used to send and receive communication.
         turbo_address: int
             The serial Address of the Turbo Controller.
@@ -72,7 +72,7 @@ class PfeifferTC400:
 
     def get_turbo_set_rotation_speed(self):
         """Gets the the rotation speed that the turbo is set to from the turbo controller.
-           This is the speed in Hz that the turbo motor will spin up to if turned on.
+        This is the speed in Hz that the turbo motor will spin up to if turned on.
 
         Returns
         -------
@@ -116,6 +116,7 @@ class PfeifferTC400:
 
     def ready_turbo(self):
         """Readies the turbo for spinning. Does not cause the turbo to spin up.
+
         Returns
         -------
         bool
@@ -146,6 +147,7 @@ class PfeifferTC400:
 
     def turn_turbo_motor_off(self):
         """Turns the turbo motor off.
+
         Returns
         -------
         bool
