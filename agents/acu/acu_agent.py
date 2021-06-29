@@ -16,7 +16,7 @@ from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
 
-def timecode(self, acutime):
+def timecode(acutime):
     """
     Takes the time code produced by the ACU status stream and returns
     a ctime.
@@ -162,8 +162,8 @@ class ACUAgent:
         """
         with self.lock.acquire_timeout(timeout=1.0, job=job_name) as acquired:
             if not acquired:
-                self.log.warn(f"Lock could not be acquried because it is held"
-                              " by {self.lock.job}")
+                self.log.warn("Lock could not be acquried because it is held"
+                              f" by {self.lock.job}")
                 return False
             # Set running.
             self.jobs[job_name] = 'run'
@@ -178,8 +178,8 @@ class ACUAgent:
         """
         with self.lock.acquire_timeout(timeout=1.0, job=job_name) as acquired:
             if not acquired:
-                self.log.warn(f"Lock could not be acquired because it is"
-                              " held by {self.lock.job}")
+                self.log.warn("Lock could not be acquired because it is"
+                              f" held by {self.lock.job}")
                 return False
             self.jobs[job_name] = 'stop'
 #            state = self.jobs.get(job_name, 'idle')
@@ -199,8 +199,8 @@ class ACUAgent:
         """
         with self.lock.acquire_timeout(timeout=1.0, job=job_name) as acquired:
             if not acquired:
-                self.log.warn(f"Lock could not be acquried because it is held"
-                              " by {self.lock.job}")
+                self.log.warn("Lock could not be acquried because it is held"
+                              f" by {self.lock.job}")
                 return False
             self.jobs[job_name] = 'idle'
 
@@ -445,9 +445,7 @@ class ACUAgent:
         az = params.get('az')
         el = params.get('el')
         if params.get('wait'):
-            wait_for_motion = params.get('wait')
-        else:
-            wait_for_motion = 1.
+            wait_for_motion = params.get('wait', 1)
         current_az = round(self.data['broadcast']['Azimuth_Corrected'], 4)
         current_el = round(self.data['broadcast']['Elevation_Corrected'], 4)
         publish_dict = {'Start_Azimuth': current_az,
