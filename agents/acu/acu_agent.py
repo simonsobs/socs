@@ -444,8 +444,7 @@ class ACUAgent:
             return ok, msg
         az = params.get('az')
         el = params.get('el')
-        if params.get('wait'):
-            wait_for_motion = params.get('wait', 1)
+        wait_for_motion = params.get('wait', 1)
         current_az = round(self.data['broadcast']['Azimuth_Corrected'], 4)
         current_el = round(self.data['broadcast']['Elevation_Corrected'], 4)
         publish_dict = {'Start_Azimuth': current_az,
@@ -689,20 +688,21 @@ class ACUAgent:
         Scan generator, currently only works for constant-velocity az scans
         with fixed elevation.
 
-        Params:
+        Args:
             scantype (str): type of scan you are generating. For dev, preset to
-                            'linear'.
+                'linear'.
             stop_iter (float): how many times the generator should generate a
-                               new set of points before forced to stop
+                new set of points before forced to stop
             az_endpoint1 (float): first endpoint of a linear azimuth scan
             az_endpoint2 (float): second endpoint of a linear azimuth scan
             az_speed (float): azimuth speed for constant-velocity scan
             acc (float): turnaround acceleration for a constant-velocity scan
             el_endpoint1 (float): first endpoint of elevation motion
             el_endpoint2 (float): second endpoint of elevation motion. For dev,
-                                  currently both el endpoints should be equal
+                currently both el endpoints should be equal
             el_speed (float): speed of motion for a scan with changing
-                              elevation. For dev, currently set to 0.0
+                elevation. For dev, currently set to 0.0
+
         """
         ok, msg = self.try_set_job('control')
         if not ok:
