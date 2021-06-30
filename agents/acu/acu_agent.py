@@ -444,8 +444,7 @@ class ACUAgent:
             return ok, msg
         az = params.get('az')
         el = params.get('el')
-        if params.get('wait'):
-            wait_for_motion = params.get('wait', 1)
+        wait_for_motion = params.get('wait', 1)
         current_az = round(self.data['broadcast']['Azimuth_Corrected'], 4)
         current_el = round(self.data['broadcast']['Elevation_Corrected'], 4)
         publish_dict = {'Start_Azimuth': current_az,
