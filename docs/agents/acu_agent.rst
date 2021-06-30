@@ -12,12 +12,12 @@ platforms.
 
 .. argparse::
     :filename: ../agents/acu/acu_agent.py
-    :func:
+    :func: add_agent_args
     :prog: python3 acu_agent.py
 
 Dependencies
 ------------
-The `soaculib <https://github.com/simonsobs/soaculib>` package must be
+The `soaculib <https://github.com/simonsobs/soaculib>`_ package must be
 installed to use this Agent.
 
 Configuration File Examples
@@ -31,7 +31,7 @@ file. An example configuration block using all availabile arguments is below::
 
     {'agent-class': 'ACUAgent',
      'instance-id': 'acu1',
-     'arguments': [],
+     'arguments': [['--acu_config', 'guess']],
      }
 
 soaculib
@@ -82,4 +82,5 @@ Agent API
 ---------
 
 .. autoclass:: agents.acu.acu_agent.ACUAgent
-    :members: monitor, broadcast, generate_scan, go_to, run_specified_scan, set_boresight, stop_and_clear
+    :members: start_monitor, start_udp_monitor, generate_scan, go_to,
+        run_specified_scan, set_boresight, stop_and_clear
