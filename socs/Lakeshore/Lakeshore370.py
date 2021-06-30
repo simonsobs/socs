@@ -1,14 +1,16 @@
-# Lakeshore372.py
+#!/usr/bin/env python3
+# Lakeshore370.py
 
 import sys
-import socket
+import serial
 import time
 import numpy as np
 
+import traceback
+
 # Lookup keys for command parameters.
 autorange_key = {'0': 'off',
-                 '1': 'on',
-                 '2': 'ROX 102B'}
+                 '1': 'on'}
 
 mode_key = {'0': 'voltage',
             '1': 'current'}
@@ -150,12 +152,10 @@ tempco_lock = {'negative': '1',
                'positive': '2'}
 
 format_key = {'3': "Ohm/K (linear)",
-              '4': "log Ohm/K (linear)",
-              '7': "Ohm/K (cubic spline)"}
+              '4': "log Ohm/K (linear)"}
 
 format_lock = {"Ohm/K (linear)": '3',
-               "log Ohm/K (linear)": '4',
-               "Ohm/K (cubic spline)": '7'}
+               "log Ohm/K (linear)": '4'}
 
 heater_range_key = {"0": "Off", "1": 31.6e-6, "2": 100e-6, "3": 316e-6,
                     "4": 1e-3, "5": 3.16e-3, "6": 10e-3, "7": 31.6e-3,
@@ -163,78 +163,55 @@ heater_range_key = {"0": "Off", "1": 31.6e-6, "2": 100e-6, "3": 316e-6,
 heater_range_lock = {v:k for k, v in heater_range_key.items()}
 heater_range_lock["On"] = "1"
 
-output_modes = {'0': 'Off', '1': 'Monitor Out', '2': 'Open Loop', '3': 'Zone', '4': 'Still',
-                '5': 'Closed Loop', '6': 'Warm up'}
+output_modes = {'1': 'Closed Loop', '2': 'Zone', '3': 'Open Loop', '4': 'Off'}
 output_modes_lock = {v.lower():k for k, v in output_modes.items()}
+
+analog_modes = {'0': 'Off', '1': 'Channel', '2': 'Manual', '3': 'Zone', '4': 'Still'}
+analog_modes_lock = {v.lower():k for k, v in analog_modes.items()}
 
 heater_display_key = { '1': 'current',
                 '2': 'power'}
 heater_display_lock = {v: k for k,v in heater_display_key.items()}
 
-def _establish_socket_connection(ip, timeout, port=7777):
-    """Establish socket connection to the LS372.
 
-    Parameters
-    ----------
-    ip : str
-        IP address of the LS372
-    timeout : int
-        timeout period for the socket connection in seconds
-    port : int
-        Port for the connection, defaults to the default LS372 port of 7777
-
-    Returns
-    -------
-    socket.socket
-        The socket object with open connection to the 372
-
+class LS370:
     """
-    com = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    try:
-        com.connect((ip, port))
-    except OSError as e:
-        if 'No route to host' in e.strerror:
-            raise ConnectionError("Cannot connect to LS372")
-        else:
-            raise e
-    com.settimeout(timeout)
-
-    return com
-
-
-class LS372:
-    """
-        Lakeshore 372 class.
+        Lakeshore 370 class.
 
     Attributes:
         channels - list of channels, index corresponds to channel number with
-                   index 0 corresponding to the control channel, 'A'
+                   index 0 corresponding to channel 1
     """
-    def __init__(self, ip, timeout=10, num_channels=16):
-        self.com = _establish_socket_connection(ip, timeout)
+
+    _bytesize = serial.SEVENBITS
+    _parity = serial.PARITY_ODD
+    _stopbits = serial.STOPBITS_ONE
+
+    def __init__(self, port, baudrate=9600, timeout=10, num_channels=16):
+        self.port = port
+        self.baudrate = baudrate
+        self.timeout = timeout
+
+        print(self.baudrate)
+
+        self.com = serial.Serial(self.port, self.baudrate, self._bytesize, self._parity, self._stopbits, self.timeout)
         self.num_channels = num_channels
 
         self.id = self.get_id()
         self.autoscan = self.get_autoscan()
-        # Enable all channels
-        #  going to hold off on enabling all channels automatically - bjk
-        # for i in range(self.num_channels):
-        #     print(i)
-        #     self.msg('INSET %d,1,3,3'%(i))
-
+        
         self.channels = []
-        for i in range(num_channels + 1):
-            if i == 0:
-                c = Channel(self, 'A')
-            else:
-                c = Channel(self, i)
+
+        #unlike 372, 370 does not have dedicated control input channel; rather, only numbered channels 
+        for i in range(1, num_channels + 1):
+            c = Channel(self, i)
             self.channels.append(c)
 
-        self.sample_heater = Heater(self, 0)
-        self.still_heater = Heater(self, 2)
+        self.sample_heater = Heater(self)
+        #self.still_heater = Heater(self, 2)
 
     def msg(self, message):
-        """Send message to the Lakeshore 372 over ethernet.
+        """Send message to the Lakeshore 370 over RS-232.
 
         If we're asking for something from the Lakeshore (indicated by a ? in
         the message string), then we will attempt to ask twice before giving up
@@ -243,7 +220,7 @@ class LS372:
         Parameters
         ----------
         message : str
-            Message string as described in the Lakeshore 372 manual.
+            Message string as described in the Lakeshore 370 manual.
 
         Returns
         -------
@@ -252,41 +229,41 @@ class LS372:
 
         """
         msg_str = f'{message}\r\n'.encode()
+        self.com.write(msg_str)
+        resp = ''
 
         if '?' in message:
-            self.com.send(msg_str)
-            # Try once, if we timeout, try again. Usually gets around single event glitches.
-            for attempt in range(2):
-                try:
-                    time.sleep(0.061)
-                    resp = str(self.com.recv(4096), 'utf-8').strip()
-                    break
-                except socket.timeout:
-                    print("Warning: Caught timeout waiting for response to '%s', trying again " \
-                          "before giving up"%message)
-                    if attempt == 1:
-                        raise RuntimeError('Query response to Lakeshore timed out after two ' \
-                                           'attempts. Check connection.')
-        else:
-            self.com.send(msg_str)
-            resp = ''
+            resp = str(self.com.read_until(), 'utf-8').strip()
 
-        if 'RDG' in message:
-            time.sleep(0.1)  # Instrument sampling rate of 10 readings/s max (pg 34)
-        else:
-            time.sleep(0.061)  # No comms for 61ms after sending message after trial & error (manual says50ms)
+            # Try a few times, if we timeout, try again.
+            try_count = 3
+            while resp == '':
+                if try_count == 0:
+                    break
+                
+                print(f"Warning: Caught timeout waiting for response to {message}, waiting 1s and " \
+                          "trying again {try_count} more time(s) before giving up")
+                time.sleep(1)
+
+                # retry comms
+                self.com.write(msg_str)
+                resp = str(self.com.read_until(), 'utf-8').strip()
+                try_count -= 1
+
+        time.sleep(0.1)  # No comms for 100ms after sending message (manual says 50ms)
+
         return resp
 
     def get_id(self):
         """Get the ID number of the Lakeshore unit."""
         return self.msg('*IDN?')
 
-    def get_temp(self, unit=None, chan=-1):
+    def get_temp(self, unit='kelvin', chan=-1):
         """Get temperature from the Lakeshore.
 
         Args:
             unit (str): Unit to return reading for ('ohms' or 'kelvin')
-            chan (str): Channel to query, -1 for currently active channel
+            chan (int): Channel to query, -1 for currently active channel
 
         Returns:
             float: The reading from the lakeshore, either in ohms or kelvin.
@@ -294,23 +271,18 @@ class LS372:
         """
         if (chan == -1):
             resp = self.msg("SCAN?")
-            c = resp.split(',')[0]
-        elif (chan == 0):
-            c = 'A'
+            c = int(resp.split(',')[0])
         else:
-            c = str(chan)
+            c = chan
 
-        if unit is None:
-            active_ch = self.get_active_channel()
-            unit = active_ch.units
+        channel = self.chan_num2channel(c)
 
         assert unit.lower() in ['ohms', 'kelvin']
 
         if unit == 'ohms':
-            # Sensor is same as Resistance Query
-            return float(self.msg('SRDG? %s' % c))
+            return float(channel.get_resistance_reading())
         if unit == 'kelvin':
-            return float(self.msg('KRDG? %s' % c))
+            return float(channel.get_kelvin_reading())
 
     def get_autoscan(self):
         """Determine state of autoscan.
@@ -337,7 +309,7 @@ class LS372:
         self.autoscan = bool(autoscan)
 
     def enable_autoscan(self):
-        """Enable the autoscan feature of the Lakeshore 372.
+        """Enable the autoscan feature of the Lakeshore 370.
 
         Will query active channel to pass already selected channel to SCAN
         command.
@@ -347,7 +319,7 @@ class LS372:
         self.autoscan = True
 
     def disable_autoscan(self):
-        """Disable the autoscan feature of the Lakeshore 372.
+        """Disable the autoscan feature of the Lakeshore 370.
 
         Will query active channel to pass already selected channel to SCAN
         command.
@@ -355,6 +327,19 @@ class LS372:
         active_channel = self.get_active_channel()
         self.msg('SCAN {},{}'.format(active_channel.channel_num, 0))
         self.autoscan = False
+
+    def chan_num2channel(self, channel_number):
+        """Return a Channel Object from LS370.channels by associated Channel number
+
+        :param channel_number: Number associated with Channel to be returned
+        :type channl_number: int
+
+        :returns: Channel Object corresponding to channel_number
+        :rtype: Channel Object:
+        """
+        channel_list = [_.channel_num for _ in self.channels]
+        idx = channel_list.index(channel_number)
+        return self.channels[idx]
 
     def get_active_channel(self):
         """Query the Lakeshore for which channel it's currently scanning.
@@ -364,9 +349,7 @@ class LS372:
         """
         resp = self.msg("SCAN?")
         channel_number = int(resp.split(',')[0])
-        channel_list = [_.channel_num for _ in self.channels]
-        idx = channel_list.index(channel_number)
-        return self.channels[idx]
+        return self.chan_num2channel(channel_number)
 
     def set_active_channel(self, channel):
         """Set the active scanner channel.
@@ -392,10 +375,10 @@ class LS372:
 
 
 class Channel:
-    """Lakeshore 372 Channel Object
+    """Lakeshore 370 Channel Object
 
     :param ls: Lakeshore unit for communication
-    :type ls: LS372 Object
+    :type ls: LS370 Object
     :param channel_num: The channel number (1-8 or 1-16 depending on scanner
                         type)
     :type channel_num: int
@@ -404,12 +387,12 @@ class Channel:
         self.ls = ls
         self.channel_num = channel_num
         self.enabled = False
-        self.get_input_channel_parameter()
-        self.get_sensor_input_name()
-        self.get_input_setup()
-        self.tlimit = self.get_temperature_limit()
+        self._get_input_channel_parameter()
+        self._get_input_setup()
+        self.name = f'Channel {channel_num}'
+        #self.tlimit = self.get_temperature_limit()
 
-    def get_input_channel_parameter(self):
+    def _get_input_channel_parameter(self):
         """Run Input Channel Parameter Query
 
         ::
@@ -423,14 +406,14 @@ class Channel:
                   type pause - int in units of seconds
               curve number - Specifies which curve the channel uses
                   type curve number - int
-              tempco - Sets the temperature coefficien that will be used for
+              tempco - Sets the temperature coefficient that will be used for
                        temperature control if no curve is selected
                   type tempco - str
 
 
         :returns: response from INSET? command
 
-        Reference: LakeShore 372 Manual - pg177
+        Reference: LakeShore 370 Manual - page 6-29
         """
         resp = self.ls.msg(f"INSET? {self.channel_num}").split(',')
 
@@ -447,7 +430,7 @@ class Channel:
 
         Parameters should be <disabled/enabled>, <dwell>, <pause>, <curve
         number>, <tempco>. Will determine <input/channel> from attributes. This
-        allows us to use output from get_input_channel_parameters directly, as
+        allows us to use output from _get_input_channel_parameters directly, as
         it doesn't return <input/channel>.
 
         :param params: INSET parameters
@@ -463,8 +446,8 @@ class Channel:
         param_str = ','.join(reply)
         return self.ls.msg(f"INSET {param_str}")
 
-    def get_input_setup(self):
-        """Run Input Setup Query, storing results in human readable format.
+    def _get_input_setup(self):
+        """Run Resistance Range Query, storing results in human readable format.
 
         ::
 
@@ -476,13 +459,13 @@ class Channel:
                   type mode - int
               excitation - Measurement input excitation range
                   type excitation - int
+              range - Measurement input resistance. Ignored for control input.
+                  type range - int
               autorange - Specifies if auto range is enabled.
                               0 = off,
                               1 = autorange current,
                               2 = ROX102B Autorange (control input only)
                   type autorange - int
-              range - Measurement input resistance. Ignored for control input.
-                  type range - int
               cs shunt - Current source shunt.
                           0 = current source not shunted, excitation on
                           1 = current source shunted, excitation off
@@ -493,37 +476,23 @@ class Channel:
                           2 = ohms
                   type units - int
 
-        :returns: response from INTYPE? command
+        :returns: response from RDGRNG? command
 
-        Reference: LakeShore 372 Manual - pg178-179
+        Reference: LakeShore 370 Manual - page 6-33 - 6-34
         """
-        resp = self.ls.msg(f"INTYPE? {self.channel_num}").split(',')
+        resp = self.ls.msg(f"RDGRNG? {self.channel_num}").split(',')
 
         _mode = resp[0]
         _excitation = resp[1]
-        _autorange = resp[2]
-        _range = resp[3]
+        _range = resp[2]
+        _autorange = resp[3]
         _csshunt = resp[4]
-        _units = resp[5]
-
-        if self.channel_num == "A":
-            control_channel = True
-        else:
-            control_channel = False
+        #_units = resp[5]
 
         self.mode = mode_key[_mode]
 
-        if control_channel:
-            # TODO: should test this with control channel connected
-            excitation_key = {'1': {1: 316.0e-12,
-                                    2: 1e-9,
-                                    3: 3.16e-9,
-                                    4: 10e-9,
-                                    5: 31.6e-9,
-                                    6: 100e-9}}
-        else:
-            excitation_key = {'0': voltage_excitation_key,
-                              '1': current_excitation_key}
+        excitation_key = {'0': voltage_excitation_key,
+                            '1': current_excitation_key}
 
         excitation_units_key = {'0': 'volts',
                                 '1': 'amps'}
@@ -537,38 +506,38 @@ class Channel:
 
         self.csshunt = csshunt_key[_csshunt]
 
-        self.units = units_key[_units]
+        #self.units = units_key[_units]
 
         return resp
 
     def _set_input_setup(self, params):
-        """Set INTYPE.
+        """Set RDGRNG.
 
-        Parameters are <mode>, <excitation>, <autorange>, <range>, <cs shunt>,
-        <units>. Will determine <input/channel> from attributes.
+        Parameters are <mode>, <excitation>, <range>, <autorange>, <cs shunt>.
+        Will determine <input/channel> from attributes.
 
-        :param params: INTYPE parameters
+        :param params: RDGRNG parameters
         :type params: list of str
 
         :returns: response from ls.msg
         """
-        assert len(params) == 6
+        assert len(params) == 5
 
         reply = [str(self.channel_num)]
         [reply.append(x) for x in params]
 
         param_str = ','.join(reply)
-        return self.ls.msg(f"INTYPE {param_str}")
+        return self.ls.msg(f"RDGRNG {param_str}")
 
     # Public API
 
     def get_excitation_mode(self):
-        """Get the excitation mode form INTYPE?
+        """Get the excitation mode form RDGRNG?
 
         :returns: excitation mode, 'current' or 'voltage'
         :rtype: str
         """
-        resp = self.get_input_setup()
+        resp = self._get_input_setup()
         self.mode = mode_key[resp[0]]
         return self.mode
 
@@ -579,13 +548,13 @@ class Channel:
         :param excitation_mode: mode we want, must be 'current' or 'voltage'
         :type excitation_mode: str
 
-        :returns: reply from INTYPE call
+        :returns: reply from RDGRNG call
         :rtype: str
 
         """
         assert excitation_mode in ['voltage', 'current']
 
-        resp = self.get_input_setup()
+        resp = self._get_input_setup()
         resp[0] = mode_lock[excitation_mode]
 
         self.mode = mode_key[resp[0]]
@@ -593,83 +562,68 @@ class Channel:
         return self._set_input_setup(resp)
 
     def get_excitation(self):
-        """Get excitation value from INTYPE?
+        """Get excitation value from RDGRNG?
 
         :returns: excitation value in volts or amps, depending on mode
         :rtype: float
         """
-        resp = self.get_input_setup()
+        resp = self._get_input_setup()
         _mode = resp[0]
         _excitation = resp[1]
 
-        if self.channel_num == "A":
-            control_channel = True
-        else:
-            control_channel = False
-
-        if control_channel:
-            excitation_key = {'1': {1: 316.0e-12,
-                                    2: 1e-9,
-                                    3: 3.16e-9,
-                                    4: 10e-9,
-                                    5: 31.6e-9,
-                                    6: 100e-9}}
-        else:
-            excitation_key = {'0': voltage_excitation_key,
-                              '1': current_excitation_key}
+        excitation_key = {'0': voltage_excitation_key,
+                            '1': current_excitation_key}
 
         self.excitation = excitation_key[_mode][int(_excitation)]
 
         return self.excitation
 
     def set_excitation(self, excitation_value):
-        """Set voltage/current exitation to specified value via INTYPE command.
+        """Set voltage/current exitation to specified value via RDGRNG command.
 
         :param excitation_value: value in volts/amps of excitation
         :type excitation_value: float
 
-        :returns: response from INTYPE command
+        :returns: response from RDGRNG command
         :rtype: str
         """
         _mode = self.mode
 
-        if self.channel_num == "A":
-            control_channel = True
-        else:
-            control_channel = False
-
-        if control_channel:
-            excitation_lock = {316.0e-12: 1,
-                               1e-9: 2,
-                               3.16e-9: 3,
-                               10e-9: 4,
-                               31.6e-9: 5,
-                               100e-9: 6}
-        else:
-            if _mode == 'voltage':
-                excitation_lock = voltage_excitation_lock
-            elif _mode == 'current':
-                excitation_lock = current_excitation_lock
+        if _mode == 'voltage':
+            excitation_lock = voltage_excitation_lock
+        elif _mode == 'current':
+            excitation_lock = current_excitation_lock
 
         closest_value = min(excitation_lock, key=lambda x: abs(x-excitation_value))
 
-        resp = self.get_input_setup()
+        resp = self._get_input_setup()
         resp[1] = str(excitation_lock[closest_value])
 
         return self._set_input_setup(resp)
 
     def enable_autorange(self):
-        """Enable auto range for channel via INTYPE command."""
-        resp = self.get_input_setup()
-        resp[2] = '1'
-        self.autorange = autorange_key[resp[2]]
+        """Enable auto range for channel via RDGRNG command."""
+        resp = self._get_input_setup()
+        #order of resp args switch for range, autorange in LS370
+        resp[3] = '1'     
+
+        #all LS370 channels respond to this command
+        for c in self.ls.channels: 
+            c.autorange = autorange_key[resp[3]]
+
+        #TODO: move method to LS370 class, fix references in agent
         return self._set_input_setup(resp)
 
     def disable_autorange(self):
-        """Disable auto range for channel via INTYPE command."""
-        resp = self.get_input_setup()
-        resp[2] = '0'
-        self.autorange = autorange_key[resp[2]]
+        """Disable auto range for channel via RDGRNG command."""
+        resp = self._get_input_setup()
+        resp[3] = '0'
+
+        #all LS370 channels respond to this command
+        for c in self.ls.channels:
+            c.autorange = autorange_key[resp[3]]
+       
+        #TODO: move method to LS370 class, fix references in agent
         return self._set_input_setup(resp)
 
     def set_resistance_range(self, resistance_range):
@@ -681,7 +635,7 @@ class Channel:
                                  though note these are in increments of 2, 6.32, 20, 63.2, etc.
         :type resistance_range: float
 
-        :returns: response from INTYPE command
+        :returns: response from RDGRNG command
         :rtype: str
         """
 
@@ -695,8 +649,10 @@ class Channel:
 
         _range = get_closest_resistance_range(resistance_range)
 
-        resp = self.get_input_setup()
-        resp[3] = str(range_lock[_range])
+        resp = self._get_input_setup()
+
+        #order of range, autorange switched in LS370
+        resp[2] = str(range_lock[_range])
         self.range = _range
         return self._set_input_setup(resp)
 
@@ -706,31 +662,41 @@ class Channel:
         :returns: resistance range in Ohms
         :rtype: float
         """
-        resp = self.get_input_setup()
-        _range = resp[3]
+        resp = self._get_input_setup()
+        _range = resp[2]
         self.range = range_key[int(_range)]
         return self.range
 
     def enable_excitation(self):
-        """Enable excitation by not shunting the current source via INTYPE command.
+        """Enable excitation by not shunting the current source via RDGRNG command.
 
         :returns: state of excitation
         :rtype: str
         """
-        resp = self.get_input_setup()
+        resp = self._get_input_setup()
         resp[4] = '0'
-        self.csshunt = csshunt_key[resp[4]]
+
+        #all LS370 channels respond to this command
+        for c in self.ls.channels:
+            c.csshunt = csshunt_key[resp[4]]
+        
+        #TODO: move method to LS370 class, fix references in agent
         return self._set_input_setup(resp)
 
     def disable_excitation(self):
-        """Disable excitation by shunting the current source via INTYPE command.
+        """Disable excitation by shunting the current source via RDGRNG command.
 
         :returns: state of excitation
         :rtype: str
         """
-        resp = self.get_input_setup()
+        resp = self._get_input_setup()
         resp[4] = '1'
-        self.csshunt = csshunt_key[resp[4]]
+
+        #all LS370 channels respond to this command
+        for c in self.ls.channels:
+            c.csshunt = csshunt_key[resp[4]]
+        
+        #TODO: move method to LS370 class, fix references in agent
         return self._set_input_setup(resp)
 
     def get_excitation_power(self):
@@ -743,33 +709,33 @@ class Channel:
         resp = self.ls.msg(f"RDGPWR? {self.channel_num}").strip()
         return float(resp)
 
-    def set_units(self, units):
-        """Set preferred units using INTYPE command.
-
-        :param units: preferred units parameter for sensor readings, 'kelvin'
-                      or 'ohms'
-        :type units: str
-
-        :returns: response from INTYPE command
-        :rtype: str
-        """
-        assert units.lower() in ['kelvin', 'ohms']
-
-        resp = self.get_input_setup()
-        resp[5] = units_lock[units.lower()]
-        return self._set_input_setup(resp)
-
-    def get_units(self):
-        """Get preferred units from INTYPE? command.
-
-        :returns: preferred units
-        :rtype: str
-        """
-        resp = self.get_input_setup()
-        _units = resp[5]
-        self.units = units_key[_units]
-
-        return self.units
+#    def set_units(self, units):
+#        """Set preferred units using INTYPE command.
+#
+#        :param units: preferred units parameter for sensor readings, 'kelvin'
+#                      or 'ohms'
+#        :type units: str
+#
+#        :returns: response from INTYPE command
+#        :rtype: str
+#        """
+#        assert units.lower() in ['kelvin', 'ohms']
+#
+#        resp = self._get_input_setup()
+#        resp[5] = units_lock[units.lower()]
+#        return self._set_input_setup(resp)
+#
+#    def get_units(self):
+#        """Get preferred units from INTYPE? command.
+#
+#        :returns: preferred units
+#        :rtype: str
+#        """
+#        resp = self._get_input_setup()
+#        _units = resp[5]
+#        self.units = units_key[_units]
+#
+#        return self.units
 
     def enable_channel(self):
         """Enable channel using INSET command.
@@ -777,7 +743,7 @@ class Channel:
         :returns: response from self._set_input_channel_parameter()
         :rtype: str
         """
-        resp = self.get_input_channel_parameter()
+        resp = self._get_input_channel_parameter()
         resp[0] = '1'
         self.enabled = True
         return self._set_input_channel_parameter(resp)
@@ -788,7 +754,7 @@ class Channel:
         :returns: response from self._set_input_channel_parameter()
         :rtype: str
         """
-        resp = self.get_input_channel_parameter()
+        resp = self._get_input_channel_parameter()
         resp[0] = '0'
         self.enabled = False
         return self._set_input_channel_parameter(resp)
@@ -804,7 +770,7 @@ class Channel:
         """
         assert dwell in range(1, 201), "Dwell must be 1 to 200 sec"
 
-        resp = self.get_input_channel_parameter()
+        resp = self._get_input_channel_parameter()
         resp[1] = str(dwell)  # seconds
         self.dwell = dwell  # seconds
         return self._set_input_channel_parameter(resp)
@@ -815,7 +781,7 @@ class Channel:
         :returns: the dwell time in seconds
         :rtype: int
         """
-        resp = self.get_input_channel_parameter()
+        resp = self._get_input_channel_parameter()
         self.dwell = int(resp[1])
         return self.dwell
 
@@ -830,7 +796,7 @@ class Channel:
         """
         assert pause in range(3, 201), "Pause must be 3 to 200 sec"
 
-        resp = self.get_input_channel_parameter()
+        resp = self._get_input_channel_parameter()
         resp[2] = str(pause)  # seconds
         self.pause = pause  # seconds
         return self._set_input_channel_parameter(resp)
@@ -841,7 +807,7 @@ class Channel:
         :returns: the pause time in seconds
         :rtype: int
         """
-        resp = self.get_input_channel_parameter()
+        resp = self._get_input_channel_parameter()
         self.pause = int(resp[2])  # seconds
         return self.pause
 
@@ -855,7 +821,7 @@ class Channel:
         """
         assert curve_number in range(0, 60), "Curve number must from 0 to 59"
 
-        resp = self.get_input_channel_parameter()
+        resp = self._get_input_channel_parameter()
         resp[3] = str(curve_number)
         self.curve_num = self.get_calibration_curve()
         return self._set_input_channel_parameter(resp)
@@ -866,7 +832,7 @@ class Channel:
         :returns: curve number in use for the channel
         :rtype: int
         """
-        resp = self.get_input_channel_parameter()
+        resp = self._get_input_channel_parameter()
         self.curve_num = int(resp[3])
         return self.curve_num
 
@@ -883,7 +849,7 @@ class Channel:
         """
         assert coefficient in ['positive', 'negative']
 
-        resp = self.get_input_channel_parameter()
+        resp = self._get_input_channel_parameter()
         resp[4] = tempco_lock[coefficient]
         self.tempco = coefficient
         return self._set_input_channel_parameter(resp)
@@ -893,34 +859,34 @@ class Channel:
 
         :returns: temperature coefficient
         """
-        resp = self.get_input_channel_parameter()
+        resp = self._get_input_channel_parameter()
         self.tempco = tempco_key[resp[4]]
         return self.tempco
 
-    def get_sensor_input_name(self):
-        """Run Sensor Input Name Query
-
-        :returns: response from INNAME? command
-        :rtype: str
-        """
-        resp = self.ls.msg(f"INNAME? {self.channel_num}").strip()
-
-        self.name = resp
-
-        return resp
-
-    def set_sensor_input_name(self, name):
-        """Set sensor input name using INNAME.
-
-        Note: ',' and ';' characters are sanatized from input
-
-        :param name: name to give input channel
-        :type name: str
-        """
-        name = name.replace(',', '').replace(';', '')
-        resp = self.ls.msg(f'INNAME {self.channel_num},"{name}"')
-        self.name = name
-        return resp
+#    def get_sensor_input_name(self):
+#        """Run Sensor Input Name Query
+#
+#        :returns: response from INNAME? command
+#        :rtype: str
+#        """
+#        resp = self.ls.msg(f"INNAME? {self.channel_num}").strip()
+#
+#        self.name = resp
+#
+#        return resp
+#
+#    def set_sensor_input_name(self, name):
+#        """Set sensor input name using INNAME.
+#
+#        Note: ',' and ';' characters are sanatized from input
+#
+#        :param name: name to give input channel
+#        :type name: str
+#        """
+#        name = name.replace(',', '').replace(';', '')
+#        resp = self.ls.msg(f'INNAME {self.channel_num},"{name}"')
+#        self.name = name
+#        return resp
 
     def get_kelvin_reading(self):
         """Get temperature reading from channel.
@@ -969,44 +935,44 @@ class Channel:
 
         return error_list
 
-    def get_sensor_reading(self):
-        """Get sensor reading from channel.
+#    def get_sensor_reading(self):
+#        """Get sensor reading from channel.
+#
+#        :returns: resistance from channel in Ohms
+#        :rtype: float
+#        """
+#        return float(self.ls.msg(f"SRDG? {self.channel_num}"))
 
-        :returns: resistance from channel in Ohms
-        :rtype: float
-        """
-        return float(self.ls.msg(f"SRDG? {self.channel_num}"))
-
-    def set_temperature_limit(self, limit):
-        """Set temperature limit in kelvin for which to shutdown all control
-        outputs when exceeded. A temperature limit of zero turns the
-        temperature limit feature off for the given sensor input.
-
-        :param limit: temperature limit in kelvin
-        :type limit: float
-
-        :returns: response from TLIMIT command
-        :rtype: str
-        """
-        resp = self.ls.msg(f"TLIMIT {self.channel_num},{limit}")
-        self.tlimit = limit
-        return resp
-
-    def get_temperature_limit(self):
-        """Get temperature limit, at which output controls are shutdown.
-
-        A temperature limit of 0 disables this feature.
-
-        :returns: temperature limit in Kelvin
-        :rtype: float
-        """
-        resp = self.ls.msg(f"TLIMIT? {self.channel_num}").strip()
-        self.tlimit = float(resp)
-        return self.tlimit
+#    def set_temperature_limit(self, limit):
+#        """Set temperature limit in kelvin for which to shutdown all control
+#        outputs when exceeded. A temperature limit of zero turns the
+#        temperature limit feature off for the given sensor input.
+#
+#        :param limit: temperature limit in kelvin
+#        :type limit: float
+#
+#        :returns: response from TLIMIT command
+#        :rtype: str
+#        """
+#        resp = self.ls.msg(f"TLIMIT {self.channel_num},{limit}")
+#        self.tlimit = limit
+#        return resp
+#
+#    def get_temperature_limit(self):
+#        """Get temperature limit, at which output controls are shutdown.
+#
+#        A temperature limit of 0 disables this feature.
+#
+#        :returns: temperature limit in Kelvin
+#        :rtype: float
+#        """
+#        resp = self.ls.msg(f"TLIMIT? {self.channel_num}").strip()
+#        self.tlimit = float(resp)
+#        return self.tlimit
 
     def __str__(self):
         string = "-" * 50 + "\n"
-        string += "Channel %s: %s\n" % (self.channel_num, self.name)
+        string += "Channel %s" % (self.channel_num)
         string += "-" * 50 + "\n"
         string += "\t%-30s\t%r\n" % ("Enabled :", self.enabled)
         string += "\t%-30s\t%s %s\n" % ("Dwell:", self.dwell, "seconds")
@@ -1018,13 +984,13 @@ class Channel:
         string += "\t%-30s\t%s %s\n" % ("Excitation:", self.excitation, self.excitation_units)
         string += "\t%-30s\t%s\n" % ("Autorange:", self.autorange)
         string += "\t%-30s\t%s %s\n" % ("Resistance Range:", self.range, "ohms")
-        string += "\t%-30s\t%s\n" % ("Preferred Units:", self.units)
+#        string += "\t%-30s\t%s\n" % ("Preferred Units:", self.units)
 
         return string
 
 
 class Curve:
-    """Calibration Curve class for the LS372."""
+    """Calibration Curve class for the LS370."""
     def __init__(self, ls, curve_num):
         self.ls = ls
         self.curve_num = curve_num
@@ -1082,12 +1048,12 @@ class Curve:
         _name = params[0][:15]
         _sn = params[1][-10:]
         _format = params[2]
-        assert _format.strip() in ['3', '4', '7']
+        assert _format.strip() in ['3', '4']
         _limit = params[3]
         _coeff = params[4]
         assert _coeff.strip() in ['1', '2']
 
-        return self.ls.msg(f'CRVHDR {_curve_num},"{_name}","{_sn}",{_format},{_limit},{_coeff}')
+        return self.ls.msg(f'CRVHDR {_curve_num},{_name},{_sn},{_format},{_limit},{_coeff}')
 
     def get_name(self):
         """Get the curve name with the CRVHDR? command.
@@ -1217,14 +1183,14 @@ class Curve:
         """Get a single data point from a curve, given the index, using the
         CRVPT? command.
 
-        The format for the return value, a 3-tuple of floats, is chosen to work
+        The format for the return value, a 2-tuple of floats, is chosen to work
         with how the get_curve() method later stores the entire curve in a
         numpy structured array.
 
         :param index: index of breakpoint to query
         :type index: int
 
-        :returns: (units, tempertaure, curvature) values for the given breakpoint
+        :returns: (units, temperature) values for the given breakpoint
         :rtype: 3-tuple of floats
         """
         resp = self.ls.msg(f"CRVPT? {self.curve_num},{index}").split(',')
@@ -1241,24 +1207,21 @@ class Curve:
         :type units: float
         :param kelvin: value of the corresponding temp in Kelvin to 6 digits
         :type kelvin: float
-        :param curavature: used for calculating cublic spline coefficients (optional)
-        :type curvature: float
 
         :returns: response from the CRVPT command
         :rtype: str
         """
-        if curvature is None:
-            resp = self.ls.msg(f"CRVPT {self.curve_num}, {index}, {units}, {kelvin}")
-        else:
-            resp = self.ls.msg(f"CRVPT {self.curve_num}, {index}, {units}, {kelvin}, {curvature}")
-
+        resp = self.ls.msg(f"CRVPT {self.curve_num}, {index}, {units}, {kelvin}")
         return resp
 
     # Public API Elements
     def get_curve(self, _file=None):
-        """Get a calibration curve from the LS372.
+        """Get a calibration curve from the LS370.
 
         If _file is not None, save to file location.
+        
+        :param _file: the file to load the calibration curve from
+        :type _file: str
         """
         breakpoints = []
         for i in range(1, 201):
@@ -1277,7 +1240,10 @@ class Curve:
                 f.write('Sensor Model:\t' + self.name + '\r\n')
                 f.write('Serial Number:\t' + self.serial_number + '\r\n')
                 f.write('Data Format:\t' + format_lock[self.format] + f'\t({self.format})\r\n')
-                f.write('SetPoint Limit:\t%s\t(Kelvin)\r\n' % '%0.4f' % np.max(self.breakpoints['temperature']))
+
+                #TODO: shouldn't this be the curve_header limit?
+                #above is done ZA 20200405
+                f.write('SetPoint Limit:\t%s\t(Kelvin)\r\n' % '%0.4f' % self.limit)
                 f.write('Temperature coefficient:\t' + tempco_lock[self.coefficient] + f' ({self.coefficient})\r\n')
                 f.write('Number of Breakpoints:\t%s\r\n' % len(self.breakpoints))
                 f.write('\r\n')
@@ -1341,19 +1307,40 @@ class Curve:
         values = []
         for i in range(9, len(content)):
             values.append(content[i].strip().split()) #data points that should have been uploaded
-    
-        for j in range(1, len(values)+1):
+        
+        #TODO: shouldn't this be capped at len(values) + 1?
+        #above is done ZA 20200330
+        for j in range(1, len(values) + 1):
             try:
-                resp = self.get_data_point(j) #response from the 372
+                resp = self.get_data_point(j) #response from the 370
                 point = values[j-1]
                 units = float(resp[0])
                 temperature = float(resp[1])
                 assert units == float(point[1]), "Point number %s not uploaded"%point[0]
                 assert temperature == float(point[2]), "Point number %s not uploaded"%point[0]
                 print("Successfully uploaded %s, %s" %(units,temperature))
-            #if AssertionError, tell 372 to re-upload points
+            #if AssertionError, tell 370 to re-upload points
+
+            #TODO: shouldn't this condition on either units or temperature, not just units?
+            #above is done ZA 20200330
             except AssertionError:
-                if units != float(point[1]):
+                if units != float(point[1]) or temperature != float(point[2]):
+         
+                    #TODO: fix, could enter infinite loop if always fails 
+                    self.set_curve(_file)
+
+        #check that remainining points are zeros
+        for j in range(len(values) + 1, 201):
+            try:
+                resp = self.get_data_point(j) #response from the 370
+                units = float(resp[0])
+                temperature = float(resp[1])
+                assert units == 0, "Point number %s contains nonzero data"%j
+                assert temperature == 0, "Point number %s contains nonzero data"%j
+            except AssertionError:
+                if units != 0 or temperature != 0:
+
+                    #TODO: fix, could enter infinite loop if always fails
                     self.set_curve(_file)
 
     def delete_curve(self):
@@ -1377,119 +1364,126 @@ class Curve:
 
         return string
 
-
+#TODO: make new Analog class. Too many firmware distictions to group both Heater and Analog outputs
+#into same class of objects
 class Heater:
-    """Heater class for LS372 control
+    """Heater class for LS370 control
 
     :param ls: the lakeshore object we're controlling
-    :type ls: Lakeshore372.LS372
-    :param output: the heater output we want to control, 0 = sample,
-                   1 = warm-up, 2 = still
-    :type output: int
+    :type ls: Lakeshore370.LS370
     """
-    def __init__(self, ls, output):
+    def __init__(self, ls):
         self.ls = ls
-        self.output = output
+
         self.mode = None
         self.input = None
-        self.powerup = None
+        #self.powerup = None in 370, powerup is always disabled
         self.polarity = None
         self.filter = None
         self.delay = None
+        self.units = None
 
         self.range = None
 
-        self.resistance = None
-        self.max_current = None
-        self.max_user_current = None
+        self.resistance = None     #only for output = 0
+        #self.max_current = None   in 370, there is only htrrng limit and curve limit 
+        #self.max_user_current = None  not in 370
+        self.rng_limit = None
         self.display = None
 
-        self.get_output_mode()
+        self._get_output_mode()
+        self.get_heater_range()
         self.get_heater_setup()
 
-    def get_output_mode(self):
-        """Query the heater mode using the OUTMODE? command.
+    def _get_output_mode(self):
+        """Query the heater mode using the CMODE?, CPOL?, CSET? commands.
 
-        :returns: 6-tuple with output mode, input channel, whether powerup is
-                  enabled, polarity, unfiltered/filtered, and the autoscanning
-                  delay time.
+        :returns: 6-tuple with output mode, polarity, input channel, 
+            unfiltered/filtered, heater units (kelvin, ohms), and autoscanning delay time.
         :rtype: tuple
         """
-        resp = self.ls.msg(f"OUTMODE? {self.output}").split(",")
+        _mode = self.ls.msg('CMODE?')
+        self.mode = output_modes[_mode]
+        self.polarity = self.ls.msg('CPOL?')
 
-        # TODO: make these human readable
-        self.mode = output_modes[resp[0]]
-        self.input = resp[1]
+        resp = self.ls.msg('CSET?').split(',')
+        self.input = resp[0]
+        self.filter = resp[1]
+        self.units = units_key[resp[2]]
+        self.delay = resp[3]
 
-        self.powerup = resp[2]
-        self.polarity = resp[3]
-        self.filter = resp[4]
-        self.delay = resp[5]
+        return [self.mode, self.polarity, self.input, self.filter, self.units, self.delay]
 
-        return resp
-
-    # OUTMODE
     def _set_output_mode(self, params):
-        """Set the output mode of the heater with the OUTMODE command.
+        """Set the output mode of the heater with the CMODE, CPOL, CSET commands.
 
-        Parameters should be <mode>, <input/channel>, <powerup enable>, <polarity>,
-        <filter>, <delay>. Will determine <output> from attributes. This allows
-        us to use output from get_output_mode directly, as it doesn't return
-        <outpu>.
+        Parameters should be <mode>, <polarity>, <input/channel>, <filter>, <units>,
+        <delay>.
 
-        :param params: OUTMODE parameters
+        :param params: CMODE/CPOL/CSET parameters
         :type params: list of str
 
         :returns: response from ls.msg
         """
         assert len(params) == 6
 
-        reply = [str(self.output)]
-        [reply.append(x) for x in params]
+        self.ls.msg(f'CMODE {params.pop(0)}')
+        self.ls.msg(f'CPOL {params.pop(0)}')
+        
+        reply = params + [heater_display_lock[self.display], heater_range_lock[self.rng_limit],
+                str(self.resistance)]
 
         param_str = ','.join(reply)
-        return self.ls.msg(f"OUTMODE {param_str}")
+        return self.ls.msg(f"CSET {param_str}")
+
+    def get_heater_setup(self):
+        """Gets Heater setup params with the CSET? command.
+
+        :return resp: List of values that have been returned from the Lakeshore.
+        """
+        resp = self.ls.msg("CSET?").split(',')
+
+        self.display = heater_display_key[resp[4]]
+        self.rng_limit = heater_range_key[resp[5]] 
+        self.resistance = float(resp[6])
+        #self.max_current = int(resp[1])
+        #self.max_user_current = float(resp[2].strip('E+'))
+
+        return [self.display, self.rng_limit, self.resistance]
 
     def _set_heater_setup(self, params):
         """
-        Sets the heater setup using the HTRSET command.
+        Sets the heater setup using the CSET command.
 
         Params must be a list with the parameters:
-            <heater resistance>:    Heater load in Ohms (Sample);
-                                    1=25 Ohms, 2=50 Ohms (warmp-up)
-            <max current>: Specifies max heater output for warm-up heater.
-                           0=User spec, 1=0.45 A, 2=0.63 A.
-            <max user current>: Max heater output if max_current is set to user (warm-up only)
             <current/power>:    Specifies if heater display is current or power.
                                 1=current, 2=power.
+            <rng_limit>: Max heater range; ranges according to HTRRNG command
+            <heater resistance>:    Heater load in Ohms (Sample);
+                                    1=25 Ohms, 2=50 Ohms (warmp-up)
 
         :param params:
         :return:
         """
-        assert self.output in [0,1]
+        assert len(params) == 3
 
-        assert len(params) == 4
-
-        reply = [str(self.output)]
-        [reply.append(x) for x in params]
-
+        reply = [self.input, self.filter, units_lock[self.units], self.delay] + params
         param_str = ','.join(reply)
-        return self.ls.msg("HTRSET {}".format(param_str))
+        return self.ls.msg("CSET {}".format(param_str))
 
     def get_mode(self):
-        """Set output mode with OUTMODE? commnd.
+        """Set output mode with CMODE? commnd.
 
         :returns: The output mode
         :rtype: str
         """
-        self.get_output_mode()
+        self._get_output_mode()
         return self.mode
 
     def set_mode(self, mode):
-        """Set output mode with OUTMODE commnd.
+        """Set output mode with CMODE commnd.
 
-        :param mode: control mode for heater, see page 171 of LS372 Manual for
-                     valid modes, as it changes per output
+        :param mode: control mode for heater, see page 6-24 pf Lakeshore 370 manual
         :type mode: str
 
         :returns: the response from the OUTMODE command
@@ -1497,35 +1491,35 @@ class Heater:
         # TODO: Make assertions check specific output and it's validity in mode selection
         assert mode.lower() in output_modes_lock.keys(), f"{mode} not a valid mode"
 
-        resp = self.get_output_mode()
+        resp = self._get_output_mode()
         resp[0] = output_modes_lock[mode.lower()]
         self.mode = mode
         return self._set_output_mode(resp)
 
     def get_manual_out(self):
-        resp = self.ls.msg("MOUT? {}".format(self.output))
+        resp = self.ls.msg("MOUT?")
         return float(resp)
 
-
     def get_input_channel(self):
-        """Get the control channel with the OUTMODE? command.
+        """Get the control channel with the CSET? command.
 
         :returns: The control channel
         :rtype: str
         """
-        self.get_output_mode()
+        self._get_output_mode()
         return self.input
 
     def set_input_channel(self, _input):
-        """Set the control channel with the OUTMODE command.
+        """Set the control channel with the CSET command.
 
         :param _input: specifies which input or channel to control from
         :type _input: str or int
         """
-        assert int(_input) in range(17) or _input == "A", f"{_input} not a valid input/channel"
+        #ZA fixed to range(1, 17) from range(17). deleted 'A'
+        assert int(_input) in range(1, 17), f"{_input} not a valid input/channel"
 
-        resp = self.get_output_mode()
-        resp[1] = str(_input)
+        resp = self._get_output_mode()
+        resp[2] = str(_input)
         self.input = str(_input)
         return self._set_output_mode(resp)
 
@@ -1572,6 +1566,28 @@ class Heater:
         #
         pass
 
+    def get_units(self):
+        """Get the setpoint units with the CSET? command.
+
+        :returns: units, either 'kelvin' or 'ohms'
+        :rtype: str
+        """
+        self._get_output_mode()
+        return self.units
+
+    def set_units(self, units):
+        """Set the setpoint units with the CSET command.
+
+        :param units: units, either 'kelvin' or 'ohms'
+        :type units: str
+        """
+        assert units.lower() in units_lock.keys(), f"{units} not a valid unit"
+
+        resp = self._get_output_mode()
+        resp[4] = units_lock[units.lower()]
+        self.units = units.lower()
+        return self._set_output_mode(resp)
+
     def get_delay(self):
         pass
 
@@ -1584,21 +1600,15 @@ class Heater:
         #
         pass
 
-
     def set_heater_display(self, display):
         """
         :param display: Display mode for heater. Can either be 'current' or 'power'.
         :type display: string
         """
-
-        if self.output == 2:
-            print("Cannot set still heater dispaly")
-            return False
-
         assert display.lower() in heater_display_lock.keys(), f"{display} is not a valid display"
 
         resp = self.get_heater_setup()
-        resp[3] = heater_display_lock[display.lower()]
+        resp[0] = heater_display_lock[display.lower()]
 
         self._set_heater_setup(resp)
 
@@ -1611,11 +1621,9 @@ class Heater:
 
         :param output: heater output value. If display is 'power', value should
                         be in Watts. If 'current', value should be in percent.
-                        If this is the still heater, value should be percent of
-                        max voltage (10 V).
         :type output: float
         :param display_type: Display type if you want to set this before setting heater.
-                        Can be 'power' or 'current' if output is sample or warm-up heater.
+                        Can be 'power' or 'current'.
         :type display_type: string
 
         :returns: heater output
@@ -1632,67 +1640,26 @@ class Heater:
             print("Heater range is off... Not setting output")
             return False
 
-        if self.output == 0:
-            # For sample heater
-            max_pow = self.range ** 2 * self.resistance
+        # For sample heater
+        max_pow = self.range ** 2 * self.resistance
 
-            if self.display == 'power':
-                if 0 <= output <= max_pow:
-                    self.ls.msg(f"MOUT {self.output} {output}")
-                    return True
-                else:
-                    print("Cannot set to {} W, max power is {:2e} W".format(
-                        output, max_pow))
-                    return False
-
-            if self.display == 'current':
-                if 0 <= output <= 100:
-                    self.ls.msg(f"MOUT {self.output} {output}")
-                    return True
-                else:
-                    print(
-                        "Display is current: output must be between 0 and 100")
-                    return False
-
-        if self.output == 1:
-            # Does anyone actually plan on using the warm-up heater?
-            pass
-
-        if self.output == 2:
-            if 0 <= output <= 100:
-                self.ls.msg(f"MOUT {self.output} {output}")
+        if self.display == 'power':
+            if 0 <= output <= max_pow:
+                self.ls.msg(f"MOUT {output}")
                 return True
             else:
-                print("Still heater output must be between 0 and 100%")
+                print("Cannot set to {} W, max power is {:2e} W".format(
+                    output, max_pow))
                 return False
 
-    def get_sample_heater_output(self):
-        """Get sample heater output in percent of current or in actual power,
-        depending on the heater output selection.
-
-        :return: Sample heater output percentage.
-
-        """
-        # Sample Heater
-        if self.output == 0:
-            resp = self.ls.msg("HTR?")
-
-        return float(resp)
-
-    def get_heater_setup(self):
-        """Gets Heater setup params with the HTRSET? command.
-
-        :return resp: List of values that have been returned from the Lakeshore.
-        """
-        resp = self.ls.msg("HTRSET? {}".format(self.output)).split(',')
-
-        self.resistance = float(resp[0])
-        self.max_current = int(resp[1])
-        self.max_user_current = float(resp[2].strip('E+'))
-        self.display = heater_display_key[resp[3]]
-
-        return resp
-
+        if self.display == 'current':
+            if 0 <= output <= 100:
+                self.ls.msg(f"MOUT {output}")
+                return True
+            else:
+                print(
+                    "Display is current: output must be between 0 and 100")
+                return False
 
     # RAMP, RAMP? - in heater class
     def set_ramp_rate(self, rate):
@@ -1713,7 +1680,7 @@ class Heater:
 
     # RANGE
     def set_heater_range(self, _range):
-        """Set heater range with RANGE command.
+        """Set heater range with HTRRNG command.
 
         :param _range: heater range
         :type _range: float or str (for "On" "Off")
@@ -1728,39 +1695,30 @@ class Heater:
         if str(_range).lower() == 'on':
             _range = "On"
 
-        if self.output == 0:
-            resp = self.ls.msg(f"RANGE {self.output} {heater_range_lock[_range]}").strip()
-        else:
-            on_off_key = {"0": "Off", "1": "On"}
-            on_off_lock = {v:k for k, v in on_off_key.items()}
-            resp = self.ls.msg(f"RANGE {self.output} {on_off_lock[_range]}").strip()
-
+        resp = self.ls.msg(f"HTRRNG {heater_range_lock[_range]}").strip()
+        
         # refresh self.heater value with RANGE? query
         self.get_heater_range()
 
     def get_heater_range(self):
-        """Get heater range with RANGE? command.
+        """Get heater range with HTRRNG? command.
 
         :returns: heater range in amps
         :rtype: float
         """
-        resp = self.ls.msg(f"RANGE? {self.output}").strip()
+        resp = self.ls.msg(f"HTRRNG?").strip()
 
-        if self.output == 0:
-            self.range = heater_range_key[resp]
-        else:
-            on_off_key = {"0": "Off", "1": "On"}
-            self.range = on_off_key[resp]
+        self.range = heater_range_key[resp]
 
         return self.range
 
-    # SETP - heater class
+    # SETP - heater class, uses self.units to interpret value
     def set_setpoint(self, value):
-        self.ls.msg(f"SETP {self.output},{value}")
+        self.ls.msg(f"SETP {value}")
 
-    # SETP? - heater class
+    # SETP? - heater class, uses self.units to interpret value
     def get_setpoint(self):
-        resp = self.ls.msg(f"SETP? {self.output}")
+        resp = self.ls.msg(f"SETP?")
         return resp
 
     # STILL - heater class?
@@ -1798,7 +1756,7 @@ class Heater:
         assert float(I) <= 10000 and float(I) >= 0
         assert float(D) <= 2500 and float(D) >= 0
 
-        resp = self.ls.msg(f"PID {self.output},{P},{I},{D}")
+        resp = self.ls.msg(f"PID {P},{I},{D}")
         return resp
 
     # PID?
@@ -1813,4 +1771,6 @@ class Heater:
 
 
 if __name__ == "__main__":
-    ls = LS372(sys.argv[1])
+    ls = LS370(sys.argv[1])
+    print(ls.msg('*IDN?'))
+    print(f'LS370 successfully initialized at port {sys.argv[1]}')
