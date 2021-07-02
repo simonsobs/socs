@@ -47,6 +47,7 @@ class PMX:
                 self.ser.inWaiting()
             else  :
                 self.clean_serial()
+                self.wait()
                 self.ser.write(str.encode("OUTP?\n\r"))
                 self.wait()
                 val = (self.ser.readline().strip())

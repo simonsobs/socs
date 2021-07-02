@@ -19,6 +19,7 @@ class KikusuiAgent:
         self.take_data = False
         self.switching = False # True while a command is sent to KIKSUI.
         self.switching2= False # True while IV is gotten.
+        self.wait_loop = 100 # Max number of loop in __wait_control
         self.kikusui_ip = kikusui_ip
         self.kikusui_port = int(kikusui_port)
 
@@ -80,28 +81,57 @@ class KikusuiAgent:
             self.cmd = None
             return False, msg
 
+    def __wait_control(self):
+        # check control
+        for i in range(self.wait_loop) :
+            if (not self.switching) and (not self.switching2) :
+                self.switching=True
+                return True
+            time.sleep(0.1)
+            pass
+        msg = 'Failed to wait for getting the control. Exceed max. number of Waiting loop. (max={})'.format(self.wait_loop)
+        self.log.warn(msg)
+        return False
  
     def set_on(self, session, params = None):
         with self.lock.acquire_timeout(0, job = 'set_on') as acquired:
             if not acquired:
-                self.log.warn('Could not set on because {} is already running'.format(self.lock.job))
+                self.log.warn('Could not set ON because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            self.switching = True
-            self.cmd.user_input('on')
-            self.switching = False
+            # wait for getting control
+            ret = self.__wait_control()
+            if ret :
+                self.switching = True
+                self.cmd.user_input('on')
+                self.switching = False
+            else :
+                msg = 'Could not set ON because of failure in getting the control.'
+                self.log.warn(msg)
+                return False, msg
+                pass
+            pass
 
         return True, 'Set Kikusui on'
 
     def set_off(self, session, params = None):
         with self.lock.acquire_timeout(0, job = 'set_off') as acquired:
             if not acquired:
-                self.log.warn('Could not set off because {} is already running'.format(self.lock.job))
+                self.log.warn('Could not set OFF because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            self.switching = True
-            self.cmd.user_input('off')
-            self.switching = False
+            # wait for getting control
+            ret = self.__wait_control()
+            if ret :
+                self.switching = True
+                self.cmd.user_input('off')
+                self.switching = False
+            else :
+                msg = 'Could not set OFF because of failure in getting the control.'
+                self.log.warn(msg)
+                return False, msg
+                pass
+            pass
 
         return True, 'Set Kikusui off'
 
@@ -114,11 +144,20 @@ class KikusuiAgent:
                 self.log.warn('Could not set c because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            self.switching = True
-            self.cmd.user_input('C {}'.format(params['current']))
-            self.switching = False
+            # wait for getting control
+            ret = self.__wait_control()
+            if ret :
+                self.switching = True
+                self.cmd.user_input('C {}'.format(params['current']))
+                self.switching = False
+            else :
+                msg = 'Could not set c because of failure in getting the control.'
+                self.log.warn(msg)
+                return False, msg
+                pass
+            pass
 
-        return True, 'Set Kikusui voltage to {} A'.format(params['current'])
+        return True, 'Set Kikusui current to {} A'.format(params['current'])
 
 
     def set_v(self, session, params = None):
@@ -130,9 +169,18 @@ class KikusuiAgent:
                 self.log.warn('Could not set v because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            self.switching = True
-            self.cmd.user_input('V {}'.format(params['volt']))
-            self.switching = False
+            # wait for getting control
+            ret = self.__wait_control()
+            if ret :
+                self.switching = True
+                self.cmd.user_input('V {}'.format(params['volt']))
+                self.switching = False
+            else :
+                msg = 'Could not set v because of failure in getting the control.'
+                self.log.warn(msg)
+                return False, msg
+                pass
+            pass
 
         return True, 'Set Kikusui voltage to {} V'.format(params['volt'])
 
@@ -143,25 +191,30 @@ class KikusuiAgent:
                               .format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            # check connection
-            ret, msg = self.__check_connect()
-            if not ret :
-                return False, msg 
-
             v_val = None
             c_val = None
             s_val = None
             msg   = 'Error'
             s_msg = 'Error'
-            for i in range(100) :
-                if (not self.switching) and (not self.switching2) :
-                    self.switching = True
+
+            # wait for getting control
+            ret = self.__wait_control()
+            if ret :
+                self.switching = True
+                # check connection
+                ret, msg = self.__check_connect()
+                if not ret :
+                    msg = 'Could not get c,v because of failure of connection.'
+                else :
                     msg, v_val, c_val = self.cmd.user_input('VC?')
                     s_msg, s_val      = self.cmd.user_input('O?')
-                    self.switching = False
-                    break
-                time.sleep(0.1)
+                    pass
+                self.switching = False
+            else :
+                msg = 'Could not get c,v because of failure in getting the control.'
+                self.log.warn(msg)
                 pass
+            pass
 
         self.log.info('Get voltage/current message: {}'.format(msg));
         self.log.info('Get status message: {}'.format(s_msg));
@@ -190,7 +243,7 @@ class KikusuiAgent:
                     v_val, i_val, vs_val, is_val = 0., 0., 0., 0.
                     s_val = -1 # -1 means Not connected.
                     # try to reconnect
-                    #ret, msg = self.__reconnect()
+                    self.__reconnect()
                 else :
                     v_msg, v_val = self.cmd.user_input('V?')
                     i_msg, i_val = self.cmd.user_input('C?')

@@ -96,6 +96,9 @@ class WiregridActuatorAgent:
         if LSL2==0 and LSR2==0 : 
             status, msg = self.actuator.move(distance, speedrate)
             if status<0 : return False, msg
+        else :
+            self.log.warn('Warning! One of limit switches on opposite side (inside) is ON (LSL2={}, LSR2={})!'.format(LSL2, LSR2));
+            self.log.warn('  --> Did not move.');
             pass
         isrun = True
         while LSL2==0 and LSR2==0 and isrun :
@@ -104,6 +107,9 @@ class WiregridActuatorAgent:
             if self.verbose>0 : self.log.info('LSL2={}, LSR2={}, run={}'.format(LSL2,LSR2,isrun))
             pass
         self.actuator.hold()
+        if LSL2 or LSR2 :
+            self.log.info('Stopped moving because one of limit switches on opposite side (inside) is ON (LSL2={}, LSR2={})!'.format(LSL2, LSR2))
+            pass
         self.actuator.release()
         return True, 'Finish forward(distance={}, speedrate={})'.format(distance, speedrate)
 
@@ -115,6 +121,9 @@ class WiregridActuatorAgent:
         if LSL1==0 and LSR1==0 : 
             status, msg = self.actuator.move(-1*distance, speedrate)
             if status<0 : return False, msg
+        else :
+            self.log.warn('Warning! One of limit switches on motor side (outside) is ON (LSL1={}, LSR1={})!'.format(LSL1, LSR1));
+            self.log.warn('  --> Did not move.');
             pass
         isrun = True
         while LSL1==0 and LSR1==0 and isrun :
@@ -123,6 +132,9 @@ class WiregridActuatorAgent:
             if self.verbose>0 : self.log.info('LSL1={}, LSR1={}, run={}'.format(LSL1,LSR1,isrun))
             pass
         self.actuator.hold()
+        if LSL1 or LSR1 :
+            self.log.info('Stopped moving because one of limit switches on motor side (outside) is ON (LSL1={}, LSR1={})!'.format(LSL1, LSR1))
+            pass
         self.actuator.release()
         return True, 'Finish backward(distance={}, speedrate={})'.format(distance, speedrate)
 
@@ -164,21 +176,27 @@ class WiregridActuatorAgent:
                 self.log.error('ERROR!: Stopper set_allon() --> STOP')
                 return False
             # forward a bit
-            status, msg  = self.__forward(10, speedrate=0.1)
+            status, msg  = self.__forward(20, speedrate=0.1)
             if not status : 
                 self.log.error('ERROR!:(in first forwarding) {}'.format(msg))
                 return False
             # check limitswitch
             LSL1,LSR1 = self.limitswitch.get_onoff(pinname=['LSL1','LSR1'])
-            print('LSL1,LSR1',LSL1,LSR1);
+            #print('LSL1,LSR1',LSL1,LSR1);
             if LSL1==1 or LSR1==1 :
-                self.log.error('ERROR!: The limitswitch on motor side is NOT OFF after moving forward without stopper.')
-                self.log.error('ERROR!: --> STOP')
+                self.log.error('ERROR!: The limitswitch on motor side is NOT OFF after moving forward without stopper.--> STOP')
                 return False
             # power off stopper
             if self.stopper.set_alloff() < 0 : 
                 self.log.error('ERROR!: Stopper set_alloff() --> STOP')
                 return  False
+            # check stopper
+            while True :
+                onoff_st = self.stopper.get_onoff()
+                if not any(onoff_st) :
+                    break
+                pass
+            time.sleep(1)
             # main forward
             status, msg = self.__forward(main_distance, speedrate=main_speedrate)
             if not status : 
@@ -192,7 +210,7 @@ class WiregridActuatorAgent:
             # check limitswitch
             LSL2,LSR2 = self.limitswitch.get_onoff(pinname=['LSL2','LSR2'])
             if LSL2==0 and LSR2==0 :
-                self.log.error('ERROR!: The limitswitch on opposite side is NOT ON after forwardEdge. --> STOP')
+                self.log.error('ERROR!: The limitswitch on opposite side is NOT ON after __insert(). --> STOP')
                 return False
             return True
 
@@ -217,7 +235,7 @@ class WiregridActuatorAgent:
                 self.log.error('ERROR!: Stopper set_allon() --> STOP')
                 return False
             # backward a bit
-            status, msg = self.__backward(10, speedrate=0.1)
+            status, msg = self.__backward(20, speedrate=0.1)
             if not status : 
                 self.log.error('ERROR!:(in first backwarding) {}'.format(msg))
                 return False
@@ -226,6 +244,7 @@ class WiregridActuatorAgent:
             if LSL2==1 or LSR2==1 :
                 self.log.error('ERROR!: The limitswitch on opposite side (inside) is NOT OFF after moving backward. --> STOP')
                 return False
+            time.sleep(1)
             # main backward
             status, msg = self.__backward(main_distance, speedrate=main_speedrate)
             if not status : 
@@ -239,7 +258,7 @@ class WiregridActuatorAgent:
             # check limitswitch
             LSL1,LSR1 = self.limitswitch.get_onoff(pinname=['LSL1','LSR1'])
             if LSL1==0 and LSR1==0 :
-                self.log.error('ERROR!: The limitswitch on motor side (outside) is NOT ON after backward. --> STOP')
+                self.log.error('ERROR!: The limitswitch on motor side (outside) is NOT ON after __eject(). --> STOP')
                 return False
             # power off stopper
             self.log.warn('WARNING!: Stopper set_alloff() --> STOP')
@@ -254,10 +273,8 @@ class WiregridActuatorAgent:
     ##################
 
     def check_limitswitch(self, session, params=None):
-        if params is None:
-            params = {}
-            pass
-        pinname = params.get('pinname')
+        if params is None: params = {}
+        pinname = params.get('pinname', None)
         onoffs = []
         msg = ''
         with self.lock.acquire_timeout(timeout=3, job='check_limitswitch') as acquired:
@@ -281,9 +298,7 @@ class WiregridActuatorAgent:
         return onoffs, msg
 
     def check_stopper(self, session, params=None):
-        if params is None:
-            params = {}
-            pass
+        if params is None: params = {}
         pinname = params.get('pinname')
         onoffs = []
         msg = ''
@@ -456,26 +471,40 @@ class WiregridActuatorAgent:
         # check connection
         ret, msg = self.__check_connect()
         self.log.warn(msg)
-        # reconnect
+
+        # try to reconnect if no connection 
         if ret :
-            msg = 'Did not tried to reconnect the actuator.'
+            msg = 'Did not tried to reconnect the actuator beacuase the connection is good.'
             self.log.warn(msg)
             return ret, msg
         else :
+            # get new device file
+            if params is None: params = {}
+            devfile = params.get('devfile', None)
+            if devfile is None: devfile = self.actuator_dev
+            # check device file
+            lsdev = os.listdir('/dev/')
+            self.log.warn('device files in /dev: {}'.format(lsdev))
+            if not os.path.exists(devfile) :
+                msg = 'ERROR! There is no actuator device file ({}).'.format(devfile)
+                self.log.error(msg)
+                return False, msg
+            # set device file
+            self.actuator_dev = devfile
+
+            # reconnect
             self.controlling = True
             self.log.warn('Trying to reconnect to the actuator...')
-            ret2, msg2 = self.actuator.__reconnect()
+            ret2, msg2 = self.__reconnect()
             self.controlling = False
             return ret2, msg2
 
 
     def start_acq(self, session, params=None):
-        if params is None:
-            params = {}
-            pass
+        if params is None: params = {}
 
         # Define data taking interval_time 
-        interval_time = params.get('interval-time')
+        interval_time = params.get('interval-time', None)
         # If interval-time is None, use value passed to Agent init
         if interval_time is None :
             self.log.info('Not set by parameter of "interval-time" for start_acq()')
@@ -520,6 +549,7 @@ class WiregridActuatorAgent:
                     onoff_dict_st[name] = onoff
                     pass
             else :
+                time.sleep(2.+interval_time) # wait for at least 2 sec
                 continue
                 pass
             # publish data
