@@ -94,8 +94,8 @@ class WiregridActuatorAgent:
         LSR2 = 0 # right actuator opposite limitswitch
         LSL2,LSR2 = self.limitswitch.get_onoff(pinname=['LSL2','LSR2'])
         if LSL2==0 and LSR2==0 : 
-            status, msg = self.actuator.move(distance, speedrate)
-            if status<0 : return False, msg
+            ret, msg = self.actuator.move(distance, speedrate)
+            if not ret : return False, msg
         else :
             self.log.warn('Warning! One of limit switches on opposite side (inside) is ON (LSL2={}, LSR2={})!'.format(LSL2, LSR2));
             self.log.warn('  --> Did not move.');
@@ -103,7 +103,7 @@ class WiregridActuatorAgent:
         isrun = True
         while LSL2==0 and LSR2==0 and isrun :
             LSL2,LSR2 = self.limitswitch.get_onoff(pinname=['LSL2','LSR2'])
-            isrun = self.actuator.isRun()
+            isrun, msg = self.actuator.isRun()
             if self.verbose>0 : self.log.info('LSL2={}, LSR2={}, run={}'.format(LSL2,LSR2,isrun))
             pass
         self.actuator.hold()
@@ -119,8 +119,8 @@ class WiregridActuatorAgent:
         LSR1 = 0 # right actuator limitswitch @ motor (outside)
         LSL1,LSR1 = self.limitswitch.get_onoff(pinname=['LSL1','LSR1'])
         if LSL1==0 and LSR1==0 : 
-            status, msg = self.actuator.move(-1*distance, speedrate)
-            if status<0 : return False, msg
+            ret, msg = self.actuator.move(-1*distance, speedrate)
+            if not ret : return False, msg
         else :
             self.log.warn('Warning! One of limit switches on motor side (outside) is ON (LSL1={}, LSR1={})!'.format(LSL1, LSR1));
             self.log.warn('  --> Did not move.');
@@ -128,7 +128,7 @@ class WiregridActuatorAgent:
         isrun = True
         while LSL1==0 and LSR1==0 and isrun :
             LSL1, LSR1 = self.limitswitch.get_onoff(pinname=['LSL1','LSR1'])
-            isrun = self.actuator.isRun()
+            isrun, msg = self.actuator.isRun()
             if self.verbose>0 : self.log.info('LSL1={}, LSR1={}, run={}'.format(LSL1,LSR1,isrun))
             pass
         self.actuator.hold()
@@ -440,7 +440,8 @@ class WiregridActuatorAgent:
         # This will disable move() command in Actuator class until release() is called.
         self.actuator.STOP = True 
         # Hold the actuator
-        ret = self.actuator.hold()
+        ret, msg = self.actuator.hold()
+        if not ret : return False, msg
         self.controlling = False
 
         return True, 'Finish stop()'
@@ -456,7 +457,9 @@ class WiregridActuatorAgent:
         # This will enable move() command in Actuator class.
         self.actuator.STOP = False
         # Relase the actuator
-        ret = self.actuator.release()
+        ret, msg = self.actuator.release()
+        if not ret : return False, msg
+
         self.controlling = False
 
         return True, 'Finish release()'
