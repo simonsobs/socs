@@ -1,7 +1,7 @@
 # WireGrid Encoder Agent
 
 # Use socs base image
-FROM socs:latest
+FROM simonsobs/socs:latest
 
 # Set the working directory to registry directory
 WORKDIR /app/socs/agents/wiregrid_encoder/
@@ -16,4 +16,4 @@ ENTRYPOINT ["dumb-init", "python3", "-u", "wiregrid_encoder.py"]
 CMD ["--site-hub=ws://crossbar:8001/ws", \
      "--site-http=http://crossbar:8001/call"]
 
-EXPOSE 50007/udp
+#EXPOSE 50007/udp
