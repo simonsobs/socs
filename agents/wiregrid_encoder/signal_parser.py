@@ -4,6 +4,9 @@ import select
 import time
 import numpy as np
 from collections import deque
+import txaio
+
+txaio.use_twisted()
 
 ## should be consistent with the software on beaglebone
 COUNTER_INFO_LENGTH = 100
@@ -23,6 +26,8 @@ class EncoderParser:
 
         self.data = ''
         self.read_chunk_size = read_chunk_size
+
+        self.log = txaio.make_logger()
 
     def check_once(self):
 

@@ -1,7 +1,10 @@
 import os
 import time
+from typing import Counter
 import numpy as np
 import argparse
+
+import traceback
 
 from signal_parser import EncoderParser
 
@@ -13,6 +16,11 @@ if not ON_RTD:
     pass
 
 NUM_ENCODER_TO_PUBLISH = 5000
+SEC_ENCODER_TO_PUBLISH = 10
+
+COUNTER_INFO_LENGTH = 100
+
+REFERENCE_COUNT_MAX = 2 << 15 # > that of belt on wiregrid (=nominal 52000)
 
 class WGEncoderAgent:
 
@@ -31,7 +39,10 @@ class WGEncoderAgent:
         #self.irig_time = 0
 
         agg_params = {'frame_length': 60}
-        self.agent.register_feed('WGEncoder', record=True, agg_params=agg_params, buffer_time=1)
+        self.agent.register_feed('WGEncoder_rough', record=True, agg_params=agg_params, buffer_time=0.1)
+
+        agg_params = {'frame_length': 60, 'exclude_influx': True}
+        self.agent.register_feed('WGEncoder_full', record=True, agg_params=agg_params)
 
         self.parser = EncoderParser(beaglebone_port=self.bbport)
 
@@ -57,67 +68,89 @@ class WGEncoderAgent:
             iter_counts = 0
 
             while self.take_data:
-                data = {
+                rdata = {
                         'timestamp': [],
-                        'block_name':'WGEncoder_PRU',
-                        'data':{}
-                        }
-                self.parser.grab_and_parse_data()
+                        'block_name': 'WGEncoder_rough',
+                        'data': {}
+                }
+                fdata = {
+                        'timestamp': [],
+                        'block_name': 'WGEncoder_full',
+                        'data': {}
+                }
 
-                encoder_data = self.parser.encoder_queue.popleft()
-                
-                with open('log0', 'w') as f:
-                    f.write(str(quad_data[0:3])+'\n')
-                    f.write(str(len(quad_data))+'\n')
-                    f.write(str(pru_clock[0:3])+'\n')
-                    f.write(str(len(pru_clock))+'\n')
+                try:
+                    self.parser.grab_and_parse_data()
+                except:
+                    with open('parse_log', 'a') as f:
+                        traceback.print_exc(file=f)
+                        pass
                     pass
 
-                iter_counts += 1
+                if len(self.parser.encoder_queue):
+                    encoder_data = self.parser.encoder_queue.popleft()
 
-                quad_data += encoder_data[0].tolist()
-                pru_clock += encoder_data[1].tolist()
-                ref_count += encoder_data[2].tolist()
-                error_flag += encoder_data[3].tolist()
-                received_time_list.append(encoder_data[4])
+                    iter_counts += 1
 
-                if len(quad_data) > NUM_ENCODER_TO_PUBLISH:
-                #if (time.time() - current_time) > 1.:
-
-                    with open('feed_log', 'w') as f:
-                        f.write(str(iter_counts)+'\n')
-                        f.write(str(current_time)+'\n')
-                        f.write(str(pru_clock[0])+'\n')
-                        f.write(str(ref_count[0])+'\n')
+                    with open('test0', 'w') as f:
+                        f.write('test')
                         pass
 
-                    for data_ind in range(len(pru_clock)):
+                    quad_data += encoder_data[0].tolist()
+                    pru_clock += encoder_data[1].tolist()
+                    ref_count += (encoder_data[2]%REFERENCE_COUNT_MAX).tolist()
+                    error_flag += encoder_data[3].tolist()
+                    received_time_list.append(encoder_data[4])
 
-                        data['timestamp'] = received_time_list[int(data_ind*0.01)] + 5e-6*(data_ind%100)
-                        data['data']['pru_clock'] = pru_clock[data_ind]
-                        data['data']['reference_count'] = ref_count[data_ind]
+                    if len(pru_clock) > NUM_ENCODER_TO_PUBLISH \
+                        or (len(pru_clock) and (current_time - time_encoder_published) > SEC_ENCODER_TO_PUBLISH):
 
-                        self.agent.publish_to_feed('WGEncoder', data)
+                        loop_start = time.time()
+
+                        for data_ind in range(int(len(pru_clock)/COUNTER_INFO_LENGTH)):
+
+                            rdata['timestamp']               = received_time_list[data_ind]# + 5e-6*(data_ind%COUNTER_INFO_LENGTH)
+                            rdata['data']['quadrature']      = quad_data[data_ind*COUNTER_INFO_LENGTH]
+                            rdata['data']['pru_clock']       = pru_clock[data_ind*COUNTER_INFO_LENGTH]
+                            rdata['data']['reference_count'] = ref_count[data_ind*COUNTER_INFO_LENGTH]
+                            rdata['data']['error']           = error_flag[data_ind*COUNTER_INFO_LENGTH]
+
+                            self.agent.publish_to_feed('WGEncoder_rough', rdata)
+                            pass
+
+                        loop_stop = time.time()
+
+                        fdata['timestamp']                   = received_time_list
+                        fdata['data']['quadrature']          = quad_data
+                        fdata['data']['pru_clock']           = pru_clock
+                        fdata['data']['reference_count']     = ref_count
+                        fdata['data']['error']               = error_flag
+
+                        self.agent.publish_to_feed('WGEncoder_full', fdata)
+
+                        with open('feed_log', 'w') as f:
+                            f.write(str(iter_counts)+'\n')
+                            f.write('current_time:'+str(current_time)+'\n')
+                            f.write('pru_clock[0]:'+str(pru_clock[0])+'\n')
+                            f.write('loop time:'+str(loop_stop - loop_start)+'\n')
+                            pass
+
+                        quad_data = []
+                        pru_clock = []
+                        ref_count = []
+                        error_flag = []
+                        received_time_list = []
+
+                        time_encoder_published = current_time
+
+                        current_time = time.time()
+                        time.sleep(0.05)
                         pass
-
-                    #data['timestamp'] = current_time
-                    #data['data']['pru_clock'] = pru_clock[0]
-                    #data['data']['reference_count'] = ref_count[0]
-                    
-                    quad_data = []
-                    pru_clock = []
-                    ref_count = []
-                    error_flag = []
-                    received_time_list = []
-
-                    time_encoder_published = current_time
-
-                    current_time = time.time()
-                    time.sleep(1)
                     pass
                 pass
 
-        self.agent.feeds['WGEncoder'].flush_buffer()
+        self.agent.feeds['WGEncoder_rough'].flush_buffer()
+        self.agent.feeds['WGEncoder_full'].flush_buffer()
 
         return True, 'Acquisition exited cleanly.'
 
