@@ -124,6 +124,7 @@ Example docker-compose configuration::
   ocs-bluefors:
     image: simonsobs/ocs-bluefors-agent:latest
     hostname: ocs-docker
+    network_mode: "host"
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
       - /home/simonsobs/bluefors/logs/:/logs:ro
@@ -132,6 +133,8 @@ Example docker-compose configuration::
       FRAME_LENGTH: 600
       STALE_TIME: 2
       MODE: "follow"
+    command:
+      - "--instance-id=bluefors"
 
 Depending on how you are running your containers it might be easier to hard
 code the `OCS_CONFIG_DIR` environment variable.
