@@ -14,15 +14,15 @@ if not ON_RTD:
     from ocs.ocs_twisted import TimeoutLock
     pass
 
-NUM_ENCODER_TO_PUBLISH = 5000
-SEC_ENCODER_TO_PUBLISH = 10
+NUM_ENCODER_TO_PUBLISH = 1000
+SEC_ENCODER_TO_PUBLISH = 2
 
 COUNTER_INFO_LENGTH = 100
 
 COUNTS_ON_BELT = 52000
 REFERENCE_COUNT_MAX = 2 << 15 # > that of belt on wiregrid (=nominal 52000)
 
-SLEEP=0.4
+SLEEP=0.1
 #SLEEP=1
 
 class WGEncoderAgent:
@@ -122,7 +122,7 @@ class WGEncoderAgent:
                     irg_fdata['data']['irig_synch_pulse_clock_time'] = list(irig_time + 0.09 + np.arange(10) * 0.1)
                     irg_fdata['data']['irig_synch_pulse_clock_counts'] = synch_pulse_clock_counts
                     irg_fdata['data']['irig_info'] = list(irig_info)
-                    self.agent.publish_to_feed('WGEncoder_full', irg_fdata)
+                    #self.agent.publish_to_feed('WGEncoder_full', irg_fdata)
                     pass
 
                 if len(self.parser.encoder_queue):
@@ -136,6 +136,8 @@ class WGEncoderAgent:
                     error_flag += encoder_data[3].tolist()
                     received_time_list.append(encoder_data[4])
                     #received_time_list += [encoder_data[4]] * len(pru_clock)
+
+                    current_time = time.time()
 
                     shared_time = received_time_list[-1]
                     shared_position = ref_count[-1]
@@ -156,13 +158,24 @@ class WGEncoderAgent:
                     if len(pru_clock) > NUM_ENCODER_TO_PUBLISH \
                         or (len(pru_clock) and (current_time - time_encoder_published) > SEC_ENCODER_TO_PUBLISH):
 
+                        dclock = (pru_clock[-1] - pru_clock[-COUNTER_INFO_LENGTH])*5e-9
+
+                        if (dclock > 0.) and (ref_count[-COUNTER_INFO_LENGTH] > ref_count[-1]):
+                            ddeg = (ref_count[-1] + COUNTS_ON_BELT - ref_count[-COUNTER_INFO_LENGTH])*360/COUNTS_ON_BELT
+                            pass
+                        else:
+                            ddeg = (ref_count[-1] - ref_count[-COUNTER_INFO_LENGTH])*360/COUNTS_ON_BELT
+                            pass
+
                         for data_ind in range(int(len(pru_clock)/COUNTER_INFO_LENGTH)):
                             enc_rdata['timestamp']               = received_time_list[data_ind]# + 5e-6*(data_ind%COUNTER_INFO_LENGTH)
                             enc_rdata['data']['quadrature']      = quad_data[data_ind*COUNTER_INFO_LENGTH]
                             enc_rdata['data']['pru_clock']       = pru_clock[data_ind*COUNTER_INFO_LENGTH]
                             enc_rdata['data']['reference_count'] = ref_count[data_ind*COUNTER_INFO_LENGTH]*360/COUNTS_ON_BELT
                             enc_rdata['data']['error']           = error_flag[data_ind*COUNTER_INFO_LENGTH]
+
                             enc_rdata['data']['ave_count']       = np.mean(ref_count)
+                            enc_rdata['data']['speed']           = ddeg/dclock
                             self.agent.publish_to_feed('WGEncoder_rough', enc_rdata)
                             pass
 
@@ -190,7 +203,6 @@ class WGEncoderAgent:
 
                         time_encoder_published = current_time
 
-                        current_time = time.time()
                         time.sleep(SLEEP)
                         pass
                     pass
