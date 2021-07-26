@@ -289,9 +289,12 @@ class Actuator:
 
 
     def __setActuatorParameters(self) :
-        self.__sendCommand('$100=26.667') # step/mm X-axis (not used)
-        self.__sendCommand('$101=26.667') # step/mm Y-axis
-        self.__sendCommand('$102=26.667') # step/mm Z-axis (not used)
+        #self.__sendCommand('$100=26.667') # step/mm X-axis (not used)
+        #self.__sendCommand('$101=26.667') # step/mm Y-axis
+        #self.__sendCommand('$102=26.667') # step/mm Z-axis (not used)
+        self.__sendCommand('$100=22.220') # step/mm X-axis (not used)
+        self.__sendCommand('$101=22.220') # step/mm Y-axis
+        self.__sendCommand('$102=22.220') # step/mm Z-axis (not used)
         self.__sendCommand('$110=1000') # speed [mm/min] X-axis (not used)
         self.__sendCommand('$111=1000') # speed [mm/min] Y-axis
         self.__sendCommand('$112=1000') # speed [mm/min] Z-axis (not used)

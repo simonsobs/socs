@@ -241,31 +241,44 @@ class PMX:
 
         return msg
 
-    def turn_on(self):
+    def turn_on(self,notmakesure=False):
         """ Turn the PMX on """
-        self.clean_serial()
-        self.ser.write(str.encode("OUTP ON\n\r"))
-        self.wait()
-        self.ser.write(str.encode("OUTP?\n\r"))
-        self.wait()
-        val = self.ser.readline()
-        msg = "Output state = %s" % (val)
-        print(msg)
+        if notmakesure == True:
+            self.clean_serial()
+            self.ser.write(str.encode("OUTP ON\n\r"))
+            msg = "PMX turned ON perhaps"
+            print(msg)
+            pass
+        else:
+            self.clean_serial()
+            self.ser.write(str.encode("OUTP ON\n\r"))
+            self.wait()
+            self.ser.write(str.encode("OUTP?\n\r"))
+            self.wait()
+            val = self.ser.readline()
+            msg = "\nOutput state = %s" % (val)
+            print(msg)
+            return msg
+            pass
 
-        return msg
-
-    def turn_off(self):
+    def turn_off(self,notmakesure=False):
         """ Turn the PMX off """
-        self.clean_serial()
-        self.ser.write(str.encode("OUTP OFF\n\r"))
-        self.wait()
-        self.ser.write(str.encode("OUTP?\n\r"))
-        self.wait()
-        val = self.ser.readline()
-        msg = "Output state = %s" % (val)
-        print(msg)
-
-        return msg
+        if notmakesure == True:
+            self.clean_serial()
+            self.ser.write(str.encode("OUTP OFF\n\r"))
+            msg = "PMX turned OFF perhaps"
+            print(msg)
+            pass
+        else:
+            self.clean_serial()
+            self.ser.write(str.encode("OUTP OFF\n\r"))
+            self.wait()
+            self.ser.write(str.encode("OUTP?\n\r"))
+            self.wait()
+            val = self.ser.readline()
+            msg = "\nOutput state = %s" % (val)
+            print(msg)
+            return msg
 
     # ***** Helper Methods *****
     def __conn(self, rtu_port=None, tcp_ip=None, tcp_port=None, timeout=None):

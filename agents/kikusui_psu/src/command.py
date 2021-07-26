@@ -81,7 +81,7 @@ class Command:
         argv = arg.split()
         #if len(args) > 0:
             #value = float(args[0])
-        
+
         while len(argv):
             cmd = str(argv.pop(0)).upper()
             # No command
@@ -110,10 +110,10 @@ class Command:
                 return self._PMX.check_output()
             # Turn output state ON
             elif cmd == self._cmds["set_on"]:
-                return self._PMX.turn_on()
+                return self._PMX.turn_on(notmakesure=True)
             # Turn output state OFF
             elif cmd == self._cmds["set_off"]:
-                return self._PMX.turn_off()
+                return self._PMX.turn_off(notmakesure=True)
             # Get HELP
 
             #elif cmd == self._cmds["set_v"]:

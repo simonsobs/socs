@@ -1,4 +1,6 @@
 import sys, os, argparse, time
+import numpy as np
+import traceback
 
 this_dir = os.path.dirname(__file__)
 sys.path.append(
@@ -9,7 +11,6 @@ import command as cm
 
 from ocs import ocs_agent, site_config, client_t
 from ocs.ocs_twisted import TimeoutLock
-
 class KikusuiAgent:
     def __init__(self, agent, kikusui_ip, kikusui_port):
         self.agent = agent
@@ -22,6 +23,18 @@ class KikusuiAgent:
         self.wait_loop = 100 # Max number of loop in __wait_control
         self.kikusui_ip = kikusui_ip
         self.kikusui_port = int(kikusui_port)
+
+        self.position_path = '/data/wg-data/position.log'
+
+        self.open_trial = 10
+        self.Deg = 360/52000
+        self.feedback_time = [0.181, 0.221, 0.251, 0.281, 0.301]
+        self.feedback_cut = [0.5, 2.5, 4.5, 6.0, 7.0]
+        self.operation_time = 0.401
+        self.feedback_steps = 8
+        self.num_laps = 2
+        self.stopped_time = 30
+        self.agent_interval = 0.2
 
         agg_params = {'frame_length': 60}
         self.agent.register_feed('kikusui_psu', record = True, agg_params = agg_params)
@@ -92,7 +105,7 @@ class KikusuiAgent:
         msg = 'Failed to wait for getting the control. Exceed max. number of Waiting loop. (max={})'.format(self.wait_loop)
         self.log.warn(msg)
         return False
- 
+
     def set_on(self, session, params = None):
         with self.lock.acquire_timeout(0, job = 'set_on') as acquired:
             if not acquired:
@@ -102,7 +115,6 @@ class KikusuiAgent:
             # wait for getting control
             ret = self.__wait_control()
             if ret :
-                self.switching = True
                 self.cmd.user_input('on')
                 self.switching = False
             else :
@@ -123,7 +135,6 @@ class KikusuiAgent:
             # wait for getting control
             ret = self.__wait_control()
             if ret :
-                self.switching = True
                 self.cmd.user_input('off')
                 self.switching = False
             else :
@@ -134,6 +145,150 @@ class KikusuiAgent:
             pass
 
         return True, 'Set Kikusui off'
+
+    def calibrate_itself(self, session, params = None):
+
+        with self.lock.acquire_timeout(0, job = 'set_off') as acquired:
+            if not acquired:
+                self.log.warn('Could not calibrate itself because {} is already running'.format(self.lock.job))
+                return False, 'Could not acquire lock'
+
+        cycle = 1
+        for i in range(11):
+            tperiod = 0.10 + 0.02*i
+            for j in range(100):
+                if j%20 == 0:
+                    self.log.warn(f'this is {cycle}th time action')
+                    pass
+                self.rotate_alittle(tperiod)
+                time.sleep(self.agent_interval+1.)
+                self.rotate_alittle(0.70)
+                time.sleep(self.agent_interval)
+                cycle += 1
+                pass
+            pass
+
+        return True, 'Micro step rotation of wire grid finished. Please calibrate and take feedback params.'
+
+    def emit_stepwise_signals(self, session, params = None):
+        if params == None:
+            params = {'feedback_steps': 8, 'num_laps': 1, 'stopped_time': 20, 'feedback_time': [0.181, 0.221, 0.251, 0.281, 0.301]}
+            pass
+
+        with self.lock.acquire_timeout(0, job = 'set_off') as acquired:
+            if not acquired:
+                self.log.warn('Could not emit polarized signals because {} is already running'.format(self.lock.job))
+                return False, 'Could not acquire lock'
+
+        self.feedback_steps = params['feedback_steps']
+        self.num_laps = params['num_laps']
+        self.stopped_time = params['stopped_time']
+        self.feedback_time = params['feedback_time']
+
+        for i in range(self.num_laps*16):
+            self.move_next(self.feedback_steps, self.feedback_time)
+            time.sleep(self.stopped_time)
+            pass
+
+        return True, 'Step-wise rotation finished'
+
+    def move_next(self, feedback_steps, feedback_time): # each value can be changed
+        wanted_angle = 22.5
+        uncertaity_cancel = 3
+        absolute_position = np.arange(0,360,wanted_angle)
+
+        start_position = self.get_position(self.position_path, self.open_trial, self.Deg)
+        if (360 < start_position + uncertaity_cancel):
+            goal_position = wanted_angle
+            pass
+        elif absolute_position[-1] < start_position + uncertaity_cancel:
+            goal_position = 0
+            pass
+        else:
+            goal_position = min(absolute_position[np.where(start_position + uncertaity_cancel < absolute_position)[0]])
+            pass
+
+        with open('feedback.log', 'a') as f:
+            f.write('start: {}, goal: {}\n'.format(round(start_position,3), round(goal_position,3)))
+            pass
+
+        self.rotate_alittle(feedback_time[-1]+0.1)
+        time.sleep(self.agent_interval)
+
+        for l in range(feedback_steps):
+            mid_position = self.get_position(self.position_path, self.open_trial, self.Deg)
+            if goal_position + wanted_angle < mid_position:
+                self.operation_time = self.get_exectime(goal_position - (mid_position - 360), self.feedback_cut, feedback_time)
+                pass
+            else:
+                self.operation_time = self.get_exectime(goal_position - mid_position, self.feedback_cut, feedback_time)
+                pass
+
+            with open('operation_time.log', 'a') as f:
+                f.write(str(l)+':'+str(round(mid_position,3))+' '+str(self.operation_time)+'\n')
+                pass
+
+            self.rotate_alittle(self.operation_time)
+            time.sleep(self.agent_interval)
+            pass
+
+    def rotate_alittle(self, operation_time):
+        ret = self.__wait_control()
+        if ret:
+            if operation_time != 0.:
+                self.cmd.user_input('on')
+                time.sleep(operation_time)
+                self.cmd.user_input('off')
+                pass
+            self.switching = False
+            pass
+        else:
+            msg = 'Could not rotate because of failure in getting the control.'
+            self.log.warn(msg)
+            return False, msg
+            pass
+        pass
+
+    def get_position(self, position_path, open_trial, Deg):
+        try:
+            for i in range(open_trial):
+                with open(position_path) as f:
+                    position_data = f.readlines()
+                    position = position_data[-1].split(' ')[1].replace('\n','')
+                    if len(position) != 0:
+                        break
+                    pass
+                pass
+            pass
+        except:
+            with open('file_open_error.log','a') as f:
+                traceback.print_exc(file=f)
+                pass
+            self.log.warn('Failed ENCODER POSITION FILE')
+            pass
+
+        return int(position)*Deg
+
+    def get_exectime(self, position_difference, feedback_cut, feedback_time):
+        if position_difference >= feedback_cut[4]:
+            operation_time = feedback_time[4]
+            pass
+        if (feedback_cut[4] > position_difference) & (position_difference >= feedback_cut[3]):
+            operation_time = feedback_time[3]
+            pass
+        if (feedback_cut[3] > position_difference) & (position_difference >= feedback_cut[2]):
+            operation_time = feedback_time[2]
+            pass
+        if (feedback_cut[2] > position_difference) & (position_difference >= feedback_cut[1]):
+            operation_time = feedback_time[1]
+            pass
+        if (feedback_cut[1] > position_difference) & (position_difference >= feedback_cut[0]):
+            operation_time = feedback_time[0]
+            pass
+        if feedback_cut[0] > position_difference:
+            operation_time = 0.
+            pass
+        return operation_time
 
     def set_c(self, session, params = None):
         if params == None:
@@ -147,8 +302,13 @@ class KikusuiAgent:
             # wait for getting control
             ret = self.__wait_control()
             if ret :
-                self.switching = True
-                self.cmd.user_input('C {}'.format(params['current']))
+                if params['current'] <= 3. and 0. <= params['current']:
+                    self.cmd.user_input('C {}'.format(params['current']))
+                    pass
+                else:
+                    self.log.warn('Value Error: set current 3.0 A or less. Now set to 3.0 A')
+                    self.cmd.user_input('C {}'.format(3.0))
+                    pass
                 self.switching = False
             else :
                 msg = 'Could not set c because of failure in getting the control.'
@@ -172,8 +332,13 @@ class KikusuiAgent:
             # wait for getting control
             ret = self.__wait_control()
             if ret :
-                self.switching = True
-                self.cmd.user_input('V {}'.format(params['volt']))
+                if params['volt'] == 12.:
+                    self.cmd.user_input('V {}'.format(params['volt']))
+                    pass
+                else:
+                    self.log.warn('Value Error: Rated Voltage of the motor is 12 V. Now set to 12 V')
+                    self.cmd.user_input('V {}'.format(12.))
+                    pass
                 self.switching = False
             else :
                 msg = 'Could not set v because of failure in getting the control.'
@@ -200,7 +365,6 @@ class KikusuiAgent:
             # wait for getting control
             ret = self.__wait_control()
             if ret :
-                self.switching = True
                 # check connection
                 ret, msg = self.__check_connect()
                 if not ret :
@@ -228,12 +392,12 @@ class KikusuiAgent:
                 return False, 'Could not acquire lock'
 
             session.set_status('running')
-        
+
         self.take_data = True
 
         while self.take_data:
             data = {'timestamp': time.time(), 'block_name': 'Kikusui_IV', 'data': {}}
-            
+
             if not self.switching:
                 self.switching2 = True;
                 # check connection
@@ -294,7 +458,7 @@ if __name__ == '__main__':
 
     site_config.reparse_args(args, 'KikusuiAgent')
     agent, runner = ocs_agent.init_site_agent(args)
-    kikusui_agent = KikusuiAgent(agent, kikusui_ip = args.kikusui_ip, 
+    kikusui_agent = KikusuiAgent(agent, kikusui_ip = args.kikusui_ip,
                                           kikusui_port = args.kikusui_port)
     agent.register_process('IV_acq', kikusui_agent.start_IV_acq,
                            kikusui_agent.stop_IV_acq, startup = True)
@@ -303,6 +467,7 @@ if __name__ == '__main__':
     agent.register_task('set_c', kikusui_agent.set_c)
     agent.register_task('set_v', kikusui_agent.set_v)
     agent.register_task('get_vc',kikusui_agent.get_vc)
+    agent.register_task('calibrate_wg',kikusui_agent.calibrate_itself)
+    agent.register_task('stepwise_rotation', kikusui_agent.emit_stepwise_signals)
 
     runner.run(agent, auto_reconnect = True)
-
