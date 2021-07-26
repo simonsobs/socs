@@ -19,6 +19,9 @@ class Actuator:
         self.maxwaitloop = 10
         self.maxwaitloop_for_read = 1000
 
+        self.Fmax =2000
+        self.Fmin =   0
+
         # Open serial communication
         self.ser = None
         self.ser = serial.Serial(
@@ -61,9 +64,7 @@ class Actuator:
             print("Actuator:move() : WARNING! Speedrate is sed to 0.1.")
             speedrate = 0.1
             pass
-        Fmax =1000
-        Fmin =   0
-        speed = int(speedrate * (Fmax-Fmin) + Fmin)
+        speed = int(speedrate * (self.Fmax-self.Fmin) + self.Fmin)
         cmd  = '$J=G91 F{:d} Y{:d}'.format(speed,distance)
         ret = self.__sendCommand(cmd)
         if not ret :
@@ -295,9 +296,9 @@ class Actuator:
         self.__sendCommand('$100=22.220') # step/mm X-axis (not used)
         self.__sendCommand('$101=22.220') # step/mm Y-axis
         self.__sendCommand('$102=22.220') # step/mm Z-axis (not used)
-        self.__sendCommand('$110=1000') # speed [mm/min] X-axis (not used)
-        self.__sendCommand('$111=1000') # speed [mm/min] Y-axis
-        self.__sendCommand('$112=1000') # speed [mm/min] Z-axis (not used)
+        self.__sendCommand('$110={}'.format(self.Fmax)) # speed [mm/min] X-axis (not used)
+        self.__sendCommand('$111={}'.format(self.Fmax)) # speed [mm/min] Y-axis
+        self.__sendCommand('$112={}'.format(self.Fmax)) # speed [mm/min] Z-axis (not used)
         self.__sendCommand('$120=10') # accel. [mm/sec^2] X-axis (not used)
         self.__sendCommand('$121=10') # accel. [mm/sec^2] Y-axis
         self.__sendCommand('$122=10') # accel. [mm/sec^2] Z-axis (not used)

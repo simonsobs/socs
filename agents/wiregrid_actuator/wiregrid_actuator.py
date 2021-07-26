@@ -87,7 +87,16 @@ class WiregridActuatorAgent:
             self.actuator = None
             return False, msg
 
+    
+    # Power off stopper
+    def __stopper_off(self) :
+        if self.stopper.set_alloff() < 0 : 
+            self.log.error('ERROR!: Stopper set_alloff()')
+            return  False
+        return True
 
+
+    # Return True/False, message, limitswitch ON/OFF
     def __forward(self, distance, speedrate=0.1):
         distance = abs(distance)
         LSL2 = 0 # left  actuator opposite limitswitch
@@ -107,11 +116,12 @@ class WiregridActuatorAgent:
             if self.verbose>0 : self.log.info('LSL2={}, LSR2={}, run={}'.format(LSL2,LSR2,isrun))
             pass
         self.actuator.hold()
-        if LSL2 or LSR2 :
+        LSonoff = LSL2 or LSR2
+        if LSonoff :
             self.log.info('Stopped moving because one of limit switches on opposite side (inside) is ON (LSL2={}, LSR2={})!'.format(LSL2, LSR2))
             pass
         self.actuator.release()
-        return True, 'Finish forward(distance={}, speedrate={})'.format(distance, speedrate)
+        return True, 'Finish forward(distance={}, speedrate={}, limitswitch={})'.format(distance, speedrate,LSonoff), LSonoff
 
     def __backward(self, distance, speedrate=0.1):
         distance = abs(distance)
@@ -132,11 +142,12 @@ class WiregridActuatorAgent:
             if self.verbose>0 : self.log.info('LSL1={}, LSR1={}, run={}'.format(LSL1,LSR1,isrun))
             pass
         self.actuator.hold()
-        if LSL1 or LSR1 :
+        LSonoff = LSL1 or LSR1
+        if LSonoff :
             self.log.info('Stopped moving because one of limit switches on motor side (outside) is ON (LSL1={}, LSR1={})!'.format(LSL1, LSR1))
             pass
         self.actuator.release()
-        return True, 'Finish backward(distance={}, speedrate={})'.format(distance, speedrate)
+        return True, 'Finish backward(distance={}, speedrate={}, limitswitch={})'.format(distance, speedrate, LSonoff), LSonoff
 
 
     def  __insert(self, main_distance=850, main_speedrate=1.0):
@@ -175,21 +186,25 @@ class WiregridActuatorAgent:
             if self.stopper.set_allon() < 0 : 
                 self.log.error('ERROR!: Stopper set_allon() --> STOP')
                 return False
-            # forward a bit
-            status, msg  = self.__forward(20, speedrate=0.1)
+            # first small forward
+            status, msg, LSonoff  = self.__forward(20, speedrate=0.1)
             if not status : 
                 self.log.error('ERROR!:(in first forwarding) {}'.format(msg))
+                if not self.__stopper_off() : return False
                 return False
+            if LSonoff :
+                self.log.warn('WARNING!: Limit switch is ON after first forwarding. --- {}'.format(msg))
+                if not self.__stopper_off() : return False
+                return True
             # check limitswitch
             LSL1,LSR1 = self.limitswitch.get_onoff(pinname=['LSL1','LSR1'])
             #print('LSL1,LSR1',LSL1,LSR1);
             if LSL1==1 or LSR1==1 :
                 self.log.error('ERROR!: The limitswitch on motor side is NOT OFF after moving forward without stopper.--> STOP')
+                if not self.__stopper_off() : return False
                 return False
             # power off stopper
-            if self.stopper.set_alloff() < 0 : 
-                self.log.error('ERROR!: Stopper set_alloff() --> STOP')
-                return  False
+            if not self.__stopper_off() : return False
             # check stopper
             while True :
                 onoff_st = self.stopper.get_onoff()
@@ -198,18 +213,19 @@ class WiregridActuatorAgent:
                 pass
             time.sleep(1)
             # main forward
-            status, msg = self.__forward(main_distance, speedrate=main_speedrate)
+            status, msg, LSonoff = self.__forward(main_distance, speedrate=main_speedrate)
             if not status : 
                 self.log.error('ERROR!:(in main forwarding) {}'.format(msg))
                 return False
-            # last forward
-            status, msg = self.__forward(200, speedrate=0.1)
+            if LSonoff :
+                self.log.warn('WARNING!: Limit switch is ON after main forwarding. --- {}'.format(msg))
+                return True
+            # last slow forward
+            status, msg, LSonoff = self.__forward(200, speedrate=0.1)
             if not status : 
                 self.log.error('ERROR!:(in last forwarding) {}'.format(msg))
                 return False
-            # check limitswitch
-            LSL2,LSR2 = self.limitswitch.get_onoff(pinname=['LSL2','LSR2'])
-            if LSL2==0 and LSR2==0 :
+            if LSonoff==0 :
                 self.log.error('ERROR!: The limitswitch on opposite side is NOT ON after __insert(). --> STOP')
                 return False
             return True
@@ -234,11 +250,16 @@ class WiregridActuatorAgent:
             if self.stopper.set_allon() < 0 : 
                 self.log.error('ERROR!: Stopper set_allon() --> STOP')
                 return False
-            # backward a bit
-            status, msg = self.__backward(20, speedrate=0.1)
+            # first small backward
+            status, msg, LSonoff = self.__backward(20, speedrate=0.1)
             if not status : 
                 self.log.error('ERROR!:(in first backwarding) {}'.format(msg))
+                if not self.__stopper_off() : return False
                 return False
+            if LSonoff :
+                self.log.warn('WARNING!: Limit switch is ON after first backwarding. --- {}'.format(msg))
+                if not self.__stopper_off() : return False
+                return True
             # check limitswitch
             LSL2,LSR2 = self.limitswitch.get_onoff(pinname=['LSL2','LSR2'])
             if LSL2==1 or LSR2==1 :
@@ -246,25 +267,27 @@ class WiregridActuatorAgent:
                 return False
             time.sleep(1)
             # main backward
-            status, msg = self.__backward(main_distance, speedrate=main_speedrate)
+            status, msg, LSonoff = self.__backward(main_distance, speedrate=main_speedrate)
             if not status : 
                 self.log.error('ERROR!:(in main backwarding) {}'.format(msg))
+                if not self.__stopper_off() : return False
                 return False
-            # last backward
+            if LSonoff :
+                self.log.warn('WARNING!: Limit switch is ON after main backwarding. --- {}'.format(msg))
+                if not self.__stopper_off() : return False
+                return True
+            # last slow backward
             status, msg = self.__backward(200, speedrate=0.1)
             if not status : 
                 self.log.error('ERROR!:(in last backwarding) {}'.format(msg))
+                if not self.__stopper_off() : return False
                 return False
-            # check limitswitch
-            LSL1,LSR1 = self.limitswitch.get_onoff(pinname=['LSL1','LSR1'])
-            if LSL1==0 and LSR1==0 :
+            if LSonoff==0 :
                 self.log.error('ERROR!: The limitswitch on motor side (outside) is NOT ON after __eject(). --> STOP')
+                if not self.__stopper_off() : return False
                 return False
             # power off stopper
-            self.log.warn('WARNING!: Stopper set_alloff() --> STOP')
-            if self.stopper.set_alloff() < 0 : 
-                self.log.error('ERROR!: Stopper set_alloff() --> STOP')
-                return  False
+            if not self.__stopper_off() : return False
             return True
 
 

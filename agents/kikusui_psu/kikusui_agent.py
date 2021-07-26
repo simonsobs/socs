@@ -33,7 +33,7 @@ class KikusuiAgent:
         self.operation_time = 0.401
         self.feedback_steps = 8
         self.num_laps = 2
-        self.stopped_time = 30
+        self.stopped_time = 10
         self.agent_interval = 0.2
 
         agg_params = {'frame_length': 60}
@@ -172,7 +172,7 @@ class KikusuiAgent:
 
     def emit_stepwise_signals(self, session, params = None):
         if params == None:
-            params = {'feedback_steps': 8, 'num_laps': 1, 'stopped_time': 20, 'feedback_time': [0.181, 0.221, 0.251, 0.281, 0.301]}
+            params = {'feedback_steps': 8, 'num_laps': 1, 'stopped_time': 10, 'feedback_time': [0.181, 0.221, 0.251, 0.281, 0.301]}
             pass
 
         with self.lock.acquire_timeout(0, job = 'set_off') as acquired:
