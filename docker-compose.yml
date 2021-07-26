@@ -155,11 +155,4 @@ services:
     image: "ocs-wg-kikusui"
     build: ./agents/wiregrid_kikusui/
 
-  # --------------------------------------------------------------------------
-  # Wiregrid encoder agent
-  # --------------------------------------------------------------------------
-  ocs-wg-encoder:
-    image: "ocs-wg-encoder"
-    build: ./agents/wiregrid_encoder/
-
 
