@@ -10,7 +10,6 @@ ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 
 if not ON_RTD:
     from ocs import ocs_agent, site_config
-    from ocs.ocs_twisted import TimeoutLock
 
 
 class FIRFilter:
@@ -69,7 +68,6 @@ class FocalplaneConfig:
     def grid(cls, xdim, ydim, ygap=0):
         fp = cls()
         xs, ys = range(xdim), range(ydim)
-        cmap = "red_cmap"
         i = 0
         for y in ys:
             for x in xs:
@@ -136,7 +134,6 @@ class FocalplaneConfig:
 
     @classmethod
     def from_wafer_file(cls, wafer_file, wafer_scale=50):
-        import copy
         import quaternionarray as qa
         import toml
 
@@ -224,29 +221,63 @@ class MagpieAgent:
         self.demod_filter = FIRFilter.butter_lowpass(1, 200., order=4)
         self.demod_freq = 4
 
-    def set_scale(self, session, params={}):
+    def set_scale(self, session, params=None):
+        """
+        Task to set the scaling factor by which timestreams should be
+        multiplied by. This is currently necessary while we are still fine
+        tuning the color scale, we may soon be able to remove it.
+
+        Args:
+            scale (float):
+                scale factor to multiple det timestreams before sending to
+                lyrebird
+        """
+        if params is None:
+            params = {}
         self.scale = params['scale']
         return True, f"Set scale to {self.scale}"
 
-    def zero_dets(self, session, params={}):
+    def zero_dets(self, session, params=None):
+        """
+        Task to zero out detector timestreams if they've drifted too far,
+        messing up the color scale. Again, this might not be needed if we
+        improve how the color mapping of detector data.
+        """
         self.zero_flag = True
         return True, "Zeroing detectors"
 
-    def set_target_rate(self, session, params={}):
+    def set_target_rate(self, session, params=None):
         """
-        Args
-        ----
-        target_rate : float
-            Target sample rate for lyrebird (Hz)
+        Sets the target downsampled sample-rate of the data sent to lyrebird
+
+        Args:
+            target_rate : float
+                Target sample rate for lyrebird (Hz)
         """
+        if params is None:
+            params = {}
         self.target_rate = params['target_rate']
         return True, f'Set target rate to {self.target_rate}'
 
-    def set_demod(self, session, params={}):
+    def set_demod(self, session, params=None):
+        """
+        Sets demodulation parameters. Detector demodulation is still in
+        development and needs more testing.
+
+        Args:
+            state (bool, optional):
+                Enables or disables the demod filters
+            freq (float, optional):
+                Sets the demodulation frequency
+            lowpass_order: (int, optional):
+                Sets the order of the demod filter
+        """
+        if params is None:
+            params = {}
         if 'state' in params:
             self.demodulate = params['state']
         if 'freq' in params:
-            self.demodulate = params['freq']
+            self.demod_freq = params['freq']
         if ('lowpass_order' in params) or ('lowpass_cutoff'):
             order = params.get('lowpass_order', 4)
             cutoff = params.get('lowpass_cutoff', 1)

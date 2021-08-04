@@ -119,3 +119,9 @@ Docker-compose entry for the K2SO system::
         command:
             - "--site-hub=ws://${CB_HOST}:8001/ws"
             - "--site-http=http://${CB_HOST}:8001/call"
+
+Agent API
+---------
+
+.. autoclass:: agents.magpie.magpie_agent.MagpieAgent
+   :members: set_scale, zero_dets, set_target_rate, set_demod, run
