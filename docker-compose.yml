@@ -153,4 +153,4 @@ services:
   # --------------------------------------------------------------------------
   ocs-honeywell-HMR23000-agent:
       image: "ocs-honeywell-HMR2300"
-      build: ./agents/honeywell-HMR2300/
+      build: ./agents/honeywell_HMR2300/
