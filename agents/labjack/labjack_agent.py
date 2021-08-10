@@ -8,6 +8,9 @@ import csv
 from scipy.interpolate import interp1d
 import numpy as np
 import txaio
+
+from socs.signal_processing import FIRFilter
+
 txaio.use_twisted()
 
 ON_RTD = os.environ.get('READTHEDOCS') == 'True'
@@ -154,7 +157,8 @@ class LabJackFunctions:
 # LabJack agent class
 class LabJackAgent:
     def __init__(self, agent, ip_address, active_channels, function_file,
-                 sampling_frequency):
+                 sampling_frequency, enable_filter=False, lowpass_order=5,
+                 lowpass_cutoff=200., downsample_factor=1):
         self.active = True
         self.agent = agent
         self.log = agent.log
@@ -163,6 +167,12 @@ class LabJackAgent:
         self.module = None
         self.ljf = LabJackFunctions()
         self.sampling_frequency = sampling_frequency
+
+        # Filtering params
+        self.enable_filter = enable_filter
+        self.lowpass_order = lowpass_order
+        self.lowpass_cutoff = lowpass_cutoff
+        self.downsample_factor = downsample_factor
 
         # Labjack channels to read
         if active_channels == 'T7-all':
@@ -244,12 +254,21 @@ class LabJackAgent:
 
     def start_acq(self, session, params=None):
         """
-        Task to start data acquisition.
+        Task to start data acquisition. All parameters will default to those
+        in site-config entry if specified. If unspecified, will default to
+        the vaules below.
 
         Args:
             sampling_frequency (float):
                 Sampling frequency for data collection. Defaults to 2.5 Hz
-
+            enable_filter (bool):
+                Whether to enable the lowpass filter. Defaults to False.
+            lowpass_order (int):
+                Order of butterworth lowpasss filter. Defaults to 5
+            lowpass_cutoff (float):
+                Cutoff frequency for lowpass filter. Defaults to 200 Hz.
+            downsample_factor (int):
+                Factor to downsample data. Defaults to 1 (not downsampled).
         """
         if params is None:
             params = {}
@@ -261,6 +280,17 @@ class LabJackAgent:
         scans_per_read = max(1, int(scan_rate_input))
         num_chs = len(self.chs)
         ch_addrs = ljm.namesToAddresses(num_chs, self.chs)[0]
+
+        ### Filter stuff if specified
+        enable_filter = params.get('enable_filter', self.enable_filter)
+        lowpass_order = params.get('lowpass_order', self.lowpass_order)
+        lowpass_cutoff = params.get('lowpass_cutoff', self.lowpass_cutoff)
+        downsample_factor = params.get('downsample_factor',
+                                       self.downsample_factor)
+        downsample_mask = np.zeros(scans_per_read)
+        lowpass_filter = FIRFilter.butter_lowpass(
+            lowpass_cutoff, scan_rate_input, order=lowpass_order,
+            nchans=num_chs)
 
         with self.lock.acquire_timeout(0, job='acq') as acquired:
             if not acquired:
@@ -284,7 +314,9 @@ class LabJackAgent:
                                              ch_addrs, scan_rate_input)
             self.log.info(f"\nStream started with a scan rate of {scan_rate} Hz.")
 
-            cur_time = time.time()
+            t0 = time.time()
+            read_period = scans_per_read / scan_rate
+
             while self.take_data:
                 data = {
                     'block_name': 'sens',
@@ -293,11 +325,17 @@ class LabJackAgent:
 
                 # Query the labjack
                 raw_output = ljm.eStreamRead(self.handle)
-                output = raw_output[0]
-
                 # Data comes in form ['AIN0_1', 'AIN1_1', 'AIN0_2', ...]
+                output = raw_output[0]
+                output.reshape((num_chs, scans_per_read))
+                if enable_filter:
+                    lowpass_filter.lfilt(output, in_place=True)
+
+                downsample_mask[:] = 0
+                downsample_mask[::downsample_factor] = 1
+
                 for i, ch in enumerate(self.chs):
-                    ch_output = output[i::num_chs]
+                    ch_output = output[i, downsample_mask]
                     data['data'][ch + 'V'] = ch_output
 
                     # Apply unit conversion function for this channel
@@ -309,9 +347,10 @@ class LabJackAgent:
 
                 # The labjack outputs at exactly the scan rate but doesn't
                 # generate timestamps. So create them here.
-                timestamps = [cur_time+i/scan_rate for i in range(scans_per_read)]
-                cur_time += scans_per_read/scan_rate
-                data['timestamps'] = timestamps
+                t1 = t0 + read_period
+                timestamps = np.linspace(t0, t1, scans_per_read)
+                data['timestamps'] = timestamps[downsample_mask]
+                t0 = t1
 
                 self.agent.publish_to_feed('sensors', data)
 
@@ -359,7 +398,15 @@ def make_parser(parser=None):
     pgroup.add_argument('--active-channels',
                         default='T7-all')
     pgroup.add_argument('--function-file', default='None')
-    pgroup.add_argument('--sampling-frequency', default='2.5')
+    pgroup.add_argument('--sampling-frequency', default=2.5, type=float)
+    pgroup.add_argument('--enable-filter', action='store_true',
+                        help="If true, will lowpass filter data")
+    pgroup.add_argument('--lowpass-order', type=int, default=5,
+                        help="Order of butterworth lowpass filter")
+    pgroup.add_argument('--lowpass-cutoff', type=float, default=200.,
+                        help="Cutoff frequency of lowpass filter")
+    pgroup.add_argument('--downsample-factor', type=int, default=1,
+                        help="Factor by which to downsample data")
 
     return parser
 
@@ -367,13 +414,8 @@ def make_parser(parser=None):
 if __name__ == '__main__':
     # Start logging
     txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
-
-    site_parser = site_config.add_arguments()
-    parser = make_parser(site_parser)
-
-    args = parser.parse_args()
-
-    site_config.reparse_args(args, 'LabJackAgent')
+    parser = make_parser()
+    args = site_config.parse_args(agent_class='LabJackAgent', parser=parser)
 
     init_params = False
     if args.mode == 'acq':
@@ -382,15 +424,16 @@ if __name__ == '__main__':
     ip_address = str(args.ip_address)
     active_channels = args.active_channels
     function_file = str(args.function_file)
-    sampling_frequency = float(args.sampling_frequency)
+    sampling_frequency = args.sampling_frequency
 
     agent, runner = ocs_agent.init_site_agent(args)
 
-    sensors = LabJackAgent(agent,
-                           ip_address=ip_address,
-                           active_channels=active_channels,
-                           function_file=function_file,
-                           sampling_frequency=sampling_frequency)
+    sensors = LabJackAgent(
+        agent, ip_address=ip_address, active_channels=active_channels,
+        function_file=function_file, sampling_frequency=sampling_frequency,
+        enable_filter=args.enable_filter, lowpass_order=args.lowpass_order,
+        lowpass_cutoff=args.lowpass_cutoff,
+        downsample_factor=args.downsample_factor)
 
     agent.register_task('init_labjack',
                         sensors.init_labjack_task,
