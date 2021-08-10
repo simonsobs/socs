@@ -147,3 +147,10 @@ services:
   ocs-lakeshore240-simulator:
     image: "ocs-lakeshore240-simulator"
     build: ./simulators/lakeshore240/
+
+# --------------------------------------------------------------------------
+  # Honeywell_HMR2300
+  # --------------------------------------------------------------------------
+  ocs-honeywell-HMR23000-agent:
+      image: "ocs-honeywell-HMR2300"
+      build: ./agents/honeywell-HMR2300/
