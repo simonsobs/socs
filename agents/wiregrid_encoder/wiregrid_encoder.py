@@ -23,7 +23,12 @@ COUNTS_ON_BELT = 52000
 REFERENCE_COUNT_MAX = 2 << 15 # > that of belt on wiregrid (=nominal 52000)
 
 SLEEP=0.1
-#SLEEP=1
+
+def count2time(counts, t_offset=0.):
+    t_array = np.array(counts, dtype=float) - counts[0]
+    t_array *= 5.e-9
+    t_array += t_offset
+    return t_array.tolist()
 
 class WGEncoderAgent:
 
@@ -57,6 +62,10 @@ class WGEncoderAgent:
         error_flag = []
         received_time_list = []
 
+        dclock = []
+        dcount = []
+        rot_speed = []
+
         with self.lock.acquire_timeout(timeout=0, job='acq') as acquired:
             if not acquired:
                 self.log.warn('Could not start acq because {} is already running'.format(self.lock.job))
@@ -83,8 +92,7 @@ class WGEncoderAgent:
                         pass
                     pass
 
-
-                if len(self.parser.irig_queue):
+                if len(self.parser.irig_queue):# IRIG part mainly takes over CHWP scripts by H.Nishino
                     irig_data = self.parser.irig_queue.popleft()
 
                     rising_edge_count = irig_data[0]
@@ -95,13 +103,14 @@ class WGEncoderAgent:
 
                     irg_rdata = {'timestamp':sys_time, 'block_name':'WGEncoder_irig', 'data':{}}
 
-                    irg_rdata['data']['irig_time'] = irig_time
+                    irg_rdata['data']['irig_time']         = irig_time
                     irg_rdata['data']['rising_edge_count'] = rising_edge_count
-                    irg_rdata['data']['irig_sec'] = self.parser.de_irig(irig_info[0], 1)
-                    irg_rdata['data']['irig_min'] = self.parser.de_irig(irig_info[1], 0)
-                    irg_rdata['data']['irig_hour'] = self.parser.de_irig(irig_info[2], 0)
-                    irg_rdata['data']['irig_day'] = self.parser.de_irig(irig_info[3], 0) + self.parser.de_irig(irig_info[4], 0) * 100
-                    irg_rdata['data']['irig_year'] = self.parser.de_irig(irig_info[5], 0)
+                    irg_rdata['data']['edge_diff']         = rising_edge_count - self.rising_edge_count
+                    irg_rdata['data']['irig_sec']          = self.parser.de_irig(irig_info[0], 1)
+                    irg_rdata['data']['irig_min']          = self.parser.de_irig(irig_info[1], 0)
+                    irg_rdata['data']['irig_hour']         = self.parser.de_irig(irig_info[2], 0)
+                    irg_rdata['data']['irig_day']          = self.parser.de_irig(irig_info[3], 0) + self.parser.de_irig(irig_info[4], 0) * 100
+                    irg_rdata['data']['irig_year']         = self.parser.de_irig(irig_info[5], 0)
 
                     # Beagleboneblack clock frequency measured by IRIG
                     if self.rising_edge_count > 0 and irig_time > 0:
@@ -135,7 +144,16 @@ class WGEncoderAgent:
                     ref_count += (encoder_data[2]%REFERENCE_COUNT_MAX).tolist()
                     error_flag += encoder_data[3].tolist()
                     received_time_list.append(encoder_data[4])
-                    #received_time_list += [encoder_data[4]] * len(pru_clock)
+
+                    dclock.append((encoder_data[1][-1] - encoder_data[1][0])*5e-9)
+                    if (dclock[-1] > 0.) and (ref_count[-COUNTER_INFO_LENGTH] > ref_count[-1]):
+                        dcount.append((ref_count[-1] + COUNTS_ON_BELT - ref_count[-COUNTER_INFO_LENGTH])/COUNTS_ON_BELT)
+                        pass
+                    else:
+                        dcount.append((ref_count[-1] - ref_count[-COUNTER_INFO_LENGTH])/COUNTS_ON_BELT)
+                        pass
+
+                    rot_speed.append(dcount[-1]/dclock[-1])
 
                     current_time = time.time()
 
@@ -143,13 +161,13 @@ class WGEncoderAgent:
                     shared_position = ref_count[-1]
 
                     enc_rdata = {
-                        'timestamp': [],
+                        'timestamps': [],
                         'block_name': 'WGEncoder_rough',
-                        'data': {'quadrature':[],'pru_clock':[],'reference_count':[],'error':[]}
+                        'data': {}
                     }
                     '''
                     enc_fdata = {
-                            'timestamp': [],
+                            'timestamps': [],
                             'block_name': 'WGEncoder_full',
                             'data': {}
                     }
@@ -158,35 +176,24 @@ class WGEncoderAgent:
                     if len(pru_clock) > NUM_ENCODER_TO_PUBLISH \
                         or (len(pru_clock) and (current_time - time_encoder_published) > SEC_ENCODER_TO_PUBLISH):
 
-                        dclock = (pru_clock[-1] - pru_clock[-COUNTER_INFO_LENGTH])*5e-9
+                        enc_rdata['timestamps']               = received_time_list# + 5e-6*(data_ind%COUNTER_INFO_LENGTH)
+                        enc_rdata['data']['quadrature']       = quad_data[::COUNTER_INFO_LENGTH]
+                        enc_rdata['data']['pru_clock']        = pru_clock[::COUNTER_INFO_LENGTH]
+                        enc_rdata['data']['reference_degree'] = (np.array(ref_count)[::COUNTER_INFO_LENGTH]*360/COUNTS_ON_BELT).tolist()
+                        enc_rdata['data']['error']            = error_flag[::COUNTER_INFO_LENGTH]
 
-                        if (dclock > 0.) and (ref_count[-COUNTER_INFO_LENGTH] > ref_count[-1]):
-                            ddeg = (ref_count[-1] + COUNTS_ON_BELT - ref_count[-COUNTER_INFO_LENGTH])*360/COUNTS_ON_BELT
-                            pass
-                        else:
-                            ddeg = (ref_count[-1] - ref_count[-COUNTER_INFO_LENGTH])*360/COUNTS_ON_BELT
-                            pass
-
-                        for data_ind in range(int(len(pru_clock)/COUNTER_INFO_LENGTH)):
-                            enc_rdata['timestamp']               = received_time_list[data_ind]# + 5e-6*(data_ind%COUNTER_INFO_LENGTH)
-                            enc_rdata['data']['quadrature']      = quad_data[data_ind*COUNTER_INFO_LENGTH]
-                            enc_rdata['data']['pru_clock']       = pru_clock[data_ind*COUNTER_INFO_LENGTH]
-                            enc_rdata['data']['reference_count'] = ref_count[data_ind*COUNTER_INFO_LENGTH]*360/COUNTS_ON_BELT
-                            enc_rdata['data']['error']           = error_flag[data_ind*COUNTER_INFO_LENGTH]
-
-                            enc_rdata['data']['ave_count']       = np.mean(ref_count)
-                            enc_rdata['data']['speed']           = ddeg/dclock
-                            self.agent.publish_to_feed('WGEncoder_rough', enc_rdata)
-                            pass
+                        enc_rdata['data']['rotation_speed']   = rot_speed # Hz
+                        self.agent.publish_to_feed('WGEncoder_rough', enc_rdata)
 
                         '''
-                        enc_fdata['timestamp']                   = received_time_list
+                        enc_fdata['timestamps']                  = count2time(pru_clock, received_time_list[0])
                         enc_fdata['data']['quadrature']          = quad_data
                         enc_fdata['data']['pru_clock']           = pru_clock
                         enc_fdata['data']['reference_count']     = ref_count
                         enc_fdata['data']['error']               = error_flag
                         self.agent.publish_to_feed('WGEncoder_full', enc_fdata)
 
+                        
                         with open('feed_log', 'w') as f:
                             f.write(str(iter_counts)+'\n')
                             f.write('current_time:'+str(current_time)+'\n')
@@ -200,6 +207,10 @@ class WGEncoderAgent:
                         ref_count = []
                         error_flag = []
                         received_time_list = []
+
+                        dclock = []
+                        dcount = []
+                        rot_speed = []
 
                         time_encoder_published = current_time
 
