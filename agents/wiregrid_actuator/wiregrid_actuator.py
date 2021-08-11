@@ -20,7 +20,7 @@ import limitswitch_config
 import stopper_config
 
 class WiregridActuatorAgent:
-    def __init__(self, agent, actuator_dev='/dev/ttyUSB0', interval_time=1, sleep=0.10, verbose=0):
+    def __init__(self, agent, actuator_dev='/dev/ttyUSB0', interval_time=1, sleep=0.20, verbose=0):
         self.agent = agent
         self.log   = agent.log
         self.lock    = TimeoutLock()
@@ -104,7 +104,7 @@ class WiregridActuatorAgent:
         LSL2,LSR2 = self.limitswitch.get_onoff(pinname=['LSL2','LSR2'])
         if LSL2==0 and LSR2==0 : 
             ret, msg = self.actuator.move(distance, speedrate)
-            if not ret : return False, msg
+            if not ret : return False, msg, LSL2 or LSR2
         else :
             self.log.warn('Warning! One of limit switches on opposite side (inside) is ON (LSL2={}, LSR2={})!'.format(LSL2, LSR2));
             self.log.warn('  --> Did not move.');
@@ -130,7 +130,7 @@ class WiregridActuatorAgent:
         LSL1,LSR1 = self.limitswitch.get_onoff(pinname=['LSL1','LSR1'])
         if LSL1==0 and LSR1==0 : 
             ret, msg = self.actuator.move(-1*distance, speedrate)
-            if not ret : return False, msg
+            if not ret : return False, msg, LSL2 or LSR2
         else :
             self.log.warn('Warning! One of limit switches on motor side (outside) is ON (LSL1={}, LSR1={})!'.format(LSL1, LSR1));
             self.log.warn('  --> Did not move.');
@@ -277,7 +277,7 @@ class WiregridActuatorAgent:
                 if not self.__stopper_off() : return False
                 return True
             # last slow backward
-            status, msg = self.__backward(200, speedrate=0.1)
+            status, msg, LSonoff = self.__backward(200, speedrate=0.1)
             if not status : 
                 self.log.error('ERROR!:(in last backwarding) {}'.format(msg))
                 if not self.__stopper_off() : return False
@@ -614,7 +614,7 @@ def make_parser(parser = None):
                         help='')
     pgroup.add_argument('--actuator-dev', dest='actuator_dev', type=str, default='/dev/ttyUSB0',
                         help='')
-    pgroup.add_argument('--sleep', dest='sleep', type=float, default=0.10,
+    pgroup.add_argument('--sleep', dest='sleep', type=float, default=0.20,
                         help='sleep time for every actuator command')
     pgroup.add_argument('--verbose', dest='verbose', type=int, default=0,
                         help='')

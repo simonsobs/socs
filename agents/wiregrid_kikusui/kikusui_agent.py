@@ -8,6 +8,7 @@ sys.path.append(
 
 import pmx as pm
 import command as cm
+from common import * # openlog, writelog
 
 from ocs import ocs_agent, site_config, client_t
 from ocs.ocs_twisted import TimeoutLock
@@ -25,6 +26,7 @@ class KikusuiAgent:
         self.kikusui_port = int(kikusui_port)
 
         self.position_path = '/data/wg-data/position.log'
+        self.action_path = '/data/wg-data/action/'
 
         self.open_trial = 10
         self.Deg = 360/52000
@@ -147,11 +149,18 @@ class KikusuiAgent:
         return True, 'Set Kikusui off'
 
     def calibrate_itself(self, session, params = None):
+        if params == None:
+            params = {'storepath':self.action_path}
+            pass
 
         with self.lock.acquire_timeout(0, job = 'set_off') as acquired:
             if not acquired:
                 self.log.warn('Could not calibrate itself because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
+
+        logfile = openlog(params['storepath'])
+
+        ret = self.__wait_control()
 
         cycle = 1
         for i in range(11):
@@ -160,13 +169,23 @@ class KikusuiAgent:
                 if j%20 == 0:
                     self.log.warn(f'this is {cycle}th time action')
                     pass
-                self.rotate_alittle(tperiod)
+
+                writelog(logfile, 'ON', tperiod, self.get_position(self.position_path, self.open_trial, self.Deg))
+                self.rotate_alittle(ret, tperiod)
                 time.sleep(self.agent_interval+1.)
-                self.rotate_alittle(0.70)
-                time.sleep(self.agent_interval)
+                writelog(logfile, 'OFF', 0., self.get_position(self.position_path, self.open_trial, self.Deg))
+                writelog(logfile, 'ON', 0.70, self.get_position(self.position_path, self.open_trial, self.Deg))
+                self.rotate_alittle(ret, 0.70)
+                time.sleep(self.agent_interval+1.)
+                writelog(logfile, 'OFF', 0., self.get_position(self.position_path, self.open_trial, self.Deg))
                 cycle += 1
+
                 pass
             pass
+
+        self.switching = False
+
+        logfile.close()
 
         return True, 'Micro step rotation of wire grid finished. Please calibrate and take feedback params.'
 
@@ -185,14 +204,22 @@ class KikusuiAgent:
         self.stopped_time = params['stopped_time']
         self.feedback_time = params['feedback_time']
 
+        logfile = openlog(self.action_path)
+
+        ret = self.__wait_control()
+
         for i in range(self.num_laps*16):
-            self.move_next(self.feedback_steps, self.feedback_time)
+            self.move_next(ret, logfile, self.feedback_steps, self.feedback_time)
             time.sleep(self.stopped_time)
             pass
 
+        self.switching = False
+
+        logfile.close()
+
         return True, 'Step-wise rotation finished'
 
-    def move_next(self, feedback_steps, feedback_time): # each value can be changed
+    def move_next(self, ret, logfile, feedback_steps, feedback_time): # each value can be changed
         wanted_angle = 22.5
         uncertaity_cancel = 3
         absolute_position = np.arange(0,360,wanted_angle)
@@ -212,8 +239,10 @@ class KikusuiAgent:
             f.write('start: {}, goal: {}\n'.format(round(start_position,3), round(goal_position,3)))
             pass
 
-        self.rotate_alittle(feedback_time[-1]+0.1)
+        #writelog(logfile, 'ON', feedback_time[-1]+0.1, self.get_position(self.position_path, self.open_trial, self.Deg))
+        self.rotate_alittle(ret, feedback_time[-1]+0.1)
         time.sleep(self.agent_interval)
+        #writelog(logfile, 'OFF', 0., self.get_position(self.position_path, self.open_trial, self.Deg))
 
         for l in range(feedback_steps):
             mid_position = self.get_position(self.position_path, self.open_trial, self.Deg)
@@ -228,19 +257,19 @@ class KikusuiAgent:
                 f.write(str(l)+':'+str(round(mid_position,3))+' '+str(self.operation_time)+'\n')
                 pass
 
-            self.rotate_alittle(self.operation_time)
-            time.sleep(self.agent_interval)
+            #writelog(logfile, 'ON', self.operation_time, self.get_position(self.position_path, self.open_trial, self.Deg))
+            self.rotate_alittle(ret, self.operation_time)
+            #writelog(logfile, 'OFF', 0., self.get_position(self.position_path, self.open_trial, self.Deg))
             pass
 
-    def rotate_alittle(self, operation_time):
-        ret = self.__wait_control()
+    def rotate_alittle(self, ret, operation_time):
         if ret:
             if operation_time != 0.:
                 self.cmd.user_input('on')
                 time.sleep(operation_time)
                 self.cmd.user_input('off')
+                time.sleep(self.agent_interval)
                 pass
-            self.switching = False
             pass
         else:
             msg = 'Could not rotate because of failure in getting the control.'
@@ -264,7 +293,7 @@ class KikusuiAgent:
             with open('file_open_error.log','a') as f:
                 traceback.print_exc(file=f)
                 pass
-            self.log.warn('Failed ENCODER POSITION FILE')
+            self.log.warn('Failed to open ENCODER POSITION FILE')
             pass
 
         return int(position)*Deg
