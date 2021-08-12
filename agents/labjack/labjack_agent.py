@@ -269,6 +269,11 @@ class LabJackAgent:
                 Cutoff frequency for lowpass filter. Defaults to 200 Hz.
             downsample_factor (int):
                 Factor to downsample data. Defaults to 1 (not downsampled).
+            save_unfiltered (bool):
+                Whether to save unfiltered voltage data to G3. Only relevant
+                if filter is enabled.
+            channels (list of strings):
+                List of channel names to read from
         """
         if params is None:
             params = {}
@@ -278,8 +283,6 @@ class LabJackAgent:
         scan_rate_input = params.get('sampling_frequency',
                                      self.sampling_frequency)
         scans_per_read = max(1, int(scan_rate_input))
-        num_chs = len(self.chs)
-        ch_addrs = ljm.namesToAddresses(num_chs, self.chs)[0]
 
         ### Filter stuff if specified
         enable_filter = params.get('enable_filter', self.enable_filter)
@@ -287,10 +290,25 @@ class LabJackAgent:
         lowpass_cutoff = params.get('lowpass_cutoff', self.lowpass_cutoff)
         downsample_factor = params.get('downsample_factor',
                                        self.downsample_factor)
-        downsample_mask = np.zeros(scans_per_read)
-        lowpass_filter = FIRFilter.butter_lowpass(
-            lowpass_cutoff, scan_rate_input, order=lowpass_order,
-            nchans=num_chs)
+        save_unfiltered = params.get('save_unfiltered', False)
+        chs = params.get('channels', self.chs)
+        if not set(chs).issubset(set(self.chs)):
+            raise ValueError(
+                f"Invalid channels specified! Must be in {self.chs}"
+            )
+        self.log.info(f"Starting taking data for channels {chs}")
+        block_name = '_'.join(sorted(chs))
+
+        num_chs = len(chs)
+        ch_addrs = ljm.namesToAddresses(num_chs, chs)[0]
+
+        downsample_mask = np.zeros(scans_per_read, dtype=bool)
+        if enable_filter:
+            lowpass_filter = FIRFilter.butter_lowpass(
+                lowpass_cutoff, scan_rate_input, order=lowpass_order,
+                nchans=num_chs)
+        else:
+            lowpass_filter = None
 
         with self.lock.acquire_timeout(0, job='acq') as acquired:
             if not acquired:
@@ -319,24 +337,41 @@ class LabJackAgent:
 
             while self.take_data:
                 data = {
-                    'block_name': 'sens',
+                    'block_name': block_name,
                     'data': {}
                 }
 
                 # Query the labjack
                 raw_output = ljm.eStreamRead(self.handle)
                 # Data comes in form ['AIN0_1', 'AIN1_1', 'AIN0_2', ...]
-                output = raw_output[0]
-                output.reshape((num_chs, scans_per_read))
-                if enable_filter:
-                    lowpass_filter.lfilt(output, in_place=True)
+                output = np.array(raw_output[0])
+                output = output.reshape((scans_per_read, num_chs)).T
+
+                # The labjack outputs at exactly the scan rate but doesn't
+                # generate timestamps. So create them here.
+                t1 = t0 + read_period
+                timestamps = np.linspace(t0, t1, scans_per_read)
+                t0 = t1
 
                 downsample_mask[:] = 0
                 downsample_mask[::downsample_factor] = 1
 
-                for i, ch in enumerate(self.chs):
+                if enable_filter:
+                    if save_unfiltered:
+                        data_unfiltered = {
+                            'block_name': f'{block_name}_unfiltered',
+                            'data': {}
+                        }
+                        for i, ch in enumerate(chs):
+                            ch_output = output[i, downsample_mask]
+                            data_unfiltered['data'][ch + 'V_unfiltered'] = list(ch_output)
+                        data_unfiltered['timestamps'] = timestamps[downsample_mask]
+                        self.agent.publish_to_feed('sensors', data_unfiltered)
+                    lowpass_filter.lfilt(output, in_place=True)
+
+                for i, ch in enumerate(chs):
                     ch_output = output[i, downsample_mask]
-                    data['data'][ch + 'V'] = ch_output
+                    data['data'][ch + 'V'] = list(ch_output)
 
                     # Apply unit conversion function for this channel
                     if ch in self.functions.keys():
@@ -345,19 +380,14 @@ class LabJackAgent:
                                                      self.functions[ch])
                         data['data'][ch + units] = list(new_ch_output)
 
-                # The labjack outputs at exactly the scan rate but doesn't
-                # generate timestamps. So create them here.
-                t1 = t0 + read_period
-                timestamps = np.linspace(t0, t1, scans_per_read)
-                data['timestamps'] = timestamps[downsample_mask]
-                t0 = t1
+                data['timestamps'] = list(timestamps[downsample_mask])
 
                 self.agent.publish_to_feed('sensors', data)
 
                 # Publish to the downsampled data feed only the first
                 # timestamp and data point for each channel.
                 data_downsampled = {
-                    'block_name': 'sens',
+                    'block_name': block_name,
                     'data': {},
                     'timestamp': timestamps[0]
                 }
@@ -395,7 +425,7 @@ def make_parser(parser=None):
     pgroup = parser.add_argument_group('Agent Options')
 
     pgroup.add_argument('--ip-address')
-    pgroup.add_argument('--active-channels',
+    pgroup.add_argument('--active-channels', nargs='+',
                         default='T7-all')
     pgroup.add_argument('--function-file', default='None')
     pgroup.add_argument('--sampling-frequency', default=2.5, type=float)
@@ -407,6 +437,7 @@ def make_parser(parser=None):
                         help="Cutoff frequency of lowpass filter")
     pgroup.add_argument('--downsample-factor', type=int, default=1,
                         help="Factor by which to downsample data")
+    pgroup.add_argument('--mode')
 
     return parser
 
@@ -420,6 +451,8 @@ if __name__ == '__main__':
     init_params = False
     if args.mode == 'acq':
         init_params = {'auto_acquire': True}
+    if args.mode == 'idle':
+        init_params=True
 
     ip_address = str(args.ip_address)
     active_channels = args.active_channels
