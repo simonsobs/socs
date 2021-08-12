@@ -56,6 +56,7 @@ class ACUAgent:
         self.sleeptime = self.acu_config['motion_waittime']
         self.udp = self.acu_config['streams']['main']
         self.udp_ext = self.acu_config['streams']['ext']
+        self.acu8100 = None 
 
         self.log = agent.log
 
@@ -97,7 +98,7 @@ class ACUAgent:
         self.agent.register_feed('acu_status_summary',
                                  record=True,
                                  agg_params={'frame_length': 60,
-                                             'exclude_influx': True
+                                             'exclude_influx': False
                                              },
                                  buffer_time=1)
         self.agent.register_feed('acu_status_full',
@@ -115,7 +116,7 @@ class ACUAgent:
         self.agent.register_feed('acu_udp_stream',
                                  record=True,
                                  agg_params={'frame_length': 60,
-                                             'exclude_influx': True
+                                             'exclude_influx': False
                                              },
                                  buffer_time=1)
         self.agent.register_feed('acu_broadcast_influx',
@@ -139,7 +140,7 @@ class ACUAgent:
         agent.register_task('go_to', self.go_to, blocking=False)
         agent.register_task('run_specified_scan',
                             self.run_specified_scan,
-                            locking=False)
+                            blocking=False)
         agent.register_task('set_boresight',
                             self.set_boresight,
                             blocking=False)
@@ -242,8 +243,8 @@ class ACUAgent:
                           'Elevation mode',
                           'Elevation current position',
                           'Elevation current velocity',
-                          # 'Boresight mode',
-                          # 'Boresight current position',
+                          'Boresight mode',
+                          'Boresight current position',
                           'Qty of free program track stack positions',
                           ]
         mode_key = {'Stop': 0,
@@ -272,8 +273,8 @@ class ACUAgent:
 
             query_t = now
             try:
-                # j = yield self.acu.http.Values('DataSets.StatusSATPDetailed8100')
-                j = yield self.acu.http.Values('DataSets.StatusCCATDetailed8100')
+                j = yield self.acu.http.Values('DataSets.StatusSATPDetailed8100')
+               # j = yield self.acu.http.Values('DataSets.StatusCCATDetailed8100')
                 n_ok += 1
                 session.data = j
             except Exception as e:
@@ -345,7 +346,7 @@ class ACUAgent:
         if not ok:
             return ok, msg
         session.set_status('running')
-        FMT = '<iddddd'
+        FMT = '<idddddddddddd'
         FMT_LEN = struct.calcsize(FMT)
         UDP_PORT = self.acu_config['PositionBroadcast_target'].split(':')[1]
         udp_data = []
@@ -366,9 +367,12 @@ class ACUAgent:
                 udp_data = udp_data[200:]
                 year = datetime.datetime.now().year
                 gyear = calendar.timegm(time.strptime(str(year), '%Y'))
-                sample_rate = (len(process_data) /
-                               ((process_data[-1][0]-process_data[0][0])*86400
-                                + process_data[-1][1]-process_data[0][1]))
+                if len(process_data):
+                    sample_rate = (len(process_data) /
+                                  ((process_data[-1][0]-process_data[0][0])*86400
+                                  + process_data[-1][1]-process_data[0][1]))
+                else:
+                    sample_rate = 0.0
                 latest_az = process_data[2]
                 latest_el = process_data[3]
                 latest_az_raw = process_data[4]
@@ -403,19 +407,34 @@ class ACUAgent:
                     sec = d[1]
                     data_ctime = gyear + gday + sec
                     azimuth_corrected = d[2]
-                    azimuth_raw = d[4]
+                    azimuth_raw = d[5]
                     elevation_corrected = d[3]
-                    elevation_raw = d[5]
+                    elevation_raw = d[6]
+                    boresight_corrected = d[4]
+                    boresight_raw = d[7]
+                    azimuth_motor_1 = d[8]
+                    azimuth_motor_2 = d[9]
+                    elevation_motor_1 = d[10]
+                    boresight_motor_1 = d[11]
+                    boresight_motor_2 = d[12]
                     self.data['broadcast'] = {'Time': data_ctime,
                                               'Azimuth_Corrected': azimuth_corrected,
                                               'Azimuth_Raw': azimuth_raw,
                                               'Elevation_Corrected': elevation_corrected,
                                               'Elevation_Raw': elevation_raw,
+                                              'Boresight_Corrected': boresight_corrected,
+                                              'Boresight_Raw': boresight_raw,
+                                              'Azimuth_Motor_1': azimuth_motor_1,
+                                              'Azimuth_Motor_2': azimuth_motor_2,
+                                              'Elevation_Motor_1': elevation_motor_1,
+                                              'Boresight_Motor_1': boresight_motor_1,
+                                              'Boresight_Motor_2': boresight_motor_2,
                                               }
                     acu_udp_stream = {'timestamp': self.data['broadcast']['Time'],
                                       'block_name': 'ACU_position',
                                       'data': self.data['broadcast']
                                       }
+                    #print(acu_udp_stream)
                     self.agent.publish_to_feed('acu_udp_stream',
                                                acu_udp_stream)
             else:
