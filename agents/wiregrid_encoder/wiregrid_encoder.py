@@ -14,8 +14,8 @@ if not ON_RTD:
     from ocs.ocs_twisted import TimeoutLock
     pass
 
-NUM_ENCODER_TO_PUBLISH = 1000
-SEC_ENCODER_TO_PUBLISH = 2
+NUM_ENCODER_TO_PUBLISH = 10000
+SEC_ENCODER_TO_PUBLISH = 10
 
 COUNTER_INFO_LENGTH = 100
 
@@ -49,8 +49,8 @@ class WGEncoderAgent:
         agg_params = {'frame_length': 60}
         self.agent.register_feed('WGEncoder_rough', record=True, agg_params=agg_params, buffer_time=0.5)
 
-        #agg_params = {'frame_length': 60, 'exclude_influx': True}
-        #self.agent.register_feed('WGEncoder_full', record=True, agg_params=agg_params)
+        agg_params = {'frame_length': 60, 'exclude_influx': True}
+        self.agent.register_feed('WGEncoder_full', record=True, agg_params=agg_params)
 
         self.parser = EncoderParser(beaglebone_port=self.bbport)
 
@@ -131,7 +131,7 @@ class WGEncoderAgent:
                     irg_fdata['data']['irig_synch_pulse_clock_time'] = list(irig_time + 0.09 + np.arange(10) * 0.1)
                     irg_fdata['data']['irig_synch_pulse_clock_counts'] = synch_pulse_clock_counts
                     irg_fdata['data']['irig_info'] = list(irig_info)
-                    #self.agent.publish_to_feed('WGEncoder_full', irg_fdata)
+                    self.agent.publish_to_feed('WGEncoder_full', irg_fdata)
                     pass
 
                 if len(self.parser.encoder_queue):
@@ -165,13 +165,13 @@ class WGEncoderAgent:
                         'block_name': 'WGEncoder_rough',
                         'data': {}
                     }
-                    '''
+
                     enc_fdata = {
                             'timestamps': [],
                             'block_name': 'WGEncoder_full',
                             'data': {}
                     }
-                    '''
+
 
                     if len(pru_clock) > NUM_ENCODER_TO_PUBLISH \
                         or (len(pru_clock) and (current_time - time_encoder_published) > SEC_ENCODER_TO_PUBLISH):
@@ -185,7 +185,6 @@ class WGEncoderAgent:
                         enc_rdata['data']['rotation_speed']   = rot_speed # Hz
                         self.agent.publish_to_feed('WGEncoder_rough', enc_rdata)
 
-                        '''
                         enc_fdata['timestamps']                  = count2time(pru_clock, received_time_list[0])
                         enc_fdata['data']['quadrature']          = quad_data
                         enc_fdata['data']['pru_clock']           = pru_clock
@@ -193,7 +192,7 @@ class WGEncoderAgent:
                         enc_fdata['data']['error']               = error_flag
                         self.agent.publish_to_feed('WGEncoder_full', enc_fdata)
 
-                        
+                        '''
                         with open('feed_log', 'w') as f:
                             f.write(str(iter_counts)+'\n')
                             f.write('current_time:'+str(current_time)+'\n')
