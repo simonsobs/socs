@@ -85,7 +85,8 @@ class LS372_Agent:
             ensures at least one second of data collection at the end of a scan.
 
     """
-    def __init__(self, agent, name, ip, fake_data=False, dwell_time_delay=0):
+    def __init__(self, agent, name, ip, fake_data=False, dwell_time_delay=0,
+                 enable_control_chan=False):
 
         # self._acq_proc_lock is held for the duration of the acq Process.
         # Tasks that require acq to not be running, at all, should use
@@ -109,6 +110,7 @@ class LS372_Agent:
         self.log = agent.log
         self.initialized = False
         self.take_data = False
+        self.control_chan_enabled = enable_control_chan
 
         self.agent = agent
         # Registers temperature feeds
@@ -119,6 +121,16 @@ class LS372_Agent:
                                  record=True,
                                  agg_params=agg_params,
                                  buffer_time=1)
+
+    def enable_control_chan(self, session, params=None):
+        """Enables readout on the control channel"""
+        self.control_chan_enabled = True
+        return True, 'Enabled control channel'
+
+    def disable_control_chan(self, session, params=None):
+        """Disables readout on the control channel"""
+        self.control_chan_enabled = False
+        return True, 'Disabled control channel'
 
     def init_lakeshore_task(self, session, params=None):
         """init_lakeshore_task(params=None)
@@ -314,17 +326,36 @@ class LS372_Agent:
                     # For data feed
                     data['data'][channel_str + '_T'] = temp_reading
                     data['data'][channel_str + '_R'] = res_reading
+                    session.app.publish_to_feed('temperatures', data)
+                    self.log.debug("{data}", data=session.data)
 
                     # For session.data
                     field_dict = {channel_str: {"T": temp_reading,
                                                 "R": res_reading,
                                                 "timestamp": current_time}}
-
                     session.data['fields'].update(field_dict)
 
-                session.app.publish_to_feed('temperatures', data)
-
-                self.log.debug("{data}", data=session.data)
+                    # Also queries control channel if enabled
+                    if self.control_chan_enabled:
+                        temp = self.module.get_temp(unit='kelvin', chan=0)
+                        res = self.module.get_temp(unit='ohms', chan=0)
+                        cur_time = time.time()
+                        data = {
+                            'timestamp': time.time(),
+                            'block_name': 'control_chan',
+                            'data': {
+                                'control_T': temp,
+                                'control_R': res
+                            }
+                        }
+                        session.app.publish_to_feed('temperatures', data)
+                        self.log.debug("{data}", data=session.data)
+                        # Updates session data w/ control field
+                        session.data['fields'].update({
+                            'control': {
+                                'T': temp, 'R': res, 'timestamp': cur_time
+                            }
+                        })
 
                 if params.get("sample_heater", False):
                     # Sample Heater
@@ -700,7 +731,7 @@ class LS372_Agent:
             session.app.publish_to_feed('temperatures', data)
 
         return True, "Set still output to {}".format(output)
-        
+
     def get_still_output(self, session, params=None):
         """
         Gets the current still output on the still heater.
@@ -753,10 +784,12 @@ def make_parser(parser=None):
                               second if it is set longer than a channel's dwell\
                               time. This ensures at least one second of data\
                               collection at the end of a scan.")
-    pgroup.add_argument('--auto-acquire', type=bool, default=True,
+    pgroup.add_argument('--auto-acquire', action='store_true',
                         help='Automatically start data acquisition on startup')
     pgroup.add_argument('--sample-heater', type=bool, default=False,
                         help='Record sample heater output during acquisition.')
+    pgroup.add_argument('--enable-control-chan', action='store_true',
+                        help='Enable reading of the control input each acq cycle')
 
     return parser
 
@@ -768,9 +801,8 @@ if __name__ == '__main__':
     # Start logging
     txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
 
-    # Get the default ocs argument parser.
     parser = make_parser()
-    args = site_config.parse_args(agent_class='Lakeshore372', parser=parser)
+    args = site_config.parse_args(agent_class='Lakeshore372Agent', parser=parser)
 
     # Automatically acquire data if requested (default)
     init_params = False
@@ -785,7 +817,8 @@ if __name__ == '__main__':
 
     lake_agent = LS372_Agent(agent, args.serial_number, args.ip_address,
                              fake_data=args.fake_data,
-                             dwell_time_delay=args.dwell_time_delay)
+                             dwell_time_delay=args.dwell_time_delay,
+                             enable_control_chan=args.enable_control_chan)
 
     agent.register_task('init_lakeshore', lake_agent.init_lakeshore_task,
                         startup=init_params)
@@ -802,5 +835,7 @@ if __name__ == '__main__':
     agent.register_task('set_still_output', lake_agent.set_still_output)
     agent.register_task('get_still_output', lake_agent.get_still_output)
     agent.register_process('acq', lake_agent.start_acq, lake_agent.stop_acq)
+    agent.register_task('enable_control_chan', lake_agent.enable_control_chan)
+    agent.register_task('disable_control_chan', lake_agent.disable_control_chan)
 
     runner.run(agent, auto_reconnect=True)
