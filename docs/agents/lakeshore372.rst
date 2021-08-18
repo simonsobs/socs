@@ -27,7 +27,7 @@ configuration block::
    'arguments': [['--serial-number', 'LSA22YG'],
                  ['--ip-address', '10.10.10.2'],
                  ['--dwell-time-delay', 0],
-                 ['--auto-acquire', True],
+                 ['--auto-acquire'],
                  ['--sample-heater', False]]},
 
 Each device requires configuration under 'agent-instances'. See the OCS site

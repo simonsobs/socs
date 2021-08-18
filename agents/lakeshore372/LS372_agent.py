@@ -83,7 +83,9 @@ class LS372_Agent:
             accounted for. Will automatically be reduced to dwell_time - 1
             second if it is set longer than a channel's dwell time. This
             ensures at least one second of data collection at the end of a scan.
-
+        enable_control_chan (bool, optional):
+            If True, will read data from the control channel each iteration of
+            the acq loop. Defaults to False.
     """
     def __init__(self, agent, name, ip, fake_data=False, dwell_time_delay=0,
                  enable_control_chan=False):
@@ -213,7 +215,8 @@ class LS372_Agent:
                  "Channel_06": {"T": 0, "R": 1022.44, "timestamp": 1601924499.5258765},
                  "Channel_08": {"T": 0, "R": 1026.98, "timestamp": 1601924494.8172355},
                  "Channel_01": {"T": 293.41, "R": 108.093, "timestamp": 1601924450.9315426},
-                 "Channel_02": {"T": 293.701, "R": 30.7398, "timestamp": 1601924466.6130798}
+                 "Channel_02": {"T": 293.701, "R": 30.7398, "timestamp": 1601924466.6130798},
+                 "control": {"T": 293.701, "R": 30.7398, "timestamp": 1601924466.6130798}
                 }
             }
 
