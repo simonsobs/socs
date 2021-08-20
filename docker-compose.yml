@@ -19,6 +19,13 @@ services:
     build: ./agents/lakeshore372/
 
   # --------------------------------------------------------------------------
+  # The Lakeshore 370 Agent
+  # --------------------------------------------------------------------------
+  ocs-lakeshore370-agent:
+    image: "ocs-lakeshore370-agent"
+    build: ./agents/lakeshore370/
+
+  # --------------------------------------------------------------------------
   # The Lakeshore 240 Agent
   # --------------------------------------------------------------------------
   ocs-lakeshore240-agent:
@@ -101,6 +108,13 @@ services:
   ocs-pfeiffer-tpg366-agent:
     image: "ocs-pfeiffer-tpg366-agent"
     build: ./agents/pfeiffer_tpg366/
+    
+  # --------------------------------------------------------------------------
+  # Synaccess power strip agent
+  # --------------------------------------------------------------------------
+  ocs-synaccess-agent:
+    image: "ocs-synaccess-agent"
+    build: ./agents/synacc/
 
   # --------------------------------------------------------------------------
   # Meinberg M1000
@@ -108,6 +122,27 @@ services:
   ocs-meinberg-m1000-agent:
     image: "ocs-meinberg-m1000-agent"
     build: ./agents/meinberg_m1000/
+
+  # -------------------------------------------------------------------------
+  # SMuRF Crate Monitor
+  # -------------------------------------------------------------------------
+  ocs-smurf-crate-monitor:
+    image: "ocs-smurf-crate-monitor"
+    build: ./agents/smurf_crate_monitor/
+
+  # --------------------------------------------------------------------------
+  # Tektronix3021c
+  # --------------------------------------------------------------------------
+  ocs-tektronix3021c-agent:
+    image: "ocs-tektronix3021c-agent"
+    build: ./agents/tektronix3021c/
+
+  # --------------------------------------------------------------------------
+  # CHWP Encoder BBB agent
+  # --------------------------------------------------------------------------
+  ocs-hwpbbb-agent:
+    image: "ocs-hwpbbb-agent"
+    build: ./agents/chwp/
 
   # --------------------------------------------------------------------------
   # SOCS Simulators

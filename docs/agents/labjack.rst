@@ -31,7 +31,7 @@ available arguments::
          'instance-id': 'labjack',
          'arguments':[
            ['--ip-address', '10.10.10.150'],
-           ['--active-channels', ['1', '2', '3']],
+           ['--active-channels', ['AIN0', 'AIN1', 'AIN2']],
            ['--function-file', 'labjack-functions.yaml'],
            ['--mode', 'acq'],
            ['--sampling_frequency', '700'],
@@ -41,35 +41,43 @@ You should assign your LabJack a static IP, you'll need to know that here.
 The 'active-channels' argument specifies the channels that will be read out.
 It can be a list, 'T7-all', or 'T4-all'. The latter two read out all 
 14 or 12 analog channels on the T7 and T4, respectively. 'sampling_frequency'
-is in Hz, and has been tested sucessfully up to about 700 Hz. The 'function-file' 
-argument specifies the labjack configuration file, which is located in your 
-OCS configuration directory. This allows analog voltage inputs on the labjack 
-to be converted to different units. Here is an example labjack configuration 
-file::
+is in Hz, and has been tested sucessfully from 0.1 to 5000 Hz. To avoid 
+high sample rates potentially clogging up live monitoring, the main feed 
+doesn't get published to influxdb. Instead influx gets a seperate feed 
+downsampled to a maximum of 1Hz. Both the main and downsampled feeds are 
+published to g3 files. 
 
-    Channel_1:
+The 'function-file' argument specifies the labjack configuration file, which 
+is located in your OCS configuration directory. This allows analog voltage 
+inputs on the labjack to be converted to different units. Here is an example 
+labjack configuration file::
+
+    AIN0:
         user_defined: 'False'
         type: "MKS390"
 
-    Channel_2: 
+    AIN1: 
         user_defined: 'False'
         type: 'warm_therm'
 
-    Channel_3:
+    AIN2:
         user_defined: 'True'
         units: 'Ohms'
         function: '(2.5-v)*10000/v'
         
-In this example, Channels 1 and 2 (AIN0 and AIN1 on the labjack) are hooked
-up to the MKS390 pressure `gauge`_ and a `thermistor`_ from the SO-specified
-warm thermometry setup, respectively. Since these are defined functions in the
-LabJackFunctions class, specifying the name of their method is all that is
-needed. Channel 3 shows how to define a custom function. In this case, the user
-specifies the units and the function itself, which takes the input voltage 'v'
-as the only argument.
+In this example, channels AIN0 and AIN1 are hooked up to the MKS390 pressure 
+`gauge`_ and a `thermistor`_ from the SO-specified warm thermometry setup, 
+respectively. Since these are defined functions in the LabJackFunctions class, 
+specifying the name of their method is all that is needed. AIN2 shows how to 
+define a custom function. In this case, the user specifies the units and the 
+function itself, which takes the input voltage 'v' as the only argument.
 
 .. _gauge: https://www.mksinst.com/f/390-micro-ion-atm-modular-vacuum-gauge
 .. _thermistor: https://docs.rs-online.com/c868/0900766b8142cdef.pdf
+
+.. note:: 
+    The (lower-case) letter 'v' must be used when writing user-defined 
+    functions. No other variable will be parsed correctly.
 
 Docker
 ``````
@@ -78,6 +86,7 @@ example docker-compose service configuration is shown here::
 
   ocs-labjack:
     image: simonsobs/ocs-labjack-agent:latest
+    <<: *log-options
     hostname: ocs-docker
     network_mode: "host"
     volumes:
@@ -92,7 +101,7 @@ Example Client
 --------------
 Since labjack functionality is currently limited to acquiring data, which can 
 enabled on startup, users are likely to rarely need a client. This example
-shows the basic acquisition funcionality::
+shows the basic acquisition functionality::
 
     #Initialize the labjack
     from ocs import matched_client
@@ -105,6 +114,7 @@ shows the basic acquisition funcionality::
     print(session)
 
     #Get the current data values 1 second after starting acquistion
+    import time
     time.sleep(1)
     status, message, session = lj.acq.status()
     print(session["data"])

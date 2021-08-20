@@ -22,10 +22,9 @@ RUN ./labjack_ljm_minimal_2020_03_30_x86_64/labjack_ljm_installer.run -- --no-re
 
 RUN pip3 install --no-cache-dir https://labjack.com/sites/default/files/software/Python_LJM_2019_04_03.zip
 
-
 # Run registry on container startup
-ENTRYPOINT ["python3", "-u", "labjack_agent.py"]
+ENTRYPOINT ["dumb-init", "python3", "-u", "labjack_agent.py"]
 
 # Sensible default arguments
-CMD ["--site-hub=ws://sisock-crossbar:8001/ws", \
-     "--site-http=http://sisock-crossbar:8001/call"]
+CMD ["--site-hub=ws://crossbar:8001/ws", \
+     "--site-http=http://crossbar:8001/call"]

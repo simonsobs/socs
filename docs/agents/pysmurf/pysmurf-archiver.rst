@@ -58,8 +58,6 @@ The docker-compose entry is similar to that of the pysmurf-monitor. For example:
             - ${OCS_CONFIG_DIR}:/config
             - /home/ocs:/home/ocs
             - /data:/data
-        depends_on:
-            - "sisock-crossbar"
 
 Archived Path
 --------------

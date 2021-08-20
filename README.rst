@@ -6,8 +6,8 @@ SOCS - Simons Observatory Control System
     :target: https://github.com/simonsobs/socs/actions?query=workflow%3A%22Build+Develop+Images%22
     :alt: GitHub Workflow Status
 
-.. image:: https://readthedocs.org/projects/socs/badge/?version=latest
-    :target: https://socs.readthedocs.io/en/latest/?badge=latest
+.. image:: https://readthedocs.org/projects/socs/badge/?version=develop
+    :target: https://socs.readthedocs.io/en/develop/?badge=develop
     :alt: Documentation Status
 
 .. image:: https://coveralls.io/repos/github/simonsobs/socs/badge.svg?branch=travis

@@ -3,6 +3,8 @@ from enum import Enum
 
 import time
 import txaio
+import numpy as np
+import socket
 
 # For logging
 txaio.use_twisted()
@@ -117,6 +119,8 @@ class FrameRecorder:
         G3Reader object to read the frames from the G3NetworkSender.
     writer : spt3g.core.G3Writer
         G3Writer for writing the frames to disk.
+    data_received : bool
+        Whether data has been received by the current instance of the G3Reader.
     frames : list
         List of frames that have been read from the network. Gets cleared after
         writing to file.
@@ -146,9 +150,18 @@ class FrameRecorder:
     basename : str
         The basename of the file currently being used. The actual file will
         also contain the tracked suffix.
-
+    monitored_channels : list
+        List of readout channels to be monitored. Data from these channels will
+        be stored in ``stream_data`` after each ``run`` function call.
+    target_rate : float
+        Target sampling rate for monitored channels in Hz.
+    stream_data : dict
+        Data containing downsampled timestream data from the monitored. This
+        dict will have the channel name (such as ``r0012``) as the key, and
+        the values will have the structure required by the OCS_Feed.
     """
-    def __init__(self, file_duration, tcp_addr, data_dir, stream_id):
+    def __init__(self, file_duration, tcp_addr, data_dir, stream_id,
+                 target_rate=10):
         # Parameters
         self.time_per_file = file_duration
         self.address = tcp_addr
@@ -159,6 +172,7 @@ class FrameRecorder:
         # Reader/Writer
         self.reader = None
         self.writer = None
+        self.data_received = False
 
         # Attributes
         self.frames = []
@@ -171,6 +185,10 @@ class FrameRecorder:
         self.start_time = None
         self.dirname = None
         self.basename = None
+
+        self.monitored_channels = []
+        self.target_rate = target_rate
+        self.stream_data = {}
 
     def __del__(self):
         """Clean up by closing out the file once writing is complete."""
@@ -196,10 +214,12 @@ class FrameRecorder:
 
         """
         reader = None
+
         try:
             reader = core.G3Reader(self.address,
                                    timeout=timeout)
-            self.log.info("G3Reader connection established")
+            self.log.debug("G3Reader connection to {addr} established!",
+                           addr=self.address)
         except RuntimeError:
             self.log.error("G3Reader could not connect.")
 
@@ -261,13 +281,21 @@ class FrameRecorder:
 
             # Discard all flow control frames
             self.frames = [x for x in self.frames if 'sostream_flowcontrol' not in x]
-
+            # Discard Pipeline info frame
+            self.frames = [x for x in self.frames
+                           if x.type != core.G3FrameType.PipelineInfo]
+            if self.frames and not self.data_received:
+                self.data_received = True
+                self.log.info("Started receiving frames from {addr}",
+                              addr=self.address)
             return
         else:
-            self.log.debug("Could not read frames. Connection " +
-                           "timed out, or G3NetworkSender offline. " +
-                           "Cleaning up...")
+            if self.data_received:
+                self.log.info("Could not read frames. Connection " +
+                              "timed out, or G3NetworkSender offline. " +
+                              "Cleaning up...")
             self.close_file()
+            self.data_received = False
             self.reader = None
 
     def check_for_frame_gap(self, gap_size=5):
@@ -426,7 +454,46 @@ class FrameRecorder:
         """
         self.read_frames()
         self.check_for_frame_gap(10)
+        if len(self.monitored_channels) > 0:
+            try:
+                self.read_stream_data()
+            except Exception as e:
+                self.log.warn("Exception thrown when reading stream data:\n{e}", e=e)
+
         if self.frames:
             self.create_new_file()
             self.write_frames_to_file()
             self.split_acquisition()
+
+    def read_stream_data(self):
+        """Reads stream data from ``self.frames``, downsamples it, and stores
+        it in ``self.stream_data``.
+        """
+        chan_keys = [f'r{c:04}' for c in self.monitored_channels]
+        self.stream_data = {
+            k: {'timestamps': [], 'block_name': k, 'data': {k:[]}}
+            for k in chan_keys
+        }
+
+        for frame in self.frames:
+            if frame.type != core.G3FrameType.Scan:
+                continue
+            ds_factor = (frame['data'].sample_rate/core.G3Units.Hz) \
+                        // self.target_rate
+            if np.isnan(ds_factor):
+                continue
+            ds_factor = max(int(ds_factor), 1)
+            n_samples = frame['data'].n_samples
+            if 1 < n_samples <= ds_factor:
+                ds_factor = n_samples - 1
+            times = [
+                t.time / core.G3Units.s
+                for t in frame['data'].times()[::ds_factor]
+            ]
+            for key in chan_keys:
+                data = frame['data'].get(key)
+                if data is None:
+                    continue
+                self.stream_data[key]['timestamps'].extend(times)
+                self.stream_data[key]['data'][key].extend(list(data[::ds_factor]))
+

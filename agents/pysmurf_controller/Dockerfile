@@ -1,21 +1,6 @@
-FROM simonsobs/sodetlib:v0.0.1
-
-# Set locale
-ENV LANG C.UTF-8
-
-# Installs Jupyter requirements
-RUN pip3 install jupyter
+FROM simonsobs/sodetlib:v0.2.0-23-g90fd9f2
 
 WORKDIR /app
-
-# Installs OCS requirements
-#COPY requirements.txt .
-#RUN pip3 install -r requirements.txt
-
-# OCS installation
-RUN git clone https://github.com/simonsobs/ocs.git \
-    && pip3 install -r ocs/requirements.txt \
-    && pip3 install -e ocs
 
 # SOCS installation
 RUN git clone https://github.com/simonsobs/socs.git \
@@ -31,8 +16,8 @@ WORKDIR /app/socs/agents/pysmurf_controller
 COPY . .
 RUN pip3 install -r requirements.txt
 
-ENTRYPOINT ["python3", "-u", "pysmurf_controller.py"]
+ENTRYPOINT ["dumb-init", "python3", "-u", "pysmurf_controller.py"]
 
 # Sensible defaults for setup with sisock
-CMD ["--site-hub=ws://sisock-crossbar:8001/ws", \
-     "--site-http=http://sisock-crossbar:8001/call"]
+CMD ["--site-hub=ws://crossbar:8001/ws", \
+     "--site-http=http://crossbar:8001/call"]

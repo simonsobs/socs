@@ -2,7 +2,7 @@ import time
 import os
 import socket
 import argparse
-from socs.agent.scpi_psu_driver import psuInterface
+from socs.agent.scpi_psu_driver import PsuInterface
 
 on_rtd = os.environ.get('READTHEDOCS') == 'True'
 if not on_rtd:
@@ -40,7 +40,7 @@ class ScpiPsuAgent:
                 return False, "Could not acquire lock"
 
             try:
-                self.psu = psuInterface(self.ip_address, self.gpib_slot)
+                self.psu = PsuInterface(self.ip_address, self.gpib_slot)
                 self.idn = self.psu.identify()
             except socket.timeout as e:
                 self.log.error("PSU timed out during connect")
@@ -75,8 +75,8 @@ class ScpiPsuAgent:
                     }
 
                     for chan in [1, 2, 3]:
-                        data['data']["Voltage_{}".format(chan)] = self.psu.getVolt(chan)
-                        data['data']["Current_{}".format(chan)] = self.psu.getCurr(chan)
+                        data['data']["Voltage_{}".format(chan)] = self.psu.get_volt(chan)
+                        data['data']["Current_{}".format(chan)] = self.psu.get_curr(chan)
 
                     # self.log.info(str(data))
                     # print(data)
@@ -107,7 +107,7 @@ class ScpiPsuAgent:
 
         with self.lock.acquire_timeout(1) as acquired:
             if acquired:
-                self.psu.setVolt(params['channel'], params['volts'])
+                self.psu.set_volt(params['channel'], params['volts'])
             else:
                 return False, "Could not acquire lock"
 
@@ -123,7 +123,7 @@ class ScpiPsuAgent:
         """
         with self.lock.acquire_timeout(1) as acquired:
             if acquired:
-                self.psu.setCurr(params['channel'], params['current'])
+                self.psu.set_curr(params['channel'], params['current'])
             else:
                 return False, "Could not acquire lock"
 
@@ -139,7 +139,7 @@ class ScpiPsuAgent:
         """
         with self.lock.acquire_timeout(1) as acquired:
             if acquired:
-                self.psu.setOutput(params['channel'], params['state'])
+                self.psu.set_output(params['channel'], params['state'])
             else:
                 return False, "Could not acquire lock"
 

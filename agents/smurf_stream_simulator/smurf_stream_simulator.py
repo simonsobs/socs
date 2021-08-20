@@ -176,7 +176,7 @@ class SmurfStreamSimulator:
                     ts = core.G3Timestream([chan.read() for t in times])
                     ts.start = core.G3Time(frame_start * core.G3Units.sec)
                     ts.stop = core.G3Time(frame_stop * core.G3Units.sec)
-                    f['data'][str(i)] = ts
+                    f['data'][f"r{i:04}"] = ts
 
                 self.writer.Process(f)
                 self.log.info("Writing frame...")
@@ -219,7 +219,6 @@ class SmurfStreamSimulator:
             f['start_time'] = time.time()
             f['sostream_id'] = self.stream_id
             self.writer.Process(f)
-
 
     def _send_end_flowcontrol_frame(self):
         """Send END flowcontrol frame."""
@@ -347,6 +346,8 @@ def make_parser(parser=None):
                         help="Port to listen on.")
     pgroup.add_argument("--num-chans", default=528,
                         help="Number of detector channels to simulate.")
+    pgroup.add_argument("--stream-id", default="stream_sim",
+                        help="Stream ID for the simulator.")
 
     return parser
 
@@ -364,7 +365,8 @@ if __name__ == '__main__':
     agent, runner = ocs_agent.init_site_agent(args)
     sim = SmurfStreamSimulator(agent, target_host=args.target_host,
                                port=int(args.port),
-                               num_chans=int(args.num_chans))
+                               num_chans=int(args.num_chans),
+                               stream_id=args.stream_id)
 
     agent.register_process('stream', sim.start_background_streamer,
                            sim.stop_background_streamer,

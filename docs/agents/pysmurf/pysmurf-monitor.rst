@@ -138,8 +138,6 @@ An example docker-compose entry might look like::
         volumes:
             - ${OCS_CONFIG_DIR}:/config
             - /data:/data
-        depends_on:
-            - "sisock-crossbar"
 
 Where DB_HOST, DB, DB_USER, and DB_PW are set in the ``.env`` file in the same dir as
 the docker-compose file.

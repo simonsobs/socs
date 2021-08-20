@@ -13,6 +13,7 @@ import argparse
 from twisted.enterprise import adbapi
 
 from socs.util import get_md5sum
+from ocs.agent.aggregator import Provider
 
 on_rtd = os.environ.get('READTHEDOCS') == 'True'
 if not on_rtd:
@@ -98,6 +99,7 @@ class PysmurfMonitor(DatagramProtocol):
             (host, port) of the sender.
         """
         data = json.loads(_data)
+        pub_id = data['id']
 
         if data['type'] in ['data_file']:
             self.log.info("New file: {fname}", fname=data['payload']['path'])
@@ -121,7 +123,7 @@ class PysmurfMonitor(DatagramProtocol):
                 'instance_id':          instance,
                 'copied':               0,
                 'failed_copy_attempts': 0,
-                'md5sum':               get_md5sum(d['path']),
+                'md5sum':               get_md5sum(path),
                 'socs_version':         socs.__version__,
             }
 
@@ -133,6 +135,36 @@ class PysmurfMonitor(DatagramProtocol):
             self.agent.publish_to_feed(
                 "pysmurf_session_data", data, from_reactor=True
             )
+
+        # Handles published metadata from the streamer
+        elif data['type'] == "metadata":
+            self.log.debug("Received Metadata: {payload}", payload=data['payload'])
+
+            # streamer publisher-id looks like `STREAMER:<stream-id>`
+            if ':' in pub_id:
+                stream_id = pub_id.split(':')[1]
+            else:
+                # This is so that this still works before people update to the
+                # version of the stream fuction where the pub-id is set
+                # properly. In this case the stream-id will be something like
+                # "unidentified"
+                stream_id = pub_id
+
+            path = data['payload']['path']
+            val = data['payload']['value']
+            val_type = data['payload']['type']
+
+            field_name = Provider._enforce_field_name_rules(path)
+            feed_name = f'{stream_id}_meta'
+
+            if feed_name not in self.agent.feeds:
+                self.agent.register_feed(feed_name, record=True, buffer_time=0)
+
+            feed_data = {'block_name': field_name,
+                         'timestamp': data['time'],
+                         'data': {field_name: val}}
+
+            self.agent.publish_to_feed(feed_name, feed_data, from_reactor=True)
 
     def init(self, session, params=None):
         """

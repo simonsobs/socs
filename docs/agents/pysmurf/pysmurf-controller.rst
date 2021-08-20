@@ -85,8 +85,6 @@ named ``ocs-pysmurf-monitor`` might look something like::
             - ${OCS_CONFIG_DIR}:/config
             - /data:/data
             - /path/to/dev/pysmurf/:/usr/local/src/pysmurf
-        depends_on:
-            - "sisock-crossbar"
 
 
 

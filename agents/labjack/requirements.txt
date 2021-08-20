@@ -1,2 +1,3 @@
 numexpr
 scipy
+labjack-ljm

@@ -6,6 +6,7 @@ import numpy as np
 import txaio
 import threading
 from contextlib import contextmanager
+from twisted.internet import reactor
 
 from socs.Lakeshore.Lakeshore372 import LS372
 
@@ -131,6 +132,8 @@ class LS372_Agent:
         Parameters:
             auto_acquire (bool, optional): Default is False. Starts data
                 acquisition after initialization if True.
+            acq_params (dict, optional): Params to pass to acq process if
+                auto_acquire is True.
 
         """
 
@@ -160,7 +163,17 @@ class LS372_Agent:
                 session.add_message("No initialization since faking data")
                 self.thermometers = ["thermA", "thermB"]
             else:
-                self.module = LS372(self.ip)
+                try:
+                    self.module = LS372(self.ip)
+                except ConnectionError:
+                    self.log.error("Could not connect to the LS372. Exiting.")
+                    reactor.callFromThread(reactor.stop)
+                    return False, 'Lakeshore initialization failed'
+                except Exception as e:
+                    self.log.error(f"Unhandled exception encountered: {e}")
+                    reactor.callFromThread(reactor.stop)
+                    return False, 'Lakeshore initialization failed'
+
                 print("Initialized Lakeshore module: {!s}".format(self.module))
                 session.add_message("Lakeshore initilized with ID: %s"%self.module.id)
 
@@ -170,7 +183,7 @@ class LS372_Agent:
 
         # Start data acquisition if requested
         if params.get('auto_acquire', False):
-            self.agent.start('acq')
+            self.agent.start('acq', params.get('acq_params', None))
 
         return True, 'Lakeshore module initialized.'
 
@@ -191,6 +204,11 @@ class LS372_Agent:
                  "Channel_02": {"T": 293.701, "R": 30.7398, "timestamp": 1601924466.6130798}
                 }
             }
+
+        Parameters:
+            sample_heater (bool, optional): Default is False. Will record
+                values from the sample heater, typically used to servo a DR if
+                True.
 
         """
 
@@ -307,6 +325,21 @@ class LS372_Agent:
                 session.app.publish_to_feed('temperatures', data)
 
                 self.log.debug("{data}", data=session.data)
+
+                if params.get("sample_heater", False):
+                    # Sample Heater
+                    heater = self.module.sample_heater
+                    hout = heater.get_sample_heater_output()
+
+                    current_time = time.time()
+                    htr_data = {
+                        'timestamp': current_time,
+                        'block_name': "heaters",
+                        'data': {}
+                    }
+                    htr_data['data']['sample_heater_output'] = hout
+
+                    session.app.publish_to_feed('temperatures', htr_data)
 
         return True, 'Acquisition exited cleanly.'
 
@@ -595,6 +628,9 @@ class LS372_Agent:
         output - Specifies heater output value.
                     If display is set to "Current" or heater is "still", can be any number between 0 and 100.
                     If display is set to "Power", can be any number between 0 and the maximum allowed power.
+        
+        Note that for the still heater this sets the still heater manual output, NOT the still heater still output.
+        Use set_still_output() instead to set the still output.
 
         display (opt)- Specifies heater display type. Can be "Current" or "Power".
                         If None, heater display is not reset before setting output.
@@ -629,6 +665,69 @@ class LS372_Agent:
             session.app.publish_to_feed('temperatures', data)
 
         return True, "Set {} display to {}, output to {}".format(heater, display, output)
+                                    
+    def set_still_output(self, session, params=None):
+        """
+        Set the still output on the still heater. This is different than the manual output
+        on the still heater. Use set_heater_output() for that.
+
+        :param params: dict with "output" parameter
+        :type params: dict
+
+        output - Specifies still heater output value.
+                    Can be any number between 0 and 100.
+
+        """
+
+        with self._lock.acquire_timeout(job='set_still_output') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            output = params['output']
+
+            self.module.still_heater.set_still_output(output)
+
+            self.log.info("Set still output to {}".format(output))
+
+            session.set_status('running')
+
+            data = {'timestamp': time.time(),
+                    'block_name': 'still_heater_still_out',
+                    'data': {'still_heater_still_out': output}
+                    }
+            session.app.publish_to_feed('temperatures', data)
+
+        return True, "Set still output to {}".format(output)
+        
+    def get_still_output(self, session, params=None):
+        """
+        Gets the current still output on the still heater.
+
+        This task has no useful parameters.
+
+        The still heater output is stored in the session.data
+        object in the format::
+
+          {"still_heater_still_out": 9.628}
+
+        """
+
+        with self._lock.acquire_timeout(job='get_still_output') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            still_output = self.module.still_heater.get_still_output()
+
+            self.log.info("Current still output is {}".format(still_output))
+
+            session.set_status('running')
+            session.data = {"still_heater_still_out": still_output}
+
+        return True, "Current still output is {}".format(still_output)
 
 def make_parser(parser=None):
     """Build the argument parser for the Agent. Allows sphinx to automatically
@@ -656,6 +755,8 @@ def make_parser(parser=None):
                               collection at the end of a scan.")
     pgroup.add_argument('--auto-acquire', type=bool, default=True,
                         help='Automatically start data acquisition on startup')
+    pgroup.add_argument('--sample-heater', type=bool, default=False,
+                        help='Record sample heater output during acquisition.')
 
     return parser
 
@@ -668,20 +769,16 @@ if __name__ == '__main__':
     txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
 
     # Get the default ocs argument parser.
-    site_parser = site_config.add_arguments()
-
-    parser = make_parser(site_parser)
-
-    # Parse comand line.
-    args = parser.parse_args()
+    parser = make_parser()
+    args = site_config.parse_args(agent_class='Lakeshore372', parser=parser)
 
     # Automatically acquire data if requested (default)
     init_params = False
     if args.auto_acquire:
-        init_params = {'auto_acquire': True}
+        init_params = {'auto_acquire': True,
+                       'acq_params': {'sample_heater': args.sample_heater}}
 
     # Interpret options in the context of site_config.
-    site_config.reparse_args(args, 'Lakeshore372Agent')
     print('I am in charge of device with serial number: %s' % args.serial_number)
 
     agent, runner = ocs_agent.init_site_agent(args)
@@ -702,6 +799,8 @@ if __name__ == '__main__':
     agent.register_task('check_temperature_stability', lake_agent.check_temperature_stability)
     agent.register_task('set_output_mode', lake_agent.set_output_mode)
     agent.register_task('set_heater_output', lake_agent.set_heater_output)
+    agent.register_task('set_still_output', lake_agent.set_still_output)
+    agent.register_task('get_still_output', lake_agent.get_still_output)
     agent.register_process('acq', lake_agent.start_acq, lake_agent.stop_acq)
 
     runner.run(agent, auto_reconnect=True)
