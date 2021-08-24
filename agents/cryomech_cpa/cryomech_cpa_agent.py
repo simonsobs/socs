@@ -321,14 +321,8 @@ def make_parser(parser=None):
 
 
 def main():
-    site_parser = site_config.add_arguments()
-    parser = make_parser(site_parser)
-
-    # Get the parser to process the command line.
-    args = parser.parse_args()
-
-    # Interpret options in the context of site_config.
-    site_config.reparse_args(args, 'CryomechCPAAgent')
+    parser = make_parser()
+    args = site_config.parse_args(agent_class='CryomechCPAAgent', parser=parser)
     print('I am in charge of device with serial number: %s' % args.serial_number)
 
     # Automatically acquire data if requested (default)
