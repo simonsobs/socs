@@ -1,3 +1,4 @@
+import argparse
 import time
 import threading
 import glob
@@ -502,23 +503,29 @@ class BlueforsAgent:
                      False: 'Failed to request process stop.'}[ok])
 
 
-if __name__ == '__main__':
-    # Start logging
-    txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
+def make_parser(parser=None):
+    """Build the argument parser for the Agent. Allows sphinx to automatically
+    build documentation based on this function.
 
-    # Get the default ocs argument parser.
-    parser = site_config.add_arguments()
+    """
+    if parser is None:
+        parser = argparse.ArgumentParser()
 
     # Add options specific to this agent.
     pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--log-directory')
 
-    # Parse comand line.
-    args = parser.parse_args()
+    return parser
 
-    # Interpret options in the context of site_config.
-    site_config.reparse_args(args, 'BlueforsAgent')
-    print('I am following logs located at : %s' % args.log_directory)
+
+if __name__ == '__main__':
+    # Start logging
+    txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
+
+    # Setup argument parser
+    parser = make_parser()
+    args = site_config.parse_args(agent_class='BlueforsAgent', parser=parser)
+    LOG.info('I am following logs located at : %s' % args.log_directory)
 
     agent, runner = ocs_agent.init_site_agent(args)
 
