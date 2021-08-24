@@ -293,11 +293,9 @@ def make_parser(parser=None):
 
 
 def main():
-    parser = site_config.add_arguments()
-    parser = make_parser(parser)
-
-    args = parser.parse_args()
-    site_config.reparse_args(args, 'PysmurfArchiverAgent')
+    parser = make_parser()
+    args = site_config.parse_args(agent_class='PysmurfArchiverAgent',
+                                  parser=parser)
 
     if args.target is None:
         raise Exception("Argument --target is required")
