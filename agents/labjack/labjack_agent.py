@@ -368,12 +368,8 @@ if __name__ == '__main__':
     # Start logging
     txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
 
-    site_parser = site_config.add_arguments()
-    parser = make_parser(site_parser)
-
-    args = parser.parse_args()
-
-    site_config.reparse_args(args, 'LabJackAgent')
+    parser = make_parser()
+    args = site_config.parse_args(agent_class='LabJackAgent', parser=parser)
 
     init_params = False
     if args.mode == 'acq':
