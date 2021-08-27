@@ -2,6 +2,7 @@
 # via Ethernet connection
 # Zhilei Xu, Tanay Bhandarkar
 
+import argparse
 import socket
 import numpy as np
 from ocs import ocs_agent, site_config
@@ -159,16 +160,25 @@ class PfeifferAgent:
             return False, 'acq is not currently running'
 
 
-if __name__ == '__main__':
-    parser = site_config.add_arguments()
+def make_parser(parser=None):
+    """Build the argument parser for the Agent. Allows sphinx to automatically
+    build documentation based on this function.
+
+    """
+    if parser is None:
+        parser = argparse.ArgumentParser()
 
     pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--ip_address')
     pgroup.add_argument('--port')
 
-    args = parser.parse_args()
+    return parser
 
-    site_config.reparse_args(args, 'PfeifferAgent')
+
+if __name__ == '__main__':
+    parser = make_parser()
+    args = site_config.parse_args(agent_class='PfeifferAgent', parser=parser)
+
     agent, runner = ocs_agent.init_site_agent(args)
     pfeiffer_agent = PfeifferAgent(agent, args.ip_address, args.port)
     agent.register_process('acq', pfeiffer_agent.start_acq,

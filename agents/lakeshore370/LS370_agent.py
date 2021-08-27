@@ -753,22 +753,15 @@ if __name__ == '__main__':
     # Start logging
     txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
 
-    # Get the default ocs argument parser.
-    site_parser = site_config.add_arguments()
-
-    parser = make_parser(site_parser)
-
-    # Parse comand line.
-    args = parser.parse_args()
+    parser = make_parser()
+    args = site_config.parse_args(agent_class='Lakeshore370Agent', parser=parser)
 
     # Automatically acquire data if requested (default)
     init_params = False
     if args.auto_acquire:
         init_params = {'auto_acquire': True}
 
-    # Interpret options in the context of site_config.
-    site_config.reparse_args(args, 'Lakeshore370Agent')
-    print('I am in charge of device with serial number: %s' % args.serial_number)
+    LOG.info('I am in charge of device with serial number: %s' % args.serial_number)
 
     agent, runner = ocs_agent.init_site_agent(args)
 

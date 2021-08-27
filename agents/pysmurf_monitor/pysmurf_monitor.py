@@ -209,13 +209,8 @@ def make_parser(parser=None):
 
 
 if __name__ == '__main__':
-    parser = site_config.add_arguments()
-
-    parser = make_parser(parser)
-
-    args = parser.parse_args()
-
-    site_config.reparse_args(args, 'PysmurfMonitor')
+    parser = make_parser()
+    args = site_config.parse_args(agent_class='PysmurfMonitor', parser=parser)
 
     agent, runner = ocs_agent.init_site_agent(args)
     monitor = PysmurfMonitor(agent, args)

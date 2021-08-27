@@ -428,14 +428,8 @@ if __name__ == "__main__":
     # Start logging
     txaio.start_logging(level=environ.get("LOGLEVEL", "info"))
 
-    # Get the default ocs agrument parser
-    site_parser = site_config.add_arguments()
-    parser = make_parser(site_parser)
-
-    # Parse commandline
-    args = parser.parse_args()
-
-    site_config.reparse_args(args, "MeinbergM1000Agent")
+    parser = make_parser()
+    args = site_config.parse_args(agent_class="MeinbergM1000Agent", parser=parser)
 
     agent, runner = ocs_agent.init_site_agent(args)
     listener = MeinbergM1000Agent(agent,
