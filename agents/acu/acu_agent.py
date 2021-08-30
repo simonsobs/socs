@@ -56,7 +56,7 @@ class ACUAgent:
         self.sleeptime = self.acu_config['motion_waittime']
         self.udp = self.acu_config['streams']['main']
         self.udp_ext = self.acu_config['streams']['ext']
-        self.acu8100 = None 
+        self.acu8100 = self.acu_config['status']['status_name']
 
         self.log = agent.log
 
@@ -97,31 +97,33 @@ class ACUAgent:
         agg_params = {'frame_length': 60}
         self.agent.register_feed('acu_status_summary',
                                  record=True,
-                                 agg_params={'frame_length': 60,
-                                             'exclude_influx': False
-                                             },
+                                 agg_params=agg_params,
                                  buffer_time=1)
         self.agent.register_feed('acu_status_full',
                                  record=True,
                                  agg_params={'frame_length': 60,
-                                             'exclude_influx': True
+                                             'exclude_influx': True,
+                                             'exclude_aggregator': False
                                              },
                                  buffer_time=1)
         self.agent.register_feed('acu_status_influx',
                                  record=True,
                                  agg_params={'frame_length': 60,
+                                             'exclude_influx': False,
                                              'exclude_aggregator': True
                                              },
                                  buffer_time=1)
         self.agent.register_feed('acu_udp_stream',
                                  record=True,
                                  agg_params={'frame_length': 60,
-                                             'exclude_influx': False
+                                             'exclude_influx': True,
+                                             'exclude_aggregator': False
                                              },
                                  buffer_time=1)
         self.agent.register_feed('acu_broadcast_influx',
-                                 record=False,
+                                 record=True,
                                  agg_params={'frame_length': 60,
+                                             'exclude_influx': False,
                                              'exclude_aggregator': True
                                              },
                                  buffer_time=1)
@@ -273,8 +275,7 @@ class ACUAgent:
 
             query_t = now
             try:
-                j = yield self.acu.http.Values('DataSets.StatusSATPDetailed8100')
-               # j = yield self.acu.http.Values('DataSets.StatusCCATDetailed8100')
+                j = yield self.acu.http.Values(self.acu8100)
                 n_ok += 1
                 session.data = j
             except Exception as e:
@@ -348,7 +349,7 @@ class ACUAgent:
         session.set_status('running')
         FMT = '<idddddddddddd'
         FMT_LEN = struct.calcsize(FMT)
-        UDP_PORT = self.acu_config['PositionBroadcast_target'].split(':')[1]
+        UDP_PORT = self.udp['port'] #self.acu_config['PositionBroadcast_target'].split(':')[1]
         udp_data = []
         class MonitorUDP(protocol.DatagramProtocol):
 
@@ -388,17 +389,17 @@ class ACUAgent:
                 pd0_sec = pd0[1]
                 pd0_data_ctime = gyear + pd0_gday + pd0_sec
                 pd0_azimuth_corrected = pd0[2]
-                pd0_azimuth_raw = pd0[4]
+                pd0_azimuth_raw = pd0[5]
                 pd0_elevation_corrected = pd0[3]
-                pd0_elevation_raw = pd0[5]
-                bcast_first = {'Time': pd0_data_ctime,
-                               'Azimuth_Corrected': pd0_azimuth_corrected,
-                               'Azimuth_Raw': pd0_azimuth_raw,
-                               'Elevation_Corrected': pd0_elevation_corrected,
-                               'Elevation_Raw': pd0_elevation_raw,
+                pd0_elevation_raw = pd0[6]
+                bcast_first = {'Time_bcast_influx': pd0_data_ctime,
+                               'Azimuth_Corrected_bcast_influx': pd0_azimuth_corrected,
+                               'Azimuth_Raw_bcast_influx': pd0_azimuth_raw,
+                               'Elevation_Corrected_bcast_influx': pd0_elevation_corrected,
+                               'Elevation_Raw_bcast_influx': pd0_elevation_raw,
                                }
-                acu_broadcast_influx = {'timestamp': bcast_first['Time'],
-                                        'block_name': 'ACU_position',
+                acu_broadcast_influx = {'timestamp': bcast_first['Time_bcast_influx'],
+                                        'block_name': 'ACU_position_bcast_influx',
                                         'data': bcast_first,
                                         }
                 self.agent.publish_to_feed('acu_broadcast_influx', acu_broadcast_influx)
@@ -682,6 +683,7 @@ class ACUAgent:
                           'block_name': 'ACU_upload',
                           'data': upload_publish_dict
                           }
+            print(acu_upload)
             self.agent.publish_to_feed('acu_upload', acu_upload)
             self.log.info('Uploaded a group')
         self.log.info('No more lines to upload')
