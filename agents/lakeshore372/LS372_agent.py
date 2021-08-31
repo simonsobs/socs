@@ -603,20 +603,23 @@ class LS372_Agent:
 
             session.set_status('running')
 
-            # Check we're in correct control mode for servo.
-            if self.module.sample_heater.mode != 'Closed Loop':
-                session.add_message(f'Changing control to Closed Loop mode for servo.')
-                self.module.sample_heater.set_mode("Closed Loop")
+            # Check if the PID input channel is the control input. 
+            # If it is, turn off autoscan. If it isn't, make sure autoscan is on
+            if str(self.module.sample_heater.input) != 'A' :
+                # Check we aren't autoscanning.
+                if self.module.get_autoscan() is True:
+                    session.add_message(f'Autoscan is enabled, disabling for PID control on dedicated channel.')
+                    self.module.disable_autoscan()
 
-            # Check we aren't autoscanning.
-            if self.module.get_autoscan() is True:
-                session.add_message(f'Autoscan is enabled, disabling for PID control on dedicated channel.')
-                self.module.disable_autoscan()
+                # Check we're scanning same channel expected by heater for control.
+                if self.module.get_active_channel().channel_num != int(self.module.sample_heater.input):
+                    session.add_message(f'Changing active channel to expected heater control input')
+                    self.module.set_active_channel(int(self.module.sample_heater.input))
 
-            # Check we're scanning same channel expected by heater for control.
-            if self.module.get_active_channel().channel_num != int(self.module.sample_heater.input):
-                session.add_message(f'Changing active channel to expected heater control input')
-                self.module.set_active_channel(int(self.module.sample_heater.input))
+            else:
+                if self.module.get_autoscan() is False:
+                    session.add_message(f'Autoscan is disabled. Turning on autoscan.')
+                    self.module.enable_autoscan()
 
             # Check we're setup to take correct units.
             if self.module.get_active_channel().units != 'kelvin':
@@ -829,6 +832,29 @@ class LS372_Agent:
 
         return True, "Current still output is {}".format(still_output)
 
+    def set_input_channel(self, session, params):
+        """
+        Set the input channel for the sample heater, for use in PID.
+
+        :param params: dict with "channel" key for Heater.set_input_channel()
+        :type params: dict
+        """
+
+        with self._acq_proc_lock.acquire_timeout(1, job='set_input_channel') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start init because "
+                              f"{self._acq_proc_lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            session.set_status('running')
+
+            self.module.sample_heater.set_input_channel(params['channel'])
+            active_channel = self.module.sample_heater.input
+            session.add_message('active channel is ' + str(active_channel))
+
+        return True, f'Set sample heater input channel to {params["channel"]}.'
+
+
 def make_parser(parser=None):
     """Build the argument parser for the Agent. Allows sphinx to automatically
     build documentation based on this function.
@@ -906,5 +932,6 @@ if __name__ == '__main__':
     agent.register_process('acq', lake_agent.acq, lake_agent._stop_acq)
     agent.register_task('enable_control_chan', lake_agent.enable_control_chan)
     agent.register_task('disable_control_chan', lake_agent.disable_control_chan)
+    agent.register_task('set_input_channel', lake_agent.set_input_channel)
 
     runner.run(agent, auto_reconnect=True)

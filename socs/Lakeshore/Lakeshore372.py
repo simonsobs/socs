@@ -1522,7 +1522,10 @@ class Heater:
         :param _input: specifies which input or channel to control from
         :type _input: str or int
         """
-        assert int(_input) in range(17) or _input == "A", f"{_input} not a valid input/channel"
+        assert int(_input) in range(17), f"{_input} not a valid input/channel"
+
+        if int(_input) == 0:
+            _input = 'A'
 
         resp = self.get_output_mode()
         resp[1] = str(_input)
