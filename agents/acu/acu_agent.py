@@ -133,7 +133,10 @@ class ACUAgent:
                                  buffer_time=1)
         self.agent.register_feed('acu_upload',
                                  record=True,
-                                 agg_params=agg_params,
+                                 agg_params={'frame_length': 60,
+                                             'exclude_influx': False,
+                                             'exclude_aggregator': False
+                                             },
                                  buffer_time=1)
         self.agent.register_feed('acu_error',
                                  record=True,
@@ -259,6 +262,20 @@ class ACUAgent:
                    'False': 0,
                    'True': 1
                    }
+        self.data['uploads'] = {'Start_Azimuth': 0.0,
+                                'Start_Elevation': 0.0,
+                                'Start_Boresight': 0.0,
+                                'Command_Type': 0,
+                                'Preset_Azimuth': 0.0,
+                                'Preset_Elevation': 0.0,
+                                'PtStack_Lines': 'False',
+                                'PtStack_Time': '000, 00:00:00.000000',
+                                'PtStack_Azimuth': 0.0,
+                                'PtStack_Elevation': 0.0,
+                                'PtStack_AzVelocity': 0.0,
+                                'PtStack_ElVelocity': 0.0,
+                                'PtStack_AzFlag': 0,
+                                'PtStack_ElFlag': 0}
         char_replace = [' ', '-', ':', '(', ')', '+', ',', '/']
         while self.jobs['monitor'] == 'run':
             now = time.time()
@@ -329,9 +346,15 @@ class ACUAgent:
                                 'block_name': 'ACU_fullstatus_ints',
                                 'data': influx_status
                                 }
+            acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
+                          'block_name': 'ACU_upload',
+                          'data': self.data['uploads']
+                          }
+            print(acu_upload)
             self.agent.publish_to_feed('acu_status_summary', acustatus_summary)
             self.agent.publish_to_feed('acu_status_full', acustatus_full)
             self.agent.publish_to_feed('acu_status_influx', acustatus_influx)
+            self.agent.publish_to_feed('acu_upload', acu_upload)
         self.set_job_done('monitor')
         return True, 'Acquisition exited cleanly.'
 
@@ -467,18 +490,25 @@ class ACUAgent:
         wait_for_motion = params.get('wait', 1)
         current_az = round(self.data['broadcast']['Azimuth_Corrected'], 4)
         current_el = round(self.data['broadcast']['Elevation_Corrected'], 4)
-        publish_dict = {'Start_Azimuth': current_az,
-                        'Start_Elevation': current_el,
-                        'Start_Boresight': 0,
-                        'Upload_Type': 1,
-                        'Preset_Azimuth': az,
-                        'Preset_Elevation': el,
-                        'Upload_Lines': []}
-        acu_upload = {'timestamp': self.data['broadcast']['Time'],
-                      'block_name': 'ACU_upload',
-                      'data': publish_dict
-                      }
-        self.agent.publish_to_feed('acu_upload', acu_upload)
+        self.data['uploads'] = {'Start_Azimuth': current_az,
+                                'Start_Elevation': current_el,
+                                'Start_Boresight': 0.0,
+                                'Command_Type': 1,
+                                'Preset_Azimuth': az,
+                                'Preset_Elevation': el,
+                                'PtStack_Lines': 'False',
+                                'PtStack_Time': '000, 00:00:00.000000',
+                                'PtStack_Azimuth': 0.0,
+                                'PtStack_Elevation': 0.0,
+                                'PtStack_AzVelocity': 0.0,
+                                'PtStack_ElVelocity': 0.0,
+                                'PtStack_AzFlag': 0,
+                                'PtStack_ElFlag': 0}
+#        acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
+#                      'block_name': 'ACU_upload',
+#                      'data': self.data['uploads']
+#                      }
+#        self.agent.publish_to_feed('acu_upload', acu_upload)
         # Check whether the telescope is already at the point
         self.log.info('Checking current position')
         if current_az == az and current_el == el:
@@ -519,6 +549,21 @@ class ACUAgent:
                     return False, 'Fault triggered!'
 
         yield self.acu.stop()
+        self.data['uploads'] = {'Start_Azimuth': 0.0,
+                               'Start_Elevation': 0.0,
+                               'Start_Boresight': 0.0,
+                               'Command_Type': 0,
+                               'Preset_Azimuth': 0.0,
+                               'Preset_Elevation': 0.0,
+                               'PtStack_Lines': 'False',
+                               'PtStack_Time': '000, 00:00:00.000000',
+                               'PtStack_Azimuth': 0.0,
+                               'PtStack_Elevation': 0.0,
+                               'PtStack_AzVelocity': 0.0,
+                               'PtStack_ElVelocity': 0.0,
+                               'PtStack_AzFlag': 0,
+                               'PtStack_ElFlag': 0}
+
         self.set_job_done('control')
         return True, 'Pointing completed'
 
@@ -574,7 +619,7 @@ class ACUAgent:
 
     @inlineCallbacks
     def run_specified_scan(self, session, params=None):
-        """TASK run_specifid_scan
+        """TASK run_specified_scan
 
         Upload and execute a scan pattern. The pattern may be specified by a
         numpy file, parameters for a linear scan in one direction, or a linear
@@ -645,13 +690,20 @@ class ACUAgent:
         start_az = azs[0]
         start_el = els[0]
 
-        upload_publish_dict = {'Start_Azimuth': start_az,
+        self.data['uploads'] = {'Start_Azimuth': start_az,
                                'Start_Elevation': start_el,
-                               'Start_Boresight': 0,
-                               'Upload_Type': 2,
-                               'Preset_Azimuth': 0,
-                               'Preset_Elevation': 0,
-                               'Upload_Lines': []}
+                               'Start_Boresight': 0.0,
+                               'Command_Type': 2,
+                               'Preset_Azimuth': 0.0,
+                               'Preset_Elevation': 0.0,
+                               'PtStack_Lines': 'True',
+                               'PtStack_Time': '000, 00:00:00.000000',
+                               'PtStack_Azimuth': 0.0,
+                               'PtStack_Elevation': 0.0,
+                               'PtStack_AzVelocity': 0.0,
+                               'PtStack_ElVelocity': 0.0,
+                               'PtStack_AzFlag': 0,
+                               'PtStack_ElFlag': 0}
 
         # Follow the scan in ProgramTrack mode, then switch to Stop mode
         if scantype == 'linear_turnaround_sameends':
@@ -678,13 +730,20 @@ class ACUAgent:
                     ['Qty_of_free_program_track_stack_positions']
                 yield dsleep(0.1)
             yield self.acu.http.UploadPtStack(text)
-            upload_publish_dict['Upload_Lines'] = upload_lines
-            acu_upload = {'timestamp': self.data['broadcast']['Time'],
-                          'block_name': 'ACU_upload',
-                          'data': upload_publish_dict
-                          }
-            print(acu_upload)
-            self.agent.publish_to_feed('acu_upload', acu_upload)
+            for u in upload_lines:
+                self.data['uploads']['PtStack_Time'] = u.split(';')[0]
+                self.data['uploads']['PtStack_Azimuth'] = float(u.split(';')[1])
+                self.data['uploads']['PtStack_Elevation'] = float(u.split(';')[2])
+                self.data['uploads']['PtStack_AzVelocity'] = float(u.split(';')[3])
+                self.data['uploads']['PtStack_ElVelocity'] = float(u.split(';')[4])
+                self.data['uploads']['PtStack_AzFlag'] = int(u.split(';')[5])
+                self.data['uploads']['PtStack_ElFlag'] = int(u.split(';')[6])
+#                print(upload_publish_dict)
+#                acu_upload = {'timestamp': self.data['broadcast']['Time'],
+#                              'block_name': 'ACU_upload',
+#                              'data': upload_publish_dict
+#                              }
+#                self.agent.publish_to_feed('acu_upload', acu_upload)
             self.log.info('Uploaded a group')
         self.log.info('No more lines to upload')
         current_az = round(self.data['broadcast']['Azimuth_Corrected'], 4)
@@ -700,6 +759,26 @@ class ACUAgent:
                                4)
         yield dsleep(self.sleeptime)
         yield self.acu.stop()
+        self.data['uploads'] = {'Start_Azimuth': 0.0,
+                               'Start_Elevation': 0.0,
+                               'Start_Boresight': 0.0,
+                               'Command_Type': 0,
+                               'Preset_Azimuth': 0.0,
+                               'Preset_Elevation': 0.0,
+                               'PtStack_Lines': 'False',
+                               'PtStack_Time': '000, 00:00:00.000000',
+                               'PtStack_Azimuth': 0.0,
+                               'PtStack_Elevation': 0.0,
+                               'PtStack_AzVelocity': 0.0,
+                               'PtStack_ElVelocity': 0.0,
+                               'PtStack_AzFlag': 0,
+                               'PtStack_ElFlag': 0}
+#        print(upload_publish_dict)
+#        acu_upload = {'timestamp': self.data['broadcast']['Time'],
+#                      'block_name': 'ACU_upload',
+#                      'data': upload_publish_dict
+#                      }
+#        self.agent.publish_to_feed('acu_upload', acu_upload)
         self.set_job_done('control')
         return True, 'Track completed.'
 
