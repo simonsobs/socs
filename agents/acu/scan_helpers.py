@@ -7,7 +7,7 @@ def linear_turnaround_scanpoints(azpts, el, azvel, acc, ntimes):
     azimuth motion flags, and elevation motion flags for a finitely long azimuth scan with
     constant velocity.
 
-    Params:
+    Parameters:
         azpts (2-tuple): The endpoints of motion in azimuth, in increasing order
         el (float): The elevation that is maintained throughout the scan
         azvel (float): Desired speed of the azimuth motion in degrees/sec
@@ -70,7 +70,7 @@ def from_file(filename):
     of arrays in the order [times, azimuths, elevations, azimuth velocities, elevation 
     velocities]
 
-    Params:
+    Parameters:
         filename (str): Full path to the numpy file containing scan parameter array
     """
     info = np.load(filename)
@@ -88,7 +88,7 @@ def write_lines(conctimes, concaz, concel, concva, concve, az_flags, el_flags):
     Produces a list of lines in the format necessary to upload to the ACU to complete a scan. 
     Params are the outputs of from_file or linear_turnaround_scanpoints.
 
-    Params:
+    Parameters:
         conctimes (list): List of times starting at 0 for the ACU to reach associated positions
         concaz (list): List of azimuth positions associated with times
         concel (list): List of elevation positions associated with times
@@ -111,7 +111,7 @@ def write_generator_lines(conctimes, concaz, concel, concva, concve, az_flags, e
     Produces a list of lines in the format necessary to upload to the ACU to complete a 
     generated scan. Params are the outputs of generate.
 
-    Params:
+    Parameters:
         conctimes (list): List of times starting at most recently used time for the ACU 
                           to reach associated positions
         concaz (list): List of azimuth positions associated with times
@@ -135,7 +135,7 @@ def generate(stop_iter, az_endpoint1, az_endpoint2, az_speed, acc, el_endpoint1,
     velocities, azimuth and elevation flags for arbitrarily long scans. For development, this 
     is limited to constant-velocity azimuth scans.
 
-    Params:
+    Parameters:
         stop_iter (int): maximum number of times the generator should produce new points.
         az_endpoint1 (float): the azimuth endpoint at which to start the scan
         az_endpoint2 (float): the second azimuth endpoint of the scan

@@ -24,8 +24,9 @@ Configuration File Examples
 ---------------------------
 Below are configuration examples for the ocs config file and for soaculib.
 
-ocs_config
-``````````
+OCS Site Config
+```````````````
+
 To configure the ACU Agent we need to add a block to the ocs configuration
 file. An example configuration block using all availabile arguments is below::
 
@@ -36,6 +37,7 @@ file. An example configuration block using all availabile arguments is below::
 
 soaculib
 ````````
+
 We additionally need to add a block to the soaculib configuration file. An
 example configuration block is below::
 
@@ -60,8 +62,15 @@ example configuration block is below::
         }
     }
 
-Example Client
---------------
+Agent API
+---------
+
+.. autoclass:: agents.acu.acu_agent.ACUAgent
+    :members: monitor, broadcast, generate_scan, go_to,
+        run_specified_scan, set_boresight, stop_and_clear
+
+Example Clients
+---------------
 Below is an example client demonstrating a go-to task followed by a scan.
 Note that all tasks and the generate_scan process can be run while the data 
 acquisition processes are running::
@@ -78,9 +87,8 @@ acquisition processes are running::
     if __name__ == '__main__':
         upload_track('linear_turnaround_sameends', True, (120., 160.), 35., 1., 4, 3)
 
-Agent API
----------
+Supporting APIs
+---------------
 
-.. autoclass:: agents.acu.acu_agent.ACUAgent
-    :members: start_monitor, start_udp_monitor, generate_scan, go_to,
-        run_specified_scan, set_boresight, stop_and_clear
+.. automodule:: agents.acu.scan_helpers
+    :members:
