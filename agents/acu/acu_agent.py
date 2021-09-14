@@ -730,7 +730,9 @@ class ACUAgent:
                     ['Qty_of_free_program_track_stack_positions']
                 yield dsleep(0.1)
             yield self.acu.http.UploadPtStack(text)
+            print(upload_lines)
             for u in upload_lines:
+# TODO: switch over to pre-line formatting
                 self.data['uploads']['PtStack_Time'] = u.split(';')[0]
                 self.data['uploads']['PtStack_Azimuth'] = float(u.split(';')[1])
                 self.data['uploads']['PtStack_Elevation'] = float(u.split(';')[2])
@@ -738,6 +740,7 @@ class ACUAgent:
                 self.data['uploads']['PtStack_ElVelocity'] = float(u.split(';')[4])
                 self.data['uploads']['PtStack_AzFlag'] = int(u.split(';')[5])
                 self.data['uploads']['PtStack_ElFlag'] = int(u.split(';')[6])
+                yield dsleep (0.2)
 #                print(upload_publish_dict)
 #                acu_upload = {'timestamp': self.data['broadcast']['Time'],
 #                              'block_name': 'ACU_upload',
