@@ -6,17 +6,24 @@
 Lakeshore 372
 =============
 
-The Lakeshore 372 (LS372) units are used for 100 mK and 1K thermometer readout.
-Basic functionality to interface and control an LS372 is provided by the
-``socs.Lakeshore.Lakeshore372.py`` module.
+The Lakeshore 372 Agent interfaces with the Lakeshore 372 (LS372) hardware to
+perform 100 mK and 1K thermometer readout and control heater output. Basic
+functionality to interface and control an LS372 is provided by the
+:ref:`372_driver`.
 
 .. argparse::
     :filename: ../agents/lakeshore372/LS372_agent.py
     :func: make_parser
     :prog: python3 LS372_agent.py
 
-OCS Configuration
------------------
+Configuration File Examples
+---------------------------
+
+Below are configuration examples for the ocs config file and for running the
+Agent in a docker container.
+
+OCS Site Config
+````````````````
 
 To configure your Lakeshore 372 for use with OCS you need to add a
 Lakeshore372Agent block to your ocs configuration file. Here is an example
@@ -34,8 +41,8 @@ configuration block::
 Each device requires configuration under 'agent-instances'. See the OCS site
 configs documentation for more details.
 
-Docker Configuration
---------------------
+Docker Compose
+``````````````
 
 The Lakeshore 372 Agent should be configured to run in a Docker container. An
 example configuration is::
@@ -60,9 +67,17 @@ example configuration is::
 .. note::
     The serial numbers here will need to be updated for your device.
 
+Description
+-----------
+
+The Lakeshore 372 provides several connection options for communicating
+remotely with the hardware. For the Lakeshore 372 Agent we have written the
+interface for communication via Ethernet cable. When extending the Agent it can
+often be useful to directly communicate with the 372 for testing. This is
+described in the following section.
 
 Direct Communication
---------------------
+````````````````````
 Direct communication with the Lakeshore can be achieved without OCS, using the
 ``Lakeshore372.py`` module in ``socs/socs/Lakeshore/``. From that directory,
 you can run a script like::
@@ -87,8 +102,10 @@ Agent API
 .. autoclass:: agents.lakeshore372.LS372_agent.LS372_Agent
     :members:
 
-Driver API
-----------
+.. _372_driver:
+
+Supporting APIs
+---------------
 
 For the API all methods should start with one of the following:
 
