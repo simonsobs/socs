@@ -97,6 +97,13 @@ from unittest import mock
 for m in autodoc_mock_imports:
     sys.modules[m] = mock.Mock()
 
+# Mock the ocs_agent.param decorator to preserve docstrings
+def wrap(*args, **kw):
+    return lambda f: f
+
+import ocs
+ocs.ocs_agent.param = wrap
+
 # -- Options for HTML output -------------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
