@@ -10,10 +10,8 @@ from twisted.internet import reactor
 
 from socs.Lakeshore.Lakeshore372 import LS372
 
-ON_RTD = os.environ.get('READTHEDOCS') == 'True'
-if not ON_RTD:
-    from ocs import ocs_agent, site_config
-    from ocs.ocs_twisted import TimeoutLock
+from ocs import ocs_agent, site_config
+from ocs.ocs_twisted import TimeoutLock
 
 
 class YieldingLock:
