@@ -124,6 +124,7 @@ class LS372_Agent:
                                  agg_params=agg_params,
                                  buffer_time=1)
 
+    @ocs_agent.param('_')
     def enable_control_chan(self, session, params=None):
         """enable_control_chan()
 
@@ -133,6 +134,7 @@ class LS372_Agent:
         self.control_chan_enabled = True
         return True, 'Enabled control channel'
 
+    @ocs_agent.param('_')
     def disable_control_chan(self, session, params=None):
         """disable_control_chan()
 
@@ -142,6 +144,9 @@ class LS372_Agent:
         self.control_chan_enabled = False
         return True, 'Disabled control channel'
 
+    @ocs_agent.param('auto_acquire', default=False, type=bool)
+    @ocs_agent.param('acq_params', type=dict)
+    @ocs_agent.param('force', default=False, type=bool)
     def init_lakeshore(self, session, params=None):
         """init_lakeshore(auto_acquire=False, acq_params=None, force=False)
 
@@ -206,6 +211,7 @@ class LS372_Agent:
 
         return True, 'Lakeshore module initialized.'
 
+    @ocs_agent.param('sample_heater', default=False, type=bool)
     def acq(self, session, params=None):
         """acq(sample_heater=False)
 
@@ -395,6 +401,9 @@ class LS372_Agent:
         else:
             return False, 'acq is not currently running'
 
+    @ocs_agent.param('heater', type=str)
+    @ocs_agent.param('range')
+    @ocs_agent.param('wait', type=float)
     def set_heater_range(self, session, params):
         """set_heater_range(heater=None, range=None, wait=0)
 
@@ -435,6 +444,8 @@ class LS372_Agent:
 
         return True, f'Set {heater_string} heater range to {params["range"]}'
 
+    @ocs_agent.param('channel', type=int)
+    @ocs_agent.param('mode', type=str)
     def set_excitation_mode(self, session, params):
         """set_excitation_mode(channel=None, mode=None)
 
@@ -460,6 +471,8 @@ class LS372_Agent:
 
         return True, f'return text for Set channel {params["channel"]} excitation mode to {params["mode"]}'
 
+    @ocs_agent.param('channel', type=int)
+    @ocs_agent.param('value', type=float)
     def set_excitation(self, session, params):
         """set_excitation(channel=None, value=None)
 
@@ -490,6 +503,9 @@ class LS372_Agent:
 
         return True, f'Set channel {params["channel"]} excitation to {params["value"]}'
 
+    @ocs_agent.param('P', type=int)
+    @ocs_agent.param('I', type=int)
+    @ocs_agent.param('D', type=int)
     def set_pid(self, session, params):
         """set_pid(P=None, I=None, D=None)
 
@@ -518,6 +534,7 @@ class LS372_Agent:
 
         return True, f'return text for Set PID to {params["P"]}, {params["I"]}, {params["D"]}'
 
+    @ocs_agent.param('channel', type=int)
     def set_active_channel(self, session, params):
         """set_active_channel(channel=None)
 
@@ -541,6 +558,7 @@ class LS372_Agent:
 
         return True, f'return text for set channel to {params["channel"]}'
 
+    @ocs_agent.param('autoscan', type=bool)
     def set_autoscan(self, session, params):
         """set_autoscan(autoscan=None)
 
@@ -567,6 +585,7 @@ class LS372_Agent:
 
         return True, 'Set autoscan to {}'.format(params['autoscan'])
 
+    @ocs_agent.param('temperature', type=float, check=lambda x: x < 1)
     def servo_to_temperature(self, session, params):
         """servo_to_temperature(temperature=None)
 
@@ -574,7 +593,7 @@ class LS372_Agent:
         fixed channel. This will automatically disable autoscan if enabled.
 
         Parameters:
-            temperature (float): Temperatuer to servo to in units of Kelvin.
+            temperature (float): Temperature to servo to in units of Kelvin.
 
         """
         with self._lock.acquire_timeout(job='servo_to_temperature') as acquired:
@@ -613,6 +632,8 @@ class LS372_Agent:
 
         return True, f'Setpoint now set to {params["temperature"]} K'
 
+    @ocs_agent.param('measurements', type=int)
+    @ocs_agent.param('threshold', type=float)
     def check_temperature_stability(self, session, params):
         """check_temperature_stability(measurements=None, threshold=None)
 
@@ -661,6 +682,8 @@ class LS372_Agent:
 
         return False, f"Temperature not stable within {params['threshold']}."
 
+    @ocs_agent.param('heater', type=str, choices=['sample', 'still'])
+    @ocs_agent.param('mode', type=str, choices=['Off', 'Monitor Out', 'Open Loop', 'Zone', 'Still', 'Closed Loop', 'Warm up'])
     def set_output_mode(self, session, params=None):
         """set_output_mode(heater=None, mode=None)
 
@@ -689,6 +712,9 @@ class LS372_Agent:
 
         return True, "Set {} output mode to {}".format(params['heater'], params['mode'])
 
+    @ocs_agent.param('heater', type=str, choices=['sample', 'still'])
+    @ocs_agent.param('output', type=float)
+    @ocs_agent.param('display', type=str, choices=['current', 'power'])
     def set_heater_output(self, session, params=None):
         """set_heater_output(heater=None, output=None, display=None)
 
@@ -701,7 +727,7 @@ class LS372_Agent:
             output (float): Specifies heater output value. For possible values see
                 :func:`socs.Lakeshore.Lakeshore372.Heater.set_heater_output`
             display (str, optional): Specifies heater display type. Can be
-                "Current" or "Power". If None, heater display is not reset
+                "current" or "power". If None, heater display is not reset
                 before setting output.
 
         Notes:
@@ -740,13 +766,13 @@ class LS372_Agent:
 
         return True, "Set {} display to {}, output to {}".format(heater, display, output)
                                     
+    @ocs_agent.param('output', type=float, check=lambda x: 0 <= x <= 100)
     def set_still_output(self, session, params=None):
         """set_still_output(output=None)
 
         **Task** - Set the still output on the still heater. This is different
         than the manual output on the still heater. Use
         :func:`LS372_Agent.set_heater_output()` for that.
-
 
         Parameters:
             output (float): Specifies still heater output value as a percentage. Can be any
@@ -775,6 +801,7 @@ class LS372_Agent:
 
         return True, "Set still output to {}".format(output)
 
+    @ocs_agent.param('_')
     def get_still_output(self, session, params=None):
         """get_still_output()
 
