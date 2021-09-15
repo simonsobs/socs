@@ -42,8 +42,14 @@ extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.napoleon',
     'sphinx.ext.todo',
+    'sphinx.ext.viewcode',
 ]
 extensions += ['sphinxarg.ext']
+
+# Present auto-documented members in source order (rather than alphabetical).
+autodoc_default_options = {
+    'member-order': 'bysource',
+}
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -90,6 +96,13 @@ autodoc_mock_imports = ['spt3g',
 from unittest import mock
 for m in autodoc_mock_imports:
     sys.modules[m] = mock.Mock()
+
+# Mock the ocs_agent.param decorator to preserve docstrings
+def wrap(*args, **kw):
+    return lambda f: f
+
+import ocs
+ocs.ocs_agent.param = wrap
 
 # -- Options for HTML output -------------------------------------------------
 
