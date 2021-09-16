@@ -1,5 +1,7 @@
 [run]
-source = socs
+source =
+    socs
+    agents/
 
 omit =
   # omit versioneer
