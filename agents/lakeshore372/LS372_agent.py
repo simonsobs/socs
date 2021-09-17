@@ -415,6 +415,7 @@ class LS372_Agent:
                 heater = self.module.still_heater
 
             current_range = heater.get_heater_range()
+            self.log.debug(f"Current heater range: {current_range}")
 
             if params['range'] == current_range:
                 print("Current heater range matches commanded value. Proceeding unchanged.")

@@ -46,6 +46,7 @@ def mock_372_msg():
 
     values = {'*IDN?': 'LSCI,MODEL372,LSA23JD,1.3',
               'SCAN?': '01,1',
+              'SCAN 1,1': '',
               'INSET? A': '0,010,003,00,1',
               'INNAME? A': 'Input A',
               'INTYPE? A': '1,04,0,15,0,2',
@@ -61,6 +62,19 @@ def mock_372_msg():
         values[f'INTYPE? {i}'] = '0,07,1,10,0,1'
         values[f'TLIMIT? {i}'] = '+0000'
 
+    # Channel settings
+    values.update({'INTYPE 1,1,07,1,10,0,1': '',
+                   'INTYPE 1,0,1,1,10,0,1': ''})
+
+    # Heaters
+    values.update({'RANGE? 0': '0',
+                   'RANGE 0 4': '',
+                   'RANGE? 2': '1',
+                   'PID 0,40,2,0': '',
+                   'OUTMODE 2,0,16,1,0,0,001': '',
+                   'MOUT 2 50': ''})
+
+    # TODO: get any non ? command to return ''
     def side_effect(arg):
         return values[arg]
 
@@ -153,3 +167,205 @@ def test_ls372_init_lakeshore_task_auto_acquire(mock_agent):
     res = agent.init_lakeshore_task(session, {'auto_acquire': True, 'acq_params': {'test': 1}})
     assert res[0] is True
     agent.agent.start.assert_called_once_with('acq', {'test': 1})
+
+
+# set_heater_range
+@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
+def test_ls372_set_heater_range_sample_heater(mock_agent):
+    """Set sample heater to different range than currently set. Normal
+    operation.
+
+    """
+    agent = LS372_Agent(mock_agent, 'mock372', '127.0.0.1')
+
+    mock_app = mock.MagicMock()
+    session = OpSession(1, 'set_heater_range', app=mock_app)
+
+    # Have to init before running anything else
+    agent.init_lakeshore_task(session, None)
+
+    params = {'range': 1e-3, 'heater': 'sample', 'wait': 0}
+    res = agent.set_heater_range(session, params)
+    assert res[0] is True
+
+
+@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
+def test_ls372_set_heater_range_still_heater(mock_agent):
+    """Set still heater to different range than currently set. Normal
+    operation.
+
+    """
+    agent = LS372_Agent(mock_agent, 'mock372', '127.0.0.1')
+
+    mock_app = mock.MagicMock()
+    session = OpSession(1, 'set_heater_range', app=mock_app)
+
+    # Have to init before running anything else
+    agent.init_lakeshore_task(session, None)
+
+    params = {'range': 'On', 'heater': 'still', 'wait': 0}
+    res = agent.set_heater_range(session, params)
+    assert res[0] is True
+
+
+@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
+def test_ls372_set_heater_range_identical_range(mock_agent):
+    """Set heater to same range as currently set. Should not change range, just
+    return True.
+
+    """
+    agent = LS372_Agent(mock_agent, 'mock372', '127.0.0.1')
+
+    mock_app = mock.MagicMock()
+    session = OpSession(1, 'set_heater_range', app=mock_app)
+
+    # Have to init before running anything else
+    agent.init_lakeshore_task(session, None)
+
+    # Mock the heater interface
+    #agent.module.sample_heater.get_heater_range = mock.Mock(return_value="Off")
+    agent.module.sample_heater.set_heater_range = mock.Mock()
+
+    params = {'range': 'Off', 'heater': 'sample', 'wait': 0}
+    res = agent.set_heater_range(session, params)
+    assert res[0] is True
+    agent.module.sample_heater.set_heater_range.assert_not_called()
+
+
+# set_excitation_mode
+@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
+def test_ls372_set_excitation_mode(mock_agent):
+    """Normal operation of 'set_excitation_mode' task."""
+    agent = LS372_Agent(mock_agent, 'mock372', '127.0.0.1')
+
+    mock_app = mock.MagicMock()
+    session = OpSession(1, 'set_excitation_mode', app=mock_app)
+
+    # Have to init before running anything else
+    agent.init_lakeshore_task(session, None)
+
+    params = {'channel': 1, 'mode': 'current'}
+    res = agent.set_excitation_mode(session, params)
+    assert res[0] is True
+
+
+# set_excitation
+@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
+def test_ls372_set_excitation(mock_agent):
+    """Normal operation of 'set_excitation' task."""
+    agent = LS372_Agent(mock_agent, 'mock372', '127.0.0.1')
+
+    mock_app = mock.MagicMock()
+    session = OpSession(1, 'set_excitation', app=mock_app)
+
+    # Have to init before running anything else
+    agent.init_lakeshore_task(session, None)
+
+    params = {'channel': 1, 'value': 1e-9}
+    res = agent.set_excitation(session, params)
+    assert res[0] is True
+
+
+# set_pid
+@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
+def test_ls372_set_pid(mock_agent):
+    """Normal operation of 'set_pid' task."""
+    agent = LS372_Agent(mock_agent, 'mock372', '127.0.0.1')
+
+    mock_app = mock.MagicMock()
+    session = OpSession(1, 'set_pid', app=mock_app)
+
+    # Have to init before running anything else
+    agent.init_lakeshore_task(session, None)
+
+    params = {'P': 40, 'I': 2, 'D': 0}
+    res = agent.set_pid(session, params)
+    assert res[0] is True
+
+
+# set_active_channel
+@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
+def test_ls372_set_active_channel(mock_agent):
+    """Normal operation of 'set_active_channel' task."""
+    agent = LS372_Agent(mock_agent, 'mock372', '127.0.0.1')
+
+    mock_app = mock.MagicMock()
+    session = OpSession(1, 'set_active_channel', app=mock_app)
+
+    # Have to init before running anything else
+    agent.init_lakeshore_task(session, None)
+
+    params = {'channel': 1}
+    res = agent.set_active_channel(session, params)
+    assert res[0] is True
+
+
+# set_autoscan
+@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
+def test_ls372_set_autoscan(mock_agent):
+    """Normal operation of 'set_autoscan' task."""
+    agent = LS372_Agent(mock_agent, 'mock372', '127.0.0.1')
+
+    mock_app = mock.MagicMock()
+    session = OpSession(1, 'set_autoscan', app=mock_app)
+
+    # Have to init before running anything else
+    agent.init_lakeshore_task(session, None)
+
+    params = {'autoscan': True}
+    res = agent.set_autoscan(session, params)
+    assert res[0] is True
+
+
+# servo_to_temperature
+## this task should really get reworked, mostly into a client
+# check_temperature_stability
+## this task should become a client function really
+
+
+# set_output_mode
+@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
+def test_ls372_set_output_mode(mock_agent):
+    """Normal operation of 'set_output_mode' task."""
+    agent = LS372_Agent(mock_agent, 'mock372', '127.0.0.1')
+
+    mock_app = mock.MagicMock()
+    session = OpSession(1, 'set_output_mode', app=mock_app)
+
+    # Have to init before running anything else
+    agent.init_lakeshore_task(session, None)
+
+    params = {'heater': 'still', 'mode': 'Off'}
+    res = agent.set_output_mode(session, params)
+    assert res[0] is True
+
+
+# set_heater_output
+@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
+def test_ls372_set_heater_output(mock_agent):
+    """Normal operation of 'set_heater_output' task."""
+    agent = LS372_Agent(mock_agent, 'mock372', '127.0.0.1')
+
+    mock_app = mock.MagicMock()
+    session = OpSession(1, 'set_heater_output', app=mock_app)
+
+    # Have to init before running anything else
+    agent.init_lakeshore_task(session, None)
+
+    params = {'heater': 'still', 'output': 50}
+    res = agent.set_heater_output(session, params)
+    assert res[0] is True
+
+
+# set_still_output
+# get_still_output
