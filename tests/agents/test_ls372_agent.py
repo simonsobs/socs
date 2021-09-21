@@ -98,13 +98,13 @@ def mock_372_msg():
 # Tests
 @mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
-def test_ls372_init_lakeshore_task(agent):
-    """Run init_lakeshore_task, mocking a connection and the 372 messaging.
+def test_ls372_init_lakeshore(agent):
+    """Run init_lakeshore, mocking a connection and the 372 messaging.
     This should be as if the initialization worked without issue.
 
     """
     session = create_session('init_lakeshore')
-    res = agent.init_lakeshore_task(session, None)
+    res = agent.init_lakeshore(session, None)
 
     print(res)
     print(agent.initialized)
@@ -115,13 +115,13 @@ def test_ls372_init_lakeshore_task(agent):
 
 @mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
-def test_ls372_init_lakeshore_task_already_initialized(agent):
+def test_ls372_init_lakeshore_already_initialized(agent):
     """Initializing an already initialized LS372_Agent should just return True.
 
     """
     session = create_session('init_lakeshore')
-    agent.init_lakeshore_task(session, None)
-    res = agent.init_lakeshore_task(session, None)
+    agent.init_lakeshore(session, None)
+    res = agent.init_lakeshore(session, None)
     assert agent.initialized is True
     assert res[0] is True
 
@@ -129,13 +129,13 @@ def test_ls372_init_lakeshore_task_already_initialized(agent):
 # If we don't patch the reactor out, it'll mess up pytest when stop is called
 @mock.patch('LS372_agent.reactor', mock.MagicMock())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
-def test_ls372_init_lakeshore_task_failed_connection(agent):
+def test_ls372_init_lakeshore_failed_connection(agent):
     """Leaving off the connection Mock, if the connection fails the init task
     should fail and return False.
 
     """
     session = create_session('init_lakeshore')
-    res = agent.init_lakeshore_task(session, None)
+    res = agent.init_lakeshore(session, None)
     assert res[0] is False
 
 
@@ -143,25 +143,25 @@ def test_ls372_init_lakeshore_task_failed_connection(agent):
 @mock.patch('LS372_agent.reactor', mock.MagicMock())
 @mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_failed_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
-def test_ls372_init_lakeshore_task_unhandled_error(agent):
+def test_ls372_init_lakeshore_unhandled_error(agent):
     """If we cause an unhandled exception during connection init task should
     also fail and return False.
 
     """
     session = create_session('init_lakeshore')
-    res = agent.init_lakeshore_task(session, None)
+    res = agent.init_lakeshore(session, None)
     assert res[0] is False
 
 
 @mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
-def test_ls372_init_lakeshore_task_auto_acquire(agent):
+def test_ls372_init_lakeshore_auto_acquire(agent):
     """If we initalize and pass the auto_acquire param, we should expect the
     Agent to make a start call for the acq process, given the params in acq_params.
 
     """
     session = create_session('init_lakeshore')
-    res = agent.init_lakeshore_task(session, {'auto_acquire': True, 'acq_params': {'test': 1}})
+    res = agent.init_lakeshore(session, {'auto_acquire': True, 'acq_params': {'test': 1}})
     assert res[0] is True
     agent.agent.start.assert_called_once_with('acq', {'test': 1})
 
@@ -174,7 +174,7 @@ def test_ls372_enable_control_chan(agent):
     session = create_session('enable_control_chan')
 
     # Have to init before running anything else
-    agent.init_lakeshore_task(session, None)
+    agent.init_lakeshore(session, None)
 
     res = agent.enable_control_chan(session, params=None)
     assert res[0] is True
@@ -188,7 +188,7 @@ def test_ls372_disable_control_chan(agent):
     session = create_session('disable_control_chan')
 
     # Have to init before running anything else
-    agent.init_lakeshore_task(session, None)
+    agent.init_lakeshore(session, None)
 
     res = agent.disable_control_chan(session, params=None)
     assert res[0] is True
@@ -202,10 +202,10 @@ def test_ls372_acq(agent):
     session = create_session('acq')
 
     # Have to init before running anything else
-    agent.init_lakeshore_task(session, None)
+    agent.init_lakeshore(session, None)
 
     params = {'run_once': True}
-    res = agent.start_acq(session, params=params)
+    res = agent.acq(session, params=params)
     assert res[0] is True
 
     assert session.data['fields']['Channel_01']['T'] == 293.873
@@ -219,13 +219,13 @@ def test_ls372_acq_w_control_chan(agent):
     session = create_session('acq')
 
     # Have to init before running anything else
-    agent.init_lakeshore_task(session, None)
+    agent.init_lakeshore(session, None)
 
     # Turn on control channel
     agent.enable_control_chan(session, None)
 
     params = {'run_once': True}
-    res = agent.start_acq(session, params=params)
+    res = agent.acq(session, params=params)
     assert res[0] is True
 
     assert session.data['fields']['control']['T'] == 0.0
@@ -239,10 +239,10 @@ def test_ls372_acq_w_sample_heater(agent):
     session = create_session('acq')
 
     # Have to init before running anything else
-    agent.init_lakeshore_task(session, None)
+    agent.init_lakeshore(session, None)
 
     params = {'run_once': True, 'sample_heater': True}
-    res = agent.start_acq(session, params=params)
+    res = agent.acq(session, params=params)
     assert res[0] is True
 
 
@@ -254,9 +254,9 @@ def test_ls372_stop_acq_not_running(agent):
     session = create_session('stop_acq')
 
     # Have to init before running anything else
-    agent.init_lakeshore_task(session, None)
+    agent.init_lakeshore(session, None)
 
-    res = agent.stop_acq(session, params=None)
+    res = agent._stop_acq(session, params=None)
     assert res[0] is False
 
 
@@ -267,12 +267,12 @@ def test_ls372_stop_acq_while_running(agent):
     session = create_session('stop_acq')
 
     # Have to init before running anything else
-    agent.init_lakeshore_task(session, None)
+    agent.init_lakeshore(session, None)
 
     # Mock running the acq Process
     agent.take_data = True
 
-    res = agent.stop_acq(session, params=None)
+    res = agent._stop_acq(session, params=None)
     assert res[0] is True
     assert agent.take_data is False
 
@@ -288,7 +288,7 @@ def test_ls372_set_heater_range_sample_heater(agent):
     session = create_session('set_heater_range')
 
     # Have to init before running anything else
-    agent.init_lakeshore_task(session, None)
+    agent.init_lakeshore(session, None)
 
     params = {'range': 1e-3, 'heater': 'sample', 'wait': 0}
     res = agent.set_heater_range(session, params)
@@ -305,7 +305,7 @@ def test_ls372_set_heater_range_still_heater(agent):
     session = create_session('set_heater_range')
 
     # Have to init before running anything else
-    agent.init_lakeshore_task(session, None)
+    agent.init_lakeshore(session, None)
 
     params = {'range': 'On', 'heater': 'still', 'wait': 0}
     res = agent.set_heater_range(session, params)
@@ -322,7 +322,7 @@ def test_ls372_set_heater_range_identical_range(agent):
     session = create_session('set_heater_range')
 
     # Have to init before running anything else
-    agent.init_lakeshore_task(session, None)
+    agent.init_lakeshore(session, None)
 
     # Mock the heater interface
     #agent.module.sample_heater.get_heater_range = mock.Mock(return_value="Off")
@@ -342,7 +342,7 @@ def test_ls372_set_excitation_mode(agent):
     session = create_session('set_excitation_mode')
 
     # Have to init before running anything else
-    agent.init_lakeshore_task(session, None)
+    agent.init_lakeshore(session, None)
 
     params = {'channel': 1, 'mode': 'current'}
     res = agent.set_excitation_mode(session, params)
@@ -357,7 +357,7 @@ def test_ls372_set_excitation(agent):
     session = create_session('set_excitation')
 
     # Have to init before running anything else
-    agent.init_lakeshore_task(session, None)
+    agent.init_lakeshore(session, None)
 
     params = {'channel': 1, 'value': 1e-9}
     res = agent.set_excitation(session, params)
@@ -371,7 +371,7 @@ def test_ls372_set_excitation_already_set(agent):
     session = create_session('set_excitation')
 
     # Have to init before running anything else
-    agent.init_lakeshore_task(session, None)
+    agent.init_lakeshore(session, None)
 
     params = {'channel': 1, 'value': 2e-3}
     res = agent.set_excitation(session, params)
@@ -386,7 +386,7 @@ def test_ls372_set_pid(agent):
     session = create_session('set_pid')
 
     # Have to init before running anything else
-    agent.init_lakeshore_task(session, None)
+    agent.init_lakeshore(session, None)
 
     params = {'P': 40, 'I': 2, 'D': 0}
     res = agent.set_pid(session, params)
@@ -401,7 +401,7 @@ def test_ls372_set_active_channel(agent):
     session = create_session('set_active_channel')
 
     # Have to init before running anything else
-    agent.init_lakeshore_task(session, None)
+    agent.init_lakeshore(session, None)
 
     params = {'channel': 1}
     res = agent.set_active_channel(session, params)
@@ -416,7 +416,7 @@ def test_ls372_set_autoscan_on(agent):
     session = create_session('set_autoscan')
 
     # Have to init before running anything else
-    agent.init_lakeshore_task(session, None)
+    agent.init_lakeshore(session, None)
 
     params = {'autoscan': True}
     res = agent.set_autoscan(session, params)
@@ -430,7 +430,7 @@ def test_ls372_set_autoscan_off(agent):
     session = create_session('set_autoscan')
 
     # Have to init before running anything else
-    agent.init_lakeshore_task(session, None)
+    agent.init_lakeshore(session, None)
 
     params = {'autoscan': False}
     res = agent.set_autoscan(session, params)
@@ -451,7 +451,7 @@ def test_ls372_set_output_mode_still(agent):
     session = create_session('set_output_mode')
 
     # Have to init before running anything else
-    agent.init_lakeshore_task(session, None)
+    agent.init_lakeshore(session, None)
 
     params = {'heater': 'still', 'mode': 'Off'}
     res = agent.set_output_mode(session, params)
@@ -465,7 +465,7 @@ def test_ls372_set_output_mode_sample(agent):
     session = create_session('set_output_mode')
 
     # Have to init before running anything else
-    agent.init_lakeshore_task(session, None)
+    agent.init_lakeshore(session, None)
 
     params = {'heater': 'sample', 'mode': 'Off'}
     res = agent.set_output_mode(session, params)
@@ -480,7 +480,7 @@ def test_ls372_set_heater_output_still(agent):
     session = create_session('set_heater_output')
 
     # Have to init before running anything else
-    agent.init_lakeshore_task(session, None)
+    agent.init_lakeshore(session, None)
 
     params = {'heater': 'still', 'output': 50}
     res = agent.set_heater_output(session, params)
@@ -494,7 +494,7 @@ def test_ls372_set_heater_output_sample(agent):
     session = create_session('set_heater_output')
 
     # Have to init before running anything else
-    agent.init_lakeshore_task(session, None)
+    agent.init_lakeshore(session, None)
 
     params = {'heater': 'sample', 'output': 50}
     res = agent.set_heater_output(session, params)
@@ -509,7 +509,7 @@ def test_ls372_set_still_output(agent):
     session = create_session('set_still_output')
 
     # Have to init before running anything else
-    agent.init_lakeshore_task(session, None)
+    agent.init_lakeshore(session, None)
 
     params = {'output': 50}
     res = agent.set_still_output(session, params)
@@ -524,7 +524,7 @@ def test_ls372_get_still_output(agent):
     session = create_session('get_still_output')
 
     # Have to init before running anything else
-    agent.init_lakeshore_task(session, None)
+    agent.init_lakeshore(session, None)
 
     res = agent.get_still_output(session, params=None)
     assert res[0] is True
