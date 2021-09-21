@@ -9,5 +9,5 @@ omit =
 
 [paths]
 source =
-  socs/
-  /app/socs/socs/
+  ./
+  /app/socs/
