@@ -375,6 +375,9 @@ class LS372_Agent:
 
                     session.app.publish_to_feed('temperatures', htr_data)
 
+                if params['run_once']:
+                    break
+
         return True, 'Acquisition exited cleanly.'
 
     def stop_acq(self, session, params=None):

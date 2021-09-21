@@ -47,6 +47,7 @@ def mock_372_msg():
     values = {'*IDN?': 'LSCI,MODEL372,LSA23JD,1.3',
               'SCAN?': '01,1',
               'SCAN 1,1': '',
+              'SCAN 1,0': '',
               'INSET? A': '0,010,003,00,1',
               'INNAME? A': 'Input A',
               'INTYPE? A': '1,04,0,15,0,2',
@@ -72,7 +73,17 @@ def mock_372_msg():
                    'RANGE? 2': '1',
                    'PID 0,40,2,0': '',
                    'OUTMODE 2,0,16,1,0,0,001': '',
-                   'MOUT 2 50': ''})
+                   'OUTMODE 0,0,6,1,0,0,001': '',
+                   'MOUT 2 50': '',
+                   'STILL 50': '',
+                   'STILL?': '+10.60',
+                   'HTR?': '+00.0005E+00'})
+
+    # Senor readings
+    values.update({'KRDG? 1': '+293.873E+00',
+                   'SRDG? 1': '+108.278E+00',
+                   'KRDG? A': '+00.0000E-03',
+                   'SRDG? A': '+000.000E+09'})
 
     # TODO: get any non ? command to return ''
     def side_effect(arg):
@@ -167,6 +178,138 @@ def test_ls372_init_lakeshore_task_auto_acquire(mock_agent):
     res = agent.init_lakeshore_task(session, {'auto_acquire': True, 'acq_params': {'test': 1}})
     assert res[0] is True
     agent.agent.start.assert_called_once_with('acq', {'test': 1})
+
+
+# enable_control_chan
+@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
+def test_ls372_enable_control_chan(mock_agent):
+    """Normal operation of 'enable_control_chan' task."""
+    agent = LS372_Agent(mock_agent, 'mock372', '127.0.0.1')
+
+    mock_app = mock.MagicMock()
+    session = OpSession(1, 'enable_control_chan', app=mock_app)
+
+    # Have to init before running anything else
+    agent.init_lakeshore_task(session, None)
+
+    res = agent.enable_control_chan(session, params=None)
+    assert res[0] is True
+
+
+# disable_control_chan
+@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
+def test_ls372_disable_control_chan(mock_agent):
+    """Normal operation of 'disable_control_chan' task."""
+    agent = LS372_Agent(mock_agent, 'mock372', '127.0.0.1')
+
+    mock_app = mock.MagicMock()
+    session = OpSession(1, 'disable_control_chan', app=mock_app)
+
+    # Have to init before running anything else
+    agent.init_lakeshore_task(session, None)
+
+    res = agent.disable_control_chan(session, params=None)
+    assert res[0] is True
+
+
+# acq
+@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
+def test_ls372_acq(mock_agent):
+    """Test running the 'acq' Process once."""
+    agent = LS372_Agent(mock_agent, 'mock372', '127.0.0.1')
+
+    mock_app = mock.MagicMock()
+    session = OpSession(1, 'acq', app=mock_app)
+
+    # Have to init before running anything else
+    agent.init_lakeshore_task(session, None)
+
+    params = {'run_once': True}
+    res = agent.start_acq(session, params=params)
+    assert res[0] is True
+
+    assert session.data['fields']['Channel_01']['T'] == 293.873
+    assert session.data['fields']['Channel_01']['R'] == 108.278
+
+
+@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
+def test_ls372_acq_w_control_chan(mock_agent):
+    """Test running the 'acq' Process once with control channel active."""
+    agent = LS372_Agent(mock_agent, 'mock372', '127.0.0.1')
+
+    mock_app = mock.MagicMock()
+    session = OpSession(1, 'acq', app=mock_app)
+
+    # Have to init before running anything else
+    agent.init_lakeshore_task(session, None)
+
+    # Turn on control channel
+    agent.enable_control_chan(session, None)
+
+    params = {'run_once': True}
+    res = agent.start_acq(session, params=params)
+    assert res[0] is True
+
+    assert session.data['fields']['control']['T'] == 0.0
+    assert session.data['fields']['control']['R'] == 0.0
+
+
+@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
+def test_ls372_acq_w_sample_heater(mock_agent):
+    """Test running the 'acq' Process once with sample heater active."""
+    agent = LS372_Agent(mock_agent, 'mock372', '127.0.0.1')
+
+    mock_app = mock.MagicMock()
+    session = OpSession(1, 'acq', app=mock_app)
+
+    # Have to init before running anything else
+    agent.init_lakeshore_task(session, None)
+
+    params = {'run_once': True, 'sample_heater': True}
+    res = agent.start_acq(session, params=params)
+    assert res[0] is True
+
+
+# stop_acq
+@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
+def test_ls372_stop_acq_not_running(mock_agent):
+    """'stop_acq' should return False if acq Process isn't running."""
+    agent = LS372_Agent(mock_agent, 'mock372', '127.0.0.1')
+
+    mock_app = mock.MagicMock()
+    session = OpSession(1, 'stop_acq', app=mock_app)
+
+    # Have to init before running anything else
+    agent.init_lakeshore_task(session, None)
+
+    res = agent.stop_acq(session, params=None)
+    assert res[0] is False
+
+
+@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
+def test_ls372_stop_acq_while_running(mock_agent):
+    """'stop_acq' should return True if acq Process is running."""
+    agent = LS372_Agent(mock_agent, 'mock372', '127.0.0.1')
+
+    mock_app = mock.MagicMock()
+    session = OpSession(1, 'stop_acq', app=mock_app)
+
+    # Have to init before running anything else
+    agent.init_lakeshore_task(session, None)
+
+    # Mock running the acq Process
+    agent.take_data = True
+
+    res = agent.stop_acq(session, params=None)
+    assert res[0] is True
+    assert agent.take_data is False
 
 
 # set_heater_range
@@ -271,6 +414,23 @@ def test_ls372_set_excitation(mock_agent):
     assert res[0] is True
 
 
+@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
+def test_ls372_set_excitation_already_set(mock_agent):
+    """Setting to already set excitation value."""
+    agent = LS372_Agent(mock_agent, 'mock372', '127.0.0.1')
+
+    mock_app = mock.MagicMock()
+    session = OpSession(1, 'set_excitation', app=mock_app)
+
+    # Have to init before running anything else
+    agent.init_lakeshore_task(session, None)
+
+    params = {'channel': 1, 'value': 2e-3}
+    res = agent.set_excitation(session, params)
+    assert res[0] is True
+
+
 # set_pid
 @mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
@@ -310,7 +470,7 @@ def test_ls372_set_active_channel(mock_agent):
 # set_autoscan
 @mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
-def test_ls372_set_autoscan(mock_agent):
+def test_ls372_set_autoscan_on(mock_agent):
     """Normal operation of 'set_autoscan' task."""
     agent = LS372_Agent(mock_agent, 'mock372', '127.0.0.1')
 
@@ -325,6 +485,23 @@ def test_ls372_set_autoscan(mock_agent):
     assert res[0] is True
 
 
+@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
+def test_ls372_set_autoscan_off(mock_agent):
+    """Normal operation of 'set_autoscan' task."""
+    agent = LS372_Agent(mock_agent, 'mock372', '127.0.0.1')
+
+    mock_app = mock.MagicMock()
+    session = OpSession(1, 'set_autoscan', app=mock_app)
+
+    # Have to init before running anything else
+    agent.init_lakeshore_task(session, None)
+
+    params = {'autoscan': False}
+    res = agent.set_autoscan(session, params)
+    assert res[0] is True
+
+
 # servo_to_temperature
 ## this task should really get reworked, mostly into a client
 # check_temperature_stability
@@ -334,8 +511,8 @@ def test_ls372_set_autoscan(mock_agent):
 # set_output_mode
 @mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
-def test_ls372_set_output_mode(mock_agent):
-    """Normal operation of 'set_output_mode' task."""
+def test_ls372_set_output_mode_still(mock_agent):
+    """Normal operation of 'set_output_mode' task for the still heater."""
     agent = LS372_Agent(mock_agent, 'mock372', '127.0.0.1')
 
     mock_app = mock.MagicMock()
@@ -349,11 +526,28 @@ def test_ls372_set_output_mode(mock_agent):
     assert res[0] is True
 
 
+@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
+def test_ls372_set_output_mode_sample(mock_agent):
+    """Normal operation of 'set_output_mode' task for the sample heater."""
+    agent = LS372_Agent(mock_agent, 'mock372', '127.0.0.1')
+
+    mock_app = mock.MagicMock()
+    session = OpSession(1, 'set_output_mode', app=mock_app)
+
+    # Have to init before running anything else
+    agent.init_lakeshore_task(session, None)
+
+    params = {'heater': 'sample', 'mode': 'Off'}
+    res = agent.set_output_mode(session, params)
+    assert res[0] is True
+
+
 # set_heater_output
 @mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
-def test_ls372_set_heater_output(mock_agent):
-    """Normal operation of 'set_heater_output' task."""
+def test_ls372_set_heater_output_still(mock_agent):
+    """Normal operation of 'set_heater_output' task for the still heater."""
     agent = LS372_Agent(mock_agent, 'mock372', '127.0.0.1')
 
     mock_app = mock.MagicMock()
@@ -367,5 +561,54 @@ def test_ls372_set_heater_output(mock_agent):
     assert res[0] is True
 
 
+@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
+def test_ls372_set_heater_output_sample(mock_agent):
+    """Normal operation of 'set_heater_output' task for the sample heater."""
+    agent = LS372_Agent(mock_agent, 'mock372', '127.0.0.1')
+
+    mock_app = mock.MagicMock()
+    session = OpSession(1, 'set_heater_output', app=mock_app)
+
+    # Have to init before running anything else
+    agent.init_lakeshore_task(session, None)
+
+    params = {'heater': 'sample', 'output': 50}
+    res = agent.set_heater_output(session, params)
+    assert res[0] is True
+
+
 # set_still_output
+@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
+def test_ls372_set_still_output(mock_agent):
+    """Normal operation of 'set_still_output' task."""
+    agent = LS372_Agent(mock_agent, 'mock372', '127.0.0.1')
+
+    mock_app = mock.MagicMock()
+    session = OpSession(1, 'set_still_output', app=mock_app)
+
+    # Have to init before running anything else
+    agent.init_lakeshore_task(session, None)
+
+    params = {'output': 50}
+    res = agent.set_still_output(session, params)
+    assert res[0] is True
+
+
 # get_still_output
+@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
+def test_ls372_get_still_output(mock_agent):
+    """Normal operation of 'get_still_output' task."""
+    agent = LS372_Agent(mock_agent, 'mock372', '127.0.0.1')
+
+    mock_app = mock.MagicMock()
+    session = OpSession(1, 'get_still_output', app=mock_app)
+
+    # Have to init before running anything else
+    agent.init_lakeshore_task(session, None)
+
+    res = agent.get_still_output(session, params=None)
+    assert res[0] is True
+    assert session.data['still_heater_still_out'] == '+10.60'
