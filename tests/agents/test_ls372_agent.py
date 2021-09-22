@@ -46,8 +46,6 @@ def mock_372_msg():
 
     values = {'*IDN?': 'LSCI,MODEL372,LSA23JD,1.3',
               'SCAN?': '01,1',
-              'SCAN 1,1': '',
-              'SCAN 1,0': '',
               'INSET? A': '0,010,003,00,1',
               'INNAME? A': 'Input A',
               'INTYPE? A': '1,04,0,15,0,2',
@@ -63,19 +61,9 @@ def mock_372_msg():
         values[f'INTYPE? {i}'] = '0,07,1,10,0,1'
         values[f'TLIMIT? {i}'] = '+0000'
 
-    # Channel settings
-    values.update({'INTYPE 1,1,07,1,10,0,1': '',
-                   'INTYPE 1,0,1,1,10,0,1': ''})
-
     # Heaters
     values.update({'RANGE? 0': '0',
-                   'RANGE 0 4': '',
                    'RANGE? 2': '1',
-                   'PID 0,40,2,0': '',
-                   'OUTMODE 2,0,16,1,0,0,001': '',
-                   'OUTMODE 0,0,6,1,0,0,001': '',
-                   'MOUT 2 50': '',
-                   'STILL 50': '',
                    'STILL?': '+10.60',
                    'HTR?': '+00.0005E+00'})
 
@@ -85,8 +73,12 @@ def mock_372_msg():
                    'KRDG? A': '+00.0000E-03',
                    'SRDG? A': '+000.000E+09'})
 
-    # TODO: get any non ? command to return ''
     def side_effect(arg):
+        # All commands just return ''
+        if '?' not in arg:
+            return ''
+
+        # Mocked example query responses
         return values[arg]
 
     mock_msg.side_effect = side_effect
