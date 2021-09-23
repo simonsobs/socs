@@ -198,7 +198,7 @@ class Lakeshore372_Simulator:
         for p in range(self.port, self.port + 10):
             try:
                 self.log.info(f"Trying to listen on port {p}")
-                sock.bind(('localhost', p))
+                sock.bind(('', p))
                 break
             except OSError as e:
                 if e.errno == 48:
