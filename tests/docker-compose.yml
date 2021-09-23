@@ -1,0 +1,15 @@
+version: '3.7'
+services:
+  crossbar:
+    image: simonsobs/ocs-crossbar:v0.7.0-9-g1d136a3-dev
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./config.json:/app/crossbar/config.json
+    environment:
+         - PYTHONUNBUFFERED=1
+
+  ocs-LS372:
+    image: ocs-lakeshore372-simulator
+    ports:
+      - "7777:7777"

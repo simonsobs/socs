@@ -20,3 +20,7 @@ pysmi
 
 # Docs
 sphinx_rtd_theme
+
+# testing
+pytest
+pytest-docker-compose
