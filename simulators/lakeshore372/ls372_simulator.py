@@ -58,7 +58,7 @@ current_excitation_key = {1: 1.0e-12,
                           22: 31.6-3}
 
 class Lakeshore372_Simulator:
-    def __init__(self, port, num_channels=16, sn="LSSIM"):
+    def __init__(self, port, num_channels=16, sn="LSASIM"):
         self.log = logging.getLogger()
 
         self.port = port
@@ -276,10 +276,10 @@ class Lakeshore372_Simulator:
 
     def get_idn(self):
         return ','.join([
-            "Lakeshore",
-            "LSSIM_{}P".format(self.num_channels),
+            "LSCI",
+            "MODEL372",
             self.sn,
-            'v0.0.0'
+            '0.0'
         ])
 
     def get_reading(self, chan, unit='S'):
@@ -807,7 +807,7 @@ def make_parser(parser=None):
                              "until it finds one that is free.")
     parser.add_argument('--num-channels', type=int, default=16,
                         help="Number of channels which the simulator will have.")
-    parser.add_argument('--sn', type=str, default='LS_SIM',
+    parser.add_argument('--sn', type=str, default='LSASIM',
                         help="Serial number for the device")
     parser.add_argument('--log-file', type=str, default=None,
                         help="File where logs are written")
