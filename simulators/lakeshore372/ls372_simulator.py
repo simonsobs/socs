@@ -72,9 +72,7 @@ class Lakeshore372_Simulator:
             else:
                 c = ChannelSim(i, "Channel {}".format(i))
             self.channels.append(c)
-
-        for i in range(self.num_channels + 1):
-            print(self.channels[i].name)
+            self.log.debug(f'Created channel "{self.channels[i].name}"')
 
         self.scanner = 1  # 0 = autoscan off; 1 = autoscan on
         self.active_channel = 1  # start on channel 1
@@ -221,13 +219,15 @@ class Lakeshore372_Simulator:
                 while True:
                     data = conn.recv(BUFF_SIZE)
                     elapsed_time = time.time() - start_time
-                    print(elapsed_time)  # timestamp printed every time a command is received
+                    #self.log.debug('time:', elapsed_time)  # timestamp printed every time a command is received
 
                     if not data:
                         self.log.info("Connection closed by client")
                         break
 
-                    self.log.debug("Command: {}".format(data))
+                    clean_cmd = data.decode().strip()
+                    self.log.info(f"Received command: {clean_cmd}")
+                    self.log.debug("Raw Command: {}".format(data))
                     # Only takes first command in case multiple commands are s
                     cmds = data.decode().split(';')
 
@@ -241,7 +241,7 @@ class Lakeshore372_Simulator:
                             new_channel_change = int(channel_change % 16)
                             self.active_channel = 1 + new_channel_change
 
-                        print(self.active_channel)
+                        self.log.debug(f"Active channel: {self.active_channel}")
 
                     elif int(self.scanner) == 0:
                         pass
@@ -265,6 +265,7 @@ class Lakeshore372_Simulator:
                                 continue
 
                             resp = cmd_fn(*args)
+                            self.log.info(f"Sent response: {resp}")
 
                         except TypeError as e:
                             self.log.error(f"Command error: {e}")
@@ -306,7 +307,7 @@ class Lakeshore372_Simulator:
 
     def get_scanner(self):
         msg_string = '{:02d},{} '.format(int(self.active_channel), str(self.scanner))
-        print(msg_string)
+        self.log.debug(f"get_scanner: {msg_string}")
         return msg_string
 
     def set_scanner(self, chan, auto):
