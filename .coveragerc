@@ -1,7 +1,7 @@
 [run]
 source =
     socs
-    agents/
+    ../agents/
 
 omit =
   # omit versioneer

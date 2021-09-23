@@ -10,12 +10,12 @@ hardware. All other tests should be runable independently.
 
 Running the Test Suite
 ----------------------
-To run the tests, from the top level of the repo run::
+To run the tests, from the tests directory::
 
-    $ python3 -m pytest -p no:wampy --cov-report html --cov socs ./tests/
+    $ cd tests/
+    $ python3 -m pytest --cov --cov-config=../.coveragerc --cov-report=html
 
 You can then view the coverage report in the typical ``htmlcov/`` directory.
-
 
 If you are running tests on hardware you likely want to run them directly from
 the hardware directory, which is configured to be ignored by the automatic test
