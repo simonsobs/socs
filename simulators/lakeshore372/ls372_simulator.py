@@ -110,6 +110,7 @@ class Lakeshore372_Simulator:
             # Heater commands
             "OUTMODE?": self.get_outmode,
             "OUTMODE": self.set_outmode,
+            "HTR?": self.get_htr,
             "HTRSET?": self.get_htrset,
             "HTRSET": self.set_htrset,
             "MOUT?": self.get_mout,
@@ -389,6 +390,10 @@ class Lakeshore372_Simulator:
 
         args = map(str, args)
         self.heaters[int(heater_output)].set_output_mode(*args)
+
+    def get_htr(self):
+        """Random sample heater value."""
+        return f"+{np.random.rand():.4f}E+00"
 
     def get_htrset(self, heater_output):
         if not 0 <= int(heater_output) <= 2:
