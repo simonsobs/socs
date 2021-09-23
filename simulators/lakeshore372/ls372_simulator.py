@@ -12,6 +12,7 @@
 # ls.msg('SCAN?'), ls.msg('INTYPE? 1'), ls.msg('OUTMODE? 0')
 
 
+import os
 import socket
 import argparse
 import numpy as np
@@ -809,10 +810,6 @@ def make_parser(parser=None):
                         help="Serial number for the device")
     parser.add_argument('--log-file', type=str, default=None,
                         help="File where logs are written")
-    parser.add_argument('--log-level',
-                        choices=['debug', 'info', 'warning', 'error'],
-                        default='info',
-                        help="Minimum log level to be displayed")
     parser.add_argument('-o', '--log-stdout', action="store_true",
                         help="Log to stdout")
     return parser
@@ -823,12 +820,13 @@ if __name__ == '__main__':
     parser = make_parser()
     args = parser.parse_args()
 
+    level = os.environ.get('LOGLEVEL', 'info')
     log_level = {
         'debug': logging.DEBUG,
         'info': logging.INFO,
         'warning': logging.WARNING,
         'error': logging.ERROR
-    }[args.log_level]
+    }[level]
 
     format_string = '%(asctime)-15s [%(levelname)s]:  %(message)s'
     # logging.basicConfig(level=log_level, format=format_string)
