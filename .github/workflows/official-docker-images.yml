@@ -26,7 +26,7 @@ jobs:
     # Test (already been run by pytest workflow, but they don't take long...)
     - name: Test with pytest wtihin a docker container
       run: |
-        docker run -v $PWD:/coverage --rm socs sh -c "COVERAGE_FILE=/coverage/.coverage.docker python3 -m pytest --cov --cov-config=/app/socs/.coveragerc /app/socs/socs/ ./tests/"
+        docker run -v $PWD:/coverage --rm -w="/app/socs/tests/" socs sh -c "COVERAGE_FILE=/coverage/.coverage.docker python3 -m pytest --cov -m 'not integtest'"
 
     - name: Test documentation build
       run: |
