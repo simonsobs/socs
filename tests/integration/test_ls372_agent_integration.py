@@ -11,6 +11,7 @@ from urllib.error import URLError
 from ocs.matched_client import MatchedClient
 
 import ocs
+from ocs.base import OpCode
 
 pytest_plugins = ("docker_compose")
 
@@ -72,6 +73,7 @@ def test_init_lakeshore(wait_for_crossbar, run_agent):
     #print(resp)
     assert resp.status == ocs.OK
     #print(resp.session)
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 @pytest.mark.integtest
 def test_enable_control_chan(wait_for_crossbar, run_agent):
@@ -80,6 +82,7 @@ def test_enable_control_chan(wait_for_crossbar, run_agent):
     client.init_lakeshore()
     resp = client.enable_control_chan()
     assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 @pytest.mark.integtest
 def test_disable_control_chan(wait_for_crossbar, run_agent):
@@ -88,6 +91,7 @@ def test_disable_control_chan(wait_for_crossbar, run_agent):
     client.init_lakeshore()
     resp = client.disable_control_chan()
     assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 @pytest.mark.integtest
 def test_start_acq(wait_for_crossbar, run_agent):
@@ -96,6 +100,17 @@ def test_start_acq(wait_for_crossbar, run_agent):
     client.init_lakeshore()
     resp = client.acq.start(sample_heater=False, run_once=True)
     assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.STARTING.value
+
+    # We stopped the process with run_once=True, but that will leave us in the
+    # RUNNING state
+    resp = client.acq.status()
+    assert resp.session['op_code'] == OpCode.RUNNING.value
+
+    # Now we request a formal stop, which should put us in STOPPING
+    client.acq.stop()
+    resp = client.acq.status()
+    assert resp.session['op_code'] == OpCode.STOPPING.value
 
 @pytest.mark.integtest
 def test_set_heater_range(wait_for_crossbar, run_agent):
@@ -104,6 +119,7 @@ def test_set_heater_range(wait_for_crossbar, run_agent):
     client.init_lakeshore()
     resp = client.set_heater_range(range=1e-3, heater='sample', wait=0)
     assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 @pytest.mark.integtest
 def test_set_excitation_mode(wait_for_crossbar, run_agent):
@@ -112,6 +128,7 @@ def test_set_excitation_mode(wait_for_crossbar, run_agent):
     client.init_lakeshore()
     resp = client.set_excitation_mode(channel=1, mode='current')
     assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 @pytest.mark.integtest
 def test_set_excitation(wait_for_crossbar, run_agent):
@@ -120,6 +137,7 @@ def test_set_excitation(wait_for_crossbar, run_agent):
     client.init_lakeshore()
     resp = client.set_excitation(channel=1, value=1e-9)
     assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 @pytest.mark.integtest
 def test_set_pid(wait_for_crossbar, run_agent):
@@ -128,6 +146,7 @@ def test_set_pid(wait_for_crossbar, run_agent):
     client.init_lakeshore()
     resp = client.set_pid(P=40, I=2, D=0)
     assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 @pytest.mark.integtest
 def test_set_active_channel(wait_for_crossbar, run_agent):
@@ -136,6 +155,7 @@ def test_set_active_channel(wait_for_crossbar, run_agent):
     client.init_lakeshore()
     resp = client.set_active_channel(channel=1)
     assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 @pytest.mark.integtest
 def test_set_autoscan(wait_for_crossbar, run_agent):
@@ -144,6 +164,7 @@ def test_set_autoscan(wait_for_crossbar, run_agent):
     client.init_lakeshore()
     resp = client.set_autoscan(autoscan=True)
     assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 @pytest.mark.integtest
 def test_set_output_mode(wait_for_crossbar, run_agent):
@@ -152,6 +173,7 @@ def test_set_output_mode(wait_for_crossbar, run_agent):
     client.init_lakeshore()
     resp = client.set_output_mode(heater='still', mode='Off')
     assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 @pytest.mark.integtest
 def test_set_heater_output(wait_for_crossbar, run_agent):
@@ -160,6 +182,7 @@ def test_set_heater_output(wait_for_crossbar, run_agent):
     client.init_lakeshore()
     resp = client.set_heater_output(heater='still', output=50)
     assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 @pytest.mark.integtest
 def test_set_still_output(wait_for_crossbar, run_agent):
@@ -168,6 +191,7 @@ def test_set_still_output(wait_for_crossbar, run_agent):
     client.init_lakeshore()
     resp = client.set_still_output(output=50)
     assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 @pytest.mark.integtest
 def test_get_still_output(wait_for_crossbar, run_agent):
@@ -176,3 +200,4 @@ def test_get_still_output(wait_for_crossbar, run_agent):
     client.init_lakeshore()
     resp = client.get_still_output()
     assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
