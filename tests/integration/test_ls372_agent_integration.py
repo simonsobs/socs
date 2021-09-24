@@ -41,8 +41,8 @@ def run_agent(cov):
                                  stderr=subprocess.PIPE,
                                  preexec_fn=os.setsid)
 
-    # wait for Agent to initialize (can we make this faster?)
-    time.sleep(10)
+    # wait for Agent to connect
+    time.sleep(2)
 
     yield
 
