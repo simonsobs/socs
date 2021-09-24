@@ -8,7 +8,7 @@ import scan_helpers as sh
 from soaculib.twisted_backend import TwistedHttpBackend
 import argparse
 import soaculib.status_keys as status_keys
-
+import pickle
 from twisted.internet import reactor, protocol
 from twisted.internet.defer import inlineCallbacks
 import twisted.web.client as tclient
@@ -32,14 +32,15 @@ def timecode(acutime):
     comptime = gyear+sec_of_day
     return comptime
 
-def uploadtime_to_ctime(ptstack_time):
-    year = datetime.datetime.now().year
+def uploadtime_to_ctime(ptstack_time, upload_year):
+#    year = datetime.datetime.now().year
+    year = int(upload_year)
     gyear = calendar.timegm(time.strptime(str(year), '%Y'))
-    day_of_year = float(ptstack_time.split(',')[0])
+    day_of_year = float(ptstack_time.split(',')[0]) - 1.0
     hour = float(ptstack_time.split(',')[1].split(':')[0])
     minute = float(ptstack_time.split(',')[1].split(':')[1])
     second = float(ptstack_time.split(',')[1].split(':')[2])
-    comptime = gyear + hour*60*60 + minute*60 + second
+    comptime = gyear + day_of_year*60*60*24 + hour*60*60 + minute*60 + second
     return comptime
 
 
@@ -60,6 +61,7 @@ class ACUAgent:
             'monitor': 'idle',
             'broadcast': 'idle',
             'control': 'idle',  # shared by all motion tasks/processes
+            'scanspec': 'idle',
             }
 
         self.acu_config = aculib.guess_config(acu_config)
@@ -76,10 +78,6 @@ class ACUAgent:
         # self.data provides a place to reference data from the monitors.
         # 'status' is populated by the monitor operation
         # 'broadcast' is populated by the udp_monitor operation
-#        self.data = {'status': {'summary': {}, 'full_status': {}},
-#                     'broadcast': {},
-#                     'uploads': {},
-#                     }
 
         self.data = {'status': {'summary': {},
                                 'position_errors': {},
@@ -110,6 +108,7 @@ class ACUAgent:
                                 'PtStack_ElVelocity': 0.0,
                                 'PtStack_AzFlag': 0,
                                 'PtStack_ElFlag': 0},
+                     'scanspec': {},
                      }
 
         self.health_check = {'broadcast': False, 'status': False}
@@ -229,6 +228,12 @@ class ACUAgent:
         agent.register_task('stop_and_clear',
                             self.stop_and_clear,
                             blocking=False)
+        agent.register_task('spec_scan_linear_turnaround',
+                            self.spec_scan_linear_turnaround,
+                            blocking=False)
+        agent.register_task('spec_scan_fromfile',
+                            self.spec_scan_fromfile,
+                            blocking=False)
 
     # Operation management.  This agent has several Processes that
     # must be able to alone or simultaneously.  The state of each is
@@ -245,7 +250,7 @@ class ACUAgent:
         """
         with self.lock.acquire_timeout(timeout=1.0, job=job_name) as acquired:
             if not acquired:
-                self.log.warn("Lock could not be acquried because it is held"
+                self.log.warn("Lock could not be acquired because it is held"
                               f" by {self.lock.job}")
                 return False
             # Set running.
@@ -380,8 +385,8 @@ class ACUAgent:
                 timecode(self.data['status']['summary']['Time'])
             if self.data['uploads']['PtStack_Time'] == '000, 00:00:00.000000':#'000, 00:0:00.000000':
                 self.data['uploads']['PtStack_ctime'] = self.data['status']['summary']['ctime']
-            else:
-                self.data['uploads']['PtStack_ctime'] = uploadtime_to_ctime(self.data['uploads']['PtStack_Time'])
+#            else:
+#                self.data['uploads']['PtStack_ctime'] = uploadtime_to_ctime(self.data['uploads']['PtStack_Time'])
 
             acustatus_summary = {'timestamp':
                                  self.data['status']['summary']['ctime'],
@@ -438,10 +443,10 @@ class ACUAgent:
                                 'data': influx_status
                                 }
         #    print(acustatus_summary)
-            acu_upload = {'timestamp': self.data['uploads']['PtStack_ctime'],
-                          'block_name': 'ACU_upload',
-                          'data': self.data['uploads']
-                          }
+#            acu_upload = {'timestamp': self.data['uploads']['PtStack_ctime'],
+#                          'block_name': 'ACU_upload',
+#                          'data': self.data['uploads']
+#                          }
 #            print(acu_upload)
             self.agent.publish_to_feed('acu_status_summary', acustatus_summary)
             self.agent.publish_to_feed('acu_status_axis_faults', acustatus_axisfaults)
@@ -456,7 +461,7 @@ class ACUAgent:
             self.agent.publish_to_feed('acu_status_platform', acustatus_platform)
             self.agent.publish_to_feed('acu_status_emergency', acustatus_emergency)
 #            self.agent.publish_to_feed('acu_status_influx', acustatus_influx)
-            self.agent.publish_to_feed('acu_upload', acu_upload)
+#            self.agent.publish_to_feed('acu_upload', acu_upload)
         self.set_job_done('monitor')
         return True, 'Acquisition exited cleanly.'
 
@@ -598,6 +603,12 @@ class ACUAgent:
         self.data['uploads']['Preset_Azimuth'] = az
         self.data['uploads']['Preset_Elevation'] = el
 
+        acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
+                      'block_name': 'ACU_upload',
+                      'data': self.data['uploads']
+                      }
+        self.agent.publish_to_feed('acu_upload', acu_upload)
+
         # Check whether the telescope is already at the point
         self.log.info('Checking current position')
         if current_az == az and current_el == el:
@@ -618,6 +629,11 @@ class ACUAgent:
             mdata = self.data['status']['summary']
         moving = True
         while moving:
+            acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
+                      'block_name': 'ACU_upload',
+                      'data': self.data['uploads']
+                      }
+            self.agent.publish_to_feed('acu_upload', acu_upload)
             mdata = self.data['status']['summary']
             ve = round(mdata['Elevation_current_velocity'], 2)
             va = round(mdata['Azimuth_current_velocity'], 2)
@@ -643,6 +659,11 @@ class ACUAgent:
         self.data['uploads']['Command_Type'] = 0
         self.data['uploads']['Preset_Azimuth'] = 0.0
         self.data['uploads']['Preset_Elevation'] = 0.0
+        acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
+                      'block_name': 'ACU_upload',
+                      'data': self.data['uploads']
+                      }
+        self.agent.publish_to_feed('acu_upload', acu_upload)
         self.set_job_done('control')
         return True, 'Pointing completed'
 
@@ -664,17 +685,32 @@ class ACUAgent:
         self.data['uploads']['Start_Boresight'] = self.data['status']['summary']['Boresight_current_position']
         self.data['uploads']['Command_Type'] = 1
         self.data['uploads']['Preset_Boresight'] = bs_destination
+        acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
+                      'block_name': 'ACU_upload',
+                      'data': self.data['uploads']
+                      }
+        self.agent.publish_to_feed('acu_upload', acu_upload)
         yield self.acu.go_3rd_axis(bs_destination)
         current_position = self.data['status']['summary']\
             ['Boresight_current_position']
         while current_position != bs_destination:
             yield dsleep(1)
+            acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
+                          'block_name': 'ACU_upload',
+                          'data': self.data['uploads']
+                          }
+            self.agent.publish_to_feed('acu_upload', acu_upload)
             current_position = self.data['status']['summary']\
                 ['Boresight_current_position']
         yield self.acu.stop()
         self.data['uploads']['Start_Boresight'] = 0.0
         self.data['uploads']['Command_Type'] = 0
         self.data['uploads']['Preset_Boresight'] = 0.0
+        acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
+                      'block_name': 'ACU_upload',
+                      'data': self.data['uploads']
+                      }
+        self.agent.publish_to_feed('acu_upload', acu_upload)
         self.set_job_done('control')
         return True, 'Moved to new 3rd axis position'
 
@@ -704,17 +740,7 @@ class ACUAgent:
 
     @inlineCallbacks
     def spec_scan_fromfile(self, session, params=None):
-        ok, msg = self.try_set_job('scanspec')
-        if not ok:
-            return ok, msg
-        self.log.info('try_set_job scanspec ok')
-        scantype = params.get('scantype')
-        if scantype == 'from_file':
-            filename = params.get('filename')
-        else:
-            self.log.error('Scantype incorrect, client needs correction')
-            self.set_job_done('scanspec')
-            return False, 'Scan specification failed'
+        filename = params.get('filename')
         times, azs, els, vas, ves, azflags, elflags = sh.from_file(filename)
         self.data['scanspec'] = {'times': times,
                                  'azs': azs,
@@ -724,6 +750,27 @@ class ACUAgent:
                                  'azflags': azflags,
                                  'elflags': elflags
                                  }
+        self.log.info('Scan from file specified')
+        return True, 'Scan from file specified'
+
+    @inlineCallbacks
+    def spec_scan_linear_turnaround(self, session, params=None):
+        azpts = params.get('azpts')
+        el = params.get('el')
+        azvel = params.get('azvel')
+        acc = params.get('acc')
+        ntimes = params.get('ntimes')
+        times, azs, els, vas, ves, azflags, elflags = sh.linear_turnaround_scanpoints(azpts, el, azvel, acc, ntimes)
+        self.data['scanspec'] = {'times': times,
+                                 'azs': azs,
+                                 'els': els,
+                                 'vas': vas,
+                                 'ves': ves,
+                                 'azflags': azflags,
+                                 'elflags': elflags
+                                 }
+        self.log.info('Scan linear turnaround scan specified')
+        return True, 'Scan linear turnaround scan specified'
 
     @inlineCallbacks
     def run_specified_scan(self, session, params=None):
@@ -760,75 +807,68 @@ class ACUAgent:
         if not ok:
             return ok, msg
         self.log.info('try_set_job ok')
-        scantype = params.get('scantype')
-        if scantype == 'from_file':
-            filename = params.get('filename')
-            times, azs, els, vas, ves, azflags, elflags =\
-                sh.from_file(filename)
-        elif scantype == 'linear_1dir':
-            azpts = params.get('azpts')
-            el = params.get('el')
-            azvel = params.get('azvel')
-            total_time = (azpts[1]-azpts[0])/azvel
-            azs = np.linspace(azpts[0], azpts[1], total_time*10)
-            els = np.linspace(el, el, total_time*10)
-            times = np.linspace(0.0, total_time, total_time*10)
-        elif scantype == 'linear_turnaround_sameends':
-            # from parameters, generate the full set of scan points
-            self.log.info('scantype is' + str(scantype))
-            azpts = params.get('azpts')
-            el = params.get('el')
-            azvel = params.get('azvel')
-            acc = params.get('acc')
-            ntimes = params.get('ntimes')
-            times, azs, els, vas, ves, azflags, elflags =\
-                sh.linear_turnaround_scanpoints(azpts, el, azvel, acc, ntimes)
-
-        # Switch to Stop mode and clear the stack
-        yield self.acu.stop()
-        self.log.info('Stop called')
-        yield dsleep(5)
-        yield self.acu.http.Command('DataSets.CmdTimePositionTransfer',
-                                    'Clear Stack')
-        yield dsleep(0.1)
-        self.log.info('Cleared stack.')
 
         # Move to the starting position for the scan and then switch to Stop
         # mode
+        scantype = params.get('scantype')
+        times = self.data['scanspec']['times']
+        azs = self.data['scanspec']['azs']
+        els = self.data['scanspec']['els']
+        vas = self.data['scanspec']['vas']
+        ves = self.data['scanspec']['ves']
+        azflags = self.data['scanspec']['azflags']
+        elflags = self.data['scanspec']['elflags']
+ 
         start_az = azs[0]
         start_el = els[0]
 
-        self.data['uploads'] = {'Start_Azimuth': start_az,
-                               'Start_Elevation': start_el,
-                               'Start_Boresight': 0.0,
-                               'Command_Type': 2,
-                               'Preset_Azimuth': 0.0,
-                               'Preset_Elevation': 0.0,
-                               'PtStack_Lines': 'True',
-                               'PtStack_Time': '000, 00:00:00.000000',
-                               'PtStack_Azimuth': 0.0,
-                               'PtStack_Elevation': 0.0,
-                               'PtStack_AzVelocity': 0.0,
-                               'PtStack_ElVelocity': 0.0,
-                               'PtStack_AzFlag': 0,
-                               'PtStack_ElFlag': 0}
+        self.data['uploads']['Start_Azimuth'] = start_az
+        self.data['uploads']['Start_Elevation'] = start_el
+        self.data['uploads']['Command_Type'] = 2
+
+        acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
+                      'block_name': 'ACU_upload',
+                      'data': self.data['uploads']
+                      }
+        self.agent.publish_to_feed('acu_upload', acu_upload)
 
         # Follow the scan in ProgramTrack mode, then switch to Stop mode
-        if scantype == 'linear_turnaround_sameends':
-            all_lines = sh.write_lines(times, azs, els, vas, ves, azflags,
+        all_lines = sh.write_lines(times, azs, els, vas, ves, azflags,
                                        elflags)
-        elif scantype == 'from_file':
-            all_lines = sh.write_lines(times, azs, els, vas, ves, azflags,
-                                       elflags)
-        # Other scan types not yet implemented, so break
-        else:
-            return False, 'Not enough information to scan'
+        with open('/home/simons/code/vertex-acu-agent/test_clients/'+str(time.time())+'_test.pkl','wb') as f:
+            pickle.dump(all_lines, f)
+        f.close()
         self.log.info('all_lines generated')
+        self.data['uploads']['PtStack_Lines'] = 'True'
         yield self.acu.mode('ProgramTrack')
         self.log.info('mode is now ProgramTrack')
         group_size = 120
         while len(all_lines):
             upload_lines = all_lines[:group_size]
+            upload_vals = {'azs': azs[:group_size],
+                           'els': els[:group_size],
+                           'vas': vas[:group_size],
+                           'ves': ves[:group_size],
+                           'azflags': azflags[:group_size],
+                           'elflags': elflags[:group_size]
+                           }
+            for u in range(len(upload_vals['azs'])):
+                self.data['uploads']['PtStack_Time'] = upload_lines[u].split(';')[0]
+                self.data['uploads']['PtStack_Azimuth'] = upload_vals['azs'][u]
+                self.data['uploads']['PtStack_Elevation'] = upload_vals['els'][u]
+                self.data['uploads']['PtStack_AzVelocity'] = upload_vals['vas'][u]
+                self.data['uploads']['PtStack_ElVelocity'] = upload_vals['ves'][u]
+                self.data['uploads']['PtStack_AzFlag'] = upload_vals['azflags'][u]
+                self.data['uploads']['PtStack_ElFlag'] = upload_vals['elflags'][u]
+                self.data['uploads']['PtStack_ctime'] = uploadtime_to_ctime(self.data['uploads']['PtStack_Time'], int(self.data['status']['summary']['Year']))
+                acu_upload = {'timestamp': self.data['uploads']['PtStack_ctime'],
+                              'block_name': 'ACU_upload',
+                              'data': self.data['uploads']
+                              }
+                print(acu_upload)
+ #               print(self.data['uploads']['PtStack_Time'])
+ #               print(time.time())
+                self.agent.publish_to_feed('acu_upload', acu_upload)
             text = ''.join(upload_lines)
             all_lines = all_lines[group_size:]
             free_positions = self.data['status']['summary']\
@@ -838,17 +878,17 @@ class ACUAgent:
                     ['Free_upload_positions']
                 yield dsleep(0.1)
             yield self.acu.http.UploadPtStack(text)
-            print(upload_lines)
-            for u in upload_lines:
+            #print(upload_lines)
+            #for u in upload_lines:
 # TODO: switch over to pre-line formatting
-                self.data['uploads']['PtStack_Time'] = u.split(';')[0]
-                self.data['uploads']['PtStack_Azimuth'] = float(u.split(';')[1])
-                self.data['uploads']['PtStack_Elevation'] = float(u.split(';')[2])
-                self.data['uploads']['PtStack_AzVelocity'] = float(u.split(';')[3])
-                self.data['uploads']['PtStack_ElVelocity'] = float(u.split(';')[4])
-                self.data['uploads']['PtStack_AzFlag'] = int(u.split(';')[5])
-                self.data['uploads']['PtStack_ElFlag'] = int(u.split(';')[6])
-                yield dsleep (0.2)
+#                self.data['uploads']['PtStack_Time'] = u.split(';')[0]
+#                self.data['uploads']['PtStack_Azimuth'] = float(u.split(';')[1])
+#                self.data['uploads']['PtStack_Elevation'] = float(u.split(';')[2])
+#                self.data['uploads']['PtStack_AzVelocity'] = float(u.split(';')[3])
+#                self.data['uploads']['PtStack_ElVelocity'] = float(u.split(';')[4])
+#                self.data['uploads']['PtStack_AzFlag'] = int(u.split(';')[5])
+#                self.data['uploads']['PtStack_ElFlag'] = int(u.split(';')[6])
+#                yield dsleep (0.2)
 #                print(upload_publish_dict)
 #                acu_upload = {'timestamp': self.data['broadcast']['Time'],
 #                              'block_name': 'ACU_upload',
@@ -870,26 +910,22 @@ class ACUAgent:
                                4)
         yield dsleep(self.sleeptime)
         yield self.acu.stop()
-        self.data['uploads'] = {'Start_Azimuth': 0.0,
-                               'Start_Elevation': 0.0,
-                               'Start_Boresight': 0.0,
-                               'Command_Type': 0,
-                               'Preset_Azimuth': 0.0,
-                               'Preset_Elevation': 0.0,
-                               'PtStack_Lines': 'False',
-                               'PtStack_Time': '000, 00:00:00.000000',
-                               'PtStack_Azimuth': 0.0,
-                               'PtStack_Elevation': 0.0,
-                               'PtStack_AzVelocity': 0.0,
-                               'PtStack_ElVelocity': 0.0,
-                               'PtStack_AzFlag': 0,
-                               'PtStack_ElFlag': 0}
-#        print(upload_publish_dict)
-#        acu_upload = {'timestamp': self.data['broadcast']['Time'],
-#                      'block_name': 'ACU_upload',
-#                      'data': upload_publish_dict
-#                      }
-#        self.agent.publish_to_feed('acu_upload', acu_upload)
+        self.data['uploads']['Start_Azimuth'] = 0.0
+        self.data['uploads']['Start_Elevation'] = 0.0
+        self.data['uploads']['Command_Type'] = 0
+        self.data['uploads']['PtStack_Lines'] = 'False'
+        self.data['uploads']['PtStack_Time'] = '000, 00:00:00.000000'
+        self.data['uploads']['PtStack_Azimuth'] = 0.0
+        self.data['uploads']['PtStack_Elevation'] = 0.0
+        self.data['uploads']['PtStack_AzVelocity'] = 0.0
+        self.data['uploads']['PtStack_ElVelocity'] = 0.0
+        self.data['uploads']['PtStack_AzFlag'] = 0
+        self.data['uploads']['PtStack_ElFlag'] = 0
+        acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
+                      'block_name': 'ACU_upload',
+                      'data': self.data['uploads']
+                      }
+        self.agent.publish_to_feed('acu_upload', acu_upload)
         self.set_job_done('control')
         return True, 'Track completed.'
 
