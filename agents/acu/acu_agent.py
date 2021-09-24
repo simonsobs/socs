@@ -7,6 +7,7 @@ import soaculib as aculib
 import scan_helpers as sh
 from soaculib.twisted_backend import TwistedHttpBackend
 import argparse
+import soaculib.status_keys as status_keys
 
 from twisted.internet import reactor, protocol
 from twisted.internet.defer import inlineCallbacks
@@ -31,6 +32,16 @@ def timecode(acutime):
     comptime = gyear+sec_of_day
     return comptime
 
+def uploadtime_to_ctime(ptstack_time):
+    year = datetime.datetime.now().year
+    gyear = calendar.timegm(time.strptime(str(year), '%Y'))
+    day_of_year = float(ptstack_time.split(',')[0])
+    hour = float(ptstack_time.split(',')[1].split(':')[0])
+    minute = float(ptstack_time.split(',')[1].split(':')[1])
+    second = float(ptstack_time.split(',')[1].split(':')[2])
+    comptime = gyear + hour*60*60 + minute*60 + second
+    return comptime
+
 
 class ACUAgent:
 
@@ -53,19 +64,51 @@ class ACUAgent:
 
         self.acu_config = aculib.guess_config(acu_config)
         self.base_url = self.acu_config['base_url']
+        self.readonly_url = self.acu_config['readonly_url']
         self.sleeptime = self.acu_config['motion_waittime']
         self.udp = self.acu_config['streams']['main']
         self.udp_ext = self.acu_config['streams']['ext']
         self.acu8100 = self.acu_config['status']['status_name']
+        self.monitor_fields = status_keys.status_fields[self.acu_config['platform']]['status_fields']
 
         self.log = agent.log
 
         # self.data provides a place to reference data from the monitors.
         # 'status' is populated by the monitor operation
         # 'broadcast' is populated by the udp_monitor operation
-        self.data = {'status': {'summary': {}, 'full_status': {}},
+#        self.data = {'status': {'summary': {}, 'full_status': {}},
+#                     'broadcast': {},
+#                     'uploads': {},
+#                     }
+
+        self.data = {'status': {'summary': {},
+                                'position_errors': {},
+                                'axis_limits': {},
+                                'axis_faults_errors_overages': {},
+                                'axis_warnings': {},
+                                'axis_failures': {},
+                                'axis_state': {},
+                                'osc_alarms': {},
+                                'commands': {},
+                                'ACU_failures_errors': {},
+                                'platform_status': {},
+                                'ACU_emergency': {},
+                                },
                      'broadcast': {},
-                     'uploads': {},
+                     'uploads': {'Start_Azimuth': 0.0,
+                                'Start_Elevation': 0.0,
+                                'Start_Boresight': 0.0,
+                                'Command_Type': 0,
+                                'Preset_Azimuth': 0.0,
+                                'Preset_Elevation': 0.0,
+                                'PtStack_Lines': 'False',
+                                'PtStack_Time': '000, 00:00:00.000000',
+                                'PtStack_Azimuth': 0.0,
+                                'PtStack_Elevation': 0.0,
+                                'PtStack_AzVelocity': 0.0,
+                                'PtStack_ElVelocity': 0.0,
+                                'PtStack_AzFlag': 0,
+                                'PtStack_ElFlag': 0},
                      }
 
         self.health_check = {'broadcast': False, 'status': False}
@@ -88,59 +131,92 @@ class ACUAgent:
                                self.start_udp_monitor,
                                lambda: self.set_job_stop('broadcast'),
                                blocking=False,
-                               startup=True)
+                               startup=False)
         agent.register_process('generate_scan',
                                self.generate_scan,
                                lambda: self.set_job_stop('generate_scan'),
                                blocking=False,
                                startup=False)
-        agg_params = {'frame_length': 60}
+        basic_agg_params = {'frame_length': 60}
+        fullstatus_agg_params = {'frame_length': 60,
+                                 'exclude_influx': True,
+                                 'exclude_aggregator': False
+                                 }
+        influx_agg_params = {'frame_length': 60,
+                             'exclude_influx': False,
+                             'exclude_aggregator': True
+                             } 
         self.agent.register_feed('acu_status_summary',
                                  record=True,
-                                 agg_params=agg_params,
+                                 agg_params=basic_agg_params,
                                  buffer_time=1)
-        self.agent.register_feed('acu_status_full',
-                                 record=True,
-                                 agg_params={'frame_length': 60,
-                                             'exclude_influx': True,
-                                             'exclude_aggregator': False
-                                             },
-                                 buffer_time=1)
+        self.agent.register_feed('acu_status_axis_faults',
+                                  record=True,
+                                  agg_params=fullstatus_agg_params,
+                                  buffer_time=1)
+        self.agent.register_feed('acu_status_position_errs',
+                                  record=True,
+                                  agg_params=fullstatus_agg_params,
+                                  buffer_time=1)
+        self.agent.register_feed('acu_status_axis_limits',
+                                  record=True,
+                                  agg_params=fullstatus_agg_params,
+                                  buffer_time=1)
+        self.agent.register_feed('acu_status_axis_warnings',
+                                  record=True,
+                                  agg_params=fullstatus_agg_params,
+                                  buffer_time=1)
+        self.agent.register_feed('acu_status_axis_failures',
+                                  record=True,
+                                  agg_params=fullstatus_agg_params,
+                                  buffer_time=1)
+        self.agent.register_feed('acu_status_axis_state',
+                                  record=True,
+                                  agg_params=fullstatus_agg_params,
+                                  buffer_time=1)
+        self.agent.register_feed('acu_status_osc_alarms',
+                                  record=True,
+                                  agg_params=fullstatus_agg_params,
+                                  buffer_time=1)
+        self.agent.register_feed('acu_status_commands',
+                                  record=True,
+                                  agg_params=fullstatus_agg_params,
+                                  buffer_time=1)
+        self.agent.register_feed('acu_status_general_errs',
+                                  record=True,
+                                  agg_params=fullstatus_agg_params,
+                                  buffer_time=1)
+        self.agent.register_feed('acu_status_platform',
+                                  record=True,
+                                  agg_params=fullstatus_agg_params,
+                                  buffer_time=1)
+        self.agent.register_feed('acu_status_emergency',
+                                  record=True,
+                                  agg_params=fullstatus_agg_params,
+                                  buffer_time=1)
         self.agent.register_feed('acu_status_influx',
                                  record=True,
-                                 agg_params={'frame_length': 60,
-                                             'exclude_influx': False,
-                                             'exclude_aggregator': True
-                                             },
+                                 agg_params=influx_agg_params,
                                  buffer_time=1)
         self.agent.register_feed('acu_udp_stream',
                                  record=True,
-                                 agg_params={'frame_length': 60,
-                                             'exclude_influx': True,
-                                             'exclude_aggregator': False
-                                             },
+                                 agg_params=fullstatus_agg_params,
                                  buffer_time=1)
         self.agent.register_feed('acu_broadcast_influx',
                                  record=True,
-                                 agg_params={'frame_length': 60,
-                                             'exclude_influx': False,
-                                             'exclude_aggregator': True
-                                             },
+                                 agg_params=influx_agg_params,
                                  buffer_time=1)
         self.agent.register_feed('acu_health_check',
                                  record=True,
-                                 agg_params=agg_params,
+                                 agg_params=basic_agg_params,
                                  buffer_time=1)
         self.agent.register_feed('acu_upload',
                                  record=True,
-                                 agg_params={'frame_length': 60,
-                                             'exclude_influx': False,
-                                             'exclude_aggregator': False
-                                             },
+                                 agg_params=basic_agg_params,
                                  buffer_time=1)
         self.agent.register_feed('acu_error',
                                  record=True,
-                                 agg_params=agg_params,
+                                 agg_params=basic_agg_params,
                                  buffer_time=1)
         agent.register_task('go_to', self.go_to, blocking=False)
         agent.register_task('run_specified_scan',
@@ -241,42 +317,30 @@ class ACUAgent:
         n_ok = 0
         min_query_period = 0.05   # Seconds
         query_t = 0
-        summary_params = ['Time',
-                          'Azimuth mode',
-                          'Azimuth current position',
-                          'Azimuth current velocity',
-                          'Elevation mode',
-                          'Elevation current position',
-                          'Elevation current velocity',
-                          'Boresight mode',
-                          'Boresight current position',
-                          'Qty of free program track stack positions',
-                          ]
         mode_key = {'Stop': 0,
                     'Preset': 1,
                     'ProgramTrack': 2,
                     'Stow': 3,
                     'SurvivalMode': 4,
                     }
-        tfn_key = {'None': 0,
-                   'False': 0,
-                   'True': 1
+        tfn_key = {'None': 0.0,
+                   'False': 0.0,
+                   'True': 1.0
                    }
-        self.data['uploads'] = {'Start_Azimuth': 0.0,
-                                'Start_Elevation': 0.0,
-                                'Start_Boresight': 0.0,
-                                'Command_Type': 0,
-                                'Preset_Azimuth': 0.0,
-                                'Preset_Elevation': 0.0,
-                                'PtStack_Lines': 'False',
-                                'PtStack_Time': '000, 00:00:00.000000',
-                                'PtStack_Azimuth': 0.0,
-                                'PtStack_Elevation': 0.0,
-                                'PtStack_AzVelocity': 0.0,
-                                'PtStack_ElVelocity': 0.0,
-                                'PtStack_AzFlag': 0,
-                                'PtStack_ElFlag': 0}
-        char_replace = [' ', '-', ':', '(', ')', '+', ',', '/']
+#        self.data['uploads'] = {'Start_Azimuth': 0.0,
+#                                'Start_Elevation': 0.0,
+#                                'Start_Boresight': 0.0,
+#                                'Command_Type': 0,
+#                                'Preset_Azimuth': 0.0,
+#                                'Preset_Elevation': 0.0,
+#                                'PtStack_Lines': 'False',
+#                                'PtStack_Time': '000, 00:00:00.000000',
+#                                'PtStack_Azimuth': 0.0,
+#                                'PtStack_Elevation': 0.0,
+#                                'PtStack_AzVelocity': 0.0,
+#                                'PtStack_ElVelocity': 0.0,
+#                                'PtStack_AzFlag': 0,
+#                                'PtStack_ElFlag': 0}
         while self.jobs['monitor'] == 'run':
             now = time.time()
 
@@ -307,53 +371,104 @@ class ACUAgent:
                 yield dsleep(1)
 
             for (key, value) in session.data.items():
-                ocs_key = key
-                for char in char_replace:
-                    ocs_key = ocs_key.replace(char, '_')
-                ocs_key = ocs_key.replace('24V', 'V24')
-                if key in summary_params:
-                    self.data['status']['summary'][ocs_key] = value
-                    if key == 'Azimuth mode':
-                        self.data['status']['summary']['Azimuth_mode_num'] =\
-                            mode_key[value]
-                    elif key == 'Elevation mode':
-                        self.data['status']['summary']['Elevation_mode_num'] =\
-                            mode_key[value]
-                else:
-                    self.data['status']['full_status'][ocs_key] = str(value)
+                for category in self.monitor_fields:
+                    if key in self.monitor_fields[category]:
+                         self.data['status'][category][self.monitor_fields[category][key]] = value
             influx_status = {}
-            for v in self.data['status']['full_status']:
-                try:
-                    influx_status[str(v) + '_influx'] =\
-                        float(self.data['status']['full_status'][v])
-                except ValueError:
-                    influx_status[str(v) + '_influx'] =\
-                        tfn_key[self.data['status']['full_status'][v]]
+            for category in self.data['status']:
+                for statkey in self.data['status'][category].keys():
+                    if type(self.data['status'][category][statkey]) == float:
+                        influx_status[statkey + '_influx'] = self.data['status'][category][statkey]
+                    elif type(self.data['status'][category][statkey]) == bool:
+                        influx_status[statkey + '_influx'] = tfn_key[str(self.data['status'][category][statkey])]
+                    elif self.data['status'][category][statkey] == None:
+                        influx_status[statkey + '_influx'] = tfn_key[str(self.data['status'][category][statkey])]
+                    elif type(self.data['status'][category][statkey]) == str:
+                        influx_status[statkey + '_influx'] = mode_key[self.data['status'][category][statkey]]
+                    elif type(self.data['status'][category][statkey]) == int:
+                        influx_status[statkey + '_influx'] = self.data['status'][category][statkey]
+                    else:
+                        print(statkey)
             self.data['status']['summary']['ctime'] =\
                 timecode(self.data['status']['summary']['Time'])
+            if self.data['uploads']['PtStack_Time'] == '000, 00:00:00.000000':#'000, 00:0:00.000000':
+                self.data['uploads']['PtStack_ctime'] = self.data['status']['summary']['ctime']
+            else:
+                self.data['uploads']['PtStack_ctime'] = uploadtime_to_ctime(self.data['uploads']['PtStack_Time'])
+
             acustatus_summary = {'timestamp':
                                  self.data['status']['summary']['ctime'],
                                  'block_name': 'ACU_summary_output',
                                  'data': self.data['status']['summary']
                                  }
-            acustatus_full = {'timestamp':
-                              self.data['status']['summary']['ctime'],
-                              'block_name': 'ACU_fullstatus_output',
-                              'data': self.data['status']['full_status']
-                              }
+            acustatus_axisfaults = {'timestamp': self.data['status']['summary']['ctime'],
+                                    'block_name': 'ACU_axis_faults',
+                                    'data': self.data['status']['axis_faults_errors_overages']
+                                    }
+            acustatus_poserrors = {'timestamp': self.data['status']['summary']['ctime'],
+                                   'block_name': 'ACU_position_errors',
+                                   'data': self.data['status']['position_errors']
+                                   }
+            acustatus_axislims = {'timestamp': self.data['status']['summary']['ctime'],
+                                  'block_name': 'ACU_axis_limits',
+                                  'data': self.data['status']['axis_limits']
+                                  }
+            acustatus_axiswarn = {'timestamp': self.data['status']['summary']['ctime'],
+                                  'block_name': 'ACU_axis_warnings',
+                                  'data': self.data['status']['axis_warnings']
+                                  }
+            acustatus_axisfail = {'timestamp': self.data['status']['summary']['ctime'],
+                                  'block_name': 'ACU_axis_failures',
+                                  'data': self.data['status']['axis_failures']
+                                  }
+            acustatus_axisstate = {'timestamp': self.data['status']['summary']['ctime'],
+                                   'block_name': 'ACU_axis_state',
+                                   'data': self.data['status']['axis_state']
+                                   }
+            acustatus_oscalarm = {'timestamp': self.data['status']['summary']['ctime'],
+                                  'block_name': 'ACU_oscillation_alarm',
+                                  'data': self.data['status']['osc_alarms']
+                                  }
+            acustatus_commands = {'timestamp': self.data['status']['summary']['ctime'],
+                                  'block_name': 'ACU_command_status',
+                                  'data': self.data['status']['commands']
+                                  }
+            acustatus_acufails = {'timestamp': self.data['status']['summary']['ctime'],
+                                  'block_name': 'ACU_general_errors',
+                                  'data': self.data['status']['ACU_failures_errors']
+                                  }
+            acustatus_platform = {'timestamp': self.data['status']['summary']['ctime'],
+                                  'block_name': 'ACU_platform_status',
+                                  'data': self.data['status']['platform_status']
+                                  }
+            acustatus_emergency = {'timestamp': self.data['status']['summary']['ctime'],
+                                   'block_name': 'ACU_emergency',
+                                   'data': self.data['status']['ACU_emergency']
+                                   }
             acustatus_influx = {'timestamp':
                                 self.data['status']['summary']['ctime'],
-                                'block_name': 'ACU_fullstatus_ints',
+                                'block_name': 'ACU_status_INFLUX',
                                 'data': influx_status
                                 }
-            acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
+        #    print(acustatus_summary)
+            acu_upload = {'timestamp': self.data['uploads']['PtStack_ctime'],
                           'block_name': 'ACU_upload',
                           'data': self.data['uploads']
                           }
-            print(acu_upload)
+#            print(acu_upload)
             self.agent.publish_to_feed('acu_status_summary', acustatus_summary)
-            self.agent.publish_to_feed('acu_status_full', acustatus_full)
-            self.agent.publish_to_feed('acu_status_influx', acustatus_influx)
+            self.agent.publish_to_feed('acu_status_axis_faults', acustatus_axisfaults)
+            self.agent.publish_to_feed('acu_status_position_errs', acustatus_poserrors)
+            self.agent.publish_to_feed('acu_status_axis_limits', acustatus_axislims)
+            self.agent.publish_to_feed('acu_status_axis_warnings', acustatus_axiswarn)
+            self.agent.publish_to_feed('acu_status_axis_failures', acustatus_axisfail)
+            self.agent.publish_to_feed('acu_status_axis_state', acustatus_axisstate)
+            self.agent.publish_to_feed('acu_status_osc_alarms', acustatus_oscalarm)
+#            self.agent.publish_to_feed('acu_status_commands', acustatus_commands)
+            self.agent.publish_to_feed('acu_status_general_errs', acustatus_acufails)
+            self.agent.publish_to_feed('acu_status_platform', acustatus_platform)
+            self.agent.publish_to_feed('acu_status_emergency', acustatus_emergency)
+#            self.agent.publish_to_feed('acu_status_influx', acustatus_influx)
             self.agent.publish_to_feed('acu_upload', acu_upload)
         self.set_job_done('monitor')
         return True, 'Acquisition exited cleanly.'
@@ -724,10 +839,10 @@ class ACUAgent:
             text = ''.join(upload_lines)
             all_lines = all_lines[group_size:]
             free_positions = self.data['status']['summary']\
-                ['Qty_of_free_program_track_stack_positions']
+                ['Free_upload_positions']
             while free_positions < 9899:
                 free_positions = self.data['status']['summary']\
-                    ['Qty_of_free_program_track_stack_positions']
+                    ['Free_upload_positions']
                 yield dsleep(0.1)
             yield self.acu.http.UploadPtStack(text)
             print(upload_lines)
@@ -840,11 +955,11 @@ class ACUAgent:
                 text = ''.join(upload_lines)
                 current_lines = current_lines[group_size:]
                 free_positions = self.data['status']['summary']\
-                    ['Qty_of_free_program_track_stack_positions']
+                    ['Free_upload_positions']
                 while free_positions < 5099:
                     yield dsleep(0.1)
                     free_positions = self.data['status']['summary']\
-                        ['Qty_of_free_program_track_stack_positions']
+                        ['Free_upload_positions']
                 yield self.acu.http.UploadPtStack(text)
         yield self.acu.stop()
         self.set_job_done('control')
