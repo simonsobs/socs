@@ -101,6 +101,7 @@ class ACUAgent:
                                 'Command_Type': 0,
                                 'Preset_Azimuth': 0.0,
                                 'Preset_Elevation': 0.0,
+                                'Preset_Boresight': 0.0,
                                 'PtStack_Lines': 'False',
                                 'PtStack_Time': '000, 00:00:00.000000',
                                 'PtStack_Azimuth': 0.0,
@@ -131,7 +132,7 @@ class ACUAgent:
                                self.start_udp_monitor,
                                lambda: self.set_job_stop('broadcast'),
                                blocking=False,
-                               startup=False)
+                               startup=True)
         agent.register_process('generate_scan',
                                self.generate_scan,
                                lambda: self.set_job_stop('generate_scan'),
@@ -327,20 +328,6 @@ class ACUAgent:
                    'False': 0.0,
                    'True': 1.0
                    }
-#        self.data['uploads'] = {'Start_Azimuth': 0.0,
-#                                'Start_Elevation': 0.0,
-#                                'Start_Boresight': 0.0,
-#                                'Command_Type': 0,
-#                                'Preset_Azimuth': 0.0,
-#                                'Preset_Elevation': 0.0,
-#                                'PtStack_Lines': 'False',
-#                                'PtStack_Time': '000, 00:00:00.000000',
-#                                'PtStack_Azimuth': 0.0,
-#                                'PtStack_Elevation': 0.0,
-#                                'PtStack_AzVelocity': 0.0,
-#                                'PtStack_ElVelocity': 0.0,
-#                                'PtStack_AzFlag': 0,
-#                                'PtStack_ElFlag': 0}
         while self.jobs['monitor'] == 'run':
             now = time.time()
 
@@ -605,25 +592,12 @@ class ACUAgent:
         wait_for_motion = params.get('wait', 1)
         current_az = round(self.data['broadcast']['Azimuth_Corrected'], 4)
         current_el = round(self.data['broadcast']['Elevation_Corrected'], 4)
-        self.data['uploads'] = {'Start_Azimuth': current_az,
-                                'Start_Elevation': current_el,
-                                'Start_Boresight': 0.0,
-                                'Command_Type': 1,
-                                'Preset_Azimuth': az,
-                                'Preset_Elevation': el,
-                                'PtStack_Lines': 'False',
-                                'PtStack_Time': '000, 00:00:00.000000',
-                                'PtStack_Azimuth': 0.0,
-                                'PtStack_Elevation': 0.0,
-                                'PtStack_AzVelocity': 0.0,
-                                'PtStack_ElVelocity': 0.0,
-                                'PtStack_AzFlag': 0,
-                                'PtStack_ElFlag': 0}
-#        acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
-#                      'block_name': 'ACU_upload',
-#                      'data': self.data['uploads']
-#                      }
-#        self.agent.publish_to_feed('acu_upload', acu_upload)
+        self.data['uploads']['Start_Azimuth'] = current_az
+        self.data['uploads']['Start_Elevation'] = current_el
+        self.data['uploads']['Command_Type'] = 1
+        self.data['uploads']['Preset_Azimuth'] = az
+        self.data['uploads']['Preset_Elevation'] = el
+
         # Check whether the telescope is already at the point
         self.log.info('Checking current position')
         if current_az == az and current_el == el:
@@ -664,21 +638,11 @@ class ACUAgent:
                     return False, 'Fault triggered!'
 
         yield self.acu.stop()
-        self.data['uploads'] = {'Start_Azimuth': 0.0,
-                               'Start_Elevation': 0.0,
-                               'Start_Boresight': 0.0,
-                               'Command_Type': 0,
-                               'Preset_Azimuth': 0.0,
-                               'Preset_Elevation': 0.0,
-                               'PtStack_Lines': 'False',
-                               'PtStack_Time': '000, 00:00:00.000000',
-                               'PtStack_Azimuth': 0.0,
-                               'PtStack_Elevation': 0.0,
-                               'PtStack_AzVelocity': 0.0,
-                               'PtStack_ElVelocity': 0.0,
-                               'PtStack_AzFlag': 0,
-                               'PtStack_ElFlag': 0}
-
+        self.data['uploads']['Start_Azimuth'] = 0.0
+        self.data['uploads']['Start_Elevation'] = 0.0
+        self.data['uploads']['Command_Type'] = 0
+        self.data['uploads']['Preset_Azimuth'] = 0.0
+        self.data['uploads']['Preset_Elevation'] = 0.0
         self.set_job_done('control')
         return True, 'Pointing completed'
 
@@ -697,6 +661,9 @@ class ACUAgent:
         bs_destination = params.get('b')
         yield self.acu.stop()
         yield dsleep(5)
+        self.data['uploads']['Start_Boresight'] = self.data['status']['summary']['Boresight_current_position']
+        self.data['uploads']['Command_Type'] = 1
+        self.data['uploads']['Preset_Boresight'] = bs_destination
         yield self.acu.go_3rd_axis(bs_destination)
         current_position = self.data['status']['summary']\
             ['Boresight_current_position']
@@ -705,6 +672,9 @@ class ACUAgent:
             current_position = self.data['status']['summary']\
                 ['Boresight_current_position']
         yield self.acu.stop()
+        self.data['uploads']['Start_Boresight'] = 0.0
+        self.data['uploads']['Command_Type'] = 0
+        self.data['uploads']['Preset_Boresight'] = 0.0
         self.set_job_done('control')
         return True, 'Moved to new 3rd axis position'
 
@@ -731,6 +701,29 @@ class ACUAgent:
         self.log.info('Cleared stack.')
         self.set_job_done('control')
         return True, 'Job completed'
+
+    @inlineCallbacks
+    def spec_scan_fromfile(self, session, params=None):
+        ok, msg = self.try_set_job('scanspec')
+        if not ok:
+            return ok, msg
+        self.log.info('try_set_job scanspec ok')
+        scantype = params.get('scantype')
+        if scantype == 'from_file':
+            filename = params.get('filename')
+        else:
+            self.log.error('Scantype incorrect, client needs correction')
+            self.set_job_done('scanspec')
+            return False, 'Scan specification failed'
+        times, azs, els, vas, ves, azflags, elflags = sh.from_file(filename)
+        self.data['scanspec'] = {'times': times,
+                                 'azs': azs,
+                                 'els': els,
+                                 'vas': vas,
+                                 'ves': ves,
+                                 'azflags': azflags,
+                                 'elflags': elflags
+                                 }
 
     @inlineCallbacks
     def run_specified_scan(self, session, params=None):
