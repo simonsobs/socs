@@ -68,6 +68,7 @@ class ACUAgent:
         self.readonly_url = self.acu_config['readonly_url']
         self.sleeptime = self.acu_config['motion_waittime']
         self.udp = self.acu_config['streams']['main']
+        self.udp_schema = aculib.get_stream_schema(self.udp['schema'])
         self.udp_ext = self.acu_config['streams']['ext']
         self.acu8100 = self.acu_config['status']['status_name']
         self.monitor_fields = status_keys.status_fields[self.acu_config['platform']]['status_fields']
@@ -383,10 +384,8 @@ class ACUAgent:
                         print(statkey)
             self.data['status']['summary']['ctime'] =\
                 timecode(self.data['status']['summary']['Time'])
-            if self.data['uploads']['PtStack_Time'] == '000, 00:00:00.000000':#'000, 00:0:00.000000':
+            if self.data['uploads']['PtStack_Time'] == '000, 00:00:00.000000':
                 self.data['uploads']['PtStack_ctime'] = self.data['status']['summary']['ctime']
-#            else:
-#                self.data['uploads']['PtStack_ctime'] = uploadtime_to_ctime(self.data['uploads']['PtStack_Time'])
 
             acustatus_summary = {'timestamp':
                                  self.data['status']['summary']['ctime'],
@@ -442,12 +441,6 @@ class ACUAgent:
                                 'block_name': 'ACU_status_INFLUX',
                                 'data': influx_status
                                 }
-        #    print(acustatus_summary)
-#            acu_upload = {'timestamp': self.data['uploads']['PtStack_ctime'],
-#                          'block_name': 'ACU_upload',
-#                          'data': self.data['uploads']
-#                          }
-#            print(acu_upload)
             self.agent.publish_to_feed('acu_status_summary', acustatus_summary)
             self.agent.publish_to_feed('acu_status_axis_faults', acustatus_axisfaults)
             self.agent.publish_to_feed('acu_status_position_errs', acustatus_poserrors)
@@ -461,7 +454,6 @@ class ACUAgent:
             self.agent.publish_to_feed('acu_status_platform', acustatus_platform)
             self.agent.publish_to_feed('acu_status_emergency', acustatus_emergency)
 #            self.agent.publish_to_feed('acu_status_influx', acustatus_influx)
-#            self.agent.publish_to_feed('acu_upload', acu_upload)
         self.set_job_done('monitor')
         return True, 'Acquisition exited cleanly.'
 
@@ -477,10 +469,11 @@ class ACUAgent:
         if not ok:
             return ok, msg
         session.set_status('running')
-        FMT = '<idddddddddddd'
+        FMT = self.udp_schema['format']#'<idddddddddddd'
         FMT_LEN = struct.calcsize(FMT)
         UDP_PORT = self.udp['port'] #self.acu_config['PositionBroadcast_target'].split(':')[1]
         udp_data = []
+        fields = self.udp_schema['fields']
         class MonitorUDP(protocol.DatagramProtocol):
 
             def datagramReceived(self, data, src_addr):
@@ -537,30 +530,33 @@ class ACUAgent:
                     gday = (d[0]-1) * 86400
                     sec = d[1]
                     data_ctime = gyear + gday + sec
-                    azimuth_corrected = d[2]
-                    azimuth_raw = d[5]
-                    elevation_corrected = d[3]
-                    elevation_raw = d[6]
-                    boresight_corrected = d[4]
-                    boresight_raw = d[7]
-                    azimuth_motor_1 = d[8]
-                    azimuth_motor_2 = d[9]
-                    elevation_motor_1 = d[10]
-                    boresight_motor_1 = d[11]
-                    boresight_motor_2 = d[12]
-                    self.data['broadcast'] = {'Time': data_ctime,
-                                              'Azimuth_Corrected': azimuth_corrected,
-                                              'Azimuth_Raw': azimuth_raw,
-                                              'Elevation_Corrected': elevation_corrected,
-                                              'Elevation_Raw': elevation_raw,
-                                              'Boresight_Corrected': boresight_corrected,
-                                              'Boresight_Raw': boresight_raw,
-                                              'Azimuth_Motor_1': azimuth_motor_1,
-                                              'Azimuth_Motor_2': azimuth_motor_2,
-                                              'Elevation_Motor_1': elevation_motor_1,
-                                              'Boresight_Motor_1': boresight_motor_1,
-                                              'Boresight_Motor_2': boresight_motor_2,
-                                              }
+                    self.data['broadcast']['Time'] = data_ctime
+                    for i in range(2, len(d)):
+                        self.data['broadcast'][fields[i]] = d[i]
+#                    azimuth_corrected = d[2]
+#                    azimuth_raw = d[5]
+#                    elevation_corrected = d[3]
+#                    elevation_raw = d[6]
+#                    boresight_corrected = d[4]
+#                    boresight_raw = d[7]
+#                    azimuth_motor_1 = d[8]
+#                    azimuth_motor_2 = d[9]
+#                    elevation_motor_1 = d[10]
+#                    boresight_motor_1 = d[11]
+#                    boresight_motor_2 = d[12]
+#                    self.data['broadcast'] = {'Time': data_ctime,
+#                                              'Azimuth_Corrected': azimuth_corrected,
+#                                              'Azimuth_Raw': azimuth_raw,
+#                                              'Elevation_Corrected': elevation_corrected,
+#                                              'Elevation_Raw': elevation_raw,
+#                                              'Boresight_Corrected': boresight_corrected,
+#                                              'Boresight_Raw': boresight_raw,
+#                                              'Azimuth_Motor_1': azimuth_motor_1,
+#                                              'Azimuth_Motor_2': azimuth_motor_2,
+#                                              'Elevation_Motor_1': elevation_motor_1,
+#                                              'Boresight_Motor_1': boresight_motor_1,
+#                                              'Boresight_Motor_2': boresight_motor_2,
+#                                              }
                     acu_udp_stream = {'timestamp': self.data['broadcast']['Time'],
                                       'block_name': 'ACU_position',
                                       'data': self.data['broadcast']
