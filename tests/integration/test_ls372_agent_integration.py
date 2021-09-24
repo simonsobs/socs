@@ -35,7 +35,7 @@ def run_agent(cov):
     env = os.environ.copy()
     env['COVERAGE_FILE'] = '.coverage.agent'
     env['OCS_CONFIG_DIR'] = os.getcwd()
-    agentproc = subprocess.Popen(['coverage', 'run', '--rcfile=../.coveragerc', '../agents/lakeshore372/LS372_agent.py', '--site-file', './default.yaml'],
+    agentproc = subprocess.Popen(['coverage', 'run', '--rcfile=./.coveragerc', '../agents/lakeshore372/LS372_agent.py', '--site-file', './default.yaml'],
                                  env=env,
                                  stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE,

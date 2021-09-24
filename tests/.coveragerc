@@ -1,6 +1,6 @@
 [run]
 source =
-    socs
+    ../socs
     ../agents/
 
 omit =
