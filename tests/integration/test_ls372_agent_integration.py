@@ -10,6 +10,8 @@ from urllib.error import URLError
 
 from ocs.matched_client import MatchedClient
 
+import ocs
+
 pytest_plugins = ("docker_compose")
 
 # Fixture to wait for crossbar server to be available.
@@ -59,9 +61,21 @@ def test_testing(wait_for_crossbar):
     assert True
 
 @pytest.mark.integtest
-def test_agent(wait_for_crossbar, run_agent):
+def test_init_lakeshore(wait_for_crossbar, run_agent):
     os.environ['OCS_CONFIG_DIR'] = os.getcwd()
-    print(os.getenv('OCS_CONFIG_DIR'))
+    #print(os.getenv('OCS_CONFIG_DIR'))
     client = MatchedClient('LSASIM')
     resp = client.init_lakeshore()
+    #print(resp)
+    assert resp.status == ocs.OK
+    #print(resp.session)
+
+@pytest.mark.integtest
+def test_enable_control_chan(wait_for_crossbar, run_agent):
+    os.environ['OCS_CONFIG_DIR'] = os.getcwd()
+    client = MatchedClient('LSASIM')
+    client.init_lakeshore()
+    resp = client.enable_control_chan()
     print(resp)
+    assert resp.status == ocs.OK
+    print(resp.session)
