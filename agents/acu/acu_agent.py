@@ -33,7 +33,6 @@ def timecode(acutime):
     return comptime
 
 def uploadtime_to_ctime(ptstack_time, upload_year):
-#    year = datetime.datetime.now().year
     year = int(upload_year)
     gyear = calendar.timegm(time.strptime(str(year), '%Y'))
     day_of_year = float(ptstack_time.split(',')[0]) - 1.0
@@ -117,7 +116,8 @@ class ACUAgent:
 
         self.take_data = False
 
-        self.web_agent = tclient.Agent(reactor)
+        pool = tclient.HTTPConnectionPool(reactor)
+        self.web_agent = tclient.Agent(reactor, pool=pool)
         tclient._HTTP11ClientFactory.noisy = False
 
         self.acu = aculib.AcuControl(
