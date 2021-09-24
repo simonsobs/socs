@@ -15,8 +15,11 @@ import ocs
 pytest_plugins = ("docker_compose")
 
 # Fixture to wait for crossbar server to be available.
-@pytest.fixture(scope="function")
-def wait_for_crossbar(function_scoped_container_getter):
+# Speeds up tests a bit to have this session scoped
+# If tests start interfering with one another this should be changed to "function" scoped
+# and session_scoped_container_getter should be changed to function_scoped_container_getter
+@pytest.fixture(scope="session")
+def wait_for_crossbar(session_scoped_container_getter):
     """Wait for the crossbar server from docker-compose to become responsive."""
     attempts = 0
 
@@ -76,6 +79,100 @@ def test_enable_control_chan(wait_for_crossbar, run_agent):
     client = MatchedClient('LSASIM')
     client.init_lakeshore()
     resp = client.enable_control_chan()
-    print(resp)
     assert resp.status == ocs.OK
-    print(resp.session)
+
+@pytest.mark.integtest
+def test_disable_control_chan(wait_for_crossbar, run_agent):
+    os.environ['OCS_CONFIG_DIR'] = os.getcwd()
+    client = MatchedClient('LSASIM')
+    client.init_lakeshore()
+    resp = client.disable_control_chan()
+    assert resp.status == ocs.OK
+
+@pytest.mark.integtest
+def test_start_acq(wait_for_crossbar, run_agent):
+    os.environ['OCS_CONFIG_DIR'] = os.getcwd()
+    client = MatchedClient('LSASIM')
+    client.init_lakeshore()
+    resp = client.acq.start(sample_heater=False, run_once=True)
+    assert resp.status == ocs.OK
+
+@pytest.mark.integtest
+def test_set_heater_range(wait_for_crossbar, run_agent):
+    os.environ['OCS_CONFIG_DIR'] = os.getcwd()
+    client = MatchedClient('LSASIM')
+    client.init_lakeshore()
+    resp = client.set_heater_range(range=1e-3, heater='sample', wait=0)
+    assert resp.status == ocs.OK
+
+@pytest.mark.integtest
+def test_set_excitation_mode(wait_for_crossbar, run_agent):
+    os.environ['OCS_CONFIG_DIR'] = os.getcwd()
+    client = MatchedClient('LSASIM')
+    client.init_lakeshore()
+    resp = client.set_excitation_mode(channel=1, mode='current')
+    assert resp.status == ocs.OK
+
+@pytest.mark.integtest
+def test_set_excitation(wait_for_crossbar, run_agent):
+    os.environ['OCS_CONFIG_DIR'] = os.getcwd()
+    client = MatchedClient('LSASIM')
+    client.init_lakeshore()
+    resp = client.set_excitation(channel=1, value=1e-9)
+    assert resp.status == ocs.OK
+
+@pytest.mark.integtest
+def test_set_pid(wait_for_crossbar, run_agent):
+    os.environ['OCS_CONFIG_DIR'] = os.getcwd()
+    client = MatchedClient('LSASIM')
+    client.init_lakeshore()
+    resp = client.set_pid(P=40, I=2, D=0)
+    assert resp.status == ocs.OK
+
+@pytest.mark.integtest
+def test_set_active_channel(wait_for_crossbar, run_agent):
+    os.environ['OCS_CONFIG_DIR'] = os.getcwd()
+    client = MatchedClient('LSASIM')
+    client.init_lakeshore()
+    resp = client.set_active_channel(channel=1)
+    assert resp.status == ocs.OK
+
+@pytest.mark.integtest
+def test_set_autoscan(wait_for_crossbar, run_agent):
+    os.environ['OCS_CONFIG_DIR'] = os.getcwd()
+    client = MatchedClient('LSASIM')
+    client.init_lakeshore()
+    resp = client.set_autoscan(autoscan=True)
+    assert resp.status == ocs.OK
+
+@pytest.mark.integtest
+def test_set_output_mode(wait_for_crossbar, run_agent):
+    os.environ['OCS_CONFIG_DIR'] = os.getcwd()
+    client = MatchedClient('LSASIM')
+    client.init_lakeshore()
+    resp = client.set_output_mode(heater='still', mode='Off')
+    assert resp.status == ocs.OK
+
+@pytest.mark.integtest
+def test_set_heater_output(wait_for_crossbar, run_agent):
+    os.environ['OCS_CONFIG_DIR'] = os.getcwd()
+    client = MatchedClient('LSASIM')
+    client.init_lakeshore()
+    resp = client.set_heater_output(heater='still', output=50)
+    assert resp.status == ocs.OK
+
+@pytest.mark.integtest
+def test_set_still_output(wait_for_crossbar, run_agent):
+    os.environ['OCS_CONFIG_DIR'] = os.getcwd()
+    client = MatchedClient('LSASIM')
+    client.init_lakeshore()
+    resp = client.set_still_output(output=50)
+    assert resp.status == ocs.OK
+
+@pytest.mark.integtest
+def test_get_still_output(wait_for_crossbar, run_agent):
+    os.environ['OCS_CONFIG_DIR'] = os.getcwd()
+    client = MatchedClient('LSASIM')
+    client.init_lakeshore()
+    resp = client.get_still_output()
+    assert resp.status == ocs.OK
