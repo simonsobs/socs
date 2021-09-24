@@ -143,7 +143,7 @@ class LS372_Agent:
         return True, 'Disabled control channel'
 
     @ocs_agent.param('auto_acquire', default=False, type=bool)
-    @ocs_agent.param('acq_params', type=dict)
+    @ocs_agent.param('acq_params', type=dict, default=None)
     @ocs_agent.param('force', default=False, type=bool)
     def init_lakeshore(self, session, params=None):
         """init_lakeshore(auto_acquire=False, acq_params=None, force=False)
@@ -210,6 +210,7 @@ class LS372_Agent:
         return True, 'Lakeshore module initialized.'
 
     @ocs_agent.param('sample_heater', default=False, type=bool)
+    @ocs_agent.param('run_once', default=False, type=bool)
     def acq(self, session, params=None):
         """acq(sample_heater=False)
 
@@ -383,7 +384,7 @@ class LS372_Agent:
 
                     session.app.publish_to_feed('temperatures', htr_data)
 
-                if params.get('run_once', False):
+                if params['run_once']:
                     break
 
         return True, 'Acquisition exited cleanly.'
@@ -712,7 +713,7 @@ class LS372_Agent:
 
     @ocs_agent.param('heater', type=str, choices=['sample', 'still'])
     @ocs_agent.param('output', type=float)
-    @ocs_agent.param('display', type=str, choices=['current', 'power'])
+    @ocs_agent.param('display', type=str, choices=['current', 'power'], default=None)
     def set_heater_output(self, session, params=None):
         """set_heater_output(heater=None, output=None, display=None)
 
