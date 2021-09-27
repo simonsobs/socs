@@ -8,7 +8,7 @@ import scan_helpers as sh
 from soaculib.twisted_backend import TwistedHttpBackend
 import argparse
 import soaculib.status_keys as status_keys
-import pickle
+#import pickle
 from twisted.internet import reactor, protocol
 from twisted.internet.defer import inlineCallbacks
 import twisted.web.client as tclient
@@ -831,9 +831,9 @@ class ACUAgent:
         # Follow the scan in ProgramTrack mode, then switch to Stop mode
         all_lines = sh.write_lines(times, azs, els, vas, ves, azflags,
                                        elflags)
-        with open('/home/simons/code/vertex-acu-agent/test_clients/'+str(time.time())+'_test.pkl','wb') as f:
-            pickle.dump(all_lines, f)
-        f.close()
+  #      with open('/home/simons/code/vertex-acu-agent/test_clients/'+str(time.time())+'_test.pkl','wb') as f:
+  #          pickle.dump(all_lines, f)
+  #      f.close()
         self.log.info('all_lines generated')
         self.data['uploads']['PtStack_Lines'] = 'True'
         yield self.acu.mode('ProgramTrack')
