@@ -23,4 +23,6 @@ sphinx_rtd_theme
 
 # testing
 pytest
+pytest-cov
 pytest-docker-compose
+pytest-dependency
