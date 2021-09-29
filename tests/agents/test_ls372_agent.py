@@ -28,6 +28,14 @@ def mock_failed_connection():
     return failed_con
 
 
+def create_session(op_name):
+    """Create an OpSession with a mocked app for testing."""
+    mock_app = mock.MagicMock()
+    session = OpSession(1, op_name, app=mock_app)
+
+    return session
+
+
 @pytest.fixture
 def agent():
     """Test fixture to setup a mocked OCSAgent."""
@@ -95,8 +103,7 @@ def test_ls372_init_lakeshore_task(agent):
     This should be as if the initialization worked without issue.
 
     """
-    mock_app = mock.MagicMock()
-    session = OpSession(1, 'init_lakeshore', app=mock_app)
+    session = create_session('init_lakeshore')
     res = agent.init_lakeshore_task(session, None)
 
     print(res)
@@ -112,8 +119,7 @@ def test_ls372_init_lakeshore_task_already_initialized(agent):
     """Initializing an already initialized LS372_Agent should just return True.
 
     """
-    mock_app = mock.MagicMock()
-    session = OpSession(1, 'init_lakeshore', app=mock_app)
+    session = create_session('init_lakeshore')
     agent.init_lakeshore_task(session, None)
     res = agent.init_lakeshore_task(session, None)
     assert agent.initialized is True
@@ -128,8 +134,7 @@ def test_ls372_init_lakeshore_task_failed_connection(agent):
     should fail and return False.
 
     """
-    mock_app = mock.MagicMock()
-    session = OpSession(1, 'init_lakeshore', app=mock_app)
+    session = create_session('init_lakeshore')
     res = agent.init_lakeshore_task(session, None)
     assert res[0] is False
 
@@ -143,8 +148,7 @@ def test_ls372_init_lakeshore_task_unhandled_error(agent):
     also fail and return False.
 
     """
-    mock_app = mock.MagicMock()
-    session = OpSession(1, 'init_lakeshore', app=mock_app)
+    session = create_session('init_lakeshore')
     res = agent.init_lakeshore_task(session, None)
     assert res[0] is False
 
@@ -156,8 +160,7 @@ def test_ls372_init_lakeshore_task_auto_acquire(agent):
     Agent to make a start call for the acq process, given the params in acq_params.
 
     """
-    mock_app = mock.MagicMock()
-    session = OpSession(1, 'init_lakeshore', app=mock_app)
+    session = create_session('init_lakeshore')
     res = agent.init_lakeshore_task(session, {'auto_acquire': True, 'acq_params': {'test': 1}})
     assert res[0] is True
     agent.agent.start.assert_called_once_with('acq', {'test': 1})
@@ -168,8 +171,7 @@ def test_ls372_init_lakeshore_task_auto_acquire(agent):
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_enable_control_chan(agent):
     """Normal operation of 'enable_control_chan' task."""
-    mock_app = mock.MagicMock()
-    session = OpSession(1, 'enable_control_chan', app=mock_app)
+    session = create_session('enable_control_chan')
 
     # Have to init before running anything else
     agent.init_lakeshore_task(session, None)
@@ -183,8 +185,7 @@ def test_ls372_enable_control_chan(agent):
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_disable_control_chan(agent):
     """Normal operation of 'disable_control_chan' task."""
-    mock_app = mock.MagicMock()
-    session = OpSession(1, 'disable_control_chan', app=mock_app)
+    session = create_session('disable_control_chan')
 
     # Have to init before running anything else
     agent.init_lakeshore_task(session, None)
@@ -198,8 +199,7 @@ def test_ls372_disable_control_chan(agent):
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_acq(agent):
     """Test running the 'acq' Process once."""
-    mock_app = mock.MagicMock()
-    session = OpSession(1, 'acq', app=mock_app)
+    session = create_session('acq')
 
     # Have to init before running anything else
     agent.init_lakeshore_task(session, None)
@@ -216,8 +216,7 @@ def test_ls372_acq(agent):
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_acq_w_control_chan(agent):
     """Test running the 'acq' Process once with control channel active."""
-    mock_app = mock.MagicMock()
-    session = OpSession(1, 'acq', app=mock_app)
+    session = create_session('acq')
 
     # Have to init before running anything else
     agent.init_lakeshore_task(session, None)
@@ -237,8 +236,7 @@ def test_ls372_acq_w_control_chan(agent):
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_acq_w_sample_heater(agent):
     """Test running the 'acq' Process once with sample heater active."""
-    mock_app = mock.MagicMock()
-    session = OpSession(1, 'acq', app=mock_app)
+    session = create_session('acq')
 
     # Have to init before running anything else
     agent.init_lakeshore_task(session, None)
@@ -253,8 +251,7 @@ def test_ls372_acq_w_sample_heater(agent):
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_stop_acq_not_running(agent):
     """'stop_acq' should return False if acq Process isn't running."""
-    mock_app = mock.MagicMock()
-    session = OpSession(1, 'stop_acq', app=mock_app)
+    session = create_session('stop_acq')
 
     # Have to init before running anything else
     agent.init_lakeshore_task(session, None)
@@ -267,8 +264,7 @@ def test_ls372_stop_acq_not_running(agent):
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_stop_acq_while_running(agent):
     """'stop_acq' should return True if acq Process is running."""
-    mock_app = mock.MagicMock()
-    session = OpSession(1, 'stop_acq', app=mock_app)
+    session = create_session('stop_acq')
 
     # Have to init before running anything else
     agent.init_lakeshore_task(session, None)
@@ -289,8 +285,7 @@ def test_ls372_set_heater_range_sample_heater(agent):
     operation.
 
     """
-    mock_app = mock.MagicMock()
-    session = OpSession(1, 'set_heater_range', app=mock_app)
+    session = create_session('set_heater_range')
 
     # Have to init before running anything else
     agent.init_lakeshore_task(session, None)
@@ -307,8 +302,7 @@ def test_ls372_set_heater_range_still_heater(agent):
     operation.
 
     """
-    mock_app = mock.MagicMock()
-    session = OpSession(1, 'set_heater_range', app=mock_app)
+    session = create_session('set_heater_range')
 
     # Have to init before running anything else
     agent.init_lakeshore_task(session, None)
@@ -325,8 +319,7 @@ def test_ls372_set_heater_range_identical_range(agent):
     return True.
 
     """
-    mock_app = mock.MagicMock()
-    session = OpSession(1, 'set_heater_range', app=mock_app)
+    session = create_session('set_heater_range')
 
     # Have to init before running anything else
     agent.init_lakeshore_task(session, None)
@@ -346,8 +339,7 @@ def test_ls372_set_heater_range_identical_range(agent):
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_set_excitation_mode(agent):
     """Normal operation of 'set_excitation_mode' task."""
-    mock_app = mock.MagicMock()
-    session = OpSession(1, 'set_excitation_mode', app=mock_app)
+    session = create_session('set_excitation_mode')
 
     # Have to init before running anything else
     agent.init_lakeshore_task(session, None)
@@ -362,8 +354,7 @@ def test_ls372_set_excitation_mode(agent):
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_set_excitation(agent):
     """Normal operation of 'set_excitation' task."""
-    mock_app = mock.MagicMock()
-    session = OpSession(1, 'set_excitation', app=mock_app)
+    session = create_session('set_excitation')
 
     # Have to init before running anything else
     agent.init_lakeshore_task(session, None)
@@ -377,8 +368,7 @@ def test_ls372_set_excitation(agent):
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_set_excitation_already_set(agent):
     """Setting to already set excitation value."""
-    mock_app = mock.MagicMock()
-    session = OpSession(1, 'set_excitation', app=mock_app)
+    session = create_session('set_excitation')
 
     # Have to init before running anything else
     agent.init_lakeshore_task(session, None)
@@ -393,8 +383,7 @@ def test_ls372_set_excitation_already_set(agent):
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_set_pid(agent):
     """Normal operation of 'set_pid' task."""
-    mock_app = mock.MagicMock()
-    session = OpSession(1, 'set_pid', app=mock_app)
+    session = create_session('set_pid')
 
     # Have to init before running anything else
     agent.init_lakeshore_task(session, None)
@@ -409,8 +398,7 @@ def test_ls372_set_pid(agent):
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_set_active_channel(agent):
     """Normal operation of 'set_active_channel' task."""
-    mock_app = mock.MagicMock()
-    session = OpSession(1, 'set_active_channel', app=mock_app)
+    session = create_session('set_active_channel')
 
     # Have to init before running anything else
     agent.init_lakeshore_task(session, None)
@@ -425,8 +413,7 @@ def test_ls372_set_active_channel(agent):
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_set_autoscan_on(agent):
     """Normal operation of 'set_autoscan' task."""
-    mock_app = mock.MagicMock()
-    session = OpSession(1, 'set_autoscan', app=mock_app)
+    session = create_session('set_autoscan')
 
     # Have to init before running anything else
     agent.init_lakeshore_task(session, None)
@@ -440,8 +427,7 @@ def test_ls372_set_autoscan_on(agent):
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_set_autoscan_off(agent):
     """Normal operation of 'set_autoscan' task."""
-    mock_app = mock.MagicMock()
-    session = OpSession(1, 'set_autoscan', app=mock_app)
+    session = create_session('set_autoscan')
 
     # Have to init before running anything else
     agent.init_lakeshore_task(session, None)
@@ -462,8 +448,7 @@ def test_ls372_set_autoscan_off(agent):
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_set_output_mode_still(agent):
     """Normal operation of 'set_output_mode' task for the still heater."""
-    mock_app = mock.MagicMock()
-    session = OpSession(1, 'set_output_mode', app=mock_app)
+    session = create_session('set_output_mode')
 
     # Have to init before running anything else
     agent.init_lakeshore_task(session, None)
@@ -477,8 +462,7 @@ def test_ls372_set_output_mode_still(agent):
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_set_output_mode_sample(agent):
     """Normal operation of 'set_output_mode' task for the sample heater."""
-    mock_app = mock.MagicMock()
-    session = OpSession(1, 'set_output_mode', app=mock_app)
+    session = create_session('set_output_mode')
 
     # Have to init before running anything else
     agent.init_lakeshore_task(session, None)
@@ -493,8 +477,7 @@ def test_ls372_set_output_mode_sample(agent):
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_set_heater_output_still(agent):
     """Normal operation of 'set_heater_output' task for the still heater."""
-    mock_app = mock.MagicMock()
-    session = OpSession(1, 'set_heater_output', app=mock_app)
+    session = create_session('set_heater_output')
 
     # Have to init before running anything else
     agent.init_lakeshore_task(session, None)
@@ -508,8 +491,7 @@ def test_ls372_set_heater_output_still(agent):
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_set_heater_output_sample(agent):
     """Normal operation of 'set_heater_output' task for the sample heater."""
-    mock_app = mock.MagicMock()
-    session = OpSession(1, 'set_heater_output', app=mock_app)
+    session = create_session('set_heater_output')
 
     # Have to init before running anything else
     agent.init_lakeshore_task(session, None)
@@ -524,8 +506,7 @@ def test_ls372_set_heater_output_sample(agent):
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_set_still_output(agent):
     """Normal operation of 'set_still_output' task."""
-    mock_app = mock.MagicMock()
-    session = OpSession(1, 'set_still_output', app=mock_app)
+    session = create_session('set_still_output')
 
     # Have to init before running anything else
     agent.init_lakeshore_task(session, None)
@@ -540,8 +521,7 @@ def test_ls372_set_still_output(agent):
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_get_still_output(agent):
     """Normal operation of 'get_still_output' task."""
-    mock_app = mock.MagicMock()
-    session = OpSession(1, 'get_still_output', app=mock_app)
+    session = create_session('get_still_output')
 
     # Have to init before running anything else
     agent.init_lakeshore_task(session, None)
