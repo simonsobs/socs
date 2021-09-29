@@ -15,6 +15,9 @@ from ocs.base import OpCode
 
 pytest_plugins = ("docker_compose")
 
+# Set the OCS_CONFIG_DIR so we read the local default.yaml file always
+os.environ['OCS_CONFIG_DIR'] = os.getcwd()
+
 # Fixture to wait for crossbar server to be available.
 # Speeds up tests a bit to have this session scoped
 # If tests start interfering with one another this should be changed to "function" scoped
@@ -59,16 +62,18 @@ def run_agent(cov):
     agentcov.read()
     cov.get_data().update(agentcov)
 
+@pytest.fixture()
+def client():
+    client = MatchedClient('LSASIM')
+    return client
+
 @pytest.mark.integtest
 def test_testing(wait_for_crossbar):
     """Just a quick test to make sure we can bring up crossbar."""
     assert True
 
 @pytest.mark.integtest
-def test_init_lakeshore(wait_for_crossbar, run_agent):
-    os.environ['OCS_CONFIG_DIR'] = os.getcwd()
-    #print(os.getenv('OCS_CONFIG_DIR'))
-    client = MatchedClient('LSASIM')
+def test_init_lakeshore(wait_for_crossbar, run_agent, client):
     resp = client.init_lakeshore()
     #print(resp)
     assert resp.status == ocs.OK
@@ -76,27 +81,21 @@ def test_init_lakeshore(wait_for_crossbar, run_agent):
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 @pytest.mark.integtest
-def test_enable_control_chan(wait_for_crossbar, run_agent):
-    os.environ['OCS_CONFIG_DIR'] = os.getcwd()
-    client = MatchedClient('LSASIM')
+def test_enable_control_chan(wait_for_crossbar, run_agent, client):
     client.init_lakeshore()
     resp = client.enable_control_chan()
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 @pytest.mark.integtest
-def test_disable_control_chan(wait_for_crossbar, run_agent):
-    os.environ['OCS_CONFIG_DIR'] = os.getcwd()
-    client = MatchedClient('LSASIM')
+def test_disable_control_chan(wait_for_crossbar, run_agent, client):
     client.init_lakeshore()
     resp = client.disable_control_chan()
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 @pytest.mark.integtest
-def test_start_acq(wait_for_crossbar, run_agent):
-    os.environ['OCS_CONFIG_DIR'] = os.getcwd()
-    client = MatchedClient('LSASIM')
+def test_start_acq(wait_for_crossbar, run_agent, client):
     client.init_lakeshore()
     resp = client.acq.start(sample_heater=False, run_once=True)
     assert resp.status == ocs.OK
@@ -113,90 +112,70 @@ def test_start_acq(wait_for_crossbar, run_agent):
     assert resp.session['op_code'] == OpCode.STOPPING.value
 
 @pytest.mark.integtest
-def test_set_heater_range(wait_for_crossbar, run_agent):
-    os.environ['OCS_CONFIG_DIR'] = os.getcwd()
-    client = MatchedClient('LSASIM')
+def test_set_heater_range(wait_for_crossbar, run_agent, client):
     client.init_lakeshore()
     resp = client.set_heater_range(range=1e-3, heater='sample', wait=0)
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 @pytest.mark.integtest
-def test_set_excitation_mode(wait_for_crossbar, run_agent):
-    os.environ['OCS_CONFIG_DIR'] = os.getcwd()
-    client = MatchedClient('LSASIM')
+def test_set_excitation_mode(wait_for_crossbar, run_agent, client):
     client.init_lakeshore()
     resp = client.set_excitation_mode(channel=1, mode='current')
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 @pytest.mark.integtest
-def test_set_excitation(wait_for_crossbar, run_agent):
-    os.environ['OCS_CONFIG_DIR'] = os.getcwd()
-    client = MatchedClient('LSASIM')
+def test_set_excitation(wait_for_crossbar, run_agent, client):
     client.init_lakeshore()
     resp = client.set_excitation(channel=1, value=1e-9)
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 @pytest.mark.integtest
-def test_set_pid(wait_for_crossbar, run_agent):
-    os.environ['OCS_CONFIG_DIR'] = os.getcwd()
-    client = MatchedClient('LSASIM')
+def test_set_pid(wait_for_crossbar, run_agent, client):
     client.init_lakeshore()
     resp = client.set_pid(P=40, I=2, D=0)
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 @pytest.mark.integtest
-def test_set_active_channel(wait_for_crossbar, run_agent):
-    os.environ['OCS_CONFIG_DIR'] = os.getcwd()
-    client = MatchedClient('LSASIM')
+def test_set_active_channel(wait_for_crossbar, run_agent, client):
     client.init_lakeshore()
     resp = client.set_active_channel(channel=1)
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 @pytest.mark.integtest
-def test_set_autoscan(wait_for_crossbar, run_agent):
-    os.environ['OCS_CONFIG_DIR'] = os.getcwd()
-    client = MatchedClient('LSASIM')
+def test_set_autoscan(wait_for_crossbar, run_agent, client):
     client.init_lakeshore()
     resp = client.set_autoscan(autoscan=True)
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 @pytest.mark.integtest
-def test_set_output_mode(wait_for_crossbar, run_agent):
-    os.environ['OCS_CONFIG_DIR'] = os.getcwd()
-    client = MatchedClient('LSASIM')
+def test_set_output_mode(wait_for_crossbar, run_agent, client):
     client.init_lakeshore()
     resp = client.set_output_mode(heater='still', mode='Off')
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 @pytest.mark.integtest
-def test_set_heater_output(wait_for_crossbar, run_agent):
-    os.environ['OCS_CONFIG_DIR'] = os.getcwd()
-    client = MatchedClient('LSASIM')
+def test_set_heater_output(wait_for_crossbar, run_agent, client):
     client.init_lakeshore()
     resp = client.set_heater_output(heater='still', output=50)
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 @pytest.mark.integtest
-def test_set_still_output(wait_for_crossbar, run_agent):
-    os.environ['OCS_CONFIG_DIR'] = os.getcwd()
-    client = MatchedClient('LSASIM')
+def test_set_still_output(wait_for_crossbar, run_agent, client):
     client.init_lakeshore()
     resp = client.set_still_output(output=50)
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 @pytest.mark.integtest
-def test_get_still_output(wait_for_crossbar, run_agent):
-    os.environ['OCS_CONFIG_DIR'] = os.getcwd()
-    client = MatchedClient('LSASIM')
+def test_get_still_output(wait_for_crossbar, run_agent, client):
     client.init_lakeshore()
     resp = client.get_still_output()
     assert resp.status == ocs.OK
