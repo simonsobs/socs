@@ -100,9 +100,9 @@ def write_lines(conctimes, concaz, concel, concva, concve, az_flags, el_flags):
     fmt = '%j, %H:%M:%S'
     start_time = time.time() + 10.
     true_times = [start_time + i for i in conctimes]
-    fmt_times = [time.strftime(fmt, time.gmtime(t)) + ('%.6f' % (t%1.))[1:] for t in true_times]
+    fmt_times = [time.strftime(fmt, time.gmtime(t)) + ('%.3f' % (t%1.))[1:] for t in true_times]
 
-    all_lines = [('%s;%.4f;%.4f;%.4f;%.4f;%i;%i\r\n' % (fmt_times[n], concaz[n], concel[n], concva[n], concve[n], az_flags[n], el_flags[n])) for n in range(len(fmt_times))]
+    all_lines = [('%s; %.3f; %.3f; %.1f; %.1f; %i; %i\r\n' % (fmt_times[n], concaz[n], concel[n], concva[n], concve[n], az_flags[n], el_flags[n])) for n in range(len(fmt_times))]
 
     return all_lines
 
