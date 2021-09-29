@@ -10,8 +10,8 @@ SOCS - Simons Observatory Control System
     :target: https://socs.readthedocs.io/en/develop/?badge=develop
     :alt: Documentation Status
 
-.. image:: https://coveralls.io/repos/github/simonsobs/socs/badge.svg?branch=travis
-    :target: https://coveralls.io/github/simonsobs/socs?branch=travis
+.. image:: https://coveralls.io/repos/github/simonsobs/socs/badge.svg?branch=develop
+    :target: https://coveralls.io/github/simonsobs/socs?branch=develop
 
 .. image:: https://img.shields.io/badge/dockerhub-latest-blue
     :target: https://hub.docker.com/r/simonsobs/ocs/tags

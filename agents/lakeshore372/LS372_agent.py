@@ -375,6 +375,9 @@ class LS372_Agent:
 
                     session.app.publish_to_feed('temperatures', htr_data)
 
+                if params['run_once']:
+                    break
+
         return True, 'Acquisition exited cleanly.'
 
     def stop_acq(self, session, params=None):
@@ -415,6 +418,7 @@ class LS372_Agent:
                 heater = self.module.still_heater
 
             current_range = heater.get_heater_range()
+            self.log.debug(f"Current heater range: {current_range}")
 
             if params['range'] == current_range:
                 print("Current heater range matches commanded value. Proceeding unchanged.")

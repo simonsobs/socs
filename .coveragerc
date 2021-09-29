@@ -1,5 +1,7 @@
 [run]
-source = socs
+source =
+    socs
+    agents/
 
 omit =
   # omit versioneer
@@ -7,5 +9,5 @@ omit =
 
 [paths]
 source =
-  socs/
-  /app/socs/socs/
+  ./
+  /app/socs/
