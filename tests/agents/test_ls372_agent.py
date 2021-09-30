@@ -1,5 +1,5 @@
 import sys
-sys.path.insert(0, './agents/lakeshore372/')
+sys.path.insert(0, '../agents/lakeshore372/')
 from LS372_agent import LS372_Agent
 
 from ocs.ocs_agent import OpSession

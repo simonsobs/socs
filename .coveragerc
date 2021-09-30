@@ -1,12 +1,3 @@
-[run]
-source =
-    socs
-    agents/
-
-omit =
-  # omit versioneer
-  */_version.py
-
 [paths]
 source =
   ./

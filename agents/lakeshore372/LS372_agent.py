@@ -375,7 +375,7 @@ class LS372_Agent:
 
                     session.app.publish_to_feed('temperatures', htr_data)
 
-                if params['run_once']:
+                if params.get('run_once', False):
                     break
 
         return True, 'Acquisition exited cleanly.'
@@ -385,6 +385,7 @@ class LS372_Agent:
         Stops acq process.
         """
         if self.take_data:
+            session.set_status('stopping')
             self.take_data = False
             return True, 'requested to stop taking data.'
         else:

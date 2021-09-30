@@ -3,9 +3,21 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from socs.agent.smurf_recorder import FrameRecorder, FlowControl
+try:
+    from spt3g import core
 
-from spt3g import core
+    from socs.agent.smurf_recorder import FrameRecorder, FlowControl
+except ModuleNotFoundError as e:
+    print(f"Unable to import spt3g: {e}")
+
+@pytest.mark.spt3g
+@pytest.mark.dependency(name="spt3g")
+def test_spt3g_import():
+    """Test that we can import spt3g. Used to skip dependent tests."""
+    from spt3g import core
+
+    # Just to avoid flake8 complaining we aren't using these imports
+    print(core.__file__)
 
 
 @pytest.fixture
@@ -22,11 +34,15 @@ def networksender():
 
 
 # test basic initialization
+@pytest.mark.spt3g
+@pytest.mark.dependency(depends=["spt3g"])
 def test_frame_recorder_init(frame_recorder):
     pass
 
 
 # Test reader connection
+@pytest.mark.spt3g
+@pytest.mark.dependency(depends=["spt3g"])
 class TestReaderConnection():
     def test_g3reader_connection(self, frame_recorder, networksender):
         """Test we can establish a connection with a G3NetworkSender."""
@@ -53,6 +69,8 @@ class TestReaderConnection():
 
 
 # test split_acquisition
+@pytest.mark.spt3g
+@pytest.mark.dependency(depends=["spt3g"])
 class TestSplitAcquisition():
     """Splitting an acquisition is time based, and rotates the file we're
     writing to. This class tests various scenarios with this file splitting.
@@ -80,6 +98,8 @@ class TestSplitAcquisition():
 
 
 # test close_file
+@pytest.mark.spt3g
+@pytest.mark.dependency(depends=["spt3g"])
 def test_close_file(frame_recorder):
     """Test closing out the file and removing the writer."""
     frame_recorder.writer = MagicMock()
@@ -91,6 +111,8 @@ def test_close_file(frame_recorder):
 
 
 # test check_for_frame_gap
+@pytest.mark.spt3g
+@pytest.mark.dependency(depends=["spt3g"])
 class TestFrameGap():
     def test_null_writer_check_for_frame_gap(self, frame_recorder):
         """If writer is None return."""
@@ -106,6 +128,8 @@ class TestFrameGap():
 
 
 # test create_new_file
+@pytest.mark.spt3g
+@pytest.mark.dependency(depends=["spt3g"])
 class TestCreateNewFile():
     def test_create_new_file(self, frame_recorder):
         """Writer should be None to create a new file."""
@@ -134,6 +158,8 @@ class TestCreateNewFile():
 
 
 # test write_frames_to_file
+@pytest.mark.spt3g
+@pytest.mark.dependency(depends=["spt3g"])
 class TestWriteFrames():
     def test_write_flowcontrol_frame(self, frame_recorder):
         """Flow control frames should log a warning and continue."""
@@ -164,6 +190,8 @@ class TestWriteFrames():
 
 
 # test read_frames
+@pytest.mark.spt3g
+@pytest.mark.dependency(depends=["spt3g"])
 class TestReadFrames():
     def test_failed_g3reader_connection(self, frame_recorder):
         """Should just return if we can't get a connection.

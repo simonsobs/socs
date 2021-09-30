@@ -61,6 +61,7 @@ Simulator Reference  Simulators are used to mock software and hardware
     :maxdepth: 2
 
     simulators/ls240_simulator
+    simulators/ls372_simulator
     simulators/smurf_stream_simulator
 
 .. toctree::
@@ -68,6 +69,7 @@ Simulator Reference  Simulators are used to mock software and hardware
     :maxdepth: 2
 
     developer/snmp
+    developer/testing
 
 Indices and tables
 ==================

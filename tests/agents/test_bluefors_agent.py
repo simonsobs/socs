@@ -1,5 +1,5 @@
 import sys
-sys.path.insert(0, './agents/bluefors/')
+sys.path.insert(0, '../agents/bluefors/')
 from bluefors_log_tracker import BlueforsAgent
 
 from unittest import mock
