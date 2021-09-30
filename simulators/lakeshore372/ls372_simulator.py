@@ -807,8 +807,8 @@ def make_parser(parser=None):
         parser = argparse.ArgumentParser()
 
     parser.add_argument('-p', '--port', type=int, default=50000,
-                        help="Port which simulator will wait for a connection."
-                             "If taken, it will test several consecutive ports"
+                        help="Port which simulator will wait for a connection. "
+                             "If taken, it will test several consecutive ports "
                              "until it finds one that is free.")
     parser.add_argument('--num-channels', type=int, default=16,
                         help="Number of channels which the simulator will have.")
