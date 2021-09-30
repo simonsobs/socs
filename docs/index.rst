@@ -69,6 +69,7 @@ Simulator Reference  Simulators are used to mock software and hardware
     :maxdepth: 2
 
     developer/snmp
+    developer/testing
 
 Indices and tables
 ==================

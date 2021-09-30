@@ -81,6 +81,18 @@ browser. You can also find a copy hosted on `Read the Docs`_.
 
 .. _Read the Docs: https://socs.readthedocs.io/en/latest/
 
+Tests
+-----
+The tests for SOCS are run using pytest, and should be run from the
+``tests/`` directory::
+
+  $ cd tests/
+  $ python3 -m pytest --cov
+
+For more details see `tests/README.rst <tests_>`_.
+
+.. _tests: tests/README.rst
+
 Contributing
 ------------
 For guidelines on how to contribute to OCS see `CONTRIBUTING.rst`_.
