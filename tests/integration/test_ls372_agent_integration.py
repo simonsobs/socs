@@ -70,7 +70,7 @@ def run_agent(cov):
     time.sleep(1)
 
     # report coverage
-    agentcov = coverage.data.CoverageData(basename='.coverage.ls372agent')
+    agentcov = coverage.data.CoverageData(basename='.coverage.agent')
     agentcov.read()
     cov.get_data().update(agentcov)
 
@@ -88,7 +88,7 @@ def test_testing(wait_for_crossbar):
 
 
 @pytest.mark.integtest
-def test_init_lakeshore(wait_for_crossbar, run_agent, client):
+def test_ls372_init_lakeshore(wait_for_crossbar, run_agent, client):
     resp = client.init_lakeshore()
     # print(resp)
     assert resp.status == ocs.OK
@@ -97,7 +97,7 @@ def test_init_lakeshore(wait_for_crossbar, run_agent, client):
 
 
 @pytest.mark.integtest
-def test_enable_control_chan(wait_for_crossbar, run_agent, client):
+def test_ls372_enable_control_chan(wait_for_crossbar, run_agent, client):
     client.init_lakeshore()
     resp = client.enable_control_chan()
     assert resp.status == ocs.OK
@@ -105,7 +105,7 @@ def test_enable_control_chan(wait_for_crossbar, run_agent, client):
 
 
 @pytest.mark.integtest
-def test_disable_control_chan(wait_for_crossbar, run_agent, client):
+def test_ls372_disable_control_chan(wait_for_crossbar, run_agent, client):
     client.init_lakeshore()
     resp = client.disable_control_chan()
     assert resp.status == ocs.OK
@@ -113,7 +113,7 @@ def test_disable_control_chan(wait_for_crossbar, run_agent, client):
 
 
 @pytest.mark.integtest
-def test_start_acq(wait_for_crossbar, run_agent, client):
+def test_ls372_start_acq(wait_for_crossbar, run_agent, client):
     client.init_lakeshore()
     resp = client.acq.start(sample_heater=False, run_once=True)
     assert resp.status == ocs.OK
@@ -131,7 +131,7 @@ def test_start_acq(wait_for_crossbar, run_agent, client):
 
 
 @pytest.mark.integtest
-def test_set_heater_range(wait_for_crossbar, run_agent, client):
+def test_ls372_set_heater_range(wait_for_crossbar, run_agent, client):
     client.init_lakeshore()
     resp = client.set_heater_range(range=1e-3, heater='sample', wait=0)
     assert resp.status == ocs.OK
@@ -139,7 +139,7 @@ def test_set_heater_range(wait_for_crossbar, run_agent, client):
 
 
 @pytest.mark.integtest
-def test_set_excitation_mode(wait_for_crossbar, run_agent, client):
+def test_ls372_set_excitation_mode(wait_for_crossbar, run_agent, client):
     client.init_lakeshore()
     resp = client.set_excitation_mode(channel=1, mode='current')
     assert resp.status == ocs.OK
@@ -147,7 +147,7 @@ def test_set_excitation_mode(wait_for_crossbar, run_agent, client):
 
 
 @pytest.mark.integtest
-def test_set_excitation(wait_for_crossbar, run_agent, client):
+def test_ls372_set_excitation(wait_for_crossbar, run_agent, client):
     client.init_lakeshore()
     resp = client.set_excitation(channel=1, value=1e-9)
     assert resp.status == ocs.OK
@@ -155,7 +155,7 @@ def test_set_excitation(wait_for_crossbar, run_agent, client):
 
 
 @pytest.mark.integtest
-def test_set_pid(wait_for_crossbar, run_agent, client):
+def test_ls372_set_pid(wait_for_crossbar, run_agent, client):
     client.init_lakeshore()
     resp = client.set_pid(P=40, I=2, D=0)
     assert resp.status == ocs.OK
@@ -163,7 +163,7 @@ def test_set_pid(wait_for_crossbar, run_agent, client):
 
 
 @pytest.mark.integtest
-def test_set_active_channel(wait_for_crossbar, run_agent, client):
+def test_ls372_set_active_channel(wait_for_crossbar, run_agent, client):
     client.init_lakeshore()
     resp = client.set_active_channel(channel=1)
     assert resp.status == ocs.OK
@@ -171,7 +171,7 @@ def test_set_active_channel(wait_for_crossbar, run_agent, client):
 
 
 @pytest.mark.integtest
-def test_set_autoscan(wait_for_crossbar, run_agent, client):
+def test_ls372_set_autoscan(wait_for_crossbar, run_agent, client):
     client.init_lakeshore()
     resp = client.set_autoscan(autoscan=True)
     assert resp.status == ocs.OK
@@ -179,7 +179,7 @@ def test_set_autoscan(wait_for_crossbar, run_agent, client):
 
 
 @pytest.mark.integtest
-def test_set_output_mode(wait_for_crossbar, run_agent, client):
+def test_ls372_set_output_mode(wait_for_crossbar, run_agent, client):
     client.init_lakeshore()
     resp = client.set_output_mode(heater='still', mode='Off')
     assert resp.status == ocs.OK
@@ -187,7 +187,7 @@ def test_set_output_mode(wait_for_crossbar, run_agent, client):
 
 
 @pytest.mark.integtest
-def test_set_heater_output(wait_for_crossbar, run_agent, client):
+def test_ls372_set_heater_output(wait_for_crossbar, run_agent, client):
     client.init_lakeshore()
     resp = client.set_heater_output(heater='still', output=50)
     assert resp.status == ocs.OK
@@ -195,7 +195,7 @@ def test_set_heater_output(wait_for_crossbar, run_agent, client):
 
 
 @pytest.mark.integtest
-def test_set_still_output(wait_for_crossbar, run_agent, client):
+def test_ls372_set_still_output(wait_for_crossbar, run_agent, client):
     client.init_lakeshore()
     resp = client.set_still_output(output=50)
     assert resp.status == ocs.OK
@@ -203,7 +203,7 @@ def test_set_still_output(wait_for_crossbar, run_agent, client):
 
 
 @pytest.mark.integtest
-def test_get_still_output(wait_for_crossbar, run_agent, client):
+def test_ls372_get_still_output(wait_for_crossbar, run_agent, client):
     client.init_lakeshore()
     resp = client.get_still_output()
     assert resp.status == ocs.OK
