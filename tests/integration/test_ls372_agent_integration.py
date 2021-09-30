@@ -18,13 +18,18 @@ pytest_plugins = ("docker_compose")
 # Set the OCS_CONFIG_DIR so we read the local default.yaml file always
 os.environ['OCS_CONFIG_DIR'] = os.getcwd()
 
+
 # Fixture to wait for crossbar server to be available.
 # Speeds up tests a bit to have this session scoped
-# If tests start interfering with one another this should be changed to "function" scoped
-# and session_scoped_container_getter should be changed to function_scoped_container_getter
+# If tests start interfering with one another this should be changed to
+# "function" scoped and session_scoped_container_getter should be changed to
+# function_scoped_container_getter
 @pytest.fixture(scope="session")
 def wait_for_crossbar(session_scoped_container_getter):
-    """Wait for the crossbar server from docker-compose to become responsive."""
+    """Wait for the crossbar server from docker-compose to become
+    responsive.
+
+    """
     attempts = 0
 
     while attempts < 6:
@@ -39,12 +44,17 @@ def wait_for_crossbar(session_scoped_container_getter):
     assert code == 200
     print("Crossbar server online.")
 
+
 @pytest.fixture()
 def run_agent(cov):
     env = os.environ.copy()
     env['COVERAGE_FILE'] = '.coverage.agent'
     env['OCS_CONFIG_DIR'] = os.getcwd()
-    agentproc = subprocess.Popen(['coverage', 'run', '--rcfile=./.coveragerc', '../agents/lakeshore372/LS372_agent.py', '--site-file', './default.yaml'],
+    agentproc = subprocess.Popen(['coverage', 'run',
+                                  '--rcfile=./.coveragerc',
+                                  '../agents/lakeshore372/LS372_agent.py',
+                                  '--site-file',
+                                  './default.yaml'],
                                  env=env,
                                  stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE,
@@ -64,23 +74,27 @@ def run_agent(cov):
     agentcov.read()
     cov.get_data().update(agentcov)
 
+
 @pytest.fixture()
 def client():
     client = MatchedClient('LSASIM')
     return client
+
 
 @pytest.mark.integtest
 def test_testing(wait_for_crossbar):
     """Just a quick test to make sure we can bring up crossbar."""
     assert True
 
+
 @pytest.mark.integtest
 def test_init_lakeshore(wait_for_crossbar, run_agent, client):
     resp = client.init_lakeshore()
-    #print(resp)
+    # print(resp)
     assert resp.status == ocs.OK
-    #print(resp.session)
+    # print(resp.session)
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
 
 @pytest.mark.integtest
 def test_enable_control_chan(wait_for_crossbar, run_agent, client):
@@ -89,12 +103,14 @@ def test_enable_control_chan(wait_for_crossbar, run_agent, client):
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
+
 @pytest.mark.integtest
 def test_disable_control_chan(wait_for_crossbar, run_agent, client):
     client.init_lakeshore()
     resp = client.disable_control_chan()
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
 
 @pytest.mark.integtest
 def test_start_acq(wait_for_crossbar, run_agent, client):
@@ -113,12 +129,14 @@ def test_start_acq(wait_for_crossbar, run_agent, client):
     resp = client.acq.status()
     assert resp.session['op_code'] == OpCode.STOPPING.value
 
+
 @pytest.mark.integtest
 def test_set_heater_range(wait_for_crossbar, run_agent, client):
     client.init_lakeshore()
     resp = client.set_heater_range(range=1e-3, heater='sample', wait=0)
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
 
 @pytest.mark.integtest
 def test_set_excitation_mode(wait_for_crossbar, run_agent, client):
@@ -127,12 +145,14 @@ def test_set_excitation_mode(wait_for_crossbar, run_agent, client):
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
+
 @pytest.mark.integtest
 def test_set_excitation(wait_for_crossbar, run_agent, client):
     client.init_lakeshore()
     resp = client.set_excitation(channel=1, value=1e-9)
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
 
 @pytest.mark.integtest
 def test_set_pid(wait_for_crossbar, run_agent, client):
@@ -141,12 +161,14 @@ def test_set_pid(wait_for_crossbar, run_agent, client):
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
+
 @pytest.mark.integtest
 def test_set_active_channel(wait_for_crossbar, run_agent, client):
     client.init_lakeshore()
     resp = client.set_active_channel(channel=1)
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
 
 @pytest.mark.integtest
 def test_set_autoscan(wait_for_crossbar, run_agent, client):
@@ -155,12 +177,14 @@ def test_set_autoscan(wait_for_crossbar, run_agent, client):
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
+
 @pytest.mark.integtest
 def test_set_output_mode(wait_for_crossbar, run_agent, client):
     client.init_lakeshore()
     resp = client.set_output_mode(heater='still', mode='Off')
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
 
 @pytest.mark.integtest
 def test_set_heater_output(wait_for_crossbar, run_agent, client):
@@ -169,12 +193,14 @@ def test_set_heater_output(wait_for_crossbar, run_agent, client):
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
+
 @pytest.mark.integtest
 def test_set_still_output(wait_for_crossbar, run_agent, client):
     client.init_lakeshore()
     resp = client.set_still_output(output=50)
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
 
 @pytest.mark.integtest
 def test_get_still_output(wait_for_crossbar, run_agent, client):
