@@ -51,14 +51,16 @@ def run_agent(cov):
                                  preexec_fn=os.setsid)
 
     # wait for Agent to connect
-    time.sleep(2)
+    time.sleep(1)
 
     yield
 
+    # shutdown Agent
     agentproc.send_signal(signal.SIGINT)
     time.sleep(1)
-    # 4.
-    agentcov = coverage.data.CoverageData(basename='.coverage.agent')
+
+    # report coverage
+    agentcov = coverage.data.CoverageData(basename='.coverage.ls372agent')
     agentcov.read()
     cov.get_data().update(agentcov)
 
