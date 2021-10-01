@@ -187,12 +187,12 @@ class PTC:
 class PTCAgent:
     """Agent to connect to a single cryomech compressor.
 
-    Args:
+    Parameters:
         port (int): TCP port to connect to.
         ip_address (str): IP Address for the compressor.
-        f_sample (float, optional): Data acquisiton rate
-        fake_errors (bool, optional): Generates fake errors in
-                                      the string output 50% of the time.
+        f_sample (float, optional): Data acquisiton rate, defaults to 2.5 Hz.
+        fake_errors (bool, optional): Generates fake errors in the string
+            output 50% of the time.
 
     """
     def __init__(self, agent, port, ip_address, f_sample=2.5,
@@ -219,9 +219,15 @@ class PTCAgent:
                                  agg_params=agg_params,
                                  buffer_time=1)
 
-    def init_ptc_task(self, session, params=None):
-        """
-        Initializes the connection to the ptc.
+    def init(self, session, params=None):
+        """init(auto_acquire=False)
+
+        **Task** - Initializes the connection to the PTC.
+
+        Parameters:
+            auto_acquire (bool): Automatically start acq process after
+                initialization
+
         """
         if params is None:
             params = {}
@@ -256,14 +262,12 @@ class PTCAgent:
 
         return True, "PTC agent initialized"
 
-    def start_acq(self, session, params=None):
-        """
-        Starts acqusition of data from the ptc.
-        """
+    def acq(self, session, params=None):
+        """acq()
 
-        if params is None:
-            params = {}
+        **Process** - Starts acqusition of data from the PTC.
 
+        """
         with self.lock.acquire_timeout(0, job='acq') as acquired:
             if not acquired:
                 self.log.warn("Could not start acq because {} is already"
@@ -290,10 +294,8 @@ class PTCAgent:
 
         return True, 'Acquisition exited cleanly.'
 
-    def stop_acq(self, session, params=None):
-        """
-        Stops acqusition of data from the ptc..
-        """
+    def _stop_acq(self, session, params=None):
+        """Stops acqusition of data from the PTC."""
         if self.take_data:
             self.take_data = False
             return True, 'requested to stop taking data.'
@@ -312,10 +314,12 @@ def make_parser(parser=None):
     # Add options specific to this agent.
     pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--ip-address')
+    pgroup.add_argument('--port', default=502)
     pgroup.add_argument('--serial-number')
-    pgroup.add_argument('--mode')
-    pgroup.add_argument('--port')
-    pgroup.add_argument('--fake-errors', default=False)
+    pgroup.add_argument('--mode', choices=['init', 'acq'])
+    pgroup.add_argument('--fake-errors', default=False,
+                        help="If True, randomly output 'FAKE ERROR' instead of "\
+                             "data half of the time.")
 
     return parser
 
@@ -341,8 +345,8 @@ def main():
     ptc = PTCAgent(agent, args.port, args.ip_address,
                    fake_errors=args.fake_errors)
 
-    agent.register_task('init',  ptc.init_ptc_task, startup=init_params)
-    agent.register_process('acq', ptc.start_acq, ptc.stop_acq)
+    agent.register_task('init',  ptc.init, startup=init_params)
+    agent.register_process('acq', ptc.acq, ptc._stop_acq)
 
     runner.run(agent, auto_reconnect=True)
 
