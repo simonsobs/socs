@@ -151,8 +151,18 @@ class LabJackFunctions:
         return values, units
 
 
-# LabJack agent class
 class LabJackAgent:
+    """Agent to collect data from LabJack device.
+
+    Parameters:
+        agent (OCSAgent): OCSAgent object for the Agent.
+        ip_address (str): IP Address for the LabJack device.
+        active_channels (str or list): Active channel description, i.e.
+            'T7-all', 'T4-all', or list of channels in form ['AIN0', 'AIN1'].
+        function_file (str): Path to file for unit conversion.
+        sampling_frequency (float): Sampling rate in Hz.
+
+    """
     def __init__(self, agent, ip_address, active_channels, function_file,
                  sampling_frequency):
         self.active = True
@@ -208,11 +218,16 @@ class LabJackAgent:
                                  buffer_time=1)
 
     # Task functions
-    def init_labjack_task(self, session, params=None):
-        """
-        task to initialize labjack module
-        """
+    def init_labjack(self, session, params=None):
+        """init_labjack(auto_acquire=False)
 
+        **Task** - Initialize LabJack module.
+
+        Parameters:
+            auto_acquire (bool): Automatically start acq process after
+                initialization. Defaults to False.
+
+        """
         if self.initialized:
             return True, "Already initialized module"
 
@@ -242,13 +257,14 @@ class LabJackAgent:
 
         return True, 'LabJack module initialized.'
 
-    def start_acq(self, session, params=None):
-        """
-        Task to start data acquisition.
+    def acq(self, session, params=None):
+        """acq(sampling_freq=2.5)
 
-        Args:
+        **Process** - Acquire data from the Labjack.
+
+        Parameters:
             sampling_frequency (float):
-                Sampling frequency for data collection. Defaults to 2.5 Hz
+                Sampling frequency for data collection. Defaults to 2.5 Hz.
 
         """
         if params is None:
@@ -335,7 +351,7 @@ class LabJackAgent:
 
         return True, 'Acquisition exited cleanly.'
 
-    def stop_acq(self, session, params=None):
+    def _stop_acq(self, session, params=None):
         if self.take_data:
             self.take_data = False
             return True, 'requested to stop taking data.'
@@ -357,8 +373,10 @@ def make_parser(parser=None):
 
     pgroup.add_argument('--ip-address')
     pgroup.add_argument('--active-channels',
-                        default='T7-all')
-    pgroup.add_argument('--function-file', default='None')
+                        default='T7-all',
+                        help="Active channel description, or list of channels, i.e. ['AIN0', 'AIN1']")
+    pgroup.add_argument('--function-file', default='None',
+                        help='Path to file for unit conversion.')
     pgroup.add_argument('--sampling-frequency', default='2.5')
 
     return parser
@@ -389,8 +407,8 @@ if __name__ == '__main__':
                            sampling_frequency=sampling_frequency)
 
     agent.register_task('init_labjack',
-                        sensors.init_labjack_task,
+                        sensors.init_labjack,
                         startup=init_params)
-    agent.register_process('acq', sensors.start_acq, sensors.stop_acq)
+    agent.register_process('acq', sensors.acq, sensors._stop_acq)
 
     runner.run(agent, auto_reconnect=True)
