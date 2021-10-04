@@ -341,8 +341,8 @@ class MeinbergM1000Agent:
                                  buffer_time=1)
 
     @inlineCallbacks
-    def start_acq(self, session, params=None):
-        """start_acq()
+    def acq(self, session, params=None):
+        """acq()
 
         **Process** - Fetch values from the M1000 via SNMP.
 
@@ -398,7 +398,7 @@ class MeinbergM1000Agent:
     def _stop_acq(self, session, params=None):
         """_stop_acq()
 
-        **Task** - Stop task associated with start_acq process.
+        **Task** - Stop task associated with acq process.
 
         """
         self.is_streaming = False
@@ -438,7 +438,7 @@ if __name__ == "__main__":
                                   port=int(args.port))
 
     agent.register_process("acq",
-                           listener.start_acq,
+                           listener.acq,
                            listener._stop_acq,
                            startup=bool(args.auto_start), blocking=False)
 
