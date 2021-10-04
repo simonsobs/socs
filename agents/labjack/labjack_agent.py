@@ -92,10 +92,12 @@ class LabJackFunctions:
         Given a voltage array and function information from the
         labjack_config.yaml file, applies a unit conversion.
         Returns the converted value and its units.
+
         Args:
             v_array (numpy array): The voltages to be converted.
-            function_info (dict): Specifies the type of function.
-                If custom, also gives the function.
+            function_info (dict): Specifies the type of function. If custom,
+                also gives the function.
+
         """
         if function_info["user_defined"] == 'False':
             function = getattr(self, function_info['type'])
