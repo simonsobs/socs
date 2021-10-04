@@ -213,8 +213,8 @@ class PysmurfController:
                     'datafile': '/data/smurf_data/20200316/1584401673/outputs/1584402020.dat',
                     'active_channels': [0,1,2,3,4]
                 }
-        """
 
+        """
         ok, msg = yield self._run_script(
             params['script'],
             params.get('args', []),
@@ -228,6 +228,7 @@ class PysmurfController:
         """abort()
 
         **Task** - Aborts the actively running script.
+
         """
         self.prot.transport.signalProcess('KILL')
         return True, "Aborting process"
@@ -235,6 +236,7 @@ class PysmurfController:
     @inlineCallbacks
     def tune_squids(self, session, params=None):
         """tune_squids(args=[], log=True)
+
         **Task** - Runs the fake script /config/scripts/pysmurf/tune_squids.py
 
         Args:
@@ -245,6 +247,7 @@ class PysmurfController:
                 Determines if and how the process's stdout should be logged.
                 You can pass the path to a logfile, True to use the agent's log,
                 or False to not log at all.
+
         """
         if params is None:
             params = {}
@@ -266,7 +269,7 @@ def make_parser(parser=None):
     if parser is None:
         parser = argparse.ArgumentParser()
 
-    pgroup = parser.add_argument_group('Agent Config')
+    pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--monitor-id', '-m', type=str,
                         help="Instance id for pysmurf-monitor corresponding to "
                              "this pysmurf instance.")

@@ -188,3 +188,9 @@ Agent API
 ---------------
 .. autoclass:: agents.pysmurf_controller.pysmurf_controller.PysmurfController
     :members:
+
+Supporting APIs
+---------------
+
+.. autoclass:: agents.pysmurf_controller.pysmurf_controller.PysmurfScriptProtocol
+    :members:
