@@ -31,11 +31,12 @@ An example configuration for your ocs config file::
        'arguments': [['--log-directory', '/logs']]
       }
 
-The `--log-directory` argument will need to be updated in your configuration if
-you are running outside of a Docker container.
+.. note::
+    The ``--log-directory`` argument will need to be updated in your configuration if
+    you are running outside of a Docker container.
 
-Docker
-``````
+Docker Compose
+``````````````
 
 Example docker-compose configuration::
 
