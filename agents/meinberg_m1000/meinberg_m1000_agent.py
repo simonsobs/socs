@@ -341,45 +341,46 @@ class MeinbergM1000Agent:
                                  buffer_time=1)
 
     @inlineCallbacks
-    def start_acq(self, session, params=None):
-        """start_acq(params=None)
+    def acq(self, session, params=None):
+        """acq()
 
-        OCS Process for fetching values from the M1000 via SNMP.
+        **Process** - Fetch values from the M1000 via SNMP.
 
-        The session.data object stores each unique OID with its latest status,
-        decoded value, and the last time the value was retrived. This will look like
-        the example here::
+        Notes:
+            The session.data object stores each unique OID with its latest status,
+            decoded value, and the last time the value was retrived. This will look like
+            the example here::
 
-            >>> session.data
-            {"mbgLtNgRefclockLeapSecondDate_1":
-                {"status": "not announced",
-                 "lastGet":1598626144.5365012},
-             "mbgLtNgPtpPortState_1":
-                {"status": 3,
-                 "description": "disabled",
-                 "lastGet": 1598543397.689727},
-             "mbgLtNgNtpCurrentState_0":
-                {"status": 1,
-                 "description": "not synchronized",
-                 "lastGet": 1598543363.289597},
-             "mbgLtNgRefclockState_1":
-                {"status": 2,
-                 "description": "not synchronized",
-                 "lastGet": 1598543359.6326838},
-             "mbgLtNgSysPsStatus_1":
-                {"status": 2,
-                 "description": "up",
-                 "lastGet": 1598543359.6326838},
-             "mbgLtNgSysPsStatus_2":
-                {"status": 2,
-                 "description": "up",
-                 "lastGet": 1598543359.6326838},
-             "mbgLtNgEthPortLinkState_1":
-                {"status": 1,
-                 "description": "up",
-                 "lastGet": 1598543359.6326838}}
+                >>> response.session['data']
+                {"mbgLtNgRefclockLeapSecondDate_1":
+                    {"status": "not announced",
+                     "lastGet":1598626144.5365012},
+                 "mbgLtNgPtpPortState_1":
+                    {"status": 3,
+                     "description": "disabled",
+                     "lastGet": 1598543397.689727},
+                 "mbgLtNgNtpCurrentState_0":
+                    {"status": 1,
+                     "description": "not synchronized",
+                     "lastGet": 1598543363.289597},
+                 "mbgLtNgRefclockState_1":
+                    {"status": 2,
+                     "description": "not synchronized",
+                     "lastGet": 1598543359.6326838},
+                 "mbgLtNgSysPsStatus_1":
+                    {"status": 2,
+                     "description": "up",
+                     "lastGet": 1598543359.6326838},
+                 "mbgLtNgSysPsStatus_2":
+                    {"status": 2,
+                     "description": "up",
+                     "lastGet": 1598543359.6326838},
+                 "mbgLtNgEthPortLinkState_1":
+                    {"status": 1,
+                     "description": "up",
+                     "lastGet": 1598543359.6326838}}
 
-        Note that session.data is populated within the self.meinberg.run_snmp_get() call.
+            Note that session.data is populated within the :func:`MeinbergSNMP.run_snmp_get` call.
 
         """
         if params is None:
@@ -394,10 +395,10 @@ class MeinbergM1000Agent:
 
         return True, "Finished Recording"
 
-    def stop_acq(self, session, params=None):
-        """stop_acq(params=None)
+    def _stop_acq(self, session, params=None):
+        """_stop_acq()
 
-        Stop method associated with start_acq process.
+        **Task** - Stop task associated with acq process.
 
         """
         self.is_streaming = False
@@ -437,8 +438,8 @@ if __name__ == "__main__":
                                   port=int(args.port))
 
     agent.register_process("acq",
-                           listener.start_acq,
-                           listener.stop_acq,
+                           listener.acq,
+                           listener._stop_acq,
                            startup=bool(args.auto_start), blocking=False)
 
     runner.run(agent, auto_reconnect=True)
