@@ -167,12 +167,13 @@ class PysmurfMonitor(DatagramProtocol):
     def init(self, session, params=None):
         """init(create_table=True)
 
-        Initizes agent by creating / updating the pysmurf_files table if
-        requested, and initializing the database connection pool.
+        **Task** - Initizes agent by creating / updating the pysmurf_files
+        table if requested, and initializing the database connection pool.
 
         Parameters:
             create_table (bool):
                 If true will attempt to create/update pysmurf_files table.
+
         """
         if params is None:
             params = {}
@@ -194,7 +195,7 @@ def make_parser(parser=None):
     if parser is None:
         parser = argparse.ArgumentParser()
 
-    pgroup = parser.add_argument_group('Agent Config')
+    pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--udp-port', type=int,
                         help="Port for upd-publisher")
     pgroup.add_argument('--create-table', type=bool,

@@ -152,3 +152,9 @@ Agent API
 
 .. autoclass:: agents.pysmurf_monitor.pysmurf_monitor.PysmurfMonitor
     :members:
+    :exclude-members: datagramReceived
+
+Supporting APIs
+---------------
+
+.. automethod:: agents.pysmurf_monitor.pysmurf_monitor.PysmurfMonitor.datagramReceived
