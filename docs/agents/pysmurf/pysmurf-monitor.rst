@@ -7,20 +7,20 @@ Pysmurf Monitor
 ====================
 
 The pysmurf_monitor agent listens to the UDP messages that the
-*pysmurf publisher* sends and acts on them.
-Currently, its main job is to wait until the publisher registers a new file
-that pysmurf has created, and it puts the file info into a database so that
-the file can be copied over by the *archiver* running on the storage node.
-
-This agent has no registered operations.
-
-Site Options
-------------
+*pysmurf publisher* sends and acts on them. It will add newly registered filse
+to the pysmurf_files database, and send session info to pysmurf-controller
+agents through an OCS Feed.
 
 .. argparse::
     :filename: ../agents/pysmurf_monitor/pysmurf_monitor.py
     :func: make_parser
     :prog: python3 pysmurf_monitor.py
+
+Configuration File Examples
+---------------------------
+
+OCS Site Config
+````````````````
 
 Example site-config entry::
 
@@ -29,17 +29,47 @@ Example site-config entry::
        'arguments': [['--udp-port', 8200],
                      ['--create-table', True]]},
 
+Docker Compose
+````````````````
 
+You can set the sql config info with the environment variables MYSQL_HOST,
+MYSQL_DATABASE, MYSQL_USER and MYSQL_PASSWORD.
+
+An example docker-compose entry might look like::
+
+    ocs-pysmurf-monitor:
+        image: simonsobs/ocs-pysmurf-monitor-agent:${SOCS_TAG}
+        hostname: ocs-docker
+        user: ocs:ocs
+        network_mode: host
+        container_name: ocs-pysmurf-monitor
+        environment:
+            MYSQL_HOST: ${DB_HOST}
+            MYSQL_DATABASE: ${DB}
+            MYSQL_USER: ${DB_USER}
+            MYSQL_PASSWORD: ${DB_PW}
+              - env_files/db.env
+        volumes:
+            - ${OCS_CONFIG_DIR}:/config
+            - /data:/data
+        command:
+            - "--site-hub=ws://${CB_HOST}:8001/ws"
+            - "--site-http=http://${CB_HOST}:8001/call"
+
+Where DB_HOST, DB, DB_USER, and DB_PW, SOCS_TAG, and CB_HOST are set in the
+``.env`` file in the same dir as the docker-compose file.
+
+
+Description
+-----------
 
 .. _pysmurf_files_db:
 
-Database
---------
+Pysmurf Files Database
+````````````````````````
 
-
-The database is located in a MariaDB docker container running on the crossbar
-system. The database name is ``files``, and it is also used to index hk files
-written by the hk-aggregator.
+The pysmurf_files table is located in a MariaDB docker container, usually on
+the daq node with the crossbar docker. The database name is ``files``.
 
 The table containing the pysmurf file info is called ``pysmurf_files_v<VERSION>``
 where ``VERSION`` is the current iteration of the table.
@@ -117,27 +147,14 @@ Below are the columns that exist in ``pysmurf_files_v1``:
       - str
       - version id for socs
 
+Agent API
+---------
 
-Docker Configuration
---------------------
+.. autoclass:: agents.pysmurf_monitor.pysmurf_monitor.PysmurfMonitor
+    :members:
+    :exclude-members: datagramReceived
 
-You can set the sql config info with the environment variables MYSQL_HOST,
-MYSQL_DATABASE, MYSQL_USER and MYSQL_PASSWORD.
+Supporting APIs
+---------------
 
-An example docker-compose entry might look like::
-
-    ocs-pysmurf-monitor:
-        image: simonsobs/ocs-pysmurf-monitor-agent:${SOCS_TAG}
-        user: "9000"    # ocs user id
-        container_name: ocs-pysmurf-monitor
-        environment:
-            MYSQL_HOST: ${DB_HOST}
-            MYSQL_DATABASE: ${DB}
-            MYSQL_USER: ${DB_USER}
-            MYSQL_PASSWORD: ${DB_PW}
-        volumes:
-            - ${OCS_CONFIG_DIR}:/config
-            - /data:/data
-
-Where DB_HOST, DB, DB_USER, and DB_PW are set in the ``.env`` file in the same dir as
-the docker-compose file.
+.. automethod:: agents.pysmurf_monitor.pysmurf_monitor.PysmurfMonitor.datagramReceived

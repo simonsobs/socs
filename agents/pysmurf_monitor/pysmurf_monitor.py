@@ -25,29 +25,28 @@ class PysmurfMonitor(DatagramProtocol):
     """
     Monitor for pysmurf UDP publisher.
 
-    This agent should be run on the smurf-server host, and will monitor messages
+    This agent should be run on the smurf-server and will monitor messages
     published via the pysmurf Publisher.
 
-    One of its main functions is to register files that pysmurf writes into the
-    pysmurf_files database.
+    Main functions are making sure registered files make their way to the pysmurf
+    files database, and passing session info to pysmurf-controller agents via
+    the ``pysmurf_session_data``
 
-    Arguments
-    ---------
-    agent: ocs.ocs_agent.OCSAgent
-        OCSAgent object which is running
-    args: Namespace
-        argparse namespace with site_config and agent specific arguments\
+    Args:
+        agent (ocs.ocs_agent.OCSAgent):
+            OCSAgent object
+        args (Namespace):
+            argparse namespace with site_config and agent specific arguments
 
-    Attributes
-    -----------
-    agent: ocs.ocs_agent.OCSAgent
-        OCSAgent object which is running
-    log: txaio.tx.Logger
-        txaio logger object created by agent
-    base_file_info: dict
-        shared file info added to all file entries registered by this agent
-    dbpool: twisted.enterprise.adbapi.ConnectionPool
-        DB connection pool
+    Attributes:
+        agent (ocs.ocs_agent.OCSAgent):
+            OCSAgent object
+        log (txaio.tx.Logger):
+            txaio logger object created by agent
+        base_file_info (dict):
+            shared file info added to all file entries registered by this agent
+        dbpool (twisted.enterprise.adbapi.ConnectionPool):
+            DB connection pool
     """
     def __init__(self, agent, args):
         self.agent: ocs_agent.OCSAgent = agent
@@ -90,13 +89,12 @@ class PysmurfMonitor(DatagramProtocol):
         """
         Called whenever UDP data is received.
 
-        Arguments
-        ----------
-        _data:
-            Raw data passed over UDP port. Pysmurf publisher will send a JSON
-            string
-        addr: tuple
-            (host, port) of the sender.
+        Args:
+            _data (str):
+                Raw data passed over UDP port. Pysmurf publisher will send a JSON
+                string
+            addr (tuple):
+                (host, port) of the sender.
         """
         data = json.loads(_data)
         pub_id = data['id']
@@ -131,7 +129,7 @@ class PysmurfMonitor(DatagramProtocol):
             deferred.addErrback(self._add_file_errback, d)
             deferred.addCallback(self._add_file_callback, d)
 
-        elif data['type'] == "session_data":
+        elif data['type'] == "session_data" or data['type'] == "session_log":
             self.agent.publish_to_feed(
                 "pysmurf_session_data", data, from_reactor=True
             )
@@ -167,16 +165,15 @@ class PysmurfMonitor(DatagramProtocol):
             self.agent.publish_to_feed(feed_name, feed_data, from_reactor=True)
 
     def init(self, session, params=None):
-        """
-        Initizes agent. If self.create_table, attempts to create pysmurf_files
-        if it doesn't already exist. Will update with new cols if any have been
-        added to ``socs.db.pysmurf_files_manager``. Will not alter existing cols
-        if their name or datatype has been changed.
+        """init(create_table=True)
 
-        Parameters
-        ----------
-        create_table: bool
-            If true will attempt to create/update pysmurf_files table.
+        **Task** - Initizes agent by creating / updating the pysmurf_files
+        table if requested, and initializing the database connection pool.
+
+        Parameters:
+            create_table (bool):
+                If true will attempt to create/update pysmurf_files table.
+
         """
         if params is None:
             params = {}
@@ -198,7 +195,7 @@ def make_parser(parser=None):
     if parser is None:
         parser = argparse.ArgumentParser()
 
-    pgroup = parser.add_argument_group('Agent Config')
+    pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--udp-port', type=int,
                         help="Port for upd-publisher")
     pgroup.add_argument('--create-table', type=bool,
