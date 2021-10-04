@@ -275,7 +275,7 @@ def make_parser(parser=None):
     if parser is None:
         parser = argparse.ArgumentParser()
 
-    pgroup = parser.add_argument_group('Agent Config')
+    pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--data-dir', type=str,
                         help="Directory where pysmurf data should be copied")
     pgroup.add_argument('--user',  type=str,

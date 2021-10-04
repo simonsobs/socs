@@ -15,6 +15,18 @@ node.
     :func: make_parser
     :prog: python3 pysmurf_archiver_agent.py
 
+Dependencies
+------------
+
+In addition to the dependencies listed in the Pysmurf Archiver's
+``requirements.txt`` file, the Archiver needs ssh-keys configured to be able to
+rsync files off of the smurf server.
+
+Setting up SSH Permissions
+``````````````````````````
+For instructions on how to setup ssh-permissions for the pysmurf-archiver,
+see the following SO-wiki page: http://simonsobservatory.wikidot.com/daq:smurf-ssh-permissions
+
 Configuration File Examples
 -----------------------------
 
@@ -47,11 +59,6 @@ The docker-compose entry is similar to that of the pysmurf-monitor. For example:
             - ${OCS_CONFIG_DIR}:/config
             - /home/ocs:/home/ocs
             - /data:/data
-
-Setting up SSH Permissions
---------------------------
-For instructions on how to setup ssh-permissions for the pysmurf-archiver,
-see the following SO-wiki page: http://simonsobservatory.wikidot.com/daq:smurf-ssh-permissions
 
 Description
 -----------
