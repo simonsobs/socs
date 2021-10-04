@@ -39,18 +39,14 @@ class LS240_Agent:
                                  buffer_time=1)
 
     # Task functions.
-    def init_lakeshore_task(self, session, params=None):
-        """init_lakeshore_task(params=None)
+    def init_lakeshore(self, session, params=None):
+        """init_lakeshore(auto_acquire=False)
 
-        Perform first time setup of the Lakeshore 240 Module.
-
-        Args:
-            params (dict): Parameters dictionary for passing parameters to
-                task.
+        **Task** - Perform first time setup of the Lakeshore 240 Module.
 
         Parameters:
-            auto_acquire (bool, optional): Default is False. Starts data
-                acquisition after initialization if True.
+            auto_acquire (bool, optional): Starts data acquisition after
+                initialization if True. Defaults to False.
 
         """
         if params is None:
@@ -82,64 +78,38 @@ class LS240_Agent:
         return True, 'Lakeshore module initialized.'
 
     def set_values(self, session, params=None):
-        """set_values(params=None)
+        """set_values(channel, sensor=None, auto_range=None, range=None,\
+                current_reversal=None, units=None, enabled=None, name=None)
 
-        A task to set sensor parameters for a Lakeshore240 Channel
+        **Task** - Set sensor parameters for a Lakeshore240 Channel.
 
         Args:
-            channel (int, 1 -- 2 or 8):
-                Channel number to  set.
-            sensor (int, 1, 2, or 3, optional):
-                Specifies sensor type:
-                    +---+---------+
-                    | 1 | Diode   |
-                    +---+---------+
-                    | 2 | PlatRTC |
-                    +---+---------+
-                    | 3 | NTC RTD |
-                    +---+---------+
-            auto_range (int, 0 or 1, optional):
-                Must be 0 or 1. Specifies if channel should use autorange.
-            range (int 0-8, optional):
-                Specifies range if autorange is false. Only settable for NTC RTD:
-                    +---+--------------------+
-                    | 0 | 10 Ohms (1 mA)     |
-                    +---+--------------------+
-                    | 1 | 30 Ohms (300 uA)   |
-                    +---+--------------------+
-                    | 2 | 100 Ohms (100 uA)  |
-                    +---+--------------------+
-                    | 3 | 300 Ohms (30 uA)   |
-                    +---+--------------------+
-                    | 4 | 1 kOhm (10 uA)     |
-                    +---+--------------------+
-                    | 5 | 3 kOhms (3 uA)     |
-                    +---+--------------------+
-                    | 6 | 10 kOhms (1 uA)    |
-                    +---+--------------------+
-                    | 7 | 30 kOhms (300 nA)  |
-                    +---+--------------------+
-                    | 8 | 100 kOhms (100 nA) |
-                    +---+--------------------+
-            current_reversal (int, 0 or 1, optional):
+            channel (int):
+                Channel number to set. Valid choices are 1-8.
+            sensor (int, optional):
+                Specifies sensor type.  See
+                :func:`socs.Lakeshore.Lakeshore240.Channel.set_values` for
+                possible types.
+            auto_range (int, optional):
+                Specifies if channel should use autorange. Must be 0 or 1.
+            range (int, optional):
+                Specifies range if auto_range is false. Only settable for NTC
+                RTD.  See
+                :func:`socs.Lakeshore.Lakeshore240.Channel.set_values` for
+                possible ranges.
+            current_reversal (int, optional):
                 Specifies if input current reversal is on or off.
                 Always 0 if input is a diode.
-            units (int, 1-4, optional):
-                Specifies preferred units parameter, and sets the units
-                for alarm settings:
-                    +---+------------+
-                    | 1 | Kelvin     |
-                    +---+------------+
-                    | 2 | Celsius    |
-                    +---+------------+
-                    | 3 | Sensor     |
-                    +---+------------+
-                    | 4 | Fahrenheit |
-                    +---+------------+
-            enabled (int, 0 or 1, optional):
-                sets if channel is enabled
+            units (int, optional):
+                Specifies preferred units parameter, and sets the units for
+                alarm settings.  See
+                :func:`socs.Lakeshore.Lakeshore240.Channel.set_values` for
+                possible units.
+            enabled (int, optional):
+                Sets if channel is enabled.
             name (str, optional):
-                sets name of channel
+                Sets name of channel.
+
         """
         if params is None:
             params = {}
@@ -163,15 +133,15 @@ class LS240_Agent:
         return True, 'Set values for channel {}'.format(params['channel'])
 
     def upload_cal_curve(self, session, params=None):
+        """upload_cal_curve(channel, filename)
+
+        **Task** - Upload a calibration curve to a channel.
+
+        Parameters:
+            channel (int): Channel number, 1-8.
+            filename (str): Filename for calibration curve.
+
         """
-        Task to upload a calibration curve to a channel.
-
-        Args:
-
-            channel (int, 1 -- 2 or 8): Channel number
-            filename (str): filename for cal curve
-        """
-
         channel = params['channel']
         filename = params['filename']
 
@@ -188,15 +158,20 @@ class LS240_Agent:
 
         return True, "Uploaded curve to channel {}".format(channel)
 
-    def start_acq(self, session, params=None):
-        """acq(params=None)
+    def acq(self, session, params=None):
+        """acq(sampling_frequency=2.5)
 
-        Method to start data acquisition process.
+        **Process** - Start data acquisition.
 
-        The most recent data collected is stored in session.data in the
+        Parameters:
+            sampling_frequency (float):
+                Sampling frequency for data collection. Defaults to 2.5 Hz
+
+
+        The most recent data collected is stored in session data in the
         structure::
 
-            >>> session.data
+            >>> response.session['data']
             {"fields":
                 {"Channel_1": {"T": 99.26, "V": 99.42},
                  "Channel_2": {"T": 99.54, "V": 101.06},
@@ -207,10 +182,6 @@ class LS240_Agent:
                  "Channel_7": {"T": 98.03, "V": 100.82},
                  "Channel_8": {"T": 101.14, "V":101.01}},
              "timestamp":1601925677.6914878}
-
-        Args:
-            sampling_frequency (float):
-                Sampling frequency for data collection. Defaults to 2.5 Hz
 
         """
         if params is None:
@@ -267,7 +238,7 @@ class LS240_Agent:
 
         return True, 'Acquisition exited cleanly.'
 
-    def stop_acq(self, session, params=None):
+    def _stop_acq(self, session, params=None):
         """
         Stops acq process.
         """
@@ -282,7 +253,7 @@ def make_parser(parser=None):
     if parser is None:
         parser = argparse.ArgumentParser()
 
-    pgroup = parser.add_argument_group('Agent Config')
+    pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--serial-number', type=str,
                         help="Serial number of your Lakeshore240 device")
     pgroup.add_argument('--port', type=str,
@@ -358,11 +329,11 @@ def main():
 
     therm = LS240_Agent(agent, **kwargs)
 
-    agent.register_task('init_lakeshore', therm.init_lakeshore_task,
+    agent.register_task('init_lakeshore', therm.init_lakeshore,
                         startup=init_params)
     agent.register_task('set_values', therm.set_values)
     agent.register_task('upload_cal_curve', therm.upload_cal_curve)
-    agent.register_process('acq', therm.start_acq, therm.stop_acq)
+    agent.register_process('acq', therm.acq, therm._stop_acq)
 
     runner.run(agent, auto_reconnect=True)
 
