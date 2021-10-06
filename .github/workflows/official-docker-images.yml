@@ -71,11 +71,6 @@ jobs:
         coverage combine
         coverage report
         coveralls --service=github
-
-    # Documentation
-    - name: Test documentation build
-      run: |
-        docker run --rm -e READTHEDOCS=True socs sh -c "make -C docs/ html"
     # (end steps from pytest workflow)
 
     # Build
