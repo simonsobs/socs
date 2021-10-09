@@ -331,8 +331,8 @@ class ACUAgent:
                     'SurvivalMode': 4,
                     }
         tfn_key = {'None': 0.0,
-                   'False': 0.0,
-                   'True': 1.0
+                   'False': 0,
+                   'True': 1,
                    }
         while self.jobs['monitor'] == 'run':
             now = time.time()
@@ -366,24 +366,38 @@ class ACUAgent:
             for (key, value) in session.data.items():
                 for category in self.monitor_fields:
                     if key in self.monitor_fields[category]:
-                         self.data['status'][category][self.monitor_fields[category][key]] = value
+                        if type(value) == bool:
+                            self.data['status'][category][self.monitor_fields[category][key]] = str(value)
+                        elif type(value) == int or type(value) == float:
+                            self.data['status'][category][self.monitor_fields[category][key]] = value
+                        elif value == None:
+                            self.data['status'][category][self.monitor_fields[category][key]] = 'None'
+                        else:
+                            self.data['status'][category][self.monitor_fields[category][key]] = str(value)
+            self.data['status']['summary']['ctime'] =\
+                timecode(self.data['status']['summary']['Time'])
+
+            # influx_status refers to all other self.data['status'] keys. Do not add
+            # more keys to any self.data['status'] categories beyond this point
             influx_status = {}
             for category in self.data['status']:
                 for statkey in self.data['status'][category].keys():
                     if type(self.data['status'][category][statkey]) == float:
                         influx_status[statkey + '_influx'] = self.data['status'][category][statkey]
-                    elif type(self.data['status'][category][statkey]) == bool:
-                        influx_status[statkey + '_influx'] = tfn_key[str(self.data['status'][category][statkey])]
-                    elif self.data['status'][category][statkey] == None:
-                        influx_status[statkey + '_influx'] = tfn_key[str(self.data['status'][category][statkey])]
+     #               elif type(self.data['status'][category][statkey]) == bool:
+     #                   influx_status[statkey + '_influx'] = tfn_key[str(self.data['status'][category][statkey])]
+     #               elif self.data['status'][category][statkey] == None:
+     #                   influx_status[statkey + '_influx'] = tfn_key[str(self.data['status'][category][statkey])]
                     elif type(self.data['status'][category][statkey]) == str:
-                        influx_status[statkey + '_influx'] = mode_key[self.data['status'][category][statkey]]
+                        if self.data['status'][category][statkey] in ['None', 'True', 'False']:
+                            influx_status[statkey + '_influx'] = tfn_key[self.data['status'][category][statkey]]
+                        else:
+                            influx_status[statkey + '_influx'] = mode_key[self.data['status'][category][statkey]]
                     elif type(self.data['status'][category][statkey]) == int:
-                        influx_status[statkey + '_influx'] = self.data['status'][category][statkey]
+                        influx_status[statkey + '_influx'] = float(self.data['status'][category][statkey])
                     else:
                         print(statkey)
-            self.data['status']['summary']['ctime'] =\
-                timecode(self.data['status']['summary']['Time'])
+
             if self.data['uploads']['PtStack_Time'] == '000, 00:00:00.000000':
                 self.data['uploads']['PtStack_ctime'] = self.data['status']['summary']['ctime']
 
@@ -420,10 +434,10 @@ class ACUAgent:
                                   'block_name': 'ACU_oscillation_alarm',
                                   'data': self.data['status']['osc_alarms']
                                   }
-            acustatus_commands = {'timestamp': self.data['status']['summary']['ctime'],
-                                  'block_name': 'ACU_command_status',
-                                  'data': self.data['status']['commands']
-                                  }
+#            acustatus_commands = {'timestamp': self.data['status']['summary']['ctime'],
+#                                  'block_name': 'ACU_command_status',
+#                                  'data': self.data['status']['commands']
+#                                  }
             acustatus_acufails = {'timestamp': self.data['status']['summary']['ctime'],
                                   'block_name': 'ACU_general_errors',
                                   'data': self.data['status']['ACU_failures_errors']
@@ -453,7 +467,13 @@ class ACUAgent:
             self.agent.publish_to_feed('acu_status_general_errs', acustatus_acufails)
             self.agent.publish_to_feed('acu_status_platform', acustatus_platform)
             self.agent.publish_to_feed('acu_status_emergency', acustatus_emergency)
-#            self.agent.publish_to_feed('acu_status_influx', acustatus_influx)
+#            influx_status={'fake_data':1.0}
+            try:
+                self.agent.publish_to_feed('acu_status_influx', acustatus_influx, from_reactor=True)
+                print(acustatus_influx)
+            except:
+#                print(acustatus_influx)
+                print('failed')
         self.set_job_done('monitor')
         return True, 'Acquisition exited cleanly.'
 
@@ -532,7 +552,7 @@ class ACUAgent:
                     data_ctime = gyear + gday + sec
                     self.data['broadcast']['Time'] = data_ctime
                     for i in range(2, len(d)):
-                        self.data['broadcast'][fields[i]] = d[i]
+                        self.data['broadcast'][fields[i].replace(' ', '_')] = d[i]
 #                    azimuth_corrected = d[2]
 #                    azimuth_raw = d[5]
 #                    elevation_corrected = d[3]
@@ -558,10 +578,9 @@ class ACUAgent:
 #                                              'Boresight_Motor_2': boresight_motor_2,
 #                                              }
                     acu_udp_stream = {'timestamp': self.data['broadcast']['Time'],
-                                      'block_name': 'ACU_position',
+                                      'block_name': 'ACU_broadcast',
                                       'data': self.data['broadcast']
                                       }
-                    #print(acu_udp_stream)
                     self.agent.publish_to_feed('acu_udp_stream',
                                                acu_udp_stream)
             else:
@@ -591,8 +610,8 @@ class ACUAgent:
         az = params.get('az')
         el = params.get('el')
         wait_for_motion = params.get('wait', 1)
-        current_az = round(self.data['broadcast']['Azimuth_Corrected'], 4)
-        current_el = round(self.data['broadcast']['Elevation_Corrected'], 4)
+        current_az = round(self.data['broadcast']['Corrected_Azimuth'], 4)
+        current_el = round(self.data['broadcast']['Corrected_Elevation'], 4)
         self.data['uploads']['Start_Azimuth'] = current_az
         self.data['uploads']['Start_Elevation'] = current_el
         self.data['uploads']['Command_Type'] = 1
@@ -893,16 +912,16 @@ class ACUAgent:
 #                self.agent.publish_to_feed('acu_upload', acu_upload)
             self.log.info('Uploaded a group')
         self.log.info('No more lines to upload')
-        current_az = round(self.data['broadcast']['Azimuth_Corrected'], 4)
-        current_el = round(self.data['broadcast']['Elevation_Corrected'], 4)
+        current_az = round(self.data['broadcast']['Corrected_Azimuth'], 4)
+        current_el = round(self.data['broadcast']['Corrected_Elevation'], 4)
         while current_az != azs[-1] or current_el != els[-1]:
             yield dsleep(0.1)
             modes = (self.data['status']['summary']['Azimuth_mode'],
                      self.data['status']['summary']['Elevation_mode'])
             if modes != ('ProgramTrack', 'ProgramTrack'):
                 return False, 'Fault triggered (not ProgramTrack)!'
-            current_az = round(self.data['broadcast']['Azimuth_Corrected'], 4)
-            current_el = round(self.data['broadcast']['Elevation_Corrected'],
+            current_az = round(self.data['broadcast']['Corrected_Azimuth'], 4)
+            current_el = round(self.data['broadcast']['Corrected_Elevation'],
                                4)
         yield dsleep(self.sleeptime)
         yield self.acu.stop()
