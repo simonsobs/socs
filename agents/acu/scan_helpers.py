@@ -117,7 +117,7 @@ def from_file(filename):
         return False
     return conctimes, concaz, concel, concva, concve, az_flags, el_flags
 
-def ptstack_format(conctimes, concaz, concel, concva, concve, az_flags, el_flags):
+def ptstack_format(conctimes, concaz, concel, concva, concve, az_flags, el_flags, generator=False):
     """
     Produces a list of lines in the format necessary to upload to the ACU to complete a scan. 
     Params are the outputs of from_file or linear_turnaround_scanpoints.
@@ -130,9 +130,17 @@ def ptstack_format(conctimes, concaz, concel, concva, concve, az_flags, el_flags
         concve (list): List of elevation velocities associated with times
         az_flags (list): List of flags associated with azimuth motions at associated times
         el_flags (list): List of flags associated with elevation motions at associated times
+        generator (bool): Toggles the start time. When true, start time is 10, otherwise
+                          start time is time.time() + 10
+
+    Returns:
+        all_lines: List of lines in the correct format to upload to the ACU.
     """
     fmt = '%j, %H:%M:%S'
-    start_time = time.time() + 10.
+    if generator:
+        start_time = 10.
+    else:
+        start_time = time.time() + 10.
     true_times = [start_time + i for i in conctimes]
     fmt_times = [time.strftime(fmt, time.gmtime(t)) + ('{tt:.6f}'.format(tt=t%1.))[1:] for t in true_times]
 
@@ -140,28 +148,28 @@ def ptstack_format(conctimes, concaz, concel, concva, concve, az_flags, el_flags
 
     return all_lines
 
-def write_generator_lines(conctimes, concaz, concel, concva, concve, az_flags, el_flags):
-    """
-    Produces a list of lines in the format necessary to upload to the ACU to complete a 
-    generated scan. Params are the outputs of generate.
-
-    Params:
-        conctimes (list): List of times starting at most recently used time for the ACU 
-                          to reach associated positions
-        concaz (list): List of azimuth positions associated with times
-        concel (list): List of elevation positions associated with times
-        concva (list): List of azimuth velocities associated with times
-        concve (list): List of elevation velocities associated with times
-        az_flags (list): List of flags associated with azimuth motions at associated times
-        el_flags (list): List of flags associated with elevation motions at associated times
-    """
-    fmt = '%j, %H:%M:%S'
-    start_time = 10.
-    true_times = [start_time + i for i in conctimes]
-    fmt_times = [time.strftime(fmt, time.gmtime(t)) + ('%.6f' % (t%1.))[1:] for t in true_times]
-
-    all_lines = [('%s;%.4f;%.4f;%.4f;%.4f;%i;%i\r\n' % (fmt_times[n], concaz[n], concel[n], concva[n], concve[n], az_flags[n], el_flags[n])) for n in range(len(fmt_times))]
-    return all_lines
+#def ptstack_format_generator(conctimes, concaz, concel, concva, concve, az_flags, el_flags):
+#    """
+#    Produces a list of lines in the format necessary to upload to the ACU to complete a 
+#    generated scan. Params are the outputs of generate.
+#
+#    Params:
+#        conctimes (list): List of times starting at most recently used time for the ACU 
+#                          to reach associated positions
+#        concaz (list): List of azimuth positions associated with times
+#        concel (list): List of elevation positions associated with times
+#        concva (list): List of azimuth velocities associated with times
+#        concve (list): List of elevation velocities associated with times
+#        az_flags (list): List of flags associated with azimuth motions at associated times
+#        el_flags (list): List of flags associated with elevation motions at associated times
+#    """
+#    fmt = '%j, %H:%M:%S'
+#    start_time = 10.
+#    true_times = [start_time + i for i in conctimes]
+#    fmt_times = [time.strftime(fmt, time.gmtime(t)) + ('%.6f' % (t%1.))[1:] for t in true_times]
+#
+#    all_lines = [('%s;%.4f;%.4f;%.4f;%.4f;%i;%i\r\n' % (fmt_times[n], concaz[n], concel[n], concva[n], concve[n], az_flags[n], el_flags[n])) for n in range(len(fmt_times))]
+#    return all_lines
 
 def generate(stop_iter, az_endpoint1, az_endpoint2, az_speed, acc, el_endpoint1, el_endpoint2, el_speed):
     """
