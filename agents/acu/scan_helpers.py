@@ -54,23 +54,23 @@ def linear_turnaround_scanpoints(azpts, el, azvel, acc, ntimes):
     all_elflags = elflags
 
     for n in range(ntimes):
-        print(str(n)+' '+str(sect_start_time))
-        time_for_section = list(np.linspace(sect_start_time, sect_start_time + tot_time_dir, num_dirpoints))
+        #print(str(n)+' '+str(sect_start_time))
+        end_dir_time = sect_start_time + tot_time_dir
+        time_for_section = np.linspace(sect_start_time, end_dir_time, num_dirpoints)
         if n%2 != 0:
-            new_az = list(np.linspace(azpts[1], azpts[0], num_dirpoints))
-            new_va = list(np.zeros(num_dirpoints) - azvel)
+            new_az = np.linspace(azpts[1], azpts[0], num_dirpoints)
+            new_va = np.zeros(num_dirpoints) - azvel
         else:
-            new_az = list(np.linspace(azpts[0], azpts[1], num_dirpoints))
-            new_va = list(np.zeros(num_dirpoints) + azvel)
+            new_az = np.linspace(azpts[0], azpts[1], num_dirpoints)
+            new_va = np.zeros(num_dirpoints) + azvel
 
-        for k in range(len(time_for_section)):
-            conctimes.append(time_for_section[k])
-            concaz.append(new_az[k])
-            concel.append(el1[k])
-            concva.append(new_va[k])
-            concve.append(ve1[k])
-            all_azflags.append(azflags[k])
-            all_elflags.append(elflags[k])
+        contimes.extend(time_for_section)
+        concaz.extend(new_az)
+        concel.extend(el1)
+        concva.extend(new_va)
+        concve.extend(ve1)
+        all_azflags.extend(azflags)
+        all_elflags.extend(elflags)
         sect_start_time = time_for_section[-1] + turn_time
 
     concva[-1] = 0.0
