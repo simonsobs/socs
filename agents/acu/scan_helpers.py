@@ -88,19 +88,30 @@ def from_file(filename):
 
     Params:
         filename (str): Full path to the numpy file containing scan parameter array
+
+    Returns:
+        tuple of lists (times, azimuths, elevations, azimuth veolicities, elevation velocities, 
+                        azimuth flags, elevation flags)
+
+    NOTE: Flags can be set in the numpy file (0=unspecified, 1=constant velocity, 2=last
+          point before turnaround). If flags are not set in the file, all flags are set
+          to 0 to accommodate non-linear scans
     """
-    info = np.load(filename)
-    conctimes = info[0]
-    concaz = info[1]
-    concel = info[2]
     info = np.load(filename)
     conctimes = info[0]
     concaz = info[1]
     concel = info[2]
     concva = info[3]
     concve = info[4]
-    az_flags = np.array([0 for x in range(len(conctimes))])
-    el_flags = az_flags
+    if len(info) == 5:
+        az_flags = np.array([0 for x in range(len(conctimes))])
+        el_flags = az_flags
+    elif len(info) == 7:
+        az_flags = info[5]
+        el_flags = info[6]
+    else:
+        print('File has too many parameters!')
+        return False
     return conctimes, concaz, concel, concva, concve, az_flags, el_flags
 
 def write_lines(conctimes, concaz, concel, concva, concve, az_flags, el_flags):
