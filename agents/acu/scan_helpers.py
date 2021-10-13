@@ -5,57 +5,79 @@ def linear_turnaround_scanpoints(azpts, el, azvel, acc, ntimes):
     """
     Produces lists of times, azimuths, elevations, azimuthal velocities, elevation velocities,
     azimuth motion flags, and elevation motion flags for a finitely long azimuth scan with
-    constant velocity.
+    constant velocity. Scan begins at the first azpts value.
 
-    Params:
-        azpts (2-tuple): The endpoints of motion in azimuth, in increasing order
+    Parameters:
+        azpts (2-tuple): The endpoints of motion in azimuth, where the first point
+                         is the start position of the scan.
         el (float): The elevation that is maintained throughout the scan
         azvel (float): Desired speed of the azimuth motion in degrees/sec
         acc (float): The turnaround acceleration in degrees/sec^2
-        ntimes(int): Number of times to travel between the endpoints
+        ntimes(int): Number of times to travel between the endpoints. ntimes = 1
+                     corresponds to a scan from, ex., left to right, and does not
+                     return to left.
+
+    Returns:
+        tuple of lists (times, azimuths, elevations, azimuth veolicities, elevation velocities, 
+                        azimuth flags, elevation flags)
     """
+    if float(azvel) == 0.0:
+        print('Azimuth velocity is zero, invalid scan parameter')
+        return False
+    if float(acc) == 0.0:
+        print('Acceleration is zero, unable to calculate turnaround')
+        return False
     turn_time = 2 * azvel / acc
     tot_time_dir = float((abs(azpts[1] - azpts[0])) / azvel)
-    time1 = np.linspace(0, tot_time_dir, int(tot_time_dir*10.))
-    conctimes = list(time1)
+    num_dirpoints = int(tot_time_dir*10.)
+    if num_dirpoints < 2:
+        print('Scan is too short to run')
+        return False
+#    time1 = np.linspace(0, tot_time_dir, num_dirpoints)
+    sect_start_time = 0.0
+#    conctimes = list(time1)
+    conctimes = []
 
-    az1 = np.linspace(azpts[0], azpts[1], int(tot_time_dir*10.))
-    concaz = list(az1)
+#    az1 = np.linspace(azpts[0], azpts[1], num_dirpoints)
+#    concaz = list(az1)
+    concaz = []
 
-    el1 = np.linspace(el, el, int(tot_time_dir*10.))
+    el1 = np.linspace(el, el, num_dirpoints)
     concel = list(el1)
 
-    va1 = np.zeros(int(tot_time_dir*10.)) + azvel
-    concva = list(va1)
-    ve1 = np.zeros(int(tot_time_dir*10.))
+#    va1 = np.zeros(num_dirpoints) + azvel
+#    concva = list(va1)
+    concva = []
+    ve1 = np.zeros(num_dirpoints)
     concve = list(ve1)
+    concve = []
 
-    azflags = [1 for i in range(int(tot_time_dir*10.)-1)]
+    azflags = [1 for i in range(num_dirpoints-1)]
     azflags += [2]
     all_azflags = azflags
 
-    elflags = [0 for i in range(int(tot_time_dir*10.))]
+    elflags = [0 for i in range(num_dirpoints)]
     all_elflags = elflags
 
-    for n in range(1, ntimes):
-        last_time_prevdir = conctimes[-1]
-        time2 = list(np.linspace(last_time_prevdir + turn_time, last_time_prevdir + turn_time + tot_time_dir, int(tot_time_dir*10.)))
-
+    for n in range(ntimes):
+        print(str(n)+' '+str(sect_start_time))
+        time_for_section = list(np.linspace(sect_start_time, sect_start_time + tot_time_dir, num_dirpoints))
         if n%2 != 0:
-            new_az = list(np.linspace(azpts[1], azpts[0], int(tot_time_dir*10.)))
-            new_va = list(np.zeros(int(tot_time_dir*10.)) - azvel)
+            new_az = list(np.linspace(azpts[1], azpts[0], num_dirpoints))
+            new_va = list(np.zeros(num_dirpoints) - azvel)
         else:
-            new_az = list(np.linspace(azpts[0], azpts[1], int(tot_time_dir*10.)))
-            new_va = list(np.zeros(int(tot_time_dir*10.)) + azvel)
+            new_az = list(np.linspace(azpts[0], azpts[1], num_dirpoints))
+            new_va = list(np.zeros(num_dirpoints) + azvel)
 
-        for k in range(len(time2)):
-            conctimes.append(time2[k])
+        for k in range(len(time_for_section)):
+            conctimes.append(time_for_section[k])
             concaz.append(new_az[k])
             concel.append(el1[k])
             concva.append(new_va[k])
             concve.append(ve1[k])
             all_azflags.append(azflags[k])
             all_elflags.append(elflags[k])
+        sect_start_time = time_for_section[-1] + turn_time
 
     concva[-1] = 0.0
     all_azflags[-1] = 0
@@ -73,6 +95,10 @@ def from_file(filename):
     Params:
         filename (str): Full path to the numpy file containing scan parameter array
     """
+    info = np.load(filename)
+    conctimes = info[0]
+    concaz = info[1]
+    concel = info[2]
     info = np.load(filename)
     conctimes = info[0]
     concaz = info[1]
@@ -230,7 +256,3 @@ if __name__ == "__main__":
     print(time.time())
     times, azs, els, vas, ves, azf, elf = linear_turnaround_scanpoints((120., 130.), 55., 1., 4, 2000)
     print(time.time())
-    print(len(times))
-    print(times[0], azs[0], els[0], vas[0], ves[0], azf[0], elf[0])
-    lines = write_lines(times, azs, els, vas, ves, azf, elf)
-    print(lines[20])
