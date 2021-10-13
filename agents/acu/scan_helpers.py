@@ -98,6 +98,9 @@ def from_file(filename):
           to 0 to accommodate non-linear scans
     """
     info = np.load(filename)
+    if len(info) < 5:
+        print('Not enough information. Make sure you have specified time, azimuth, elevation, '\
+              'azimuth velocity, and elevation velocity') 
     conctimes = info[0]
     concaz = info[1]
     concel = info[2]
@@ -114,7 +117,7 @@ def from_file(filename):
         return False
     return conctimes, concaz, concel, concva, concve, az_flags, el_flags
 
-def write_lines(conctimes, concaz, concel, concva, concve, az_flags, el_flags):
+def ptstack_format(conctimes, concaz, concel, concva, concve, az_flags, el_flags):
     """
     Produces a list of lines in the format necessary to upload to the ACU to complete a scan. 
     Params are the outputs of from_file or linear_turnaround_scanpoints.
@@ -131,9 +134,9 @@ def write_lines(conctimes, concaz, concel, concva, concve, az_flags, el_flags):
     fmt = '%j, %H:%M:%S'
     start_time = time.time() + 10.
     true_times = [start_time + i for i in conctimes]
-    fmt_times = [time.strftime(fmt, time.gmtime(t)) + ('%.3f' % (t%1.))[1:] for t in true_times]
+    fmt_times = [time.strftime(fmt, time.gmtime(t)) + ('{tt:.6f}'.format(tt=t%1.))[1:] for t in true_times]
 
-    all_lines = [('%s; %.3f; %.3f; %.1f; %.1f; %i; %i\r\n' % (fmt_times[n], concaz[n], concel[n], concva[n], concve[n], az_flags[n], el_flags[n])) for n in range(len(fmt_times))]
+    all_lines = [('{ftime}; {az:.6f}; {el:.6f}; {azvel:.4f}; {elvel:.4f}; {azflag}; {elflag}\r\n'.format(ftime=fmt_times[n], az=concaz[n], el=concel[n], azvel=concva[n], elvel=concve[n], azflag=az_flags[n], elflag=el_flags[n])) for n in range(len(fmt_times))]
 
     return all_lines
 
