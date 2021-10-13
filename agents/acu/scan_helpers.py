@@ -33,25 +33,19 @@ def linear_turnaround_scanpoints(azpts, el, azvel, acc, ntimes):
     if num_dirpoints < 2:
         print('Scan is too short to run')
         return False
-#    time1 = np.linspace(0, tot_time_dir, num_dirpoints)
     sect_start_time = 0.0
-#    conctimes = list(time1)
     conctimes = []
-
-#    az1 = np.linspace(azpts[0], azpts[1], num_dirpoints)
-#    concaz = list(az1)
     concaz = []
-
     el1 = np.linspace(el, el, num_dirpoints)
     concel = list(el1)
-
-#    va1 = np.zeros(num_dirpoints) + azvel
-#    concva = list(va1)
     concva = []
     ve1 = np.zeros(num_dirpoints)
     concve = list(ve1)
-    concve = []
 
+    # Flag values:
+    # 0 : unidentified portion of the scan
+    # 1 : constant velocity, with the next point at the same velocity
+    # 2 : final point before a turnaround
     azflags = [1 for i in range(num_dirpoints-1)]
     azflags += [2]
     all_azflags = azflags
