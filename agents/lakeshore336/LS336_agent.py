@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
-# author: zatkins
-# acknowledgments: LS372 agent -- bkoopman, mhasselfield, jlashner
+# Author: zatkins
+# Documentation: zhuber
+# Acknowledgments: LS372 agent -- bkoopman, mhasselfield, jlashner
 
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
@@ -13,8 +14,50 @@ import time
 
 
 class LS336_Agent:
+    """Agent to connect to a single Lakeshore 336 device.
 
-    def __init__(self, agent, sn, ip, f_sample=0.1, wait=1, threshold=0.1, window=900):
+    Parameters
+    ----------
+
+    sn: str
+        Serial number of the LS336
+    ip: str
+        IP Address for the 336 device
+    f_sample: float, optional (default 0.1)
+        The frequency of sampling for acquiring data (in Hz)
+    threshold: float, optional (default 0.1)
+        The max difference (in K) between the setpoint and current
+        temperature that will be considered stable
+    window: int, optional (default 900)
+        The amount of time (in s) over which the difference between the
+        setpoint and the current temperature must not exceed threshold
+        while checking for temperature stability.
+
+    Attributes
+    ----------
+    sn: str
+        Serial number of the LS336
+    ip: str
+        IP Address for the 336 device
+    f_sample: float
+        The frequency of sampling for acquiring data (in Hz)
+    t_sample: float
+        The time between each sample (inverse of f_sample - 0.01)
+    threshold: float
+        The max difference (in K) between the setpoint and current temperature
+        that will be considered stable
+    window: int
+        The amount of time (in s) over which the difference between the
+        setpoint and the current temperature must not exceed threshold
+        while checking for temperature stability.
+    _recent_temps: numpy array, protected
+        Array of recent temperatures for checking temperature stability
+    _static_setpoint: float, protected
+        The final setpoint value to avoid issues when the setpoint is
+        ramping to a new value. Used in checking temperature stability
+    """
+    def __init__(self, agent, sn, ip, f_sample=0.1,
+                 threshold=0.1, window=900):
         self.agent = agent
         self.sn = sn
         self.ip = ip
@@ -23,19 +66,18 @@ class LS336_Agent:
         assert self.t_sample < 7200, \
             "acq sampling freq must be such that t_sample is less than 2 hours"
 
-        self.lock = TimeoutLock()
+        self._lock = TimeoutLock()
         self.log = agent.log
         self.initialized = False
         self.take_data = False
 
         self.module = None
-        self.wait = wait
 
         # for stability checking
         self.threshold = threshold
         self.window = window
-        self.recent_temps = None
-        self.static_setpoint = None
+        self._recent_temps = None
+        self._static_setpoint = None
 
         agg_params = {'frame_length': 10*60}  # sec
 
@@ -47,14 +89,15 @@ class LS336_Agent:
             buffer_time=1
         )
 
-    def init_lakeshore_task(self, session, params=None):
-        """Initialize the physical lakeshore module
+    @ocs_agent.param('auto_acquire', default=False, type=bool)
+    def init_lakeshore(self, session, params=None):
+        """init_lakeshore(auto_acquire=False)
 
-        Parameters
-        ----------
-        params : dict, optional
-            Contains optional parameters passed at Agent instantiation, by default None.
-            Only parameter here is auto_acquire, by default False.
+        **Task** - Perform first time setup of the Lakeshore 336 communication
+
+        Parameters:
+            auto_acquire (bool, optional): Default is False. Starts data
+                acquisition after initialization if True.
         """
         if params is None:
             params = {}
@@ -65,10 +108,11 @@ class LS336_Agent:
             return True, 'Already initialized'
 
         # initialize lakeshore
-        with self.lock.acquire_timeout(job='init', timeout=0) as acquired:
+        with self._lock.acquire_timeout(job='init', timeout=0) as acquired:
             if not acquired:
                 print(
-                    f"Lock could not be acquired because it is held by {self.lock.job}")
+                    f"Lock could not be acquired because it is held by "
+                    f"{self._lock.job}")
                 return False, 'Could not acquire lock'
 
             session.set_status('running')
@@ -86,14 +130,35 @@ class LS336_Agent:
 
         return True, 'Lakeshore module initialized'
 
-    def start_acq(self, session, params=None):
-        """Begins recording of data to frames.
+    @ocs_agent.param('f_sample', default=0.1, type=float)
+    def acq(self, session, params=None):
+        """acq(f_sample=0.1)
 
-        Parameters
-        ----------
-        params : dict, optional
-            Contains optional parameters passed at Agent instantiation, by default None.
-            Only parameter is 'f_sample', by default 0.1.
+        **Process** - Begins recording data from thermometers and heaters.
+
+        Parameters:
+            f_sample (float, optional): Default is 0.1. Sets the
+                sampling rate in Hz.
+
+        Notes:
+            The most recent data collected is stored in session.data in the
+            structure:
+
+               >>> response.session['data']
+               {"ls336_fields":
+                   {"timestamp": 1921920543,
+                    "block_name": "temperatures"
+                    "data": {"Channel_01_T": (some value)
+                             "Channel_01_V": (some value)
+                             "Channel_02_T": (some value)
+                             "Channel_02_V": (some value)
+                             "Channel_03_T": (some value)
+                             "Channel_03_V": (some value)
+                             "Channel_04_T": (some value)
+                             "Channel_04_V": (some value)
+                            }
+                   }
+               }
         """
         if params is None:
             params = {}
@@ -107,18 +172,20 @@ class LS336_Agent:
             self.t_sample = t_sample
 
         # acquire lock and start Process
-        with self.lock.acquire_timeout(job='acq', timeout=3) as acquired:
+        with self._lock.acquire_timeout(job='acq', timeout=3) as acquired:
             if not acquired:
                 print(
-                    f"Lock could not be acquired because it is held by {self.lock.job}")
+                    f"Lock could not be acquired because it is held by "
+                    f"{self._lock.job}")
                 return False, 'Could not acquire lock'
 
             session.set_status('running')
 
             # initialize recent temps array
-            # shape is N_points x 4, where N_points is 2 hour / t_sample rounded up
+            # shape is N_points x 4, where N_points is 2 hour / t_sample
+            # rounded up
             # t_sample can't be more than 2 hours
-            self.recent_temps = np.full(
+            self._recent_temps = np.full(
                 (int(np.ceil(7200 / self.t_sample)), 4), -1.0)
 
             # acquire data from Lakeshore
@@ -126,8 +193,9 @@ class LS336_Agent:
             while self.take_data:
 
                 # get thermometry data
+                current_time = time.time()
                 temperatures_message = {
-                    'timestamp': time.time(),
+                    'timestamp': current_time,
                     'block_name': 'temperatures',
                     'data': {}
                 }
@@ -140,31 +208,35 @@ class LS336_Agent:
                     temperatures_message['data'][channel_str +
                                                  '_V'] = voltages[i]
 
-                # append to recent temps array
-                self.recent_temps = np.roll(self.recent_temps, 1, axis=0)
-                self.recent_temps[0] = temps
+                # append to recent temps array for temp stability check
+                self._recent_temps = np.roll(self._recent_temps, 1, axis=0)
+                self._recent_temps[0] = temps
 
                 # publish to feed
                 self.agent.publish_to_feed(
                     'temperatures', temperatures_message)
 
+                # For session.data - named to avoid conflicting with LS372
+                # if in use at same time.
+                session.data['ls336_fields'].update(temperatures_message)
+
                 # get heater data
                 heaters_message = {
-                    'timestamp': time.time(),
+                    'timestamp': current_time,
                     'block_name': 'heaters',
                     'data': {}
                 }
 
                 for i, heater in enumerate(self.module.heaters.values()):
                     heater_str = heater.output_name.replace(' ', '_')
-                    heaters_message['data'][heater_str +
-                                            '_Percent'] = heater.get_heater_percent()
-                    heaters_message['data'][heater_str +
-                                           '_Range'] = heater.get_heater_range()
-                    heaters_message['data'][heater_str +
-                                            '_Max_Current'] = heater.get_max_current()
-                    heaters_message['data'][heater_str +
-                                            '_Setpoint'] = heater.get_setpoint()
+                    heaters_message['data'][
+                        heater_str + '_Percent'] = heater.get_heater_percent()
+                    heaters_message['data'][
+                        heater_str + '_Range'] = heater.get_heater_range()
+                    heaters_message['data'][
+                        heater_str + '_Max_Current'] = heater.get_max_current()
+                    heaters_message['data'][
+                        heater_str + '_Setpoint'] = heater.get_setpoint()
 
                 # publish to feed
                 self.agent.publish_to_feed('temperatures', heaters_message)
@@ -174,17 +246,23 @@ class LS336_Agent:
                     f'Sleeping for {np.round(self.t_sample)} seconds...')
 
                 # release and reacquire lock between data acquisition
-                self.lock.release()
+                self._lock.release()
                 time.sleep(t_sample)
-                if not self.lock.acquire(timeout=10, job='acq'):
+                if not self._lock.acquire(timeout=10, job='acq'):
                     print(
-                        f"Lock could not be acquired because it is held by {self.lock.job}")
+                        f"Lock could not be acquired because it is held by "
+                        f"{self._lock.job}")
                     return False, 'Could not re-acquire lock'
 
         return True, 'Acquisition exited cleanly'
 
+    @ocs_agent.param('_')
     def stop_acq(self, session, params=None):
-        """Stops acq process."""
+        """stop_acq()
+
+        **Task** - Stops acq process.
+
+        """
         if params is None:
             params = {}
 
@@ -194,19 +272,43 @@ class LS336_Agent:
         else:
             return False, 'acq is not currently running'
 
+    @ocs_agent.param('range', type=str,
+                     choices=['off', 'low', 'medium', 'high'])
+    @ocs_agent.param('heater', default='2', type=str,
+                     choices=['1', '2', '3', '4'])
     def set_heater_range(self, session, params):
-        """Adjusts the heater range for servoing the load.
+        """set_heater_range(range=None,heater='2')
 
-        Parameters
-        ----------
-        params : dict
-            Contains parameters 'range' (not optional), 'heater' (optional, default '2'),
-            and 'wait' (optional, default 1).
+        **Task** - Adjusts the heater range for servoing the load.
+
+        Parameters:
+            range (str): Sets the range of the chosen heater. See notes for
+                         valid options.
+            heater (str, optional): default '2'. Chooses which heater's range
+                                    to change. Must be one of '1','2','3','4'.
+
+        Notes:
+            If the heater is '1' or '2', then there are four options for the
+            range: 'off', 'low', 'medium', and 'high'.
+            If the heater is '3' or '4', then there are two options for the
+            range: 'off' and 'low'. Note that these options are really 'off'
+            and 'on', but in order to match the way the driver code is written
+            you should pass 'low' when you want the heater on.
+
+            The range setting has no effect if an output is in the Off mode,
+            and it does not apply to an output in Monitor Out mode. An output
+            in Monitor Out mode is always on.
         """
-        with self.lock.acquire_timeout(job='set_heater_range', timeout=3) as acquired:
+        if (params['heater'] in ['3', '4'
+                                 ] and params['range'] in ['medium', 'high']):
+            raise ocs_agent.ParamError("Range must be 'off' or 'low' for "
+                                       "heaters 3 and 4.")
+        with self._lock.acquire_timeout(job='set_heater_range',
+                                        timeout=3) as acquired:
             if not acquired:
                 print(
-                    f"Lock could not be acquired because it is held by {self.lock.job}")
+                    f"Lock could not be acquired because it is held by "
+                    f"{self._lock.job}")
                 return False, 'Could not acquire lock'
 
             session.set_status('running')
@@ -219,29 +321,42 @@ class LS336_Agent:
             current_range = heater.get_heater_range()
             if params['range'] == current_range:
                 print(
-                    'Current heater range matches commanded value. Proceeding unchanged')
+                    'Current heater range matches commanded value. '
+                    'Proceeding unchanged')
             else:
                 heater.set_heater_range(params['range'])
-                time.sleep(params.get('wait', self.wait))
 
             session.add_message(
                 f"Set {heater.output_name} range to {params['range']}")
 
         return True, f"Set {heater.output_name} range to {params['range']}"
 
+    @ocs_agent.param('P', type=float, check=lambda x: 0.1 <= x <= 1000)
+    @ocs_agent.param('I', type=float, check=lambda x: 0.1 <= x <= 1000)
+    @ocs_agent.param('D', type=float, check=lambda x: 0 <= x <= 200)
+    @ocs_agent.param('heater', default='2', type=str,
+                     choices=['1', '2', '3', '4'])
     def set_pid(self, session, params):
-        """Set the PID parameters for servoing the load.
+        """set_pid(P=None,I=None,D=None,heater='2')
 
-        Parameters
-        ----------
-        params : dict
-            Contains parameters 'P', 'I', 'D' (not optional), 'heater' (optional, default '2'),
-            and 'wait' (optional, default 1).
+        **Task** - Set the PID parameters for servoing the load.
+
+        Parameters:
+            P (float): Proportional term for PID loop (must be between
+                       0.1 and 1000)
+            I (float): Integral term for PID loop (must be between 0.1
+                       and 1000)
+            D (float): Derivative term for PID loop (must be between 0 and 200)
+            heater (str, optional): Selects the heater on which to change
+                                    the PID settings. Must be one of
+                                    '1','2','3','4'.
+
         """
-        with self.lock.acquire_timeout(job='set_pid', timeout=3) as acquired:
+        with self._lock.acquire_timeout(job='set_pid', timeout=3) as acquired:
             if not acquired:
                 print(
-                    f"Lock could not be acquired because it is held by {self.lock.job}")
+                    f"Lock could not be acquired because it is held by "
+                    f"{self._lock.job}")
                 return False, 'Could not acquire lock'
 
             session.set_status('running')
@@ -252,30 +367,54 @@ class LS336_Agent:
 
             # set pid
             current_p, current_i, current_d = heater.get_pid()
-            if params['P'] == current_p and params['I'] == current_i and params['D'] == current_d:
-                print('Current heater PID matches commanded value. Proceeding unchanged')
+            if (params['P'] == current_p
+                    and params['I'] == current_i
+                    and params['D'] == current_d):
+                print('Current heater PID matches commanded value. '
+                      'Proceeding unchanged')
             else:
                 heater.set_pid(params['P'], params['I'], params['D'])
-                time.sleep(params.get('wait', self.wait))
 
             session.add_message(
-                f"Set {heater.output_name} PID to {params['P']}, {params['I']}, {params['D']}")
+                f"Set {heater.output_name} PID to {params['P']}, "
+                f"{params['I']}, {params['D']}")
 
-        return True, f"Set {heater.output_name} PID to {params['P']}, {params['I']}, {params['D']}"
+        return True, (f"Set {heater.output_name} PID to {params['P']}, "
+                      f" {params['I']}, {params['D']}")
 
+    @ocs_agent.param('mode', type=str, choices=['off', 'closed loop', 'zone',
+                                                'open loop', 'monitor out',
+                                                'warm up'])
+    @ocs_agent.param('heater', default='2', type=str,
+                     choices=['1', '2', '3', '4'])
     def set_mode(self, session, params):
-        """Sets the output mode of the heater.
+        """set_mode(mode=None,heater='2')
 
-        Parameters
-        ----------
-        params : dict
-            Contains parameters 'mode' (not optional), 'heater' (optional, default '2'),
-            and 'wait' (optional, default 1).
+        **Task** - Sets the output mode of the heater.
+
+        Parameters:
+            mode (str): Selects the output mode for the heater.
+                        Accepts six options: 'off', 'closed loop', 'zone',
+                        'open loop', 'monitor out', and 'warm up'. See notes
+                        for restrictions based on the selected heater.
+            heater (str, optional): Default '2'. Selects the heater on which
+                                    to change the mode. Must be one of
+                                    '1','2','3','4'.
+
+        Notes:
+            The options 'monitor out' and 'warm up' only work for the analog
+            outputs (heaters 3 and 4).
         """
-        with self.lock.acquire_timeout(job='set_mode', timeout=3) as acquired:
+        if params['heater'] in ['1', '2'] and params['mode'] in ['monitor out',
+                                                                 'warm up']:
+            raise ocs_agent.ParamError("Mode cannot be 'monitor out' or "
+                                       "'warm up' for heaters 1 and 2.")
+
+        with self._lock.acquire_timeout(job='set_mode', timeout=3) as acquired:
             if not acquired:
                 print(
-                    f"Lock could not be acquired because it is held by {self.lock.job}")
+                    f"Lock could not be acquired because it is held by "
+                    f"{self._lock.job}")
                 return False, 'Could not acquire lock'
 
             session.set_status('running')
@@ -288,29 +427,37 @@ class LS336_Agent:
             current_mode = heater.get_mode()
             if params['mode'] == current_mode:
                 print(
-                    'Current heater mode matches commanded value. Proceeding unchanged')
+                    'Current heater mode matches commanded value. '
+                    'Proceeding unchanged')
             else:
                 heater.set_mode(params['mode'])
-                time.sleep(params.get('wait', self.wait))
 
             session.add_message(
                 f"Set {heater.output_name} mode to {params['mode']}")
 
         return True, f"Set {heater.output_name} mode to {params['mode']}"
 
+    @ocs_agent.param('resistance', type=float)
+    @ocs_agent.param('heater', default='2', type=str,
+                     choices=['1', '2', '3', '4'])
     def set_heater_resistance(self, session, params):
-        """Sets the heater resistance and resistance setting of the heater.
+        """set_heater_resistance(resistance=None,heater='2')
 
-        Parameters
-        ----------
-        params : dict
-            Contains parameters 'resistance' (not optional), 'heater' (optional, default '2'),
-            and 'wait' (optional, default 1).
+        **Task** - Sets the heater resistance and resistance setting
+        of the heater.
+
+        Parameters:
+            resistance (float): The actual resistance of the load
+            heater (str, optional): Default '2'. Selects the heater on which
+                                    to set the resistance. Must be one of
+                                    '1','2','3','4'.
         """
-        with self.lock.acquire_timeout(job='set_heater_resistance', timeout=3) as acquired:
+        with self._lock.acquire_timeout(job='set_heater_resistance',
+                                        timeout=3) as acquired:
             if not acquired:
                 print(
-                    f"Lock could not be acquired because it is held by {self.lock.job}")
+                    f"Lock could not be acquired because it is held by "
+                    f"{self._lock.job}")
                 return False, 'Could not acquire lock'
 
             session.set_status('running')
@@ -323,29 +470,39 @@ class LS336_Agent:
             _ = heater.get_heater_resistance_setting()
             if params['resistance'] == heater.resistance:
                 print(
-                    'Current heater resistance matches commanded value. Proceeding unchanged')
+                    'Current heater resistance matches commanded value. '
+                    'Proceeding unchanged')
             else:
                 heater.set_heater_resistance(params['resistance'])
-                time.sleep(params.get('wait', self.wait))
 
             session.add_message(
-                f"Set {heater.output_name} resistance to {params['resistance']}")
+                f"Set {heater.output_name} resistance to "
+                f"{params['resistance']}")
 
-        return True, f"Set {heater.output_name} resistance to {params['resistance']}"
+        return True, (f"Set {heater.output_name} resistance to "
+                      f"{params['resistance']}")
 
+    @ocs_agent.param('current', type=float, check=lambda x: 0.0 <= x <= 2.0)
+    @ocs_agent.param('heater', default='2', type=str,
+                     choices=['1', '2', '3', '4'])
     def set_max_current(self, session, params):
-        """Sets the heater resistance and resistance setting of the heater.
+        """set_max_current(current=None,heater='2')
 
-        Parameters
-        ----------
-        params : dict
-            Contains parameters 'resistance' (not optional), 'heater' (optional, default '2'),
-            and 'wait' (optional, default 1).
+        **Task** - Sets the maximum current that can pass through a heater.
+
+        Parameters:
+            current (float): The desired max current. Must be between
+                             0 and 2 A.
+            heater (str, optional): Default '2'. Selects the heater on which
+                                    to set the max current. Must be one of
+                                    '1','2','3','4'.
         """
-        with self.lock.acquire_timeout(job='set_max_current', timeout=3) as acquired:
+        with self._lock.acquire_timeout(job='set_max_current',
+                                        timeout=3) as acquired:
             if not acquired:
                 print(
-                    f"Lock could not be acquired because it is held by {self.lock.job}")
+                    f"Lock could not be acquired because it is held by "
+                    f"{self._lock.job}")
                 return False, 'Could not acquire lock'
 
             session.set_status('running')
@@ -358,29 +515,40 @@ class LS336_Agent:
             current_max_current = heater.get_max_current()
             if params['current'] == current_max_current:
                 print(
-                    'Current max current matches commanded value. Proceeding unchanged')
+                    'Current max current matches commanded value. '
+                    'Proceeding unchanged')
             else:
                 heater.set_max_current(params['current'])
-                time.sleep(params.get('wait', self.wait))
 
             session.add_message(
                 f"Set {heater.output_name} max current to {params['current']}")
 
-        return True, f"Set {heater.output_name} max current to {params['current']}"
+        return True, (f"Set {heater.output_name} max current to "
+                      f"{params['current']}")
 
+    @ocs_agent.param('percent', type=float)
+    @ocs_agent.param('heater', default='2', type=str,
+                     choices=['1', '2', '3', '4'])
     def set_manual_out(self, session, params):
-        """Sets the manual output of the heater.
+        """set_manual_out(percent=None,heater='2')
 
-        Parameters
-        ----------
-        params : dict
-            Contains parameters 'percent' (not optional), 'heater' (optional, default '2'),
-            and 'wait' (optional, default 1).
+        **Task** - Sets the manual output of the heater as a percentage of the
+        full current or power depending on which display the heater
+        is set to use.
+
+        Parameters:
+            percent (float): Percent of full current or power to set on the
+                             heater. Must have 2 or fewer decimal places.
+            heater (str, optional): Default '2'. Selects the heater on which
+                                    to set the manual output. Must be one of
+                                    '1','2','3','4'.
         """
-        with self.lock.acquire_timeout(job='set_manual_out', timeout=3) as acquired:
+        with self._lock.acquire_timeout(job='set_manual_out',
+                                        timeout=3) as acquired:
             if not acquired:
                 print(
-                    f"Lock could not be acquired because it is held by {self.lock.job}")
+                    f"Lock could not be acquired because it is held by "
+                    f"{self._lock.job}")
                 return False, 'Could not acquire lock'
 
             session.set_status('running')
@@ -392,29 +560,45 @@ class LS336_Agent:
             # set manual out
             current_manual_out = heater.get_manual_out()
             if params['percent'] == current_manual_out:
-                print('Current manual out matches commanded value. Proceeding unchanged')
+                print('Current manual out matches commanded value. '
+                      'Proceeding unchanged')
             else:
                 heater.set_manual_out(params['percent'])
-                time.sleep(params.get('wait', self.wait))
 
             session.add_message(
                 f"Set {heater.output_name} manual out to {params['percent']}")
 
-        return True, f"Set {heater.output_name} manual out to {params['percent']}"
+        return True, (f"Set {heater.output_name} manual out to "
+                      f"{params['percent']}")
 
+    @ocs_agent.param('input', type=str, choices=['none', 'A', 'B', 'C', 'D'])
+    @ocs_agent.param('heater', default='2', type=str,
+                     choices=['1', '2', '3', '4'])
     def set_input_channel(self, session, params):
-        """Sets the input channel of the heater control loop.
+        """set_input_channel(input=None,heater='2')
 
-        Parameters
-        ----------
-        params : dict
-            Contains parameters 'input' (not optional), 'heater' (optional, default '2'),
-            and 'wait' (optional, default 1).
+        **Task** - Sets the input channel of the heater control loop.
+
+        Parameters:
+            input (str): The name of the heater to use as the input channel.
+                         Must be one of 'none','A','B','C', or 'D'.
+            heater (str, optional): Default '2'. Selects the heater for which
+                                    to set the input channel. Must be one of
+                                    '1','2','3','4'.
+
+        Notes:
+            Currently does not have extra functionality for Lakeshore 336s
+            that have a Model 3062 4-channel scanner installed. In that case,
+            there are four extra channels that are not supported by
+            this function (D2-D5).
+
         """
-        with self.lock.acquire_timeout(job='set_input_channel', timeout=3) as acquired:
+        with self._lock.acquire_timeout(job='set_input_channel',
+                                        timeout=3) as acquired:
             if not acquired:
                 print(
-                    f"Lock could not be acquired because it is held by {self.lock.job}")
+                    f"Lock could not be acquired because it is held by "
+                    f"{self._lock.job}")
                 return False, 'Could not acquire lock'
 
             session.set_status('running')
@@ -427,29 +611,40 @@ class LS336_Agent:
             current_input_channel = heater.get_input_channel()
             if params['input'] == current_input_channel:
                 print(
-                    'Current input channel matches commanded value. Proceeding unchanged')
+                    'Current input channel matches commanded value. '
+                    'Proceeding unchanged')
             else:
                 heater.set_input_channel(params['input'])
-                time.sleep(params.get('wait', self.wait))
 
             session.add_message(
                 f"Set {heater.output_name} input channel to {params['input']}")
 
-        return True, f"Set {heater.output_name} input channel to {params['input']}"
+        return True, (f"Set {heater.output_name} input channel to "
+                      f"{params['input']}")
 
+    @ocs_agent.param('setpoint', type=float)
+    @ocs_agent.param('heater', default='2', type=str,
+                     choices=['1', '2', '3', '4'])
     def set_setpoint(self, session, params):
-        """Sets the setpoint of the heater control loop, after first turning ramp off.
+        """set_setpoint(setpoint=None,heater='2')
 
-        Parameters
-        ----------
-        params : dict
-            Contains parameters 'setpoint' (not optional), 'heater' (optional, default '2'),
-            and 'wait' (optional, default 1).
+        **Task** - Sets the setpoint of the heater control loop,
+        after first turning ramp off.
+
+        Parameters:
+            setpoint (float): The setpoint for the control loop. Units depend
+                              on the preferred sensor units (Kelvin, Celsius,
+                              or Sensor).
+            heater (str, optional): Default '2'. Selects the heater for which
+                                    to set the input channel. Must be one of
+                                    '1','2','3','4'.
         """
-        with self.lock.acquire_timeout(job='set_setpoint', timeout=3) as acquired:
+        with self._lock.acquire_timeout(job='set_setpoint',
+                                        timeout=3) as acquired:
             if not acquired:
                 print(
-                    f"Lock could not be acquired because it is held by {self.lock.job}")
+                    f"Lock could not be acquired because it is held by "
+                    f"{self._lock.job}")
                 return False, 'Could not acquire lock'
 
             session.set_status('running')
@@ -461,32 +656,44 @@ class LS336_Agent:
             # set setpoint
             current_setpoint = heater.get_setpoint()
             if params['setpoint'] == current_setpoint:
-                print('Current setpoint matches commanded value. Proceeding unchanged')
+                print('Current setpoint matches commanded value. '
+                      'Proceeding unchanged')
             else:
                 heater.set_ramp_on_off('off')
                 heater.set_setpoint(params['setpoint'])
-                # static setpoint used in temp stability check to avoid ramping bug
-                self.static_setpoint = params['setpoint']
-                time.sleep(params.get('wait', self.wait))
+                # static setpoint used in temp stability check
+                # to avoid ramping bug
+                self._static_setpoint = params['setpoint']
 
             session.add_message(
-                f"Turned ramp off and set {heater.output_name} setpoint to {params['setpoint']}")
+                f"Turned ramp off and set {heater.output_name} setpoint to "
+                f"{params['setpoint']}")
 
-        return True, f"Turned ramp off and set {heater.output_name} setpoint to {params['setpoint']}"
+        return True, (f"Turned ramp off and set {heater.output_name} "
+                      f"setpoint to {params['setpoint']}")
 
+    @ocs_agent.param('T_limit', type=int)
+    @ocs_agent.param('channel', type=str, default='A',
+                     choices=['A', 'B', 'C', 'D'])
     def set_T_limit(self, session, params):
-        """Sets the input T limit for use in control.
+        """set_T_limit(T_limit=None,channel='A')
 
-        Parameters
-        ----------
-        params : dict
-            Contains parameters 'T_limit' (not optional), 'channel' (optional, default 'A'),
-            and 'wait' (optional, default 1).
+        **Task** - Sets the temperature limit above which the control
+                   output assigned to the selected channel shut off.
+
+        Parameters:
+            T_limit (int): The temperature limit in Kelvin. Note that a limit
+                           of 0 K turns off this feature for the given channel.
+            channel (str, optional): Default 'A'. Selects which channel to use
+                                     for controlling the temperature. Options
+                                     are 'A','B','C', and 'D'.
         """
-        with self.lock.acquire_timeout(job='set_T_limit', timeout=3) as acquired:
+        with self._lock.acquire_timeout(job='set_T_limit',
+                                        timeout=3) as acquired:
             if not acquired:
                 print(
-                    f"Lock could not be acquired because it is held by {self.lock.job}")
+                    f"Lock could not be acquired because it is held by "
+                    f"{self._lock.job}")
                 return False, 'Could not acquire lock'
 
             session.set_status('running')
@@ -498,19 +705,29 @@ class LS336_Agent:
             # set T limit
             current_limit = channel.get_T_limit()
             if params['T_limit'] == current_limit:
-                print('Current T limit matches commanded value. Proceeding unchanged')
+                print('Current T limit matches commanded value. '
+                      'Proceeding unchanged')
             else:
                 channel.set_T_limit(params['T_limit'])
-                time.sleep(params.get('wait', self.wait))
 
             session.add_message(
                 f"Set {channel.input_name} T limit to {params['T_limit']}")
 
         return True, f"Set {channel.input_name} T limit to {params['T_limit']}"
 
+    @ocs_agent.param('temperature', type=float)
+    @ocs_agent.param('ramp', default=0.1, type=float)
+    @ocs_agent.param('heater', default='2', type=str,
+                     choices=['1', '2', '3', '4'])
+    @ocs_agent.param('transport', default=False, type=bool)
+    @ocs_agent.param('transport_offset', default=0, type=float,
+                     check=lambda x: x >= 0.0)
     def servo_to_temperature(self, session, params):
-        """A wrapper for setting the heater setpoint. Performs sanity checks on heater
-        configuration before publishing setpoint:
+        """servo_to_temperature(temperature=None,ramp=0.1,heater='2',
+                                transport=False,transport_offset=0)
+
+        **Task** - A wrapper for setting the heater setpoint. Performs sanity
+        checks on heater configuration before publishing setpoint:
             1. checks control mode of heater (closed loop)
             2. checks units of input channel (kelvin)
             3. resets setpoint to current temperature with ramp off
@@ -518,31 +735,41 @@ class LS336_Agent:
             5. checks setpoint does not exceed input channel T_limit
             6. sets setpoint to commanded value
 
-        Parameters
-        ----------
-        params : dict
-            Contains parameters 'temperature' (not optional), 'ramp' (optional, default 0.1),
-            'heater' (optional, default '2'), 'wait' (optional, default 1),
-            'transport' (optional, default False), and 'transport_offset' (optional, default 0).
+        Parameters:
+            temperature (float): The new setpoint in Kelvin. Make sure there is
+                                 is a control input set to the heater and its
+                                 units are Kelvin.
+            ramp (float, optional): Default 0.1. The rate for how quickly
+                                    the setpoint ramps to new value.
+                                    Units of K/min.
+            heater (str, optional): Default '2'. The heater to use
+                                    for servoing.
+            transport (bool, optional): Default False. See Notes
+                                        for description.
+            transport_offset (float, optional): Default 0. In Kelvin.
+                                                See Notes.
 
-        Notes
-        -----
-        If param 'transport' is provided and True, the control loop restarts when the setpoint
-        is first reached. This is useful for loads with long time cooling times or time constants
-        to help minimize over/undershoot.
+        Notes:
+        If param 'transport' is provided and True, the control loop restarts
+        when the setpoint is first reached. This is useful for loads with long
+        cooling times or time constant to help minimize over/undershoot.
 
-        If param 'transport' is provided and True, and 'transport_offset' is provided and positive,
-        and the setpoint is higher than the current temperature, then the control loop will restart
-        when the setpoint - transport_offset is first reached. This is useful to avoid  a "false positive"
+        If param 'transport' is provided and True, and 'transport_offset' is
+        provided and positive, and the setpoint is higher than the
+        current temperature, then the control loop will restart
+        when the setpoint - transport_offset is first reached.
+        This is useful to avoid  a "false positive"
         temperature stability check too shortly after transport completes.
         """
         # get sampling frequency
         t_sample = self.t_sample
 
-        with self.lock.acquire_timeout(job='servo_to_temperature', timeout=3) as acquired:
+        with self._lock.acquire_timeout(job='servo_to_temperature',
+                                        timeout=3) as acquired:
             if not acquired:
                 print(
-                    f"Lock could not be acquired because it is held by {self.lock.job}")
+                    f"Lock could not be acquired because it is held by "
+                    f"{self._lock.job}")
                 return False, 'Could not acquire lock'
 
             session.set_status('running')
@@ -563,16 +790,19 @@ class LS336_Agent:
             # check in correct units
             channel = heater.get_input_channel()
             if channel == 'none':
-                return False, f'{heater.output_name} does not have an input channel assigned'
+                return False, (f'{heater.output_name} does not have an '
+                               f'input channel assigned')
             if self.module.channels[channel].get_units() != 'kelvin':
                 session.add_message(
-                    'Setting preferred units to kelvin on heater control input.')
+                    'Setting preferred units to kelvin on '
+                    'heater control input.')
                 self.module.channels[channel].set_units('kelvin')
 
             # restart setpoint at current temperature
             current_temp = np.round(float(self.module.get_kelvin(channel)), 4)
             session.add_message(
-                f'Turning ramp off and setting setpoint to current temperature {current_temp}')
+                f'Turning ramp off and setting setpoint to current '
+                f'temperature {current_temp}')
             heater.set_ramp_on_off('off')
             heater.set_setpoint(current_temp)
 
@@ -586,20 +816,25 @@ class LS336_Agent:
             # make sure not exceeding channel T limit
             T_limit = self.module.channels[channel].get_T_limit()
             if T_limit <= params['temperature']:
-                return False, f"{heater.output_name} control channel {channel} T limit of \
-                     {T_limit}K is higher than setpoint of {params['temperature']}"
+                return False, (f"{heater.output_name} control channel "
+                               f"{channel} T limit of {T_limit}K is higher "
+                               f"than setpoint of {params['temperature']}")
 
             # set setpoint
             if params['temperature'] == current_setpoint:
-                print('Current setpoint matches commanded value. Proceeding unchanged')
+                print('Current setpoint matches commanded value. '
+                      'Proceeding unchanged')
             else:
                 session.add_message(
-                    f"Setting {heater.output_name} setpoint to {params['temperature']}")
+                    f"Setting {heater.output_name} setpoint to "
+                    f"{params['temperature']}")
                 heater.set_setpoint(params['temperature'])
-                # static setpoint used in temp stability check to avoid pulling the ramping setpoint
-                self.static_setpoint = params['temperature']
+                # static setpoint used in temp stability check
+                # to avoid pulling the ramping setpoint
+                self._static_setpoint = params['temperature']
 
-                # if transport, restart control loop when setpoint first crossed
+                # if transport, restart control loop when setpoint
+                # first crossed
                 if params.get('transport', False):
 
                     current_range = heater.get_heater_range()
@@ -607,12 +842,14 @@ class LS336_Agent:
                         params['temperature'] - current_temp)
                     transporting = True
 
-                    # if we are raising temp, allow possibility of stopping transport at a cooler temp
+                    # if we are raising temp, allow possibility of
+                    # stopping transport at a cooler temp
                     T_offset = 0
                     if starting_sign > 0:
                         T_offset = params.get('transport_offset', 0)
                         if T_offset < 0:
-                            return False, 'Transport offset temperature cannot be negative'
+                            return False, ('Transport offset temperature '
+                                           'cannot be negative')
 
                     while transporting:
                         current_temp = np.round(
@@ -622,11 +859,13 @@ class LS336_Agent:
                             params['temperature'] - T_offset - current_temp)
 
                         # release and reacquire lock between data acquisition
-                        self.lock.release()
+                        self._lock.release()
                         time.sleep(t_sample)
-                        if not self.lock.acquire(timeout=10, job='servo_to_temperature'):
+                        if not self._lock.acquire(timeout=10,
+                                                  job='servo_to_temperature'):
                             print(
-                                f"Lock could not be acquired because it is held by {self.lock.job}")
+                                f"Lock could not be acquired because it is "
+                                f"held by {self._lock.job}")
                             return False, 'Could not re-acquire lock'
 
                         if current_sign != starting_sign:
@@ -634,31 +873,42 @@ class LS336_Agent:
 
                             # cycle control loop
                             session.add_message(
-                                'Transport complete, restarting control loop at provided setpoint')
+                                'Transport complete, restarting control '
+                                'loop at provided setpoint')
                             heater.set_heater_range('off')
-                            # necessary 1s for prev command to register in ls336 firmware for some reason
+                            # necessary 1 s for prev command to register
+                            # in ls336 firmware for some reason
                             time.sleep(1)
                             heater.set_heater_range(current_range)
 
-                time.sleep(params.get('wait', self.wait))
+        return True, (f"Set {heater.output_name} setpoint to "
+                      f"{params['temperature']}")
 
-        return True, f"Set {heater.output_name} setpoint to {params['temperature']}"
-
+    @ocs_agent.param('threshold', default=0.1, type=float)
+    @ocs_agent.param('window', default=900, type=int)
+    @ocs_agent.param('heater', default='2', type=str,
+                     choices=['1', '2', '3', '4'])
     def check_temperature_stability(self, session, params):
-        """Assesses whether the load is stable around the setpoint to within some threshold.
+        """check_temperature_stability(threshold=0.1,window=900,heater='2')
 
-        Parameters
-        ----------
-        params : dict
-            Contains parameters 'threshold' (optiona, default 0.1), 'window' (option, default 900),
-            'heater' (optional, default '2'), and 'wait' (optional, default 1).
+        **Task** - Assesses whether the load is stable around the setpoint
+        to within some threshold.
+
+        Parameters:
+            threshold (float, optional): Default 0.1. See notes.
+            window (int, optional): Default 900. See notes.
+            heater (str, optional): Default '2'. Selects the heater for which
+                                    to set the input channel. Must be one of
+                                    '1','2','3','4'.
 
         Notes
         -----
-        Param 'threshold' sets the upper bound on the absolute temperature difference between
-        the setpoint and any temperature from the input channel in the last 'window' seconds.
+        Param 'threshold' sets the upper bound on the absolute
+        temperature difference between the setpoint and any temperature
+        from the input channel in the last 'window' seconds.
 
-        Param 'window' sets the lookback time into the most recent temperature data, in seconds.
+        Param 'window' sets the lookback time into the most recent
+        temperature data, in seconds.
         """
 
         # get threshold
@@ -672,10 +922,12 @@ class LS336_Agent:
             window = self.window
         num_idxs = int(np.ceil(window / self.t_sample))
 
-        with self.lock.acquire_timeout(job='check_temperature_stability', timeout=3) as acquired:
+        with self._lock.acquire_timeout(job='check_temperature_stability',
+                                        timeout=3) as acquired:
             if not acquired:
                 print(
-                    f"Lock could not be acquired because it is held by {self.lock.job}")
+                    f"Lock could not be acquired because it is held by "
+                    f"{self._lock.job}")
                 return False, 'Could not acquire lock'
 
             session.set_status('running')
@@ -692,48 +944,58 @@ class LS336_Agent:
             current_temp = np.round(self.module.get_kelvin(channel), 4)
 
             # check if recent temps and current temps are within threshold
-            recent_temps = self.recent_temps[:num_idxs, channel_num-1]
-            recent_temps = np.concatenate(
-                (np.array([current_temp]), recent_temps))
+            _recent_temps = self._recent_temps[:num_idxs, channel_num-1]
+            _recent_temps = np.concatenate(
+                (np.array([current_temp]), _recent_temps))
 
             # get static setpoint if None
-            if self.static_setpoint is None:
-                self.static_setpoint = heater.get_setpoint()
+            if self._static_setpoint is None:
+                self._static_setpoint = heater.get_setpoint()
 
-            # avoids checking against the ramping setpoint, i.e. want to compare to commanded setpoint not mid-ramp setpoint
-            setpoint = self.static_setpoint
+            # avoids checking against the ramping setpoint,
+            # i.e. want to compare to commanded setpoint not mid-ramp setpoint
+            setpoint = self._static_setpoint
             session.add_message(
-                f'Maximum absolute difference in recent temps is {np.max(np.abs(recent_temps - setpoint))}K')
+                f'Maximum absolute difference in recent temps is '
+                f'{np.max(np.abs(_recent_temps - setpoint))}K')
 
-            if np.all(np.abs(recent_temps - setpoint) < threshold):
+            if np.all(np.abs(_recent_temps - setpoint) < threshold):
                 session.add_message(
                     f'Recent temps are within {threshold}K of setpoint')
-                return True, f'Servo temperature is stable within {threshold}K of setpoint'
+                return True, (f'Servo temperature is stable within '
+                              f'{threshold}K of setpoint')
 
-            time.sleep(params.get('wait', self.wait))
+        return False, (f'Servo temperature is not stable within '
+                       f'{threshold}K of setpoint')
 
-        return False, f'Servo temperature is not stable within {threshold}K of setpoint'
-
+    @ocs_agent.param('attribute', type=str)
+    @ocs_agent.param('channel', type=str, default='A',
+                     choices=['A', 'B', 'C', 'D'])
     def get_channel_attribute(self, session, params):
-        """Gets an arbitrary channel attribute and stores it in the session.data dict.
-        Attribute must be the name of a method in the namespace of the Lakeshore336 Channel
-        class, with a leading "get_" removed (see example).
+        """get_channel_attribute(attribute=None,channel='A')
 
-        Parameters
-        ----------
-        params : dict
-            Contains parameters 'attribute' (not optional), 'channel' (optional, default 'A'),
-            and 'wait' (optional, default 1).
+        **Task** - Gets an arbitrary channel attribute and stores it in the
+        session.data dict. Attribute must be the name of a method
+        in the namespace of the Lakeshore336 Channel class,
+        with a leading "get_" removed (see example).
 
-        Examples
-        --------
+        Parameters:
+            attribute (str): The name of the channel attribute to get. See the
+                             Lakeshore 336 Channel class API for all options.
+            channel (str, optional): Default 'A'. Selects which channel for
+                                     which to get the attribute. Options
+                                     are 'A','B','C', and 'D'.
+
+        Example:
         >>> ls.get_channel_attribute(attribute = 'T_limit').session['data']
         {'T_limit': 30.0}
         """
-        with self.lock.acquire_timeout(job=f"get_{params['attribute']}", timeout=3) as acquired:
+        with self._lock.acquire_timeout(job=f"get_{params['attribute']}",
+                                        timeout=3) as acquired:
             if not acquired:
                 print(
-                    f"Lock could not be acquired because it is held by {self.lock.job}")
+                    f"Lock could not be acquired because it is held by "
+                    f"{self._lock.job}")
                 return False, 'Could not acquire lock'
 
             session.set_status('running')
@@ -743,37 +1005,45 @@ class LS336_Agent:
             channel = self.module.channels[channel_key]
 
             # check that attribute is a valid channel method
-            if getattr(channel, f"get_{params['attribute']}", False) is not False:
+            if getattr(channel, f"get_{params['attribute']}",
+                       False) is not False:
                 query = getattr(channel, f"get_{params['attribute']}")
 
             # get attribute
             resp = query()
             session.data[params['attribute']] = resp
 
-            time.sleep(params.get('wait', self.wait))
-
         return True, f"Retrieved {channel.input_name} {params['attribute']}"
 
+    @ocs_agent.param('attribute', type=str)
+    @ocs_agent.param('heater', default='2', type=str,
+                     choices=['1', '2', '3', '4'])
     def get_heater_attribute(self, session, params):
-        """Gets an arbitrary heater attribute and stores in the session.data dict.
-        Attribute must be the name of a method in the namespace of the Lakeshore336 Heater
-        class, with a leading "get_" removed (see example).
+        """get_heater_attribute(attribute=None,heater='2')
 
-        Parameters
-        ----------
-        params : dict
-            Contains parameters 'attribute' (not optional), 'heater' (optional, default '2'),
-            and 'wait' (optional, default 1).
+        **Task** - Gets an arbitrary heater attribute and stores it
+        in the session.data dict. Attribute must be the name of a method
+        in the namespace of the Lakeshore336 Heater class, with a leading
+        "get_" removed (see example).
+
+        Parameters:
+            attribute (str): The name of the channel attribute to get. See the
+                             Lakeshore 336 Heater class API for all options.
+            heater (str, optional): Default '2'. Selects the heater for which
+                                    to get the heater attribute. Must be one of
+                                    '1','2','3','4'.
 
         Examples
         --------
         >>> ls.get_heater_attribute(attribute = 'heater_range').session['data']
         {'heater_range': 'off'}
         """
-        with self.lock.acquire_timeout(job=f"get_{params['attribute']}", timeout=3) as acquired:
+        with self._lock.acquire_timeout(job=f"get_{params['attribute']}",
+                                        timeout=3) as acquired:
             if not acquired:
                 print(
-                    f"Lock could not be acquired because it is held by {self.lock.job}")
+                    f"Lock could not be acquired because it is held by "
+                    f"{self._lock.job}")
                 return False, 'Could not acquire lock'
 
             session.set_status('running')
@@ -783,21 +1053,20 @@ class LS336_Agent:
             heater = self.module.heaters[heater_key]
 
             # check that attribute is a valid heater method
-            if getattr(heater, f"get_{params['attribute']}", False) is not False:
+            if getattr(heater, f"get_{params['attribute']}",
+                       False) is not False:
                 query = getattr(heater, f"get_{params['attribute']}")
 
             # get attribute
             resp = query()
             session.data[params['attribute']] = resp
 
-            time.sleep(params.get('wait', self.wait))
-
         return True, f"Retrieved {heater.output_name} {params['attribute']}"
 
 
 def make_parser(parser=None):
-    """Build the argument parser for the Agent. Allows sphinx to automatically
-    build documentation based on this function.
+    """Build the argument parser for the Agent. Allows sphinx to
+    automatically build documentation based on this function.
     """
     if parser is None:
         parser = argparse.ArgumentParser()
@@ -809,12 +1078,12 @@ def make_parser(parser=None):
                         help="IP address for the lakeshore")
     pgroup.add_argument('--f-sample', type=float, default=0.1,
                         help='The frequency of data acquisition')
-    pgroup.add_argument('--wait', type=float, default=1.0,
-                        help='The wait time after most operations')
     pgroup.add_argument('--threshold', type=float, default=0.1,
-                        help='The upper bound on temperature differences for stability check')
-    pgroup.add_argument('--window', type=float, default=600.,
-                        help='The lookback time on temperature differences for stability check')
+                        help='The upper bound on temperature differences '
+                             'for stability check')
+    pgroup.add_argument('--window', type=float, default=900.,
+                        help='The lookback time on temperature differences '
+                             'for stability check')
     pgroup.add_argument('--auto-acquire', type=bool, default=True,
                         help='Automatically start data acquisition on startup')
     return parser
@@ -832,18 +1101,19 @@ if __name__ == '__main__':
     if args.auto_acquire:
         init_params = {'auto_acquire': True}
 
-    print('I am in charge of device with serial number: %s' % args.serial_number)
+    print('I am in charge of device with serial '
+          'number: %s' % args.serial_number)
 
     # Create a session and a runner which communicate over WAMP
     agent, runner = ocs_agent.init_site_agent(args)
 
     # Pass the new agent session to the agent class
-    lake_agent = LS336_Agent(agent, args.serial_number, args.ip_address, args.f_sample,
-                             args.wait, args.threshold, args.window)
+    lake_agent = LS336_Agent(agent, args.serial_number, args.ip_address,
+                             args.f_sample, args.threshold, args.window)
 
     # Register tasks (name, agent_function)
     agent.register_task(
-        'init_lakeshore', lake_agent.init_lakeshore_task, startup=init_params)
+        'init_lakeshore', lake_agent.init_lakeshore, startup=init_params)
     agent.register_task('set_heater_range', lake_agent.set_heater_range)
     agent.register_task('set_heater_resistance',
                         lake_agent.set_heater_resistance)
@@ -864,7 +1134,7 @@ if __name__ == '__main__':
                         lake_agent.get_heater_attribute)
 
     # Register processes (name, agent_start_function, agent_end_function)
-    agent.register_process('acq', lake_agent.start_acq, lake_agent.stop_acq)
+    agent.register_process('acq', lake_agent.acq, lake_agent.stop_acq)
 
     # Run the agent
     runner.run(agent, auto_reconnect=True)

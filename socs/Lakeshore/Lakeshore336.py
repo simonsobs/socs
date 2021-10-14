@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-# contributors: zatkins, bkoopman, sbhimani
+# contributors: zatkins, bkoopman, sbhimani, zhuber
 
 import math
 import numpy as np
@@ -95,8 +95,9 @@ class LS336:
     """
     Implements a lakeshore 336 box to interface with client scripts.
     Only contains locally relevant information; namely, port parameters.
-    The state of the device is not stored locally to avoid the potential for inconsistent information.
-    Device status can always be accessed (accurately) through a msg.    
+    The state of the device is not stored locally to avoid the potential
+    for inconsistent information.
+    Device status can always be accessed (accurately) through a msg.
     """
     # Constructor and instance variables
 
@@ -121,13 +122,14 @@ class LS336:
 
     # Instance methods
 
-    # copied from Lakeshore372 driver on 2020/12/09, modified end-of-method sleep to 0.1s in all cases
+    # copied from Lakeshore372 driver on 2020/12/09,
+    # modified end-of-method sleep to 0.1s in all cases
     def msg(self, message):
         """Send message to the Lakeshore 336 over ethernet.
 
         If we're asking for something from the Lakeshore (indicated by a ? in
-        the message string), then we will attempt to ask twice before giving up
-        due to potential communication timeouts.
+        the message string), then we will attempt to ask twice before giving
+        up due to potential communication timeouts.
 
         Parameters
         ----------
@@ -144,23 +146,25 @@ class LS336:
 
         if '?' in message:
             self.com.send(msg_str)
-            # Try once, if we timeout, try again. Usually gets around single event glitches.
+            # Try once, if we timeout, try again.
+            # Usually gets around single event glitches.
             for attempt in range(2):
                 try:
                     time.sleep(0.061)
                     resp = str(self.com.recv(4096), 'utf-8').strip()
                     break
                 except socket.timeout:
-                    print("Warning: Caught timeout waiting for response to '%s', trying again "
-                          "before giving up" % message)
+                    print("Warning: Caught timeout waiting for response "
+                          "to '%s', trying again before giving up" % message)
                     if attempt == 1:
-                        raise RuntimeError('Query response to Lakeshore timed out after two '
-                                           'attempts. Check connection.')
+                        raise RuntimeError('Query response to Lakeshore timed '
+                                           'out after two attempts. '
+                                           'Check connection.')
         else:
             self.com.send(msg_str)
             resp = ''
 
-        # No comms for 100ms after sending message (manual says50ms)
+        # No comms for 100ms after sending message (manual says 50ms)
         time.sleep(0.1)
         return resp
 
@@ -169,8 +173,8 @@ class LS336:
         return self.msg('*IDN?')
 
     def get_kelvin(self, inp):
-        """Return a temperature reading of the specified input ('A', 'B', 'C', or 'D')
-        or '0' for all inputs
+        """Return a temperature reading of the specified input
+        ('A', 'B', 'C', or 'D') or '0' for all inputs
 
         Parameters
         ----------
@@ -180,7 +184,8 @@ class LS336:
         Returns
         -------
         array or float
-            array of four floats if input is '0', float otherwise of temperature reading
+            array of four floats if input is '0', float otherwise of
+            temperature reading
 
         Raises
         ------
@@ -199,8 +204,8 @@ class LS336:
             return float(resp)
 
     def get_sensor(self, inp):
-        """Return a sensor reading of the specified input ('A', 'B', 'C', or 'D')
-        or '0' for all inputs
+        """Return a sensor reading of the specified input
+        ('A', 'B', 'C', or 'D') or '0' for all inputs
 
         Parameters
         ----------
@@ -210,7 +215,8 @@ class LS336:
         Returns
         -------
         array or float
-            array of four floats if input is '0', float otherwise of sensor reading
+            array of four floats if input is '0',
+            float otherwise of sensor reading
 
         Raises
         ------
@@ -265,7 +271,7 @@ class Channel:
 
     def get_input_type(self):
         """Return sensor metadata, <sensor type>, <autorange>, <range>,
-        <compensation>, and <units>. For diodes, only sensor type and 
+        <compensation>, and <units>. For diodes, only sensor type and
         units are relevant.
 
         Returns
@@ -285,7 +291,7 @@ class Channel:
 
     def _set_input_type(self, params):
         """Assign sensor metadata, <sensor type>, <autorange>, <range>,
-        <compensation>, and <units>. For diodes, only sensor type and 
+        <compensation>, and <units>. For diodes, only sensor type and
         units are relevant.
 
         Parameters
@@ -360,7 +366,8 @@ class Channel:
         Parameters
         ----------
         name : str
-            The channel name for display purposes. Only send the first 15 characters
+            The channel name for display purposes. Only send the first 15
+            characters
         """
         name = name[:15]
         self.input_name = name
@@ -382,15 +389,15 @@ class Channel:
         return resp
 
     def get_T_limit(self):
-        """Return the temperature limit above which control outputs assigned this channel
-        shut off"""
+        """Return the temperature limit above which control outputs assigned
+        this channel shut off"""
         resp = self.ls.msg(f'TLIMIT? {self.input}')
         self.T_limit = float(resp)
         return self.T_limit
 
     def set_T_limit(self, limit):
-        """Set the temperature limit above which control outputs assigned this channel
-        shut off"""
+        """Set the temperature limit above which control outputs assigned
+        this channel shut off"""
         self.T_limit = limit
         resp = self.ls.msg(f'TLIMIT {self.input},{self.T_limit}')
         return resp
@@ -432,14 +439,19 @@ class Curve:
 
     def _set_header(self, params):
         """Set the Curve Header with the CRVHDR command.
+
         Parameters should be <name>, <SN>, <format>, <limit value>,
         <coefficient>. We will determine <curve> from attributes. This
         allows us to use output from get_header directly, as it doesn't return
         the curve number.
-        <name> is limited to 15 characters. Longer names take the fist 15 characters
+
+        <name> is limited to 15 characters. Longer names take the first
+               15 characters
         <sn> is limited to 10 characters. Longer sn's take the last 10 digits
+
         :param params: CRVHDR parameters
         :type params: list of str
+
         :returns: response from ls.msg
         """
         assert len(params) == 5
@@ -454,7 +466,8 @@ class Curve:
         assert _coeff.strip() in ['1', '2']
 
         print(f'CRVHDR {_curve_num},{_name},{_sn},{_format},{_limit},{_coeff}')
-        return self.ls.msg(f'CRVHDR {_curve_num},{_name},{_sn},{_format},{_limit},{_coeff}')
+        return self.ls.msg(f'CRVHDR {_curve_num},{_name},{_sn},'
+                           f'{_format},{_limit},{_coeff}')
 
     def get_name(self):
         """Get the curve name with the CRVHDR? command.
@@ -466,7 +479,8 @@ class Curve:
 
     def set_name(self, name):
         """Set the curve name with the CRVHDR command.
-        :param name: The curve name, limit of 15 characters, longer names get truncated
+        :param name: The curve name, limit of 15 characters,
+                     longer names get truncated
         :type name: str
         :returns: the response from the CRVHDR command
         :rtype: str
@@ -554,7 +568,8 @@ class Curve:
 
     def set_coefficient(self, coefficient):
         """Set the curve temperature coefficient with the CRVHDR command.
-        :param coefficient: The curve temperature coefficient, either 'positive' or 'negative'
+        :param coefficient: The curve temperature coefficient,
+                            either 'positive' or 'negative'
         :type limit: str
         :returns: the response from the CRVHDR command
         :rtype: str
@@ -574,7 +589,8 @@ class Curve:
         numpy structured array.
         :param index: index of breakpoint to msg
         :type index: int
-        :returns: (units, tempertaure, curvature) values for the given breakpoint
+        :returns: (units, tempertaure, curvature) values for the given
+                  breakpoint
         :rtype: 3-tuple of floats
         """
         resp = self.ls.msg(f"CRVPT? {self.curve_num},{index}").split(',')
@@ -623,8 +639,9 @@ class Curve:
                         format_lock[self.format] + f'\t({self.format})\r\n')
                 f.write('SetPoint Limit:\t%s\t(Kelvin)\r\n' % '%0.4f' %
                         np.max(self.breakpoints['temperature']))
-                f.write('Temperature coefficient:\t' +
-                        tempco_lock[self.coefficient] + f' ({self.coefficient})\r\n')
+                f.write('Temperature coefficient:\t'
+                        + tempco_lock[self.coefficient]
+                        + f' ({self.coefficient})\r\n')
                 f.write('Number of Breakpoints:\t%s\r\n' %
                         len(self.breakpoints))
                 f.write('\r\n')
@@ -632,7 +649,8 @@ class Curve:
                 f.write('\r\n')
                 for idx, point in enumerate(self.breakpoints):
                     f.write('%s\t%s %s\r\n' % (idx+1, '%0.5f' %
-                                               point['units'], '%0.4f' % point['temperature']))
+                                               point['units'],
+                                               '%0.4f' % point['temperature']))
 
         return self.breakpoints
 
@@ -654,12 +672,14 @@ class Curve:
                 header.append(content[i].strip().split(":", 1)[
                               1].strip().split("(", 1)[0].strip())
 
-        # Skip to the V and T values in the file and strip them of tabs, newlines, etc
+        # Skip to the V and T values in the file and strip them of tabs,
+        # newlines, etc
         values = []
         for i in range(9, len(content)):
             values.append(content[i].strip().split())
 
-        self.delete_curve()  # remove old curve first, so old breakpoints don't remain
+        self.delete_curve()
+        # remove old curve first, so old breakpoints don't remain
         time.sleep(1)  # necessary to make work
 
         self._set_header(header[:-1])  # ignore num of breakpoints
@@ -730,7 +750,8 @@ class Curve:
         points_str = ','.join(points)
 
         resp = self.ls.msg(
-            f'SCAL {std},{self.curve_num},{self.serial_number},{points_str}', delay=delay)
+            f'SCAL {std},{self.curve_num},{self.serial_number},{points_str}',
+            delay=delay)
         self.get_header()
         return resp
 
@@ -740,7 +761,8 @@ class Curve:
         string += "-" * 50 + "\n"
         string += "  %-30s\t%r\n" % ("Serial Number:", self.serial_number)
         string += "  %-30s\t%s (%s)\n" % ("Format :",
-                                          format_lock[self.format], self.format)
+                                          format_lock[self.format],
+                                          self.format)
         string += "  %-30s\t%s\n" % ("Temperature Limit:", self.limit)
         string += "  %-30s\t%s\n" % ("Temperature Coefficient:",
                                      self.coefficient)
@@ -773,7 +795,8 @@ class Heater:
 
     def get_output_mode(self):
         """msg the heater mode using the OUTMODE? command.
-        :returns: 3-tuple with output mode, input, and whether powerup is enabled
+        :returns: 3-tuple with output mode, input, and whether powerup
+                  is enabled
         :rtype: tuple
         """
         resp = self.ls.msg(f"OUTMODE? {self.output}").split(",")
@@ -788,7 +811,7 @@ class Heater:
     def _set_output_mode(self, params):
         """Set the output mode of the heater with the OUTMODE command.
         Parameters should be <mode>, <input>, and <powerup enable>.
-        This allows us to use output from get_output_mode directly, as 
+        This allows us to use output from get_output_mode directly, as
         it doesn't return <output>.
         :param params: OUTMODE parameters
         :type params: list of str
@@ -869,7 +892,8 @@ class Heater:
 
     def get_heater_setup(self):
         """Gets Heater setup params with the HTRSET? command.
-        :return resp: List of values that have been returned from the Lakeshore.
+        :return resp: List of values that have been returned from the
+        Lakeshore.
         """
         resp = self.ls.msg("HTRSET? {}".format(self.output)).split(',')
 
@@ -884,12 +908,13 @@ class Heater:
         """
         Sets the heater setup using the HTRSET command.
         Params must be a list with the parameters:
-            <heater resistance mode>:    Heater mode in Ohms; 1=25 Ohms, 2=50 Ohms
+            <heater resistance mode>:    Heater mode in Ohms; 1=25 Ohms,
+                                         2=50 Ohms
             <max current>: Specifies max heater output for warm-up heater.
                            0=User spec, 1=0.707 A, 2=1 A, 3=1.141 A, 4=2 A.
             <max user current>: Max heater output if max_current is set to user
-            <current/power>:    Specifies if heater display is current or power.
-                                1=current, 2=power.
+            <current/power>:    Specifies if heater display is current or
+                                power. 1=current, 2=power.
         :param params:
         :return:
         """
@@ -902,13 +927,15 @@ class Heater:
         return self.ls.msg("HTRSET {}".format(param_str))
 
     def get_heater_resistance_setting(self):
-        """Get the "setting" of the heater resistance, which can only be 25 or 50 Ohms
+        """Get the "setting" of the heater resistance, which can only be
+        25 or 50 Ohms
         """
         self.get_heater_setup()
         return self.resistance_setting
 
     def set_heater_resistance(self, res):
-        """Sets the correct heater setting depending on the actual load resistance
+        """Sets the correct heater setting depending on the actual
+        load resistance
 
         Parameters
         ----------
@@ -969,8 +996,9 @@ class Heater:
         return self.display
 
     def set_heater_display(self, display):
-        """Change the display of the heater 
-        :param display: Display mode for heater. Can either be 'current' or 'power'.
+        """Change the display of the heater
+        :param display: Display mode for heater. Can either be 'current'
+        or 'power'.
         :type display: string
         """
         assert display.lower() in heater_display_lock.keys(
@@ -982,7 +1010,8 @@ class Heater:
         return self._set_heater_setup(resp)
 
     def get_manual_out(self):
-        """Return the % of full current or power depending on heater display, if set by MOUT
+        """Return the % of full current or power depending on heater display,
+        if set by MOUT
 
         Returns
         -------
@@ -993,7 +1022,8 @@ class Heater:
         return float(resp)
 
     def set_manual_out(self, percent):
-        """Set the % of full current or power depending on heater display, with MOUT
+        """Set the % of full current or power depending on heater display,
+        with MOUT
 
         Parameters
         ----------
@@ -1002,7 +1032,8 @@ class Heater:
         """
         assert 100 * \
             percent == int(
-                100*percent), "Percent value cannot have more than 2 decimal places"
+                100*percent), ("Percent value cannot have more than 2 "
+                               "decimal places")
 
         resp = self.ls.msg(f'MOUT {self.output},{percent}')
         return resp
@@ -1035,7 +1066,7 @@ class Heater:
         return self.setpoint
 
     def set_setpoint(self, value):
-        """Set the setpoint of the control loop in sensor units 
+        """Set the setpoint of the control loop in sensor units
 
         Parameters
         ----------
