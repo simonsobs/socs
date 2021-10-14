@@ -55,9 +55,9 @@ An example configuration is::
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
     command:
-      - "instance-id=LSA2833"
-      - "site-hub=ws://127.0.0.1:8001/ws"
-      - "site-http=http://127.0.0.1:8001/call"
+      - "--instance-id=LSA2833"
+      - "--site-hub=ws://127.0.0.1:8001/ws"
+      - "--site-http=http://127.0.0.1:8001/call"
 
 .. note::
     Since the 336 Agent container needs ``network_mode: "host"``, it must be
