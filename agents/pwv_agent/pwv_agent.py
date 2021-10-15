@@ -43,28 +43,22 @@ class PWV_Agent:
         self.lock = TimeoutLock()
         self.job = None
 
-        agg_params = {'frame_length': 60}
+        agg_params = {'frame_length': 60,
+                      'exclude_influx': False}
 
         # register the feed
         self.agent.register_feed('pwvs',
-                                record=True,
-                                agg_params=agg_params,
-                                buffer_time=1)
+                                 record=True,
+                                 agg_params=agg_params,
+                                 buffer_time=1
+                                 )
 
         self.last_published_reading = None
 
-    def read_data_from_textfile(self, filename, year):
-        """
-        Read data from textfile as it gathers pwv's and convert from Julian Day to unix timestamp.
-
-        Args:
-            filename (str): name of PWV text file
-            year (int): year for the corresponding Julian Day
-        """
-        # TODO: because never using this method for anything else, might as well put it in start_acq
-        with open(self.filename, 'r') as f:
+    def read_data_from_textfile(self, _f, year):
+        with open(_f, 'r') as f:
             i = 0
-            for l in f.readlines(): 
+            for l in f.readlines():
                 if i == 0:
                     pass  # skip header
                 else:
@@ -76,7 +70,7 @@ class PWV_Agent:
                     _data = (data, timestamp)
 
                 i += 1
-        return _data
+            return _data
 
     def start_acq(self, filename, year):
         """
@@ -89,21 +83,21 @@ class PWV_Agent:
         """
         while True:
             last_pwv, last_timestamp = self.read_data_from_textfile(self.filename, self.year)
+
             pwvs = {'block_name': 'pwvs',
                     'timestamp': last_timestamp,
                     'data': {'pwv': last_pwv}
                     }
 
             if self.last_published_reading is not None:
-                print('if not None, last reading:', self.last_published_reading)
                 if last_timestamp > self.last_published_reading[0]:
                     self.agent.publish_to_feed('pwvs', pwvs)
-                    self.last_published_reading = (last_timestamp, last_pwv)
-                    #print('if pwvs:', pwvs)
+                    self.last_published_reading = (last_pwv, last_timestamp)
+                    print('if pwvs', pwvs)
             else:
                 self.agent.publish_to_feed('pwvs', pwvs)
-                self.last_published_reading = (last_timestamp, last_pwv)
-                #print('else pwvs:,', pwvs)
+                self.last_published_reading = (last_pwv, last_timestamp)
+                print('else pwvs', pwvs)
 
     def stop_acq(self):
         ok = False
