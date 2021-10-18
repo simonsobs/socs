@@ -31,8 +31,8 @@ def julian_day_year_to_unixtime(day, year):
     return unixtime
 
 
-def read_data_from_textfile(_f, year):
-    with open(_f, 'r') as f:
+def read_data_from_textfile(filename, year):
+    with open(filename, 'r') as f:
         i = 0
         for l in f.readlines():
             if i == 0:
