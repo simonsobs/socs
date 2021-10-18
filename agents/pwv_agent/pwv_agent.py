@@ -17,19 +17,36 @@ txaio.use_twisted()
 LOG = txaio.make_logger()
 
 
-class pwv_loader:
-    def julian_day_year_to_unixtime(day, year):
-        """
-        Convert water vapor radiometer's output Julian Day to unix timestamp.
+def julian_day_year_to_unixtime(day, year):
+    """
+    Convert water vapor radiometer's output Julian Day to unix timestamp.
 
-        Args:
-            day (float): day of the year
-            year (int):  year for the corresponding Julian Day
-        """
-        a = datetime.datetime(year, 1, 1) + datetime.timedelta(day-1)
-        unixtime = time.mktime(a.timetuple())
+    Args:
+        day (float): day of the year
+        year (int):  year for the corresponding Julian Day
+    """
+    a = datetime.datetime(year, 1, 1) + datetime.timedelta(day-1)
+    unixtime = time.mktime(a.timetuple())
 
-        return unixtime
+    return unixtime
+
+
+def read_data_from_textfile(self, _f, year):
+    with open(_f, 'r') as f:
+        i = 0
+        for l in f.readlines():
+            if i == 0:
+                pass  # skip header
+            else:
+                line = l.strip().split()
+                timestamp = julian_day_year_to_unixtime(float(line[0]), self.year)
+
+                pwv = float(line[1])
+
+                _data = (pwv, timestamp)
+
+            i += 1
+        return _data
 
 
 class PWV_Agent:
@@ -55,23 +72,6 @@ class PWV_Agent:
 
         self.last_published_reading = None
 
-    def read_data_from_textfile(self, _f, year):
-        with open(_f, 'r') as f:
-            i = 0
-            for l in f.readlines():
-                if i == 0:
-                    pass  # skip header
-                else:
-                    line = l.strip().split()
-                    timestamp = pwv_loader.julian_day_year_to_unixtime(float(line[0]), self.year)
-
-                    data = float(line[1])
-
-                    _data = (data, timestamp)
-
-                i += 1
-            return _data
-
     def start_acq(self, filename, year):
         """
         PROCESS: Acquire data and write to feed
@@ -93,11 +93,9 @@ class PWV_Agent:
                 if last_timestamp > self.last_published_reading[0]:
                     self.agent.publish_to_feed('pwvs', pwvs)
                     self.last_published_reading = (last_pwv, last_timestamp)
-                    print('if pwvs', pwvs)
             else:
                 self.agent.publish_to_feed('pwvs', pwvs)
                 self.last_published_reading = (last_pwv, last_timestamp)
-                print('else pwvs', pwvs)
 
     def stop_acq(self):
         ok = False
