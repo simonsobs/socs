@@ -31,7 +31,7 @@ def julian_day_year_to_unixtime(day, year):
     return unixtime
 
 
-def read_data_from_textfile(self, _f, year):
+def read_data_from_textfile(_f, year):
     with open(_f, 'r') as f:
         i = 0
         for l in f.readlines():
@@ -39,7 +39,7 @@ def read_data_from_textfile(self, _f, year):
                 pass  # skip header
             else:
                 line = l.strip().split()
-                timestamp = julian_day_year_to_unixtime(float(line[0]), self.year)
+                timestamp = julian_day_year_to_unixtime(float(line[0]), year)
 
                 pwv = float(line[1])
 
@@ -82,7 +82,7 @@ class PWV_Agent:
 
         """
         while True:
-            last_pwv, last_timestamp = self.read_data_from_textfile(self.filename, self.year)
+            last_pwv, last_timestamp = read_data_from_textfile(self.filename, self.year)
 
             pwvs = {'block_name': 'pwvs',
                     'timestamp': last_timestamp,
