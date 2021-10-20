@@ -111,8 +111,6 @@ class ACUAgent:
                      'scanspec': {},
                      }
 
-        self.health_check = {'broadcast': False, 'status': False}
-
         self.agent = agent
 
         self.take_data = False
@@ -149,7 +147,8 @@ class ACUAgent:
                              } 
         self.agent.register_feed('acu_status_summary',
                                  record=True,
-                                 agg_params=basic_agg_params,
+                              #   agg_params=basic_agg_params,
+                                 agg_params=fullstatus_agg_params,
                                  buffer_time=1)
         self.agent.register_feed('acu_status_axis_faults',
                                   record=True,
@@ -206,10 +205,6 @@ class ACUAgent:
         self.agent.register_feed('acu_broadcast_influx',
                                  record=True,
                                  agg_params=influx_agg_params,
-                                 buffer_time=1)
-        self.agent.register_feed('acu_health_check',
-                                 record=True,
-                                 agg_params=basic_agg_params,
                                  buffer_time=1)
         self.agent.register_feed('acu_upload',
                                  record=True,
@@ -298,8 +293,6 @@ class ACUAgent:
     #
 
     @inlineCallbacks
-    def health_check(self, session, params=None):
-        pass
 
     @inlineCallbacks
     def start_monitor(self, session, params=None):
@@ -319,35 +312,44 @@ class ACUAgent:
 
         session.set_status('running')
 
-        report_t = time.time()
-        report_period = 10
-        n_ok = 0
-        min_query_period = 0.05   # Seconds
-        query_t = 0
         mode_key = {'Stop': 0,
                     'Preset': 1,
                     'ProgramTrack': 2,
                     'Stow': 3,
                     'SurvivalMode': 4,
                     }
-        tfn_key = {'None': 0.0,
+        tfn_key = {'None': float('nan'),
                    'False': 0,
                    'True': 1,
                    }
+        report_t = time.time()
+        report_period = 20
+        n_ok = 0
+        min_query_period = 0.05   # Seconds
+        query_t = 0
+#        mode_key = {'Stop': 0,
+#                    'Preset': 1,
+#                    'ProgramTrack': 2,
+#                    'Stow': 3,
+#                    'SurvivalMode': 4,
+#                    }
+#        tfn_key = {'None': float('nan'),
+#                   'False': 0,
+#                   'True': 1,
+#                   }
         while self.jobs['monitor'] == 'run':
             now = time.time()
 
             if now > report_t + report_period:
                 self.log.info('Responses ok at %.3f Hz'
                               % (n_ok / (now - report_t)))
-                self.health_check['status'] = True
                 report_t = now
                 n_ok = 0
 
             if now - query_t < min_query_period:
-                yield dsleep(now - query_t)
+                yield dsleep(-(now - query_t-min_query_period))
 
-            query_t = now
+            query_t = time.time()
             try:
                 j = yield self.acu.http.Values(self.acu8100)
                 n_ok += 1
@@ -355,7 +357,7 @@ class ACUAgent:
             except Exception as e:
                 # Need more error handling here...
                 errormsg = {'aculib_error_message': str(e)}
-                self.log.error(errormsg)
+                self.log.error(str(e))
                 acu_error = {'timestamp': time.time(),
                              'block_name': 'ACU_error',
                              'data': errormsg
@@ -367,11 +369,11 @@ class ACUAgent:
                 for category in self.monitor_fields:
                     if key in self.monitor_fields[category]:
                         if type(value) == bool:
-                            self.data['status'][category][self.monitor_fields[category][key]] = str(value)
+                            self.data['status'][category][self.monitor_fields[category][key]] = int(value)
                         elif type(value) == int or type(value) == float:
                             self.data['status'][category][self.monitor_fields[category][key]] = value
                         elif value == None:
-                            self.data['status'][category][self.monitor_fields[category][key]] = 'None'
+                            self.data['status'][category][self.monitor_fields[category][key]] = float('nan')#'None'
                         else:
                             self.data['status'][category][self.monitor_fields[category][key]] = str(value)
             self.data['status']['summary']['ctime'] =\
@@ -384,10 +386,6 @@ class ACUAgent:
                 for statkey in self.data['status'][category].keys():
                     if type(self.data['status'][category][statkey]) == float:
                         influx_status[statkey + '_influx'] = self.data['status'][category][statkey]
-     #               elif type(self.data['status'][category][statkey]) == bool:
-     #                   influx_status[statkey + '_influx'] = tfn_key[str(self.data['status'][category][statkey])]
-     #               elif self.data['status'][category][statkey] == None:
-     #                   influx_status[statkey + '_influx'] = tfn_key[str(self.data['status'][category][statkey])]
                     elif type(self.data['status'][category][statkey]) == str:
                         if self.data['status'][category][statkey] in ['None', 'True', 'False']:
                             influx_status[statkey + '_influx'] = tfn_key[self.data['status'][category][statkey]]
@@ -470,7 +468,7 @@ class ACUAgent:
 #            influx_status={'fake_data':1.0}
             try:
                 self.agent.publish_to_feed('acu_status_influx', acustatus_influx, from_reactor=True)
-                print(acustatus_influx)
+          #      print(acustatus_influx)
             except:
 #                print(acustatus_influx)
                 print('failed')
@@ -506,7 +504,6 @@ class ACUAgent:
         handler = reactor.listenUDP(int(UDP_PORT), MonitorUDP())
         while self.jobs['broadcast'] == 'run':
             if udp_data:
-                self.health_check['broadcast'] = True
                 process_data = udp_data[:200]
                 udp_data = udp_data[200:]
                 year = datetime.datetime.now().year
@@ -766,7 +763,7 @@ class ACUAgent:
                                  'elflags': elflags
                                  }
         self.log.info('Scan from file specified')
-        return True, 'Scan from file specified'
+        yield True, 'Scan from file specified'
 
     @inlineCallbacks
     def spec_scan_linear_turnaround(self, session, params=None):
@@ -784,6 +781,7 @@ class ACUAgent:
                                  'azflags': azflags,
                                  'elflags': elflags
                                  }
+        print('SPECED')
         self.log.info('Scan linear turnaround scan specified')
         return True, 'Scan linear turnaround scan specified'
 
@@ -848,7 +846,7 @@ class ACUAgent:
         self.agent.publish_to_feed('acu_upload', acu_upload)
 
         # Follow the scan in ProgramTrack mode, then switch to Stop mode
-        all_lines = sh.write_lines(times, azs, els, vas, ves, azflags,
+        all_lines = sh.ptstack_format(times, azs, els, vas, ves, azflags,
                                        elflags)
   #      with open('/home/simons/code/vertex-acu-agent/test_clients/'+str(time.time())+'_test.pkl','wb') as f:
   #          pickle.dump(all_lines, f)
