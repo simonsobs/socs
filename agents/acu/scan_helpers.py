@@ -64,7 +64,7 @@ def linear_turnaround_scanpoints(azpts, el, azvel, acc, ntimes):
             new_az = np.linspace(azpts[0], azpts[1], num_dirpoints)
             new_va = np.zeros(num_dirpoints) + azvel
 
-        contimes.extend(time_for_section)
+        conctimes.extend(time_for_section)
         concaz.extend(new_az)
         concel.extend(el1)
         concva.extend(new_va)
@@ -117,7 +117,7 @@ def from_file(filename):
         return False
     return conctimes, concaz, concel, concva, concve, az_flags, el_flags
 
-def ptstack_format(conctimes, concaz, concel, concva, concve, az_flags, el_flags, generator=False):
+def ptstack_format(conctimes, concaz, concel, concva, concve, az_flags, el_flags, start_offset=10., generator=False):
     """
     Produces a list of lines in the format necessary to upload to the ACU to complete a scan. 
     Params are the outputs of from_file or linear_turnaround_scanpoints.
@@ -138,9 +138,9 @@ def ptstack_format(conctimes, concaz, concel, concva, concve, az_flags, el_flags
     """
     fmt = '%j, %H:%M:%S'
     if generator:
-        start_time = 10.
+        start_time = start_offset
     else:
-        start_time = time.time() + 10.
+        start_time = time.time() + start_offset
     true_times = [start_time + i for i in conctimes]
     fmt_times = [time.strftime(fmt, time.gmtime(t)) + ('{tt:.6f}'.format(tt=t%1.))[1:] for t in true_times]
 
@@ -171,11 +171,11 @@ def ptstack_format(conctimes, concaz, concel, concva, concve, az_flags, el_flags
 #    all_lines = [('%s;%.4f;%.4f;%.4f;%.4f;%i;%i\r\n' % (fmt_times[n], concaz[n], concel[n], concva[n], concve[n], az_flags[n], el_flags[n])) for n in range(len(fmt_times))]
 #    return all_lines
 
-def generate(stop_iter, az_endpoint1, az_endpoint2, az_speed, acc, el_endpoint1, el_endpoint2, el_speed):
+def generate_linear_turnaround(stop_iter, az_endpoint1, az_endpoint2, az_speed, acc, el_endpoint1, el_endpoint2, el_speed):
     """
     Python generator to produce times, azimuth and elevation positions, azimuth and elevation 
-    velocities, azimuth and elevation flags for arbitrarily long scans. For development, this 
-    is limited to constant-velocity azimuth scans.
+    velocities, azimuth and elevation flags for arbitrarily long constant-velocity azimuth 
+    scans.
 
     Params:
         stop_iter (int): maximum number of times the generator should produce new points.
