@@ -499,8 +499,137 @@ class LS372_Agent:
                 self.module.channels[params['channel']].set_excitation(params['value'])
                 session.add_message(f'Set channel {params["channel"]} excitation to {params["value"]}')
                 print(f'Set channel {params["channel"]} excitation to {params["value"]}')
+                session.data = {"excitation": params["value"]}
 
         return True, f'Set channel {params["channel"]} excitation to {params["value"]}'
+
+    def get_excitation(self, session, params):
+        """get_excitation(params)
+        Get the excitation voltage/current value of a specified channel.
+
+        :param params: dict with "channel" and "value" keys for Channel.get_excitation()
+        :type params: dict
+        """
+        with self._lock.acquire_timeout(job='get_excitation') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            session.set_status('running')
+
+            current_excitation = self.module.channels[params["channel"]].get_excitation()
+            print(current_excitation)
+            session.add_message(f'Channel {params["channel"]} excitation is {current_excitation}')
+            print(f'Channel {params["channel"]} excitation is {current_excitation}')
+            session.data = {"excitation": current_excitation}
+
+        return True, f'Set channel {params["channel"]} excitation is {current_excitation}'
+
+    def set_resistance_range(self, session, params):
+        """
+        Set the resistance range for a specified channel.
+        :param params: dict with "channel" and "resistance_range" keys for Channel.set_resistance_range()
+        :type params: dict
+
+	channel - The channel number (1-8 or 1-16 depending on scanner), Type is int.
+	resistance_range - range in ohms we want to measure. Doesn't need to be exactly one of the
+	options on the lakeshore, will select closest valid range, though note these are in increments
+	of 2, 6.32, 20, 63.2, etc. Type is float.
+        """
+        with self._lock.acquire_timeout(job='set_resistance_range') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            session.set_status('running')
+
+            current_resistance_range = self.module.channels[params['channel']].get_resistance_range()
+
+            if params['resistance_range'] == current_resistance_range:
+                print(f'Channel {params["channel"]} resistance_range already set to {params["resistance_range"]}')
+            else:
+                self.module.channels[params['channel']].set_resistance_range(params['resistance_range'])
+                session.add_message(f'Set channel {params["channel"]} resistance range to {params["resistance_range"]}')
+                print(f'Set channel {params["channel"]} resistance range to {params["resistance_range"]}')
+                session.data = {"resistance_range": params['resistance_range']}
+
+        return True, f'Set channel {params["channel"]} resistance range to {params["resistance_range"]}'
+
+    def get_resistance_range(self, session, params):
+        """
+        Get the resistance range for a specified channel.
+        :param params: dict with "channel" keys for Channel.get_resistance_range()
+        :type params: dict
+
+        channel - The channel number (1-8 or 1-16 depending on scanner), Type is int.
+        """
+        with self._lock.acquire_timeout(job='get_resistance_range') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            session.set_status('running')
+
+            current_resistance_range = self.module.channels[params['channel']].get_resistance_range()
+            session.add_message(f'Channel {params["channel"]} resistance range is {current_resistance_range}')
+            print(f'Channel {params["channel"]} resistance range is {current_resistance_range}')
+            session.data = {"resistance_range": current_resistance_range}
+
+        return True, f'Channel {params["channel"]} resistance range is {current_resistance_range}'
+
+
+    def set_dwell(self, session, params):
+        """
+        Set the autoscanning dwell time.
+
+        :param params: dict with "dwell" time for set_dwell() method in the Channel class
+        :type params: dict
+
+        dwell - Dwell time in seconds, type is int and must be in the rang 1-200 inclusive.
+        channel - The channel number (1-8 or 1-16 depending on scanner), Type is int.
+        """
+        with self._lock.acquire_timeout(job='set_dwell') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            session.set_status('running')
+
+            current_dwell = self.module.channels[params["channel"]].set_dwell(params["dwell"])
+            session.add_message(f'Set dwell to {params["dwell"]}')
+            print(f'Set dwell to {params["dwell"]}')
+
+
+        return True, f'Set channel {params["channel"]} dwell time to {params["dwell"]}'
+
+    def get_dwell(self, session, params):
+        """
+        Get the autoscanning dwell time.
+
+        :param params: dict with "dwell" time for get_dwell() method in the Channel class
+        :type params: dict
+
+        channel - The channel number (1-8 or 1-16 depending on scanner), Type is int.
+        """
+        with self._lock.acquire_timeout(job='set_dwell') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            session.set_status('running')
+
+            current_dwell = self.module.channels[params["channel"]].get_dwell()
+            session.add_message(f'Dwell time for channel {params["channel"]} is {current_dwell}')
+            print(f'Dwell time for channel {params["channel"]} is {current_dwell}')
+            session.data = {"dwell_time": current_dwell}
+
+
+        return True, f'Channel {params["channel"]} dwell time is {current_dwell}'
 
     @ocs_agent.param('P', type=int)
     @ocs_agent.param('I', type=int)
@@ -894,6 +1023,11 @@ if __name__ == '__main__':
     agent.register_task('set_heater_range', lake_agent.set_heater_range)
     agent.register_task('set_excitation_mode', lake_agent.set_excitation_mode)
     agent.register_task('set_excitation', lake_agent.set_excitation)
+    agent.register_task('get_excitation', lake_agent.get_excitation)
+    agent.register_task('set_resistance_range', lake_agent.set_resistance_range)
+    agent.register_task('get_resistance_range', lake_agent.get_resistance_range)
+    agent.register_task('set_dwell', lake_agent.set_dwell)
+    agent.register_task('get_dwell', lake_agent.get_dwell)
     agent.register_task('set_pid', lake_agent.set_pid)
     agent.register_task('set_autoscan', lake_agent.set_autoscan)
     agent.register_task('set_active_channel', lake_agent.set_active_channel)
