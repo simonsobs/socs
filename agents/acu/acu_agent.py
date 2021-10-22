@@ -228,12 +228,12 @@ class ACUAgent:
         agent.register_task('stop_and_clear',
                             self.stop_and_clear,
                             blocking=False)
-        agent.register_task('spec_scan_linear_turnaround',
-                            self.spec_scan_linear_turnaround,
-                            blocking=False)
-        agent.register_task('spec_scan_fromfile',
-                            self.spec_scan_fromfile,
-                            blocking=False)
+#        agent.register_task('spec_scan_linear_turnaround',
+#                            self.spec_scan_linear_turnaround,
+#                            blocking=False)
+#        agent.register_task('spec_scan_fromfile',
+#                            self.spec_scan_fromfile,
+#                            blocking=False)
         agent.register_task('find_az_stop_point',
                             self.find_az_stop_point,
                             blocking=False)
@@ -599,14 +599,13 @@ class ACUAgent:
             return ok, msg
         az = params.get('az')
         wait_for_motion = params.get('wait', 1)
-        current_az = round(self.data['broadcast']['Corrected_Azimuth'], 4)
-        current_el = round(self.data['broadcast']['Corrected_Elevation'], 4)
+        current_az = self.data['broadcast']['Corrected_Azimuth']
+        current_el = self.data['broadcast']['Corrected_Elevation']
 
         # Check whether the telescope is already at the point
         self.log.info('Checking current position')
-        if current_az == az:
-            self.log.info('Already positioned at %.2f'
-                          % (current_az))
+        if round(current_az-az, 4) == 0.0:
+            self.log.info('Already positioned at %.2f' % (current_az))
             self.set_job_done('control')
             return False, 'Could not find stop times.'
         # find az stop time
@@ -630,7 +629,7 @@ class ACUAgent:
                 last20az.append(current_az)
                 yield dsleep(0.005)
             else:
-                while round(current_az, 4) != az:
+                while round(current_az - az, 4) != 0.0:
                     yield dsleep(0.005)
                     mdata = self.data['status']['summary']
                     current_az = mdata['Azimuth_current_position']
@@ -647,7 +646,7 @@ class ACUAgent:
         yield self.acu.stop()
         determine_stop = motion_end - reached_az
         self.stop_times['az'] = determine_stop
-        print('az_stop: ' + str(determine_stop))
+        self.log.info('az_stop: ' + str(determine_stop))
         self.set_job_done('control')
         return True, 'Azimuth stop time determined.'
 
@@ -658,17 +657,16 @@ class ACUAgent:
             return ok, msg
         el = params.get('el')
         wait_for_motion = params.get('wait', 1)
-        current_az = round(self.data['broadcast']['Corrected_Azimuth'], 4)
-        current_el = round(self.data['broadcast']['Corrected_Elevation'], 4)
+        current_az = self.data['broadcast']['Corrected_Azimuth']
+        current_el = self.data['broadcast']['Corrected_Elevation']
 
         # Check whether the telescope is already at the point
         self.log.info('Checking current position')
-        if current_el == el:
-            self.log.info('Already positioned at %.2f'
-                          % (current_el))
+        if round(current_el-el, 4) == 0.0:
+            self.log.info('Already positioned at %.2f' % (current_el))
             self.set_job_done('control')
             return False, 'Could not find stop time.'
-        # find az stop time
+        # find el stop time
         yield self.acu.stop()
         self.log.info('Stopped')
         yield dsleep(0.1)
@@ -689,7 +687,7 @@ class ACUAgent:
                 last20el.append(current_el)
                 yield dsleep(0.005)
             else:
-                while round(current_el, 4) != el:
+                while round(current_el-el, 4) != 0.0:
                     yield dsleep(0.005)
                     mdata = self.data['status']['summary']
                     current_el = mdata['Elevation_current_position']
@@ -797,7 +795,7 @@ class ACUAgent:
                       'block_name': 'ACU_upload',
                       'data': self.data['uploads']
                       }
-        self.agent.publish_to_feed('acu_upload', acu_upload)
+        self.agent.publish_to_feed('acu_upload', acu_upload, from_reactor=True)
         self.set_job_done('control')
         return True, 'Pointing completed'
 
@@ -887,13 +885,14 @@ class ACUAgent:
         self.log.info('Scan from file specified')
         yield True, 'Scan from file specified'
 
-    @inlineCallbacks
-    def spec_scan_linear_turnaround(self, session, params=None):
-        azpts = params.get('azpts')
-        el = params.get('el')
-        azvel = params.get('azvel')
-        acc = params.get('acc')
-        ntimes = params.get('ntimes')
+    def _spec_scan_linear_turnaround(self, passparams):
+        print('params received')
+        print(passparams)
+        azpts = passparams['azpts']
+        el = passparams['el']
+        azvel = passparams['azvel']
+        acc = passparams['acc']
+        ntimes = passparams['ntimes']
         times, azs, els, vas, ves, azflags, elflags = sh.linear_turnaround_scanpoints(azpts, el, azvel, acc, ntimes)
         self.data['scanspec'] = {'times': times,
                                  'azs': azs,
@@ -919,24 +918,6 @@ class ACUAgent:
             scantype (str): the type of scan information you are uploading.
                             Options are 'from_file', 'linear_1dir', or
                             'linear_turnaround'.
-        Optional params:
-            filename (str): full path to desired numpy file. File contains an
-                            array of three lists ([list(times), list(azimuths),
-                            list(elevations)]). Times begin from 0.0. Applies
-                            to scantype 'from_file'.
-            azpts (tuple): spatial endpoints of the azimuth scan. Applies to
-                           scantype 'linear_1dir' (2 values) and
-                           'linear_turnaround' (3 values).
-            el (float): elevation for a linear velocity azimuth scan. Applies
-                        to scantype 'linear_1dir' and 'linear_turnaround'.
-            azvel (float): velocity of the azimuth axis in a linear velocity
-                           azimuth scan. Applies to scantype 'linear_1dir' and
-                           'linear_turnaround'.
-            acc (float): acceleration of the turnaround for a linear velocity
-                         scan with a turnaround. Applies to scantype
-                         'linear_turnaround'.
-            ntimes (int): number of times the platform traverses between
-                          azimuth endpoints for a 'linear_turnaround' scan.
         """
         ok, msg = self.try_set_job('control')
         if not ok:
@@ -946,6 +927,14 @@ class ACUAgent:
         # Move to the starting position for the scan and then switch to Stop
         # mode
         scantype = params.get('scantype')
+        scantype_params = {'linear_turnaround': ['azpts', 'el', 'azvel', 'acc', 'ntimes'],
+                           'fromfile': ['filename'],
+                           }
+        passparams = {}
+        for pname in scantype_params[scantype]:
+            pvals = params.get(pname)
+            passparams[pname] = pvals
+        self._spec_scan_linear_turnaround(passparams)
         times = self.data['scanspec']['times']
         azs = self.data['scanspec']['azs']
         els = self.data['scanspec']['els']
@@ -980,6 +969,7 @@ class ACUAgent:
         group_size = 120
         while len(all_lines):
             upload_lines = all_lines[:group_size]
+            all_lines = all_lines[group_size:]
             upload_vals = {'azs': azs[:group_size],
                            'els': els[:group_size],
                            'vas': vas[:group_size],
@@ -1000,12 +990,12 @@ class ACUAgent:
                               'block_name': 'ACU_upload',
                               'data': self.data['uploads']
                               }
-                print(acu_upload)
+      #          print(acu_upload)
  #               print(self.data['uploads']['PtStack_Time'])
  #               print(time.time())
-                self.agent.publish_to_feed('acu_upload', acu_upload)
+                self.agent.publish_to_feed('acu_upload', acu_upload, from_reactor=True)
             text = ''.join(upload_lines)
-            all_lines = all_lines[group_size:]
+#            all_lines = all_lines[group_size:]
             free_positions = self.data['status']['summary']\
                 ['Free_upload_positions']
             while free_positions < 9899:
