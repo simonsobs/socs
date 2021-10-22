@@ -144,7 +144,11 @@ class ACUAgent:
         influx_agg_params = {'frame_length': 60,
                              'exclude_influx': False,
                              'exclude_aggregator': True
-                             } 
+                             }
+        self.stop_times = {'az': float('nan'),
+                           'el': float('nan'),
+                           'bs': float('nan'),
+                           } 
         self.agent.register_feed('acu_status_summary',
                                  record=True,
                               #   agg_params=basic_agg_params,
@@ -230,6 +234,12 @@ class ACUAgent:
         agent.register_task('spec_scan_fromfile',
                             self.spec_scan_fromfile,
                             blocking=False)
+        agent.register_task('find_az_stop_point',
+                            self.find_az_stop_point,
+                            blocking=False)
+        agent.register_task('find_el_stop_point',
+                            self.find_el_stop_point,
+                            blocking=False)
 
     # Operation management.  This agent has several Processes that
     # must be able to alone or simultaneously.  The state of each is
@@ -293,8 +303,6 @@ class ACUAgent:
     #
 
     @inlineCallbacks
-
-    @inlineCallbacks
     def start_monitor(self, session, params=None):
         """PROCESS "monitor".
 
@@ -327,16 +335,6 @@ class ACUAgent:
         n_ok = 0
         min_query_period = 0.05   # Seconds
         query_t = 0
-#        mode_key = {'Stop': 0,
-#                    'Preset': 1,
-#                    'ProgramTrack': 2,
-#                    'Stow': 3,
-#                    'SurvivalMode': 4,
-#                    }
-#        tfn_key = {'None': float('nan'),
-#                   'False': 0,
-#                   'True': 1,
-#                   }
         while self.jobs['monitor'] == 'run':
             now = time.time()
 
@@ -373,7 +371,7 @@ class ACUAgent:
                         elif type(value) == int or type(value) == float:
                             self.data['status'][category][self.monitor_fields[category][key]] = value
                         elif value == None:
-                            self.data['status'][category][self.monitor_fields[category][key]] = float('nan')#'None'
+                            self.data['status'][category][self.monitor_fields[category][key]] = float(0.0)#'None'
                         else:
                             self.data['status'][category][self.monitor_fields[category][key]] = str(value)
             self.data['status']['summary']['ctime'] =\
@@ -385,14 +383,20 @@ class ACUAgent:
             for category in self.data['status']:
                 for statkey in self.data['status'][category].keys():
                     if type(self.data['status'][category][statkey]) == float:
-                        influx_status[statkey + '_influx'] = self.data['status'][category][statkey]
+                        if self.data['status'][category][statkey] == float('nan'):
+                            influx_status[statkey + '_influx'] = 0.0
+                        else:
+                            influx_status[statkey + '_influx'] = self.data['status'][category][statkey]
                     elif type(self.data['status'][category][statkey]) == str:
                         if self.data['status'][category][statkey] in ['None', 'True', 'False']:
                             influx_status[statkey + '_influx'] = tfn_key[self.data['status'][category][statkey]]
                         else:
                             influx_status[statkey + '_influx'] = mode_key[self.data['status'][category][statkey]]
                     elif type(self.data['status'][category][statkey]) == int:
-                        influx_status[statkey + '_influx'] = float(self.data['status'][category][statkey])
+                        if statkey in ['Year', 'Free_upload_positions']:
+                            influx_status[statkey + '_influx'] = float(self.data['status'][category][statkey])
+                        else:
+                            influx_status[statkey + '_influx'] = int(self.data['status'][category][statkey])
                     else:
                         print(statkey)
 
@@ -468,7 +472,7 @@ class ACUAgent:
 #            influx_status={'fake_data':1.0}
             try:
                 self.agent.publish_to_feed('acu_status_influx', acustatus_influx, from_reactor=True)
-          #      print(acustatus_influx)
+            #    print(acustatus_influx)
             except:
 #                print(acustatus_influx)
                 print('failed')
@@ -587,6 +591,124 @@ class ACUAgent:
         handler.stopListening()
         self.set_job_done('broadcast')
         return True, 'Acquisition exited cleanly.'
+
+    @inlineCallbacks
+    def find_az_stop_point(self, session, params=None):
+        ok, msg = self.try_set_job('control')
+        if not ok:
+            return ok, msg
+        az = params.get('az')
+        wait_for_motion = params.get('wait', 1)
+        current_az = round(self.data['broadcast']['Corrected_Azimuth'], 4)
+        current_el = round(self.data['broadcast']['Corrected_Elevation'], 4)
+
+        # Check whether the telescope is already at the point
+        self.log.info('Checking current position')
+        if current_az == az:
+            self.log.info('Already positioned at %.2f'
+                          % (current_az))
+            self.set_job_done('control')
+            return False, 'Could not find stop times.'
+        # find az stop time
+        yield self.acu.stop()
+        self.log.info('Stopped')
+        yield dsleep(0.1)
+        last20az = []
+        yield self.acu.go_to(az, current_el)
+        motion_start = time.time()
+        mdata = self.data['status']['summary']
+        # Wait for telescope to start moving
+        self.log.info('Moving to commanded position')
+        while mdata['Azimuth_current_velocity'] == 0.0:
+            yield dsleep(wait_for_motion)
+            mdata = self.data['status']['summary']
+        moving = True
+        while moving:
+            mdata = self.data['status']['summary']
+            current_az = mdata['Azimuth_current_position']
+            if len(last20az) < 20:
+                last20az.append(current_az)
+                yield dsleep(0.005)
+            else:
+                while round(current_az, 4) != az:
+                    yield dsleep(0.005)
+                    mdata = self.data['status']['summary']
+                    current_az = mdata['Azimuth_current_position']
+                reached_az = time.time()
+                last20az = last20az[1:]
+                last20az.append(current_az)
+                avel = np.gradient(last20az)
+                absavg = np.mean(abs(avel))
+                if absavg < 0.0001:
+                    moving = False
+                else:
+                    moving = True
+        motion_end = time.time()
+        yield self.acu.stop()
+        determine_stop = motion_end - reached_az
+        self.stop_times['az'] = determine_stop
+        print('az_stop: ' + str(determine_stop))
+        self.set_job_done('control')
+        return True, 'Azimuth stop time determined.'
+
+    @inlineCallbacks
+    def find_el_stop_point(self, session, params=None):
+        ok, msg = self.try_set_job('control')
+        if not ok:
+            return ok, msg
+        el = params.get('el')
+        wait_for_motion = params.get('wait', 1)
+        current_az = round(self.data['broadcast']['Corrected_Azimuth'], 4)
+        current_el = round(self.data['broadcast']['Corrected_Elevation'], 4)
+
+        # Check whether the telescope is already at the point
+        self.log.info('Checking current position')
+        if current_el == el:
+            self.log.info('Already positioned at %.2f'
+                          % (current_el))
+            self.set_job_done('control')
+            return False, 'Could not find stop time.'
+        # find az stop time
+        yield self.acu.stop()
+        self.log.info('Stopped')
+        yield dsleep(0.1)
+        last20el = []
+        yield self.acu.go_to(current_az, el)
+        motion_start = time.time()
+        mdata = self.data['status']['summary']
+        # Wait for telescope to start moving
+        self.log.info('Moving to commanded position')
+        while mdata['Elevation_current_velocity'] == 0.0:
+            yield dsleep(wait_for_motion)
+            mdata = self.data['status']['summary']
+        moving = True
+        while moving:
+            mdata = self.data['status']['summary']
+            current_el = mdata['Elevation_current_position']
+            if len(last20el) < 20:
+                last20el.append(current_el)
+                yield dsleep(0.005)
+            else:
+                while round(current_el, 4) != el:
+                    yield dsleep(0.005)
+                    mdata = self.data['status']['summary']
+                    current_el = mdata['Elevation_current_position']
+                reached_el = time.time()
+                last20el = last20el[1:]
+                last20el.append(current_el)
+                evel = np.gradient(last20el)
+                absavg = np.mean(abs(evel))
+                if absavg < 0.0001:
+                    moving = False
+                else:
+                    moving = True
+        motion_end = time.time()
+        yield self.acu.stop()
+        determine_stop = motion_end - reached_el
+        self.stop_times['el'] = determine_stop
+        print('el_stop: ' + str(determine_stop))
+        self.set_job_done('control')
+        return True, 'Elevation stop time determined.' 
 
     @inlineCallbacks
     def go_to(self, session, params=None):
