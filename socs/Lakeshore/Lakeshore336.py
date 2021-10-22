@@ -55,7 +55,12 @@ channel_key = {
     '1': 'A',
     '2': 'B',
     '3': 'C',
-    '4': 'D'
+    '4': 'D',
+    '5': 'D1',
+    '6': 'D2',
+    '7': 'D3',
+    '8': 'D4',
+    '9': 'D5'
 }
 channel_lock = {v: k for k, v in channel_key.items()}
 
@@ -113,8 +118,20 @@ class LS336:
         print(self.id)  # print idenfitication information to see if working
 
         # Get Channels
-        inps = ['A', 'B', 'C', 'D']
-        self.channels = {inp: Channel(self, inp) for inp in inps}
+        # Test whether device has extra scanner installed first
+        self.extra_scanner = False
+        temps = self.get_kelvin('0')
+
+        if len(temps) == 8:
+            inps = ['A', 'B', 'C', 'D', 'D2', 'D3', 'D4', 'D5']
+            self.extra_scanner = True
+            self.channels = {inp: Channel(self, inp) for inp in inps}
+        elif len(temps) == 4:
+            inps = ['A', 'B', 'C', 'D']
+            self.channels = {inp: Channel(self, inp) for inp in inps}
+        else:
+            raise ValueError("Can't determine number of channels. " 
+                             "Please debug.")
 
         # Get Heaters
         htrs = ['1', '2']
@@ -174,7 +191,10 @@ class LS336:
 
     def get_kelvin(self, inp):
         """Return a temperature reading of the specified input
-        ('A', 'B', 'C', or 'D') or '0' for all inputs
+        ('A', 'B', 'C', or 'D') or '0' for all inputs. If the
+        extra 3062 scanner is installed, possible options are
+        ('A', 'B', 'C', 'D', 'D1', 'D2', 'D3', 'D4, and 'D5').
+        Note that D and D1 refer to the same channel!
 
         Parameters
         ----------
@@ -184,16 +204,21 @@ class LS336:
         Returns
         -------
         array or float
-            array of four floats if input is '0', float otherwise of
-            temperature reading
+            array of four (or eight) floats if input is '0', 
+            float otherwise of temperature reading
 
         Raises
         ------
         ValueError
             Invalid input channel arguments
         """
-        if inp not in ['0', 'A', 'B', 'C', 'D']:
-            raise ValueError(f'invalid input in msg_kelvin: {inp}')
+        if self.extra_scanner:
+            if inp not in ['0', 'A', 'B', 'C', 'D', 'D1',
+                           'D2', 'D3', 'D4', 'D5']:
+                raise ValueError(f'invalid input in msg_kelvin: {inp}')
+        else:
+            if inp not in ['0', 'A', 'B', 'C', 'D']:
+                raise ValueError(f'invalid input in msg_kelvin: {inp}')
 
         resp = self.msg(f'KRDG? {inp}')
 
@@ -205,7 +230,10 @@ class LS336:
 
     def get_sensor(self, inp):
         """Return a sensor reading of the specified input
-        ('A', 'B', 'C', or 'D') or '0' for all inputs
+        ('A', 'B', 'C', or 'D') or '0' for all inputs. If the
+        extra 3062 scanner is installed, possible options are
+        ('A', 'B', 'C', 'D', 'D1', 'D2', 'D3', 'D4, and 'D5').
+        Note that D and D1 refer to the same channel!
 
         Parameters
         ----------
@@ -215,7 +243,7 @@ class LS336:
         Returns
         -------
         array or float
-            array of four floats if input is '0',
+            array of four (or eight) floats if input is '0',
             float otherwise of sensor reading
 
         Raises
@@ -223,8 +251,13 @@ class LS336:
         ValueError
             Invalid input channel arguments
         """
-        if inp not in ['0', 'A', 'B', 'C', 'D']:
-            raise ValueError(f'invalid input in msg_sensor: {inp}')
+        if self.extra_scanner:
+            if inp not in ['0', 'A', 'B', 'C', 'D', 'D1',
+                           'D2', 'D3', 'D4', 'D5']:
+                raise ValueError(f'invalid input in msg_kelvin: {inp}')
+        else:
+            if inp not in ['0', 'A', 'B', 'C', 'D']:
+                raise ValueError(f'invalid input in msg_kelvin: {inp}')
 
         resp = self.msg(f'SRDG? {inp}')
 
@@ -258,8 +291,11 @@ class Channel:
             The parent LS336 device
         inp : str
             The channel we are building ('A', 'B', 'C', or 'D')
+            Could also be 'D1','D2','D3','D4', or 'D5' if the extra 
+            Lakeshore 3062 scanner is installed on the LS336.
+            D and D1 refer to the same channel!
         """
-        assert inp in ['A', 'B', 'C', 'D']
+        assert inp in ['A', 'B', 'C', 'D', 'D1', 'D2', 'D3', 'D4', 'D5']
 
         self.ls = ls
         self.input = inp

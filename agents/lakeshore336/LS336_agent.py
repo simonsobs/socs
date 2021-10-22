@@ -15,6 +15,10 @@ import time
 
 class LS336_Agent:
     """Agent to connect to a single Lakeshore 336 device.
+    Supports channels 'A','B','C', and 'D' for Lakeshore 336s that
+    do not have the extra Lakeshore 3062 scanner installed. Also has
+    channels 'D2','D3','D4', and 'D5' for 336s that have the extra
+    scanner. Currently only supports heaters '1' and '2'.
 
     Parameters
     ----------
@@ -39,6 +43,12 @@ class LS336_Agent:
         Serial number of the LS336
     ip: str
         IP Address for the 336 device
+    module: LS336 object
+        Driver object
+    module.channels: dict
+        The available channels in the LS336 object
+    module.heaters: dict
+        The available heaters in the LS336 object
     f_sample: float
         The frequency of sampling for acquiring data (in Hz)
     t_sample: float
@@ -148,14 +158,14 @@ class LS336_Agent:
                {"ls336_fields":
                    {"timestamp": 1921920543,
                     "block_name": "temperatures"
-                    "data": {"Channel_01_T": (some value)
-                             "Channel_01_V": (some value)
-                             "Channel_02_T": (some value)
-                             "Channel_02_V": (some value)
-                             "Channel_03_T": (some value)
-                             "Channel_03_V": (some value)
-                             "Channel_04_T": (some value)
-                             "Channel_04_V": (some value)
+                    "data": {"Channel_A_T": (some value)
+                             "Channel_A_V": (some value)
+                             "Channel_B_T": (some value)
+                             "Channel_B_V": (some value)
+                             "Channel_C_T": (some value)
+                             "Channel_C_V": (some value)
+                             "Channel_D_T": (some value)
+                             "Channel_D_V": (some value)
                             }
                    }
                }
@@ -182,11 +192,14 @@ class LS336_Agent:
             session.set_status('running')
 
             # initialize recent temps array
-            # shape is N_points x 4, where N_points is 2 hour / t_sample
-            # rounded up
+            # shape is N_points x N_channels
+            # N_points is 2 hour / t_sample rounded up
+            # N_channels is 8 if the extra scanner is installed, 4 otherwise
             # t_sample can't be more than 2 hours
+            N_channels = len(self.module.channels)
             self._recent_temps = np.full(
-                (int(np.ceil(7200 / self.t_sample)), 4), -1.0)
+                (int(np.ceil(7200 / self.t_sample)), N_channels), -1.0)
+            print(self._recent_temps.size)
 
             # acquire data from Lakeshore
             self.take_data = True
@@ -200,8 +213,9 @@ class LS336_Agent:
                     'data': {}
                 }
 
-                temps = self.module.get_kelvin('0')  # array of four floats
-                voltages = self.module.get_sensor('0')  # array of four floats
+                temps = self.module.get_kelvin('0')  # array of 4 (or 8) floats
+                print("Temps: " + str(temps))
+                voltages = self.module.get_sensor('0')  # array of 4/8 floats
                 for i, channel in enumerate(self.module.channels.values()):
                     channel_str = channel.input_name.replace(' ', '_')
                     temperatures_message['data'][channel_str + '_T'] = temps[i]
@@ -218,7 +232,7 @@ class LS336_Agent:
 
                 # For session.data - named to avoid conflicting with LS372
                 # if in use at same time.
-                session.data['ls336_fields'].update(temperatures_message)
+                session.data['ls336_fields'] = temperatures_message
 
                 # get heater data
                 heaters_message = {
@@ -274,35 +288,23 @@ class LS336_Agent:
 
     @ocs_agent.param('range', type=str,
                      choices=['off', 'low', 'medium', 'high'])
-    @ocs_agent.param('heater', default='2', type=str,
-                     choices=['1', '2', '3', '4'])
+    @ocs_agent.param('heater', default='2', type=str, choices=['1', '2'])
     def set_heater_range(self, session, params):
         """set_heater_range(range=None,heater='2')
 
         **Task** - Adjusts the heater range for servoing the load.
 
         Parameters:
-            range (str): Sets the range of the chosen heater. See notes for
-                         valid options.
+            range (str): Sets the range of the chosen heater. Must be one of
+                         'off', 'low', 'medium', and 'high'.
             heater (str, optional): default '2'. Chooses which heater's range
-                                    to change. Must be one of '1','2','3','4'.
+                                    to change. Must be '1' or '2'.
 
         Notes:
-            If the heater is '1' or '2', then there are four options for the
-            range: 'off', 'low', 'medium', and 'high'.
-            If the heater is '3' or '4', then there are two options for the
-            range: 'off' and 'low'. Note that these options are really 'off'
-            and 'on', but in order to match the way the driver code is written
-            you should pass 'low' when you want the heater on.
-
             The range setting has no effect if an output is in the Off mode,
             and it does not apply to an output in Monitor Out mode. An output
             in Monitor Out mode is always on.
         """
-        if (params['heater'] in ['3', '4'
-                                 ] and params['range'] in ['medium', 'high']):
-            raise ocs_agent.ParamError("Range must be 'off' or 'low' for "
-                                       "heaters 3 and 4.")
         with self._lock.acquire_timeout(job='set_heater_range',
                                         timeout=3) as acquired:
             if not acquired:
@@ -334,8 +336,7 @@ class LS336_Agent:
     @ocs_agent.param('P', type=float, check=lambda x: 0.1 <= x <= 1000)
     @ocs_agent.param('I', type=float, check=lambda x: 0.1 <= x <= 1000)
     @ocs_agent.param('D', type=float, check=lambda x: 0 <= x <= 200)
-    @ocs_agent.param('heater', default='2', type=str,
-                     choices=['1', '2', '3', '4'])
+    @ocs_agent.param('heater', default='2', type=str, choices=['1', '2'])
     def set_pid(self, session, params):
         """set_pid(P=None,I=None,D=None,heater='2')
 
@@ -348,8 +349,7 @@ class LS336_Agent:
                        and 1000)
             D (float): Derivative term for PID loop (must be between 0 and 200)
             heater (str, optional): Selects the heater on which to change
-                                    the PID settings. Must be one of
-                                    '1','2','3','4'.
+                                    the PID settings. Must be '1' or '2'.
 
         """
         with self._lock.acquire_timeout(job='set_pid', timeout=3) as acquired:
@@ -383,10 +383,8 @@ class LS336_Agent:
                       f" {params['I']}, {params['D']}")
 
     @ocs_agent.param('mode', type=str, choices=['off', 'closed loop', 'zone',
-                                                'open loop', 'monitor out',
-                                                'warm up'])
-    @ocs_agent.param('heater', default='2', type=str,
-                     choices=['1', '2', '3', '4'])
+                                                'open loop'])
+    @ocs_agent.param('heater', default='2', type=str, choices=['1', '2'])
     def set_mode(self, session, params):
         """set_mode(mode=None,heater='2')
 
@@ -394,22 +392,17 @@ class LS336_Agent:
 
         Parameters:
             mode (str): Selects the output mode for the heater.
-                        Accepts six options: 'off', 'closed loop', 'zone',
-                        'open loop', 'monitor out', and 'warm up'. See notes
+                        Accepts four options: 'off', 'closed loop', 'zone',
+                        and 'open loop'.
                         for restrictions based on the selected heater.
             heater (str, optional): Default '2'. Selects the heater on which
-                                    to change the mode. Must be one of
-                                    '1','2','3','4'.
+                                    to change the mode. Must be '1' or '2'.
 
         Notes:
-            The options 'monitor out' and 'warm up' only work for the analog
-            outputs (heaters 3 and 4).
+            Does not support the options 'monitor out' and 'warm up',
+            which only work for the unsupported analog outputs 
+            (heaters 3 and 4).
         """
-        if params['heater'] in ['1', '2'] and params['mode'] in ['monitor out',
-                                                                 'warm up']:
-            raise ocs_agent.ParamError("Mode cannot be 'monitor out' or "
-                                       "'warm up' for heaters 1 and 2.")
-
         with self._lock.acquire_timeout(job='set_mode', timeout=3) as acquired:
             if not acquired:
                 print(
@@ -438,8 +431,7 @@ class LS336_Agent:
         return True, f"Set {heater.output_name} mode to {params['mode']}"
 
     @ocs_agent.param('resistance', type=float)
-    @ocs_agent.param('heater', default='2', type=str,
-                     choices=['1', '2', '3', '4'])
+    @ocs_agent.param('heater', default='2', type=str, choices=['1', '2'])
     def set_heater_resistance(self, session, params):
         """set_heater_resistance(resistance=None,heater='2')
 
@@ -449,8 +441,7 @@ class LS336_Agent:
         Parameters:
             resistance (float): The actual resistance of the load
             heater (str, optional): Default '2'. Selects the heater on which
-                                    to set the resistance. Must be one of
-                                    '1','2','3','4'.
+                                    to set the resistance. Must be '1' or '2'.
         """
         with self._lock.acquire_timeout(job='set_heater_resistance',
                                         timeout=3) as acquired:
@@ -483,8 +474,7 @@ class LS336_Agent:
                       f"{params['resistance']}")
 
     @ocs_agent.param('current', type=float, check=lambda x: 0.0 <= x <= 2.0)
-    @ocs_agent.param('heater', default='2', type=str,
-                     choices=['1', '2', '3', '4'])
+    @ocs_agent.param('heater', default='2', type=str, choices=['1', '2'])
     def set_max_current(self, session, params):
         """set_max_current(current=None,heater='2')
 
@@ -494,8 +484,7 @@ class LS336_Agent:
             current (float): The desired max current. Must be between
                              0 and 2 A.
             heater (str, optional): Default '2'. Selects the heater on which
-                                    to set the max current. Must be one of
-                                    '1','2','3','4'.
+                                    to set the max current. Must be '1' or '2'.
         """
         with self._lock.acquire_timeout(job='set_max_current',
                                         timeout=3) as acquired:
@@ -527,8 +516,7 @@ class LS336_Agent:
                       f"{params['current']}")
 
     @ocs_agent.param('percent', type=float)
-    @ocs_agent.param('heater', default='2', type=str,
-                     choices=['1', '2', '3', '4'])
+    @ocs_agent.param('heater', default='2', type=str, choices=['1', '2'])
     def set_manual_out(self, session, params):
         """set_manual_out(percent=None,heater='2')
 
@@ -540,8 +528,8 @@ class LS336_Agent:
             percent (float): Percent of full current or power to set on the
                              heater. Must have 2 or fewer decimal places.
             heater (str, optional): Default '2'. Selects the heater on which
-                                    to set the manual output. Must be one of
-                                    '1','2','3','4'.
+                                    to set the manual output. 
+                                    Must be '1' or '2'.
         """
         with self._lock.acquire_timeout(job='set_manual_out',
                                         timeout=3) as acquired:
@@ -571,9 +559,9 @@ class LS336_Agent:
         return True, (f"Set {heater.output_name} manual out to "
                       f"{params['percent']}")
 
-    @ocs_agent.param('input', type=str, choices=['none', 'A', 'B', 'C', 'D'])
-    @ocs_agent.param('heater', default='2', type=str,
-                     choices=['1', '2', '3', '4'])
+    @ocs_agent.param('input', type=str,
+                     choices=['A', 'B', 'C', 'D', 'D2', 'D3', 'D4', 'D5'])
+    @ocs_agent.param('heater', default='2', type=str, choices=['1', '2'])
     def set_input_channel(self, session, params):
         """set_input_channel(input=None,heater='2')
 
@@ -582,15 +570,11 @@ class LS336_Agent:
         Parameters:
             input (str): The name of the heater to use as the input channel.
                          Must be one of 'none','A','B','C', or 'D'.
+                         Can also be 'D2','D3','D4', or 'D5' if the extra
+                         Lakeshore 3062 Scanner is installed in your LS336.
             heater (str, optional): Default '2'. Selects the heater for which
-                                    to set the input channel. Must be one of
-                                    '1','2','3','4'.
-
-        Notes:
-            Currently does not have extra functionality for Lakeshore 336s
-            that have a Model 3062 4-channel scanner installed. In that case,
-            there are four extra channels that are not supported by
-            this function (D2-D5).
+                                    to set the input channel. 
+                                    Must be '1' or '2'.
 
         """
         with self._lock.acquire_timeout(job='set_input_channel',
@@ -623,8 +607,7 @@ class LS336_Agent:
                       f"{params['input']}")
 
     @ocs_agent.param('setpoint', type=float)
-    @ocs_agent.param('heater', default='2', type=str,
-                     choices=['1', '2', '3', '4'])
+    @ocs_agent.param('heater', default='2', type=str, choices=['1', '2'])
     def set_setpoint(self, session, params):
         """set_setpoint(setpoint=None,heater='2')
 
@@ -636,8 +619,8 @@ class LS336_Agent:
                               on the preferred sensor units (Kelvin, Celsius,
                               or Sensor).
             heater (str, optional): Default '2'. Selects the heater for which
-                                    to set the input channel. Must be one of
-                                    '1','2','3','4'.
+                                    to set the input channel. 
+                                    Must be '1' or '2'.
         """
         with self._lock.acquire_timeout(job='set_setpoint',
                                         timeout=3) as acquired:
@@ -674,7 +657,7 @@ class LS336_Agent:
 
     @ocs_agent.param('T_limit', type=int)
     @ocs_agent.param('channel', type=str, default='A',
-                     choices=['A', 'B', 'C', 'D'])
+                     choices=['A', 'B', 'C', 'D', 'D2', 'D3', 'D4', 'D5'])
     def set_T_limit(self, session, params):
         """set_T_limit(T_limit=None,channel='A')
 
@@ -686,7 +669,10 @@ class LS336_Agent:
                            of 0 K turns off this feature for the given channel.
             channel (str, optional): Default 'A'. Selects which channel to use
                                      for controlling the temperature. Options
-                                     are 'A','B','C', and 'D'.
+                                     are 'A','B','C', and 'D'. Can also be
+                                     'D2','D3','D4', or 'D5' if the extra
+                                     Lakeshore 3062 Scanner is installed in 
+                                     your LS336.
         """
         with self._lock.acquire_timeout(job='set_T_limit',
                                         timeout=3) as acquired:
@@ -717,8 +703,7 @@ class LS336_Agent:
 
     @ocs_agent.param('temperature', type=float)
     @ocs_agent.param('ramp', default=0.1, type=float)
-    @ocs_agent.param('heater', default='2', type=str,
-                     choices=['1', '2', '3', '4'])
+    @ocs_agent.param('heater', default='2', type=str, choices=['1', '2'])
     @ocs_agent.param('transport', default=False, type=bool)
     @ocs_agent.param('transport_offset', default=0, type=float,
                      check=lambda x: x >= 0.0)
@@ -743,7 +728,7 @@ class LS336_Agent:
                                     the setpoint ramps to new value.
                                     Units of K/min.
             heater (str, optional): Default '2'. The heater to use
-                                    for servoing.
+                                    for servoing. Must be '1' or '2'.
             transport (bool, optional): Default False. See Notes
                                         for description.
             transport_offset (float, optional): Default 0. In Kelvin.
@@ -886,8 +871,7 @@ class LS336_Agent:
 
     @ocs_agent.param('threshold', default=0.1, type=float)
     @ocs_agent.param('window', default=900, type=int)
-    @ocs_agent.param('heater', default='2', type=str,
-                     choices=['1', '2', '3', '4'])
+    @ocs_agent.param('heater', default='2', type=str, choices=['1', '2'])
     def check_temperature_stability(self, session, params):
         """check_temperature_stability(threshold=0.1,window=900,heater='2')
 
@@ -898,8 +882,8 @@ class LS336_Agent:
             threshold (float, optional): Default 0.1. See notes.
             window (int, optional): Default 900. See notes.
             heater (str, optional): Default '2'. Selects the heater for which
-                                    to set the input channel. Must be one of
-                                    '1','2','3','4'.
+                                    to set the input channel. 
+                                    Must be '1' or '2'.
 
         Notes
         -----
@@ -970,7 +954,7 @@ class LS336_Agent:
 
     @ocs_agent.param('attribute', type=str)
     @ocs_agent.param('channel', type=str, default='A',
-                     choices=['A', 'B', 'C', 'D'])
+                     choices=['A', 'B', 'C', 'D', 'D2', 'D3', 'D4', 'D5'])
     def get_channel_attribute(self, session, params):
         """get_channel_attribute(attribute=None,channel='A')
 
@@ -984,7 +968,10 @@ class LS336_Agent:
                              Lakeshore 336 Channel class API for all options.
             channel (str, optional): Default 'A'. Selects which channel for
                                      which to get the attribute. Options
-                                     are 'A','B','C', and 'D'.
+                                     are 'A','B','C', and 'D'. Can also be
+                                     'D2','D3','D4', or 'D5' if the extra
+                                     Lakeshore 3062 Scanner is installed in 
+                                     your LS336.
 
         Example:
         >>> ls.get_channel_attribute(attribute = 'T_limit').session['data']
@@ -1013,11 +1000,10 @@ class LS336_Agent:
             resp = query()
             session.data[params['attribute']] = resp
 
-        return True, f"Retrieved {channel.input_name} {params['attribute']}"
+        return True, f"Retrieved {channel.input_name} {params['attribute']} (Value={resp})"
 
     @ocs_agent.param('attribute', type=str)
-    @ocs_agent.param('heater', default='2', type=str,
-                     choices=['1', '2', '3', '4'])
+    @ocs_agent.param('heater', default='2', type=str, choices=['1', '2'])
     def get_heater_attribute(self, session, params):
         """get_heater_attribute(attribute=None,heater='2')
 
@@ -1030,8 +1016,8 @@ class LS336_Agent:
             attribute (str): The name of the channel attribute to get. See the
                              Lakeshore 336 Heater class API for all options.
             heater (str, optional): Default '2'. Selects the heater for which
-                                    to get the heater attribute. Must be one of
-                                    '1','2','3','4'.
+                                    to get the heater attribute.
+                                    Must be '1' or '2'.
 
         Examples
         --------
@@ -1061,7 +1047,8 @@ class LS336_Agent:
             resp = query()
             session.data[params['attribute']] = resp
 
-        return True, f"Retrieved {heater.output_name} {params['attribute']}"
+        return True, (f"Retrieved {heater.output_name} "
+                      "{params['attribute']} (value={resp})")
 
 
 def make_parser(parser=None):
