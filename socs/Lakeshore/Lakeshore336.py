@@ -56,11 +56,10 @@ channel_key = {
     '2': 'B',
     '3': 'C',
     '4': 'D',
-    '5': 'D1',
-    '6': 'D2',
-    '7': 'D3',
-    '8': 'D4',
-    '9': 'D5'
+    '5': 'D2',
+    '6': 'D3',
+    '7': 'D4',
+    '8': 'D5'
 }
 channel_lock = {v: k for k, v in channel_key.items()}
 
@@ -823,6 +822,7 @@ class Heater:
         self.ls = ls
         self.output = output
         self.output_name = f'Heater {output}'
+        self.resistance = None
 
         self.get_output_mode()
         self.get_heater_setup()
@@ -967,6 +967,11 @@ class Heater:
         25 or 50 Ohms
         """
         self.get_heater_setup()
+        if self.resistance is None:        
+            if self.resistance_setting == 1:
+                self.resistance = 25
+            elif self.resistance_setting == 2:
+                self.resistance = 50
         return self.resistance_setting
 
     def set_heater_resistance(self, res):
