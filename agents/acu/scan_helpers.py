@@ -59,10 +59,10 @@ def linear_turnaround_scanpoints(azpts, el, azvel, acc, ntimes):
         time_for_section = np.linspace(sect_start_time, end_dir_time, num_dirpoints)
         if n%2 != 0:
             new_az = np.linspace(azpts[1], azpts[0], num_dirpoints)
-            new_va = np.zeros(num_dirpoints) - azvel
+            new_va = np.zeros(num_dirpoints) + np.sign(azpts[0]-azpts[1])*azvel
         else:
             new_az = np.linspace(azpts[0], azpts[1], num_dirpoints)
-            new_va = np.zeros(num_dirpoints) + azvel
+            new_va = np.zeros(num_dirpoints) + np.sign(azpts[1]-azpts[0])*azvel
 
         conctimes.extend(time_for_section)
         concaz.extend(new_az)
