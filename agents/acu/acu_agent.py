@@ -42,6 +42,23 @@ def uploadtime_to_ctime(ptstack_time, upload_year):
     comptime = gyear + day_of_year*60*60*24 + hour*60*60 + minute*60 + second
     return comptime
 
+def pop_first_vals(data_dict, group_size):
+    new_data_dict = {}
+    for key in data_dict.keys():
+        if len(data_dict[key]):
+            new_data_dict[key] = data_dict[key][group_size:]
+        else:
+            print('no more data')
+    return new_data_dict
+
+def front_group(data_dict, group_size):
+    new_data_dict = {}
+    for key in data_dict.keys():
+        if len(data_dict[key]) > group_size:
+            new_data_dict[key] = data_dict[key][:group_size]
+        else:
+            new_data_dict[key] = data_dict[key]
+    return new_data_dict
 
 class ACUAgent:
 
@@ -554,30 +571,6 @@ class ACUAgent:
                     self.data['broadcast']['Time'] = data_ctime
                     for i in range(2, len(d)):
                         self.data['broadcast'][fields[i].replace(' ', '_')] = d[i]
-#                    azimuth_corrected = d[2]
-#                    azimuth_raw = d[5]
-#                    elevation_corrected = d[3]
-#                    elevation_raw = d[6]
-#                    boresight_corrected = d[4]
-#                    boresight_raw = d[7]
-#                    azimuth_motor_1 = d[8]
-#                    azimuth_motor_2 = d[9]
-#                    elevation_motor_1 = d[10]
-#                    boresight_motor_1 = d[11]
-#                    boresight_motor_2 = d[12]
-#                    self.data['broadcast'] = {'Time': data_ctime,
-#                                              'Azimuth_Corrected': azimuth_corrected,
-#                                              'Azimuth_Raw': azimuth_raw,
-#                                              'Elevation_Corrected': elevation_corrected,
-#                                              'Elevation_Raw': elevation_raw,
-#                                              'Boresight_Corrected': boresight_corrected,
-#                                              'Boresight_Raw': boresight_raw,
-#                                              'Azimuth_Motor_1': azimuth_motor_1,
-#                                              'Azimuth_Motor_2': azimuth_motor_2,
-#                                              'Elevation_Motor_1': elevation_motor_1,
-#                                              'Boresight_Motor_1': boresight_motor_1,
-#                                              'Boresight_Motor_2': boresight_motor_2,
-#                                              }
                     acu_udp_stream = {'timestamp': self.data['broadcast']['Time'],
                                       'block_name': 'ACU_broadcast',
                                       'data': self.data['broadcast']
@@ -935,16 +928,19 @@ class ACUAgent:
             pvals = params.get(pname)
             passparams[pname] = pvals
         self._spec_scan_linear_turnaround(passparams)
-        times = self.data['scanspec']['times']
-        azs = self.data['scanspec']['azs']
-        els = self.data['scanspec']['els']
-        vas = self.data['scanspec']['vas']
-        ves = self.data['scanspec']['ves']
-        azflags = self.data['scanspec']['azflags']
-        elflags = self.data['scanspec']['elflags']
+        spec = self.data['scanspec']
+#        times = self.data['scanspec']['times']
+#        azs = self.data['scanspec']['azs']
+#        els = self.data['scanspec']['els']
+#        vas = self.data['scanspec']['vas']
+#        ves = self.data['scanspec']['ves']
+#        azflags = self.data['scanspec']['azflags']
+#        elflags = self.data['scanspec']['elflags']
  
-        start_az = azs[0]
-        start_el = els[0]
+        start_az = spec['azs'][0]
+        start_el = spec['els'][0]
+        end_az = spec['azs'][-1]
+        end_el = spec['els'][-1]
 
         self.data['uploads']['Start_Azimuth'] = start_az
         self.data['uploads']['Start_Elevation'] = start_el
@@ -957,8 +953,7 @@ class ACUAgent:
         self.agent.publish_to_feed('acu_upload', acu_upload)
 
         # Follow the scan in ProgramTrack mode, then switch to Stop mode
-        all_lines = sh.ptstack_format(times, azs, els, vas, ves, azflags,
-                                       elflags)
+        all_lines = sh.ptstack_format(spec['times'], spec['azs'], spec['els'], spec['vas'], spec['ves'], spec['azflags'], spec['elflags'])
   #      with open('/home/simons/code/vertex-acu-agent/test_clients/'+str(time.time())+'_test.pkl','wb') as f:
   #          pickle.dump(all_lines, f)
   #      f.close()
@@ -970,13 +965,9 @@ class ACUAgent:
         while len(all_lines):
             upload_lines = all_lines[:group_size]
             all_lines = all_lines[group_size:]
-            upload_vals = {'azs': azs[:group_size],
-                           'els': els[:group_size],
-                           'vas': vas[:group_size],
-                           'ves': ves[:group_size],
-                           'azflags': azflags[:group_size],
-                           'elflags': elflags[:group_size]
-                           }
+            upload_vals = front_group(spec, group_size)
+            spec = pop_first_vals(spec, group_size)
+            
             for u in range(len(upload_vals['azs'])):
                 self.data['uploads']['PtStack_Time'] = upload_lines[u].split(';')[0]
                 self.data['uploads']['PtStack_Azimuth'] = upload_vals['azs'][u]
@@ -1022,17 +1013,16 @@ class ACUAgent:
 #                self.agent.publish_to_feed('acu_upload', acu_upload)
             self.log.info('Uploaded a group')
         self.log.info('No more lines to upload')
-        current_az = round(self.data['broadcast']['Corrected_Azimuth'], 4)
-        current_el = round(self.data['broadcast']['Corrected_Elevation'], 4)
-        while current_az != azs[-1] or current_el != els[-1]:
+        current_az = self.data['broadcast']['Corrected_Azimuth']
+        current_el = self.data['broadcast']['Corrected_Elevation']
+        while round(current_az - end_az, 4) != 0. or round(current_el - end_el, 4) != 0.:
             yield dsleep(0.1)
             modes = (self.data['status']['summary']['Azimuth_mode'],
                      self.data['status']['summary']['Elevation_mode'])
             if modes != ('ProgramTrack', 'ProgramTrack'):
                 return False, 'Fault triggered (not ProgramTrack)!'
-            current_az = round(self.data['broadcast']['Corrected_Azimuth'], 4)
-            current_el = round(self.data['broadcast']['Corrected_Elevation'],
-                               4)
+            current_az = self.data['broadcast']['Corrected_Azimuth']
+            current_el = self.data['broadcast']['Corrected_Elevation']
         yield dsleep(self.sleeptime)
         yield self.acu.stop()
         self.data['uploads']['Start_Azimuth'] = 0.0
