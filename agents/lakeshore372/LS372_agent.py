@@ -443,17 +443,18 @@ class LS372_Agent:
 
         return True, f'Set {heater_string} heater range to {params["range"]}'
 
-    @ocs_agent.param('channel', type=int)
-    @ocs_agent.param('mode', type=str)
+    @ocs_agent.param('channel', type=int, check=lambda x: 1<=x<=16)
+    @ocs_agent.param('mode', type=str, choices=['current', 'voltage'])
     def set_excitation_mode(self, session, params):
         """set_excitation_mode(channel=None, mode=None)
 
         **Task** - Set the excitation mode of a specified channel.
 
         Parameters:
-            channel (int): Channel to set the excitation mode for. Valid values are 1-16.
-            mode (str): Excitation mode. For possible values see
-                :func:`socs.Lakeshore.Lakeshore372.Channel.set_excitation_mode`
+            channel (int): Channel to set the excitation mode for. Valid values
+            are 1-16.
+            mode (str): Excitation mode. Possible modes are 'current' or
+            'voltage'.
 
         """
         with self._lock.acquire_timeout(job='set_excitation_mode') as acquired:
@@ -470,16 +471,19 @@ class LS372_Agent:
 
         return True, f'return text for Set channel {params["channel"]} excitation mode to {params["mode"]}'
 
-    @ocs_agent.param('channel', type=int)
+    @ocs_agent.param('channel', type=int, check=lambda x: 1<=x<=16)
     @ocs_agent.param('value', type=float)
     def set_excitation(self, session, params):
         """set_excitation(channel=None, value=None)
 
-        **Task** - Set the excitation voltage/current value of a specified channel.
+        **Task** - Set the excitation voltage/current value of a specified
+        channel.
 
         Parameters:
-            channel (int): Channel to set the excitation for. Valid values are 1-16.
-            value (float): Excitation value in volts or amps depending on set excitation mode. See
+            channel (int): Channel to set the excitation for. Valid values
+            are 1-16.
+            value (float): Excitation value in volts or amps depending on set
+            excitation mode. See
                 :func:`socs.Lakeshore.Lakeshore372.Channel.set_excitation`
 
         """
@@ -503,12 +507,15 @@ class LS372_Agent:
 
         return True, f'Set channel {params["channel"]} excitation to {params["value"]}'
 
+    @ocs_agent.param('channel', type=int, check=lambda x: 1<=x<=16)
     def get_excitation(self, session, params):
-        """get_excitation(params)
-        Get the excitation voltage/current value of a specified channel.
+        """get_excitation(channel=None)
 
-        :param params: dict with "channel" and "value" keys for Channel.get_excitation()
-        :type params: dict
+        **Task** - Get the excitation voltage/current value of a specified channel.
+
+        Parameters:
+            channel (int): Channel to get the excitation for. Valid values
+            are 1-16.
         """
         with self._lock.acquire_timeout(job='get_excitation') as acquired:
             if not acquired:
@@ -526,16 +533,24 @@ class LS372_Agent:
 
         return True, f'Set channel {params["channel"]} excitation is {current_excitation}'
 
+    @ocs_agent.param('channel', type=int, check=lambda x: 1<=x<=16)
+    @ocs_agent.param('resistance_range', type=float)
     def set_resistance_range(self, session, params):
-        """
-        Set the resistance range for a specified channel.
-        :param params: dict with "channel" and "resistance_range" keys for Channel.set_resistance_range()
-        :type params: dict
+        """set_resistance_range(channel=None,resistance_range=None)
 
-	channel - The channel number (1-8 or 1-16 depending on scanner), Type is int.
-	resistance_range - range in ohms we want to measure. Doesn't need to be exactly one of the
-	options on the lakeshore, will select closest valid range, though note these are in increments
-	of 2, 6.32, 20, 63.2, etc. Type is float.
+        **Task** - Set the resistance range for a specified channel.
+
+        Parameters:
+            channel (int): Channel to set the resistance range for. Valid values
+            are 1-16.
+            resistance_range (float): range in ohms we want to measure. Doesn't
+            need to be exactly one of the options on the lakeshore, will select
+            closest valid range, though note these are in increments of 2, 6.32,
+            20, 63.2, etc.
+
+        Notes:
+            If autorange is on when you change the resistance range, it may try to change
+            it to another value.
         """
         with self._lock.acquire_timeout(job='set_resistance_range') as acquired:
             if not acquired:
@@ -557,13 +572,15 @@ class LS372_Agent:
 
         return True, f'Set channel {params["channel"]} resistance range to {params["resistance_range"]}'
 
+    @ocs_agent.param('channel', type=int, check=lambda x: 1<=x<=16)
     def get_resistance_range(self, session, params):
-        """
-        Get the resistance range for a specified channel.
-        :param params: dict with "channel" keys for Channel.get_resistance_range()
-        :type params: dict
+        """get_resistance_range(channel=None)
 
-        channel - The channel number (1-8 or 1-16 depending on scanner), Type is int.
+        **Task** - Get the resistance range for a specified channel.
+
+        Parameters:
+            channel (int): Channel to get the resistance range for. Valid values
+            are 1-16.
         """
         with self._lock.acquire_timeout(job='get_resistance_range') as acquired:
             if not acquired:
@@ -580,16 +597,18 @@ class LS372_Agent:
 
         return True, f'Channel {params["channel"]} resistance range is {current_resistance_range}'
 
-
+    @ocs_agent.param('channel', type=int, check=lambda x: 1<=x<=16)
+    @ocs_agent.params('dwell', type=int, check=lambda x: 1<=x<=200)
     def set_dwell(self, session, params):
-        """
-        Set the autoscanning dwell time.
+        """set_dwell(channel=None, dwell=None)
 
-        :param params: dict with "dwell" time for set_dwell() method in the Channel class
-        :type params: dict
+        **Task** - Set the autoscanning dwell time for a particular channel.
 
-        dwell - Dwell time in seconds, type is int and must be in the rang 1-200 inclusive.
-        channel - The channel number (1-8 or 1-16 depending on scanner), Type is int.
+        Parameters:
+            channel (int): Channel to set the dwell time for. Valid values
+            are 1-16.
+            dwell (int): Dwell time in seconds, type is int and must be in the
+            range 1-200 inclusive.
         """
         with self._lock.acquire_timeout(job='set_dwell') as acquired:
             if not acquired:
@@ -606,14 +625,15 @@ class LS372_Agent:
 
         return True, f'Set channel {params["channel"]} dwell time to {params["dwell"]}'
 
+    @ocs_agent.param('channel', type=int, check=lambda x: 1<=x<=16)
     def get_dwell(self, session, params):
-        """
-        Get the autoscanning dwell time.
+        """get_dwell(channel=None, dwell=None)
 
-        :param params: dict with "dwell" time for get_dwell() method in the Channel class
-        :type params: dict
+        **Task** - Get the autoscanning dwell time for a particular channel.
 
-        channel - The channel number (1-8 or 1-16 depending on scanner), Type is int.
+        Parameters:
+            channel (int): Channel to get the dwell time for. Valid values
+            are 1-16.
         """
         with self._lock.acquire_timeout(job='set_dwell') as acquired:
             if not acquired:
