@@ -299,8 +299,7 @@ def main():
     # Start logging
     txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
 
-    p = site_config.add_arguments()
-    parser = make_parser(parser=p)
+    parser = make_parser()
 
     #Not used anymore, but we don't it to break the agent if these args are passed
     parser.add_argument('--fake-data', help=argparse.SUPPRESS)
@@ -317,7 +316,7 @@ def main():
             "remove from your site-config file", DeprecationWarning)
 
     # Interpret options in the context of site_config.
-    site_config.reparse_args(args, 'Lakeshore240Agent')
+    args = site_config.parse_args(agent_class='Lakeshore240Agent', parser=parser)
 
     # Automatically acquire data if requested (default)
     init_params = False
