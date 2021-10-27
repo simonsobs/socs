@@ -832,12 +832,17 @@ class LS372_Agent:
 
         return True, "Current still output is {}".format(still_output)
 
+    @ocs_agent.param('channel', cast=int, check=lambda x: 0 <= x <= 16)
     def set_input_channel(self, session, params):
-        """
-        Set the input channel for the sample heater, for use in PID.
+        """set_input_channel(channel)
 
-        :param params: dict with "channel" key for Heater.set_input_channel()
-        :type params: dict
+        **Task** - Sets the input channel for the sample heater to use in the PID.
+
+        Parameters:
+            channel (int):
+                Channel to for the sample heater to use in the PID. This must
+                be an integer in the range [0, 16], where 0 is the control
+                channel and 1-16 is the corresponding channel in the scanner.
         """
 
         with self._acq_proc_lock.acquire_timeout(1, job='set_input_channel') as acquired:
