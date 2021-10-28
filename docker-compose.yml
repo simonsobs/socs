@@ -154,3 +154,7 @@ services:
   ocs-lakeshore240-simulator:
     image: "ocs-lakeshore240-simulator"
     build: ./simulators/lakeshore240/
+
+  ocs-lakeshore372-simulator:
+    image: "ocs-lakeshore372-simulator"
+    build: ./simulators/lakeshore372/

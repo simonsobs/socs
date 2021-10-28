@@ -10,8 +10,8 @@ SOCS - Simons Observatory Control System
     :target: https://socs.readthedocs.io/en/develop/?badge=develop
     :alt: Documentation Status
 
-.. image:: https://coveralls.io/repos/github/simonsobs/socs/badge.svg?branch=travis
-    :target: https://coveralls.io/github/simonsobs/socs?branch=travis
+.. image:: https://coveralls.io/repos/github/simonsobs/socs/badge.svg?branch=develop
+    :target: https://coveralls.io/github/simonsobs/socs?branch=develop
 
 .. image:: https://img.shields.io/badge/dockerhub-latest-blue
     :target: https://hub.docker.com/r/simonsobs/ocs/tags
@@ -70,16 +70,30 @@ be considered unstable.
 
 Documentation
 -------------
-The SOCS documentation can be built using sphinx once you have performed the
-installation::
+The SOCS documentation can be built using Sphinx. There is a separate
+``requirements.txt`` file in the ``docs/`` directory to install Sphinx and any
+additional documentation dependencies::
 
   cd docs/
+  pip3 install -r requirements.txt
   make html
 
 You can then open ``docs/_build/html/index.html`` in your preferred web
 browser. You can also find a copy hosted on `Read the Docs`_.
 
 .. _Read the Docs: https://socs.readthedocs.io/en/latest/
+
+Tests
+-----
+The tests for SOCS are run using pytest, and should be run from the
+``tests/`` directory::
+
+  $ cd tests/
+  $ python3 -m pytest --cov
+
+For more details see `tests/README.rst <tests_>`_.
+
+.. _tests: tests/README.rst
 
 Contributing
 ------------

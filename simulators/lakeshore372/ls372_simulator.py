@@ -12,6 +12,7 @@
 # ls.msg('SCAN?'), ls.msg('INTYPE? 1'), ls.msg('OUTMODE? 0')
 
 
+import os
 import socket
 import argparse
 import numpy as np
@@ -57,7 +58,7 @@ current_excitation_key = {1: 1.0e-12,
                           22: 31.6-3}
 
 class Lakeshore372_Simulator:
-    def __init__(self, port, num_channels=16, sn="LSSIM"):
+    def __init__(self, port, num_channels=16, sn="LSASIM"):
         self.log = logging.getLogger()
 
         self.port = port
@@ -71,9 +72,7 @@ class Lakeshore372_Simulator:
             else:
                 c = ChannelSim(i, "Channel {}".format(i))
             self.channels.append(c)
-
-        for i in range(self.num_channels + 1):
-            print(self.channels[i].name)
+            self.log.debug(f'Created channel "{self.channels[i].name}"')
 
         self.scanner = 1  # 0 = autoscan off; 1 = autoscan on
         self.active_channel = 1  # start on channel 1
@@ -111,6 +110,7 @@ class Lakeshore372_Simulator:
             # Heater commands
             "OUTMODE?": self.get_outmode,
             "OUTMODE": self.set_outmode,
+            "HTR?": self.get_htr,
             "HTRSET?": self.get_htrset,
             "HTRSET": self.set_htrset,
             "MOUT?": self.get_mout,
@@ -198,7 +198,7 @@ class Lakeshore372_Simulator:
         for p in range(self.port, self.port + 10):
             try:
                 self.log.info(f"Trying to listen on port {p}")
-                sock.bind(('localhost', p))
+                sock.bind(('', p))
                 break
             except OSError as e:
                 if e.errno == 48:
@@ -220,13 +220,15 @@ class Lakeshore372_Simulator:
                 while True:
                     data = conn.recv(BUFF_SIZE)
                     elapsed_time = time.time() - start_time
-                    print(elapsed_time)  # timestamp printed every time a command is received
+                    #self.log.debug('time:', elapsed_time)  # timestamp printed every time a command is received
 
                     if not data:
                         self.log.info("Connection closed by client")
                         break
 
-                    self.log.debug("Command: {}".format(data))
+                    clean_cmd = data.decode().strip()
+                    self.log.info(f"Received command: {clean_cmd}")
+                    self.log.debug("Raw Command: {}".format(data))
                     # Only takes first command in case multiple commands are s
                     cmds = data.decode().split(';')
 
@@ -240,7 +242,7 @@ class Lakeshore372_Simulator:
                             new_channel_change = int(channel_change % 16)
                             self.active_channel = 1 + new_channel_change
 
-                        print(self.active_channel)
+                        self.log.debug(f"Active channel: {self.active_channel}")
 
                     elif int(self.scanner) == 0:
                         pass
@@ -264,6 +266,7 @@ class Lakeshore372_Simulator:
                                 continue
 
                             resp = cmd_fn(*args)
+                            self.log.info(f"Sent response: {resp}")
 
                         except TypeError as e:
                             self.log.error(f"Command error: {e}")
@@ -274,10 +277,10 @@ class Lakeshore372_Simulator:
 
     def get_idn(self):
         return ','.join([
-            "Lakeshore",
-            "LSSIM_{}P".format(self.num_channels),
+            "LSCI",
+            "MODEL372",
             self.sn,
-            'v0.0.0'
+            '0.0'
         ])
 
     def get_reading(self, chan, unit='S'):
@@ -305,7 +308,7 @@ class Lakeshore372_Simulator:
 
     def get_scanner(self):
         msg_string = '{:02d},{} '.format(int(self.active_channel), str(self.scanner))
-        print(msg_string)
+        self.log.debug(f"get_scanner: {msg_string}")
         return msg_string
 
     def set_scanner(self, chan, auto):
@@ -387,6 +390,10 @@ class Lakeshore372_Simulator:
 
         args = map(str, args)
         self.heaters[int(heater_output)].set_output_mode(*args)
+
+    def get_htr(self):
+        """Random sample heater value."""
+        return f"+{np.random.rand():.4f}E+00"
 
     def get_htrset(self, heater_output):
         if not 0 <= int(heater_output) <= 2:
@@ -800,19 +807,15 @@ def make_parser(parser=None):
         parser = argparse.ArgumentParser()
 
     parser.add_argument('-p', '--port', type=int, default=50000,
-                        help="Port which simulator will wait for a connection."
-                             "If taken, it will test several consecutive ports"
+                        help="Port which simulator will wait for a connection. "
+                             "If taken, it will test several consecutive ports "
                              "until it finds one that is free.")
     parser.add_argument('--num-channels', type=int, default=16,
                         help="Number of channels which the simulator will have.")
-    parser.add_argument('--sn', type=str, default='LS_SIM',
+    parser.add_argument('--sn', type=str, default='LSASIM',
                         help="Serial number for the device")
     parser.add_argument('--log-file', type=str, default=None,
                         help="File where logs are written")
-    parser.add_argument('--log-level',
-                        choices=['debug', 'info', 'warning', 'error'],
-                        default='info',
-                        help="Minimum log level to be displayed")
     parser.add_argument('-o', '--log-stdout', action="store_true",
                         help="Log to stdout")
     return parser
@@ -823,12 +826,13 @@ if __name__ == '__main__':
     parser = make_parser()
     args = parser.parse_args()
 
+    level = os.environ.get('LOGLEVEL', 'info')
     log_level = {
         'debug': logging.DEBUG,
         'info': logging.INFO,
         'warning': logging.WARNING,
         'error': logging.ERROR
-    }[args.log_level]
+    }[level]
 
     format_string = '%(asctime)-15s [%(levelname)s]:  %(message)s'
     # logging.basicConfig(level=log_level, format=format_string)

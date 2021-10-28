@@ -8,7 +8,7 @@ LabJack Agent
 
 LabJacks are generic devices for interfacing with different sensors, providing
 analog and digital inputs and outputs. They are then commanded and queried over
-ethernet.
+Ethernet.
 
 .. argparse::
     :filename: ../agents/labjack/labjack_agent.py
@@ -21,8 +21,9 @@ Configuration File Examples
 Below are configuration examples for the ocs config file and for running the
 Agent in a docker container.
 
-ocs-config
-``````````
+OCS Site Config
+```````````````
+
 To configure the LabJack Agent we need to add a LabJackAgent block to our ocs
 configuration file. Here is an example configuration block using all of the
 available arguments::
@@ -79,8 +80,9 @@ function itself, which takes the input voltage 'v' as the only argument.
     The (lower-case) letter 'v' must be used when writing user-defined 
     functions. No other variable will be parsed correctly.
 
-Docker
-``````
+Docker Compose
+``````````````
+
 The LabJack Agent should be configured to run in a Docker container. An
 example docker-compose service configuration is shown here::
 
@@ -97,29 +99,31 @@ example docker-compose service configuration is shown here::
 Since the agent within the container needs to communicate with hardware on the
 host network you must use ``network_mode: "host"`` in your compose file.
 
-Example Client
---------------
+Example Clients
+---------------
 Since labjack functionality is currently limited to acquiring data, which can 
 enabled on startup, users are likely to rarely need a client. This example
-shows the basic acquisition functionality::
+shows the basic acquisition functionality:
 
-    #Initialize the labjack
+.. code-block:: python
+
+    # Initialize the labjack
     from ocs import matched_client
-    lj = matched_client.MatchedClient('labjack', args=[])
+    lj = matched_client.MatchedClient('labjack')
     lj.init_labjack.start()
     lj.init_labjack.wait()
 
-    #Start data acquisiton
+    # Start data acquisiton
     status, msg, session = lj.acq.start(sampling_frequency=10)
     print(session)
 
-    #Get the current data values 1 second after starting acquistion
+    # Get the current data values 1 second after starting acquistion
     import time
     time.sleep(1)
     status, message, session = lj.acq.status()
     print(session["data"])
 
-    #Stop acqusition
+    # Stop acqusition
     lj.acq.stop()
     lj.acq.wait()
 
@@ -128,4 +132,10 @@ Agent API
 ---------
 
 .. autoclass:: agents.labjack.labjack_agent.LabJackAgent
-    :members: init_labjack_task, start_acq
+    :members:
+
+Supporting APIs
+---------------
+
+.. autoclass:: agents.labjack.labjack_agent.LabJackFunctions
+    :members:

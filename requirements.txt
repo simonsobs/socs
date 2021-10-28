@@ -19,4 +19,10 @@ pysnmp
 pysmi
 
 # Docs
-sphinx_rtd_theme
+# see docs/requirements.txt
+
+# testing
+pytest
+pytest-cov
+pytest-docker-compose
+pytest-dependency

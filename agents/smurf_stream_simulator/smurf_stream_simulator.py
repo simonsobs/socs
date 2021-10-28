@@ -356,11 +356,9 @@ if __name__ == '__main__':
     # Start logging
     txaio.start_logging(level=environ.get("LOGLEVEL", "info"))
 
-    site_parser = site_config.add_arguments()
-    parser = make_parser(site_parser)
-
-    args = parser.parse_args()
-    site_config.reparse_args(args, 'SmurfStreamSimulator')
+    parser = make_parser()
+    args = site_config.parse_args(agent_class='SmurfStreamSimulator',
+                                  parser=parser)
 
     agent, runner = ocs_agent.init_site_agent(args)
     sim = SmurfStreamSimulator(agent, target_host=args.target_host,
