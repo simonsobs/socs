@@ -378,6 +378,93 @@ def test_ls372_set_excitation_already_set(agent):
     assert res[0] is True
 
 
+# get_excitation
+@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
+def test_ls372_get_excitation(agent):
+    session = create_session('get_excitation')
+
+    # Have to init before running anything else
+    agent.init_lakeshore(session, None)
+
+    params = {'channel': 1}
+    res = agent.get_excitation(session, params)
+    assert res[0] is True
+
+
+# set_resistance_range
+@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
+def test_ls372_set_resistance_range(agent):
+    session = create_session('get_resistance_range')
+
+    # Have to init before running anything else
+    agent.init_lakeshore(session, None)
+
+    params = {'channel': 1, 'resistance_range': 2}
+    res = agent.set_resistance_range(session, params)
+    assert res[0] is True
+
+
+@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
+def test_ls372_set_resistance_range_current_range(agent):
+    session = create_session('get_resistance_range')
+
+    # Have to init before running anything else
+    agent.init_lakeshore(session, None)
+
+    # 372 mock defaults to 63.2
+    params = {'channel': 1, 'resistance_range': 63.2}
+    res = agent.set_resistance_range(session, params)
+    assert res[0] is True
+
+
+# get_resistance_range
+@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
+def test_ls372_get_resistance_range_current_range(agent):
+    session = create_session('get_resistance_range')
+
+    # Have to init before running anything else
+    agent.init_lakeshore(session, None)
+
+    # 372 mock defaults to 63.2
+    params = {'channel': 1}
+    res = agent.get_resistance_range(session, params)
+    assert res[0] is True
+
+
+# set_dwell
+@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
+def test_ls372_set_dwell(agent):
+    session = create_session('set_dwell')
+
+    # Have to init before running anything else
+    agent.init_lakeshore(session, None)
+
+    # 372 mock defaults to 63.2
+    params = {'channel': 1, 'dwell': 3}
+    res = agent.set_dwell(session, params)
+    assert res[0] is True
+
+
+# get_dwell
+@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
+def test_ls372_get_dwell(agent):
+    session = create_session('get_dwell')
+
+    # Have to init before running anything else
+    agent.init_lakeshore(session, None)
+
+    # 372 mock defaults to 63.2
+    params = {'channel': 1}
+    res = agent.get_dwell(session, params)
+    assert res[0] is True
+
+
 # set_pid
 @mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
