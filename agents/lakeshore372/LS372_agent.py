@@ -598,7 +598,7 @@ class LS372_Agent:
         return True, f'Channel {params["channel"]} resistance range is {current_resistance_range}'
 
     @ocs_agent.param('channel', type=int, check=lambda x: 1<=x<=16)
-    @ocs_agent.params('dwell', type=int, check=lambda x: 1<=x<=200)
+    @ocs_agent.param('dwell', type=int, check=lambda x: 1<=x<=200)
     def set_dwell(self, session, params):
         """set_dwell(channel=None, dwell=None)
 
