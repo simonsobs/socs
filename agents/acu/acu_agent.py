@@ -222,12 +222,12 @@ class ACUAgent:
                                  buffer_time=1)
         self.agent.register_feed('acu_udp_stream',
                                  record=True,
-                                 agg_params=basic_agg_params,
+                                 agg_params=fullstatus_agg_params,
                                  buffer_time=1)
-#        self.agent.register_feed('acu_broadcast_influx',
-#                                 record=True,
-#                                 agg_params=influx_agg_params,
-#                                 buffer_time=1)
+        self.agent.register_feed('acu_broadcast_influx',
+                                 record=True,
+                                 agg_params=influx_agg_params,
+                                 buffer_time=1)
         self.agent.register_feed('acu_upload',
                                  record=True,
                                  agg_params=basic_agg_params,
@@ -546,10 +546,14 @@ class ACUAgent:
                                 'latest_az_raw': latest_az_raw,
                                 'latest_el_raw': latest_el_raw
                                 }
-       #         pd0 = process_data[0]
-       #         pd0_gday = (pd0[0]-1) * 86400
-       #         pd0_sec = pd0[1]
-       #         pd0_data_ctime = gyear + pd0_gday + pd0_sec
+                bcast_first = {}
+                pd0 = process_data[0]
+                pd0_gday = (pd0[0]-1) * 86400
+                pd0_sec = pd0[1]
+                pd0_data_ctime = gyear + pd0_gday + pd0_sec
+                bcast_first['Time_bcast_influx'] = pd0_data_ctime
+                for i in range(2, len(pd0)):
+                    bcast_first[fields[i].replace(' ', '_')+'_bcast_influx'] = pd0[i]
        #         pd0_azimuth_corrected = pd0[2]
        #         pd0_azimuth_raw = pd0[5]
        #         pd0_elevation_corrected = pd0[3]
@@ -560,11 +564,11 @@ class ACUAgent:
        #                        'Elevation_Corrected_bcast_influx': pd0_elevation_corrected,
        #                        'Elevation_Raw_bcast_influx': pd0_elevation_raw,
        #                        }
-       #         acu_broadcast_influx = {'timestamp': bcast_first['Time_bcast_influx'],
-       #                                 'block_name': 'ACU_position_bcast_influx',
-       #                                 'data': bcast_first,
-       #                                 }
-       #         self.agent.publish_to_feed('acu_broadcast_influx', acu_broadcast_influx)
+                acu_broadcast_influx = {'timestamp': bcast_first['Time_bcast_influx'],
+                                        'block_name': 'ACU_position_bcast_influx',
+                                        'data': bcast_first,
+                                        }
+                self.agent.publish_to_feed('acu_broadcast_influx', acu_broadcast_influx, from_reactor=True)
                 for d in process_data:
                     gday = (d[0]-1) * 86400
                     sec = d[1]
