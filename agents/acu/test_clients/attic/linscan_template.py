@@ -16,4 +16,4 @@ def upload_track(azpts, el, azvel, acc, ntimes, scantype):
     acu_client.run_specified_scan.wait()
 
 if __name__ == '__main__':
-    upload_track((140., 160.), 40., 1., 4, 3, 'linear_turnaround')
+    upload_track((140., 160.), 40., 1., 4, 2, 'linear_turnaround')

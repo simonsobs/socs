@@ -12,4 +12,4 @@ def find_az_stop(startaz, startel, endaz, endel):
     acu_client.find_el_stop_point.wait()
 
 if __name__ == "__main__":
-    find_az_stop(125., 20., 128., 22.)
+    find_az_stop(125., 32., 128., 35.)

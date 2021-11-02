@@ -132,8 +132,8 @@ class ACUAgent:
 
         self.take_data = False
 
-        pool = tclient.HTTPConnectionPool(reactor)
-        self.web_agent = tclient.Agent(reactor, pool=pool)
+        #pool = tclient.HTTPConnectionPool(reactor)
+        self.web_agent = tclient.Agent(reactor)#, pool=pool)
         tclient._HTTP11ClientFactory.noisy = False
 
         self.acu = aculib.AcuControl(
@@ -453,10 +453,10 @@ class ACUAgent:
                                   'block_name': 'ACU_oscillation_alarm',
                                   'data': self.data['status']['osc_alarms']
                                   }
-#            acustatus_commands = {'timestamp': self.data['status']['summary']['ctime'],
-#                                  'block_name': 'ACU_command_status',
-#                                  'data': self.data['status']['commands']
-#                                  }
+            acustatus_commands = {'timestamp': self.data['status']['summary']['ctime'],
+                                  'block_name': 'ACU_command_status',
+                                  'data': self.data['status']['commands']
+                                  }
             acustatus_acufails = {'timestamp': self.data['status']['summary']['ctime'],
                                   'block_name': 'ACU_general_errors',
                                   'data': self.data['status']['ACU_failures_errors']
@@ -553,11 +553,21 @@ class ACUAgent:
                 pd0_azimuth_raw = pd0[5]
                 pd0_elevation_corrected = pd0[3]
                 pd0_elevation_raw = pd0[6]
+                pd0_azcurr1 = pd0[8]
+                pd0_azcurr2 = pd0[9]
+                pd0_elcurr1 = pd0[10]
+                pd0_bscurr1 = pd0[11]
+                pd0_bscurr2 = pd0[12]
                 bcast_first = {'Time_bcast_influx': pd0_data_ctime,
                                'Azimuth_Corrected_bcast_influx': pd0_azimuth_corrected,
                                'Azimuth_Raw_bcast_influx': pd0_azimuth_raw,
                                'Elevation_Corrected_bcast_influx': pd0_elevation_corrected,
                                'Elevation_Raw_bcast_influx': pd0_elevation_raw,
+                               'Azimuth_Current1_bcast_influx': pd0_azcurr1,
+                               'Azimuth_Current2_bcast_influx': pd0_azcurr2,
+                               'Elevation_Current1_bcast_influx': pd0_elcurr1,
+                               'Boresight_Current1_bcast_influx': pd0_bscurr1,
+                               'Boresight_Current2_bcast_influx': pd0_bscurr2,
                                }
                 acu_broadcast_influx = {'timestamp': bcast_first['Time_bcast_influx'],
                                         'block_name': 'ACU_position_bcast_influx',
@@ -606,7 +616,8 @@ class ACUAgent:
         self.log.info('Stopped')
         yield dsleep(0.1)
         last20az = []
-        yield self.acu.go_to(az, current_el)
+        yield self.acu.go_to(az, current_el, wait=0.5)
+        yield dsleep(5)
         motion_start = time.time()
         mdata = self.data['status']['summary']
         # Wait for telescope to start moving
@@ -622,7 +633,7 @@ class ACUAgent:
                 last20az.append(current_az)
                 yield dsleep(0.005)
             else:
-                while round(current_az - az, 4) != 0.0:
+                while round(current_az - az, 1) != 0.0:
                     yield dsleep(0.005)
                     mdata = self.data['status']['summary']
                     current_az = mdata['Azimuth_current_position']
@@ -664,8 +675,9 @@ class ACUAgent:
         self.log.info('Stopped')
         yield dsleep(0.1)
         last20el = []
-        yield self.acu.go_to(current_az, el)
+        yield self.acu.go_to(current_az, el, wait=0.5)
         motion_start = time.time()
+        yield dsleep(5)
         mdata = self.data['status']['summary']
         # Wait for telescope to start moving
         self.log.info('Moving to commanded position')
@@ -680,7 +692,7 @@ class ACUAgent:
                 last20el.append(current_el)
                 yield dsleep(0.005)
             else:
-                while round(current_el-el, 4) != 0.0:
+                while round(current_el-el, 1) != 0.0:
                     yield dsleep(0.005)
                     mdata = self.data['status']['summary']
                     current_el = mdata['Elevation_current_position']
@@ -741,13 +753,16 @@ class ACUAgent:
                           % (current_az, current_el))
             self.set_job_done('control')
             return True, 'Pointing completed'
-        yield self.acu.stop()
+   #     yield self.acu.stop()
+        yield self.acu.mode('Stop')
         self.log.info('Stopped')
-        yield dsleep(0.1)
-        yield self.acu.go_to(az, el)
+        yield dsleep(0.5)
+        yield self.acu.go_to(az, el, wait=0.1)
+        yield dsleep(0.3)
         mdata = self.data['status']['summary']
         # Wait for telescope to start moving
         self.log.info('Moving to commanded position')
+        yield dsleep(5)
         while mdata['Azimuth_current_velocity'] == 0.0 and\
                 mdata['Elevation_current_velocity'] == 0.0:
             yield dsleep(wait_for_motion)
@@ -853,7 +868,8 @@ class ACUAgent:
             yield dsleep(0.1)
             self.try_set_job('control')
         self.log.info('try_set_job ok')
-        yield self.acu.stop()
+#        yield self.acu.stop()
+        yield self.acu.mode('Stop')
         self.log.info('Stop called')
         yield dsleep(5)
         yield self.acu.http.Command('DataSets.CmdTimePositionTransfer',
@@ -994,28 +1010,11 @@ class ACUAgent:
                     ['Free_upload_positions']
                 yield dsleep(0.1)
             yield self.acu.http.UploadPtStack(text)
-            #print(upload_lines)
-            #for u in upload_lines:
-# TODO: switch over to pre-line formatting
-#                self.data['uploads']['PtStack_Time'] = u.split(';')[0]
-#                self.data['uploads']['PtStack_Azimuth'] = float(u.split(';')[1])
-#                self.data['uploads']['PtStack_Elevation'] = float(u.split(';')[2])
-#                self.data['uploads']['PtStack_AzVelocity'] = float(u.split(';')[3])
-#                self.data['uploads']['PtStack_ElVelocity'] = float(u.split(';')[4])
-#                self.data['uploads']['PtStack_AzFlag'] = int(u.split(';')[5])
-#                self.data['uploads']['PtStack_ElFlag'] = int(u.split(';')[6])
-#                yield dsleep (0.2)
-#                print(upload_publish_dict)
-#                acu_upload = {'timestamp': self.data['broadcast']['Time'],
-#                              'block_name': 'ACU_upload',
-#                              'data': upload_publish_dict
-#                              }
-#                self.agent.publish_to_feed('acu_upload', acu_upload)
             self.log.info('Uploaded a group')
         self.log.info('No more lines to upload')
         current_az = self.data['broadcast']['Corrected_Azimuth']
         current_el = self.data['broadcast']['Corrected_Elevation']
-        while round(current_az - end_az, 4) != 0. or round(current_el - end_el, 4) != 0.:
+        while round(current_az - end_az, 1) != 0. or round(current_el - end_el, 1) != 0.:
             yield dsleep(0.1)
             modes = (self.data['status']['summary']['Azimuth_mode'],
                      self.data['status']['summary']['Elevation_mode'])
