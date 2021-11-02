@@ -48,10 +48,10 @@ def linear_turnaround_scanpoints(azpts, el, azvel, acc, ntimes):
     # 2 : final point before a turnaround
     azflags = [1 for i in range(num_dirpoints-1)]
     azflags += [2]
-    all_azflags = azflags
+    all_azflags = []
 
     elflags = [0 for i in range(num_dirpoints)]
-    all_elflags = elflags
+    all_elflags = []
 
     for n in range(ntimes):
         #print(str(n)+' '+str(sect_start_time))
@@ -73,7 +73,7 @@ def linear_turnaround_scanpoints(azpts, el, azvel, acc, ntimes):
         all_elflags.extend(elflags)
         sect_start_time = time_for_section[-1] + turn_time
 
-    concva[-1] = 0.0
+#    concva[-1] = 0.0
     all_azflags[-1] = 0
 
     return conctimes, concaz, concel, concva, concve, all_azflags, all_elflags
