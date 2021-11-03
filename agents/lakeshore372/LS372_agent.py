@@ -452,9 +452,9 @@ class LS372_Agent:
 
         Parameters:
             channel (int): Channel to set the excitation mode for. Valid values
-            are 1-16.
+                are 1-16.
             mode (str): Excitation mode. Possible modes are 'current' or
-            'voltage'.
+                'voltage'.
 
         """
         with self._lock.acquire_timeout(job='set_excitation_mode') as acquired:
@@ -477,11 +477,11 @@ class LS372_Agent:
         """set_excitation(channel=None, value=None)
 
         **Task** - Set the excitation voltage/current value of a specified
-        channel.
+            channel.
 
         Parameters:
             channel (int): Channel to set the excitation for. Valid values
-            are 1-16.
+                are 1-16.
             value (float): Excitation value in volts or amps depending on set
             excitation mode. See
                 :func:`socs.Lakeshore.Lakeshore372.Channel.set_excitation`
@@ -496,26 +496,27 @@ class LS372_Agent:
             session.set_status('running')
 
             current_excitation = self.module.channels[params['channel']].get_excitation()
+            mode = self.module.channels[params["channel"]].get_excitation_mode()
+            units = 'amps' if mode == 'current' else 'volts'
 
             if params['value'] == current_excitation:
-                print(f'Channel {params["channel"]} excitation already set to {params["value"]}')
+                session.add_message(f'Channel {params["channel"]} excitation {mode} already set to {params["value"]} {units}')
             else:
                 self.module.channels[params['channel']].set_excitation(params['value'])
-                session.add_message(f'Set channel {params["channel"]} excitation to {params["value"]}')
-                print(f'Set channel {params["channel"]} excitation to {params["value"]}')
-                session.data = {"excitation": params["value"]}
+                session.add_message(f'Set channel {params["channel"]} excitation {mode} to {params["value"]} {units}')
 
-        return True, f'Set channel {params["channel"]} excitation to {params["value"]}'
+        return True, f'Set channel {params["channel"]} excitation to {params["value"]} {units}'
 
     @ocs_agent.param('channel', type=int, check=lambda x: 1<=x<=16)
     def get_excitation(self, session, params):
         """get_excitation(channel=None)
 
-        **Task** - Get the excitation voltage/current value of a specified channel.
+        **Task** - Get the excitation voltage/current value of a specified 
+            channel.
 
         Parameters:
             channel (int): Channel to get the excitation for. Valid values
-            are 1-16.
+                are 1-16.
         """
         with self._lock.acquire_timeout(job='get_excitation') as acquired:
             if not acquired:
@@ -526,12 +527,12 @@ class LS372_Agent:
             session.set_status('running')
 
             current_excitation = self.module.channels[params["channel"]].get_excitation()
-            print(current_excitation)
-            session.add_message(f'Channel {params["channel"]} excitation is {current_excitation}')
-            print(f'Channel {params["channel"]} excitation is {current_excitation}')
+            mode = self.module.channels[params["channel"]].get_excitation_mode()
+            units = 'amps' if mode == 'current' else 'volts'
+            session.add_message(f'Channel {params["channel"]} excitation {mode} is {current_excitation} {units}')
             session.data = {"excitation": current_excitation}
 
-        return True, f'Set channel {params["channel"]} excitation is {current_excitation}'
+        return True, f'Channel {params["channel"]} excitation {mode} is {current_excitation} {units}'
 
     @ocs_agent.param('channel', type=int, check=lambda x: 1<=x<=16)
     @ocs_agent.param('resistance_range', type=float)
@@ -542,11 +543,11 @@ class LS372_Agent:
 
         Parameters:
             channel (int): Channel to set the resistance range for. Valid values
-            are 1-16.
+                are 1-16.
             resistance_range (float): range in ohms we want to measure. Doesn't
-            need to be exactly one of the options on the lakeshore, will select
-            closest valid range, though note these are in increments of 2, 6.32,
-            20, 63.2, etc.
+                need to be exactly one of the options on the lakeshore, will select
+                closest valid range, though note these are in increments of 2, 6.32,
+                20, 63.2, etc.
 
         Notes:
             If autorange is on when you change the resistance range, it may try to change
@@ -563,12 +564,10 @@ class LS372_Agent:
             current_resistance_range = self.module.channels[params['channel']].get_resistance_range()
 
             if params['resistance_range'] == current_resistance_range:
-                print(f'Channel {params["channel"]} resistance_range already set to {params["resistance_range"]}')
+                session.add_message(f'Channel {params["channel"]} resistance_range already set to {params["resistance_range"]}')
             else:
                 self.module.channels[params['channel']].set_resistance_range(params['resistance_range'])
                 session.add_message(f'Set channel {params["channel"]} resistance range to {params["resistance_range"]}')
-                print(f'Set channel {params["channel"]} resistance range to {params["resistance_range"]}')
-                session.data = {"resistance_range": params['resistance_range']}
 
         return True, f'Set channel {params["channel"]} resistance range to {params["resistance_range"]}'
 
@@ -580,7 +579,7 @@ class LS372_Agent:
 
         Parameters:
             channel (int): Channel to get the resistance range for. Valid values
-            are 1-16.
+                are 1-16.
         """
         with self._lock.acquire_timeout(job='get_resistance_range') as acquired:
             if not acquired:
@@ -592,7 +591,6 @@ class LS372_Agent:
 
             current_resistance_range = self.module.channels[params['channel']].get_resistance_range()
             session.add_message(f'Channel {params["channel"]} resistance range is {current_resistance_range}')
-            print(f'Channel {params["channel"]} resistance range is {current_resistance_range}')
             session.data = {"resistance_range": current_resistance_range}
 
         return True, f'Channel {params["channel"]} resistance range is {current_resistance_range}'
@@ -605,10 +603,10 @@ class LS372_Agent:
         **Task** - Set the autoscanning dwell time for a particular channel.
 
         Parameters:
-            channel (int): Channel to set the dwell time for. Valid values
-            are 1-16.
+            channel (int): Channel to set the dwell time for. Valid values 
+                are 1-16.
             dwell (int): Dwell time in seconds, type is int and must be in the
-            range 1-200 inclusive.
+                range 1-200 inclusive.
         """
         with self._lock.acquire_timeout(job='set_dwell') as acquired:
             if not acquired:
@@ -620,7 +618,6 @@ class LS372_Agent:
 
             current_dwell = self.module.channels[params["channel"]].set_dwell(params["dwell"])
             session.add_message(f'Set dwell to {params["dwell"]}')
-            print(f'Set dwell to {params["dwell"]}')
 
 
         return True, f'Set channel {params["channel"]} dwell time to {params["dwell"]}'
@@ -633,7 +630,7 @@ class LS372_Agent:
 
         Parameters:
             channel (int): Channel to get the dwell time for. Valid values
-            are 1-16.
+                are 1-16.
         """
         with self._lock.acquire_timeout(job='set_dwell') as acquired:
             if not acquired:
@@ -645,7 +642,6 @@ class LS372_Agent:
 
             current_dwell = self.module.channels[params["channel"]].get_dwell()
             session.add_message(f'Dwell time for channel {params["channel"]} is {current_dwell}')
-            print(f'Dwell time for channel {params["channel"]} is {current_dwell}')
             session.data = {"dwell_time": current_dwell}
 
 
