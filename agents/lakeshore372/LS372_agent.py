@@ -477,7 +477,7 @@ class LS372_Agent:
         """set_excitation(channel=None, value=None)
 
         **Task** - Set the excitation voltage/current value of a specified
-            channel.
+        channel.
 
         Parameters:
             channel (int): Channel to set the excitation for. Valid values
@@ -512,7 +512,7 @@ class LS372_Agent:
         """get_excitation(channel=None)
 
         **Task** - Get the excitation voltage/current value of a specified 
-            channel.
+        channel.
 
         Parameters:
             channel (int): Channel to get the excitation for. Valid values
