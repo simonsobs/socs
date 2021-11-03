@@ -155,6 +155,52 @@ def test_ls372_set_excitation(wait_for_crossbar, run_agent, client):
 
 
 @pytest.mark.integtest
+def test_ls372_get_excitation(wait_for_crossbar, run_agent, client):
+    client.init_lakeshore()
+    client.set_excitation(channel=1, value=1e-9)
+    resp = client.get_excitation(channel=1)
+    assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+    assert resp.session['data']['excitation'] == 1e-9
+
+
+@pytest.mark.integtest
+def test_ls372_set_resistance_range(wait_for_crossbar, run_agent, client):
+    client.init_lakeshore()
+    resp = client.set_resistance_range(channel=1, resistance_range=2)
+    assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
+
+@pytest.mark.integtest
+def test_ls372_get_resistance_range(wait_for_crossbar, run_agent, client):
+    client.init_lakeshore()
+    client.set_resistance_range(channel=1, resistance_range=2)
+    resp = client.get_resistance_range(channel=1)
+    assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+    assert resp.session['data']['resistance_range'] == 2
+
+
+@pytest.mark.integtest
+def test_ls372_set_dwell(wait_for_crossbar, run_agent, client):
+    client.init_lakeshore()
+    resp = client.set_dwell(channel=1, dwell=3)
+    assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
+
+@pytest.mark.integtest
+def test_ls372_get_dwell(wait_for_crossbar, run_agent, client):
+    client.init_lakeshore()
+    client.set_dwell(channel=1, dwell=3)
+    resp = client.get_dwell(channel=1)
+    assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+    assert resp.session['data']['dwell_time'] == 3
+
+
+@pytest.mark.integtest
 def test_ls372_set_pid(wait_for_crossbar, run_agent, client):
     client.init_lakeshore()
     resp = client.set_pid(P=40, I=2, D=0)

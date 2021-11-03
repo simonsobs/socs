@@ -443,17 +443,18 @@ class LS372_Agent:
 
         return True, f'Set {heater_string} heater range to {params["range"]}'
 
-    @ocs_agent.param('channel', type=int)
-    @ocs_agent.param('mode', type=str)
+    @ocs_agent.param('channel', type=int, check=lambda x: 1<=x<=16)
+    @ocs_agent.param('mode', type=str, choices=['current', 'voltage'])
     def set_excitation_mode(self, session, params):
         """set_excitation_mode(channel=None, mode=None)
 
         **Task** - Set the excitation mode of a specified channel.
 
         Parameters:
-            channel (int): Channel to set the excitation mode for. Valid values are 1-16.
-            mode (str): Excitation mode. For possible values see
-                :func:`socs.Lakeshore.Lakeshore372.Channel.set_excitation_mode`
+            channel (int): Channel to set the excitation mode for. Valid values
+                are 1-16.
+            mode (str): Excitation mode. Possible modes are 'current' or
+                'voltage'.
 
         """
         with self._lock.acquire_timeout(job='set_excitation_mode') as acquired:
@@ -470,16 +471,19 @@ class LS372_Agent:
 
         return True, f'return text for Set channel {params["channel"]} excitation mode to {params["mode"]}'
 
-    @ocs_agent.param('channel', type=int)
+    @ocs_agent.param('channel', type=int, check=lambda x: 1<=x<=16)
     @ocs_agent.param('value', type=float)
     def set_excitation(self, session, params):
         """set_excitation(channel=None, value=None)
 
-        **Task** - Set the excitation voltage/current value of a specified channel.
+        **Task** - Set the excitation voltage/current value of a specified
+        channel.
 
         Parameters:
-            channel (int): Channel to set the excitation for. Valid values are 1-16.
-            value (float): Excitation value in volts or amps depending on set excitation mode. See
+            channel (int): Channel to set the excitation for. Valid values
+                are 1-16.
+            value (float): Excitation value in volts or amps depending on set
+            excitation mode. See
                 :func:`socs.Lakeshore.Lakeshore372.Channel.set_excitation`
 
         """
@@ -492,15 +496,156 @@ class LS372_Agent:
             session.set_status('running')
 
             current_excitation = self.module.channels[params['channel']].get_excitation()
+            mode = self.module.channels[params["channel"]].get_excitation_mode()
+            units = 'amps' if mode == 'current' else 'volts'
 
             if params['value'] == current_excitation:
-                print(f'Channel {params["channel"]} excitation already set to {params["value"]}')
+                session.add_message(f'Channel {params["channel"]} excitation {mode} already set to {params["value"]} {units}')
             else:
                 self.module.channels[params['channel']].set_excitation(params['value'])
-                session.add_message(f'Set channel {params["channel"]} excitation to {params["value"]}')
-                print(f'Set channel {params["channel"]} excitation to {params["value"]}')
+                session.add_message(f'Set channel {params["channel"]} excitation {mode} to {params["value"]} {units}')
 
-        return True, f'Set channel {params["channel"]} excitation to {params["value"]}'
+        return True, f'Set channel {params["channel"]} excitation to {params["value"]} {units}'
+
+    @ocs_agent.param('channel', type=int, check=lambda x: 1<=x<=16)
+    def get_excitation(self, session, params):
+        """get_excitation(channel=None)
+
+        **Task** - Get the excitation voltage/current value of a specified 
+        channel.
+
+        Parameters:
+            channel (int): Channel to get the excitation for. Valid values
+                are 1-16.
+        """
+        with self._lock.acquire_timeout(job='get_excitation') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            session.set_status('running')
+
+            current_excitation = self.module.channels[params["channel"]].get_excitation()
+            mode = self.module.channels[params["channel"]].get_excitation_mode()
+            units = 'amps' if mode == 'current' else 'volts'
+            session.add_message(f'Channel {params["channel"]} excitation {mode} is {current_excitation} {units}')
+            session.data = {"excitation": current_excitation}
+
+        return True, f'Channel {params["channel"]} excitation {mode} is {current_excitation} {units}'
+
+    @ocs_agent.param('channel', type=int, check=lambda x: 1<=x<=16)
+    @ocs_agent.param('resistance_range', type=float)
+    def set_resistance_range(self, session, params):
+        """set_resistance_range(channel=None,resistance_range=None)
+
+        **Task** - Set the resistance range for a specified channel.
+
+        Parameters:
+            channel (int): Channel to set the resistance range for. Valid values
+                are 1-16.
+            resistance_range (float): range in ohms we want to measure. Doesn't
+                need to be exactly one of the options on the lakeshore, will select
+                closest valid range, though note these are in increments of 2, 6.32,
+                20, 63.2, etc.
+
+        Notes:
+            If autorange is on when you change the resistance range, it may try to change
+            it to another value.
+        """
+        with self._lock.acquire_timeout(job='set_resistance_range') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            session.set_status('running')
+
+            current_resistance_range = self.module.channels[params['channel']].get_resistance_range()
+
+            if params['resistance_range'] == current_resistance_range:
+                session.add_message(f'Channel {params["channel"]} resistance_range already set to {params["resistance_range"]}')
+            else:
+                self.module.channels[params['channel']].set_resistance_range(params['resistance_range'])
+                session.add_message(f'Set channel {params["channel"]} resistance range to {params["resistance_range"]}')
+
+        return True, f'Set channel {params["channel"]} resistance range to {params["resistance_range"]}'
+
+    @ocs_agent.param('channel', type=int, check=lambda x: 1<=x<=16)
+    def get_resistance_range(self, session, params):
+        """get_resistance_range(channel=None)
+
+        **Task** - Get the resistance range for a specified channel.
+
+        Parameters:
+            channel (int): Channel to get the resistance range for. Valid values
+                are 1-16.
+        """
+        with self._lock.acquire_timeout(job='get_resistance_range') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            session.set_status('running')
+
+            current_resistance_range = self.module.channels[params['channel']].get_resistance_range()
+            session.add_message(f'Channel {params["channel"]} resistance range is {current_resistance_range}')
+            session.data = {"resistance_range": current_resistance_range}
+
+        return True, f'Channel {params["channel"]} resistance range is {current_resistance_range}'
+
+    @ocs_agent.param('channel', type=int, check=lambda x: 1<=x<=16)
+    @ocs_agent.param('dwell', type=int, check=lambda x: 1<=x<=200)
+    def set_dwell(self, session, params):
+        """set_dwell(channel=None, dwell=None)
+
+        **Task** - Set the autoscanning dwell time for a particular channel.
+
+        Parameters:
+            channel (int): Channel to set the dwell time for. Valid values 
+                are 1-16.
+            dwell (int): Dwell time in seconds, type is int and must be in the
+                range 1-200 inclusive.
+        """
+        with self._lock.acquire_timeout(job='set_dwell') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            session.set_status('running')
+
+            current_dwell = self.module.channels[params["channel"]].set_dwell(params["dwell"])
+            session.add_message(f'Set dwell to {params["dwell"]}')
+
+
+        return True, f'Set channel {params["channel"]} dwell time to {params["dwell"]}'
+
+    @ocs_agent.param('channel', type=int, check=lambda x: 1<=x<=16)
+    def get_dwell(self, session, params):
+        """get_dwell(channel=None, dwell=None)
+
+        **Task** - Get the autoscanning dwell time for a particular channel.
+
+        Parameters:
+            channel (int): Channel to get the dwell time for. Valid values
+                are 1-16.
+        """
+        with self._lock.acquire_timeout(job='set_dwell') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            session.set_status('running')
+
+            current_dwell = self.module.channels[params["channel"]].get_dwell()
+            session.add_message(f'Dwell time for channel {params["channel"]} is {current_dwell}')
+            session.data = {"dwell_time": current_dwell}
+
+
+        return True, f'Channel {params["channel"]} dwell time is {current_dwell}'
 
     @ocs_agent.param('P', type=int)
     @ocs_agent.param('I', type=int)
@@ -894,6 +1039,11 @@ if __name__ == '__main__':
     agent.register_task('set_heater_range', lake_agent.set_heater_range)
     agent.register_task('set_excitation_mode', lake_agent.set_excitation_mode)
     agent.register_task('set_excitation', lake_agent.set_excitation)
+    agent.register_task('get_excitation', lake_agent.get_excitation)
+    agent.register_task('set_resistance_range', lake_agent.set_resistance_range)
+    agent.register_task('get_resistance_range', lake_agent.get_resistance_range)
+    agent.register_task('set_dwell', lake_agent.set_dwell)
+    agent.register_task('get_dwell', lake_agent.get_dwell)
     agent.register_task('set_pid', lake_agent.set_pid)
     agent.register_task('set_autoscan', lake_agent.set_autoscan)
     agent.register_task('set_active_channel', lake_agent.set_active_channel)
