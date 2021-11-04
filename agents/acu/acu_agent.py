@@ -89,6 +89,7 @@ class ACUAgent:
         self.udp_ext = self.acu_config['streams']['ext']
         self.acu8100 = self.acu_config['status']['status_name']
         self.monitor_fields = status_keys.status_fields[self.acu_config['platform']]['status_fields']
+        self.motion_limits = self.acu_config['motion_limits']
 
         self.log = agent.log
 
@@ -545,35 +546,22 @@ class ACUAgent:
                                 'latest_az_raw': latest_az_raw,
                                 'latest_el_raw': latest_el_raw
                                 }
+                bcast_first = {}
                 pd0 = process_data[0]
                 pd0_gday = (pd0[0]-1) * 86400
                 pd0_sec = pd0[1]
                 pd0_data_ctime = gyear + pd0_gday + pd0_sec
-                pd0_azimuth_corrected = pd0[2]
-                pd0_azimuth_raw = pd0[5]
-                pd0_elevation_corrected = pd0[3]
-                pd0_elevation_raw = pd0[6]
-                pd0_azcurr1 = pd0[8]
-                pd0_azcurr2 = pd0[9]
-                pd0_elcurr1 = pd0[10]
-                pd0_bscurr1 = pd0[11]
-                pd0_bscurr2 = pd0[12]
-                bcast_first = {'Time_bcast_influx': pd0_data_ctime,
-                               'Azimuth_Corrected_bcast_influx': pd0_azimuth_corrected,
-                               'Azimuth_Raw_bcast_influx': pd0_azimuth_raw,
-                               'Elevation_Corrected_bcast_influx': pd0_elevation_corrected,
-                               'Elevation_Raw_bcast_influx': pd0_elevation_raw,
-                               'Azimuth_Current1_bcast_influx': pd0_azcurr1,
-                               'Azimuth_Current2_bcast_influx': pd0_azcurr2,
-                               'Elevation_Current1_bcast_influx': pd0_elcurr1,
-                               'Boresight_Current1_bcast_influx': pd0_bscurr1,
-                               'Boresight_Current2_bcast_influx': pd0_bscurr2,
-                               }
+<<<<<<< HEAD
+=======
+                bcast_first['Time_bcast_influx'] = pd0_data_ctime
+                for i in range(2, len(pd0)):
+                    bcast_first[fields[i].replace(' ', '_')+'_bcast_influx'] = pd0[i]
+>>>>>>> acu_agent_dev
                 acu_broadcast_influx = {'timestamp': bcast_first['Time_bcast_influx'],
                                         'block_name': 'ACU_position_bcast_influx',
                                         'data': bcast_first,
                                         }
-                self.agent.publish_to_feed('acu_broadcast_influx', acu_broadcast_influx)
+                self.agent.publish_to_feed('acu_broadcast_influx', acu_broadcast_influx, from_reactor=True)
                 for d in process_data:
                     gday = (d[0]-1) * 86400
                     sec = d[1]
@@ -585,8 +573,9 @@ class ACUAgent:
                                       'block_name': 'ACU_broadcast',
                                       'data': self.data['broadcast']
                                       }
+                    #print(acu_udp_stream)
                     self.agent.publish_to_feed('acu_udp_stream',
-                                               acu_udp_stream)
+                                               acu_udp_stream, from_reactor=True)
             else:
                 yield dsleep(1)
             yield dsleep(0.005)
@@ -731,6 +720,10 @@ class ACUAgent:
             return ok, msg
         az = params.get('az')
         el = params.get('el')
+        if az <= self.motion_limits['azimuth']['lower'] or az >= self.motion_limits['azimuth']['upper']:
+            return False, 'Azimuth location out of range!'
+        if el <= self.motion_limits['elevation']['lower'] or el >= self.motion_limits['elevation']['upper']:
+            return False, 'Elevation location out of range!'
         wait_for_motion = params.get('wait', 1)
         current_az = round(self.data['broadcast']['Corrected_Azimuth'], 4)
         current_el = round(self.data['broadcast']['Corrected_Elevation'], 4)
@@ -952,6 +945,11 @@ class ACUAgent:
 #        ves = self.data['scanspec']['ves']
 #        azflags = self.data['scanspec']['azflags']
 #        elflags = self.data['scanspec']['elflags']
+        if min(spec['azs']) <= self.motion_limits['azimuth']['lower'] or max(spec['azs']) >= self.motion_limits['azimuth']['upper']:
+            return False, 'Azimuth location out of range!'
+        if min(spec['els']) <= self.motion_limits['elevation']['lower'] or max(spec['els']) >= self.motion_limits['elevation']['upper']:
+            return False, 'Elevation location out of range!'
+
  
         start_az = spec['azs'][0]
         start_el = spec['els'][0]
