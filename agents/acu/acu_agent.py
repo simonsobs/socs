@@ -551,12 +551,9 @@ class ACUAgent:
                 pd0_gday = (pd0[0]-1) * 86400
                 pd0_sec = pd0[1]
                 pd0_data_ctime = gyear + pd0_gday + pd0_sec
-<<<<<<< HEAD
-=======
                 bcast_first['Time_bcast_influx'] = pd0_data_ctime
                 for i in range(2, len(pd0)):
                     bcast_first[fields[i].replace(' ', '_')+'_bcast_influx'] = pd0[i]
->>>>>>> acu_agent_dev
                 acu_broadcast_influx = {'timestamp': bcast_first['Time_bcast_influx'],
                                         'block_name': 'ACU_position_bcast_influx',
                                         'data': bcast_first,
