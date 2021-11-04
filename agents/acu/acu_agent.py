@@ -554,16 +554,6 @@ class ACUAgent:
                 bcast_first['Time_bcast_influx'] = pd0_data_ctime
                 for i in range(2, len(pd0)):
                     bcast_first[fields[i].replace(' ', '_')+'_bcast_influx'] = pd0[i]
-       #         pd0_azimuth_corrected = pd0[2]
-       #         pd0_azimuth_raw = pd0[5]
-       #         pd0_elevation_corrected = pd0[3]
-       #         pd0_elevation_raw = pd0[6]
-       #         bcast_first = {'Time_bcast_influx': pd0_data_ctime,
-       #                        'Azimuth_Corrected_bcast_influx': pd0_azimuth_corrected,
-       #                        'Azimuth_Raw_bcast_influx': pd0_azimuth_raw,
-       #                        'Elevation_Corrected_bcast_influx': pd0_elevation_corrected,
-       #                        'Elevation_Raw_bcast_influx': pd0_elevation_raw,
-       #                        }
                 acu_broadcast_influx = {'timestamp': bcast_first['Time_bcast_influx'],
                                         'block_name': 'ACU_position_bcast_influx',
                                         'data': bcast_first,
@@ -946,6 +936,11 @@ class ACUAgent:
 #        ves = self.data['scanspec']['ves']
 #        azflags = self.data['scanspec']['azflags']
 #        elflags = self.data['scanspec']['elflags']
+        if min(spec['azs']) <= self.motion_limits['azimuth']['lower'] or max(spec['azs']) >= self.motion_limits['azimuth']['upper']:
+            return False, 'Azimuth location out of range!'
+        if min(spec['els']) <= self.motion_limits['elevation']['lower'] or max(spec['els']) >= self.motion_limits['elevation']['upper']:
+            return False, 'Elevation location out of range!'
+
  
         start_az = spec['azs'][0]
         start_el = spec['els'][0]
