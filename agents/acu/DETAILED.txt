@@ -1,0 +1,148 @@
+# Using "DataSets.StatusSATPDetailed8100"
+Time                           : 309.621766810927
+Year                           : 2021
+Azimuth mode                   : 'Stop'
+Azimuth commanded position     : 129.9989
+Azimuth current position       : 129.9989
+Azimuth current velocity       : 0.0
+Azimuth average position error : 0.0
+Azimuth peak position error    : 0.0
+Azimuth computer disabled      : False
+Azimuth axis in stop           : True
+Azimuth brakes released        : False
+Azimuth stop at LCP            : False
+Azimuth power on               : True
+Azimuth CCW limit: 2nd emergency : False
+Azimuth CCW limit: emergency   : False
+Azimuth CCW limit: operating   : False
+Azimuth CCW limit: pre-limit   : False
+Azimuth CCW limit: operating (ACU software limit) : False
+Azimuth CCW limit: pre-limit (ACU software limit) : False
+Azimuth CW limit: pre-limit (ACU software limit) : False
+Azimuth CW limit: operating (ACU software limit) : False
+Azimuth CW limit: pre-limit    : False
+Azimuth CW limit: operating    : False
+Azimuth CW limit: emergency    : False
+Azimuth CW limit: 2nd emergency : False
+Azimuth summary fault          : False
+Azimuth servo failure          : False
+Azimuth motion error           : False
+Azimuth brake 1 failure        : False
+Azimuth brake 2 failure        : False
+Azimuth breaker failure        : False
+Azimuth motor 1 overtemperature : False
+Azimuth motor 2 overtemperature : False
+Azimuth AUX 1 mode selected    : False
+Azimuth AUX 2 mode selected    : False
+Azimuth overspeed              : False
+Azimuth regeneration resistor 1 overtemperature : False
+Azimuth regeneration resistor 2 overtemperature : False
+Azimuth CAN bus amplifier 1 communication failure : False
+Azimuth CAN bus amplifier 2 communication failure : False
+Azimuth encoder failure        : False
+Azimuth oscillation warning    : False
+Azimuth oscillation alarm      : False
+Azimuth tacho failure          : False
+Azimuth immobile               : False
+Azimuth overcurrent motor 1    : False
+Azimuth overcurrent motor 2    : False
+Elevation mode                 : 'Stop'
+Elevation commanded position   : 25.0002
+Elevation current position     : 25.0003
+Elevation current velocity     : 0.0
+Elevation average position error : 0.0
+Elevation peak position error  : 0.0
+Elevation computer disabled    : False
+Elevation axis in stop         : False
+Elevation brakes released      : False
+Elevation stop at LCP          : False
+Elevation power on             : False
+Elevation Down limit: extended emergency (co-moving shield off) : False
+Elevation Down limit: extended operating (co-moving shield off) : False
+Elevation Down limit: emergency : False
+Elevation Down limit: operating : False
+Elevation Down limit: pre-limit : False
+Elevation Down limit: operating (ACU software limit) : False
+Elevation Down limit: pre-limit (ACU software limit) : False
+Elevation Up limit: pre-limit (ACU software limit) : False
+Elevation Up limit: operating (ACU software limit) : False
+Elevation Up limit: pre-limit  : False
+Elevation Up limit: operating  : False
+Elevation Up limit: emergency  : False
+Elevation summary fault        : False
+Elevation servo failure        : False
+Elevation motion error         : False
+Elevation brake 1 failure      : False
+Elevation breaker failure      : False
+Elevation motor 1 overtemp     : False
+Elevation overspeed            : False
+Elevation regeneration resistor 1 overtemperature : False
+Elevation CAN bus amplifier 1 communication failure : False
+Elevation encoder failure      : False
+Elevation oscillation warning  : False
+Elevation oscillation alarm    : False
+Elevation immobile             : False
+Elevation overcurrent motor 1  : False
+Boresight mode                 : 'Stop'
+Boresight commanded position   : 54.9999
+Boresight current position     : 54.9999
+Boresight computer disabled    : False
+Boresight axis in stop         : True
+Boresight brakes released      : False
+Boresight stop at LCP          : False
+Boresight power on             : True
+Boresight CCW limit: emergency : False
+Boresight CCW limit: operating : False
+Boresight CCW limit: pre-limit : False
+Boresight CCW limit: operating (ACU software limit) : False
+Boresight CCW limit: pre-limit (ACU software limit) : False
+Boresight CW limit: pre-limit (ACU software limit) : False
+Boresight CW limit: operating (ACU software limit) : False
+Boresight CW limit: pre-limit  : False
+Boresight CW limit: operating  : False
+Boresight CW limit: emergency  : False
+Boresight summary fault        : False
+Boresight servo failure        : False
+Boresight motion error         : False
+Boresight brake 1 failure      : False
+Boresight brake 2 failure      : False
+Boresight breaker failure      : False
+Boresight motor 1 overtemperature : False
+Boresight motor 2 overtemperature : False
+Boresight AUX 1 mode selected  : False
+Boresight AUX 2 mode selected  : False
+Boresight overspeed            : False
+Boresight regeneration resistor 1 overtemperature : False
+Boresight regeneration resistor 2 overtemperature : False
+Boresight CAN bus amplifier 1 communication failure : False
+Boresight CAN bus amplifier 2 communication failure : False
+Boresight encoder failure      : False
+Boresight oscillation warning  : False
+Boresight oscillation alarm    : False
+Boresight tacho failure        : False
+Boresight immobile             : False
+Boresight overcurrent motor 1  : False
+Boresight overcurrent motor 2  : False
+General summary fault          : False
+E-Stop servo drive cabinet     : False
+E-Stop service pole            : False
+E-Stop Az movable              : False
+Key Switch Bypass Emergency Limit : False
+PCU operation                  : False
+Safe                           : False
+Power failure (latched)        : False
+Lightning protection surge arresters : False
+Power failure (not latched)    : False
+24V power failure              : False
+General Breaker failure        : False
+Cabinet Overtemperature        : False
+Ambient temperature low (operation inhibited) : False
+Co-Moving Shield off           : False
+PLC-ACU interface error        : False
+Qty of free program track stack positions : 9999
+ACU in remote mode             : True
+ACU fan failure                : False
+Cabinet undertemperature       : False
+Time synchronisation error     : True
+ACU-PLC communication error    : False
+

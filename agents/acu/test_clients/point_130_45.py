@@ -12,4 +12,4 @@ def point_there(azimuth, elevation, waittime):
     acu_client.go_to.wait()
 
 if __name__ == "__main__":
-    point_there(float(130), float(45), 1)
+    point_there(float(130), float(25), 1)
