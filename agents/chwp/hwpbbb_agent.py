@@ -663,7 +663,7 @@ def make_parser(parser=None):
 
     # Add options specific to this agent.
     pgroup = parser.add_argument_group('Agent Options')
-    pgroup.add_argument('--port', default=8080)
+    pgroup.add_argument('--port', type=int, default=8080)
 
     return parser
 
