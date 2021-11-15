@@ -1,6 +1,5 @@
 version: '3.2'
-services:
-  # --------------------------------------------------------------------------
+services: # --------------------------------------------------------------------------
   # The socs library.
   # --------------------------------------------------------------------------
   socs:
@@ -143,6 +142,10 @@ services:
   ocs-hwpbbb-agent:
     image: "ocs-hwpbbb-agent"
     build: ./agents/chwp/
+
+  ocs-suprsync-agent:
+    image: 'ocs-suprsync-agent'
+    build: ./agents/suprsync/
 
   # --------------------------------------------------------------------------
   # SOCS Simulators

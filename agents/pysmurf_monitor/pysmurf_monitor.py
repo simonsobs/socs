@@ -1,24 +1,46 @@
 import json
+import time
 from twisted.internet.protocol import DatagramProtocol
 from twisted.internet import reactor
 import datetime
-
 import socs
-from socs.db import pysmurf_files_manager
-
-from twisted.python.failure import Failure
-import os
-import argparse
-
-from twisted.enterprise import adbapi
+from socs.util import get_md5sum
+import queue
+from socs.db.suprsync import SupRsyncFilesManager, SupRsyncFile
+import datetime as dt
 
 from socs.util import get_md5sum
 from ocs.agent.aggregator import Provider
+import os
+import argparse
 
 on_rtd = os.environ.get('READTHEDOCS') == 'True'
 if not on_rtd:
-    import mysql.connector
     from ocs import ocs_agent, site_config
+
+
+def create_remote_path(meta, archive_name):
+    """
+    <archive_dir>/<5 ctime digits>/<pub_id>/<action_timestamp>_<action>/<plots or outputs>
+    """
+    if archive_name == 'smurf':
+        ts = meta['timestamp']
+        action_timestamp = meta['action_ts']
+        action = meta['action']
+        basename= os.path.basename(meta['path'])
+        dir_type = 'plots' if meta['plot'] else 'outputs'
+        pub_id = meta['pub_id']
+
+        return os.path.join(
+            f"{str(ts):.5}",                 # 5 ctime digits
+            pub_id,                          # Pysmurf publisher id
+            f"{action_timestamp}_{action}",  # grouptime_action
+            dir_type,                        # plots/outputs
+            basename,
+        )
+    elif archive_name == 'timestreams':
+        print(meta)
+        return str(os.path.join(*os.path.normpath(meta['path']).split(os.sep)[-3:]))
 
 
 class PysmurfMonitor(DatagramProtocol):
@@ -51,39 +73,12 @@ class PysmurfMonitor(DatagramProtocol):
     def __init__(self, agent, args):
         self.agent: ocs_agent.OCSAgent = agent
         self.log = agent.log
+        self.file_queue = queue.Queue()
+        self.db_path = args.db_path
+        self.running = False
+        self.echo_sql = args.echo_sql
 
         self.agent.register_feed('pysmurf_session_data')
-
-        self.create_table = bool(args.create_table)
-
-        site, instance = self.agent.agent_address.split('.')
-        self.base_file_info = {
-            'site': site,
-            'instance_id': instance,
-            'copied': 0,
-            'failed_copy_attempts': 0,
-            'socs_version': socs.__version__
-        }
-
-        sql_config = {
-            'user': os.environ["MYSQL_USER"],
-            'passwd': os.environ["MYSQL_PASSWORD"],
-            'database': 'files'
-        }
-        db_host = os.environ.get('MYSQL_HOST')
-        if db_host is not None:
-            sql_config['host'] = db_host
-
-        self.dbpool = adbapi.ConnectionPool('mysql.connector', **sql_config, cp_reconnect=True)
-
-    def _add_file_callback(self, res, d):
-        """Callback for when a file is successfully added to DB"""
-        self.log.info("Added {} to {}".format(d['path'], pysmurf_files_manager.table))
-
-    def _add_file_errback(self, failure: Failure, d):
-        """Errback for when there is an exception when adding file to DB"""
-        self.log.error(f"ERROR!!! {d['path']} was not added to the database")
-        self.log.error(f"Failure:\n{failure}")
 
     def datagramReceived(self, _data, addr):
         """
@@ -99,35 +94,10 @@ class PysmurfMonitor(DatagramProtocol):
         data = json.loads(_data)
         pub_id = data['id']
 
-        if data['type'] in ['data_file']:
+        if data['type'] in ['data_file', 'g3_file']:
             self.log.info("New file: {fname}", fname=data['payload']['path'])
-            d = data['payload']
-
-            site, instance = self.agent.agent_address.split('.')
-
-            path = d['path']
-            if (d['format'] == 'npy') and (not d['path'].endswith('.npy')):
-                path += '.npy'
-
-            entry = {
-                'path':                 path,
-                'action':               d['action'],
-                'timestamp':            datetime.datetime.utcfromtimestamp(d['timestamp']),
-                'action_timestamp':     d.get('action_ts'),
-                'format':               d['format'],
-                'plot':                 int(d['plot']),
-                'site':                 site,
-                'pub_id':               data['id'],
-                'instance_id':          instance,
-                'copied':               0,
-                'failed_copy_attempts': 0,
-                'md5sum':               get_md5sum(path),
-                'socs_version':         socs.__version__,
-            }
-
-            deferred = self.dbpool.runInteraction(pysmurf_files_manager.add_entry, entry)
-            deferred.addErrback(self._add_file_errback, d)
-            deferred.addCallback(self._add_file_callback, d)
+            data['payload']['pub_id'] = pub_id
+            self.file_queue.put(data['payload'])
 
         elif data['type'] == "session_data" or data['type'] == "session_log":
             self.agent.publish_to_feed(
@@ -164,31 +134,44 @@ class PysmurfMonitor(DatagramProtocol):
 
             self.agent.publish_to_feed(feed_name, feed_data, from_reactor=True)
 
-    def init(self, session, params=None):
-        """init(create_table=True)
+    def run(self, session, params=None):
+        srfm = SupRsyncFilesManager(self.db_path, create_all=True, echo=self.echo_sql)
 
-        **Task** - Initizes agent by creating / updating the pysmurf_files
-        table if requested, and initializing the database connection pool.
+        self.running = True
+        session.set_status('running')
+        while self.running:
+            files = []
+            while not self.file_queue.empty():
+                meta = self.file_queue.get()
+                # Archive name defaults to pysmurf because that is currently
+                # the only archive. The smurf-streamer will set the
+                # archive_name to "timestreams"
+                archive_name = meta.get('archive_name', 'smurf')
+                try:
+                    local_path = meta['path']
+                    remote_path = create_remote_path(meta, archive_name)
+                    files.append(SupRsyncFile(
+                        local_path=local_path, local_md5sum=get_md5sum(local_path),
+                        remote_path=remote_path, archive_name=archive_name,
+                        timestamp=dt.datetime.utcnow()
+                    ))
+                except Exception as e:
+                    self.agent.log.error(
+                        "Could not generate SupRsync file object from "
+                        "metadata:\n{meta}\nRaised Exception: {e}",
+                        meta=meta, e=e
+                    )
 
-        Parameters:
-            create_table (bool):
-                If true will attempt to create/update pysmurf_files table.
+            if files:
+                with srfm.Session.begin() as session:
+                    session.add_all(files)
 
-        """
-        if params is None:
-            params = {}
+            time.sleep(1)
 
-        if params.get('create_table', self.create_table):
-            con: mysql.connector.MySQLConnection = self.dbpool.connect()
-            cur = con.cursor()
 
-            try:
-                pysmurf_files_manager.create_table(cur, update=True)
-                con.commit()
-            finally:
-                self.dbpool.disconnect(con)
-
-        return True, "Initialized agent"
+    def _stop(self, session, params=None):
+        self.running = False
+        session.set_status('stopping')
 
 
 def make_parser(parser=None):
@@ -201,7 +184,9 @@ def make_parser(parser=None):
     pgroup.add_argument('--create-table', type=bool,
                         help="Specifies whether agent should create or update "
                              "pysmurf_files table if non exists.", default=True)
-
+    pgroup.add_argument('--db-path', type=str, default='/data/so/databases/suprsync.db',
+                        help="Path to suprsync sqlite database")
+    pgroup.add_argument('--echo-sql', action='store_true')
     return parser
 
 
@@ -212,7 +197,7 @@ if __name__ == '__main__':
     agent, runner = ocs_agent.init_site_agent(args)
     monitor = PysmurfMonitor(agent, args)
 
-    agent.register_task('init', monitor.init, startup=True)
+    agent.register_process('run', monitor.run, monitor._stop, startup=True)
 
     reactor.listenUDP(args.udp_port, monitor)
 

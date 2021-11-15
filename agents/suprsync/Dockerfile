@@ -1,7 +1,4 @@
-# SOCS Pysmurf Monitor agent
-# socs Agent for monitoring Pysmurf Publisher, and writing file info to database.
-
-# Use socs base image
+# SupRsync docker file
 FROM socs:latest
 
 # Sets up the cryo / smurf user and group so this can run on smurf-servers
@@ -15,15 +12,13 @@ RUN useradd -d /home/cryo -M cryo && \
     chown cryo:smurf /home/cryo
 
 # Set the working directory to registry directory
-WORKDIR /app/socs/agents/pysmurf_monitor/
-
+WORKDIR /app/socs/agents/suprsync
 # Copy this agent into the app/agents directory
 COPY . .
+RUN apt-get install rsync -y
 RUN pip3 install -r requirements.txt
 
-
-# Run registry on container startup
-ENTRYPOINT ["dumb-init", "python3", "-u", "pysmurf_monitor.py"]
+ENTRYPOINT ["dumb-init", "python3", "-u", "suprsync.py"]
 
 CMD ["--site-hub=ws://crossbar:8001/ws", \
      "--site-http=http://crossbar:8001/call"]
