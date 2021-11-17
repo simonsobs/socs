@@ -138,7 +138,7 @@ class ACUAgent:
         tclient._HTTP11ClientFactory.noisy = False
 
         self.acu = aculib.AcuControl(
-            'guess', backend=TwistedHttpBackend(self.web_agent))
+            acu_config, backend=TwistedHttpBackend(self.web_agent))
         agent.register_process('monitor',
                                self.start_monitor,
                                lambda: self.set_job_stop('monitor'),
@@ -1108,7 +1108,7 @@ def add_agent_args(parser_in=None):
     if parser_in is None:
         parser_in = argparse.ArgumentParser()
     pgroup = parser_in.add_argument_group('Agent Options')
-    pgroup.add_argument("--acu_config", default="guess")
+    pgroup.add_argument("--acu_config")
     return parser_in
 
 
