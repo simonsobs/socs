@@ -141,6 +141,7 @@ class ACUAgent:
             acu_config, backend=TwistedHttpBackend(self.web_agent))
         self.acu_read = aculib.AcuControl(
             acu_config, backend=TwistedHttpBackend(self.web_agent), readonly=True)
+
         agent.register_process('monitor',
                                self.start_monitor,
                                lambda: self.set_job_stop('monitor'),
@@ -339,6 +340,8 @@ class ACUAgent:
             return ok, msg
 
         session.set_status('running')
+        version = yield self.acu_read.http.Version()
+        self.log.info(version)
 
         mode_key = {'Stop': 0,
                     'Preset': 1,
