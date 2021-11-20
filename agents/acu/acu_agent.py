@@ -385,6 +385,7 @@ class ACUAgent:
                              }
                 self.agent.publish_to_feed('acu_error', acu_error)
                 yield dsleep(1)
+                continue
 
             for (key, value) in session.data.items():
                 for category in self.monitor_fields:
