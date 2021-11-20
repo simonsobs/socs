@@ -137,8 +137,10 @@ class ACUAgent:
         self.web_agent = tclient.Agent(reactor)#, pool=pool)
         tclient._HTTP11ClientFactory.noisy = False
 
-        self.acu = aculib.AcuControl(
+        self.acu_control = aculib.AcuControl(
             acu_config, backend=TwistedHttpBackend(self.web_agent))
+        self.acu_read = aculib.AcuControl(
+            acu_config, backend=TwistedHttpBackend(self.web_agent), readonly=True)
         agent.register_process('monitor',
                                self.start_monitor,
                                lambda: self.set_job_stop('monitor'),
@@ -367,7 +369,7 @@ class ACUAgent:
 
             query_t = time.time()
             try:
-                j = yield self.acu.http.Values(self.acu8100)
+                j = yield self.acu_read.http.Values(self.acu8100)
                 n_ok += 1
                 session.data = j
             except Exception as e:
@@ -509,9 +511,9 @@ class ACUAgent:
         if not ok:
             return ok, msg
         session.set_status('running')
-        FMT = self.udp_schema['format']#'<idddddddddddd'
+        FMT = self.udp_schema['format']
         FMT_LEN = struct.calcsize(FMT)
-        UDP_PORT = self.udp['port'] #self.acu_config['PositionBroadcast_target'].split(':')[1]
+        UDP_PORT = self.udp['port']
         udp_data = []
         fields = self.udp_schema['fields']
         class MonitorUDP(protocol.DatagramProtocol):
@@ -598,11 +600,11 @@ class ACUAgent:
             self.set_job_done('control')
             return False, 'Could not find stop times.'
         # find az stop time
-        yield self.acu.stop()
+        yield self.acu_control.stop()
         self.log.info('Stopped')
         yield dsleep(0.1)
         last20az = []
-        yield self.acu.go_to(az, current_el, wait=0.5)
+        yield self.acu_control.go_to(az, current_el, wait=0.5)
         yield dsleep(5)
         motion_start = time.time()
         mdata = self.data['status']['summary']
@@ -633,7 +635,7 @@ class ACUAgent:
                 else:
                     moving = True
         motion_end = time.time()
-        yield self.acu.stop()
+        yield self.acu_control.stop()
         determine_stop = motion_end - reached_az
         self.stop_times['az'] = determine_stop
         self.log.info('az_stop: ' + str(determine_stop))
@@ -657,11 +659,11 @@ class ACUAgent:
             self.set_job_done('control')
             return False, 'Could not find stop time.'
         # find el stop time
-        yield self.acu.stop()
+        yield self.acu_control.stop()
         self.log.info('Stopped')
         yield dsleep(0.1)
         last20el = []
-        yield self.acu.go_to(current_az, el, wait=0.5)
+        yield self.acu_control.go_to(current_az, el, wait=0.5)
         motion_start = time.time()
         yield dsleep(5)
         mdata = self.data['status']['summary']
@@ -692,7 +694,7 @@ class ACUAgent:
                 else:
                     moving = True
         motion_end = time.time()
-        yield self.acu.stop()
+        yield self.acu_control.stop()
         determine_stop = motion_end - reached_el
         self.stop_times['el'] = determine_stop
         print('el_stop: ' + str(determine_stop))
@@ -744,10 +746,10 @@ class ACUAgent:
             self.set_job_done('control')
             return True, 'Pointing completed'
    #     yield self.acu.stop()
-        yield self.acu.mode('Stop')
+        yield self.acu_control.mode('Stop')
         self.log.info('Stopped')
         yield dsleep(0.5)
-        yield self.acu.go_to(az, el, wait=0.1)
+        yield self.acu_control.go_to(az, el, wait=0.1)
         yield dsleep(0.3)
         mdata = self.data['status']['summary']
         # Wait for telescope to start moving
@@ -776,14 +778,14 @@ class ACUAgent:
                 pe = round(mdata['Elevation_current_position'], 2)
                 pa = round(mdata['Azimuth_current_position'], 2)
                 if pe != el or pa != az:
-                    yield self.acu.stop()
+                    yield self.acu_control.stop()
                     self.log.warn('Stopped before reaching commanded point!')
                     return False, 'Something went wrong!'
                 modes = (mdata['Azimuth_mode'], mdata['Elevation_mode'])
                 if modes != ('Preset', 'Preset'):
                     return False, 'Fault triggered!'
 
-        yield self.acu.stop()
+        yield self.acu_control.stop()
         self.data['uploads']['Start_Azimuth'] = 0.0
         self.data['uploads']['Start_Elevation'] = 0.0
         self.data['uploads']['Command_Type'] = 0
@@ -810,7 +812,7 @@ class ACUAgent:
         if not ok:
             return ok, msg
         bs_destination = params.get('b')
-        yield self.acu.stop()
+        yield self.acu_control.stop()
         yield dsleep(5)
         self.data['uploads']['Start_Boresight'] = self.data['status']['summary']['Boresight_current_position']
         self.data['uploads']['Command_Type'] = 1
@@ -820,7 +822,7 @@ class ACUAgent:
                       'data': self.data['uploads']
                       }
         self.agent.publish_to_feed('acu_upload', acu_upload)
-        yield self.acu.go_3rd_axis(bs_destination)
+        yield self.acu_control.go_3rd_axis(bs_destination)
         current_position = self.data['status']['summary']\
             ['Boresight_current_position']
         while current_position != bs_destination:
@@ -832,7 +834,7 @@ class ACUAgent:
             self.agent.publish_to_feed('acu_upload', acu_upload)
             current_position = self.data['status']['summary']\
                 ['Boresight_current_position']
-        yield self.acu.stop()
+        yield self.acu_control.stop()
         self.data['uploads']['Start_Boresight'] = 0.0
         self.data['uploads']['Command_Type'] = 0
         self.data['uploads']['Preset_Boresight'] = 0.0
@@ -859,10 +861,10 @@ class ACUAgent:
             self.try_set_job('control')
         self.log.info('try_set_job ok')
 #        yield self.acu.stop()
-        yield self.acu.mode('Stop')
+        yield self.acu_control.mode('Stop')
         self.log.info('Stop called')
         yield dsleep(5)
-        yield self.acu.http.Command('DataSets.CmdTimePositionTransfer',
+        yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
                                     'Clear Stack')
         yield dsleep(0.1)
         self.log.info('Cleared stack.')
@@ -970,7 +972,7 @@ class ACUAgent:
   #      f.close()
         self.log.info('all_lines generated')
         self.data['uploads']['PtStack_Lines'] = 'True'
-        yield self.acu.mode('ProgramTrack')
+        yield self.acu_control.mode('ProgramTrack')
         self.log.info('mode is now ProgramTrack')
         group_size = 120
         while len(all_lines):
@@ -1004,7 +1006,7 @@ class ACUAgent:
                 free_positions = self.data['status']['summary']\
                     ['Free_upload_positions']
                 yield dsleep(0.1)
-            yield self.acu.http.UploadPtStack(text)
+            yield self.acu_control.http.UploadPtStack(text)
             self.log.info('Uploaded a group')
         self.log.info('No more lines to upload')
         current_az = self.data['broadcast']['Corrected_Azimuth']
@@ -1018,7 +1020,7 @@ class ACUAgent:
             current_az = self.data['broadcast']['Corrected_Azimuth']
             current_el = self.data['broadcast']['Corrected_Elevation']
         yield dsleep(self.sleeptime)
-        yield self.acu.stop()
+        yield self.acu_control.stop()
         self.data['uploads']['Start_Azimuth'] = 0.0
         self.data['uploads']['Start_Elevation'] = 0.0
         self.data['uploads']['Command_Type'] = 0
@@ -1077,13 +1079,13 @@ class ACUAgent:
 
         self.log.info('scantype is ' + str(scantype))
 
-        yield self.acu.stop()
+        yield self.acu_control.stop()
         if scantype != 'linear':
             self.log.warn('Scan type not supported')
             return False
         g = sh.generate(stop_iter, az_endpoint1, az_endpoint2,
                         az_speed, acc, el_endpoint1, el_endpoint2, el_speed)
-        self.acu.mode('ProgramTrack')
+        self.acu_control.mode('ProgramTrack')
         while True:
             lines = next(g)
             current_lines = lines
@@ -1098,8 +1100,8 @@ class ACUAgent:
                     yield dsleep(0.1)
                     free_positions = self.data['status']['summary']\
                         ['Free_upload_positions']
-                yield self.acu.http.UploadPtStack(text)
-        yield self.acu.stop()
+                yield self.acu_control.http.UploadPtStack(text)
+        yield self.acu_control.stop()
         self.set_job_done('control')
         return True, 'Track generation ended cleanly'
 
