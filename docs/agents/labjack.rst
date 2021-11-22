@@ -35,7 +35,7 @@ available arguments::
            ['--active-channels', ['AIN0', 'AIN1', 'AIN2']],
            ['--function-file', 'labjack-functions.yaml'],
            ['--mode', 'acq'],
-           ['--sampling_frequency', '700'],
+           ['--sampling-frequency', '700'],
            ]},
 
 You should assign your LabJack a static IP, you'll need to know that here. 

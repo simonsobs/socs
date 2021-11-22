@@ -177,9 +177,9 @@ class LabJackAgent:
         self.sampling_frequency = sampling_frequency
 
         # Labjack channels to read
-        if active_channels == 'T7-all':
+        if active_channels[0] == 'T7-all':
             self.chs = ['AIN{}'.format(i) for i in range(14)]
-        elif active_channels == 'T4-all':
+        elif active_channels[0] == 'T4-all':
             self.chs = ['AIN{}'.format(i) for i in range(12)]
         else:
             self.chs = active_channels
@@ -375,11 +375,15 @@ def make_parser(parser=None):
 
     pgroup.add_argument('--ip-address')
     pgroup.add_argument('--active-channels',
-                        default='T7-all',
+                        default=['T7-all'], nargs='+',
                         help="Active channel description, or list of channels, i.e. ['AIN0', 'AIN1']")
     pgroup.add_argument('--function-file', default='None',
                         help='Path to file for unit conversion.')
     pgroup.add_argument('--sampling-frequency', default='2.5')
+    pgroup.add_argument('--mode', choices=['idle', 'acq'], default='acq',
+                        help="Starting mode for the labjack. 'acq' will have it "
+                             "acquire data on startup, and 'idle' will just leave "
+                             "it idle.")
 
     return parser
 
