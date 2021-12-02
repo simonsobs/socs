@@ -83,7 +83,7 @@ Agent API
 .. autoclass:: agents.lakeshore336.LS336_agent.LS336_Agent
     :members:
 
-.. _372_driver:
+.. _336_driver:
 
 Supporting APIs
 ---------------

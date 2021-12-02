@@ -712,17 +712,19 @@ class LS336_Agent:
     @ocs_agent.param('transport_offset', default=0, type=float,
                      check=lambda x: x >= 0.0)
     def servo_to_temperature(self, session, params):
-        """servo_to_temperature(temperature=None,ramp=0.1,heater='2',
+        """servo_to_temperature(temperature=None,ramp=0.1,heater='2',\
                                 transport=False,transport_offset=0)
 
         **Task** - A wrapper for setting the heater setpoint. Performs sanity
         checks on heater configuration before publishing setpoint:
+
             1. checks control mode of heater (closed loop)
             2. checks units of input channel (kelvin)
             3. resets setpoint to current temperature with ramp off
             4. sets ramp on to specified rate
             5. checks setpoint does not exceed input channel T_limit
             6. sets setpoint to commanded value
+
         Note that this function does NOT turn on the heater if it is off. You
         must use set_heater_range() to pick a range first.
 
@@ -977,7 +979,7 @@ class LS336_Agent:
         **Task** - Gets an arbitrary channel attribute and stores it in the
         session.data dict. Attribute must be the name of a method
         in the namespace of the Lakeshore336 Channel class,
-        with a leading "get_" removed (see example).
+        with a leading "get\_" removed (see example).
 
         Parameters:
             attribute (str): The name of the channel attribute to get. See the
@@ -1026,7 +1028,7 @@ class LS336_Agent:
         **Task** - Gets an arbitrary heater attribute and stores it
         in the session.data dict. Attribute must be the name of a method
         in the namespace of the Lakeshore336 Heater class, with a leading
-        "get_" removed (see example).
+        "get\_" removed (see example).
 
         Parameters:
             attribute (str): The name of the channel attribute to get. See the

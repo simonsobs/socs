@@ -280,20 +280,19 @@ class LS336:
 
 
 class Channel:
+    """Channel class for LS336
 
+    Parameters
+    ----------
+    ls : LS336 object
+        The parent LS336 device
+    inp : str
+        The channel we are building ('A', 'B', 'C', or 'D')
+        Could also be 'D1','D2','D3','D4', or 'D5' if the extra
+        Lakeshore 3062 scanner is installed on the LS336.
+        D and D1 refer to the same channel!
+    """
     def __init__(self, ls, inp):
-        """Channel class for LS336
-
-        Parameters
-        ----------
-        ls : LS336 object
-            The parent LS336 device
-        inp : str
-            The channel we are building ('A', 'B', 'C', or 'D')
-            Could also be 'D1','D2','D3','D4', or 'D5' if the extra 
-            Lakeshore 3062 scanner is installed on the LS336.
-            D and D1 refer to the same channel!
-        """
         assert inp in ['A', 'B', 'C', 'D', 'D1', 'D2', 'D3', 'D4', 'D5']
 
         self.ls = ls
@@ -450,8 +449,12 @@ class Curve:
 
     def get_header(self):
         """Get curve header description.
-        :returns: response from CRVHDR? in list
-        :rtype: list of str
+
+        Returns
+        -------
+        list
+            response from CRVHDR? in list
+
         """
         resp = self.ls.msg(f"CRVHDR? {self.curve_num}").split(',')
         print(resp)
@@ -484,10 +487,16 @@ class Curve:
                15 characters
         <sn> is limited to 10 characters. Longer sn's take the last 10 digits
 
-        :param params: CRVHDR parameters
-        :type params: list of str
+        Parameters
+        ----------
+        params : list
+            CRVHDR parameters
 
-        :returns: response from ls.msg
+        Returns
+        -------
+        str
+            response from ls.msg
+
         """
         assert len(params) == 5
 
@@ -506,19 +515,30 @@ class Curve:
 
     def get_name(self):
         """Get the curve name with the CRVHDR? command.
-        :returns: The curve name
-        :rtype: str
+
+        Returns
+        -------
+        str
+            The curve name
+
         """
         self.get_header()
         return self.name
 
     def set_name(self, name):
         """Set the curve name with the CRVHDR command.
-        :param name: The curve name, limit of 15 characters,
-                     longer names get truncated
-        :type name: str
-        :returns: the response from the CRVHDR command
-        :rtype: str
+
+        Parameters
+        ----------
+        name : str
+            The curve name, limit of 15 characters, longer names get
+            truncated
+
+        Returns
+        -------
+        str
+            the response from the CRVHDR command
+
         """
         resp = self.get_header()
         resp[0] = name.upper()
@@ -527,19 +547,30 @@ class Curve:
 
     def get_serial_number(self):
         """Get the curve serial number with the CRVHDR? command."
-        :returns: The curve serial number
-        :rtype: str
+
+        Returns
+        -------
+        str
+            The curve serial number
+
         """
         self.get_header()
         return self.serial_number
 
     def set_serial_number(self, serial_number):
         """Set the curve serial number with the CRVHDR command.
-        :param serial_number: The curve serial number, limit of 10 characters,
-                              longer serials get truncated
-        :type name: str
-        :returns: the response from the CRVHDR command
-        :rtype: str
+
+        Parameters
+        ----------
+        serial_number : str
+            The curve serial number, limit of 10 characters, longer serials get
+            truncated
+
+        Returns
+        -------
+        str
+            the response from the CRVHDR command
+
         """
         resp = self.get_header()
         resp[1] = serial_number
@@ -548,22 +579,30 @@ class Curve:
 
     def get_format(self):
         """Get the curve data format with the CRVHDR? command."
-        :returns: The curve data format
-        :rtype: str
+
+        Returns
+        -------
+        str
+            The curve data format
+
         """
         self.get_header()
         return self.format
 
     def set_format(self, _format):
         """Set the curve format with the CRVHDR command.
-        :param _format: The curve format, valid formats are:
-                        "mV/K (linear)"
-                        "V/K (linear)"
-                        "Ohm/K (linear)"
-                        "log Ohm/K (linear)"
-        :type name: str
-        :returns: the response from the CRVHDR command
-        :rtype: str
+
+        Parameters
+        ----------
+        _format : str
+            The curve format, valid formats are: "mV/K (linear)", "V/K
+            (linear)", "Ohm/K (linear)", and "log Ohm/K (linear)"
+
+        Returns
+        -------
+        str
+            the response from the CRVHDR command
+
         """
         resp = self.get_header()
 
@@ -575,18 +614,29 @@ class Curve:
 
     def get_limit(self):
         """Get the curve temperature limit with the CRVHDR? command.
-        :returns: The curve temperature limit
-        :rtype: str
+
+        Returns
+        -------
+        str
+            The curve temperature limit
+
         """
         self.get_header()
         return float(self.limit)
 
     def set_limit(self, limit):
         """Set the curve temperature limit with the CRVHDR command.
-        :param limit: The curve temperature limit
-        :type limit: float
-        :returns: the response from the CRVHDR command
-        :rtype: str
+
+        Parameters
+        ----------
+        limit : float
+            The curve temperature limit
+
+        Returns
+        -------
+        str
+            the response from the CRVHDR command
+
         """
         resp = self.get_header()
         resp[3] = str(limit)
@@ -595,19 +645,29 @@ class Curve:
 
     def get_coefficient(self):
         """Get the curve temperature coefficient with the CRVHDR? command.
-        :returns: The curve temperature coefficient
-        :rtype: str
+
+        Returns
+        -------
+        str
+            The curve temperature coefficient
+
         """
         self.get_header()
         return self.coefficient
 
     def set_coefficient(self, coefficient):
         """Set the curve temperature coefficient with the CRVHDR command.
-        :param coefficient: The curve temperature coefficient,
-                            either 'positive' or 'negative'
-        :type limit: str
-        :returns: the response from the CRVHDR command
-        :rtype: str
+
+        Parameters
+        ----------
+        coefficient : str
+            The curve temperature coefficient, either 'positive' or 'negative'
+
+        Returns
+        -------
+        str
+            the response from the CRVHDR command
+
         """
         assert coefficient in ['positive', 'negative']
 
@@ -619,14 +679,21 @@ class Curve:
     def get_data_point(self, index):
         """Get a single data point from a curve, given the index, using the
         CRVPT? command.
-        The format for the return value, a 2-tuple of floats, is chosen to work
-        with how the get_curve() method later stores the entire curve in a
-        numpy structured array.
-        :param index: index of breakpoint to msg
-        :type index: int
-        :returns: (units, tempertaure, curvature) values for the given
-                  breakpoint
-        :rtype: 3-tuple of floats
+
+        Parameters
+        ----------
+        index : int
+            index of breakpoint to msg
+
+        Returns
+        -------
+        tuple
+            (units, tempertaure, curvature) values for the given breakpoint
+
+            The format for the return value, a 2-tuple of floats, is chosen to work
+            with how the get_curve() method later stores the entire curve in a
+            numpy structured array.
+
         """
         resp = self.ls.msg(f"CRVPT? {self.curve_num},{index}").split(',')
         _units = float(resp[0])
@@ -635,14 +702,21 @@ class Curve:
 
     def _set_data_point(self, index, units, kelvin):
         """Set a single data point with the CRVPT command.
-        :param index: data point index
-        :type index: int
-        :param units: value of the sensor units to 6 digits
-        :type units: float
-        :param kelvin: value of the corresponding temp in Kelvin to 6 digits
-        :type kelvin: float
-        :returns: response from the CRVPT command
-        :rtype: str
+
+        Parameters
+        ----------
+        index : int
+            data point index
+        units : float
+            value of the sensor units to 6 digits
+        kelvin : float
+            value of the corresponding temp in Kelvin to 6 digits
+
+        Returns
+        -------
+        str
+            response from the CRVPT command
+
         """
         resp = self.ls.msg(
             f"CRVPT {self.curve_num}, {index}, {units}, {kelvin}")
@@ -691,10 +765,17 @@ class Curve:
 
     def set_curve(self, _file):
         """Set a calibration curve, loading it from the file.
-        :param _file: the file to load the calibration curve from
-        :type _file: str
-        :returns: return the new curve header, refreshing the attributes
-        :rtype: list of str
+
+        Parameters
+        ----------
+        _file : str
+            the file to load the calibration curve from
+
+        Returns
+        -------
+        list
+            return the new curve header, refreshing the attributes
+
         """
         with open(_file) as f:
             content = f.readlines()
@@ -732,10 +813,13 @@ class Curve:
         use CRVPT? command from get_data_point() to check
         that all points of calibration curve  were uploaded.
         If not, re-upload points.
-        :param _file: calibration curve file
-        :type _file: str
-        """
 
+        Parameters
+        ----------
+        _file : str
+            calibration curve file
+
+        """
         with open(_file) as f:
             content = f.readlines()
 
@@ -763,8 +847,12 @@ class Curve:
 
     def delete_curve(self):
         """Delete the curve using the CRVDEL command.
-        :returns: the response from the CRVDEL command
-        :rtype: str
+
+        Returns
+        -------
+        str
+            the response from the CRVDEL command
+
         """
         resp = self.ls.msg(f"CRVDEL {self.curve_num}")
         # self.get_header()
@@ -809,14 +897,17 @@ class Curve:
 
 
 class Heater:
+    """Heater class for LS336 control
 
+    Parameters
+    ----------
+    ls : Lakeshore336.LS336
+        the lakeshore object we're controlling
+    output : int
+        the heater output we want to control, 1 = 100W, 2 = 50W
+
+    """
     def __init__(self, ls, output):
-        """Heater class for LS336 control
-        :param ls: the lakeshore object we're controlling
-        :type ls: Lakeshore336.LS336
-        :param output: the heater output we want to control, 1 = 100W, 2 = 50W
-        :type output: int
-        """
         assert int(output) in [1, 2]
 
         self.ls = ls
@@ -831,9 +922,12 @@ class Heater:
 
     def get_output_mode(self):
         """msg the heater mode using the OUTMODE? command.
-        :returns: 3-tuple with output mode, input, and whether powerup
-                  is enabled
-        :rtype: tuple
+
+        Returns
+        -------
+        tuple
+            3-tuple with output mode, input, and whether powerup is enabled
+
         """
         resp = self.ls.msg(f"OUTMODE? {self.output}").split(",")
 
@@ -849,9 +943,17 @@ class Heater:
         Parameters should be <mode>, <input>, and <powerup enable>.
         This allows us to use output from get_output_mode directly, as
         it doesn't return <output>.
-        :param params: OUTMODE parameters
-        :type params: list of str
-        :returns: response from ls.msg
+
+        Parameters
+        ----------
+        params : list
+            OUTMODE parameters
+
+        Returns
+        -------
+        str
+            response from ls.msg
+
         """
         assert len(params) == 3
 
@@ -863,17 +965,29 @@ class Heater:
 
     def get_mode(self):
         """Set output mode with OUTMODE? commnd.
-        :returns: The output mode
-        :rtype: str
+
+        Returns
+        -------
+        str
+            The output mode
+
         """
         self.get_output_mode()
         return self.mode
 
     def set_mode(self, mode):
         """Set output mode with OUTMODE commnd.
-        :param mode: control mode for heater
-        :type mode: str
-        :returns: the response from the OUTMODE command
+
+        Parameters
+        ----------
+        mode : str
+            control mode for heater
+
+        Returns
+        -------
+        str
+            the response from the OUTMODE command
+
         """
         assert mode.lower() in output_modes_lock.keys(
         ), f"{mode} not a valid mode"
@@ -885,16 +999,24 @@ class Heater:
 
     def get_input_channel(self):
         """Get the control channel with the OUTMODE? command.
-        :returns: The control channel
-        :rtype: str
+
+        Returns
+        -------
+        str
+            The control channel
+
         """
         self.get_output_mode()
         return self.input
 
     def set_input_channel(self, inp):
         """Set the control channel with the OUTMODE command.
-        :param inp: specifies which input or channel to control from
-        :type inp: str or int
+
+        Parameters
+        ----------
+        inp : str or int
+            specifies which input or channel to control from
+
         """
         assert inp in channel_lock, f"{inp} not a valid input/channel"
 
@@ -905,17 +1027,24 @@ class Heater:
 
     def get_powerup(self):
         """Get the powerup state with the OUTMODE? command.
-        :returns: The powerup state
-        :rtype: str
+
+        Returns
+        -------
+        str
+            The powerup state
+
         """
         self.get_output_mode()
         return self.powerup
 
     def set_powerup(self, powerup):
         """
-        :param powerup: specifies whether the output remains on or shuts off
-                        after power cycle. True for on after powerup
-        :type powerup: bool
+        Parameters
+        ----------
+        powerup : bool
+            specifies whether the output remains on or shuts off after power
+            cycle. True for on after powerup
+
         """
         assert powerup in [
             True, False], f"{powerup} not valid powerup parameter"
@@ -928,8 +1057,12 @@ class Heater:
 
     def get_heater_setup(self):
         """Gets Heater setup params with the HTRSET? command.
-        :return resp: List of values that have been returned from the
-        Lakeshore.
+
+        Returns
+        -------
+        list
+            List of values that have been returned from the Lakeshore.
+
         """
         resp = self.ls.msg("HTRSET? {}".format(self.output)).split(',')
 
@@ -943,16 +1076,19 @@ class Heater:
     def _set_heater_setup(self, params):
         """
         Sets the heater setup using the HTRSET command.
-        Params must be a list with the parameters:
-            <heater resistance mode>:    Heater mode in Ohms; 1=25 Ohms,
-                                         2=50 Ohms
-            <max current>: Specifies max heater output for warm-up heater.
-                           0=User spec, 1=0.707 A, 2=1 A, 3=1.141 A, 4=2 A.
-            <max user current>: Max heater output if max_current is set to user
-            <current/power>:    Specifies if heater display is current or
-                                power. 1=current, 2=power.
-        :param params:
-        :return:
+
+        Parameters
+        ----------
+        params : list
+            Params must be a list with the parameters:
+                <heater resistance mode>:    Heater mode in Ohms; 1=25 Ohms,
+                                             2=50 Ohms
+                <max current>: Specifies max heater output for warm-up heater.
+                               0=User spec, 1=0.707 A, 2=1 A, 3=1.141 A, 4=2 A.
+                <max user current>: Max heater output if max_current is set to user
+                <current/power>:    Specifies if heater display is current or
+                                    power. 1=current, 2=power.
+
         """
         assert len(params) == 4
 
@@ -1038,9 +1174,12 @@ class Heater:
 
     def set_heater_display(self, display):
         """Change the display of the heater
-        :param display: Display mode for heater. Can either be 'current'
-        or 'power'.
-        :type display: string
+
+        Parameters
+        ----------
+        display : str
+            Display mode for heater. Can either be 'current' or 'power'.
+
         """
         assert display.lower() in heater_display_lock.keys(
         ), f"{display} is not a valid display"
@@ -1081,8 +1220,12 @@ class Heater:
 
     def get_heater_range(self):
         """Get heater range with RANGE? command.
-        :returns: heater range by decade in total available power/current
-        :rtype: float
+
+        Returns
+        -------
+        float
+            heater range by decade in total available power/current
+
         """
         resp = self.ls.msg(f"RANGE? {self.output}")
         self.range = heater_range_key[resp]
@@ -1090,8 +1233,12 @@ class Heater:
 
     def set_heater_range(self, rng):
         """Set heater range with RANGE command.
-        :param rng: heater range
-        :type rng: str in 'Off','Low','Medium','High'
+
+        Parameters
+        ----------
+        rng : str
+            heater range, either 'Off','Low','Medium', or 'High'
+
         """
         _range = rng.lower()
         assert _range in heater_range_lock.keys(), 'Not a valid heater Range'
@@ -1120,8 +1267,12 @@ class Heater:
 
     def get_pid(self):
         """Get PID parameters with PID? command.
-        :returns: P, I, D
-        :rtype: float, float, float
+
+        Returns
+        -------
+        tuple
+            (P, I, D)
+
         """
         resp = self.ls.msg(f"PID? {self.output}").split(',')
         self.P = float(resp[0])
@@ -1131,14 +1282,21 @@ class Heater:
 
     def set_pid(self, P, I, D):
         """Set PID parameters for closed loop control.
-        :params P: proportional term in PID loop
-        :type P: float
-        :params I: integral term in PID loop
-        :type I: float
-        :params D: derivative term in PID loop
-        :type D: float
-        :returns: response from PID command
-        :rtype: str
+
+        Parameters
+        ----------
+        P : float
+            proportional term in PID loop
+        I : float
+            integral term in PID loop
+        D : float
+            derivative term in PID loop
+
+        Returns
+        -------
+        str
+            response from PID command
+
         """
         assert float(P) <= 1000 and float(P) >= 0.1
         assert float(I) <= 1000 and float(I) >= 0.1
