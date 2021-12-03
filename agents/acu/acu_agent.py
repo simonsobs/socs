@@ -138,9 +138,11 @@ class ACUAgent:
         tclient._HTTP11ClientFactory.noisy = False
 
         self.acu_control = aculib.AcuControl(
-            acu_config, backend=TwistedHttpBackend(self.web_agent))
+            acu_config, backend=TwistedHttpBackend(persistent=False))#self.web_agent))
+   #     self.acu_read = aculib.AcuControl(
+   #         acu_config, backend=TwistedHttpBackend(self.web_agent), readonly=True)
         self.acu_read = aculib.AcuControl(
-            acu_config, backend=TwistedHttpBackend(self.web_agent), readonly=True)
+            acu_config, backend=TwistedHttpBackend(persistent=True), readonly=True)
 
         agent.register_process('monitor',
                                self.start_monitor,
@@ -243,18 +245,15 @@ class ACUAgent:
         agent.register_task('run_specified_scan',
                             self.run_specified_scan,
                             blocking=False)
+#        agent.register_task('run_azonly_scan',
+#                            self.run_azonly_scan,
+#                            blocking=False)
         agent.register_task('set_boresight',
                             self.set_boresight,
                             blocking=False)
         agent.register_task('stop_and_clear',
                             self.stop_and_clear,
                             blocking=False)
-#        agent.register_task('spec_scan_linear_turnaround',
-#                            self.spec_scan_linear_turnaround,
-#                            blocking=False)
-#        agent.register_task('spec_scan_fromfile',
-#                            self.spec_scan_fromfile,
-#                            blocking=False)
         agent.register_task('find_az_stop_point',
                             self.find_az_stop_point,
                             blocking=False)
@@ -911,6 +910,42 @@ class ACUAgent:
         self.log.info('Scan linear turnaround scan specified')
         return True, 'Scan linear turnaround scan specified'
 
+#    @inlineCallbacks
+#    def run_azonly_scan(self, session, params=None):
+#        ok, msg = self.try_set_job('control')
+#        if not ok:
+#            return ok, msg
+#        self.log.info('try_set_job ok')
+#        scantype = params.get('scantype')
+#        scantype_params = {'linear_turnaround': ['azpts', 'el', 'azvel', 'acc', 'ntimes'],
+#                           'fromfile': ['filename'],
+#                           }
+#        passparams = {}
+#        for pname in scantype_params[scantype]:
+#            pvals = params.get(pname)
+#            passparams[pname] = pvals
+#        azonly = params.get('azonly')
+#        if scantype == 'linear_turnaround':
+#            self._spec_scan_linear_turnaround(passparams)
+#        elif scantype == 'fromfile':
+#            self._spec_scan_fromfile(passparams)
+#        spec = self.data['scanspec']
+#        if min(spec['azs']) <= self.motion_limits['azimuth']['lower'] or max(spec['azs']) >= self.motion_limits['azimuth']['upper']:
+#            return False, 'Azimuth location out of range!'
+#        start_az = spec['azs'][0]
+#        end_az = spec['azs'][-1]
+#        all_lines = sh.ptstack_format(spec['times'], spec['azs'], spec['els'], spec['vas'], spec['ves'], spec['azflags'], spec['elflags'])
+#        self.log.info('all_lines generated')
+#        yield self.acu_control.azmode('ProgramTrack')
+#        self.log.info('mode is now ProgramTrack')
+#        group_size = 120
+#        while len(all_lines):
+#            upload_lines = all_lines[:group_size]
+#            all_lines = all_lines[group_size:]
+#            upload_vals = front_group(spec, group_size)
+#            spec = pop_first_vals(spec, group_size)
+#
+
     @inlineCallbacks
     def run_specified_scan(self, session, params=None):
         """TASK run_specified_scan
@@ -939,15 +974,15 @@ class ACUAgent:
         for pname in scantype_params[scantype]:
             pvals = params.get(pname)
             passparams[pname] = pvals
-        self._spec_scan_linear_turnaround(passparams)
+        azonly = params.get('azonly')
+#        print('azonly = '+ str(azonly))
+        if abs(passparams['acc']) > self.motion_limits['acc']:
+            return False, 'Acceleration too great!'
+        if scantype == 'linear_turnaround':
+            self._spec_scan_linear_turnaround(passparams)
+        elif scantype == 'fromfile':
+            self._spec_scan_fromfile(passparams)
         spec = self.data['scanspec']
-#        times = self.data['scanspec']['times']
-#        azs = self.data['scanspec']['azs']
-#        els = self.data['scanspec']['els']
-#        vas = self.data['scanspec']['vas']
-#        ves = self.data['scanspec']['ves']
-#        azflags = self.data['scanspec']['azflags']
-#        elflags = self.data['scanspec']['elflags']
         if min(spec['azs']) <= self.motion_limits['azimuth']['lower'] or max(spec['azs']) >= self.motion_limits['azimuth']['upper']:
             return False, 'Azimuth location out of range!'
         if min(spec['els']) <= self.motion_limits['elevation']['lower'] or max(spec['els']) >= self.motion_limits['elevation']['upper']:
@@ -971,12 +1006,14 @@ class ACUAgent:
 
         # Follow the scan in ProgramTrack mode, then switch to Stop mode
         all_lines = sh.ptstack_format(spec['times'], spec['azs'], spec['els'], spec['vas'], spec['ves'], spec['azflags'], spec['elflags'])
-  #      with open('/home/simons/code/vertex-acu-agent/test_clients/'+str(time.time())+'_test.pkl','wb') as f:
-  #          pickle.dump(all_lines, f)
-  #      f.close()
         self.log.info('all_lines generated')
         self.data['uploads']['PtStack_Lines'] = 'True'
-        yield self.acu_control.mode('ProgramTrack')
+        if azonly:
+            yield self.acu_control.azmode('ProgramTrack')
+        else:
+            yield self.acu_control.mode('ProgramTrack')
+        m = yield self.acu_control.mode()
+        print(m)
         self.log.info('mode is now ProgramTrack')
         group_size = 120
         while len(all_lines):
