@@ -19,6 +19,24 @@
 #
 ####################################################################################################
 
+
+####################################################################################################
+#
+# Motor Control for UCSD Remy/Joe 11/15 Update!!
+#
+#
+# This update modifies the FTS Control code to be 'more general' in regards to docstrings and variable 
+# names. By this we aim to transition FTS/Polarizer instances to motor1/motor2/motorN instances instead.
+# Also, we plan to update functions to act smarter, specifically... 
+# 
+# NEED TO DOCUMENT HOW THE MOTOR CONTROLLERS SHOULD BE CONFIGURED.
+#
+# Commands for communicating with the motor controllers can be found here:
+# https://www.applied-motion.com/sites/default/files/hardware-manuals/Host-Command-Reference_920-0002P.PDF
+#
+####################################################################################################
+
+
 import sys
 from MoxaSerial import Serial_TCPServer
 from time import sleep
@@ -57,16 +75,18 @@ MR_CODE_TO_STEPS_PER_REV = {
 
 
 class MotControl(object):
-        """FTSControl object for controlling up to 2 motors - linear stage and output polarizer"""
+        """Object for controlling up to 2 motors - all functions will work for linear stages, some will work if motors are attached
+        to non-linear stages. 
+        """
         def __init__(self, motor1_Ip=None, motor1_Port=None, motor1_isLin = True, motor2_Ip=None, motor2_Port=None, motor2_isLin = True, mRes=False):
-                """Initialize an FTSControl object.
+                """Initialize a MotControl object.
 
                 Parameters:
                 UPDATE********************
-                stageIp (str) -- the IP address associated with the linear stage motor
-                stagePort (int) -- the port address associated with the linear stage motor
-                polarizerIp (str) -- the IP address associated with the output polarizer motor
-                polarizerPort (int) -- the port address associated with the output polarizer motor
+                motor1_Ip (str) -- the IP address associated with the linear stage motor
+                motor1_Port (int) -- the port address associated with the linear stage motor
+                motor2_Ip (str) -- the IP address associated with the output polarizer motor
+                motor2_Port (int) -- the port address associated with the output polarizer motor
                 mRes (bool) -- True if manual resolution, False if default (res=8) ???
                 """
 
@@ -195,10 +215,10 @@ class MotControl(object):
 
 
         def genMotorList(self, motor):
-                """Get a list of the motors in an FTSControl object.
+                """Get a list of the motors in a MotControl object.
 
                 Parameters:
-                motor (int/motor name) -- STAGE, POLARIZER, or ALL
+                motor (int/motor name) -- MOTOR1, MOTOR2, or ALL
 
                 Returns:
                 mList (list) -- list of desired motors
@@ -213,7 +233,7 @@ class MotControl(object):
                 Also returns True if the motor provides an irregular status message, such as any alarm keys.
 
                 Parameters:
-                motor (int/motor name) -- STAGE, POLARIZER, or ALL (default ALL)
+                motor (int/motor name) -- MOTOR1, MOTOR2, or ALL (default ALL)
                 verbose (bool) -- prints output from motor requests if True (default False)
                 """
                 mList = self.genMotorList(motor)
@@ -257,13 +277,13 @@ class MotControl(object):
                 return False
         
         def homeWithLimits(self, motor=ALL):
-                """Uses the limit switches to zero the motor and encoder positions. 
+                """Uses the limit switches to zero all motor positions. 
                 This function should only be used if the linear stages do not have 
                 home switches, and should be done carefully. Does one motor at a time
                 in order to be careful.
 
                 Parameters:
-                motor (int/motor name) -- STAGE, POLARIZER, or ALL (default ALL)
+                motor (int/motor name) -- MOTOR1, MOTOR2, or ALL (default ALL)
                 """
 
                 mList = self.genMotorList(motor)
@@ -275,6 +295,14 @@ class MotControl(object):
                         mot_id = motor.propDict['motor']
                         # Basically, move motors until it hits the limit switch. This will trigger an alarm
                         self.moveAxisByLength(motor=mot_id,pos=-30,posIsInches=True)
+                        
+                        # Check if either motor is moving, and if yes exit function with an error message
+                        move_status = self.isMoving(motor)
+                        if move_status:
+                                print('Motors are still moving. Try again later.')
+                                return
+
+                        
                         moving = True
                         while moving:
                                 msg = motor.writeread(b'AL\r')
@@ -293,7 +321,7 @@ class MotControl(object):
 
                                 if not self.isMoving(motor=mot_id):
                                         # zero motor and encoder
-                                        print('Zeroing stage and encoder')
+                                        print(f'Zeroing {motor}')
                                         self.setZero(motor=mot_id)
                                         self.setEncoderValue(motor=mot_id)
                                         # move on to next stage
@@ -332,6 +360,8 @@ class MotControl(object):
                         if not motor:
                                 print("Specified motor is invalid - no motion.")
                                 continue
+                                
+                        # Perhaps generalize to 'if not motor' print message... (isLin bool variable probably)
                         elif motor.propDict['isPol']:
                                 print("Motor isn't connected to a linear stage.")
                                 continue
@@ -368,7 +398,7 @@ class MotControl(object):
                 """Get the position of the motor in counts, relative to the set zero point (or starting point).
 
                 Parameters:
-                motor (int/motor name) -- STAGE, POLARIZER, or ALL (default ALL)
+                motor (int/motor name) -- MOTOR1, MOTOR2, or ALL (default ALL)
 
                 Returns:
                 positions (list) -- the positions in counts of the specified motors
@@ -388,7 +418,7 @@ class MotControl(object):
                 """Get the position of the motor in inches, relative to the set zero point (or starting point).
 
                 Parameters:
-                motor (int/motor name) -- STAGE, POLARIZER, or ALL (default ALL)
+                motor (int/motor name) -- MOTOR1, MOTOR2, or ALL (default ALL)
 
                 Returns:
                 realPositions (list) -- the positions in inches of the specified motors
@@ -408,7 +438,7 @@ class MotControl(object):
                 calculated trajectory of the movement, relative to the zero point.
 
                 Parameters:
-                motor (int/motor name) -- STAGE, POLARIZER, or ALL (default ALL)
+                motor (int/motor name) -- MOTOR1, MOTOR2, or ALL (default ALL)
                 inches (bool) -- whether the returned position should be inches or not
 
                 Returns:
@@ -447,7 +477,7 @@ class MotControl(object):
                 """Move the axis to the given absolute position in counts or inches.
 
                 Parameters:
-                motor (int/motor name) - STAGE, POLARIZER, or ALL (default STAGE)
+                motor (int/motor name) - MOTOR1, MOTOR2, or ALL (default MOTOR1)
                 pos (float) - the desired position in counts or in inches, positive indicates away from the motor (default 0)
                 posIsInches (bool) - True if pos was specified in inches, False if in counts (default False)
                 linStage (bool) - True if the specified motor is for the linear stage, False if not (default True)
@@ -487,7 +517,7 @@ class MotControl(object):
                 """Move the axis relative to the current position by the specified number of counts or inches.
 
                 Parameters:
-                motor (int/motor name) - STAGE, POLARIZER, or ALL (default STAGE)
+                motor (int/motor name) - MOTOR1, MOTOR2, or ALL (default MOTOR1)
                 pos (float) - the desired number of counts or inches to move from current position, positive indicates away from the motor (default 0)
                 posIsInches (bool) - True if pos was specified in inches, False if in counts (default False)
                 linStage (bool) - True if the specified motor is for the linear stage, False if not (default True)
@@ -568,7 +598,7 @@ class MotControl(object):
                 """Block until the specified axes have stop moving.  Checks each axis every updatePeriod seconds.
 
                 Parameters:
-                motor (int/motor name) -- STAGE, POLARIZER, or ALL (default ALL)
+                motor (int/motor name) -- MOTOR1, MOTOR2, or ALL (default ALL)
                 updatePeriod (float) -- time after which to check each motor in seconds (default .1)
                 verbose (bool) -- prints output from motor requests if True (default False)
                 """
@@ -635,8 +665,8 @@ class MotControl(object):
                         motor.flushInput()
 
 
-        def retrieveEncoderInfo(self, motor=ALL):
-                """Retrieve encoder step count to verify movement."""
+        def retrieveMotorInfo(self, motor=ALL):
+                """Retrieve all motor step counts to verify movement."""
                 move_status = self.isMoving(motor)
 
                 mList = self.genMotorList(motor)
@@ -662,8 +692,8 @@ class MotControl(object):
                 return ePositions
 
 
-        def setEncoderValue(self, motor=ALL, value=0):
-                """Set the encoder value in order to keep track of absolute position"""
+        def setMotorValue(self, motor=ALL, value=0):
+                """Set the motor values in order to keep track of absolute position"""
                 # Check if either motor is moving, and if yes exit function with an error message
                 move_status = self.isMoving(motor)
                 if move_status:
@@ -694,7 +724,7 @@ class MotControl(object):
                 """Starts jogging specifically for the rotation of the output polarizer in the FTS.
 
                 Parameters:
-                motor (int/motor name) -- desired motor (default POLARIZER)
+                motor (int/motor name) -- desired motor (default MOTOR2)
                 velocity (float) -- the rotation velocity in revolutions/second (default 12.0)
                 accel (float) -- the acceleration in revolutions/second/second (default 1.0)
                 """
@@ -715,7 +745,7 @@ class MotControl(object):
 
 
         def stopRotation(self, motor=MOTOR2):
-                """Stops jogging specifically for the rotation of the output polarizer in the FTS."""
+                """Stops jogging specifically for the rotation of MOTOR2."""
                 mList = self.genMotorList(motor)
                 for motor in mList:
                         if not motor:
@@ -741,6 +771,20 @@ class MotControl(object):
 
 
         def closeConnection(self, motor=ALL):
+                """Close the connection to the serial controller for the specified motor."""
+                mList = self.genMotorList(motor)
+                for motor in mList:
+                        if not motor:
+                                print("Specified motor is invalid - no connection to close.")
+                                continue
+                        motor.sock.close()
+                print("Connection to serial controller disconnected.")
+
+                
+#  ##################################################################################################               
+#       Try to reset socket connection!! - need to look up how to do this. too cold outside rn :(
+#  ##################################################################################################
+        def resetConnection(self, motor=ALL):
                 """Close the connection to the serial controller for the specified motor."""
                 mList = self.genMotorList(motor)
                 for motor in mList:
