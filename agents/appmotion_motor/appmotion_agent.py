@@ -402,7 +402,7 @@ def make_parser(parser=None):
     pgroup.add_argument('--motor2_Ip', help="MOXA IP address",type=str)
     pgroup.add_argument('--motor2_Port', help="MOXA port number for motor 1",type=int)
     pgroup.add_argument('--motor2_isLin', action='store_true',
-                        help="Whether or not motor 1 is connected to a linear stage")
+                        help="Whether or not motor 2 is connected to a linear stage")
     pgroup.add_argument('--mRes', help="Manually enter microstep resolution",action='store_true')
     pgroup.add_argument('--sampling_frequency', help="Frequency to sample at for data acq",type=float)
     
