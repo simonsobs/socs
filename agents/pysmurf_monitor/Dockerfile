@@ -21,6 +21,7 @@ WORKDIR /app/socs/agents/pysmurf_monitor/
 COPY . .
 RUN pip3 install -r requirements.txt
 
+USER cryo:smurf
 
 # Run registry on container startup
 ENTRYPOINT ["dumb-init", "python3", "-u", "pysmurf_monitor.py"]

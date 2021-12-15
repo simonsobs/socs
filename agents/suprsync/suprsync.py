@@ -90,13 +90,10 @@ class SupRsync:
         if self.delete_after is None:
             return
 
-        print(file.removed)
         if file.local_md5sum == file.remote_md5sum:
             if time.time() - file.timestamp.timestamp() > self.delete_after:
                 self.log.info(f"Deleting {file.local_path}")
-                print("HERE")
                 os.remove(file.local_path)
-                print("HERE")
                 file.removed = dt.datetime.utcnow()
 
 
@@ -145,7 +142,6 @@ def make_parser(parser=None):
 
 if __name__ == '__main__':
     parser = make_parser()
-    print("HERE")
     args = site_config.parse_args('SupRsync', parser=parser)
     txaio.start_logging(level='debug')
 

@@ -18,6 +18,8 @@ COPY . .
 RUN apt-get install rsync -y
 RUN pip3 install -r requirements.txt
 
+USER cryo:smurf
+
 ENTRYPOINT ["dumb-init", "python3", "-u", "suprsync.py"]
 
 CMD ["--site-hub=ws://crossbar:8001/ws", \
