@@ -14,8 +14,8 @@ if not ON_RTD:
     from ocs.ocs_twisted import TimeoutLock
     pass
 
-NUM_ENCODER_TO_PUBLISH = 10000
-SEC_ENCODER_TO_PUBLISH = 10
+NUM_ENCODER_TO_PUBLISH = 1000
+SEC_ENCODER_TO_PUBLISH = 1
 
 COUNTER_INFO_LENGTH = 100
 
@@ -75,13 +75,7 @@ class WGEncoderAgent:
 
             self.take_data = True
 
-            current_time = time.time()
-
-            iter_counts = 0
-
             while self.take_data:
-
-                #loop_start = time.time()
 
                 try:
                     self.parser.grab_and_parse_data()
@@ -137,8 +131,6 @@ class WGEncoderAgent:
                 if len(self.parser.encoder_queue):
                     encoder_data = self.parser.encoder_queue.popleft()
 
-                    iter_counts += 1
-
                     quad_data += encoder_data[0].tolist()
                     pru_clock += encoder_data[1].tolist()
                     ref_count += (encoder_data[2]%REFERENCE_COUNT_MAX).tolist()
@@ -167,16 +159,16 @@ class WGEncoderAgent:
                     }
 
                     enc_fdata = {
-                            'timestamps': [],
-                            'block_name': 'WGEncoder_full',
-                            'data': {}
+                        'timestamps': [],
+                        'block_name': 'WGEncoder_full',
+                        'data': {}
                     }
 
 
                     if len(pru_clock) > NUM_ENCODER_TO_PUBLISH \
                         or (len(pru_clock) and (current_time - time_encoder_published) > SEC_ENCODER_TO_PUBLISH):
 
-                        enc_rdata['timestamps']               = received_time_list# + 5e-6*(data_ind%COUNTER_INFO_LENGTH)
+                        enc_rdata['timestamps']               = received_time_list
                         enc_rdata['data']['quadrature']       = quad_data[::COUNTER_INFO_LENGTH]
                         enc_rdata['data']['pru_clock']        = pru_clock[::COUNTER_INFO_LENGTH]
                         enc_rdata['data']['reference_degree'] = (np.array(ref_count)[::COUNTER_INFO_LENGTH]*360/COUNTS_ON_BELT).tolist()
@@ -191,15 +183,6 @@ class WGEncoderAgent:
                         enc_fdata['data']['reference_count']     = ref_count
                         enc_fdata['data']['error']               = error_flag
                         self.agent.publish_to_feed('WGEncoder_full', enc_fdata)
-
-                        '''
-                        with open('feed_log', 'w') as f:
-                            f.write(str(iter_counts)+'\n')
-                            f.write('current_time:'+str(current_time)+'\n')
-                            f.write('pru_clock[0]:'+str(pru_clock[0])+'\n')
-                            f.write('feed start at:'+str(loop_start)+'\n')
-                            pass
-                        '''
 
                         quad_data = []
                         pru_clock = []
@@ -221,11 +204,6 @@ class WGEncoderAgent:
                     f.write(str(shared_time)+' '+str(shared_position)+'\n')
                     f.flush()
                     pass
-
-                #loop_stop = time.time()
-                #with open('loop.log', 'a') as f:
-                #    f.write('start at:'+str(loop_start)+', stop at:'+str(loop_stop)+'\n')
-                #    pass
                 pass
 
         self.agent.feeds['WGEncoder_rough'].flush_buffer()
