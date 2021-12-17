@@ -25,7 +25,6 @@ class SynaccessAgent:
         self.ip_address = ip_address
         self.user = username
         self.passw = password
-        self.switching  = False # True while a command is sent to synaccess.
 
         agg_params = {'frame_length': 60}
         self.agent.register_feed('synaccess', record = True, agg_params = agg_params)
@@ -40,13 +39,9 @@ class SynaccessAgent:
         
 
     def get_status(self, session, params=None):
-        with self.lock.acquire_timeout(1) as acquired:
+        with self.lock.acquire_timeout(3, job='get_status') as acquired:
             if acquired:
-                if not self.switching :
-                    resp = self.__get_status()
-                else :
-                    return False, 'Could not get status because another command is running!'
-                    pass
+                resp = self.__get_status()
                 ret_str = []
                 for x in resp:
                     if x == '1':
@@ -58,14 +53,12 @@ class SynaccessAgent:
                 return False, "Could not acquire lock"
 
     def reboot(self, session, params=None):
-        with self.lock.acquire_timeout(1) as acquired:
+        with self.lock.acquire_timeout(3, job='reboot') as acquired:
             if acquired:
                 req = "http://"+self.user + ":" + \
                     self.passw + "@" + self.ip_address + \
                     "/cmd.cgi?$A4" + " " + str(params['outlet'])
-                self.switching = True
                 requests.get(req)
-                self.switching = False
                 return True, 'Rebooted outlet {}'.format(params['outlet'])
             else:
                 return False, "Could not acquire lock"
@@ -78,7 +71,7 @@ class SynaccessAgent:
             outlet (int): the outlet that we are changing the state of
             on (bool): the new state
         """
-        with self.lock.acquire_timeout(1) as acquired:
+        with self.lock.acquire_timeout(3, job='set_outlet') as acquired:
             if acquired:
                 if params['on']:
                     on = "1"
@@ -87,9 +80,7 @@ class SynaccessAgent:
                 req = "http://" + self.user + ":" + self.passw + "@" + \
                     self.ip_address+"/cmd.cgi?$A3" + " " + \
                     str(params['outlet']) + " " + on
-                self.switching = True
                 requests.get(req)
-                self.switching = False
                 return True, 'Set outlet {} to {}'.\
                     format(params['outlet'], params['on'])
             else:
@@ -104,21 +95,43 @@ class SynaccessAgent:
             on (bool): the new state
 
         """
-        with self.lock.acquire_timeout(1) as acquired:
+        with self.lock.acquire_timeout(3, job='set_all') as acquired:
             if acquired:
                 on = "0"
                 if params['on']:
                     on = "1"
                 req = "http://" + self.user + ":" + self.passw + "@" +\
                     self.ip_address + "/cmd.cgi?$A7" + " " + on
-                self.switching = True
                 requests.get(req)
-                self.switching = False
                 return True, 'Set all outlets to {}'.format(params['on'])
             else:
                 return False, "Could not acquire lock"
 
     def start_status_acq(self, session, params = None):
+        
+        """acq(params=None)
+
+         Method to start data acquisition process.
+
+         The most recent data collected is stored in session.data in the
+         structure::
+
+             >>> session.data
+             {"fields":
+                 {synaccess:
+                     {0: 0 or 1, (0: OFF, 1:ON)
+                      1: 0 or 1, (0: OFF, 1:ON)
+                      2: 0 or 1, (0: OFF, 1:ON)
+                      3: 0 or 1, (0: OFF, 1:ON)
+                      4: 0 or 1, (0: OFF, 1:ON)
+                     }
+                 }
+             }
+          
+         Parameters:
+            Nothing
+        """
+
         with self.lock.acquire_timeout(timeout = 0, job = 'status_acq') as acquired:
             if not acquired:
                 self.log.warn('Could not start status acq because {} is already running'
@@ -130,11 +143,19 @@ class SynaccessAgent:
         self.take_data = True
         session.data = {'fields':{}}
         while self.take_data:
-            current_time = time.time()
-            data = {'timestamp': current_time, 'block_name': 'synaccess_status', 'data': {}}
-            
-            status_dict = {}
-            if not self.switching:
+            last_release = time.time()
+            self.run_acq = True
+            while self.run_acq:
+                if time.time() - last_release > 1.:
+                    last_release = time.time()
+                    if not self.lock.release_and_acquire(timeout=10):
+                        self.log.warn('Could not re-acquire lock now held by {}.'.format(self.lock.job))
+                        return False, 'Could not re-acquire lock (timeout)'
+
+                current_time = time.time()
+                data = {'timestamp': current_time, 'block_name': 'synaccess_status', 'data': {}}
+                
+                status_dict = {}
                 resp = self.__get_status()
                 for i, x in enumerate(resp):
                     if x == '1':
@@ -184,14 +205,17 @@ def make_parser(parser=None):
 
 
 if __name__ == '__main__':
-    site_parser = site_config.add_arguments()
-    parser = make_parser(site_parser)
+    #site_parser = site_config.add_arguments()
+    #parser = make_parser(site_parser)
 
     # Get the parser to process the command line.
-    args = parser.parse_args()
+    #args = parser.parse_args()
 
     # Interpret options in the context of site_config.
-    site_config.reparse_args(args, 'SynAccAgent')
+    #site_config.reparse_args(args, 'SynAccAgent')
+
+    parser = make_parser()
+    args = site_config.parse_args(agent_class='SynAccAgent', parser=parser)
 
     agent, runner = ocs_agent.init_site_agent(args)
 
