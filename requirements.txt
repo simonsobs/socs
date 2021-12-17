@@ -18,6 +18,9 @@ scipy
 pysnmp
 pysmi
 
+# SupRsync Agent
+sqlalchemy
+
 # Docs
 # see docs/requirements.txt
 
