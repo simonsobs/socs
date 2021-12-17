@@ -19,19 +19,60 @@ of time if the local and remote checksums match.
 Copying Files
 -----------------
 
-A SupRsync instance is responsible for copying files to a "base-dir" on a
-remote server.
+The SupRsync agent works by monitoring a table of files to be copied in a
+sqlite database. The full table is :ref:`described here<SupRsyncFiles>`,
+but importantly it contains information such as the full local path, the
+remote path relative to a base directory determined by the SupRsync cfg,
+checksumming info, several timestamps, and an "archive" name which is used to
+determine whic SupRsync agent should manage each file. This makes it possible
+for  multiple SupRsync agents to monitor the same db, but write their archives
+to different base-directories or remote computers.
 
-Each SupRsync instance is responsible for managing one "base-dir" on a
-remote server.
+.. note:: 
 
-Each SupRsync instance is in charge of copying files to a single "archive"
+   This agent does not remove empty directories, since I can't think of a
+   foolproof way to determine whether or not more files will be written to a
+   given directory, and pysmurf output directories will likely have
+   unregistered files that stick around even after copied files have been
+   removed. I think it's probably best to have a separate cronjob make that
+   determination and remove directory husks.
 
+Adding Files to the SupRsyncFiles Database
+````````````````````````````````````````````
+
+To add a file to the SupRsync database, you can use the
+:ref:`SupRsyncFilesManager` class as follows:
+
+.. code-block:: python
+
+    from socs.db.suprsync import SupRsyncFilesManager
+
+    local_abspath = '/path/to/local/file.g3'
+    remote_relpath = 'remote/path/file.g3'
+    archive = 'timestreams'
+    srfm = SupRsyncFilesManager('/path/to/suprsync.db')
+    srfm.add_file(local_abspath, remote_relpath, archive)
+
+The SupRsync agent will then copy the file ``/path/to/local/file.g3`` to 
+the ``<remote_basedir>/remote/path/file.g3`` on the remote server (or locally
+if none is specified). If the ``--delete-after`` option is used, the original
+file will be deleted after the specified amount of time.
+
+Interfacing with Smurf
+``````````````````````````
+
+The primary use case of this agent is copying files from the smurf-server to a
+daq node or simons1. The pysmurf monitor agent now populates the files table
+with both pysmurf auxiliary files (using the archive name "smurf") and g3
+timestream files (using the archive name "timestreams"), as described in
+:ref:`this<pysmurf_monitor_suprsync_db>` section. On the smurf-server
+we'll be running one SupRsync agent for each of these two archives.
 
 Configuration File Examples
 ---------------------------
-Below are configuration examples for the ocs config file and for running the
-Agent in a docker container.
+Below is an example of what the SupRsync configuration might look like on a
+smurf-server, with an instance copying g3 files and an instance copying smurf
+auxiliary files.
 
 OCS Site Config
 ```````````````
@@ -43,7 +84,19 @@ transferred files after 7 days, or 604800 seconds::
          'instance-id': 'timestream-sync',
          'arguments':[
            '--archive-name', 'timestreams',
-           '--remote-basedir', '/path/to/base/dir',
+           '--remote-basedir', '/path/to/base/dir/timestreams',
+           '--db-path', '/data/so/dbs/suprsync.db',
+           '--ssh-host', '<user>@<hostname>',
+           '--ssh-key', '<path_to_ssh_key>',
+           '--delete-after', '604800', 
+           '--max-copy-attempts', '10',
+           ]},
+
+        {'agent-class': 'SupRsync',
+         'instance-id': 'smurf-sync',
+         'arguments':[
+           '--archive-name', 'smurf',
+           '--remote-basedir', '/path/to/base/dir/smurf',
            '--db-path', '/data/so/dbs/suprsync.db',
            '--ssh-host', '<user>@<hostname>',
            '--ssh-key', '<path_to_ssh_key>',
@@ -58,70 +111,59 @@ transferred files after 7 days, or 604800 seconds::
 Docker Compose
 ``````````````
 
-Below is a sample docker-compose entry for a SupRsync agent. In most of our
-use cases this will be running on the smurf-server, so this will go in with
-the smurf-streamer and other smurf software. Because the data we'll be transfering
-is owned by the ``cryo:smurf`` user, we set that as the user of the agent so it
-has the correct permissions. This is only possible because the ``cryo:smurf``
-user is already built into the SuprSync docker::
+Below is a sample docker-compose entry for the SupRsync agents. 
+Because the data we'll be transfering is owned by the ``cryo:smurf`` user, we
+set that as the user of the agent so it has the correct permissions. This is
+only possible because the ``cryo:smurf`` user is already built into the
+SuprSync docker::
 
-  ocs-timestream-sync:                                                                             
-       image: ocs-suprsync-agent:latest                                                            
-       hostname: ocs-docker                                                                        
-       user: cryo:smurf                                                                            
-       network_mode: host                                                                          
-       container_name: ocs-timestream-sync                                                         
-       volumes:                                                                                    
-           - ${OCS_CONFIG_DIR}:/config                                                             
-           - /data:/data                                                                           
-       command:                                                                                    
-           - '--instance-id=timestream-sync'                                                       
-           - "--site-hub=ws://${CB_HOST}:8001/ws"                                                  
-           - "--site-http=http://${CB_HOST}:8001/call"                                             
+  ocs-timestream-sync:
+       image: simonsobs/ocs-suprsync-agent:latest
+       hostname: ocs-docker 
+       user: cryo:smurf
+       network_mode: host
+       container_name: ocs-timestream-sync
+       volumes:
+           - ${OCS_CONFIG_DIR}:/config
+           - /data:/data
+       command:
+           - '--instance-id=timestream-sync'
+           - "--site-hub=ws://${CB_HOST}:8001/ws"
+           - "--site-http=http://${CB_HOST}:8001/call"
 
-
-Example Clients
----------------
-Since labjack functionality is currently limited to acquiring data, which can 
-enabled on startup, users are likely to rarely need a client. This example
-shows the basic acquisition functionality:
-
-.. code-block:: python
-
-    # Initialize the labjack
-    from ocs import matched_client
-    lj = matched_client.MatchedClient('labjack')
-    lj.init_labjack.start()
-    lj.init_labjack.wait()
-
-    # Start data acquisiton
-    status, msg, session = lj.acq.start(sampling_frequency=10)
-    print(session)
-
-    # Get the current data values 1 second after starting acquistion
-    import time
-    time.sleep(1)
-    status, message, session = lj.acq.status()
-    print(session["data"])
-
-    # Stop acqusition
-    lj.acq.stop()
-    lj.acq.wait()
+  ocs-smurf-sync:
+       image: simonsobs/ocs-suprsync-agent:latest
+       hostname: ocs-docker
+       user: cryo:smurf
+       network_mode: host
+       container_name: ocs-smurf-sync
+       volumes:
+           - ${OCS_CONFIG_DIR}:/config
+           - /data:/data
+       command:
+           - '--instance-id=smurf-sync'
+           - "--site-hub=ws://${CB_HOST}:8001/ws"
+           - "--site-http=http://${CB_HOST}:8001/call"
 
 
 Agent API
 ---------
 
-.. autoclass:: agents.labjack.labjack_agent.LabJackAgent
+.. autoclass:: agents.suprsync.suprsync.SupRsync
     :members:
 
 Supporting APIs
 ---------------
 
+
+ .. _SupRsyncFiles:
+
 SupRsyncFiles Table
 ````````````````````````````````
 .. autoclass:: socs.db.suprsync.SupRsyncFile
    :members:
+
+ .. _SupRsyncFilesManager:
 
 SupRsyncFiles Manager
 ``````````````````````````````

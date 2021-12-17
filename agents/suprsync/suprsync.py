@@ -12,6 +12,39 @@ if not on_rtd:
     from ocs import ocs_agent, site_config
 
 class SupRsync:
+    """
+    Agent to rsync files to a remote (or local) destination, verify successful
+    transfer, and delete local files after a specified amount of time.
+
+    Parameters
+    --------------
+    agent : OCSAgent
+        OCS agent object
+    args : Namespace
+        Namespace with parsed arguments
+
+    Attributes
+    ------------
+    agent : OCSAgent
+        OCS agent object
+    log : txaio.tx.Logger
+        txaio logger object, created by the OCSAgent
+    archive_name : string
+        Name of the managed archive. Sets which files in the suprsync db should
+        be copied.
+    ssh_host : str, optional
+        Remote host to copy data to. If None, will copy data locally.
+    ssh_key : str, optional
+        ssh-key to use to access the ssh host.
+    remote_basedir : path
+        Base directory on the destination server to copy files to
+    db_path : path
+        Path of the sqlite db to monitor
+    delete_after : float
+        Seconds after which this agent will delete successfully copied files.
+    stop_on_exception : bool
+        If True, will stop the run process if a file cannot be copied
+    """
     def __init__(self, agent, args):
         self.agent = agent
         self.log = txaio.make_logger()
@@ -25,6 +58,14 @@ class SupRsync:
         self.running = False
 
     def run_on_remote(self, cmd):
+        """
+        Runs a command on the remote server (or locally if none is set)
+
+        Parameters
+        -----------
+        cmd : list
+            Command to be run
+        """
         _cmd = []
         if self.ssh_host is not None:
             _cmd += ['ssh', self.ssh_host]
@@ -38,6 +79,20 @@ class SupRsync:
         return res
 
     def copy_file(self, file):
+        """
+        Attempts to copy a file to its dest.
+
+        Args
+        ----
+        file : SupRsyncFile
+            file to be copied
+
+        Returns
+        --------
+        res : str or bool
+            Returns False if unsuccessful, and the md5sum calculated on the
+            remote server if successful.
+        """
         remote_path = os.path.join(self.remote_basedir, file.remote_path)
 
         # Creates directory on dest server:
@@ -64,7 +119,17 @@ class SupRsync:
         else:
             return res.stdout.split()[0]
 
-    def _handle_file(self, file):
+    def handle_file(self, file):
+        """
+        Handles operation of an un-removed SupRsyncFile. Will attempt to copy,
+        calculate the remote md5sum, and remove from the local host if enough
+        time has passed.
+
+        Args
+        ----
+        file : SupRsyncFile
+            file to be copied
+        """
         if file.local_md5sum != file.remote_md5sum:
             md5sum = self.copy_file(file)
             if md5sum is False:  # Copy command failed with exit code != 0
@@ -76,7 +141,7 @@ class SupRsync:
                 return
 
             file.remote_md5sum = md5sum
-            file.copied = dt.datetime.utcnow()
+            file.copied = time.time()
             if md5sum != file.local_md5sum:
                 self.log.warn(
                     "Copied {local} but md5sum does not match (attempts: {c})",
@@ -91,13 +156,18 @@ class SupRsync:
             return
 
         if file.local_md5sum == file.remote_md5sum:
-            if time.time() - file.timestamp.timestamp() > self.delete_after:
+            if time.time() - file.timestamp > self.delete_after:
                 self.log.info(f"Deleting {file.local_path}")
                 os.remove(file.local_path)
-                file.removed = dt.datetime.utcnow()
-
+                file.removed = time.time()
 
     def run(self, session, params=None):
+        """run()
+
+        **Process** - Main run process for the SupRsync agent. Continuosly
+        checks the suprsync db checking for files that need to be handled.
+        """
+
         srfm = SupRsyncFilesManager(self.db_path, create_all=True)
 
         self.running = True
@@ -110,7 +180,7 @@ class SupRsync:
                 ).all()
                 for file in files:
                     try:
-                        self._handle_file(file)
+                        self.handle_file(file)
                     except Exception as e:
                         if self.stop_on_exception:
                             raise e
@@ -124,19 +194,34 @@ class SupRsync:
         session.set_status('stopping')
 
 
+
 def make_parser(parser=None):
     if parser is None:
         parser = argparse.ArgumentParser()
 
     pgroup = parser.add_argument_group('Agent Options')
-    pgroup.add_argument('--archive-name', required=True)
-    pgroup.add_argument('--remote-basedir')
-    pgroup.add_argument('--db-path')
-    pgroup.add_argument('--ssh-host')
-    pgroup.add_argument('--ssh-key')
-    pgroup.add_argument('--delete-after', type=float)
-    pgroup.add_argument('--max-copy-attempts', default=10)
-    pgroup.add_argument('--stop-on-exception', action='store_true')
+    pgroup.add_argument('--archive-name', required=True, type=str,
+                        help="Name of managed archive. Determines which files "
+                             "should be copied")
+    pgroup.add_argument('--remote-basedir', required=True, type=str,
+                        help="Base directory on the remote server where files "
+                             "will be copied")
+    pgroup.add_argument('--db-path', required=True, type=str,
+                        help="Path to the suprsync sqlite db")
+    pgroup.add_argument('--ssh-host', type=str, default=None,
+                        help="Remote host to copy files to (e.g. "
+                             "'<user>@<host>'). If None, will copy files locally")
+    pgroup.add_argument('--ssh-key', type=str,
+                        help="Path to ssh-key needed to access remote host")
+    pgroup.add_argument('--delete-after', type=float,
+                        help="Time (sec) after which this agent will delete "
+                             "local copies of successfully transfered files. "
+                             "If None, will not delete files.")
+    pgroup.add_argument('--max-copy-attempts', default=10, type=int,
+                        help="Number of failed copy attempts before the agent "
+                             "will stop trying to copy a file")
+    pgroup.add_argument('--stop-on-exception', action='store_true',
+                        help="If true will stop the run process on an exception")
     return parser
 
 

@@ -150,11 +150,9 @@ class PysmurfMonitor(DatagramProtocol):
                 try:
                     local_path = meta['path']
                     remote_path = create_remote_path(meta, archive_name)
-                    files.append(SupRsyncFile(
-                        local_path=local_path, local_md5sum=get_md5sum(local_path),
-                        remote_path=remote_path, archive_name=archive_name,
-                        timestamp=dt.datetime.utcnow()
-                    ))
+                    files.append(
+                        srfm.create_file(local_path, remote_path, archive_name)
+                    )
                 except Exception as e:
                     self.agent.log.error(
                         "Could not generate SupRsync file object from "
