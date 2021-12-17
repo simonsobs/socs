@@ -153,7 +153,7 @@ class ACUAgent:
                                self.start_udp_monitor,
                                lambda: self.set_job_stop('broadcast'),
                                blocking=False,
-                               startup=True)
+                               startup=False)
         agent.register_process('generate_scan',
                                self.generate_scan,
                                lambda: self.set_job_stop('generate_scan'),
@@ -347,6 +347,8 @@ class ACUAgent:
                     'ProgramTrack': 2,
                     'Stow': 3,
                     'SurvivalMode': 4,
+                    'Rate': 5,
+                    'StarTrack': 6,
                     }
         tfn_key = {'None': float('nan'),
                    'False': 0,
@@ -488,7 +490,7 @@ class ACUAgent:
             self.agent.publish_to_feed('acu_status_axis_failures', acustatus_axisfail)
             self.agent.publish_to_feed('acu_status_axis_state', acustatus_axisstate)
             self.agent.publish_to_feed('acu_status_osc_alarms', acustatus_oscalarm)
-#            self.agent.publish_to_feed('acu_status_commands', acustatus_commands)
+            self.agent.publish_to_feed('acu_status_commands', acustatus_commands)
             self.agent.publish_to_feed('acu_status_general_errs', acustatus_acufails)
             self.agent.publish_to_feed('acu_status_platform', acustatus_platform)
             self.agent.publish_to_feed('acu_status_emergency', acustatus_emergency)
@@ -727,6 +729,8 @@ class ACUAgent:
         if el <= self.motion_limits['elevation']['lower'] or el >= self.motion_limits['elevation']['upper']:
             return False, 'Elevation location out of range!'
         wait_for_motion = params.get('wait', 1)
+        self.log.info('Azimuth commanded position: '+str(az))
+        self.log.info('Elevation commanded position: '+str(el))
         current_az = round(self.data['broadcast']['Corrected_Azimuth'], 4)
         current_el = round(self.data['broadcast']['Corrected_Elevation'], 4)
         self.data['uploads']['Start_Azimuth'] = current_az
@@ -1052,11 +1056,13 @@ class ACUAgent:
         self.log.info('No more lines to upload')
         current_az = self.data['broadcast']['Corrected_Azimuth']
         current_el = self.data['broadcast']['Corrected_Elevation']
-        while round(current_az - end_az, 1) != 0. or round(current_el - end_el, 1) != 0.:
+        while round(current_az - end_az, 1) != 0.: #or round(current_el - end_el, 1) != 0.:
             yield dsleep(0.1)
-            modes = (self.data['status']['summary']['Azimuth_mode'],
-                     self.data['status']['summary']['Elevation_mode'])
-            if modes != ('ProgramTrack', 'ProgramTrack'):
+           # modes = (self.data['status']['summary']['Azimuth_mode'],
+           #          self.data['status']['summary']['Elevation_mode'])
+            azmode = self.data['status']['summary']['Azimuth_mode']
+            if azmode != 'ProgramTrack':
+          #  if modes != ('ProgramTrack', 'ProgramTrack'):
                 return False, 'Fault triggered (not ProgramTrack)!'
             current_az = self.data['broadcast']['Corrected_Azimuth']
             current_el = self.data['broadcast']['Corrected_Elevation']
