@@ -4,8 +4,8 @@ FROM socs:latest
 # Sets up the cryo / smurf user and group so this can run on smurf-servers
 # See link for how all other smurf-containers are set up: 
 #   https://github.com/slaclab/smurf-base-docker/blob/master/Dockerfile
-RUN useradd -d /home/cryo -M cryo && \
-    groupadd smurf && \
+RUN useradd -d /home/cryo -M cryo -u 1000 && \
+    groupadd smurf -g 1001 && \
     usermod -aG smurf cryo && \
     usermod -g smurf cryo && \
     mkdir /home/cryo && \

@@ -69,6 +69,8 @@ class SupRsync:
         _cmd = []
         if self.ssh_host is not None:
             _cmd += ['ssh', self.ssh_host]
+            if self.ssh_key is not None:
+                _cmd.extend(['-i', self.ssh_key])
         _cmd += cmd
 
         self.log.debug(f"Running: {' '.join(_cmd)}")
@@ -106,7 +108,11 @@ class SupRsync:
         else:
             dest = remote_path
 
-        cmd = ['rsync', '-t', file.local_path, dest]
+        cmd = ['rsync', '-t']
+        if self.ssh_key is not None:
+            cmd.extend(['--rsh', f'ssh -i {self.ssh_key}'])
+
+        cmd.extend([file.local_path, dest])
         self.log.debug("Running: " + ' '.join(cmd))
         res = subprocess.run(cmd, capture_output=True, text=True)
         if res.returncode != 0:
@@ -149,8 +155,11 @@ class SupRsync:
                 )
                 file.failed_copy_attempts += 1
             else:
-                self.log.info("Successfully copied {local}",
-                               local=file.local_path)
+                dest = os.path.join(self.remote_basedir, file.remote_path)
+                if self.ssh_host is not None:
+                    dest = self.ssh_host + ':' + dest
+                self.log.info("Successfully copied {local} to {dest}",
+                               local=file.local_path, dest=dest)
 
         if self.delete_after is None:
             return
@@ -228,7 +237,7 @@ def make_parser(parser=None):
 if __name__ == '__main__':
     parser = make_parser()
     args = site_config.parse_args('SupRsync', parser=parser)
-    txaio.start_logging(level='debug')
+    txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
 
     agent, runner = ocs_agent.init_site_agent(args)
     suprsync = SupRsync(agent, args)
