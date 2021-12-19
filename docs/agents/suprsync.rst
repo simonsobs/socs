@@ -126,6 +126,7 @@ SuprSync docker::
        volumes:
            - ${OCS_CONFIG_DIR}:/config
            - /data:/data
+           - /home/cryo/.ssh:/home/cryo/.ssh
        command:
            - '--instance-id=timestream-sync'
            - "--site-hub=ws://${CB_HOST}:8001/ws"
@@ -140,10 +141,16 @@ SuprSync docker::
        volumes:
            - ${OCS_CONFIG_DIR}:/config
            - /data:/data
+           - /home/cryo/.ssh:/home/cryo/.ssh
        command:
            - '--instance-id=smurf-sync'
            - "--site-hub=ws://${CB_HOST}:8001/ws"
            - "--site-http=http://${CB_HOST}:8001/call"
+
+.. note::
+   If the SSH-key needed to access the remote server is not in the .ssh
+   directory, make sure it is being mounted into the docker-container
+   and that the ssh-key argument refers to its docker path.
 
 
 Agent API
@@ -156,14 +163,14 @@ Supporting APIs
 ---------------
 
 
- .. _SupRsyncFiles:
+.. _SupRsyncFiles:
 
 SupRsyncFiles Table
 ````````````````````````````````
 .. autoclass:: socs.db.suprsync.SupRsyncFile
    :members:
 
- .. _SupRsyncFilesManager:
+.. _SupRsyncFilesManager:
 
 SupRsyncFiles Manager
 ``````````````````````````````
