@@ -31,9 +31,10 @@ class WiregridActuatorAgent:
 
         try:
             self.actuator = Actuator(
-                self.ip_address, sleep=self.sleep, verbose=self.verbose,
-                ls_io=limitswitch_config.IO_INFO,
-                st_io=stopper_config.IO_INFO)
+                self.ip_address, sleep=self.sleep,
+                ls_list=limitswitch_config.IO_INFO,
+                st_list=stopper_config.IO_INFO,
+                verbose=self.verbose)
         except Exception as e:
             msg = 'Failed to initialize Actuator instance! \
                 | Exception: {}'.format(e)
@@ -43,6 +44,8 @@ class WiregridActuatorAgent:
     ######################
     # Internal functions #
     ######################
+    # Return: status(True or False), message
+    # If an error occurs, return False.
 
     def _check_connect(self):
         if self.actuator is None:
@@ -67,9 +70,10 @@ class WiregridActuatorAgent:
             if self.actuator:
                 del self.actuator
             self.actuator = Actuator(
-                    self.ip_address, sleep=self.sleep, verbose=self.verbose,
-                    ls_io=limitswitch_config.IO_INFO,
-                    st_io=stopper_config.IO_INFO)
+                self.ip_address, sleep=self.sleep,
+                ls_list=limitswitch_config.IO_INFO,
+                st_list=stopper_config.IO_INFO,
+                verbose=self.verbose)
         except Exception as e:
             msg = 'WARNING: \
                 Failed to initialize Actuator! | Exception: {}'.format(e)
@@ -93,7 +97,7 @@ class WiregridActuatorAgent:
     # Power off stopper
     def _stopper_off(self):
         try:
-            self.actuator.stopper.set_alloff()
+            self.actuator.st.set_alloff()
         except Exception as e:
             msg = 'ERROR: Failed to set OFF all the stoppers in set_alloff()! \
                     | Exception: {}'.format(e)
@@ -107,7 +111,7 @@ class WiregridActuatorAgent:
         LSL2 = 0  # left  actuator outside limit-switch
         LSR2 = 0  # right actuator outside limit-switch
         LSL2, LSR2 = \
-            self.actuator.limitswitch.get_onoff(io_name=['LSL2', 'LSR2'])
+            self.actuator.ls.get_onoff(io_name=['LSL2', 'LSR2'])
         if LSL2 == 0 and LSR2 == 0:
             ret, msg = self.actuator.move(distance, speedrate)
             if not ret:
@@ -121,7 +125,7 @@ class WiregridActuatorAgent:
         # Loop until the limit-switch is ON or the actuator moving finishes
         while LSL2 == 0 and LSR2 == 0 and isrun:
             LSL2, LSR2 = \
-                self.actuator.limitswitch.get_onoff(io_name=['LSL2', 'LSR2'])
+                self.actuator.ls.get_onoff(io_name=['LSL2', 'LSR2'])
             isrun, msg = self.actuator.isRun()
             if self.verbose > 0:
                 self.log.info(
@@ -146,7 +150,7 @@ class WiregridActuatorAgent:
         LSL1 = 0  # left  actuator limit-switch @ motor (outside)
         LSR1 = 0  # right actuator limit-switch @ motor (outside)
         LSL1, LSR1 = \
-            self.actuator.limitswitch.get_onoff(io_name=['LSL1', 'LSR1'])
+            self.actuator.ls.get_onoff(io_name=['LSL1', 'LSR1'])
         if LSL1 == 0 and LSR1 == 0:
             ret, msg = self.actuator.move(-1*distance, speedrate)
             if not ret:
@@ -160,7 +164,7 @@ class WiregridActuatorAgent:
         # Loop until the limit-switch is ON or the actuator moving finishes
         while LSL1 == 0 and LSR1 == 0 and isrun:
             LSL1, LSR1 = \
-                 self.actuator.limitswitch.get_onoff(io_name=['LSL1', 'LSR1'])
+                 self.actuator.ls.get_onoff(io_name=['LSL1', 'LSR1'])
             isrun, msg = self.actuator.isRun()
             if self.verbose > 0:
                 self.log.info(
@@ -182,7 +186,7 @@ class WiregridActuatorAgent:
     def _insert(self, main_distance=850, main_speedrate=1.0):
         # Check motor limit-switch
         LSL1, LSR1 = \
-            self.actuator.limitswitch.get_onoff(io_name=['LSL1', 'LSR1'])
+            self.actuator.ls.get_onoff(io_name=['LSL1', 'LSR1'])
         # If limit-switch is not ON (The actuator is not at the end.)
         if LSL1 == 0 and LSR1 == 0:
             self.log.warn(
@@ -213,7 +217,7 @@ class WiregridActuatorAgent:
         # Release stopper twice (Powering ON the stoppers)
         # 1st trial
         try:
-            self.actuator.stopper.set_allon()
+            self.actuator.st.set_allon()
         except Exception as e:
             msg = 'ERROR: Failed to run the stopper set_allon() --> Stop inserting! \
                 | Exception: {}'.format(e)
@@ -221,7 +225,7 @@ class WiregridActuatorAgent:
             return False, msg
         # 2nd trial (double check)
         try:
-            self.actuator.stopper.set_allon()
+            self.actuator.st.set_allon()
         except Exception as e:
             msg = 'ERROR: Failed to run the stopper set_allon() --> Stop inserting! \
                 | Exception: {}'.format(e)
@@ -249,11 +253,12 @@ class WiregridActuatorAgent:
                     'ERROR: (In the initial backwarding) \
                     Failed to lock the actuator by the stopper: {}'\
                     .format(msg2)
+                self.log.error(msg)
                 return False, msg
             return True, msg
         # Check limit-switch
         LSL1, LSR1 = \
-            self.actuator.limitswitch.get_onoff(io_name=['LSL1', 'LSR1'])
+            self.actuator.ls.get_onoff(io_name=['LSL1', 'LSR1'])
         if LSL1 == 1 or LSR1 == 1:
             msg = 'ERROR!: The outside limit-switch is NOT OFF \
                 after the initial forwarding. \
@@ -294,6 +299,7 @@ class WiregridActuatorAgent:
             msg = 'ERROR!: (In the last forwarding) {}'.format(msg)
             self.log.error(msg)
             return False, msg
+            return True, msg
         if LSonoff == 0:
             msg = 'ERROR!: \
                 The inside limit-switch is NOT ON after _insert().'
@@ -307,23 +313,23 @@ class WiregridActuatorAgent:
                 after the last forwarding.!'
             self.log.error(msg)
             return False, msg
-        # Check the stopper until all the stoppers are OFF (released)
+        # Check the stopper until all the stoppers are OFF (locked)
         for i in range(self.max_check_stopper):
-            onoff_st = self.actuator.stopper.get_onoff()
+            onoff_st = self.actuator.st.get_onoff()
             if not any(onoff_st):
                 break
         if any(onoff_st):
             msg = 'ERROR!: (After the last forwarding) \
-                Failed to release all the stoppers'
+                Failed to lock (OFF) all the stoppers'
             self.log.error(msg)
-            return True, msg
+            return False, msg
 
         return True, 'Successfully inserting!'
 
     def _eject(self, main_distance=850, main_speedrate=1.0):
         # Check motor limit-switch
         LSL2, LSR2 = \
-            self.actuator.limitswitch.get_onoff(io_name=['LSL2', 'LSR2'])
+            self.actuator.ls.get_onoff(io_name=['LSL2', 'LSR2'])
         if LSL2 == 0 and LSR2 == 0:
             self.log.warn(
                     'The inside limit-switch is NOT ON before ejecting.')
@@ -353,7 +359,7 @@ class WiregridActuatorAgent:
         # Release stopper twice (Powering ON the stoppers)
         # 1st trial
         try:
-            self.actuator.stopper.set_allon()
+            self.actuator.st.set_allon()
         except Exception as e:
             msg = 'ERROR: Failed to run the stopper set_allon() --> Stop inserting! \
                 | Exception: {}'.format(e)
@@ -361,7 +367,7 @@ class WiregridActuatorAgent:
             return False, msg
         # 2nd trial (double check)
         try:
-            self.actuator.stopper.set_allon()
+            self.actuator.st.set_allon()
         except Exception as e:
             msg = 'ERROR: Failed to run the stopper set_allon() --> Stop inserting! \
                 | Exception: {}'.format(e)
@@ -394,7 +400,7 @@ class WiregridActuatorAgent:
 
         # Check limit-switch
         LSL2, LSR2 = \
-            self.actuator.limitswitch.get_onoff(io_name=['LSL2', 'LSR2'])
+            self.actuator.ls.get_onoff(io_name=['LSL2', 'LSR2'])
         if LSL2 == 1 or LSR2 == 1:
             msg = 'ERROR!: The inside limit-switch is NOT OFF \
                 after the initial backwarding. \
@@ -450,20 +456,22 @@ class WiregridActuatorAgent:
             return False, msg
         # Check the stopper until all the stoppers are OFF (released)
         for i in range(self.max_check_stopper):
-            onoff_st = self.actuator.stopper.get_onoff()
+            onoff_st = self.actuator.st.get_onoff()
             if not any(onoff_st):
                 break
         if any(onoff_st):
             msg = 'ERROR!: (After the last backwarding) \
-                Failed to release all the stoppers'
+                Failed to lock (OFF) all the stoppers'
             self.log.error(msg)
-            return True, msg
+            return False, msg
 
         return True, 'Successfully ejecting!'
 
     ##################
     # Main functions #
     ##################
+    # Return: status(True or False), message
+    # If an error occurs, raise an error
 
     def check_limitswitch(self, session, params=None):
         """
@@ -487,9 +495,9 @@ class WiregridActuatorAgent:
                     .format(self.lock.job))
                 return False, 'Could not acquire lock in check_limitswitch().'
 
-            onoffs = self.actuator.limitswitch.get_onoff(io_name)
-            io_names = self.actuator.limitswitch.get_io_name(io_name)
-            io_labels = self.actuator.limitswitch.get_label(io_name)
+            onoffs = self.actuator.ls.get_onoff(io_name)
+            io_names = self.actuator.ls.get_io_name(io_name)
+            io_labels = self.actuator.ls.get_label(io_name)
             for i, io_name in enumerate(io_names):
                 io_label = io_labels[i]
                 msg += '{:10s} ({:20s}) : {}\n'\
@@ -519,9 +527,9 @@ class WiregridActuatorAgent:
                     .format(self.lock.job))
                 return False, 'Could not acquire lock in check_stopper().'
 
-            onoffs = self.stopper.get_onoff(io_name)
-            io_names = self.stopper.get_io_name(io_name)
-            io_labels = self.stopper.get_label(io_name)
+            onoffs = self.actuator.st.get_onoff(io_name)
+            io_names = self.actuator.st.get_io_name(io_name)
+            io_labels = self.actuator.st.get_label(io_name)
             for i, io_name in enumerate(io_names):
                 io_label = io_labels[i]
                 msg += '{:10s} ({:20s}) : {}\n'\
@@ -550,9 +558,8 @@ class WiregridActuatorAgent:
                 msg = 'ERROR!: Failed insert() in _insert(850,1.0): {}'\
                     .format(msg)
                 self.log.error(msg)
-                return False, msg
-            else:
-                return True, 'Successfully finish insert()!'
+                raise
+            return True, 'Successfully finish insert()!'
 
     def eject(self, session, params=None):
         """
@@ -575,9 +582,8 @@ class WiregridActuatorAgent:
                 msg = 'ERROR!: Failed eject() in _eject(850,1.0): {}'\
                     .format(msg)
                 self.log.error(msg)
-                return False, msg
-            else:
-                return True, 'Successfully finish eject()!'
+                raise
+            return True, 'Successfully finish eject()!'
 
     def insert_homing(self, session, params=None):
         """
@@ -602,9 +608,8 @@ class WiregridActuatorAgent:
                 msg = 'ERROR!: Failed insert_homing()\
                     in _insert(1000,0.1): {}'.format(msg)
                 self.log.error(msg)
-                return False, msg
-            else:
-                return True, 'Successfully finish insert_homing()!'
+                raise
+            return True, 'Successfully finish insert_homing()!'
 
     def eject_homing(self, session, params=None):
         """
@@ -629,9 +634,8 @@ class WiregridActuatorAgent:
                 msg = 'ERROR!: Failed eject_homing()\
                     in _eject(1000,0.1): {}'.format(msg)
                 self.log.error(msg)
-                return False, msg
-            else:
-                return True, 'Successfully finish eject_homing()!'
+                raise
+            return True, 'Successfully finish eject_homing()!'
 
     def stop(self, session, params=None):
         """
@@ -648,9 +652,8 @@ class WiregridActuatorAgent:
         if not ret:
             msg = 'ERROR!: Failed to hold the actuator: {}'.format(msg)
             self.log.error(msg)
-            return False, msg
-        else:
-            return True, 'Successfully finish stop()!'
+            raise
+        return True, 'Successfully finish stop()!'
 
     def release(self, session, params=None):
         """
@@ -668,13 +671,13 @@ class WiregridActuatorAgent:
                 return False, 'Could not acquire lock in release().'
             self.log.warn('Try to release the actuator.')
             # This will enable move() command in Actuator class.
-            ret, msg = self.actuator.release()
-            if not ret:
-                msg = 'ERROR!: Failed to release the actuator: {}'.format(msg)
+            try:
+                self.actuator.release()
+            except Exception as e:
+                msg = 'ERROR!: Failed to release the actuator: {}'.format(e)
                 self.log.error(msg)
-                return False, msg
-            else:
-                return True, 'Successfully finish release()!'
+                raise
+            return True, 'Successfully finish release()!'
 
     def start_acq(self, session, params=None):
         """
@@ -755,14 +758,14 @@ class WiregridActuatorAgent:
                 onoff_dict_ls = {}
                 onoff_dict_st = {}
                 # Get onoff
-                onoff_ls = self.actuator.limitswitch.get_onoff()
-                onoff_st = self.actuator.stopper.get_onoff()
+                onoff_ls = self.actuator.ls.get_onoff()
+                onoff_st = self.actuator.st.get_onoff()
                 # Data for limitswitch
-                for onoff, name in zip(onoff_ls, self.limitswitch.io_names):
+                for onoff, name in zip(onoff_ls, self.actuator.ls.io_names):
                     data['data']['limitswitch_{}'.format(name)] = onoff
                     onoff_dict_ls[name] = onoff
                 # Data for stopper
-                for onoff, name in zip(onoff_st, self.stopper.io_names):
+                for onoff, name in zip(onoff_st, self.actuator.st.io_names):
                     data['data']['stopper_{}'.format(name)] = onoff
                     onoff_dict_st[name] = onoff
                 # publish data
