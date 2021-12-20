@@ -1,14 +1,10 @@
 import time
 import os
 import argparse
-import warnings
 import txaio
 
-from typing import Optional
+from ocs import ocs_agent, site_config
 
-on_rtd = os.environ.get('READTHEDOCS') == 'True'
-if not on_rtd:
-    from ocs import ocs_agent, site_config
 
 class SmurfFileEmulator:
     """

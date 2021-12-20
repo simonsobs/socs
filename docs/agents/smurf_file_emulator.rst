@@ -38,18 +38,18 @@ Here is an example of the file-emulator site-configuration block::
     ]]}
 
 
-Note that if this is running in a docker, the base-dir must be the in-docker
-path, so if you're mounting a directory to ``/data``, the base-dir should just
-be ``/data``.
+Note that if this is running in a docker container, the base-dir must be the
+in-container path, so if you're mounting a directory to ``/data``, the base-dir
+should just be ``/data``.
 
 Docker Compose
 ``````````````
 
-This agent doesn't really need to run in a docker, but if you're so inclined an
-example config entry is::
+This agent doesn't really need to run in a docker container, but if you're so
+inclined an example config entry is::
 
   ocs-smurf-file-emulator:
-    image: simonsobs/ocs-smurf-file-emulator:latest
+    image: simonsobs/ocs-smurf-file-emulator-agent:latest
     hostname: ocs-docker
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
