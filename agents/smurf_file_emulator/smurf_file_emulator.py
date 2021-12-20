@@ -27,7 +27,31 @@ class SmurfFileEmulator:
 
         self.streaming = False
 
-    def _write_smurf_file(self, name, action, action_time=None):
+    def _write_g3_file(self, session_id=None, seq=0, start=None, stop=None):
+        """
+        Writes fake G3 timestream file.
+        """
+        if session_id is None:
+            session_id = int(time.time())
+        if start is None:
+            start = time.time()
+        if stop is None:
+            stop = time.time()
+
+        timecode = f"{session_id}"[:5]
+        subdir = os.path.join(self.timestreamdir, timecode, self.stream_id)
+        os.makedirs(subdir, exist_ok=True)
+        filepath = os.path.join(subdir, f"{session_id}_{seq:0>3}.g3")
+        self.log.info(f"Writing file {filepath}")
+        with open(filepath, 'w') as f:
+            f.write(f'start: {start}\n')
+            f.write(f"stop: {stop}\n")
+        return filepath
+
+
+
+    def _write_smurf_file(self, name, action, action_time=None,
+                          prepend_ctime=True, is_plot=False):
         """
         Creates a fake pysmurf ancilliary file containing just the creation
         time of the file.
@@ -54,22 +78,95 @@ class SmurfFileEmulator:
         """
         t = int(time.time())
         if action_time is None:
-            action_time = int(t)
+            action_time = t
+        action_time = int(action_time)
         timecode = f"{action_time}"[:5]
+        dir_type = 'plots' if is_plot else 'outputs'
         subdir = os.path.join(
-            self.smurfdir, timecode, self.stream_id, f'{action_time}_{action}'
+            self.smurfdir, timecode, self.stream_id, f'{action_time}_{action}',
+            dir_type
         )
         os.makedirs(subdir, exist_ok=True)
-        filepath = os.path.join(subdir, f'{t}_{name}')
+        if prepend_ctime:
+            filepath = os.path.join(subdir, f'{t}_{name}')
+        else:
+            filepath = os.path.join(subdir, name)
         self.log.info(f"Writing smurf file: {filepath}")
         with open(filepath, 'w') as f:
             f.write(f'start: {time.time()}\n')
+        return filepath
 
+    def tune_dets(self, session, params=None):
+        """tune_dets()
 
-    @ocs_agent.param('nchans', type=int, default=4096)
-    @ocs_agent.param('sample_rate', type=float, default=400.)
+        **Task** - Emulates files that might come from a general tune dets
+        function. These are some of the files found on simons1 registered when
+        running the following ops with a single band:
+
+             1. Find-freq
+             2. setup_notches
+             3. tracking_setup
+             4. short g3 stream
+        """
+        # Find Freq
+        action_time = time.time()
+        files = ['amp_sweep_freq.txt', 'amp_sweep_resonance.txt',
+                 'amp_sweep_resp.txt']
+        for f in files:
+            self._write_smurf_file(f, 'find_freq',
+                                   action_time=action_time)
+
+        # Setup Notches
+        action_time = time.time()
+        files = ['channel_assignment_b0.txt', 'tune.npy']
+        for f in files:
+            self._write_smurf_file(f, 'setup_notches',
+                                   action_time=action_time)
+
+        # tracking setup
+        action_time = time.time()
+        fname = f"{int(time.time())}.dat"
+        self._write_smurf_file(fname, 'tracking_setup', prepend_ctime=False)
+
+        # Short g3 stream
+        self._write_g3_file()
+
+        return True, "Wrote tune files"
+
+    def take_iv(self, session, params=None):
+        """take_iv()
+
+        **Task** - Creates files generated associated with iv taking / analysis
+        """
+        action_time = time.time()
+        files = ['iv_analyze.npy', 'iv_bias_all.npy', 'iv_info.npy']
+        for f in files:
+            self._write_smurf_file(f, 'take_iv',
+                                   action_time=action_time)
+        return True, "Wrote IV files"
+
+    def take_bias_steps(self, session, params=None):
+        """take_bias_steps()
+
+        **Task** - Creates files associated with taking bias steps
+        """
+        action_time = time.time()
+        files = ['bias_step_analysis.npy']
+        for f in files:
+            self._write_smurf_file(f, 'take_bias_steps',
+                                   action_time=action_time)
+
+        return True, "Wrote Bias Step Files"
+
+    def bias_dets(self, session, params=None):
+        """bias_dets()
+
+        **Task** - Creates files associated with biasing dets, which is none.
+        """
+        return True, 'Wrote det biasing files'
+
     def stream(self, session, params=None):
-        """stream(nchans=4096, sample_rate=400)
+        """stream(duration=None)
 
         **Process** - Generates example fake-files organized in the same way as
         they would be a regular smurf-stream. For end-to-end testing, we want
@@ -78,47 +175,45 @@ class SmurfFileEmulator:
         actual G3 or pysmurf files look like, however the directory structure
         is the same.
 
-        The pysmurf file is a fake IV file created at the start of the stream
-        containing just the file creation time. The G3 files are rotated at
-        the time specified in the site-config (with 10 min as the default).
-        The files contain valid yaml and specify the file start time, the file
-        end time, the number of channels, and the number of samples, which are
-        determined by the ``nchans`` and ``sample_rate`` params.
-
         Parameters:
-            nchans (int, optional):
-                Number of chans in the stream. This is written into the g3
-                files but effects nothing else. Defaults to 4096.
-            sample_rate (float, optional):
-                Sample rate of the "data". This effects the ``nsamps`` that is
-                saved in the file's yaml, but nothing else.
+            duration (float, optional):
+                If set, will stop stream after specified amount of time (sec).
         """
         session.set_status('starting')
+        action_time = time.time()
+        files = ['freq.txt', 'mask.txt']
+        for f in files:
+            self._write_smurf_file(f, 'take_bias_steps',
+                                   action_time=action_time)
+
+        end_time = None
+        if params.get('duration') is not None:
+            end_time = time.time() + params['duration']
 
         self.streaming = True
 
-        # Writes IV file
-        self._write_smurf_file("IV.npy", 'take_IV')
-
-        session_id = int(time.time())
-        seq = 0
-        timecode = f"{session_id}"[:5]
-        subdir = os.path.join(self.timestreamdir, timecode, self.stream_id)
-        os.makedirs(subdir, exist_ok=True)
         session.set_status('running')
+        seq = 0
+        sid = int(time.time())
         while self.streaming:
-            filepath = os.path.join( subdir, f"{session_id}_{seq:0>3}.g3")
-            file_start = time.time()
-            time.sleep(self.file_duration)
-            file_stop = time.time()
-            nsamps = int(params['sample_rate'] * (file_stop - file_start))
-            self.log.info(f"Writing file {filepath}")
-            with open(filepath, 'w') as f:
-                f.write(f'start: {file_start}\n')
-                f.write(f"stop: {file_stop}\n")
-                f.write(f"nchans: {params['nchans']}\n")
-                f.write(f"nsamps: {nsamps}\n")
+            start = time.time()
+            exit=False
+            if end_time is not None:
+                time_remaining = end_time - time.time()
+                if time_remaining < self.file_duration:
+                    time.sleep(max(0, time_remaining))
+                    exit=True
+                else:
+                    time.sleep(self.file_duration)
+            else:
+                time.sleep(self.file_duration)
+            stop = time.time()
+
+            self._write_g3_file(session_id=sid, seq=seq, start=start, stop=stop)
             seq += 1
+
+            if exit: break
+
 
     def _stop_stream(self, session, params=None):
         if self.streaming:
@@ -138,8 +233,6 @@ def make_parser(parser=None):
                         help='Stream ID for fake smurf stream')
     pgroup.add_argument('--base-dir', required=True,
                         help="Base directory where data should be written")
-    pgroup.add_argument("--stream-on-start", action='store_true',
-                        help="If true, will stream data on startup")
     pgroup.add_argument('--file-duration', default=10*60, type=int,
                         help="Time in sec before rotating g3 files")
 
@@ -156,10 +249,11 @@ if __name__ == '__main__':
     agent, runner = ocs_agent.init_site_agent(args)
 
     file_em = SmurfFileEmulator(agent, args)
-    agent.register_process(
-        'stream', file_em.stream, file_em._stop_stream,
-        startup=args.stream_on_start
-    )
+    agent.register_task('tune_dets', file_em.tune_dets)
+    agent.register_task('take_iv', file_em.take_iv)
+    agent.register_task('take_bias_steps', file_em.take_bias_steps)
+    agent.register_task('bias_dets', file_em.bias_dets)
+    agent.register_process('stream', file_em.stream, file_em._stop_stream)
 
     runner.run(agent, auto_reconnect=True)
 

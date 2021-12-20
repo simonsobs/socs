@@ -10,6 +10,10 @@ The Smurf File Emulator agent creates fake pysmurf and g3 files using the same
 directory structure that we're currently archiving on simons1. This is for
 DAQ end-to-end and bookbinder tests.
 
+It has several tasks/processes that will exist in the ocs-pysmurf-controller,
+and writes out fake files based on current examples of smurf anciliary data
+that's present on simons1.
+
 .. argparse::
     :filename: ../agents/smurf_file_emulator/smurf_file_emulator.py
     :func: make_parser
@@ -28,7 +32,6 @@ Here is an example of the file-emulator site-configuration block::
    {'agent-class': 'SmurfFileEmulator',
     'instance-id': 'smurf-file-emulator',
     'arguments': [[
-       '--stream-on-start',
        '--stream-id', 'emulator',
        '--base-dir', '/path/to/fake/data/directory',
        '--file-duration', 60
