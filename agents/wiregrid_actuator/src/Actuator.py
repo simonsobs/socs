@@ -35,6 +35,7 @@ class Actuator:
         self.distance_factor = 1000./5.
 
         # Open communication to the controller
+        self.g = None
         self._connect()
 
         # Initialize Digital IO classes
@@ -47,8 +48,8 @@ class Actuator:
     def __del__(self):
         self._cleanG()
         return True,\
-            'Actuator:__del__(): \
-            Successfully close the actuator controller.'
+            'Actuator:__del__(): '\
+            'Successfully close the actuator controller.'
 
     ######################
     # Internal functions #
@@ -64,8 +65,8 @@ class Actuator:
         try:
             ret = self.g.GCommand(cmd)
         except Exception as e:
-            msg = 'Actuator:_command(): ERROR! Failed to send command({}).\n\
-                   Actuator:_command(): ERROR! Error: {}'.format(cmd, e)
+            msg = 'Actuator:_command(): ERROR! Failed to send command({}).\n'\
+                  'Actuator:_command(): ERROR! Error: {}'.format(cmd, e)
             print(msg)
             raise
         if self.verbose > 1:
@@ -84,12 +85,12 @@ class Actuator:
     def _connect(self):
         self._cleanG()
         # Open communication to the controller
-        print('Actuator:_connect(): \
-            Initialize the Galil actuator controller')
+        print('Actuator:_connect(): '
+              'Initialize the Galil actuator controller')
         self.g = gclib.py()
         if self.g is None:
-            msg = 'Actuator:_connect() : ERROR! Failed to \
-                initialize the connection to the actuator controller.'
+            msg = 'Actuator:_connect() : ERROR! Failed to '\
+                  'initialize the connection to the actuator controller.'
             print(msg)
             return False, msg
         self.g.GOpen('{}'.format(self.ip_address))
@@ -97,8 +98,8 @@ class Actuator:
         print('Actuator:_connect(): {}'.format(self.g.GInfo()))
         ret, msg = self.check_connect()
         if not ret:
-            msg = 'Actuator:_connect(): ERROR! Failed to check \
-                  the connection to the actuator controller.: {}'.format(msg)
+            msg = 'Actuator:_connect(): ERROR! Failed to check '\
+                  'the connection to the actuator controller.: {}'.format(msg)
             print(msg)
             return False, msg
         # Set controller parameters
@@ -115,19 +116,19 @@ class Actuator:
             print('Actuator:_reconnect(): {}th try to reconnection'.format(i))
             ret, msg = self._connect()
             if not ret:
-                msg = 'Actuator:_reconnect(): \
-                    WARNING! Failed to reconnect to the actuator!'
+                msg = 'Actuator:_reconnect(): '\
+                      'WARNING! Failed to reconnect to the actuator!'
                 print(msg)
                 self._cleanG()
                 time.sleep(1)
                 continue
             else:
                 time.sleep(1)
-                msg = 'Actuator:_reconnect(): \
-                    Successfully reconnect to the actuator controller!'
+                msg = 'Actuator:_reconnect(): '\
+                      'Successfully reconnect to the actuator controller!'
                 return True, msg
-        msg = 'Actuator:_reconnect(): ERROR! Exceed the max. number of \
-            trying to reconnect to the actuator controller.'
+        msg = 'Actuator:_reconnect(): ERROR! Exceed the max. number of '\
+              'trying to reconnect to the actuator controller.'
         print(msg)
         return False, msg
 
@@ -184,10 +185,10 @@ class Actuator:
             print(msg)
             raise RuntimeError(msg)
         if speedrate < 0. or speedrate > 1.:
-            print('Actuator:move(): WARNING! \
-                Speedrate should be between 0 and 1.')
-            print('Actuator:move(): WARNING! \
-                Speedrate is sed to 0.1.')
+            print('Actuator:move(): WARNING! '
+                  'Speedrate should be between 0 and 1.')
+            print('Actuator:move(): WARNING! '
+                  'Speedrate is sed to 0.1.')
             speedrate = 0.1
         speed = \
             int(speedrate * (self.speed_max-self.speed_min) + self.speed_min)
@@ -221,8 +222,8 @@ class Actuator:
             if not isrun:
                 return True,\
                     'Actuator:waitIdle(): Successfully running is finished!'
-        msg = 'Actuator:waitIdle(): ERROR! \
-              Exceed max. number of loop ({} times)'.format(i)
+        msg = 'Actuator:waitIdle(): ERROR! '\
+              'Exceed max. number of loop ({} times)'.format(i)
         print(msg)
         return False, msg
 
@@ -232,14 +233,14 @@ class Actuator:
             pass
         except Exception as e:
             msg = \
-                'Actuator:check_connect(): ERROR! Failed to check \
-                the connection to the actuator controller! |\
-                ERROR: "{}"'.format(e)
+                'Actuator:check_connect(): ERROR! Failed to check '\
+                'the connection to the actuator controller! |'\
+                'ERROR: "{}"'.format(e)
             print(msg)
             return False, msg
         return True,\
-            'Actuator:check_connect(): \
-            Successfully check the connection to the actuator controller!'
+            'Actuator:check_connect(): '\
+            'Successfully check the connection to the actuator controller!'
 
     # Hold
     def hold(self):
@@ -256,10 +257,10 @@ class Actuator:
             if not isrun:
                 msg = 'Actuator:hold(): Successfully hold the actuator!'
                 return True, msg
-            print('Actuator:hold(): WARNING! \
-                Could not hold the actuator! --> Retry')
-        msg = 'Actuator:hold(): ERROR! \
-            Exceed the max. number of retries ({} times).'.format(i)
+            print('Actuator:hold(): WARNING! '
+                  'Could not hold the actuator! --> Retry')
+        msg = 'Actuator:hold(): ERROR! '\
+              'Exceed the max. number of retries ({} times).'.format(i)
         print(msg)
         return False, msg
 
