@@ -49,7 +49,7 @@ jobs:
 
     - name: Test with spt3g dependent tests wtihin a docker container
       run: |
-        docker run -v $PWD:/coverage --rm -w="/app/socs/tests/" socs sh -c "COVERAGE_FILE=/coverage/.coverage.docker python3 -m pytest --cov -m 'spt3g'"
+        docker run -v $PWD:/coverage --rm -w="/app/socs/tests/" socs sh -c "COVERAGE_FILE=/coverage/.coverage.docker python3 -m pytest --cov --order-dependencies -m 'spt3g'"
 
     # Integration Tests
     - name: Build images for integration tests
