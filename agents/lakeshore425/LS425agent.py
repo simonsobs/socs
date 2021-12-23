@@ -1,7 +1,6 @@
 import time
-import sys, os
+import os
 import argparse
-import warnings
 import txaio
 txaio.use_twisted()
 
