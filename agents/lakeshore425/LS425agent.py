@@ -2,16 +2,12 @@ import time
 import os
 import argparse
 import txaio
-txaio.use_twisted()
-
 from typing import Optional
-
+from ocs import ocs_agent, site_config
+from ocs.ocs_twisted import TimeoutLock
 import Lakeshore425 as ls 
 
-on_rtd = os.environ.get('READTHEDOCS') == 'True'
-if not on_rtd:
-    from ocs import ocs_agent, site_config
-    from ocs.ocs_twisted import TimeoutLock
+txaio.use_twisted()
 
 class LS425Agent:
     def __init__(self, agent, port, f_sample=1.):
@@ -38,7 +34,7 @@ class LS425Agent:
     # Task functions.
     def init_lakeshore_task(self, session, params=None):
         """init_lakeshore_task(params=None)
-        Perform first time setup of the Lakeshore 240 Module.
+        Perform first time setup of the Lakeshore 425 Module.
         Args:
             params (dict): Parameters dictionary for passing parameters to
                 task.
