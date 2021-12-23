@@ -114,63 +114,24 @@ class WiregridActuatorAgent:
     # Return value: True/False, message, limit-switch ON/OFF
     def _forward(self, distance, speedrate=0.1):
         distance = abs(distance)
-        LSL2 = 0  # left  actuator outside limit-switch
-        LSR2 = 0  # right actuator outside limit-switch
-        LSL2, LSR2 = \
-            self.actuator.ls.get_onoff(io_name=['LSL2', 'LSR2'])
-        if LSL2 == 0 and LSR2 == 0:
-            ret, msg = self.actuator.move(distance, speedrate)
-            if not ret:
-                return False, msg, LSL2 or LSR2
-        else:
-            self.log.warn(
-                'One of inside limit-switches is ON (LSL2={}, LSR2={})!'
-                .format(LSL2, LSR2))
-            self.log.warn('  --> Did not move.')
-        isrun = True
-        # Loop until the limit-switch is ON or the actuator moving finishes
-        while LSL2 == 0 and LSR2 == 0 and isrun:
-            LSL2, LSR2 = \
-                self.actuator.ls.get_onoff(io_name=['LSL2', 'LSR2'])
-            isrun, msg = self.actuator.isRun()
-            if self.verbose > 0:
-                self.log.info(
-                    'LSL2={}, LSR2={}, run={}'.format(LSL2, LSR2, isrun))
-        # Stop the actuator moving
-        self.actuator.hold()
-        LSonoff = LSL2 or LSR2
-        if LSonoff:
-            self.log.info(
-                'Stopped moving because '
-                'one of inside limit-switches is ON (LSL2={}, LSR2={})!'
-                .format(LSL2, LSR2))
-        self.actuator.release()
-        return True, \
-            'Finish forward(distance={}, speedrate={}, limit-switch={})'\
-            .format(distance, speedrate, LSonoff), \
-            LSonoff
-
-    # Return value: True/False, message, limit-switch ON/OFF
-    def _backward(self, distance, speedrate=0.1):
-        distance = abs(distance)
-        LSL1 = 0  # left  actuator limit-switch @ motor (outside)
-        LSR1 = 0  # right actuator limit-switch @ motor (outside)
+        LSL1 = 0  # left  actuator limit-switch inside the forebaffle
+        LSR1 = 0  # right actuator limit-switch inside the forebaffle
         LSL1, LSR1 = \
             self.actuator.ls.get_onoff(io_name=['LSL1', 'LSR1'])
         if LSL1 == 0 and LSR1 == 0:
-            ret, msg = self.actuator.move(-1*distance, speedrate)
+            ret, msg = self.actuator.move(distance, speedrate)
             if not ret:
                 return False, msg, LSL1 or LSR1
         else:
             self.log.warn(
-                'One of outside limit-switches is ON (LSL1={}, LSR1={})!'
+                'One of inside limit-switches is ON (LSL1={}, LSR1={})!'
                 .format(LSL1, LSR1))
             self.log.warn('  --> Did not move.')
         isrun = True
         # Loop until the limit-switch is ON or the actuator moving finishes
         while LSL1 == 0 and LSR1 == 0 and isrun:
             LSL1, LSR1 = \
-                 self.actuator.ls.get_onoff(io_name=['LSL1', 'LSR1'])
+                self.actuator.ls.get_onoff(io_name=['LSL1', 'LSR1'])
             isrun, msg = self.actuator.isRun()
             if self.verbose > 0:
                 self.log.info(
@@ -181,8 +142,47 @@ class WiregridActuatorAgent:
         if LSonoff:
             self.log.info(
                 'Stopped moving because '
-                'one of outside limit-switches is ON (LSL1={}, LSR1={})!'
+                'one of inside limit-switches is ON (LSL1={}, LSR1={})!'
                 .format(LSL1, LSR1))
+        self.actuator.release()
+        return True, \
+            'Finish forward(distance={}, speedrate={}, limit-switch={})'\
+            .format(distance, speedrate, LSonoff), \
+            LSonoff
+
+    # Return value: True/False, message, limit-switch ON/OFF
+    def _backward(self, distance, speedrate=0.1):
+        distance = abs(distance)
+        LSL2 = 0  # left  actuator limit-switch outside the forebaffle
+        LSR2 = 0  # right actuator limit-switch outside the forebaffle
+        LSL2, LSR2 = \
+            self.actuator.ls.get_onoff(io_name=['LSL2', 'LSR2'])
+        if LSL2 == 0 and LSR2 == 0:
+            ret, msg = self.actuator.move(-1*distance, speedrate)
+            if not ret:
+                return False, msg, LSL2 or LSR2
+        else:
+            self.log.warn(
+                'One of outside limit-switches is ON (LSL2={}, LSR2={})!'
+                .format(LSL2, LSR2))
+            self.log.warn('  --> Did not move.')
+        isrun = True
+        # Loop until the limit-switch is ON or the actuator moving finishes
+        while LSL2 == 0 and LSR2 == 0 and isrun:
+            LSL2, LSR2 = \
+                 self.actuator.ls.get_onoff(io_name=['LSL2', 'LSR2'])
+            isrun, msg = self.actuator.isRun()
+            if self.verbose > 0:
+                self.log.info(
+                    'LSL2={}, LSR2={}, run={}'.format(LSL2, LSR2, isrun))
+        # Stop the actuator moving
+        self.actuator.hold()
+        LSonoff = LSL2 or LSR2
+        if LSonoff:
+            self.log.info(
+                'Stopped moving because '
+                'one of outside limit-switches is ON (LSL2={}, LSR2={})!'
+                .format(LSL2, LSR2))
         self.actuator.release()
         return True, \
             'Finish backward(distance={}, speedrate={}, limit-switch={})'\
@@ -190,11 +190,11 @@ class WiregridActuatorAgent:
             LSonoff
 
     def _insert(self, main_distance=850, main_speedrate=1.0):
-        # Check motor limit-switch
-        LSL1, LSR1 = \
-            self.actuator.ls.get_onoff(io_name=['LSL1', 'LSR1'])
+        # Check limit-switch outside the forebaffle
+        LSL2, LSR2 = \
+            self.actuator.ls.get_onoff(io_name=['LSL2', 'LSR2'])
         # If limit-switch is not ON (The actuator is not at the end.)
-        if LSL1 == 0 and LSR1 == 0:
+        if LSL2 == 0 and LSR2 == 0:
             self.log.warn(
                 'The outside limit-switch is NOT ON before inserting.')
             if main_speedrate > 0.1:
@@ -262,10 +262,10 @@ class WiregridActuatorAgent:
                 self.log.error(msg)
                 return False, msg
             return True, msg
-        # Check limit-switch
-        LSL1, LSR1 = \
-            self.actuator.ls.get_onoff(io_name=['LSL1', 'LSR1'])
-        if LSL1 == 1 or LSR1 == 1:
+        # Check limit-switch outside the forebaffle
+        LSL2, LSR2 = \
+            self.actuator.ls.get_onoff(io_name=['LSL2', 'LSR2'])
+        if LSL2 == 1 or LSR2 == 1:
             msg = 'ERROR!: The outside limit-switch is NOT OFF '\
                   'after the initial forwarding. '\
                   '(Maybe the limit-switch is disconnected?) '\
@@ -334,10 +334,10 @@ class WiregridActuatorAgent:
         return True, 'Successfully inserting!'
 
     def _eject(self, main_distance=850, main_speedrate=1.0):
-        # Check motor limit-switch
-        LSL2, LSR2 = \
-            self.actuator.ls.get_onoff(io_name=['LSL2', 'LSR2'])
-        if LSL2 == 0 and LSR2 == 0:
+        # Check limit-switch inside the forebaffle
+        LSL1, LSR1 = \
+            self.actuator.ls.get_onoff(io_name=['LSL1', 'LSR1'])
+        if LSL1 == 0 and LSR1 == 0:
             self.log.warn(
                     'The inside limit-switch is NOT ON before ejecting.')
             if main_speedrate > 0.1:
@@ -406,10 +406,10 @@ class WiregridActuatorAgent:
                 return False, msg
             return True, msg
 
-        # Check limit-switch
-        LSL2, LSR2 = \
-            self.actuator.ls.get_onoff(io_name=['LSL2', 'LSR2'])
-        if LSL2 == 1 or LSR2 == 1:
+        # Check limit-switch inside the forebaffle
+        LSL1, LSR1 = \
+            self.actuator.ls.get_onoff(io_name=['LSL1', 'LSR1'])
+        if LSL1 == 1 or LSR1 == 1:
             msg = 'ERROR!: The inside limit-switch is NOT OFF '\
                   'after the initial backwarding. '\
                   '(Maybe the limit-switch is disconnected?) '\
