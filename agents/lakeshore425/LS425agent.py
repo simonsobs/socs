@@ -17,7 +17,7 @@ class LS425Agent:
         self.lock = TimeoutLock()
 
         self.port = port
-        self.module: Optional[Module] = None
+        self.dev = None
 
         self.f_sample = f_sample
 
