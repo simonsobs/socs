@@ -145,7 +145,7 @@ def make_parser(parser=None):
                         help="Path to USB node for the lakeshore")
     pgroup.add_argument('--mode', type=str, choices=['init', 'acq'],
                         help="Starting action for the agent.")
-    pgroup.add_argument('--sampling-frequency', type=float,
+    pgroup.add_argument('--sampling_frequency', type=float,
                         help="Sampling frequency for data acquisition")
     return parser
 
@@ -153,14 +153,11 @@ def main():
     # Start logging
     txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
 
-    p = site_config.add_arguments()
-    parser = make_parser(parser=p)
-    
-    args = parser.parse_args()
-    site_config.reparse_args(args, 'LS425Agent')
+    parser = make_parser()
+    args = site_config.parse_args(agent_class='Lakeshore425Agent', parser=parser)
 
     agent, runner = ocs_agent.init_site_agent(args)
-    
+
     # Automatically acquire data if requested (default)
     init_params = False
     if args.mode == 'init':
