@@ -3,7 +3,9 @@ import gclib
 # Initial IP address
 # ip0 = '192.168.1.100'
 ip0 = '10.10.10.73'
+
 ip1 = '10.10.10.73'
+# ip1 = '192.168.1.100'
 
 
 def main(initial_IPaddress=ip0, new_IPaddress=ip1):
@@ -59,6 +61,8 @@ def main(initial_IPaddress=ip0, new_IPaddress=ip1):
             g.GCommand('DH 0')
             # Change the IP address
             g.GCommand('IA {}'.format(new_IPaddress.replace('.', ',')))
+        else:
+            print('check IP')
         a = int(float(g.GCommand('MG @INT[(_IA0&($FF000000))/$1000000]&$FF')))
         b = int(float(g.GCommand('MG @INT[(_IA0&($00FF0000))/$10000]')))
         c = int(float(g.GCommand('MG @INT[(_IA0&($0000FF00))/$100]')))

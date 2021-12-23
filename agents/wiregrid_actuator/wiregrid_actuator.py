@@ -736,59 +736,59 @@ class WiregridActuatorAgent:
             .format(interval_time))
 
         with self.lock.acquire_timeout(timeout=0, job='acq') as acquired:
+            self.log.info('Start to take data')
             if not acquired:
                 self.log.warn(
                     'Lock could not be acquired because it is held by {}.'
                     .format(self.lock.job))
                 return False, 'Could not acquire lock in start_acq().'
+            self.log.info('Got the lock')
 
             session.set_status('running')
 
             self.run_acq = True
+            last_release = time.time()
             session.data = {'fields': {}}
             while self.run_acq:
-                last_release = time.time()
-                self.run_acq = True
-                while self.run_acq:
-                    if time.time() - last_release > 1.:
-                        last_release = time.time()
-                        if not self.lock.release_and_acquire(timeout=120):
-                            self.log.warn(
-                                'Could not re-acquire lock now held by {}.'
-                                .format(self.lock.job))
-                            return False, 'Could not re-acquire lock (timeout)'
+                if time.time() - last_release > 1.:
+                    last_release = time.time()
+                    if not self.lock.release_and_acquire(timeout=120):
+                        self.log.warn(
+                            'Could not re-acquire lock now held by {}.'
+                            .format(self.lock.job))
+                        return False, 'Could not re-acquire lock (timeout)'
 
-                    current_time = time.time()
-                    data = {'timestamp': current_time,
-                            'block_name': 'actuator_onoff',
-                            'data': {}}
+                current_time = time.time()
+                data = {'timestamp': current_time,
+                        'block_name': 'actuator_onoff',
+                        'data': {}}
 
-                    # Take data
-                    onoff_dict_ls = {}
-                    onoff_dict_st = {}
-                    # Get onoff
-                    onoff_ls = self.actuator.ls.get_onoff()
-                    onoff_st = self.actuator.st.get_onoff()
-                    # Data for limitswitch
-                    for onoff, name in \
-                            zip(onoff_ls, self.actuator.ls.io_names):
-                        data['data']['limitswitch_{}'.format(name)] = onoff
-                        onoff_dict_ls[name] = onoff
-                    # Data for stopper
-                    for onoff, name in \
-                            zip(onoff_st, self.actuator.st.io_names):
-                        data['data']['stopper_{}'.format(name)] = onoff
-                        onoff_dict_st[name] = onoff
-                    # publish data
-                    self.agent.publish_to_feed('WGActuator', data)
-                    # store session.data
-                    field_dict = {'limitswitch': onoff_dict_ls,
-                                  'stopper': onoff_dict_st}
-                    session.data['timestamp'] = current_time
-                    session.data['fields'] = field_dict
+                # Take data
+                onoff_dict_ls = {}
+                onoff_dict_st = {}
+                # Get onoff
+                onoff_ls = self.actuator.ls.get_onoff()
+                onoff_st = self.actuator.st.get_onoff()
+                # Data for limitswitch
+                for onoff, name in \
+                        zip(onoff_ls, self.actuator.ls.io_names):
+                    data['data']['limitswitch_{}'.format(name)] = onoff
+                    onoff_dict_ls[name] = onoff
+                # Data for stopper
+                for onoff, name in \
+                        zip(onoff_st, self.actuator.st.io_names):
+                    data['data']['stopper_{}'.format(name)] = onoff
+                    onoff_dict_st[name] = onoff
+                # publish data
+                self.agent.publish_to_feed('WGActuator', data)
+                # store session.data
+                field_dict = {'limitswitch': onoff_dict_ls,
+                              'stopper': onoff_dict_st}
+                session.data['timestamp'] = current_time
+                session.data['fields'] = field_dict
 
-                    # wait an interval
-                    time.sleep(interval_time)
+                # wait an interval
+                time.sleep(interval_time)
         # End of lock acquire
 
         self.agent.feeds['WGActuator'].flush_buffer()
@@ -837,7 +837,7 @@ if __name__ == '__main__':
 
     parser = make_parser()
     args = site_config.parse_args(
-        agent_class='WiregridActuatorAgent', parser=parser)
+        agent_class='WGActuatorAgent', parser=parser)
 
     agent, runner = ocs_agent.init_site_agent(args)
 
