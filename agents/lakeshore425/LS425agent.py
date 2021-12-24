@@ -60,7 +60,7 @@ class LS425Agent:
             session.set_status('starting')
 
             self.dev = ls.LakeShore425(self.port)
-            self.log.info(self.dev.IDN())
+            self.log.info(self.dev.get_id())
             print("Initialized Lakeshore module: {!s}".format(self.dev))
 
         self.initialized = True
@@ -94,9 +94,8 @@ class LS425Agent:
             session.data = {"fields": {}}
 
             while self.take_data:
-                Bfield = self.dev.getField()
+                Bfield = self.dev.get_field()
                 current_time = time.time()
-                
                 data = {
                     'timestamp': current_time,
                     'block_name': 'Mag field',
@@ -122,14 +121,15 @@ class LS425Agent:
             return False, 'acq is not currently running'
     
     def operational_status(self, session, params=None):
-        self.log.info(self.dev.OPST())
-        return True, 'operational status is checked'
+        op_status = self.dev.get_op_status()
+        self.log.info(op_status)
+        return True, 'operational status: '+op_status
     
     def zero_calibration(self, session, params=None):
-        self.log.info(self.dev.ZeroCalibration())
+        self.dev.set_zero()
         return True, 'Zero calibration is done'
     
-    def anycommand(self, session, params=None):
+    def any_command(self, session, params=None):
         #send serial command to Lakeshore 425
         command = params['command']
         print('Input command: ' + command)
@@ -173,8 +173,8 @@ def main():
 
     agent.register_task('init_lakeshore', gauss.init_lakeshore_task, startup=init_params)
     agent.register_task('operational_status', gauss.operational_status)
-    agent.register_task('zeroCalibration', gauss.zero_calibration)
-    agent.register_task('anycommand', gauss.anycommand)
+    agent.register_task('zero_calibration', gauss.zero_calibration)
+    agent.register_task('any_command', gauss.any_command)
     agent.register_process('acq', gauss.start_acq, gauss.stop_acq)
 
     runner.run(agent, auto_reconnect=True)
