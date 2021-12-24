@@ -11,7 +11,7 @@ WORKDIR /app/socs/agents/lakeshore425/
 COPY . .
 
 # Run registry on container startup
-ENTRYPOINT ["dumb-init", "python3", "-u", "LS425agent.py"]
+ENTRYPOINT ["dumb-init", "python3", "-u", "LS425_agent.py"]
 
 CMD ["--site-hub=ws://crossbar:8001/ws", \
      "--site-http=http://crossbar:8001/call"]
