@@ -36,8 +36,7 @@ class LS425Agent:
         """init_lakeshore_task(params=None)
         Perform first time setup of the Lakeshore 425 Module.
         Args:
-            params (dict): Parameters dictionary for passing parameters to
-                task.
+            params (dict): Parameters dictionary for passing parameters to task.
         Parameters:
             auto_acquire (bool, optional): Default is False. Starts data
                 acquisition after initialization if True.
@@ -71,6 +70,20 @@ class LS425Agent:
         return True, 'Lakeshore module initialized.'
 
     def start_acq(self, session, params=None):
+        """acq(sampling_frequency=1.)
+        **Process** - Acquire data from the Lakeshore 425.
+        Parameters:
+            sampling_frequency (float):
+                Sampling frequency for data collection. Defaults to 1.0 Hz
+        Notes:
+            The most recent data collected is stored in session data in the
+            structure::
+                >>> response.session['data']
+                {"fields":
+                    {"mag_field": {"Bfield": 270.644},
+                     "timestamp": 1601924466.6130798}
+                }
+        """
         if params is None:
             params = {}
 
@@ -121,6 +134,9 @@ class LS425Agent:
             return False, 'acq is not currently running'
 
     def operational_status(self, session, params=None):
+        """
+        check operational status.
+        """
         with self.lock.acquire_timeout(0, job = 'any_command') as acquired:
             if not acquired:
                 self.log.warn('Could not any_command because {} is already running'.format(self.lock.job))
@@ -130,6 +146,9 @@ class LS425Agent:
             return True, 'operational status: '+op_status
 
     def zero_calibration(self, session, params=None):
+        """
+        calibrate zero point.
+        """
         with self.lock.acquire_timeout(0, job = 'any_command') as acquired:
             if not acquired:
                 self.log.warn('Could not any_command because {} is already running'.format(self.lock.job))
@@ -138,7 +157,12 @@ class LS425Agent:
             return True, 'Zero calibration is done'
 
     def any_command(self, session, params=None):
-        #send serial command to Lakeshore 425
+        """
+        any_command(command='*IDN?')
+        **Process** - Send serial command to Lakeshore 425
+        Parameters:
+            command (str): any serial command
+        """
         command = params['command']
         with self.lock.acquire_timeout(0, job = 'any_command') as acquired:
             if not acquired:
