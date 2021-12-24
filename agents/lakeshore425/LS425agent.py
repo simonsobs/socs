@@ -98,13 +98,13 @@ class LS425Agent:
                 current_time = time.time()
                 data = {
                     'timestamp': current_time,
-                    'block_name': 'Mag field',
+                    'block_name': 'mag_field',
                     'data': {'Bfield':Bfield}
                 }
 
-                self.agent.publish_to_feed('HallSensor', data)
+                self.agent.publish_to_feed('mag_field', data)
                 session.data.update({'timestamp': current_time})
-                self.agent.feeds['HallSensor'].flush_buffer()
+                self.agent.feeds['mag_field'].flush_buffer()
 
                 time.sleep(sleep_time)
 
@@ -121,20 +121,36 @@ class LS425Agent:
             return False, 'acq is not currently running'
 
     def operational_status(self, session, params=None):
-        op_status = self.dev.get_op_status()
-        self.log.info(op_status)
-        return True, 'operational status: '+op_status
+        with self.lock.acquire_timeout(0, job = 'any_command') as acquired:
+            if not acquired:
+                self.log.warn('Could not any_command because {} is already running'.format(self.lock.job))
+                return False, 'Could not acquire lock'
+            op_status = self.dev.get_op_status()
+            self.log.info(op_status)
+            return True, 'operational status: '+op_status
 
     def zero_calibration(self, session, params=None):
-        self.dev.set_zero()
-        return True, 'Zero calibration is done'
+        with self.lock.acquire_timeout(0, job = 'any_command') as acquired:
+            if not acquired:
+                self.log.warn('Could not any_command because {} is already running'.format(self.lock.job))
+                return False, 'Could not acquire lock'
+            self.dev.set_zero()
+            return True, 'Zero calibration is done'
 
     def any_command(self, session, params=None):
         #send serial command to Lakeshore 425
         command = params['command']
-        print('Input command: ' + command)
-        print('Results: ', self.dev.anycommand(command))
-        return True, 'anycommand is finished cleanly'
+        with self.lock.acquire_timeout(0, job = 'any_command') as acquired:
+            if not acquired:
+                self.log.warn('Could not any_command because {} is already running'.format(self.lock.job))
+                return False, 'Could not acquire lock'
+            print('Input command: ' + command)
+            if '?' in command:
+                out = self.dev.query(command)
+                return True, 'any_command is finished cleanly. Results: {}'.format(out)
+            else:
+                self.dev.command(command)
+                return True, 'any_command is finished cleanly'
 
 def make_parser(parser=None):
     if parser is None:
