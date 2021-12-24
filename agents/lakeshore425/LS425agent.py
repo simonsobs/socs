@@ -26,7 +26,7 @@ class LS425Agent:
 
         # Registers Temperature and Voltage feeds
         agg_params = {'frame_length': 60}
-        self.agent.register_feed('HallSensor',
+        self.agent.register_feed('mag_field',
                                  record=True,
                                  agg_params=agg_params,
                                  buffer_time=1)
@@ -119,16 +119,16 @@ class LS425Agent:
             return True, 'requested to stop taking data.'
         else:
             return False, 'acq is not currently running'
-    
+
     def operational_status(self, session, params=None):
         op_status = self.dev.get_op_status()
         self.log.info(op_status)
         return True, 'operational status: '+op_status
-    
+
     def zero_calibration(self, session, params=None):
         self.dev.set_zero()
         return True, 'Zero calibration is done'
-    
+
     def any_command(self, session, params=None):
         #send serial command to Lakeshore 425
         command = params['command']
