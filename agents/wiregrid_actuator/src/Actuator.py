@@ -18,7 +18,7 @@ class Actuator:
         verbose(int)        : verbosity level
     """
 
-    def __init__(self, ip_address='192.168.1.100', sleep=0.10,
+    def __init__(self, ip_address='192.168.1.100', sleep=0.05,
                  ls_list=[], st_list=[], verbose=0):
         self.ip_address = ip_address
         self.sleep = sleep
@@ -29,10 +29,10 @@ class Actuator:
         self.maxwaitloop_for_read = 1000
 
         # Actuator speed/distance setup
-        self.speed_max = 1000
+        self.speed_max = 2000
         self.speed_min = 0
         # scale factor [pulses/mm] mutiplied to distance [mm]
-        self.distance_factor = 1000./5.
+        self.distance_factor = 1000./5.5
 
         # Open communication to the controller
         self.g = None
@@ -41,9 +41,10 @@ class Actuator:
         # Initialize Digital IO classes
         # for limit-switch & stopper
         self.ls = DigitalIO.DigitalIO(
-            'limit-switch', ls_list, self.g, onoff_reverse=True)
+            'limit-switch', ls_list, self.g, get_onoff_reverse=False)
         self.st = DigitalIO.DigitalIO(
-            'stopper', st_list, self.g, onoff_reverse=False)
+            'stopper', st_list, self.g,
+            get_onoff_reverse=False, set_onoff_reverse=False)
 
     def __del__(self):
         self._cleanG()
@@ -103,6 +104,10 @@ class Actuator:
             print(msg)
             return False, msg
         # Set controller parameters
+        # Motor OFF (need for MT command)
+        self._command('MO')
+        # Motor type: stepper with active low(2)/high(2.5) step pulses
+        self._command('MT 2,2')
         self._setActuatorParameters()
 
         time.sleep(1)
@@ -135,10 +140,6 @@ class Actuator:
     def _setActuatorParameters(self):
         # Stop motion
         self._command('ST')
-        # Motor OFF (need for MT command)
-        self._command('MO')
-        # Motor type: stepper with active low(2)/high(2.5) step pulses
-        self._command('MT 2,2')
         # Set master axis of A & B is N
         self._command('GAA=N')
         self._command('GAB=N')
@@ -180,6 +181,9 @@ class Actuator:
 
     # move
     def move(self, distance, speedrate=0.1):
+        self._setActuatorParameters()
+        print('Actuator:move(): distance = {}, speedrate = {}'
+              .format(distance, speedrate))
         if self.STOP:
             msg = 'Actuator:move(): ERROR! Did NOT move due to STOP flag.'
             print(msg)
@@ -193,23 +197,26 @@ class Actuator:
         speed = \
             int(speedrate * (self.speed_max-self.speed_min) + self.speed_min)
         distance_count = int(distance * self.distance_factor)
-        self._command('SPA={}'.format(speed))
-        self._command('SPB={}'.format(speed))
+        print('Actuator:move(): distance_count = {}'.format(distance_count))
+        self._command('SPA={}'.format(0))
+        self._command('SPB={}'.format(0))
         self._command('SPN={}'.format(speed))
         self._command('PRA={}'.format(0))
         self._command('PRB={}'.format(0))
         self._command('PRN={}'.format(distance_count))
         # Start motion
-        self._command('BG')
+        print('Actuator:move(): Start the moving...')
+        self._command('BGN')
         msg = 'Actuator:move(): Succsessfully send move commands'
         return True, msg
 
     # return True, True or False
     def isRun(self):
-        ret = self._command('MG _BGN', doSleep=True)
-        isrun = (int)(ret)
+        status, ret = self._command('MG _BGN', doSleep=True)
+        # print('Actuator:isRun() : "{}"'.format(ret))
+        isrun = (int)((float)(ret))
         if self.verbose > 0:
-            print('Actuator:getStatus() : running status = "{}"'.format(isrun))
+            print('Actuator:isRun() : running status = "{}"'.format(isrun))
         return True, isrun
 
     # Wait for the end of moving
@@ -249,7 +256,7 @@ class Actuator:
         self.STOP = True
         for i in range(self.maxwaitloop):
             self._command('ST')
-            ret, isrun = self.isRun(doSleep=True)
+            ret, isrun = self.isRun()
             if not ret:
                 msg = 'Actuator:hold(): ERROR! Failed to get status!'
                 print(msg)

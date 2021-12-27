@@ -12,10 +12,12 @@ class DigitalIO:
         verbose(int)    : Verbosity level
     """
 
-    def __init__(self, name, io_list, g, onoff_reverse=False, verbose=0):
+    def __init__(self, name, io_list, g,
+                 get_onoff_reverse=False, set_onoff_reverse=False, verbose=0):
         self.name = name
         self.g = g
-        self.reverse = onoff_reverse
+        self.get_reverse = get_onoff_reverse
+        self.set_reverse = set_onoff_reverse
         self.verbose = verbose
 
         self.io_list = io_list
@@ -42,9 +44,11 @@ class DigitalIO:
                   .format(self.name, onoff, e)
             print(msg)
             raise ValueError(e)
-        if self.reverse:
+        if self.get_reverse:
             onoff = not onoff
-        return onoff
+        # print('DigitalIO[{}]:_get_onoff(): onoff for {}: {}'
+        #      .format(self.name, io_name, onoff))
+        return int(onoff)
 
     def get_onoff(self, io_name=None):
         """
@@ -61,7 +65,7 @@ class DigitalIO:
                 False : OFF
         """
         if io_name is None:
-            ret = [0 if self._get_onoff(name) else 1 for name in self.io_names]
+            ret = [self._get_onoff(name) for name in self.io_names]
         elif isinstance(io_name, list):
             if not all([(name in self.io_names) for name in io_name]):
                 msg = \
@@ -123,7 +127,7 @@ class DigitalIO:
     def _set_onoff(self, onoff, io_name):
         io_num = self.io_numdict[io_name]
         onoff = bool(int(onoff))
-        if self.reverse:
+        if self.set_reverse:
             onoff = not onoff
         if onoff:
             cmd = 'SB {}'.format(io_num)

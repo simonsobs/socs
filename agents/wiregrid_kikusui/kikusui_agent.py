@@ -485,7 +485,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    site_config.reparse_args(args, 'KikusuiAgent')
+    site_config.reparse_args(args, 'WGKikusuiAgent')
     agent, runner = ocs_agent.init_site_agent(args)
     kikusui_agent = KikusuiAgent(agent, kikusui_ip = args.kikusui_ip,
                                           kikusui_port = args.kikusui_port)

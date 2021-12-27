@@ -20,7 +20,7 @@ import stopper_config
 class WiregridActuatorAgent:
 
     def __init__(self, agent, ip_address='192.168.1.100',
-                 interval_time=1, sleep=0.10, verbose=0):
+                 interval_time=1, sleep=0.05, verbose=0):
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
@@ -112,7 +112,7 @@ class WiregridActuatorAgent:
         return True, 'Successfully set OFF all the stoppers!'
 
     # Return value: True/False, message, limit-switch ON/OFF
-    def _forward(self, distance, speedrate=0.1):
+    def _forward(self, distance, speedrate=0.2):
         distance = abs(distance)
         LSL1 = 0  # left  actuator limit-switch inside the forebaffle
         LSR1 = 0  # right actuator limit-switch inside the forebaffle
@@ -132,7 +132,7 @@ class WiregridActuatorAgent:
         while LSL1 == 0 and LSR1 == 0 and isrun:
             LSL1, LSR1 = \
                 self.actuator.ls.get_onoff(io_name=['LSL1', 'LSR1'])
-            isrun, msg = self.actuator.isRun()
+            status, isrun = self.actuator.isRun()
             if self.verbose > 0:
                 self.log.info(
                     'LSL1={}, LSR1={}, run={}'.format(LSL1, LSR1, isrun))
@@ -151,13 +151,14 @@ class WiregridActuatorAgent:
             LSonoff
 
     # Return value: True/False, message, limit-switch ON/OFF
-    def _backward(self, distance, speedrate=0.1):
+    def _backward(self, distance, speedrate=0.2):
         distance = abs(distance)
         LSL2 = 0  # left  actuator limit-switch outside the forebaffle
         LSR2 = 0  # right actuator limit-switch outside the forebaffle
         LSL2, LSR2 = \
             self.actuator.ls.get_onoff(io_name=['LSL2', 'LSR2'])
         if LSL2 == 0 and LSR2 == 0:
+            #self.log.info('_backward(): isrun = {}'.format(isrun))
             ret, msg = self.actuator.move(-1*distance, speedrate)
             if not ret:
                 return False, msg, LSL2 or LSR2
@@ -169,9 +170,8 @@ class WiregridActuatorAgent:
         isrun = True
         # Loop until the limit-switch is ON or the actuator moving finishes
         while LSL2 == 0 and LSR2 == 0 and isrun:
-            LSL2, LSR2 = \
-                 self.actuator.ls.get_onoff(io_name=['LSL2', 'LSR2'])
-            isrun, msg = self.actuator.isRun()
+            LSL2, LSR2 = self.actuator.ls.get_onoff(io_name=['LSL2', 'LSR2'])
+            status, isrun = self.actuator.isRun()
             if self.verbose > 0:
                 self.log.info(
                     'LSL2={}, LSR2={}, run={}'.format(LSL2, LSR2, isrun))
@@ -189,7 +189,7 @@ class WiregridActuatorAgent:
             .format(distance, speedrate, LSonoff), \
             LSonoff
 
-    def _insert(self, main_distance=850, main_speedrate=1.0):
+    def _insert(self, main_distance=800, main_speedrate=1.0):
         # Check limit-switch outside the forebaffle
         LSL2, LSR2 = \
             self.actuator.ls.get_onoff(io_name=['LSL2', 'LSR2'])
@@ -197,11 +197,11 @@ class WiregridActuatorAgent:
         if LSL2 == 0 and LSR2 == 0:
             self.log.warn(
                 'The outside limit-switch is NOT ON before inserting.')
-            if main_speedrate > 0.1:
+            if main_speedrate > 0.2:
                 self.log.warn(
-                    ' --> Change speedrate: {} --> 0.1'
+                    ' --> Change speedrate: {} --> 0.2'
                     .format(main_speedrate))
-                main_speedrate = 0.1
+                main_speedrate = 0.2
         else:
             self.log.info(
                 'The outside limit-switch is ON before inserting.')
@@ -239,7 +239,7 @@ class WiregridActuatorAgent:
             return False, msg
 
         # Initial slow & small forwarding
-        ret, msg, LSonoff = self._forward(20, speedrate=0.1)
+        ret, msg, LSonoff = self._forward(5, speedrate=0.2)
         # Check the status of the initial forwarding
         if not ret:
             msg = 'ERROR: (In the initail forwarding) {} '\
@@ -301,7 +301,7 @@ class WiregridActuatorAgent:
             return True, msg
 
         # Last slow & small forward
-        status, msg, LSonoff = self._forward(200, speedrate=0.1)
+        status, msg, LSonoff = self._forward(200, speedrate=0.2)
         if not status:
             msg = 'ERROR!: (In the last forwarding) {}'.format(msg)
             self.log.error(msg)
@@ -333,18 +333,18 @@ class WiregridActuatorAgent:
 
         return True, 'Successfully inserting!'
 
-    def _eject(self, main_distance=850, main_speedrate=1.0):
+    def _eject(self, main_distance=800, main_speedrate=1.0):
         # Check limit-switch inside the forebaffle
         LSL1, LSR1 = \
             self.actuator.ls.get_onoff(io_name=['LSL1', 'LSR1'])
         if LSL1 == 0 and LSR1 == 0:
             self.log.warn(
                     'The inside limit-switch is NOT ON before ejecting.')
-            if main_speedrate > 0.1:
+            if main_speedrate > 0.2:
                 self.log.warn(
-                    ' --> Change speedrate: {} --> 0.1'
+                    ' --> Change speedrate: {} --> 0.2'
                     .format(main_speedrate))
-                main_speedrate = 0.1
+                main_speedrate = 0.2
         else:
             self.log.info(
                 'The inside limit-switch is ON before ejecting.')
@@ -383,7 +383,7 @@ class WiregridActuatorAgent:
             return False, msg
 
         # Initial slow & small backwarding
-        ret, msg, LSonoff = self._backward(20, speedrate=0.1)
+        ret, msg, LSonoff = self._backward(5, speedrate=0.2)
         # Check the status of the initial backwarding
         if not ret:
             msg = 'ERROR: (In the initail backwarding) {} '\
@@ -403,6 +403,7 @@ class WiregridActuatorAgent:
                     'ERROR: (In the initial backwarding) '\
                     'Failed to lock the actuator by the stopper: {}'\
                     .format(msg2)
+                self.log.error(msg)
                 return False, msg
             return True, msg
 
@@ -441,11 +442,12 @@ class WiregridActuatorAgent:
                     'ERROR: (In the main backwarding) '\
                     'Failed to lock the actuator by the stopper: {}'\
                     .format(msg2)
+                self.log.error(msg)
                 return False, msg
             return True, msg
 
         # Last slow & small backward
-        status, msg, LSonoff = self._backward(200, speedrate=0.1)
+        status, msg, LSonoff = self._backward(200, speedrate=0.2)
         if not status:
             msg = 'ERROR!: (In the last backwarding) {}'.format(msg)
             self.log.error(msg)
@@ -562,7 +564,7 @@ class WiregridActuatorAgent:
             # Wait for a second before moving
             time.sleep(1)
             # Moving commands
-            ret, msg = self._insert(850, 1.0)
+            ret, msg = self._insert(920, 1.0)
             if not ret:
                 msg = 'ERROR!: Failed insert() in _insert(850,1.0): {}'\
                     .format(msg)
@@ -586,7 +588,7 @@ class WiregridActuatorAgent:
             # Wait for a second before moving
             time.sleep(1)
             # Moving commands
-            ret, msg = self._eject(850, 1.0)
+            ret, msg = self._eject(920, 1.0)
             if not ret:
                 msg = 'ERROR!: Failed eject() in _eject(850,1.0): {}'\
                     .format(msg)
@@ -645,6 +647,92 @@ class WiregridActuatorAgent:
                 self.log.error(msg)
                 raise
             return True, 'Successfully finish eject_homing()!'
+
+    def insert_test(self, session, params=None):
+        """
+        Insert slowly the wire-grid into the forebaffle interface above the SAT
+        with a small distance
+
+        Parameters:
+            Nothing
+        """
+        with self.lock.acquire_timeout(timeout=3, job='insert_test') \
+             as acquired:
+            if not acquired:
+                self.log.warn(
+                    'Lock could not be acquired because it is held by {}.'
+                    .format(self.lock.job))
+                return False, 'Could not acquire lock in insert_test().'
+            # Wait for a second before moving
+            time.sleep(1)
+            # Release the stoppers
+            try:
+                self.actuator.st.set_allon()
+            except Exception as e:
+                msg = 'ERROR: Failed to run the stopper set_allon() '\
+                      '--> Stop inserting! | Exception: {}'.format(e)
+                self.log.error(msg)
+                return False, msg
+            # Moving commands
+            ret, msg, LSonoff = self._forward(10, speedrate=0.2)
+            if not ret:
+                msg = 'ERROR!: Failed insert_test() in _forward(10,1.): {}'\
+                    .format(msg)
+                self.log.error(msg)
+                raise
+            # Lock the stoppers
+            ret, msg = self._stopper_off()
+            if not ret:
+                msg = \
+                    'ERROR: '\
+                    'Failed to lock the actuator by the stopper: {}'\
+                    .format(msg)
+                self.log.error(msg)
+                return False, msg
+            return True, 'Successfully finish insert_test()!'
+
+    def eject_test(self, session, params=None):
+        """
+        Eject slowly the wire-grid from the forebaffle interface above the SAT
+        with a small distance
+
+        Parameters:
+            Nothing
+        """
+        with self.lock.acquire_timeout(timeout=3, job='eject_test')\
+                as acquired:
+            if not acquired:
+                self.log.warn(
+                        'Lock could not be acquired because it is held by {}.'
+                        .format(self.lock.job))
+                return False, 'Could not acquire lock in eject_test().'
+            # Wait for a second before moving
+            time.sleep(1)
+            # Release the stoppers
+            try:
+                self.actuator.st.set_allon()
+            except Exception as e:
+                msg = 'ERROR: Failed to run the stopper set_allon() '\
+                      '--> Stop inserting! | Exception: {}'.format(e)
+                self.log.error(msg)
+                return False, msg
+            # Moving commands
+            ret, msg, LSonoff = self._backward(10, speedrate=0.2)
+            if not ret:
+                msg = 'ERROR!: Failed eject_test() '\
+                      'in _backward(10,1.): {}'.format(msg)
+                self.log.error(msg)
+                raise
+            # Lock the stoppers
+            ret, msg = self._stopper_off()
+            if not ret:
+                msg = \
+                    'ERROR: '\
+                    'Failed to lock the actuator by the stopper: {}'\
+                    .format(msg)
+                self.log.error(msg)
+                return False, msg
+            return True, 'Successfully finish eject_test()!'
 
     def stop(self, session, params=None):
         """
@@ -752,7 +840,7 @@ class WiregridActuatorAgent:
             while self.run_acq:
                 if time.time() - last_release > 1.:
                     last_release = time.time()
-                    if not self.lock.release_and_acquire(timeout=120):
+                    if not self.lock.release_and_acquire(timeout=600):
                         self.log.warn(
                             'Could not re-acquire lock now held by {}.'
                             .format(self.lock.job))
@@ -817,7 +905,7 @@ def make_parser(parser=None):
                         type=str, default='192.168.1.100',
                         help='IP address of the actuator controller')
     pgroup.add_argument('--sleep', dest='sleep',
-                        type=float, default=0.10,
+                        type=float, default=0.05,
                         help='Sleep time for every actuator command')
     pgroup.add_argument('--verbose', dest='verbose',
                         type=int, default=0,
@@ -851,6 +939,8 @@ if __name__ == '__main__':
     agent.register_task('eject', actuator_agent.eject)
     agent.register_task('insert_homing', actuator_agent.insert_homing)
     agent.register_task('eject_homing', actuator_agent.eject_homing)
+    agent.register_task('insert_test', actuator_agent.insert_test)
+    agent.register_task('eject_test', actuator_agent.eject_test)
     agent.register_task('stop', actuator_agent.stop)
     agent.register_task('release', actuator_agent.release)
     agent.register_process('acq', actuator_agent.start_acq,
