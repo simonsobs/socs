@@ -883,6 +883,8 @@ class WiregridActuatorAgent:
                 onoff_mt = self.actuator.get_motor_onoff()
                 onoff_ls = self.actuator.ls.get_onoff()
                 onoff_st = self.actuator.st.get_onoff()
+                # Data for motor
+                data['data']['motor'] = onoff_mt
                 # Data for limitswitch
                 for onoff, name in \
                         zip(onoff_ls, self.actuator.ls.io_names):
