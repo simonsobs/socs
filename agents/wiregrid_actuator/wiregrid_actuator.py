@@ -158,7 +158,6 @@ class WiregridActuatorAgent:
         LSL2, LSR2 = \
             self.actuator.ls.get_onoff(io_name=['LSL2', 'LSR2'])
         if LSL2 == 0 and LSR2 == 0:
-            #self.log.info('_backward(): isrun = {}'.format(isrun))
             ret, msg = self.actuator.move(-1*distance, speedrate)
             if not ret:
                 return False, msg, LSL2 or LSR2
@@ -654,8 +653,19 @@ class WiregridActuatorAgent:
         with a small distance
 
         Parameters:
-            Nothing
+            distance:  Actuator moving distance [mm] (default: 10)
+            speedrate: Actuator speed rate [0.0, 1.0] (default: 0.1)
         """
+        # Get parameters
+        if params is None:
+            params = {}
+        distance = params.get('distance', 10)
+        speedrate = params.get('speedrate', 10)
+        self.log.info('insert_test(): set distance   = {} mm'
+                      .format(distance))
+        self.log.info('insert_test(): set speed rate = {}'
+                      .format(speedrate))
+
         with self.lock.acquire_timeout(timeout=3, job='insert_test') \
              as acquired:
             if not acquired:
@@ -674,7 +684,7 @@ class WiregridActuatorAgent:
                 self.log.error(msg)
                 return False, msg
             # Moving commands
-            ret, msg, LSonoff = self._forward(10, speedrate=0.2)
+            ret, msg, LSonoff = self._forward(distance, speedrate=speedrate)
             if not ret:
                 msg = 'ERROR!: Failed insert_test() in _forward(10,1.): {}'\
                     .format(msg)
@@ -697,8 +707,19 @@ class WiregridActuatorAgent:
         with a small distance
 
         Parameters:
-            Nothing
+            distance:  Actuator moving distance [mm] (default: 10)
+            speedrate: Actuator speed rate [0.0, 1.0] (default: 0.1)
         """
+        # Get parameters
+        if params is None:
+            params = {}
+        distance = params.get('distance', 10)
+        speedrate = params.get('speedrate', 10)
+        self.log.info('insert_test(): set distance   = {} mm'
+                      .format(distance))
+        self.log.info('insert_test(): set speed rate = {}'
+                      .format(speedrate))
+
         with self.lock.acquire_timeout(timeout=3, job='eject_test')\
                 as acquired:
             if not acquired:
@@ -717,7 +738,7 @@ class WiregridActuatorAgent:
                 self.log.error(msg)
                 return False, msg
             # Moving commands
-            ret, msg, LSonoff = self._backward(10, speedrate=0.2)
+            ret, msg, LSonoff = self._backward(distance, speedrate=speedrate)
             if not ret:
                 msg = 'ERROR!: Failed eject_test() '\
                       'in _backward(10,1.): {}'.format(msg)
