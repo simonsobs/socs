@@ -108,7 +108,7 @@ class Actuator:
         self._command('MO')
         # Motor type: stepper with active low(2)/high(2.5) step pulses
         self._command('MT 2,2')
-        self._setActuatorParameters()
+        self._set_actuator_parameters()
 
         time.sleep(1)
         msg = 'Actuator:_connect(): Successfully make a connection.'
@@ -137,7 +137,7 @@ class Actuator:
         print(msg)
         return False, msg
 
-    def _setActuatorParameters(self):
+    def _set_actuator_parameters(self):
         # Stop motion
         self._command('ST')
         # Set master axis of A & B is N
@@ -169,7 +169,7 @@ class Actuator:
         self._command('PRN=0')
         # Activate the axises
         self._command('SH ABN')
-        msg = 'Actuator:_setActuatorParameters(): \
+        msg = 'Actuator:_set_actuator_parameters(): \
             Successfully set the actuator controller parameters!'
         return True, msg
 
@@ -181,7 +181,7 @@ class Actuator:
 
     # move
     def move(self, distance, speedrate=0.1):
-        self._setActuatorParameters()
+        self._set_actuator_parameters()
         print('Actuator:move(): distance = {}, speedrate = {}'
               .format(distance, speedrate))
         if self.STOP:
@@ -211,25 +211,25 @@ class Actuator:
         return True, msg
 
     # return True, True or False
-    def isRun(self):
+    def is_run(self):
         status, ret = self._command('MG _BGN', doSleep=True)
-        # print('Actuator:isRun() : "{}"'.format(ret))
+        # print('Actuator:is_run() : "{}"'.format(ret))
         isrun = (int)((float)(ret))
         if self.verbose > 0:
-            print('Actuator:isRun() : running status = "{}"'.format(isrun))
+            print('Actuator:is_run() : running status = "{}"'.format(isrun))
         return True, isrun
 
     # Wait for the end of moving
     # max_loop_time : maximum waiting time [sec]
-    def waitIdle(self, max_loop_time=180):
+    def wait_idle(self, max_loop_time=180):
         # Number of loop for max_loop_time [sec]
         max_loop = int(max_loop_time/self.sleep)
         for i in range(max_loop):
-            ret, isrun = self.isRun()
+            ret, isrun = self.is_run()
             if not isrun:
                 return True,\
-                    'Actuator:waitIdle(): Successfully running is finished!'
-        msg = 'Actuator:waitIdle(): ERROR! '\
+                    'Actuator:wait_idle(): Successfully running is finished!'
+        msg = 'Actuator:wait_idle(): ERROR! '\
               'Exceed max. number of loop ({} times)'.format(i)
         print(msg)
         return False, msg
@@ -237,7 +237,8 @@ class Actuator:
     # Check the connection
     def check_connect(self):
         try:
-            pass
+            status, ret = self._command('MT ?,?')
+            mts = [int(float(motor_type)) for motor_type in ret.split(',')]
         except Exception as e:
             msg = \
                 'Actuator:check_connect(): ERROR! Failed to check '\
@@ -245,9 +246,41 @@ class Actuator:
                 'ERROR: "{}"'.format(e)
             print(msg)
             return False, msg
+        if len(mts) != 2:
+            msg = \
+                'Actuator:check_connect(): ERROR! Failed to check '\
+                'the connection to the actuator controller! | '\
+                'ERROR: "Returned motor type = {}. '\
+                'Array size is not correct."'\
+                .format(mts)
+            print(msg)
+            return False, msg
+        else:
+            if not (mts[0] == 2 and mts[1] == 2):
+                msg = \
+                    'Actuator:check_connect(): ERROR! Failed to check '\
+                    'the connection to the actuator controller! |'\
+                    'ERROR: "Returned motor type is not correct: {}"'\
+                    .format(mts)
+                print(msg)
+                return False, msg
         return True,\
             'Actuator:check_connect(): '\
             'Successfully check the connection to the actuator controller!'
+
+    # Get motor ON/OFF
+    def get_motor_onoff(self):
+        try:
+            status, ret = self._command('MG _MON')
+            onoff = int(float(ret))
+        except Exception as e:
+            msg = \
+                'Actuator:get_motor_onoff(): ERROR! '\
+                'Failed to get motor on/off! | '\
+                'ERROR: {}'.format(e)
+            print(msg)
+            return False, msg
+        return True, onoff
 
     # Hold
     def hold(self):
@@ -256,7 +289,7 @@ class Actuator:
         self.STOP = True
         for i in range(self.maxwaitloop):
             self._command('ST')
-            ret, isrun = self.isRun()
+            ret, isrun = self.is_run()
             if not ret:
                 msg = 'Actuator:hold(): ERROR! Failed to get status!'
                 print(msg)

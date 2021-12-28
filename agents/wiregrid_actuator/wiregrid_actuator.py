@@ -132,7 +132,7 @@ class WiregridActuatorAgent:
         while LSL1 == 0 and LSR1 == 0 and isrun:
             LSL1, LSR1 = \
                 self.actuator.ls.get_onoff(io_name=['LSL1', 'LSR1'])
-            status, isrun = self.actuator.isRun()
+            status, isrun = self.actuator.is_run()
             if self.verbose > 0:
                 self.log.info(
                     'LSL1={}, LSR1={}, run={}'.format(LSL1, LSR1, isrun))
@@ -170,7 +170,7 @@ class WiregridActuatorAgent:
         # Loop until the limit-switch is ON or the actuator moving finishes
         while LSL2 == 0 and LSR2 == 0 and isrun:
             LSL2, LSR2 = self.actuator.ls.get_onoff(io_name=['LSL2', 'LSR2'])
-            status, isrun = self.actuator.isRun()
+            status, isrun = self.actuator.is_run()
             if self.verbose > 0:
                 self.log.info(
                     'LSL2={}, LSR2={}, run={}'.format(LSL2, LSR2, isrun))
@@ -806,15 +806,18 @@ class WiregridActuatorAgent:
 
             >>> session.data
             {"fields":
-                {limitswitch:
-                    [0 or 1, (0: OFF, 1:ON)
-                     0 or 1, (0: OFF, 1:ON)
+                {
+                 motor:
+                    0 or 1
+                 limitswitch:
+                 {   LSR1: 0 or 1, (0: OFF, 1:ON)
+                     LSR2: 0 or 1, (0: OFF, 1:ON)
                      .
                      .
-                     ],
+                     },
                  stopper:
-                    [0 or 1, (0: OFF, 1:ON)
-                     0 or 1, (0: OFF, 1:ON)
+                 {   STR1: 0 or 1, (0: OFF, 1:ON)
+                     STR2: 0 or 1, (0: OFF, 1:ON)
                      .
                      .
                      ]
@@ -873,9 +876,11 @@ class WiregridActuatorAgent:
                         'data': {}}
 
                 # Take data
+                onoff_mt = None
                 onoff_dict_ls = {}
                 onoff_dict_st = {}
                 # Get onoff
+                onoff_mt = self.actuator.get_motor_onoff()
                 onoff_ls = self.actuator.ls.get_onoff()
                 onoff_st = self.actuator.st.get_onoff()
                 # Data for limitswitch
@@ -891,7 +896,8 @@ class WiregridActuatorAgent:
                 # publish data
                 self.agent.publish_to_feed('WGActuator', data)
                 # store session.data
-                field_dict = {'limitswitch': onoff_dict_ls,
+                field_dict = {'motor': onoff_mt,
+                              'limitswitch': onoff_dict_ls,
                               'stopper': onoff_dict_st}
                 session.data['timestamp'] = current_time
                 session.data['fields'] = field_dict
