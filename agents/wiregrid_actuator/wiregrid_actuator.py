@@ -53,22 +53,6 @@ class WiregridActuatorAgent:
     # Return: status(True or False), message
     # If an error occurs, return False.
 
-    def _check_connect(self):
-        if self.actuator is None:
-            msg = 'WARNING: '\
-                  'No connection to the actuator (actuator instance is None).'
-            self.log.warn(msg)
-            return False, msg
-        else:
-            try:
-                self.actuator.check_connect()
-            except Exception as e:
-                msg = 'WARNING: Failed to check connection '\
-                      'with the actuator! | Exception: {}'.format(e)
-                self.log.warn(msg)
-                return False, msg
-        return True, 'Connection is OK.'
-
     def _reconnect(self):
         self.log.warn('*** Trying to reconnect... ***')
         # reconnect
@@ -87,7 +71,7 @@ class WiregridActuatorAgent:
             self.actuator = None
             return False, msg
         # check the connection
-        ret, msg = self._check_connect()
+        ret, msg = self.actuator.check_connect()
         if ret:
             msg = 'Successfully reconnected to the actuator!'
             self.log.info(msg)
@@ -100,382 +84,192 @@ class WiregridActuatorAgent:
             self.actuator = None
             return False, msg
 
-    # Power off stopper
-    def _stopper_off(self):
-        try:
-            self.actuator.st.set_alloff()
-        except Exception as e:
-            msg = 'ERROR: Failed to set OFF all the stoppers in set_alloff()!'\
-                  ' | Exception: {}'.format(e)
-            self.log.error(msg)
-            return False, msg
-        return True, 'Successfully set OFF all the stoppers!'
-
     # Return value: True/False, message, limit-switch ON/OFF
-    def _forward(self, distance, speedrate=0.2):
-        distance = abs(distance)
-        LSL1 = 0  # left  actuator limit-switch inside the forebaffle
-        LSR1 = 0  # right actuator limit-switch inside the forebaffle
-        LSL1, LSR1 = \
-            self.actuator.ls.get_onoff(io_name=['LSL1', 'LSR1'])
-        if LSL1 == 0 and LSR1 == 0:
+    def _move(self, distance, speedrate, LSLname, LSRname, LSlabel):
+        LSL = 0  # left  actuator limit-switch
+        LSR = 0  # right actuator limit-switch
+        LSL, LSR = \
+            self.actuator.ls.get_onoff(io_name=[LSLname, LSRname])
+        if LSL == 0 and LSR == 0:
             ret, msg = self.actuator.move(distance, speedrate)
             if not ret:
-                return False, msg, LSL1 or LSR1
+                return False, msg, LSL or LSR
         else:
             self.log.warn(
-                'One of inside limit-switches is ON (LSL1={}, LSR1={})!'
-                .format(LSL1, LSR1))
+                '_move(): One of {} limit-switches is ON (LSL={}, LSR={})!'
+                .format(LSlabel, LSL, LSR))
             self.log.warn('  --> Did not move.')
         isrun = True
         # Loop until the limit-switch is ON or the actuator moving finishes
-        while LSL1 == 0 and LSR1 == 0 and isrun:
-            LSL1, LSR1 = \
-                self.actuator.ls.get_onoff(io_name=['LSL1', 'LSR1'])
+        while LSL == 0 and LSR == 0 and isrun:
+            LSL, LSR = \
+                self.actuator.ls.get_onoff(io_name=[LSLname, LSRname])
             status, isrun = self.actuator.is_run()
             if self.verbose > 0:
                 self.log.info(
-                    'LSL1={}, LSR1={}, run={}'.format(LSL1, LSR1, isrun))
+                    '_move(): LSL={}, LSR={}, run={}'.format(LSL, LSR, isrun))
         # Stop the actuator moving
         self.actuator.hold()
-        LSonoff = LSL1 or LSR1
+        LSonoff = LSL or LSR
         if LSonoff:
             self.log.info(
-                'Stopped moving because '
-                'one of inside limit-switches is ON (LSL1={}, LSR1={})!'
-                .format(LSL1, LSR1))
+                '_move(): Stopped moving because '
+                'one of {} limit-switches is ON (LSL1={}, LSR1={})!'
+                .format(LSlabel, LSL, LSR))
         self.actuator.release()
         return True, \
+            '_move(): Finish move(distance={}, speedrate={}, limit-switch={})'\
+            .format(distance, speedrate, LSonoff), \
+            LSonoff
+
+    # Return value: True/False, message, limit-switch ON/OFF
+    def _forward(self, distance, speedrate=0.2):
+        if distance < 0.:
+            distance = abs(distance)
+        ret, msg, LSonoff = self._move(
+            distance, speedrate, 'LSL1', 'LSR1', 'inside')
+        return ret, \
             'Finish forward(distance={}, speedrate={}, limit-switch={})'\
             .format(distance, speedrate, LSonoff), \
             LSonoff
 
     # Return value: True/False, message, limit-switch ON/OFF
     def _backward(self, distance, speedrate=0.2):
-        distance = abs(distance)
-        LSL2 = 0  # left  actuator limit-switch outside the forebaffle
-        LSR2 = 0  # right actuator limit-switch outside the forebaffle
-        LSL2, LSR2 = \
-            self.actuator.ls.get_onoff(io_name=['LSL2', 'LSR2'])
-        if LSL2 == 0 and LSR2 == 0:
-            ret, msg = self.actuator.move(-1*distance, speedrate)
-            if not ret:
-                return False, msg, LSL2 or LSR2
-        else:
-            self.log.warn(
-                'One of outside limit-switches is ON (LSL2={}, LSR2={})!'
-                .format(LSL2, LSR2))
-            self.log.warn('  --> Did not move.')
-        isrun = True
-        # Loop until the limit-switch is ON or the actuator moving finishes
-        while LSL2 == 0 and LSR2 == 0 and isrun:
-            LSL2, LSR2 = self.actuator.ls.get_onoff(io_name=['LSL2', 'LSR2'])
-            status, isrun = self.actuator.is_run()
-            if self.verbose > 0:
-                self.log.info(
-                    'LSL2={}, LSR2={}, run={}'.format(LSL2, LSR2, isrun))
-        # Stop the actuator moving
-        self.actuator.hold()
-        LSonoff = LSL2 or LSR2
-        if LSonoff:
-            self.log.info(
-                'Stopped moving because '
-                'one of outside limit-switches is ON (LSL2={}, LSR2={})!'
-                .format(LSL2, LSR2))
-        self.actuator.release()
-        return True, \
+        if distance > 0.:
+            distance = -1.*abs(distance)
+        ret, msg, LSonoff = self._move(
+            distance, speedrate, 'LSL2', 'LSR2', 'outside')
+        return ret, \
             'Finish backward(distance={}, speedrate={}, limit-switch={})'\
             .format(distance, speedrate, LSonoff), \
             LSonoff
 
-    def _insert(self, main_distance=800, main_speedrate=1.0):
-        # Check limit-switch outside the forebaffle
-        LSL2, LSR2 = \
-            self.actuator.ls.get_onoff(io_name=['LSL2', 'LSR2'])
-        # If limit-switch is not ON (The actuator is not at the end.)
-        if LSL2 == 0 and LSR2 == 0:
-            self.log.warn(
-                'The outside limit-switch is NOT ON before inserting.')
-            if main_speedrate > 0.2:
-                self.log.warn(
-                    ' --> Change speedrate: {} --> 0.2'
-                    .format(main_speedrate))
-                main_speedrate = 0.2
-        else:
-            self.log.info(
-                'The outside limit-switch is ON before inserting.')
+    def _insert_eject(
+            self, main_distance=800, main_speedrate=1.0, is_insert=True):
+        # Function label
+        flabel = 'insert' if is_insert else 'eject'
+        initial_ls_names = ['LSL2', 'LSR2'] if is_insert else ['LSL1', 'LSR1']
+        move_func = self._forward if is_insert else self._backward
 
         # Check connection
-        ret, msg = self._check_connect()
+        ret, msg = self.actuator.check_connect()
         self.log.info(msg)
-        # Reconnect if connection check is failed
-        if not ret:
-            self.log.warn('Trying to reconnect to the actuator...')
-            ret2, msg2 = self._reconnect()
-            self.log.warn(msg2)
-            if not ret2:
-                msg = 'WARNING: Could not connect to the actuator '\
-                      'even after reconnection! --> Stop inserting!'
-                self.log.warn(msg)
-                return False, msg
 
         # Release stopper twice (Powering ON the stoppers)
         # 1st trial
         try:
             self.actuator.st.set_allon()
         except Exception as e:
-            msg = 'ERROR: Failed to run the stopper set_allon() '\
-                  '--> Stop inserting! | Exception: {}'.format(e)
+            msg = '_insert_eject()[{}]: '\
+                  'ERROR: Failed to run the stopper set_allon() '\
+                  '--> Stop moving! | Exception: {}'.format(flabel, e)
             self.log.error(msg)
             return False, msg
         # 2nd trial (double check)
         try:
             self.actuator.st.set_allon()
         except Exception as e:
-            msg = 'ERROR: Failed to run the stopper set_allon() '\
-                  '--> Stop inserting! | Exception: {}'.format(e)
+            msg = '_insert_eject()[{}]: '\
+                  'ERROR: Failed to run the stopper set_allon() '\
+                  '--> Stop moving! | Exception: {}'.format(flabel, e)
             self.log.error(msg)
             return False, msg
 
-        # Initial slow & small forwarding
-        ret, msg, LSonoff = self._forward(5, speedrate=0.2)
-        # Check the status of the initial forwarding
+        # Initial slow & small moving
+        ret, msg, LSonoff = move_func(5, speedrate=0.2)
+        # Check the status of the initial moving
         if not ret:
-            msg = 'ERROR: (In the initail forwarding) {} '\
-                  '--> Stop inserting!'.format(msg)
+            msg = '_insert_eject()[{}]: ERROR: (In the initail moving) {} '\
+                  '--> Stop moving!'.format(flabel, msg)
             self.log.error(msg)
             # Lock the actuator by the stoppers
-            self._stopper_off()
+            self.actuator.st.set_alloff()
             return False, msg
         if LSonoff:
-            msg = 'WARNING: Limit-switch is ON after the initial forwarding. '\
-                  '---> Stop inserting!'
-            self.log.warn(msg)
+            msg = '_insert_eject()[{}]: WARNING: '\
+                  'Limit-switch is ON after the initial moving. '\
+                  '---> Stop moving!'
+            self.log.warn(flabel, msg)
             # Lock the actuator by the stoppers
-            ret, msg2 = self._stopper_off()
-            if not ret:
-                msg = \
-                    'ERROR: (In the initial backwarding) '\
-                    'Failed to lock the actuator by the stopper: {}'\
-                    .format(msg2)
-                self.log.error(msg)
-                return False, msg
+            self.actuator.st.set_alloff()
             return True, msg
-        # Check limit-switch outside the forebaffle
-        LSL2, LSR2 = \
-            self.actuator.ls.get_onoff(io_name=['LSL2', 'LSR2'])
-        if LSL2 == 1 or LSR2 == 1:
-            msg = 'ERROR!: The outside limit-switch is NOT OFF '\
-                  'after the initial forwarding. '\
+        # Check limit-switch
+        LSL, LSR = \
+            self.actuator.ls.get_onoff(io_name=initial_ls_names)
+        if LSL == 1 or LSR == 1:
+            msg = '_insert_eject()[{}]: ERROR!: '\
+                  'The limit-switch is NOT OFF '\
+                  'after the initial moving. '\
                   '(Maybe the limit-switch is disconnected?) '\
-                  '--> Stop inserting!'
+                  '--> Stop moving!'.format(flabel)
             self.log.error(msg)
             # Lock the actuator by the stoppers
-            self._stopper_off()
+            self.actuator.st.set_alloff()
             return False, msg
 
         # Sleep before the main forwarding
         time.sleep(1)
 
-        # Main forward
+        # Main moving
         status, msg, LSonoff = \
-            self._forward(main_distance, speedrate=main_speedrate)
+            move_func(main_distance, speedrate=main_speedrate)
         if not status:
-            msg = 'ERROR!: (In the main forwarding) {} '\
-                  '--> Stop inserting!'.format(msg)
+            msg = '_insert_eject()[{}]: ERROR!: '\
+                  '(In the main moving) {} '\
+                  '--> Stop moving!'.format(flabel, msg)
             self.log.error(msg)
             return False, msg
         if LSonoff:
-            msg = 'WARNING: Limit-switch is ON after the main forwarding. '\
-                  '---> Stop inserting!'
+            msg = '_insert_eject()[{}]: WARNING: '\
+                  'Limit-switch is ON after the main moving. '\
+                  '---> Stop moving!'.format(flabel)
             self.log.warn(msg)
             # Lock the actuator by the stoppers
-            ret, msg2 = self._stopper_off()
-            if not ret:
-                msg = \
-                    'ERROR: (In the main forwarding) '\
-                    'Failed to lock the actuator by the stopper: {}'\
-                    .format(msg2)
-                return False, msg
+            self.actuator.st.set_alloff()
             return True, msg
 
-        # Last slow & small forward
-        status, msg, LSonoff = self._forward(200, speedrate=0.2)
+        # Last slow & small moving
+        status, msg, LSonoff = move_func(200, speedrate=0.2)
         if not status:
-            msg = 'ERROR!: (In the last forwarding) {}'.format(msg)
+            msg = '_insert_eject()[{}]: ERROR!: (In the last moving) {}'\
+                  .format(flabel, msg)
             self.log.error(msg)
             return False, msg
-            return True, msg
         if LSonoff == 0:
-            msg = 'ERROR!: '\
-                  'The inside limit-switch is NOT ON after _insert().'
+            msg = '_insert_eject()[{}]: ERROR!: '\
+                  'The limit-switch is NOT ON after last moving.'\
+                  .format(flabel)
             self.log.error(msg)
             return False, msg
 
         # Lock the actuator by the stoppers
-        ret, msg = self._stopper_off()
-        if not ret:
-            msg = 'ERROR!: Failed to lock the actuator by the stopper '\
-                  'after the last forwarding.!'
-            self.log.error(msg)
-            return False, msg
+        self.actuator.st.set_alloff()
         # Check the stopper until all the stoppers are OFF (locked)
         for i in range(self.max_check_stopper):
             onoff_st = self.actuator.st.get_onoff()
             if not any(onoff_st):
                 break
         if any(onoff_st):
-            msg = 'ERROR!: (After the last forwarding) '\
+            msg = 'ERROR!: (After the last moving) '\
                   'Failed to lock (OFF) all the stoppers'
             self.log.error(msg)
             return False, msg
 
         return True, 'Successfully inserting!'
 
+    def _insert(self, main_distance=800, main_speedrate=1.0):
+        ret, msg = self._insert_eject(
+            main_distance=main_distance, main_speedrate=main_speedrate,
+            is_insert=True)
+        return ret, msg
+
     def _eject(self, main_distance=800, main_speedrate=1.0):
-        # Check limit-switch inside the forebaffle
-        LSL1, LSR1 = \
-            self.actuator.ls.get_onoff(io_name=['LSL1', 'LSR1'])
-        if LSL1 == 0 and LSR1 == 0:
-            self.log.warn(
-                    'The inside limit-switch is NOT ON before ejecting.')
-            if main_speedrate > 0.2:
-                self.log.warn(
-                    ' --> Change speedrate: {} --> 0.2'
-                    .format(main_speedrate))
-                main_speedrate = 0.2
-        else:
-            self.log.info(
-                'The inside limit-switch is ON before ejecting.')
-
-        # Check connection
-        ret, msg = self._check_connect()
-        self.log.info(msg)
-        # Reconnect if connection check is failed
-        if not ret:
-            self.log.warn('Trying to reconnect to the actuator...')
-            ret2, msg2 = self._reconnect()
-            self.log.warn(msg2)
-            if not ret2:
-                msg = 'WARNING: Could not connect to '\
-                      'the actuator even after reconnection! '\
-                      '--> Stop inserting!'
-                self.log.warn(msg)
-                return False, msg
-
-        # Release stopper twice (Powering ON the stoppers)
-        # 1st trial
-        try:
-            self.actuator.st.set_allon()
-        except Exception as e:
-            msg = 'ERROR: Failed to run the stopper set_allon() '\
-                  '--> Stop inserting! | Exception: {}'.format(e)
-            self.log.error(msg)
-            return False, msg
-        # 2nd trial (double check)
-        try:
-            self.actuator.st.set_allon()
-        except Exception as e:
-            msg = 'ERROR: Failed to run the stopper set_allon() '\
-                  '--> Stop inserting! | Exception: {}'.format(e)
-            self.log.error(msg)
-            return False, msg
-
-        # Initial slow & small backwarding
-        ret, msg, LSonoff = self._backward(5, speedrate=0.2)
-        # Check the status of the initial backwarding
-        if not ret:
-            msg = 'ERROR: (In the initail backwarding) {} '\
-                  '--> Stop ejecting!'.format(msg)
-            self.log.error(msg)
-            # Lock the actuator by the stoppers
-            self._stopper_off()
-            return False, msg
-        if LSonoff:
-            msg = 'WARNING: Limit-switch is ON '\
-                  'after the initial backwarding. ---> Stop ejecting!'
-            self.log.warn(msg)
-            # Lock the actuator by the stoppers
-            ret, msg2 = self._stopper_off()
-            if not ret:
-                msg = \
-                    'ERROR: (In the initial backwarding) '\
-                    'Failed to lock the actuator by the stopper: {}'\
-                    .format(msg2)
-                self.log.error(msg)
-                return False, msg
-            return True, msg
-
-        # Check limit-switch inside the forebaffle
-        LSL1, LSR1 = \
-            self.actuator.ls.get_onoff(io_name=['LSL1', 'LSR1'])
-        if LSL1 == 1 or LSR1 == 1:
-            msg = 'ERROR!: The inside limit-switch is NOT OFF '\
-                  'after the initial backwarding. '\
-                  '(Maybe the limit-switch is disconnected?) '\
-                  '--> Stop ejecting!'
-            self.log.error(msg)
-            # Lock the actuator by the stoppers
-            self._stopper_off()
-            return False, msg
-
-        # Sleep before the main backwarding
-        time.sleep(1)
-
-        # Main backward
-        status, msg, LSonoff = \
-            self._backward(main_distance, speedrate=main_speedrate)
-        if not status:
-            msg = 'ERROR!: (In the main backwarding) {} '\
-                  '--> Stop ejecting!'.format(msg)
-            self.log.error(msg)
-            return False, msg
-        if LSonoff:
-            msg = 'WARNING: Limit-switch is ON after the main backwarding. '\
-                  '---> Stop ejectting!'
-            self.log.warn(msg)
-            # Lock the actuator by the stoppers
-            ret, msg2 = self._stopper_off()
-            if not ret:
-                msg = \
-                    'ERROR: (In the main backwarding) '\
-                    'Failed to lock the actuator by the stopper: {}'\
-                    .format(msg2)
-                self.log.error(msg)
-                return False, msg
-            return True, msg
-
-        # Last slow & small backward
-        status, msg, LSonoff = self._backward(200, speedrate=0.2)
-        if not status:
-            msg = 'ERROR!: (In the last backwarding) {}'.format(msg)
-            self.log.error(msg)
-            return False, msg
-        if LSonoff == 0:
-            msg = 'ERROR!: '\
-                  'The outside limit-switch is NOT ON after _eject().'
-            self.log.error(msg)
-            return False, msg
-
-        # Lock the actuator by the stoppers
-        ret, msg = self._stopper_off()
-        if not ret:
-            msg = 'ERROR!: Failed to lock the actuator by the stopper '\
-                  'after the last backwarding.!'
-            self.log.error(msg)
-            return False, msg
-        # Check the stopper until all the stoppers are OFF (released)
-        for i in range(self.max_check_stopper):
-            onoff_st = self.actuator.st.get_onoff()
-            if not any(onoff_st):
-                break
-        if any(onoff_st):
-            msg = 'ERROR!: (After the last backwarding) '\
-                  'Failed to lock (OFF) all the stoppers'
-            self.log.error(msg)
-            return False, msg
-
-        return True, 'Successfully ejecting!'
+        if main_distance > 0.:
+            main_distance = -1. * abs(main_distance)
+        ret, msg = self._insert_eject(
+            main_distance=main_distance, main_speedrate=main_speedrate,
+            is_insert=False)
+        return ret, msg
 
     ##################
     # Main functions #
@@ -691,14 +485,7 @@ class WiregridActuatorAgent:
                 self.log.error(msg)
                 raise
             # Lock the stoppers
-            ret, msg = self._stopper_off()
-            if not ret:
-                msg = \
-                    'ERROR: '\
-                    'Failed to lock the actuator by the stopper: {}'\
-                    .format(msg)
-                self.log.error(msg)
-                return False, msg
+            self.actuator.st.set_alloff()
             return True, 'Successfully finish insert_test()!'
 
     def eject_test(self, session, params=None):
@@ -745,14 +532,7 @@ class WiregridActuatorAgent:
                 self.log.error(msg)
                 raise
             # Lock the stoppers
-            ret, msg = self._stopper_off()
-            if not ret:
-                msg = \
-                    'ERROR: '\
-                    'Failed to lock the actuator by the stopper: {}'\
-                    .format(msg)
-                self.log.error(msg)
-                return False, msg
+            self.actuator.st.set_alloff()
             return True, 'Successfully finish eject_test()!'
 
     def stop(self, session, params=None):

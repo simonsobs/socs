@@ -245,7 +245,7 @@ class Actuator:
                 'the connection to the actuator controller! |'\
                 'ERROR: "{}"'.format(e)
             print(msg)
-            return False, msg
+            raise RuntimeError(msg)
         if len(mts) != 2:
             msg = \
                 'Actuator:check_connect(): ERROR! Failed to check '\
@@ -254,7 +254,7 @@ class Actuator:
                 'Array size is not correct."'\
                 .format(mts)
             print(msg)
-            return False, msg
+            raise RuntimeError(msg)
         else:
             if not (mts[0] == 2 and mts[1] == 2):
                 msg = \
@@ -263,7 +263,7 @@ class Actuator:
                     'ERROR: "Returned motor type is not correct: {}"'\
                     .format(mts)
                 print(msg)
-                return False, msg
+                raise RuntimeError(msg)
         return True,\
             'Actuator:check_connect(): '\
             'Successfully check the connection to the actuator controller!'
