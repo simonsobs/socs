@@ -196,8 +196,20 @@ class Actuator:
             speedrate = 0.1
         speed = \
             int(speedrate * (self.speed_max-self.speed_min) + self.speed_min)
-        distance_count = int(distance * self.distance_factor)
-        print('Actuator:move(): distance_count = {}'.format(distance_count))
+        # distance_count is absolute value
+        distance_count = int(abs(distance) * self.distance_factor)
+        if distance >= 0.:
+            # Forwarding
+            self._command('GRA=1')
+            self._command('GRB=-1')
+            dlabel = 'forwarding'
+        else:
+            # Backwarding
+            self._command('GRA=-1')
+            self._command('GRB=1')
+            dlabel = 'backwarding'
+        print('Actuator:move(): distance_count = {} ({})'
+              .format(distance_count, dlabel))
         self._command('SPA={}'.format(0))
         self._command('SPB={}'.format(0))
         self._command('SPN={}'.format(speed))
@@ -207,7 +219,7 @@ class Actuator:
         # Start motion
         print('Actuator:move(): Start the moving...')
         self._command('BGN')
-        msg = 'Actuator:move(): Succsessfully send move commands'
+        msg = 'Actuator:move(): Succsessfully sent move commands!'
         return True, msg
 
     # return True, True or False
