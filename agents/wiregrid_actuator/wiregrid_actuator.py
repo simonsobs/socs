@@ -535,6 +535,54 @@ class WiregridActuatorAgent:
             self.actuator.st.set_alloff()
             return True, 'Successfully finish eject_test()!'
 
+    def motor_on(self, session, params=None):
+        """
+        Powering ON the motors of the actuators
+
+        Parameters:
+            Nothing
+        """
+        with self.lock.acquire_timeout(timeout=3, job='motor_on')\
+                as acquired:
+            if not acquired:
+                self.log.warn(
+                        'Lock could not be acquired because it is held by {}.'
+                        .format(self.lock.job))
+                return False, 'Could not acquire lock in motor_on().'
+            self.log.warn('Try to power ON the actuator motors.')
+            try:
+                self.actuator.set_motor_onoff(onoff=True)
+            except Exception as e:
+                msg = 'ERROR!: Failed to power ON the actuator motors: '\
+                      ' {}'.format(e)
+                self.log.error(msg)
+                raise
+            return True, 'Successfully finish motor_on()!'
+
+    def motor_off(self, session, params=None):
+        """
+        Powering OFF the motors of the actuators
+
+        Parameters:
+            Nothing
+        """
+        with self.lock.acquire_timeout(timeout=3, job='motor_off')\
+                as acquired:
+            if not acquired:
+                self.log.warn(
+                        'Lock could not be acquired because it is held by {}.'
+                        .format(self.lock.job))
+                return False, 'Could not acquire lock in motor_off().'
+            self.log.warn('Try to power OFF the actuator motors.')
+            try:
+                self.actuator.set_motor_onoff(onoff=False)
+            except Exception as e:
+                msg = 'ERROR!: Failed to power OFF the actuator motors: '\
+                      '{}'.format(e)
+                self.log.error(msg)
+                raise
+            return True, 'Successfully finish motor_off()!'
+
     def stop(self, session, params=None):
         """
         Emergency stop of the wire-grid actuator (Disable the actuator moving)
@@ -750,6 +798,8 @@ if __name__ == '__main__':
     agent.register_task('eject_homing', actuator_agent.eject_homing)
     agent.register_task('insert_test', actuator_agent.insert_test)
     agent.register_task('eject_test', actuator_agent.eject_test)
+    agent.register_task('motor_on', actuator_agent.motor_on)
+    agent.register_task('motor_off', actuator_agent.motor_off)
     agent.register_task('stop', actuator_agent.stop)
     agent.register_task('release', actuator_agent.release)
     agent.register_process('acq', actuator_agent.start_acq,

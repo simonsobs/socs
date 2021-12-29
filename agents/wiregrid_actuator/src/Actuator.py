@@ -108,6 +108,8 @@ class Actuator:
         self._command('MO')
         # Motor type: stepper with active low(2)/high(2.5) step pulses
         self._command('MT 2,2')
+        # Motor ON (A,B,N[virtual gear])
+        self._command('SH ABN')
         self._set_actuator_parameters()
 
         time.sleep(1)
@@ -167,8 +169,6 @@ class Actuator:
         self._command('PRA=0')
         self._command('PRB=0')
         self._command('PRN=0')
-        # Activate the axises
-        self._command('SH ABN')
         msg = 'Actuator:_set_actuator_parameters(): \
             Successfully set the actuator controller parameters!'
         return True, msg
@@ -281,6 +281,26 @@ class Actuator:
             print(msg)
             return False, msg
         return True, onoff
+
+    # Set motor ON/OFF
+    def set_motor_onoff(self, onoff):
+        try:
+            if not onoff:  # OFF
+                status, ret = self._command('MON')
+            else:  # ON
+                status, ret = self._command('SH ABN')
+        except Exception as e:
+            msg = \
+                'Actuator:set_motor_onoff(): ERROR! '\
+                'Failed to set motor {}! | '\
+                'ERROR: {}'\
+                .format('ON' if onoff is True else 'OFF', e)
+            print(msg)
+            return False, msg
+        return True,\
+            'Actuator:set_motor_onoff(): '\
+            'Successfully {} the actuator motors!'\
+            .format('ON' if onoff is True else 'OFF')
 
     # Hold
     def hold(self):
