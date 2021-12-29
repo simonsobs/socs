@@ -42,7 +42,7 @@ class WiregridActuatorAgent:
                 st_list=stopper_config.IO_INFO,
                 verbose=self.verbose)
         except Exception as e:
-            msg = 'Failed to initialize Actuator instance! '\
+            msg = '__init__(): Failed to initialize Actuator instance! '\
                   '| Exception: {}'.format(e)
             self.log.warn(msg)
             self.actuator = None
@@ -54,7 +54,7 @@ class WiregridActuatorAgent:
     # If an error occurs, return False.
 
     def _reconnect(self):
-        self.log.warn('*** Trying to reconnect... ***')
+        self.log.warn('_reconnect(): *** Trying to reconnect... ***')
         # reconnect
         try:
             if self.actuator:
@@ -65,7 +65,7 @@ class WiregridActuatorAgent:
                 st_list=stopper_config.IO_INFO,
                 verbose=self.verbose)
         except Exception as e:
-            msg = 'WARNING: '\
+            msg = '_reconnect(): WARNING: '\
                   'Failed to initialize Actuator! | Exception: {}'.format(e)
             self.log.warn(msg)
             self.actuator = None
@@ -73,11 +73,11 @@ class WiregridActuatorAgent:
         # check the connection
         ret, msg = self.actuator.check_connect()
         if ret:
-            msg = 'Successfully reconnected to the actuator!'
+            msg = '_reconnect(): Successfully reconnected to the actuator!'
             self.log.info(msg)
             return True, msg
         else:
-            msg = 'WARNING: Failed to reconnect to the actuator!'
+            msg = '_reconnect(): WARNING: Failed to reconnect to the actuator!'
             self.log.warn(msg)
             if self.actuator:
                 del self.actuator
@@ -129,6 +129,7 @@ class WiregridActuatorAgent:
         ret, msg, LSonoff = self._move(
             distance, speedrate, 'LSL1', 'LSR1', 'inside')
         return ret, \
+            '_forward(): '\
             'Finish forward(distance={}, speedrate={}, limit-switch={})'\
             .format(distance, speedrate, LSonoff), \
             LSonoff
@@ -140,6 +141,7 @@ class WiregridActuatorAgent:
         ret, msg, LSonoff = self._move(
             distance, speedrate, 'LSL2', 'LSR2', 'outside')
         return ret, \
+            '_backward(): '\
             'Finish backward(distance={}, speedrate={}, limit-switch={})'\
             .format(distance, speedrate, LSonoff), \
             LSonoff
@@ -153,7 +155,7 @@ class WiregridActuatorAgent:
 
         # Check connection
         ret, msg = self.actuator.check_connect()
-        self.log.info(msg)
+        self.log.info('_insert_eject()[{}]: '.format(flabel)+msg)
 
         # Release stopper twice (Powering ON the stoppers)
         # 1st trial
@@ -250,12 +252,12 @@ class WiregridActuatorAgent:
             if not any(onoff_st):
                 break
         if any(onoff_st):
-            msg = 'ERROR!: (After the last moving) '\
-                  'Failed to lock (OFF) all the stoppers'
+            msg = '_insert_eject()[{}]: ERROR!: (After the last moving) '\
+                  'Failed to lock (OFF) all the stoppers'.format(flabel)
             self.log.error(msg)
             return False, msg
 
-        return True, 'Successfully inserting!'
+        return True, '_insert_eject()[{}]: Successfully moving!'.format(flabel)
 
     def _insert(self, main_distance=800, main_speedrate=1.0):
         ret, msg = self._insert_eject(
@@ -295,16 +297,19 @@ class WiregridActuatorAgent:
                 as acquired:
             if not acquired:
                 self.log.warn(
+                    'check_limitswitch(): '
                     'Lock could not be acquired because it is held by {}.'
                     .format(self.lock.job))
-                return False, 'Could not acquire lock in check_limitswitch().'
+                return False,\
+                    'check_limitswitch(): '\
+                    'Could not acquire lock in check_limitswitch().'
 
             onoffs = self.actuator.ls.get_onoff(io_name)
             io_names = self.actuator.ls.get_io_name(io_name)
             io_labels = self.actuator.ls.get_label(io_name)
             for i, io_name in enumerate(io_names):
                 io_label = io_labels[i]
-                msg += '{:10s} ({:20s}) : {}\n'\
+                msg += 'check_limitswitch(): {:10s} ({:20s}) : {}\n'\
                     .format(io_name, io_label, 'ON' if onoffs[i] else 'OFF')
             self.log.info(msg)
             return onoffs, msg
@@ -327,6 +332,7 @@ class WiregridActuatorAgent:
                 as acquired:
             if not acquired:
                 self.log.warn(
+                    'check_stopper(): '
                     'Lock could not be acquired because it is held by {}.'
                     .format(self.lock.job))
                 return False, 'Could not acquire lock in check_stopper().'
@@ -336,7 +342,7 @@ class WiregridActuatorAgent:
             io_labels = self.actuator.st.get_label(io_name)
             for i, io_name in enumerate(io_names):
                 io_label = io_labels[i]
-                msg += '{:10s} ({:20s}) : {}\n'\
+                msg += 'check_stopper(): {:10s} ({:20s}) : {}\n'\
                     .format(io_name, io_label, 'ON' if onoffs[i] else 'OFF')
             self.log.info(msg)
             return onoffs, msg
@@ -351,19 +357,21 @@ class WiregridActuatorAgent:
         with self.lock.acquire_timeout(timeout=3, job='insert') as acquired:
             if not acquired:
                 self.log.warn(
+                    'insert(): '
                     'Lock could not be acquired because it is held by {}.'
                     .format(self.lock.job))
-                return False, 'Could not acquire lock in insert().'
+                return False, 'insert(): Could not acquire lock.'
             # Wait for a second before moving
             time.sleep(1)
             # Moving commands
             ret, msg = self._insert(920, 1.0)
             if not ret:
-                msg = 'ERROR!: Failed insert() in _insert(850,1.0): {}'\
-                    .format(msg)
+                msg = 'insert(): '\
+                      'ERROR!: Failed insert() in _insert(850,1.0): {}'\
+                      .format(msg)
                 self.log.error(msg)
                 raise
-            return True, 'Successfully finish insert()!'
+            return True, 'insert(): Successfully finish!'
 
     def eject(self, session, params=None):
         """
@@ -375,19 +383,20 @@ class WiregridActuatorAgent:
         with self.lock.acquire_timeout(timeout=3, job='eject') as acquired:
             if not acquired:
                 self.log.warn(
+                        'eject(): '
                         'Lock could not be acquired because it is held by {}.'
                         .format(self.lock.job))
-                return False, 'Could not acquire lock in eject().'
+                return False, 'eject(): Could not acquire lock.'
             # Wait for a second before moving
             time.sleep(1)
             # Moving commands
             ret, msg = self._eject(920, 1.0)
             if not ret:
-                msg = 'ERROR!: Failed eject() in _eject(850,1.0): {}'\
+                msg = 'eject(): ERROR!: Failed eject() in _eject(850,1.0): {}'\
                     .format(msg)
                 self.log.error(msg)
                 raise
-            return True, 'Successfully finish eject()!'
+            return True, 'eject(): Successfully finish!'
 
     def insert_homing(self, session, params=None):
         """
@@ -401,19 +410,20 @@ class WiregridActuatorAgent:
                 as acquired:
             if not acquired:
                 self.log.warn(
+                    'insert_homing(): '
                     'Lock could not be acquired because it is held by {}.'
                     .format(self.lock.job))
-                return False, 'Could not acquire lock in insert_homing().'
+                return False, 'insert_homing(): Could not acquire lock.'
             # Wait for a second before moving
             time.sleep(1)
             # Moving commands
             ret, msg = self._insert(1000, 0.1)
             if not ret:
-                msg = 'ERROR!: Failed insert_homing() '\
+                msg = 'insert_homing(): ERROR!: Failed '\
                       'in _insert(1000,0.1): {}'.format(msg)
                 self.log.error(msg)
                 raise
-            return True, 'Successfully finish insert_homing()!'
+            return True, 'insert_homing(): Successfully finish!'
 
     def eject_homing(self, session, params=None):
         """
@@ -427,19 +437,20 @@ class WiregridActuatorAgent:
                 as acquired:
             if not acquired:
                 self.log.warn(
+                        'eject_homing(): '
                         'Lock could not be acquired because it is held by {}.'
                         .format(self.lock.job))
-                return False, 'Could not acquire lock in eject_homing().'
+                return False, 'eject_homing(): Could not acquire lock.'
             # Wait for a second before moving
             time.sleep(1)
             # Moving commands
             ret, msg = self._eject(1000, 0.1)
             if not ret:
-                msg = 'ERROR!: Failed eject_homing() '\
+                msg = 'eject_homing(): ERROR!: Failed '\
                       'in _eject(1000,0.1): {}'.format(msg)
                 self.log.error(msg)
                 raise
-            return True, 'Successfully finish eject_homing()!'
+            return True, 'eject_homing(): Successfully finish!'
 
     def insert_test(self, session, params=None):
         """
@@ -464,29 +475,31 @@ class WiregridActuatorAgent:
              as acquired:
             if not acquired:
                 self.log.warn(
+                    'insert_test(): '
                     'Lock could not be acquired because it is held by {}.'
                     .format(self.lock.job))
-                return False, 'Could not acquire lock in insert_test().'
+                return False, 'insert_test(): Could not acquire lock.'
             # Wait for a second before moving
             time.sleep(1)
             # Release the stoppers
             try:
                 self.actuator.st.set_allon()
             except Exception as e:
-                msg = 'ERROR: Failed to run the stopper set_allon() '\
+                msg = 'insert_test(): ERROR: '\
+                      'Failed to run the stopper set_allon() '\
                       '--> Stop inserting! | Exception: {}'.format(e)
                 self.log.error(msg)
                 return False, msg
             # Moving commands
             ret, msg, LSonoff = self._forward(distance, speedrate=speedrate)
             if not ret:
-                msg = 'ERROR!: Failed insert_test() in _forward(10,1.): {}'\
+                msg = 'insert_test(): ERROR!: Failed in _forward(10,1.): {}'\
                     .format(msg)
                 self.log.error(msg)
                 raise
             # Lock the stoppers
             self.actuator.st.set_alloff()
-            return True, 'Successfully finish insert_test()!'
+            return True, 'insert_test(): Successfully finish!'
 
     def eject_test(self, session, params=None):
         """
@@ -502,38 +515,40 @@ class WiregridActuatorAgent:
             params = {}
         distance = params.get('distance', 10)
         speedrate = params.get('speedrate', 10)
-        self.log.info('insert_test(): set distance   = {} mm'
+        self.log.info('eject_test(): set distance   = {} mm'
                       .format(distance))
-        self.log.info('insert_test(): set speed rate = {}'
+        self.log.info('eject_test(): set speed rate = {}'
                       .format(speedrate))
 
         with self.lock.acquire_timeout(timeout=3, job='eject_test')\
                 as acquired:
             if not acquired:
                 self.log.warn(
+                        'eject_test(): '
                         'Lock could not be acquired because it is held by {}.'
                         .format(self.lock.job))
-                return False, 'Could not acquire lock in eject_test().'
+                return False, 'eject_test(): Could not acquire lock.'
             # Wait for a second before moving
             time.sleep(1)
             # Release the stoppers
             try:
                 self.actuator.st.set_allon()
             except Exception as e:
-                msg = 'ERROR: Failed to run the stopper set_allon() '\
-                      '--> Stop inserting! | Exception: {}'.format(e)
+                msg = 'eject_test(): ERROR: '\
+                      'Failed to run the stopper set_allon() '\
+                      '--> Stop ejecting! | Exception: {}'.format(e)
                 self.log.error(msg)
                 return False, msg
             # Moving commands
             ret, msg, LSonoff = self._backward(distance, speedrate=speedrate)
             if not ret:
-                msg = 'ERROR!: Failed eject_test() '\
+                msg = 'eject_test(): ERROR!: Failed '\
                       'in _backward(10,1.): {}'.format(msg)
                 self.log.error(msg)
                 raise
             # Lock the stoppers
             self.actuator.st.set_alloff()
-            return True, 'Successfully finish eject_test()!'
+            return True, 'eject_test(): Successfully finish!'
 
     def motor_on(self, session, params=None):
         """
@@ -546,18 +561,20 @@ class WiregridActuatorAgent:
                 as acquired:
             if not acquired:
                 self.log.warn(
+                        'motor_on(): '
                         'Lock could not be acquired because it is held by {}.'
                         .format(self.lock.job))
-                return False, 'Could not acquire lock in motor_on().'
-            self.log.warn('Try to power ON the actuator motors.')
+                return False, 'motor_on(): Could not acquire lock.'
+            self.log.warn('motor_on(): Try to power ON the actuator motors.')
             try:
                 self.actuator.set_motor_onoff(onoff=True)
             except Exception as e:
-                msg = 'ERROR!: Failed to power ON the actuator motors: '\
+                msg = 'motor_on(): ERROR!: '\
+                      'Failed to power ON the actuator motors: '\
                       ' {}'.format(e)
                 self.log.error(msg)
                 raise
-            return True, 'Successfully finish motor_on()!'
+            return True, 'motor_on(): Successfully finish!'
 
     def motor_off(self, session, params=None):
         """
@@ -570,18 +587,20 @@ class WiregridActuatorAgent:
                 as acquired:
             if not acquired:
                 self.log.warn(
+                        'motor_off(): '
                         'Lock could not be acquired because it is held by {}.'
                         .format(self.lock.job))
-                return False, 'Could not acquire lock in motor_off().'
-            self.log.warn('Try to power OFF the actuator motors.')
+                return False, 'motor_off(): Could not acquire lock.'
+            self.log.warn('motor_off(): Try to power OFF the actuator motors.')
             try:
                 self.actuator.set_motor_onoff(onoff=False)
             except Exception as e:
-                msg = 'ERROR!: Failed to power OFF the actuator motors: '\
+                msg = 'motor_off(): ERROR!: '\
+                      'Failed to power OFF the actuator motors: '\
                       '{}'.format(e)
                 self.log.error(msg)
                 raise
-            return True, 'Successfully finish motor_off()!'
+            return True, 'motor_off(): Successfully finish!'
 
     def stop(self, session, params=None):
         """
@@ -591,15 +610,15 @@ class WiregridActuatorAgent:
         Parameters:
             Nothing
         """
-        self.log.warn('Try to stop and hold the actuator.')
+        self.log.warn('stop(): Try to stop and hold the actuator.')
         # This will disable move() command in Actuator class
         # until self.actuator.release() is called.
         ret, msg = self.actuator.hold()
         if not ret:
-            msg = 'ERROR!: Failed to hold the actuator: {}'.format(msg)
+            msg = 'stop(): ERROR!: Failed to hold the actuator: {}'.format(msg)
             self.log.error(msg)
             raise
-        return True, 'Successfully finish stop()!'
+        return True, 'stop(): Successfully finish!'
 
     def release(self, session, params=None):
         """
@@ -612,18 +631,20 @@ class WiregridActuatorAgent:
                 as acquired:
             if not acquired:
                 self.log.warn(
+                        'release(): '
                         'Lock could not be acquired because it is held by {}.'
                         .format(self.lock.job))
-                return False, 'Could not acquire lock in release().'
-            self.log.warn('Try to release the actuator.')
+                return False, 'release(): Could not acquire lock.'
+            self.log.warn('release(): Try to release the actuator.')
             # This will enable move() command in Actuator class.
             try:
                 self.actuator.release()
             except Exception as e:
-                msg = 'ERROR!: Failed to release the actuator: {}'.format(e)
+                msg = 'release(): ERROR!: '\
+                      'Failed to release the actuator: {}'.format(e)
                 self.log.error(msg)
                 raise
-            return True, 'Successfully finish release()!'
+            return True, 'release(): Successfully finish!'
 
     def start_acq(self, session, params=None):
         """
@@ -662,6 +683,7 @@ class WiregridActuatorAgent:
         # If interval-time is None, use value passed to Agent init
         if interval_time is None:
             self.log.info(
+                'start_acq(): '
                 'Not set by parameter of "interval-time" for start_acq()')
             interval_time = self.interval_time
         else:
@@ -669,20 +691,23 @@ class WiregridActuatorAgent:
                 interval_time = float(interval_time)
             except ValueError as e:
                 self.log.warn(
+                    'start_acq(): '
                     'Parameter of "interval-time" is incorrect : {}'.format(e))
                 interval_time = self.interval_time
         self.log.info(
+            'start_acq(): '
             'interval time for acquisition of limit-switch & stopper = {} sec'
             .format(interval_time))
 
         with self.lock.acquire_timeout(timeout=0, job='acq') as acquired:
-            self.log.info('Start to take data')
+            self.log.info('start_acq(): Start to take data')
             if not acquired:
                 self.log.warn(
+                    'start_acq(): '
                     'Lock could not be acquired because it is held by {}.'
                     .format(self.lock.job))
-                return False, 'Could not acquire lock in start_acq().'
-            self.log.info('Got the lock')
+                return False, 'start_acq(): Could not acquire lock.'
+            self.log.info('start_acq(): Got the lock')
 
             session.set_status('running')
 
@@ -694,9 +719,11 @@ class WiregridActuatorAgent:
                     last_release = time.time()
                     if not self.lock.release_and_acquire(timeout=600):
                         self.log.warn(
+                            'start_acq(): '
                             'Could not re-acquire lock now held by {}.'
                             .format(self.lock.job))
-                        return False, 'Could not re-acquire lock (timeout)'
+                        return False,\
+                            'start_acq(): Could not re-acquire lock (timeout)'
 
                 current_time = time.time()
                 data = {'timestamp': current_time,
@@ -737,15 +764,15 @@ class WiregridActuatorAgent:
         # End of lock acquire
 
         self.agent.feeds['WGActuator'].flush_buffer()
-        return True, 'Acquisition exited cleanly'
+        return True, 'start_acq(): Acquisition exited cleanly'
 
     def stop_acq(self, session, params=None):
         if self.run_acq:
             self.run_acq = False
             session.set_status('stopping')
-            return True, 'Stop data acquisition'
+            return True, 'stop_acq(): Stop data acquisition'
         session.set_status('??????')
-        return False, 'acq is not currently running'
+        return False, 'stop_acq(): acq is not currently running'
 
     # End of class WiregridActuatorAgent
 
