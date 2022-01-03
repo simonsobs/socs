@@ -26,9 +26,6 @@ class KikusuiAgent:
         self.lock = TimeoutLock()
 
         self.take_data = False
-        self.switching = False  # True while a command is sent to KIKSUI.
-        self.switching2 = False  # True while IV is gotten.
-        self.wait_loop = 100  # Max number of loop in __wait_control
         self.kikusui_ip = kikusui_ip
         self.kikusui_port = int(kikusui_port)
 
@@ -65,7 +62,11 @@ class KikusuiAgent:
         else:
             self.cmd = None
 
-    def __check_connect(self):
+    ######################
+    # Internal functions #
+    ######################
+
+    def _check_connect(self):
         if self.PMX is None:
             msg = 'No connection to the KIKUSUI power supply. | '\
                   'Error = "PMX is None"'
@@ -80,7 +81,7 @@ class KikusuiAgent:
                 return False, msg
         return True, 'Connection is OK.'
 
-    def __reconnect(self):
+    def _reconnect(self):
         self.log.warn('Trying to reconnect...')
         # reconnect
         try:
@@ -101,7 +102,7 @@ class KikusuiAgent:
             return False, msg
         # reinitialize cmd
         self.cmd = cm.Command(self.PMX)
-        ret, msg = self.__check_connect()
+        ret, msg = self._check_connect()
         if ret:
             msg = 'Successfully reconnected to the KIKUSUI power supply!'
             self.log.info(msg)
@@ -117,186 +118,7 @@ class KikusuiAgent:
             self.cmd = None
             return False, msg
 
-    def __wait_control(self):
-        # check control
-        for i in range(self.wait_loop):
-            if (not self.switching) and (not self.switching2):
-                self.switching = True
-                return True
-            time.sleep(0.1)
-        msg = 'Failed to wait for getting the control. Exceed max. '\
-              'Number of Waiting loop. (max={})'.format(self.wait_loop)
-        self.log.warn(msg)
-        return False
-
-    def set_on(self, session, params=None):
-        with self.lock.acquire_timeout(timeout=3, job='set_on') as acquired:
-            if not acquired:
-                self.log.warn('Could not set ON because {} is already running'
-                              .format(self.lock.job))
-                return False, 'Could not acquire lock'
-
-            # wait for getting control
-            ret = self.__wait_control()
-            if ret:
-                self.cmd.user_input('on')
-                self.switching = False
-            else:
-                msg = 'Could not set ON '\
-                      'because of failure in getting the control.'
-                self.log.warn(msg)
-                return False, msg
-
-        return True, 'Set Kikusui on'
-
-    def set_off(self, session, params=None):
-        with self.lock.acquire_timeout(timeout=3, job='set_off') as acquired:
-            if not acquired:
-                self.log.warn('Could not set OFF because {} is already running'
-                              .format(self.lock.job))
-                return False, 'Could not acquire lock'
-
-            # wait for getting control
-            ret = self.__wait_control()
-            if ret:
-                self.cmd.user_input('off')
-                self.switching = False
-            else:
-                msg = 'Could not set OFF '\
-                      'because of failure in getting the control.'
-                self.log.warn(msg)
-                return False, msg
-
-        return True, 'Set Kikusui off'
-
-    def calibrate_wg(self, session, params=None):
-        if params is None:
-            params = {'storepath': self.action_path}
-
-        with self.lock.acquire_timeout(timeout=3, job='calibrate_wg') as acquired:
-            if not acquired:
-                self.log.warn('Could not run calibrate_wg() '
-                              'because {} is already running'
-                              .format(self.lock.job))
-                return False, 'Could not acquire lock'
-
-        logfile = openlog(params['storepath'])
-
-        ret = self.__wait_control()
-
-        cycle = 1
-        for i in range(11):
-            tperiod = 0.10 + 0.02*i
-            for j in range(100):
-                if j % 20 == 0:
-                    self.log.warn(f'this is {cycle}th time action')
-
-                writelog(logfile, 'ON', tperiod,
-                         self.get_position(
-                            self.position_path, self.open_trial, self.Deg))
-                self.rotate_alittle(ret, tperiod)
-                time.sleep(self.agent_interval+1.)
-                writelog(logfile, 'OFF', 0.,
-                         self.get_position(
-                            self.position_path, self.open_trial, self.Deg))
-                writelog(logfile, 'ON', 0.70,
-                         self.get_position(
-                             self.position_path, self.open_trial, self.Deg))
-                self.rotate_alittle(ret, 0.70)
-                time.sleep(self.agent_interval+1.)
-                writelog(logfile, 'OFF', 0.,
-                         self.get_position(
-                            self.position_path, self.open_trial, self.Deg))
-                cycle += 1
-
-        self.switching = False
-
-        logfile.close()
-
-        return True, 'Micro step rotation of wire grid finished. '\
-                     'Please calibrate and take feedback params.'
-
-    def stepwise_rotation(self, session, params=None):
-        if params is None:
-            params = {'feedback_steps': 8, 'num_laps': 1, 'stopped_time': 10,
-                      'feedback_time': [0.181, 0.221, 0.251, 0.281, 0.301]}
-
-        with self.lock.acquire_timeout(timeout=3, job='stepwise_rotation') as acquired:
-            if not acquired:
-                self.log.warn('Could not run stepwise_rotation() '
-                              'because {} is already running'
-                              .format(self.lock.job))
-                return False, 'Could not acquire lock'
-
-        self.feedback_steps = params['feedback_steps']
-        self.num_laps = params['num_laps']
-        self.stopped_time = params['stopped_time']
-        self.feedback_time = params['feedback_time']
-
-        logfile = openlog(self.action_path)
-
-        ret = self.__wait_control()
-
-        for i in range(self.num_laps*16):
-            self.move_next(
-                ret, logfile, self.feedback_steps, self.feedback_time)
-            time.sleep(self.stopped_time)
-
-        self.switching = False
-
-        logfile.close()
-
-        return True, 'Step-wise rotation finished'
-
-    # each value can be changed
-    def move_next(self, ret, logfile, feedback_steps, feedback_time):
-        wanted_angle = 22.5
-        uncertaity_cancel = 3
-        absolute_position = np.arange(0, 360, wanted_angle)
-
-        start_position = self.get_position(
-            self.position_path, self.open_trial, self.Deg)
-        if (360 < start_position + uncertaity_cancel):
-            goal_position = wanted_angle
-        elif absolute_position[-1] < start_position + uncertaity_cancel:
-            goal_position = 0
-        else:
-            goal_position = min(
-                absolute_position[np.where(
-                    start_position + uncertaity_cancel < absolute_position)[0]
-                ]
-            )
-
-        with open('feedback.log', 'a') as f:
-            f.write('start: {}, goal: {}\n'
-                    .format(round(start_position, 3), round(goal_position, 3)))
-
-        self.rotate_alittle(ret, feedback_time[-1]+0.1)
-        time.sleep(self.agent_interval)
-
-        for step in range(feedback_steps):
-            mid_position = self.get_position(
-                self.position_path, self.open_trial, self.Deg)
-            if goal_position + wanted_angle < mid_position:
-                self.operation_time =\
-                    self.get_exectime(
-                        goal_position - (mid_position - 360),
-                        self.feedback_cut,
-                        feedback_time)
-            else:
-                self.operation_time =\
-                    self.get_exectime(
-                        goal_position - mid_position,
-                        self.feedback_cut,
-                        feedback_time)
-
-            with open('operation_time.log', 'a') as f:
-                f.write(str(step)+':'+str(round(mid_position, 3))
-                        + ' '+str(self.operation_time)+'\n')
-
-            self.rotate_alittle(ret, self.operation_time)
-
-    def rotate_alittle(self, ret, operation_time):
+    def _rotate_alittle(self, ret, operation_time):
         if ret:
             if operation_time != 0.:
                 self.cmd.user_input('on')
@@ -308,7 +130,7 @@ class KikusuiAgent:
             self.log.warn(msg)
             return False, msg
 
-    def get_position(self, position_path, open_trial, Deg):
+    def _get_position(self, position_path, open_trial, Deg):
         try:
             for i in range(open_trial):
                 with open(position_path) as f:
@@ -327,7 +149,7 @@ class KikusuiAgent:
 
         return int(position)*Deg
 
-    def get_exectime(self, position_difference, feedback_cut, feedback_time):
+    def _get_exectime(self, position_difference, feedback_cut, feedback_time):
         if position_difference >= feedback_cut[4]:
             operation_time = feedback_time[4]
         if (feedback_cut[4] > position_difference) &\
@@ -346,6 +168,77 @@ class KikusuiAgent:
             operation_time = 0.
         return operation_time
 
+    def _move_next(self, ret, logfile, feedback_steps, feedback_time):
+        wanted_angle = 22.5
+        uncertaity_cancel = 3
+        absolute_position = np.arange(0, 360, wanted_angle)
+
+        start_position = self._get_position(
+            self.position_path, self.open_trial, self.Deg)
+        if (360 < start_position + uncertaity_cancel):
+            goal_position = wanted_angle
+        elif absolute_position[-1] < start_position + uncertaity_cancel:
+            goal_position = 0
+        else:
+            goal_position = min(
+                absolute_position[np.where(
+                    start_position + uncertaity_cancel < absolute_position)[0]
+                ]
+            )
+
+        with open('feedback.log', 'a') as f:
+            f.write('start: {}, goal: {}\n'
+                    .format(round(start_position, 3), round(goal_position, 3)))
+
+        self._rotate_alittle(ret, feedback_time[-1]+0.1)
+        time.sleep(self.agent_interval)
+
+        for step in range(feedback_steps):
+            mid_position = self._get_position(
+                self.position_path, self.open_trial, self.Deg)
+            if goal_position + wanted_angle < mid_position:
+                self.operation_time =\
+                    self._get_exectime(
+                        goal_position - (mid_position - 360),
+                        self.feedback_cut,
+                        feedback_time)
+            else:
+                self.operation_time =\
+                    self._get_exectime(
+                        goal_position - mid_position,
+                        self.feedback_cut,
+                        feedback_time)
+
+            with open('operation_time.log', 'a') as f:
+                f.write(str(step)+':'+str(round(mid_position, 3))
+                        + ' '+str(self.operation_time)+'\n')
+
+            self._rotate_alittle(ret, self.operation_time)
+
+    ##################
+    # Main functions #
+    ##################
+
+    def set_on(self, session, params=None):
+        with self.lock.acquire_timeout(timeout=3, job='set_on') as acquired:
+            if not acquired:
+                self.log.warn('Could not set ON because {} is already running'
+                              .format(self.lock.job))
+                return False, 'Could not acquire lock'
+
+            self.cmd.user_input('on')
+            return True, 'Set Kikusui on'
+
+    def set_off(self, session, params=None):
+        with self.lock.acquire_timeout(timeout=3, job='set_off') as acquired:
+            if not acquired:
+                self.log.warn('Could not set OFF because {} is already running'
+                              .format(self.lock.job))
+                return False, 'Could not acquire lock'
+
+            self.cmd.user_input('off')
+            return True, 'Set Kikusui off'
+
     def set_c(self, session, params=None):
         if params is None:
             params = {'current': 0}
@@ -357,24 +250,17 @@ class KikusuiAgent:
                     .format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            # wait for getting control
-            ret = self.__wait_control()
-            if ret:
-                if params['current'] <= 3. and 0. <= params['current']:
-                    self.cmd.user_input('C {}'.format(params['current']))
-                else:
-                    self.log.warn(
-                        'Value Error: set current 3.0 A or less. '
-                        'Now set to 3.0 A')
-                    self.cmd.user_input('C {}'.format(3.0))
-                self.switching = False
+            if params['current'] <= 3. and 0. <= params['current']:
+                current = params['current']
+                self.cmd.user_input('C {}'.format(params['current']))
             else:
-                msg = 'Could not set c '\
-                      'because of failure in getting the control.'
-                self.log.warn(msg)
-                return False, msg
+                current = 3.0
+                self.log.warn(
+                    'Value Error: set current 3.0 A or less. '
+                    'Now set to {} A'.format(current))
+                self.cmd.user_input('C {}'.format(current))
 
-        return True, 'Set Kikusui current to {} A'.format(params['current'])
+            return True, 'Set Kikusui current to {} A'.format(current)
 
     def set_v(self, session, params=None):
         if params is None:
@@ -386,24 +272,15 @@ class KikusuiAgent:
                               .format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            # wait for getting control
-            ret = self.__wait_control()
-            if ret:
-                if params['volt'] == 12.:
-                    self.cmd.user_input('V {}'.format(params['volt']))
-                else:
-                    self.log.warn(
-                        'Value Error: Rated Voltage of the motor is 12 V. '
-                        'Now set to 12 V')
-                    self.cmd.user_input('V {}'.format(12.))
-                self.switching = False
+            if params['volt'] == 12.:
+                self.cmd.user_input('V {}'.format(params['volt']))
             else:
-                msg = 'Could not set v '\
-                      'because of failure in getting the control.'
-                self.log.warn(msg)
-                return False, msg
+                self.log.warn(
+                    'Value Error: Rated Voltage of the motor is 12 V. '
+                    'Now set to 12 V')
+                self.cmd.user_input('V {}'.format(12.))
 
-        return True, 'Set Kikusui voltage to {} V'.format(params['volt'])
+            return True, 'Set Kikusui voltage to 12 V'
 
     def get_vc(self, session, params=None):
         with self.lock.acquire_timeout(timeout=0, job='get_vc') as acquired:
@@ -418,91 +295,156 @@ class KikusuiAgent:
             msg = 'Error'
             s_msg = 'Error'
 
-            # wait for getting control
-            ret = self.__wait_control()
-            if ret:
-                # check connection
-                ret, msg = self.__check_connect()
-                if not ret:
-                    msg = 'Could not get c,v because of failure of connection.'
-                else:
-                    msg, v_val, c_val = self.cmd.user_input('VC?')
-                    s_msg, s_val = self.cmd.user_input('O?')
-                self.switching = False
+            # check connection
+            ret, msg = self._check_connect()
+            if not ret:
+                msg = 'Could not get c,v because of failure of connection.'
             else:
-                msg = 'Could not get c,v '\
-                      'because of failure in getting the control.'
-                self.log.warn(msg)
+                msg, v_val, c_val = self.cmd.user_input('VC?')
+                s_msg, s_val = self.cmd.user_input('O?')
 
-        self.log.info('Get voltage/current message: {}'.format(msg))
-        self.log.info('Get status message: {}'.format(s_msg))
-        return True, 'Get Kikusui voltage / current: {} V / {} A [status={}]'\
-                     .format(v_val, c_val, s_val)
+            self.log.info('Get voltage/current message: {}'.format(msg))
+            self.log.info('Get status message: {}'.format(s_msg))
+            return True, 'Get Kikusui voltage / current: {} V / {} A [status={}]'\
+                         .format(v_val, c_val, s_val)
+
+    def calibrate_wg(self, session, params=None):
+        if params is None:
+            params = {'storepath': self.action_path}
+
+        with self.lock.acquire_timeout(timeout=3, job='calibrate_wg') as acquired:
+            if not acquired:
+                self.log.warn('Could not run calibrate_wg() '
+                              'because {} is already running'
+                              .format(self.lock.job))
+                return False, 'Could not acquire lock'
+
+            logfile = openlog(params['storepath'])
+         
+            cycle = 1
+            for i in range(11):
+                tperiod = 0.10 + 0.02*i
+                for j in range(100):
+                    if j % 20 == 0:
+                        self.log.warn(f'this is {cycle}th time action')
+         
+                    writelog(logfile, 'ON', tperiod,
+                             self._get_position(
+                                self.position_path, self.open_trial, self.Deg))
+                    self._rotate_alittle(ret, tperiod)
+                    time.sleep(self.agent_interval+1.)
+                    writelog(logfile, 'OFF', 0.,
+                             self._get_position(
+                                self.position_path, self.open_trial, self.Deg))
+                    writelog(logfile, 'ON', 0.70,
+                             self._get_position(
+                                 self.position_path, self.open_trial, self.Deg))
+                    self._rotate_alittle(ret, 0.70)
+                    time.sleep(self.agent_interval+1.)
+                    writelog(logfile, 'OFF', 0.,
+                             self._get_position(
+                                self.position_path, self.open_trial, self.Deg))
+                    cycle += 1
+         
+            logfile.close()
+         
+            return True, 'Micro step rotation of wire grid finished. '\
+                     'Please calibrate and take feedback params.'
+
+    def stepwise_rotation(self, session, params=None):
+        if params is None:
+            params = {'feedback_steps': 8, 'num_laps': 1, 'stopped_time': 10,
+                      'feedback_time': [0.181, 0.221, 0.251, 0.281, 0.301]}
+
+        with self.lock.acquire_timeout(timeout=3, job='stepwise_rotation') as acquired:
+            if not acquired:
+                self.log.warn('Could not run stepwise_rotation() '
+                              'because {} is already running'
+                              .format(self.lock.job))
+                return False, 'Could not acquire lock'
+
+            self.feedback_steps = params['feedback_steps']
+            self.num_laps = params['num_laps']
+            self.stopped_time = params['stopped_time']
+            self.feedback_time = params['feedback_time']
+         
+            logfile = openlog(self.action_path)
+         
+            for i in range(self.num_laps*16):
+                self._move_next(
+                    ret, logfile, self.feedback_steps, self.feedback_time)
+                time.sleep(self.stopped_time)
+         
+            logfile.close()
+         
+            return True, 'Step-wise rotation finished'
 
     def start_IV_acq(self, session, params=None):
-        with self.lock.acquire_timeout(timeout=0, job='IV_acq') as acquired:
+        # timeout is long because calibrate_wg will take a long time (> hours)
+        with self.lock.acquire_timeout(timeout=600, job='IV_acq') as acquired:
             if not acquired:
                 self.log.warn('Could not run start_IV_acq '
                               'because {} is already running'
                               .format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-        session.set_status('running')
-
-        self.take_data = True
-        last_release = time.time()
-        session.data = {'fields': {}}
-        while self.take_data:
-            if time.time() - last_release > 1.:
-                last_release = time.time()
-                if not self.lock.release_and_acquire(timeout=600):
-                    self.log.warn(
-                        'start_acq(): '
-                        'Could not re-acquire lock now held by {}.'
-                        .format(self.lock.job))
-                    return False,\
-                        'Could not re-acquire lock for start_IV_acq() (timeout)'
-
-            current_time = time.time()
-            data = {'timestamp': time.time(),
-                    'block_name': 'Kikusui_IV',
-                    'data': {}}
-
-            # check connection
-            ret, msg = self.__check_connect()
-            if not ret:
-                msg = 'Could not connect to the KIKUSUI power supply!'
-                v_val, i_val, vs_val, is_val = 0., 0., 0., 0.
-                s_val = -1  # -1 means Not connected.
-                self.log.warn(msg)
-                # try to reconnect
-                self.__reconnect()
-            else:
-                v_msg, v_val = self.cmd.user_input('V?')
-                i_msg, i_val = self.cmd.user_input('C?')
-                vs_msg, vs_val = self.cmd.user_input('VS?')
-                is_msg, is_val = self.cmd.user_input('CS?')
-                s_msg, s_val = self.cmd.user_input('O?')
-            data['data']['kikusui_volt'] = v_val
-            data['data']['kikusui_curr'] = i_val
-            data['data']['kikusui_voltset'] = vs_val
-            data['data']['kikusui_currset'] = is_val
-            data['data']['kikusui_status'] = s_val
-            self.agent.publish_to_feed('kikusui_psu', data)
-            # store session.data
-            field_dict = {'kikusui':
-                            {'volt':v_val,
-                             'curr':i_val,
-                             'voltset':vs_val,
-                             'currset':is_val,
-                             'status':s_val
-                             }
-                          }
-            session.data['timestamp'] = current_time
-            session.data['fields'] = field_dict
-
-            time.sleep(1)  # DAQ interval
-        # End of while loop
+            session.set_status('running')
+         
+            self.take_data = True
+            last_release = time.time()
+            session.data = {'fields': {}}
+            while self.take_data:
+                if time.time() - last_release > 1.:
+                    last_release = time.time()
+                    if not self.lock.release_and_acquire(timeout=600):
+                        self.log.warn(
+                            'start_acq(): '
+                            'Could not re-acquire lock now held by {}.'
+                            .format(self.lock.job))
+                        return False,\
+                            'Could not re-acquire lock for start_IV_acq() (timeout)'
+         
+                current_time = time.time()
+                data = {'timestamp': time.time(),
+                        'block_name': 'Kikusui_IV',
+                        'data': {}}
+         
+                # check connection
+                ret, msg = self._check_connect()
+                if not ret:
+                    msg = 'Could not connect to the KIKUSUI power supply!'
+                    v_val, i_val, vs_val, is_val = 0., 0., 0., 0.
+                    s_val = -1  # -1 means Not connected.
+                    self.log.warn(msg)
+                    # try to reconnect
+                    self._reconnect()
+                else:
+                    v_msg, v_val = self.cmd.user_input('V?')
+                    i_msg, i_val = self.cmd.user_input('C?')
+                    vs_msg, vs_val = self.cmd.user_input('VS?')
+                    is_msg, is_val = self.cmd.user_input('CS?')
+                    s_msg, s_val = self.cmd.user_input('O?')
+                data['data']['kikusui_volt'] = v_val
+                data['data']['kikusui_curr'] = i_val
+                data['data']['kikusui_voltset'] = vs_val
+                data['data']['kikusui_currset'] = is_val
+                data['data']['kikusui_status'] = s_val
+                self.agent.publish_to_feed('kikusui_psu', data)
+                # store session.data
+                field_dict = {'kikusui':
+                                {'volt':v_val,
+                                 'curr':i_val,
+                                 'voltset':vs_val,
+                                 'currset':is_val,
+                                 'status':s_val
+                                 }
+                              }
+                session.data['timestamp'] = current_time
+                session.data['fields'] = field_dict
+         
+                time.sleep(1)  # DAQ interval
+            # End of while loop for take_data
+        # End of acquired lock
 
         self.agent.feeds['kikusui_feed'].flush_buffer()
         return True, 'Acqusition exited cleanly'
