@@ -220,6 +220,12 @@ class KikusuiAgent:
     ##################
 
     def set_on(self, session, params=None):
+        """
+        Set output ON
+
+        Paramters:
+            Nothing
+        """
         with self.lock.acquire_timeout(timeout=3, job='set_on') as acquired:
             if not acquired:
                 self.log.warn('Could not set ON because {} is already running'
@@ -230,6 +236,12 @@ class KikusuiAgent:
             return True, 'Set Kikusui on'
 
     def set_off(self, session, params=None):
+        """
+        Set output OFF
+
+        Paramters:
+            Nothing
+        """
         with self.lock.acquire_timeout(timeout=3, job='set_off') as acquired:
             if not acquired:
                 self.log.warn('Could not set OFF because {} is already running'
@@ -240,6 +252,12 @@ class KikusuiAgent:
             return True, 'Set Kikusui off'
 
     def set_c(self, session, params=None):
+        """
+        Set current [A]
+
+        Paramters:
+            current: set current [A] (should be [0.0, 3.0])
+        """
         if params is None:
             params = {'current': 0}
 
@@ -263,6 +281,12 @@ class KikusuiAgent:
             return True, 'Set Kikusui current to {} A'.format(current)
 
     def set_v(self, session, params=None):
+        """
+        Set voltage [V]
+
+        Paramters:
+            volt: set voltage [V] (should be ONLY 12)
+        """
         if params is None:
             params = {'volt': 0}
 
@@ -283,6 +307,12 @@ class KikusuiAgent:
             return True, 'Set Kikusui voltage to 12 V'
 
     def get_vc(self, session, params=None):
+        """
+        Show voltage [V], current [A], output on/off 
+
+        Paramters:
+            Nothing
+        """
         with self.lock.acquire_timeout(timeout=0, job='get_vc') as acquired:
             if not acquired:
                 self.log.warn('Could not run get_vc() because {} is already running'
@@ -309,6 +339,12 @@ class KikusuiAgent:
                          .format(v_val, c_val, s_val)
 
     def calibrate_wg(self, session, params=None):
+        """
+        Run rotation-motor calibration for wire-grid
+
+        Paramters:
+            storepath: path for log file
+        """
         if params is None:
             params = {'storepath': self.action_path}
 
@@ -352,6 +388,17 @@ class KikusuiAgent:
                      'Please calibrate and take feedback params.'
 
     def stepwise_rotation(self, session, params=None):
+        """
+        Run step-wise rotation for wire-grid calibration
+        In each step, seveal small-rotations are occurred 
+        to rotate 22.5-deg.
+
+        Paramters:
+            feedback_steps: number of small rotations for each 22.5-deg step
+            num_laps: number of laps (revolutions)
+            stopped_time: stopped time [sec] for each 22.5-deg step
+            feedback_time: calibration constants for the 22.5-deg rotation
+        """
         if params is None:
             params = {'feedback_steps': 8, 'num_laps': 1, 'stopped_time': 10,
                       'feedback_time': [0.181, 0.221, 0.251, 0.281, 0.301]}
@@ -380,6 +427,29 @@ class KikusuiAgent:
             return True, 'Step-wise rotation finished'
 
     def start_IV_acq(self, session, params=None):
+        """
+        Method to start data acquisition process.
+
+        The most recent data collected is stored in session.data in the
+        structure::
+
+            >>> session.data
+            {'fields':
+                {
+                 'kikusui':
+                    {'volt': voltage [V],
+                     'curr': current [A],
+                     'voltset': voltage setting [V],
+                     'currset': current setting [A],
+                     'status': output power status 1(on) or 0(off)
+                     }
+                }
+            }
+
+        Parameters:
+           Nothing
+        """
+
         # timeout is long because calibrate_wg will take a long time (> hours)
         with self.lock.acquire_timeout(timeout=600, job='IV_acq') as acquired:
             if not acquired:
