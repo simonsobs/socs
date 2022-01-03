@@ -138,20 +138,18 @@ class SynaccessAgent:
                               .format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-        session.set_status('running')
-        
-        self.take_data = True
-        session.data = {'fields':{}}
-        while self.take_data:
-            last_release = time.time()
-            self.run_acq = True
-            while self.run_acq:
+            session.set_status('running')
+            
+            self.take_data = True
+            session.data = {'fields':{}}
+            while self.take_data:
+                last_release = time.time()
                 if time.time() - last_release > 1.:
                     last_release = time.time()
                     if not self.lock.release_and_acquire(timeout=10):
                         self.log.warn('Could not re-acquire lock now held by {}.'.format(self.lock.job))
                         return False, 'Could not re-acquire lock (timeout)'
-
+         
                 current_time = time.time()
                 data = {'timestamp': current_time, 'block_name': 'synaccess_status', 'data': {}}
                 
@@ -162,23 +160,20 @@ class SynaccessAgent:
                         status = 1
                     else:
                         status = 0
-                        pass
                     data['data']['synaccess_%d' % i] = status
                     status_dict['%d' % i] = status
-                    pass
                 self.agent.publish_to_feed('synaccess', data)
                 field_dict = {'synaccess': status_dict}
-                session.data['timestamp']=current_time
-                session.data['fields']=field_dict
-                pass
-
-            time.sleep(1) # DAQ interval
-            pass # End of while loop
+                session.data['timestamp'] = current_time
+                session.data['fields'] = field_dict
+         
+                time.sleep(1) # DAQ interval
+                # End of while loop
 
         self.agent.feeds['synaccess'].flush_buffer()
         return True, 'Acqusition exited cleanly'
 
-    def stop_status_acq(self, session, params = None):
+    def stop_status_acq(self, session, params=None):
         if self.take_data:
             self.take_data = False
             return True, 'requested to stop taking data'

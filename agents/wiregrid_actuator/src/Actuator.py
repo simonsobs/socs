@@ -1,7 +1,5 @@
 # Built-in python modules
 import time
-import sys
-import os
 
 import serial
 
