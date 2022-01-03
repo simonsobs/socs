@@ -5,16 +5,18 @@ import time
 import numpy as np
 import traceback
 
+from ocs import ocs_agent, site_config
+from ocs.ocs_twisted import TimeoutLock
+
+# add PATH to ./src directory
 this_dir = os.path.dirname(__file__)
 sys.path.append(
         os.path.join(this_dir, 'src'))
 
+# import classes
 import pmx as pm
 import command as cm
 from common import openlog, writelog
-
-from ocs import ocs_agent, site_config
-from ocs.ocs_twisted import TimeoutLock
 
 
 class KikusuiAgent:
@@ -35,13 +37,14 @@ class KikusuiAgent:
 
         self.open_trial = 10
         self.Deg = 360/52000
-        self.feedback_time = [0.181, 0.221, 0.251, 0.281, 0.301]
-        self.feedback_cut = [0.5, 2.5, 4.5, 6.0, 7.0]
+        # self.feedback_time = [0.151, 0.241, 0.271, 0.301, 0.331]
+        self.feedback_time = [0.151, 0.241, 0.271, 0.361, 0.451]
+        self.feedback_cut = [1., 2., 3., 5.0, 8.0]
         self.operation_time = 0.401
         self.feedback_steps = 8
         self.num_laps = 2
         self.stopped_time = 10
-        self.agent_interval = 0.2
+        self.agent_interval = 0.1
 
         agg_params = {'frame_length': 60}
         self.agent.register_feed(
@@ -56,13 +59,11 @@ class KikusuiAgent:
             self.log.warn(
                 'Could not connect to serial converter! | Error = "%s"' % e)
             self.PMX = None
-            pass
 
         if self.PMX is not None:
             self.cmd = cm.Command(self.PMX)
         else:
             self.cmd = None
-            pass
 
     def __check_connect(self):
         if self.PMX is None:
@@ -77,7 +78,6 @@ class KikusuiAgent:
                       'Error = "%s"' % msg
                 self.log.warn(msg)
                 return False, msg
-            pass
         return True, 'Connection is OK.'
 
     def __reconnect(self):
@@ -124,14 +124,13 @@ class KikusuiAgent:
                 self.switching = True
                 return True
             time.sleep(0.1)
-            pass
         msg = 'Failed to wait for getting the control. Exceed max. '\
               'Number of Waiting loop. (max={})'.format(self.wait_loop)
         self.log.warn(msg)
         return False
 
     def set_on(self, session, params=None):
-        with self.lock.acquire_timeout(0, job='set_on') as acquired:
+        with self.lock.acquire_timeout(3, job='set_on') as acquired:
             if not acquired:
                 self.log.warn('Could not set ON because {} is already running'
                               .format(self.lock.job))
@@ -147,13 +146,11 @@ class KikusuiAgent:
                       'because of failure in getting the control.'
                 self.log.warn(msg)
                 return False, msg
-                pass
-            pass
 
         return True, 'Set Kikusui on'
 
     def set_off(self, session, params=None):
-        with self.lock.acquire_timeout(0, job='set_off') as acquired:
+        with self.lock.acquire_timeout(3, job='set_off') as acquired:
             if not acquired:
                 self.log.warn('Could not set OFF because {} is already running'
                               .format(self.lock.job))
@@ -169,17 +166,14 @@ class KikusuiAgent:
                       'because of failure in getting the control.'
                 self.log.warn(msg)
                 return False, msg
-                pass
-            pass
 
         return True, 'Set Kikusui off'
 
     def calibrate_itself(self, session, params=None):
         if params is None:
             params = {'storepath': self.action_path}
-            pass
 
-        with self.lock.acquire_timeout(0, job='set_off') as acquired:
+        with self.lock.acquire_timeout(3, job='set_off') as acquired:
             if not acquired:
                 self.log.warn('Could not calibrate itself '
                               'because {} is already running'
@@ -196,7 +190,6 @@ class KikusuiAgent:
             for j in range(100):
                 if j % 20 == 0:
                     self.log.warn(f'this is {cycle}th time action')
-                    pass
 
                 writelog(logfile, 'ON', tperiod,
                          self.get_position(
@@ -215,8 +208,6 @@ class KikusuiAgent:
                          self.get_position(
                             self.position_path, self.open_trial, self.Deg))
                 cycle += 1
-                pass
-            pass
 
         self.switching = False
 
@@ -229,9 +220,8 @@ class KikusuiAgent:
         if params is None:
             params = {'feedback_steps': 8, 'num_laps': 1, 'stopped_time': 10,
                       'feedback_time': [0.181, 0.221, 0.251, 0.281, 0.301]}
-            pass
 
-        with self.lock.acquire_timeout(0, job='set_off') as acquired:
+        with self.lock.acquire_timeout(3, job='set_off') as acquired:
             if not acquired:
                 self.log.warn('Could not emit polarized signals '
                               'because {} is already running'
@@ -251,7 +241,6 @@ class KikusuiAgent:
             self.move_next(
                 ret, logfile, self.feedback_steps, self.feedback_time)
             time.sleep(self.stopped_time)
-            pass
 
         self.switching = False
 
@@ -269,27 +258,23 @@ class KikusuiAgent:
             self.position_path, self.open_trial, self.Deg)
         if (360 < start_position + uncertaity_cancel):
             goal_position = wanted_angle
-            pass
         elif absolute_position[-1] < start_position + uncertaity_cancel:
             goal_position = 0
-            pass
         else:
             goal_position = min(
                 absolute_position[np.where(
                     start_position + uncertaity_cancel < absolute_position)[0]
                 ]
             )
-            pass
 
         with open('feedback.log', 'a') as f:
             f.write('start: {}, goal: {}\n'
                     .format(round(start_position, 3), round(goal_position, 3)))
-            pass
 
         self.rotate_alittle(ret, feedback_time[-1]+0.1)
         time.sleep(self.agent_interval)
 
-        for l in range(feedback_steps):
+        for step in range(feedback_steps):
             mid_position = self.get_position(
                 self.position_path, self.open_trial, self.Deg)
             if goal_position + wanted_angle < mid_position:
@@ -298,22 +283,18 @@ class KikusuiAgent:
                         goal_position - (mid_position - 360),
                         self.feedback_cut,
                         feedback_time)
-                pass
             else:
                 self.operation_time =\
                     self.get_exectime(
                         goal_position - mid_position,
                         self.feedback_cut,
                         feedback_time)
-                pass
 
             with open('operation_time.log', 'a') as f:
-                f.write(str(l)+':'+str(round(mid_position, 3))
+                f.write(str(step)+':'+str(round(mid_position, 3))
                         + ' '+str(self.operation_time)+'\n')
-                pass
 
             self.rotate_alittle(ret, self.operation_time)
-            pass
 
     def rotate_alittle(self, ret, operation_time):
         if ret:
@@ -322,14 +303,10 @@ class KikusuiAgent:
                 time.sleep(operation_time)
                 self.cmd.user_input('off')
                 time.sleep(self.agent_interval)
-                pass
-            pass
         else:
             msg = 'Could not rotate because of failure in getting the control.'
             self.log.warn(msg)
             return False, msg
-            pass
-        pass
 
     def get_position(self, position_path, open_trial, Deg):
         try:
@@ -340,44 +317,33 @@ class KikusuiAgent:
                         position_data[-1].split(' ')[1].replace('\n', '')
                     if len(position) != 0:
                         break
-                    pass
-                pass
-            pass
         except Exception as e:
             with open('file_open_error.log', 'a') as f:
                 traceback.print_exc(file=f)
-                pass
             self.log.warn(
                 'Failed to open ENCODER POSITION FILE | '
                 '{}'.format(e)
                 )
-            pass
 
         return int(position)*Deg
 
     def get_exectime(self, position_difference, feedback_cut, feedback_time):
         if position_difference >= feedback_cut[4]:
             operation_time = feedback_time[4]
-            pass
         if (feedback_cut[4] > position_difference) &\
            (position_difference >= feedback_cut[3]):
             operation_time = feedback_time[3]
-            pass
         if (feedback_cut[3] > position_difference) &\
            (position_difference >= feedback_cut[2]):
             operation_time = feedback_time[2]
-            pass
         if (feedback_cut[2] > position_difference) &\
            (position_difference >= feedback_cut[1]):
             operation_time = feedback_time[1]
-            pass
         if (feedback_cut[1] > position_difference) &\
            (position_difference >= feedback_cut[0]):
             operation_time = feedback_time[0]
-            pass
         if feedback_cut[0] > position_difference:
             operation_time = 0.
-            pass
         return operation_time
 
     def set_c(self, session, params=None):
@@ -396,21 +362,17 @@ class KikusuiAgent:
             if ret:
                 if params['current'] <= 3. and 0. <= params['current']:
                     self.cmd.user_input('C {}'.format(params['current']))
-                    pass
                 else:
                     self.log.warn(
                         'Value Error: set current 3.0 A or less. '
                         'Now set to 3.0 A')
                     self.cmd.user_input('C {}'.format(3.0))
-                    pass
                 self.switching = False
             else:
                 msg = 'Could not set c '\
                       'because of failure in getting the control.'
                 self.log.warn(msg)
                 return False, msg
-                pass
-            pass
 
         return True, 'Set Kikusui current to {} A'.format(params['current'])
 
@@ -429,21 +391,17 @@ class KikusuiAgent:
             if ret:
                 if params['volt'] == 12.:
                     self.cmd.user_input('V {}'.format(params['volt']))
-                    pass
                 else:
                     self.log.warn(
                         'Value Error: Rated Voltage of the motor is 12 V. '
                         'Now set to 12 V')
                     self.cmd.user_input('V {}'.format(12.))
-                    pass
                 self.switching = False
             else:
                 msg = 'Could not set v '\
                       'because of failure in getting the control.'
                 self.log.warn(msg)
                 return False, msg
-                pass
-            pass
 
         return True, 'Set Kikusui voltage to {} V'.format(params['volt'])
 
@@ -470,14 +428,11 @@ class KikusuiAgent:
                 else:
                     msg, v_val, c_val = self.cmd.user_input('VC?')
                     s_msg, s_val = self.cmd.user_input('O?')
-                    pass
                 self.switching = False
             else:
                 msg = 'Could not get c,v '\
                       'because of failure in getting the control.'
                 self.log.warn(msg)
-                pass
-            pass
 
         self.log.info('Get voltage/current message: {}'.format(msg))
         self.log.info('Get status message: {}'.format(s_msg))
@@ -518,7 +473,6 @@ class KikusuiAgent:
                     vs_msg, vs_val = self.cmd.user_input('VS?')
                     is_msg, is_val = self.cmd.user_input('CS?')
                     s_msg, s_val = self.cmd.user_input('O?')
-                    pass
                 self.switching2 = False
                 data['data']['kikusui_volt'] = v_val
                 data['data']['kikusui_curr'] = i_val
@@ -530,10 +484,9 @@ class KikusuiAgent:
                 # data['data']['kikusui_volt'] = 0
                 # data['data']['kikusui_curr'] = 0
                 # data['data']['kikusui_status'] = 0
-                pass
 
             time.sleep(1)  # DAQ interval
-            pass  # End of while loop
+            # End of while loop
 
         self.agent.feeds['kikusui_feed'].flush_buffer()
         return True, 'Acqusition exited cleanly'

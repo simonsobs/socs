@@ -101,7 +101,8 @@ class Serial_TCPServer(object):
 		try:
 			for i in range(n):
 				msg += self.sock.recv(1)
-		except: pass
+		except: 
+            pass
 		self.sock.setblocking(1)	# belt and suspenders
 		self.settimeout(self.__timeout)
 		return msg
@@ -161,8 +162,10 @@ class Serial_TCPServer(object):
 	def flushInput(self):
 		self.sock.setblocking(0)
 		try:
-			while len(self.sock.recv(1))>0: pass
-		except: pass
+			while len(self.sock.recv(1))>0: 
+                pass
+		except: 
+            pass
 		self.sock.setblocking(1)
 		self.sock.settimeout(self.__timeout)
 
