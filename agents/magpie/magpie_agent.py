@@ -1,15 +1,33 @@
 import argparse
 from spt3g import core
+import so3g
 import txaio
 import os
 import numpy as np
 import yaml
 import ast
 from scipy import signal
+import queue
+import time
 ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 
 if not ON_RTD:
     from ocs import ocs_agent, site_config
+
+
+# This will be populated when the first frame comes in
+primary_idxs = {}
+
+def load_frame_data(frame):
+    if len(primary_idxs) == 0:
+        for i, name in enumerate(frame['primary'].names):
+            primary_idxs[name] = i
+
+    times = np.array(frame['primary'].data[primary_idxs['UnixTime']]) / 1e9
+    data = frame['data'].data
+
+    return times, data
+
 
 
 class FIRFilter:
@@ -211,14 +229,18 @@ class MagpieAgent:
             hostname='*', port=args.dest, max_queue_size=1000
         )
 
-        self.lowpass = FIRFilter.butter_lowpass(self.target_rate, 200., order=4)
+        self.out_queue = queue.Queue()
+        self.delay = 0
+
+        self.lowpass = FIRFilter.butter_lowpass(
+            self.target_rate, self.target_rate * 2 + 1, order=4)
         self.send_config_flag = True
         self.scale = 1
         self.offsets = np.zeros(self.fp.num_dets)
         self.zero_flag = True
 
-        self.demodulate=True
-        self.demod_filter = FIRFilter.butter_lowpass(1, 200., order=4)
+        self.demodulate = False
+        #self.demod_filter = FIRFilter.butter_lowpass(1, 200., order=4)
         self.demod_freq = 4
 
     def set_scale(self, session, params=None):
@@ -266,8 +288,7 @@ class MagpieAgent:
 
         Args:
             state (bool, optional):
-                Enables or disables the demod filters
-            freq (float, optional):
+                Enables or disables the demod filters freq (float, optional):
                 Sets the demodulation frequency
             lowpass_order: (int, optional):
                 Sets the order of the demod filter
@@ -305,24 +326,24 @@ class MagpieAgent:
             return []
 
         # Calculate downsample factor
-        ds_factor = frame['data'].sample_rate / core.G3Units.Hz // self.target_rate
+        times_in, data_in = load_frame_data(frame)
+        sample_rate = 1./np.median(np.diff(times_in))
+        nsamps = len(times_in)
+        nchans = len(data_in)
+
+        ds_factor = sample_rate // self.target_rate
         if np.isnan(ds_factor):  # There is only one element in the timestream
             ds_factor = 1
         ds_factor = max(int(ds_factor), 1)  # Prevents downsample factors < 1
 
         # Filter and process data
-        nsamps = frame['data'].n_samples
         sample_idxs = np.arange(0, nsamps, ds_factor, dtype=np.int32)
         num_frames = len(sample_idxs)
 
-        # Array of filtered, downsampled data
-        data_in = np.array(frame['data']) * 2*np.pi / 2**16
         data_out = np.zeros((num_frames, np.max(self.fp.chan_mask)+1))
+        times_out = times_in[sample_idxs]
 
-        times_in = np.array(frame['primary']['UnixTime'])/1e9
-
-        chans = self.mask[np.arange(len(frame['data']))]
-        times = np.array(frame['primary']['UnixTime'])[sample_idxs] / 1e9
+        chans = self.mask[np.arange(nchans)]
 
         if self.demodulate:
             template = np.sin(2*np.pi*self.demod_freq * times_in)
@@ -343,15 +364,17 @@ class MagpieAgent:
                 data_out[:, idx] = (data_in[i, sample_idxs]-self.offsets[i]) * self.scale
 
         out = []
+
+        print("Queue size: ", self.out_queue.qsize())
         for i in range(num_frames):
             fr = core.G3Frame(core.G3FrameType.Scan)
-            fr['timestamp'] = core.G3Time(times[i] * core.G3Units.s)
+            fr['timestamp'] = core.G3Time(times_out[i] * core.G3Units.s)
             fr['data'] = core.G3VectorDouble(data_out[i, :])
             out.append(fr)
         return out
 
 
-    def run(self, session, params=None):
+    def process(self, session, params=None):
         self._running = True
         session.set_status('running')
 
@@ -369,13 +392,41 @@ class MagpieAgent:
             else:
                 continue
             for f in out:
-                self.sender.Process(f)
+                self.out_queue.put(f)
         return True, "Stopped run process"
 
 
-    def stop(self, session, params=None):
+    def _process_stop(self, session, params=None):
         self._running = False
         return True, "Stopping run process"
+
+    def send(self, session, params=None):
+        self._send_running = True
+        session.set_status('running')
+
+        first_frame_time = None
+        stream_start_time = None
+        self.delay = 5
+        while self._send_running:
+            f = self.out_queue.get(block=True)
+            t = f['timestamp'].time / core.G3Units.s
+            now = time.time()
+            if first_frame_time is None:
+                first_frame_time = t
+                stream_start_time = now
+
+            this_frame_time = stream_start_time + (t - first_frame_time) + self.delay
+            if this_frame_time > now:
+                time.sleep(this_frame_time - now)
+            self.sender.Process(f)
+
+        return True, "Stopped send process"
+
+
+    def _send_stop(self, session, params=None):
+        self._send_running = False
+        return True, "Stopping send process"
+
 
 
 def make_parser(parser=None):
@@ -386,7 +437,7 @@ def make_parser(parser=None):
                         help="Address of incoming G3Frames.")
     parser.add_argument('--dest', type=int, default=8675,
                         help="Port to server lyrebird frames")
-    parser.add_argument('--target-rate', '-t', type=float, default=5)
+    parser.add_argument('--target-rate', '-t', type=float, default=200)
     parser.add_argument('--layout', '-l', default='grid', choices=['grid', 'wafer'],
                         help="Focal plane layout style")
     parser.add_argument('--xdim', type=int, default=64,
@@ -410,7 +461,8 @@ if __name__ == '__main__':
     agent, runner = ocs_agent.init_site_agent(args)
     magpie = MagpieAgent(agent, args)
 
-    agent.register_process('run', magpie.run, magpie.stop, startup=True)
+    agent.register_process('process', magpie.process, magpie._process_stop, startup=True)
+    agent.register_process('send', magpie.send, magpie._send_stop, startup=True)
     agent.register_task('set_target_rate', magpie.set_target_rate)
     agent.register_task('set_scale', magpie.set_scale)
     agent.register_task('zero', magpie.zero_dets)
