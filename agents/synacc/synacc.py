@@ -27,7 +27,8 @@ class SynaccessAgent:
         self.passw = password
 
         agg_params = {'frame_length': 60}
-        self.agent.register_feed('synaccess', record = True, agg_params = agg_params)
+        self.agent.register_feed(
+            'synaccess', record=True, agg_params=agg_params)
 
     def __get_status(self):
         req = "http://" + self.user + ":" + self.passw + "@" +\
@@ -35,8 +36,6 @@ class SynaccessAgent:
         r = requests.get(req)
         resp = str(r.content)[6:11][::-1]
         return resp
-
-        
 
     def get_status(self, session, params=None):
         with self.lock.acquire_timeout(3, job='get_status') as acquired:
@@ -107,8 +106,8 @@ class SynaccessAgent:
             else:
                 return False, "Could not acquire lock"
 
-    def start_status_acq(self, session, params = None):
-        
+    def start_status_acq(self, session, params=None):
+
         """acq(params=None)
 
          Method to start data acquisition process.
@@ -127,32 +126,38 @@ class SynaccessAgent:
                      }
                  }
              }
-          
+
          Parameters:
             Nothing
         """
 
-        with self.lock.acquire_timeout(timeout = 0, job = 'status_acq') as acquired:
+        with self.lock.acquire_timeout(timeout=0, job='status_acq')\
+                as acquired:
             if not acquired:
-                self.log.warn('Could not start status acq because {} is already running'
-                              .format(self.lock.job))
+                self.log.warn(
+                    'Could not start status acq because {} is already running'
+                    .format(self.lock.job))
                 return False, 'Could not acquire lock'
 
             session.set_status('running')
-            
+
             self.take_data = True
-            session.data = {'fields':{}}
+            last_release = time.time()
+            session.data = {'fields': {}}
             while self.take_data:
-                last_release = time.time()
                 if time.time() - last_release > 1.:
                     last_release = time.time()
                     if not self.lock.release_and_acquire(timeout=10):
-                        self.log.warn('Could not re-acquire lock now held by {}.'.format(self.lock.job))
+                        self.log.warn(
+                            'Could not re-acquire lock now held by {}.'
+                            .format(self.lock.job))
                         return False, 'Could not re-acquire lock (timeout)'
-         
+
                 current_time = time.time()
-                data = {'timestamp': current_time, 'block_name': 'synaccess_status', 'data': {}}
-                
+                data = {'timestamp': current_time,
+                        'block_name': 'synaccess_status',
+                        'data': {}}
+
                 status_dict = {}
                 resp = self.__get_status()
                 for i, x in enumerate(resp):
@@ -166,8 +171,8 @@ class SynaccessAgent:
                 field_dict = {'synaccess': status_dict}
                 session.data['timestamp'] = current_time
                 session.data['fields'] = field_dict
-         
-                time.sleep(1) # DAQ interval
+
+                time.sleep(1)  # DAQ interval
                 # End of while loop
 
         self.agent.feeds['synaccess'].flush_buffer()
@@ -179,8 +184,6 @@ class SynaccessAgent:
             return True, 'requested to stop taking data'
 
         return False, 'acq is not currently running'
-
-
 
 
 def make_parser(parser=None):
@@ -200,14 +203,6 @@ def make_parser(parser=None):
 
 
 if __name__ == '__main__':
-    #site_parser = site_config.add_arguments()
-    #parser = make_parser(site_parser)
-
-    # Get the parser to process the command line.
-    #args = parser.parse_args()
-
-    # Interpret options in the context of site_config.
-    #site_config.reparse_args(args, 'SynAccAgent')
 
     parser = make_parser()
     args = site_config.parse_args(agent_class='SynAccAgent', parser=parser)
@@ -219,7 +214,7 @@ if __name__ == '__main__':
                        username=args.username,
                        password=args.password)
     agent.register_process('status_acq', p.start_status_acq,
-                           p.stop_status_acq, startup = True)
+                           p.stop_status_acq, startup=True)
     agent.register_task('get_status', p.get_status, startup={})
     agent.register_task('reboot', p.reboot)
     agent.register_task('set_outlet', p.set_outlet)
