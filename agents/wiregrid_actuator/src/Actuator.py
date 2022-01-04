@@ -130,7 +130,7 @@ class Actuator:
         if onoff:  # ON
             self._command('SH ABN')
         else:  # OFF
-            self._command('MON')
+            self._command('MO')
         return True
 
     # Check the motor type ([2,2] is correct.)
@@ -310,8 +310,11 @@ class Actuator:
     # Return: 1 (ON) or 0 (OFF)
     def get_motor_onoff(self):
         try:
+            # 0: ON, 1:OFF
             ret = self._command('MG _MON')
             onoff = int(float(ret))
+            # invert to 0: OFF, 1: ON
+            onoff = int(not onoff)
         except Exception as e:
             msg =\
                 'Actuator:get_motor_onoff(): ERROR!: '\
@@ -338,8 +341,8 @@ class Actuator:
         if onoff_test != int(onoff):
             msg = \
                 'Actuator:set_motor_onoff(): ERROR!: '\
-                'Set motor {} but the current ON/OFF is different!'\
-                .format('ON' if onoff else 'OFF')
+                'Set motor {} but the current ON/OFF ("{}") is different!'\
+                .format('ON' if onoff else 'OFF', onoff_test)
             print(msg)
             raise RuntimeError(msg)
         print('Actuator:set_motor_onoff(): '
