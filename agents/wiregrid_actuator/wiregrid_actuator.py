@@ -44,8 +44,9 @@ class WiregridActuatorAgent:
         except Exception as e:
             msg = '__init__(): Failed to initialize Actuator instance! '\
                   '| Exception = "{}"'.format(e)
-            self.log.warn(msg)
+            self.log.error(msg)
             self.actuator = None
+            raise e
 
     ######################
     # Internal functions #
@@ -656,19 +657,19 @@ class WiregridActuatorAgent:
         structure::
 
             >>> session.data
-            {"fields":
+            {'fields':
                 {
-                 motor:
+                 'motor':
                     0 or 1
-                 limitswitch:
-                 {   LSR1: 0 or 1, (0: OFF, 1:ON)
-                     LSR2: 0 or 1, (0: OFF, 1:ON)
+                 'limitswitch':
+                 {   'LSR1': 0 or 1, (0: OFF, 1:ON)
+                     'LSR2': 0 or 1, (0: OFF, 1:ON)
                      .
                      .
                      },
-                 stopper:
-                 {   STR1: 0 or 1, (0: OFF, 1:ON)
-                     STR2: 0 or 1, (0: OFF, 1:ON)
+                 'stopper':
+                 {   'STR1': 0 or 1, (0: OFF, 1:ON)
+                     'STR2': 0 or 1, (0: OFF, 1:ON)
                      .
                      .
                      ]
