@@ -223,7 +223,7 @@ class KikusuiAgent:
         Paramters:
             Nothing
         """
-        with self.lock.acquire_timeout(timeout=3, job='set_on') as acquired:
+        with self.lock.acquire_timeout(timeout=5, job='set_on') as acquired:
             if not acquired:
                 self.log.warn('Could not set ON because {} is already running'
                               .format(self.lock.job))
@@ -239,7 +239,7 @@ class KikusuiAgent:
         Paramters:
             Nothing
         """
-        with self.lock.acquire_timeout(timeout=3, job='set_off') as acquired:
+        with self.lock.acquire_timeout(timeout=5, job='set_off') as acquired:
             if not acquired:
                 self.log.warn('Could not set OFF because {} is already running'
                               .format(self.lock.job))
@@ -258,7 +258,7 @@ class KikusuiAgent:
         if params is None:
             params = {'current': 0}
 
-        with self.lock.acquire_timeout(timeout=3, job='set_c') as acquired:
+        with self.lock.acquire_timeout(timeout=5, job='set_c') as acquired:
             if not acquired:
                 self.log.warn(
                     'Could not run set_c() because {} is already running'
@@ -287,7 +287,7 @@ class KikusuiAgent:
         if params is None:
             params = {'volt': 0}
 
-        with self.lock.acquire_timeout(timeout=3, job='set_v') as acquired:
+        with self.lock.acquire_timeout(timeout=5, job='set_v') as acquired:
             if not acquired:
                 self.log.warn(
                     'Could not run set_v() because {} is already running'
@@ -311,7 +311,7 @@ class KikusuiAgent:
         Paramters:
             Nothing
         """
-        with self.lock.acquire_timeout(timeout=0, job='get_vc') as acquired:
+        with self.lock.acquire_timeout(timeout=5, job='get_vc') as acquired:
             if not acquired:
                 self.log.warn(
                     'Could not run get_vc() because {} is already running'
@@ -348,7 +348,7 @@ class KikusuiAgent:
         if params is None:
             params = {'storepath': self.action_path}
 
-        with self.lock.acquire_timeout(timeout=3, job='calibrate_wg')\
+        with self.lock.acquire_timeout(timeout=5, job='calibrate_wg')\
                 as acquired:
             if not acquired:
                 self.log.warn('Could not run calibrate_wg() '
@@ -407,7 +407,7 @@ class KikusuiAgent:
             params = {'feedback_steps': 8, 'num_laps': 1, 'stopped_time': 10,
                       'feedback_time': [0.181, 0.221, 0.251, 0.281, 0.301]}
 
-        with self.lock.acquire_timeout(timeout=3, job='stepwise_rotation')\
+        with self.lock.acquire_timeout(timeout=5, job='stepwise_rotation')\
                 as acquired:
             if not acquired:
                 self.log.warn('Could not run stepwise_rotation() '
@@ -456,7 +456,7 @@ class KikusuiAgent:
         """
 
         # timeout is long because calibrate_wg will take a long time (> hours)
-        with self.lock.acquire_timeout(timeout=600, job='IV_acq') as acquired:
+        with self.lock.acquire_timeout(timeout=1000, job='IV_acq') as acquired:
             if not acquired:
                 self.log.warn('Could not run start_IV_acq '
                               'because {} is already running'
@@ -471,14 +471,34 @@ class KikusuiAgent:
             while self.take_data:
                 if time.time() - last_release > 1.:
                     last_release = time.time()
-                    if not self.lock.release_and_acquire(timeout=600):
+                    if not self.lock.release_and_acquire(timeout=1000):
                         self.log.warn(
-                            'start_acq(): '
+                            'start_IV_acq(): '
                             'Could not re-acquire lock now held by {}.'
                             .format(self.lock.job))
-                        return False,\
-                            'Could not re-acquire lock '\
-                            'for start_IV_acq() (timeout)'
+                        if self.lock.job == 'calibrate_wg':
+                            self.log.warn(
+                                'start_IV_acq(): '
+                                'Continue to wait for {}()'
+                                .format(self.lock.job))
+                            # Wait for lock acquisition forever
+                            acquired = self.lock.acquire(
+                                timeout=-1, job='IV_acq')
+                            if acquired:
+                                self.log.info(
+                                    'Succcessfully got the lock '
+                                    'for start_IV_acq()!')
+                            else:
+                                self.log.warn(
+                                    'Failed to aquire the lock '
+                                    'for start_IV_acq()!')
+                                return False,\
+                                    'Could not re-acquire lock '\
+                                    'for start_IV_acq() (timeout=-1)'
+                        else:
+                            return False,\
+                                'Could not re-acquire lock '\
+                                'for start_IV_acq() (timeout=1000 sec)'
 
                 current_time = time.time()
                 data = {'timestamp': time.time(),
