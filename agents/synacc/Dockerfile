@@ -1,7 +1,7 @@
 # SOCS Synaccess Agent, used to run the Synaccess power strip
 
 # Use socs base image
-FROM socs:latest
+FROM simonsobs/socs:latest
 
 # Set the working directory to proper agent directory
 WORKDIR /app/socs/agents/synacc/
