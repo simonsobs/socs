@@ -54,26 +54,6 @@ class WiregridActuatorAgent:
     # Return: status(True or False), message
     # If an error occurs, return False.
 
-    def _reconnect(self):
-        self.log.warn('_reconnect(): *** Trying to reconnect... ***')
-        # reconnect
-        ret = self.actuator.reconnect()
-        if not ret:
-            msg = 'reconnect(): ERROR!: '\
-                  'Failed to reconnect the actuator controller!'
-            self.log.warn(msg)
-            return False, msg
-        # check the connection
-        ret = self.actuator.check_connect()
-        if ret:
-            msg = '_reconnect(): Successfully reconnected to the actuator!'
-            self.log.info(msg)
-            return True, msg
-        else:
-            msg = '_reconnect(): ERROR!: Failed to reconnect to the actuator!'
-            self.log.warn(msg)
-            return False, msg
-
     # Return: True/False, message, limit-switch ON/OFF
     def _move(self, distance, speedrate, LSLname, LSRname, LSlabel):
         LSL = 0  # left  actuator limit-switch
@@ -649,6 +629,41 @@ class WiregridActuatorAgent:
                 return False, msg
             return True, 'release(): Successfully finish!'
 
+    def reconnect(self, session, params=None):
+        """
+        Reconnect to the actuator controller
+        (This command turn OFF the motor power!)
+
+        Parameters:
+            Nothing
+        """
+        with self.lock.acquire_timeout(timeout=3, job='reconnect')\
+                as acquired:
+            if not acquired:
+                self.log.warn(
+                        'reconnect(): '
+                        'Lock could not be acquired because it is held by {}.'
+                        .format(self.lock.job))
+                return False, 'reconnect(): Could not acquire lock.'
+            self.log.warn('reconnect(): *** Trying to reconnect... ***')
+            # reconnect
+            ret = self.actuator.reconnect()
+            if not ret:
+                msg = 'reconnect(): ERROR!: '\
+                      'Failed to reconnect the actuator controller!'
+                self.log.warn(msg)
+                return False, msg
+            # Check connection
+            ret = self.actuator.check_connect()
+            if ret:
+                msg = 'reconnect(): Successfully reconnected to the actuator!'
+                self.log.info(msg)
+                return True, msg
+            else:
+                msg = 'reconnect(): ERROR!: Failed to reconnect to the actuator!'
+                self.log.error(msg)
+                return False, msg
+
     def start_acq(self, session, params=None):
         """
         Method to start data acquisition process.
@@ -802,14 +817,6 @@ def make_parser(parser=None):
 
 
 if __name__ == '__main__':
-    # site_parser = site_config.add_arguments()
-    # if parser is None: parser = argparse.ArgumentParser()
-    # parser = make_parser(site_parser)
-
-    # args = parser.parse_args()
-
-    # site_config.reparse_args(args, 'WiregridActuatorAgent')
-    # agent, runner = ocs_agent.init_site_agent(args)
 
     parser = make_parser()
     args = site_config.parse_args(
@@ -833,6 +840,7 @@ if __name__ == '__main__':
     agent.register_task('motor_off', actuator_agent.motor_off)
     agent.register_task('stop', actuator_agent.stop)
     agent.register_task('release', actuator_agent.release)
+    agent.register_task('reconnect', actuator_agent.reconnect)
     agent.register_process('acq', actuator_agent.start_acq,
                            actuator_agent.stop_acq, startup=True)
 
