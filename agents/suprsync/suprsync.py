@@ -1,5 +1,6 @@
 import argparse
-from socs.db.suprsync import SupRsyncFilesManager, SupRsyncFile
+from socs.db.suprsync import (SupRsyncFilesManager, SupRsyncFile,
+                              SupRsyncFileHandler)
 import os
 import time
 import subprocess
@@ -42,8 +43,12 @@ class SupRsync:
         Path of the sqlite db to monitor
     delete_after : float
         Seconds after which this agent will delete successfully copied files.
-    stop_on_exception : bool
-        If True, will stop the run process if a file cannot be copied
+    cmd_timeout : float
+        Time (sec) for which cmds run on the remote will timeout
+    copy_timeout : float
+        Time (sec) after which a copy command will timeout
+    timeout_wait : float
+        Time (sec) to sleep after a timeout occurs.
     """
     def __init__(self, agent, args):
         self.agent = agent
@@ -54,121 +59,11 @@ class SupRsync:
         self.remote_basedir = args.remote_basedir
         self.db_path = args.db_path
         self.delete_after = args.delete_after
-        self.stop_on_exception = args.stop_on_exception
+        self.max_copy_attempts = args.max_copy_attempts
         self.running = False
-
-    def run_on_remote(self, cmd):
-        """
-        Runs a command on the remote server (or locally if none is set)
-
-        Parameters
-        -----------
-        cmd : list
-            Command to be run
-        """
-        _cmd = []
-        if self.ssh_host is not None:
-            _cmd += ['ssh', self.ssh_host]
-            if self.ssh_key is not None:
-                _cmd.extend(['-i', self.ssh_key])
-        _cmd += cmd
-
-        self.log.debug(f"Running: {' '.join(_cmd)}")
-        res = subprocess.run(_cmd, capture_output=True, text=True)
-        if res.stderr:
-            self.log.error("stderr for cmd: {cmd}\n{err}",
-                           cmd=_cmd, err=res.stderr)
-        return res
-
-    def copy_file(self, file):
-        """
-        Attempts to copy a file to its dest.
-
-        Args
-        ----
-        file : SupRsyncFile
-            file to be copied
-
-        Returns
-        --------
-        res : str or bool
-            Returns False if unsuccessful, and the md5sum calculated on the
-            remote server if successful.
-        """
-        remote_path = os.path.join(self.remote_basedir, file.remote_path)
-
-        # Creates directory on dest server:
-        res = self.run_on_remote(['mkdir', '-p', os.path.dirname(remote_path)])
-        if res.returncode != 0:
-            self.log.error("remote mkdir failed:\n{e}", e=res.stderr)
-            return False
-
-        if self.ssh_host is not None:
-            dest = self.ssh_host + ':' + remote_path
-        else:
-            dest = remote_path
-
-        cmd = ['rsync', '-t']
-        if self.ssh_key is not None:
-            cmd.extend(['--rsh', f'ssh -i {self.ssh_key}'])
-
-        cmd.extend([file.local_path, dest])
-        self.log.debug("Running: " + ' '.join(cmd))
-        res = subprocess.run(cmd, capture_output=True, text=True)
-        if res.returncode != 0:
-            self.log.error("Rsync failed for file {path}!\nstderr: {err}", path=file.local_path)
-            return False
-
-        res = self.run_on_remote(['md5sum', remote_path])
-        if res.returncode != 0:
-            return False
-        else:
-            return res.stdout.split()[0]
-
-    def handle_file(self, file):
-        """
-        Handles operation of an un-removed SupRsyncFile. Will attempt to copy,
-        calculate the remote md5sum, and remove from the local host if enough
-        time has passed.
-
-        Args
-        ----
-        file : SupRsyncFile
-            file to be copied
-        """
-        if file.local_md5sum != file.remote_md5sum:
-            md5sum = self.copy_file(file)
-            if md5sum is False:  # Copy command failed with exit code != 0
-                self.log.warn(
-                    "Failed to copy {local} (attempts: {c})",
-                    local=file.local_path, c=file.failed_copy_attempts
-                )
-                file.failed_copy_attempts += 1
-                return
-
-            file.remote_md5sum = md5sum
-            file.copied = time.time()
-            if md5sum != file.local_md5sum:
-                self.log.warn(
-                    "Copied {local} but md5sum does not match (attempts: {c})",
-                    local=file.local_path, c=file.failed_copy_attempts
-                )
-                file.failed_copy_attempts += 1
-            else:
-                dest = os.path.join(self.remote_basedir, file.remote_path)
-                if self.ssh_host is not None:
-                    dest = self.ssh_host + ':' + dest
-                self.log.info("Successfully copied {local} to {dest}",
-                               local=file.local_path, dest=dest)
-
-        if self.delete_after is None:
-            return
-
-        if file.local_md5sum == file.remote_md5sum:
-            if time.time() - file.timestamp > self.delete_after:
-                self.log.info(f"Deleting {file.local_path}")
-                os.remove(file.local_path)
-                file.removed = time.time()
+        self.cmd_timeout = args.cmd_timeout
+        self.copy_timeout = args.copy_timeout
+        self.timeout_wait = args.timeout_wait
 
     def run(self, session, params=None):
         """run()
@@ -181,22 +76,28 @@ class SupRsync:
 
         self.running = True
         session.set_status('running')
+
+        handler = SupRsyncFileHandler(
+            srfm, self.remote_basedir, delete_after=self.delete_after,
+            ssh_host=self.ssh_host, ssh_key=self.ssh_key,
+            cmd_timeout=self.cmd_timeout, copy_timeout=self.copy_timeout
+        )
+
         while self.running:
             with srfm.Session.begin() as session:
-                files = session.query(SupRsyncFile).filter(
-                    SupRsyncFile.removed == None,
-                    SupRsyncFile.archive_name == self.archive_name
-                ).all()
-                for file in files:
+                file = srfm.get_next_file(
+                    self.archive_name, session=session,
+                    delete_after=self.delete_after,
+                    max_copy_attempts=self.max_copy_attempts)
+                if file is not None:
                     try:
-                        self.handle_file(file)
-                    except Exception as e:
-                        if self.stop_on_exception:
-                            raise e
-                        else:
-                            print(traceback.format_exc())
-
-            time.sleep(2)
+                        handler.handle_file(file, session)
+                    except subprocess.TimeoutExpired:
+                        self.log.error(
+                            "Timed out when processing {path}",
+                            path=file.local_path)
+                        time.sleep(self.timeout_wait)
+                time.sleep(3)
 
     def _stop(self, session, params=None):
         self.running = False
@@ -226,11 +127,16 @@ def make_parser(parser=None):
                         help="Time (sec) after which this agent will delete "
                              "local copies of successfully transfered files. "
                              "If None, will not delete files.")
-    pgroup.add_argument('--max-copy-attempts', default=10, type=int,
+    pgroup.add_argument('--max-copy-attempts', type=int,
                         help="Number of failed copy attempts before the agent "
                              "will stop trying to copy a file")
-    pgroup.add_argument('--stop-on-exception', action='store_true',
-                        help="If true will stop the run process on an exception")
+    pgroup.add_argument('--copy-timeout', type=float, default=30.,
+                        help="Time (sec) before the rsync command will timeout")
+    pgroup.add_argument('--cmd-timeout', type=float, default=5,
+                        help="Time (sec) before remote commands will timeout")
+    pgroup.add_argument('--timeout-wait', type=float, default=20.,
+                        help="Time (sec) to wait before attempting to re-copy "
+                             "after a timeout.")
     return parser
 
 
