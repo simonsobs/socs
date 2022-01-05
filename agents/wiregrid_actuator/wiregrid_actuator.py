@@ -1,649 +1,847 @@
-import sys, os, argparse, time
+import os
+import sys
+import argparse
+import time
 
-'''
-this_dir = os.path.dirname(__file__)
-sys.path.append(
-        os.path.join(this_dir, 'src'))
-
-import pmx as pm
-import command as cm
-'''
-
-from ocs import ocs_agent, site_config, client_t
+from ocs import ocs_agent
+from ocs import site_config
 from ocs.ocs_twisted import TimeoutLock
 
+# add PATH to ./src directory
+this_dir = os.path.dirname(__file__)
+sys.path.append(os.path.join(this_dir, 'src'))
+
 # import classes / configs
-from src.Actuator    import Actuator
-from src.LimitSwitch import LimitSwitch
-from src.Stopper     import Stopper
+from src.Actuator import Actuator
 import limitswitch_config
 import stopper_config
 
+
 class WiregridActuatorAgent:
-    def __init__(self, agent, actuator_dev='/dev/ttyUSB0', interval_time=1, sleep=0.20, verbose=0):
+
+    def __init__(self, agent, ip_address='192.168.1.100',
+                 interval_time=1, sleep=0.05, verbose=0):
         self.agent = agent
-        self.log   = agent.log
-        self.lock    = TimeoutLock()
+        self.log = agent.log
+        self.lock = TimeoutLock()
         self.run_acq = False
-        self.controlling = False
-        self.actuator_dev  = actuator_dev
-        self.interval_time = float(interval_time)
-        self.sleep  = sleep
-        self.verbose       = verbose
+        self.ip_address = ip_address
+        self.interval_time = interval_time
+        self.sleep = sleep
+        self.max_check_stopper = 100
+        self.verbose = verbose
 
         agg_params = {'frame_length': 60}
-        self.agent.register_feed('WGActuator', record = True, agg_params = agg_params)
-        
+        self.agent.register_feed(
+                'WGActuator', record=True, agg_params=agg_params)
+
         try:
-            self.actuator    = Actuator(self.actuator_dev, sleep=self.sleep, verbose=self.verbose)
+            self.actuator = Actuator(
+                self.ip_address, sleep=self.sleep,
+                ls_list=limitswitch_config.IO_INFO,
+                st_list=stopper_config.IO_INFO,
+                verbose=self.verbose)
         except Exception as e:
-            msg = 'Failed to initialize Actuator instance! | Error = "actuator is None"'
-            self.log.warn(msg)
+            msg = '__init__(): Failed to initialize Actuator instance! '\
+                  '| Exception = "{}"'.format(e)
+            self.log.error(msg)
             self.actuator = None
-            pass
-        self.limitswitch = LimitSwitch(limitswitch_config.GPIOpinInfo)
-        self.stopper     = Stopper    (stopper_config    .GPIOpinInfo) 
-        pass
+            raise e
 
     ######################
     # Internal functions #
     ######################
+    # Return: status(True or False), message
+    # If an error occurs, return False.
 
-    def __check_connect(self):
-        if self.actuator is None :
-            msg = 'No connection to the actuator. | Error = "actuator is None"'
-            self.log.warn(msg)
-            return False, msg
-        else :
-            ret, msg = self.actuator.check_connect()
-            if not ret :
-                msg = 'No connection to the actuator. | Error = "%s"' %  msg
+    # Return: True/False, message, limit-switch ON/OFF
+    def _move(self, distance, speedrate, LSLname, LSRname, LSlabel):
+        LSL = 0  # left  actuator limit-switch
+        LSR = 0  # right actuator limit-switch
+        LSL, LSR = \
+            self.actuator.ls.get_onoff(io_name=[LSLname, LSRname])
+        if LSL == 0 and LSR == 0:
+            ret = self.actuator.move(distance, speedrate)
+            if not ret:
+                msg = '_move(): WARNING!: Failed to move.'
                 self.log.warn(msg)
-                return False, msg
-            pass
-        return True, 'Connection is OK.'
+                return False, msg, LSL or LSR
+        else:
+            self.log.warn(
+                '_move(): One of {} limit-switches is ON (LSL={}, LSR={})!'
+                .format(LSlabel, LSL, LSR))
+            self.log.warn('  --> Did not move.')
+        isrun = True
+        # Loop until the limit-switch is ON or the actuator moving finishes
+        while LSL == 0 and LSR == 0 and isrun:
+            LSL, LSR = \
+                self.actuator.ls.get_onoff(io_name=[LSLname, LSRname])
+            isrun = self.actuator.is_run()
+            if self.verbose > 0:
+                self.log.info(
+                    '_move(): LSL={}, LSR={}, run={}'.format(LSL, LSR, isrun))
+        # Stop the actuator moving
+        self.actuator.hold()
+        LSonoff = LSL or LSR
+        if LSonoff:
+            self.log.info(
+                '_move(): Stopped moving because '
+                'one of {} limit-switches is ON (LSL1={}, LSR1={})!'
+                .format(LSlabel, LSL, LSR))
+        self.actuator.release()
+        return True, \
+            '_move(): Finish move(distance={}, speedrate={}, limit-switch={})'\
+            .format(distance, speedrate, LSonoff), \
+            LSonoff
 
-    def __reconnect(self):
-        self.log.warn('*** Trying to reconnect... ***')
-        # reconnect
-        try :
-            if self.actuator : del self.actuator
-            self.actuator    = Actuator(self.actuator_dev, sleep=self.sleep, verbose=self.verbose)
+    # Return value: True/False, message, limit-switch ON/OFF
+    def _forward(self, distance, speedrate=0.2):
+        if distance < 0.:
+            distance = abs(distance)
+        ret, msg, LSonoff = self._move(
+            distance, speedrate, 'LSL1', 'LSR1', 'inside')
+        return ret, \
+            '_forward(): '\
+            'Finish forward(distance={}, speedrate={}, limit-switch={})'\
+            .format(distance, speedrate, LSonoff), \
+            LSonoff
+
+    # Return value: True/False, message, limit-switch ON/OFF
+    def _backward(self, distance, speedrate=0.2):
+        if distance > 0.:
+            distance = -1.*abs(distance)
+        ret, msg, LSonoff = self._move(
+            distance, speedrate, 'LSL2', 'LSR2', 'outside')
+        return ret, \
+            '_backward(): '\
+            'Finish backward(distance={}, speedrate={}, limit-switch={})'\
+            .format(distance, speedrate, LSonoff), \
+            LSonoff
+
+    def _insert_eject(
+            self, main_distance=800, main_speedrate=1.0, is_insert=True):
+        # Function label
+        flabel = 'insert' if is_insert else 'eject'
+        initial_ls_names = ['LSL2', 'LSR2'] if is_insert else ['LSL1', 'LSR1']
+        move_func = self._forward if is_insert else self._backward
+
+        # Check connection
+        ret = self.actuator.check_connect()
+        if ret:
+            if self.verbose > 0:
+                self.log.info(
+                    '_insert_eject()[{}]: '
+                    'the connection to the actuator controller is OK!'
+                    .format(flabel))
+        else:
+            msg = '_insert_eject()[{}]: ERROR!: '\
+                  'the connection to the actuator controller is BAD!'\
+                  .format(flabel)
+            self.log.error(msg)
+            return False, msg
+
+        # Release stopper twice (Powering ON the stoppers)
+        # 1st trial
+        try:
+            self.actuator.st.set_allon()
         except Exception as e:
-            msg = 'Failed to initialize Actuator! | Error: %s' % e
-            self.log.warn(msg)
-            self.actuator = None
+            msg = '_insert_eject()[{}]: '\
+                  'ERROR!: Failed to run the stopper set_allon() '\
+                  '--> Stop moving! | Exception = "{}"'.format(flabel, e)
+            self.log.error(msg)
             return False, msg
-        # reinitialize cmd
-        ret, msg = self.__check_connect()
-        if ret :
-            msg = 'Successfully reconnected to the actuator!'
-            self.log.info(msg)
+        # 2nd trial (double check)
+        try:
+            self.actuator.st.set_allon()
+        except Exception as e:
+            msg = '_insert_eject()[{}]: '\
+                  'ERROR!: Failed to run the stopper set_allon() '\
+                  '--> Stop moving! | Exception = "{}"'.format(flabel, e)
+            self.log.error(msg)
+            return False, msg
+
+        # Initial slow & small moving
+        ret, msg, LSonoff = move_func(5, speedrate=0.2)
+        # Check the status of the initial moving
+        if not ret:
+            msg = '_insert_eject()[{}]: ERROR!: in the initail moving | {} '\
+                  '--> Stop moving!'.format(flabel, msg)
+            self.log.error(msg)
+            # Lock the actuator by the stoppers
+            self.actuator.st.set_alloff()
+            return False, msg
+        if LSonoff:
+            msg = '_insert_eject()[{}]: WARNING!: '\
+                  'Limit-switch is ON after the initial moving. '\
+                  '---> Stop moving!'.format(flabel)
+            self.log.warn(msg)
+            # Lock the actuator by the stoppers
+            self.actuator.st.set_alloff()
             return True, msg
-        else :
-            msg = 'Failed to reconnect to the actuator!'
-            self.log.warn(msg)
-            if self.actuator : del self.actuator
-            self.actuator = None
+        # Check limit-switch
+        LSL, LSR = \
+            self.actuator.ls.get_onoff(io_name=initial_ls_names)
+        if LSL == 1 or LSR == 1:
+            msg = '_insert_eject()[{}]: ERROR!: '\
+                  'The limit-switch is NOT OFF '\
+                  'after the initial moving. '\
+                  '(Maybe the limit-switch is disconnected?) '\
+                  '--> Stop moving!'.format(flabel)
+            self.log.error(msg)
+            # Lock the actuator by the stoppers
+            self.actuator.st.set_alloff()
             return False, msg
 
-    
-    # Power off stopper
-    def __stopper_off(self) :
-        if self.stopper.set_alloff() < 0 : 
-            self.log.error('ERROR!: Stopper set_alloff()')
-            return  False
-        return True
+        # Sleep before the main forwarding
+        time.sleep(1)
 
+        # Main moving
+        status, msg, LSonoff = \
+            move_func(main_distance, speedrate=main_speedrate)
+        if not status:
+            msg = '_insert_eject()[{}]: ERROR!: '\
+                  'in the main moving | {} '\
+                  '--> Stop moving!'.format(flabel, msg)
+            self.log.error(msg)
+            return False, msg
+        if LSonoff:
+            msg = '_insert_eject()[{}]: WARNING!: '\
+                  'Limit-switch is ON after the main moving. '\
+                  '---> Stop moving!'.format(flabel)
+            self.log.warn(msg)
+            # Lock the actuator by the stoppers
+            self.actuator.st.set_alloff()
+            return True, msg
 
-    # Return True/False, message, limitswitch ON/OFF
-    def __forward(self, distance, speedrate=0.1):
-        distance = abs(distance)
-        LSL2 = 0 # left  actuator opposite limitswitch
-        LSR2 = 0 # right actuator opposite limitswitch
-        LSL2,LSR2 = self.limitswitch.get_onoff(pinname=['LSL2','LSR2'])
-        if LSL2==0 and LSR2==0 : 
-            ret, msg = self.actuator.move(distance, speedrate)
-            if not ret : return False, msg, LSL2 or LSR2
-        else :
-            self.log.warn('Warning! One of limit switches on opposite side (inside) is ON (LSL2={}, LSR2={})!'.format(LSL2, LSR2));
-            self.log.warn('  --> Did not move.');
-            pass
-        isrun = True
-        while LSL2==0 and LSR2==0 and isrun :
-            LSL2,LSR2 = self.limitswitch.get_onoff(pinname=['LSL2','LSR2'])
-            isrun, msg = self.actuator.isRun()
-            if self.verbose>0 : self.log.info('LSL2={}, LSR2={}, run={}'.format(LSL2,LSR2,isrun))
-            pass
-        self.actuator.hold()
-        LSonoff = LSL2 or LSR2
-        if LSonoff :
-            self.log.info('Stopped moving because one of limit switches on opposite side (inside) is ON (LSL2={}, LSR2={})!'.format(LSL2, LSR2))
-            pass
-        self.actuator.release()
-        return True, 'Finish forward(distance={}, speedrate={}, limitswitch={})'.format(distance, speedrate,LSonoff), LSonoff
+        # Last slow & small moving
+        status, msg, LSonoff = move_func(200, speedrate=0.2)
+        if not status:
+            msg = '_insert_eject()[{}]: ERROR!: in the last moving | {}'\
+                  .format(flabel, msg)
+            self.log.error(msg)
+            return False, msg
+        if LSonoff == 0:
+            msg = '_insert_eject()[{}]: ERROR!: '\
+                  'The limit-switch is NOT ON after last moving.'\
+                  .format(flabel)
+            self.log.error(msg)
+            return False, msg
 
-    def __backward(self, distance, speedrate=0.1):
-        distance = abs(distance)
-        LSL1 = 0 # left  actuator limitswitch @ motor (outside)
-        LSR1 = 0 # right actuator limitswitch @ motor (outside)
-        LSL1,LSR1 = self.limitswitch.get_onoff(pinname=['LSL1','LSR1'])
-        if LSL1==0 and LSR1==0 : 
-            ret, msg = self.actuator.move(-1*distance, speedrate)
-            if not ret : return False, msg, LSL2 or LSR2
-        else :
-            self.log.warn('Warning! One of limit switches on motor side (outside) is ON (LSL1={}, LSR1={})!'.format(LSL1, LSR1));
-            self.log.warn('  --> Did not move.');
-            pass
-        isrun = True
-        while LSL1==0 and LSR1==0 and isrun :
-            LSL1, LSR1 = self.limitswitch.get_onoff(pinname=['LSL1','LSR1'])
-            isrun, msg = self.actuator.isRun()
-            if self.verbose>0 : self.log.info('LSL1={}, LSR1={}, run={}'.format(LSL1,LSR1,isrun))
-            pass
-        self.actuator.hold()
-        LSonoff = LSL1 or LSR1
-        if LSonoff :
-            self.log.info('Stopped moving because one of limit switches on motor side (outside) is ON (LSL1={}, LSR1={})!'.format(LSL1, LSR1))
-            pass
-        self.actuator.release()
-        return True, 'Finish backward(distance={}, speedrate={}, limitswitch={})'.format(distance, speedrate, LSonoff), LSonoff
+        # Lock the actuator by the stoppers
+        self.actuator.st.set_alloff()
+        # Check the stopper until all the stoppers are OFF (locked)
+        for i in range(self.max_check_stopper):
+            onoff_st = self.actuator.st.get_onoff()
+            if not any(onoff_st):
+                break
+        if any(onoff_st):
+            msg = '_insert_eject()[{}]: ERROR!: (After the last moving) '\
+                  'Failed to lock (OFF) all the stoppers'.format(flabel)
+            self.log.error(msg)
+            return False, msg
 
+        return True, '_insert_eject()[{}]: Successfully moving!'.format(flabel)
 
-    def  __insert(self, main_distance=850, main_speedrate=1.0):
-            # check motor limitswitch
-            LSL1,LSR1 = self.limitswitch.get_onoff(pinname=['LSL1','LSR1'])
-            if LSL1==0 and LSR1==0 :
-                self.log.warn('WARNING!: The limitswitch on motor side is NOT ON before inserting.')
-                if main_speedrate>0.1 :  
-                    self.log.warn('WARNING!: --> Change speedrate: {} --> 0.1'.format(main_speedrate))
-                    main_speedrate = 0.1
-                    pass
-            else :
-                self.log.info('The limitswitch on motor side is ON before inserting.')
-                self.log.info('--> Checking connection to the actuator')
-                # check connection
-                ret, msg = self.__check_connect()
-                self.log.info(msg)
-                # reconnect
-                if not ret :
-                    self.log.warn('Trying to reconnect to the actuator...')
-                    ret2, msg2 = self.__reconnect()
-                    self.log.warn(msg2)
-                    if not ret2 :
-                        msg = 'Could not connect to the actuator even after reconnection!'
-                        self.log.warn(msg)
-                        self.log.warn('--> Stop inserting [__insert()] !')
-                        return False
-                        pass
-                    pass
-                pass
+    def _insert(self, main_distance=800, main_speedrate=1.0):
+        ret, msg = self._insert_eject(
+            main_distance=main_distance, main_speedrate=main_speedrate,
+            is_insert=True)
+        return ret, msg
 
-            # release stopper
-            if self.stopper.set_allon() < 0 : 
-                self.log.error('ERROR!: Stopper set_allon() --> STOP')
-                return False
-            if self.stopper.set_allon() < 0 : 
-                self.log.error('ERROR!: Stopper set_allon() --> STOP')
-                return False
-            # first small forward
-            status, msg, LSonoff  = self.__forward(20, speedrate=0.1)
-            if not status : 
-                self.log.error('ERROR!:(in first forwarding) {}'.format(msg))
-                if not self.__stopper_off() : return False
-                return False
-            if LSonoff :
-                self.log.warn('WARNING!: Limit switch is ON after first forwarding. --- {}'.format(msg))
-                if not self.__stopper_off() : return False
-                return True
-            # check limitswitch
-            LSL1,LSR1 = self.limitswitch.get_onoff(pinname=['LSL1','LSR1'])
-            #print('LSL1,LSR1',LSL1,LSR1);
-            if LSL1==1 or LSR1==1 :
-                self.log.error('ERROR!: The limitswitch on motor side is NOT OFF after moving forward without stopper.--> STOP')
-                if not self.__stopper_off() : return False
-                return False
-            # power off stopper
-            if not self.__stopper_off() : return False
-            # check stopper
-            while True :
-                onoff_st = self.stopper.get_onoff()
-                if not any(onoff_st) :
-                    break
-                pass
-            time.sleep(1)
-            # main forward
-            status, msg, LSonoff = self.__forward(main_distance, speedrate=main_speedrate)
-            if not status : 
-                self.log.error('ERROR!:(in main forwarding) {}'.format(msg))
-                return False
-            if LSonoff :
-                self.log.warn('WARNING!: Limit switch is ON after main forwarding. --- {}'.format(msg))
-                return True
-            # last slow forward
-            status, msg, LSonoff = self.__forward(200, speedrate=0.1)
-            if not status : 
-                self.log.error('ERROR!:(in last forwarding) {}'.format(msg))
-                return False
-            if LSonoff==0 :
-                self.log.error('ERROR!: The limitswitch on opposite side is NOT ON after __insert(). --> STOP')
-                return False
-            return True
-
-
-    def __eject(self, main_distance=850, main_speedrate=1.0) :
-            # check motor limitswitch
-            LSL2,LSR2 = self.limitswitch.get_onoff(pinname=['LSL2','LSR2'])
-            if LSL2==0 and LSR2==0 :
-                self.log.warn('WARNING!: The limitswitch on opposite side (inside) is NOT ON before ejecting.')
-                if main_speedrate>0.1 :  
-                    self.log.warn('WARNING!: --> Change speedrate: {} --> 0.1'.format(main_speedrate))
-                    main_speedrate = 0.1
-                    pass
-                pass
-
-
-            # release stopper
-            if self.stopper.set_allon() < 0 : 
-                self.log.error('ERROR!: Stopper set_allon() --> STOP')
-                return False
-            if self.stopper.set_allon() < 0 : 
-                self.log.error('ERROR!: Stopper set_allon() --> STOP')
-                return False
-            # first small backward
-            status, msg, LSonoff = self.__backward(20, speedrate=0.1)
-            if not status : 
-                self.log.error('ERROR!:(in first backwarding) {}'.format(msg))
-                if not self.__stopper_off() : return False
-                return False
-            if LSonoff :
-                self.log.warn('WARNING!: Limit switch is ON after first backwarding. --- {}'.format(msg))
-                if not self.__stopper_off() : return False
-                return True
-            # check limitswitch
-            LSL2,LSR2 = self.limitswitch.get_onoff(pinname=['LSL2','LSR2'])
-            if LSL2==1 or LSR2==1 :
-                self.log.error('ERROR!: The limitswitch on opposite side (inside) is NOT OFF after moving backward. --> STOP')
-                return False
-            time.sleep(1)
-            # main backward
-            status, msg, LSonoff = self.__backward(main_distance, speedrate=main_speedrate)
-            if not status : 
-                self.log.error('ERROR!:(in main backwarding) {}'.format(msg))
-                if not self.__stopper_off() : return False
-                return False
-            if LSonoff :
-                self.log.warn('WARNING!: Limit switch is ON after main backwarding. --- {}'.format(msg))
-                if not self.__stopper_off() : return False
-                return True
-            # last slow backward
-            status, msg, LSonoff = self.__backward(200, speedrate=0.1)
-            if not status : 
-                self.log.error('ERROR!:(in last backwarding) {}'.format(msg))
-                if not self.__stopper_off() : return False
-                return False
-            if LSonoff==0 :
-                self.log.error('ERROR!: The limitswitch on motor side (outside) is NOT ON after __eject(). --> STOP')
-                if not self.__stopper_off() : return False
-                return False
-            # power off stopper
-            if not self.__stopper_off() : return False
-            return True
-
+    def _eject(self, main_distance=800, main_speedrate=1.0):
+        if main_distance > 0.:
+            main_distance = -1. * abs(main_distance)
+        ret, msg = self._insert_eject(
+            main_distance=main_distance, main_speedrate=main_speedrate,
+            is_insert=False)
+        return ret, msg
 
     ##################
     # Main functions #
     ##################
+    # Return: status(True or False), message
 
     def check_limitswitch(self, session, params=None):
-        if params is None: params = {}
-        pinname = params.get('pinname', None)
+        """
+        Print limit-switch ON/OFF
+
+        Parameters:
+            io_name (string): An io name to be printed
+                - io_name is determined in limitswitch_config.py
+                - If io_name is None, all limit-switches are printed.
+        """
+        if params is None:
+            params = {}
+        io_name = params.get('io_name', None)
         onoffs = []
         msg = ''
-        with self.lock.acquire_timeout(timeout=3, job='check_limitswitch') as acquired:
+        with self.lock.acquire_timeout(timeout=3, job='check_limitswitch') \
+                as acquired:
             if not acquired:
-                self.log.warn('Lock could not be acquired because it is held by {}.'.format(self.lock.job))
-                return False, 'Could not acquire lock in check_limitswitch().'
-            if self.controlling :
-                self.log.warn('Actuator is controlled by another function.')
-                return False, 'Actuator control is held by another function.'
-            self.controlling = True
-            onoffs    = self.limitswitch.get_onoff(pinname)
-            self.controlling = False
-            pinnames  = self.limitswitch.get_pinname(pinname)
-            pinlabels = self.limitswitch.get_label(pinname)
-            for i, pinname in enumerate(pinnames) :
-                pinlabel = pinlabels[i]
-                msg += '{:10s} ({:20s}) : {}\n'.format(pinname, pinlabel, 'ON' if onoffs[i] else 'OFF')
-                pass
-            pass
-        self.log.info(msg)
-        return onoffs, msg
+                self.log.warn(
+                    'check_limitswitch(): '
+                    'Lock could not be acquired because it is held by {}.'
+                    .format(self.lock.job))
+                return False,\
+                    'check_limitswitch(): '\
+                    'Could not acquire lock'
+
+            onoffs = self.actuator.ls.get_onoff(io_name)
+            io_names = self.actuator.ls.get_io_name(io_name)
+            io_labels = self.actuator.ls.get_label(io_name)
+            for i, io_name in enumerate(io_names):
+                io_label = io_labels[i]
+                msg += 'check_limitswitch(): {:10s} ({:20s}) : {}\n'\
+                    .format(io_name, io_label, 'ON' if onoffs[i] else 'OFF')
+            self.log.info(msg)
+            return True, msg
 
     def check_stopper(self, session, params=None):
-        if params is None: params = {}
-        pinname = params.get('pinname')
+        """
+        Print stopper ON/OFF (ON: lock the actuator, OFF: release the actuator)
+
+        Parameters:
+            io_name (string): An io name to be printed
+                - io_name is determined in stopper_config.py
+                - If io_name is None, all stoppers are printed.
+        """
+        if params is None:
+            params = {}
+        io_name = params.get('io_name', None)
         onoffs = []
         msg = ''
-        with self.lock.acquire_timeout(timeout=3, job='check_stopper') as acquired:
+        with self.lock.acquire_timeout(timeout=3, job='check_stopper') \
+                as acquired:
             if not acquired:
-                self.log.warn('Lock could not be acquired because it is held by {}.'.format(self.lock.job))
-                return False, 'Could not acquire lock in check_stopper().'
-            if self.controlling :
-                self.log.warn('Actuator is controlled by another function.')
-                return False, 'Actuator control is held by another function.'
-            self.controlling = True
-            onoffs   = self.stopper.get_onoff(pinname)
-            self.controlling = False
-            pinnames = self.stopper.get_pinname(pinname)
-            pinlabels= self.stopper.get_label(pinname)
-            for i, pinname in enumerate(pinnames) :
-                pinlabel = pinlabels[i]
-                msg += '{:10s} ({:20s}) : {}\n'.format(pinname, pinlabel, 'ON' if onoffs[i] else 'OFF')
-                pass
-            pass
-        self.log.info(msg)
-        return onoffs, msg
+                self.log.warn(
+                    'check_stopper(): '
+                    'Lock could not be acquired because it is held by {}.'
+                    .format(self.lock.job))
+                return False, 'check_stopper(): Could not acquire lock'
+
+            onoffs = self.actuator.st.get_onoff(io_name)
+            io_names = self.actuator.st.get_io_name(io_name)
+            io_labels = self.actuator.st.get_label(io_name)
+            for i, io_name in enumerate(io_names):
+                io_label = io_labels[i]
+                msg += 'check_stopper(): {:10s} ({:20s}) : {}\n'\
+                    .format(io_name, io_label, 'ON' if onoffs[i] else 'OFF')
+            self.log.info(msg)
+            return True, msg
 
     def insert(self, session, params=None):
+        """
+        Insert the wire-grid into the forebaffle interface above the SAT
+
+        Parameters:
+            Nothing
+        """
         with self.lock.acquire_timeout(timeout=3, job='insert') as acquired:
             if not acquired:
-                self.log.warn('Lock could not be acquired because it is held by {}.'.format(self.lock.job))
-                return False, 'Could not acquire lock in insert().'
-
-            if self.controlling :
-                self.log.warn('Actuator is controlled by another function.')
-                return False, 'Actuator control is held by another function.'
-         
-            # Running
-            self.controlling = True
+                self.log.warn(
+                    'insert(): '
+                    'Lock could not be acquired because it is held by {}.'
+                    .format(self.lock.job))
+                return False, 'insert(): Could not acquire lock'
+            # Wait for a second before moving
             time.sleep(1)
-         
             # Moving commands
-            ret = self.__insert(850, 1.0)
-            if not ret :
-                self.log.error('Failed to insert!')
-                return False, 'Failed insert() in __insert(850,1.0)'
-         
-            # Finishing
-            self.controlling = False
-            pass
-
-        return True, 'Finish insert()'
-
-
-    def eject(self, session, params=None):
-        with self.lock.acquire_timeout(timeout=3, job='eject') as acquired:
-            if not acquired:
-                self.log.warn('Lock could not be acquired because it is held by {}.'.format(self.lock.job))
-                return False, 'Could not acquire lock in eject().'
-
-            if self.controlling :
-                self.log.warn('Actuator is controlled by another function.')
-                return False, 'Actuator control is held by another function.'
-         
-            # Running
-            self.controlling = True
-            time.sleep(1)
-         
-            # Moving commands
-            ret = self.__eject(850, 1.0)
-            if not ret :
-                self.log.error('Failed to insert!')
-                return False, 'Failed eject() in __eject(850,1.0)'
-         
-            # Finishing
-            self.controlling = False
-            pass
-
-        return True, 'Finish eject()'
-
-
-    def insert_homing(self, session, params=None):
-        with self.lock.acquire_timeout(timeout=3, job='insert_homing') as acquired:
-            if not acquired:
-                self.log.warn('Lock could not be acquired because it is held by {}.'.format(self.lock.job))
-                return False, 'Could not acquire lock in insert_homing().'
-
-            if self.controlling :
-                self.log.warn('Actuator is controlled by another function.')
-                return False, 'Actuator control is held by another function.'
-         
-            # Running
-            self.controlling = True
-            time.sleep(1)
-         
-            # Moving commands
-            ret = self.__insert(1000, 0.1)
-            if not ret :
-                self.log.error('Failed to insert_homing!')
-                return False, 'Failed insert_homing() in __insert(1000,0.1)'
-         
-            # Finishing
-            self.controlling = False
-            pass
-
-        return True, 'Finish insert_homing()'
-
-
-    def eject_homing(self, session, params=None):
-        with self.lock.acquire_timeout(timeout=3, job='eject_homing') as acquired:
-            if not acquired:
-                self.log.warn('Lock could not be acquired because it is held by {}.'.format(self.lock.job))
-                return False, 'Could not acquire lock in eject_homing().'
-
-            if self.controlling :
-                self.log.warn('Actuator is controlled by another function.')
-                return False, 'Actuator control is held by another function.'
-         
-            # Running
-            self.controlling = True
-            time.sleep(1)
-         
-            # Moving commands
-            ret = self.__eject(1000, 0.1)
-            if not ret :
-                self.log.error('Failed to eject_homing!')
-                return False, 'Failed eject_homing() in __eject(1000,0.1)'
-         
-            # Finishing
-            self.controlling = False
-            pass
-
-        return True, 'Finish eject_homing()'
-
-
-    def stop(self, session, params=None):
-        self.log.warn('Try to stop and hold the actuator.')
-        if self.controlling :
-            self.log.warn('Actuator is controlled by another function.')
-            pass
-        
-        self.controlling = True
-        # This will disable move() command in Actuator class until release() is called.
-        self.actuator.STOP = True 
-        # Hold the actuator
-        ret, msg = self.actuator.hold()
-        if not ret : return False, msg
-        self.controlling = False
-
-        return True, 'Finish stop()'
-
-
-    def release(self, session, params=None):
-        self.log.warn('Try to release the actuator.')
-        if self.controlling :
-            self.log.warn('Actuator is controlled by another function.')
-            pass
-        
-        self.controlling = True
-        # This will enable move() command in Actuator class.
-        self.actuator.STOP = False
-        # Relase the actuator
-        ret, msg = self.actuator.release()
-        if not ret : return False, msg
-
-        self.controlling = False
-
-        return True, 'Finish release()'
-
-
-    def reconnect(self, session, params=None):
-        self.log.warn('reconnect() will power off the actuator for a short time.')
-        self.log.warn('Usually, please don\'t use this task.')
-        if self.controlling :
-            self.log.warn('Actuator is controlled by another function.')
-            pass
-        # check connection
-        ret, msg = self.__check_connect()
-        self.log.warn(msg)
-
-        # try to reconnect if no connection 
-        if ret :
-            msg = 'Did not tried to reconnect the actuator beacuase the connection is good.'
-            self.log.warn(msg)
-            return ret, msg
-        else :
-            # get new device file
-            if params is None: params = {}
-            devfile = params.get('devfile', None)
-            if devfile is None: devfile = self.actuator_dev
-            # check device file
-            lsdev = os.listdir('/dev/')
-            self.log.warn('device files in /dev: {}'.format(lsdev))
-            if not os.path.exists(devfile) :
-                msg = 'ERROR! There is no actuator device file ({}).'.format(devfile)
+            ret, msg = self._insert(920, 1.0)
+            if not ret:
+                msg = 'insert(): '\
+                      'ERROR!: Failed insert() in _insert(850,1.0) | {}'\
+                      .format(msg)
                 self.log.error(msg)
                 return False, msg
-            # set device file
-            self.actuator_dev = devfile
+            return True, 'insert(): Successfully finish!'
 
+    def eject(self, session, params=None):
+        """
+        Eject the wire-grid from the forebaffle interface above the SAT
+
+        Parameters:
+            Nothing
+        """
+        with self.lock.acquire_timeout(timeout=3, job='eject') as acquired:
+            if not acquired:
+                self.log.warn(
+                        'eject(): '
+                        'Lock could not be acquired because it is held by {}.'
+                        .format(self.lock.job))
+                return False, 'eject(): Could not acquire lock'
+            # Wait for a second before moving
+            time.sleep(1)
+            # Moving commands
+            ret, msg = self._eject(920, 1.0)
+            if not ret:
+                msg = 'eject(): ERROR!: Failed in _eject(850,1.0) | {}'\
+                    .format(msg)
+                self.log.error(msg)
+                return False, msg
+            return True, 'eject(): Successfully finish!'
+
+    def insert_homing(self, session, params=None):
+        """
+        Insert slowly the wire-grid into the forebaffle interface above the SAT
+        until the inside limit-switch becomes ON
+
+        Parameters:
+            Nothing
+        """
+        with self.lock.acquire_timeout(timeout=3, job='insert_homing')\
+                as acquired:
+            if not acquired:
+                self.log.warn(
+                    'insert_homing(): '
+                    'Lock could not be acquired because it is held by {}.'
+                    .format(self.lock.job))
+                return False, 'insert_homing(): Could not acquire lock'
+            # Wait for a second before moving
+            time.sleep(1)
+            # Moving commands
+            ret, msg = self._insert(1000, 0.1)
+            if not ret:
+                msg = 'insert_homing(): ERROR!: Failed '\
+                      'in _insert(1000,0.1) | {}'.format(msg)
+                self.log.error(msg)
+                return False, msg
+            return True, 'insert_homing(): Successfully finish!'
+
+    def eject_homing(self, session, params=None):
+        """
+        Eject slowly the wire-grid from the forebaffle interface above the SAT
+        until the outside limit-switch becomes ON
+
+        Parameters:
+            Nothing
+        """
+        with self.lock.acquire_timeout(timeout=3, job='eject_homing')\
+                as acquired:
+            if not acquired:
+                self.log.warn(
+                        'eject_homing(): '
+                        'Lock could not be acquired because it is held by {}.'
+                        .format(self.lock.job))
+                return False, 'eject_homing(): Could not acquire lock'
+            # Wait for a second before moving
+            time.sleep(1)
+            # Moving commands
+            ret, msg = self._eject(1000, 0.1)
+            if not ret:
+                msg = 'eject_homing(): ERROR!: Failed '\
+                      'in _eject(1000,0.1) | {}'.format(msg)
+                self.log.error(msg)
+                return False, msg
+            return True, 'eject_homing(): Successfully finish!'
+
+    def insert_test(self, session, params=None):
+        """
+        Insert slowly the wire-grid into the forebaffle interface above the SAT
+        with a small distance
+
+        Parameters:
+            distance:  Actuator moving distance [mm] (default: 10)
+            speedrate: Actuator speed rate [0.0, 1.0] (default: 0.1)
+        """
+        # Get parameters
+        if params is None:
+            params = {}
+        distance = params.get('distance', 10)
+        speedrate = params.get('speedrate', 10)
+        self.log.info('insert_test(): set distance   = {} mm'
+                      .format(distance))
+        self.log.info('insert_test(): set speed rate = {}'
+                      .format(speedrate))
+
+        with self.lock.acquire_timeout(timeout=3, job='insert_test') \
+             as acquired:
+            if not acquired:
+                self.log.warn(
+                    'insert_test(): '
+                    'Lock could not be acquired because it is held by {}.'
+                    .format(self.lock.job))
+                return False, 'insert_test(): Could not acquire lock.'
+            # Wait for a second before moving
+            time.sleep(1)
+            # Release the stoppers
+            try:
+                self.actuator.st.set_allon()
+            except Exception as e:
+                msg = 'insert_test(): ERROR!: '\
+                      'Failed to run the stopper set_allon() '\
+                      '--> Stop inserting! | Exception = "{}"'.format(e)
+                self.log.error(msg)
+                return False, msg
+            # Moving commands
+            ret, msg, LSonoff = self._forward(distance, speedrate=speedrate)
+            if not ret:
+                msg = 'insert_test(): ERROR!: Failed in _forward(10,1.) | {}'\
+                    .format(msg)
+                self.log.error(msg)
+                return False, msg
+            # Lock the stoppers
+            self.actuator.st.set_alloff()
+            return True, 'insert_test(): Successfully finish!'
+
+    def eject_test(self, session, params=None):
+        """
+        Eject slowly the wire-grid from the forebaffle interface above the SAT
+        with a small distance
+
+        Parameters:
+            distance:  Actuator moving distance [mm] (default: 10)
+            speedrate: Actuator speed rate [0.0, 1.0] (default: 0.1)
+        """
+        # Get parameters
+        if params is None:
+            params = {}
+        distance = params.get('distance', 10)
+        speedrate = params.get('speedrate', 10)
+        self.log.info('eject_test(): set distance   = {} mm'
+                      .format(distance))
+        self.log.info('eject_test(): set speed rate = {}'
+                      .format(speedrate))
+
+        with self.lock.acquire_timeout(timeout=3, job='eject_test')\
+                as acquired:
+            if not acquired:
+                self.log.warn(
+                        'eject_test(): '
+                        'Lock could not be acquired because it is held by {}.'
+                        .format(self.lock.job))
+                return False, 'eject_test(): Could not acquire lock.'
+            # Wait for a second before moving
+            time.sleep(1)
+            # Release the stoppers
+            try:
+                self.actuator.st.set_allon()
+            except Exception as e:
+                msg = 'eject_test(): ERROR!: '\
+                      'Failed to run the stopper set_allon() '\
+                      '--> Stop ejecting! | Exception = "{}"'.format(e)
+                self.log.error(msg)
+                return False, msg
+            # Moving commands
+            ret, msg, LSonoff = self._backward(distance, speedrate=speedrate)
+            if not ret:
+                msg = 'eject_test(): ERROR!: Failed '\
+                      'in _backward(10,1.) | {}'.format(msg)
+                self.log.error(msg)
+                return False, msg
+            # Lock the stoppers
+            self.actuator.st.set_alloff()
+            return True, 'eject_test(): Successfully finish!'
+
+    def motor_on(self, session, params=None):
+        """
+        Powering ON the motors of the actuators
+
+        Parameters:
+            Nothing
+        """
+        with self.lock.acquire_timeout(timeout=3, job='motor_on')\
+                as acquired:
+            if not acquired:
+                self.log.warn(
+                        'motor_on(): '
+                        'Lock could not be acquired because it is held by {}.'
+                        .format(self.lock.job))
+                return False, 'motor_on(): Could not acquire lock.'
+            self.log.warn('motor_on(): Try to power ON the actuator motors.')
+            try:
+                self.actuator.set_motor_onoff(onoff=True)
+            except Exception as e:
+                msg = 'motor_on(): ERROR!: '\
+                      'Failed to power ON the actuator motors | '\
+                      'Exception = "{}"'.format(e)
+                self.log.error(msg)
+                return False, msg
+            return True, 'motor_on(): Successfully finish!'
+
+    def motor_off(self, session, params=None):
+        """
+        Powering OFF the motors of the actuators
+
+        Parameters:
+            Nothing
+        """
+        with self.lock.acquire_timeout(timeout=3, job='motor_off')\
+                as acquired:
+            if not acquired:
+                self.log.warn(
+                        'motor_off(): '
+                        'Lock could not be acquired because it is held by {}.'
+                        .format(self.lock.job))
+                return False, 'motor_off(): Could not acquire lock.'
+            self.log.warn('motor_off(): Try to power OFF the actuator motors.')
+            try:
+                self.actuator.set_motor_onoff(onoff=False)
+            except Exception as e:
+                msg = 'motor_off(): ERROR!: '\
+                      'Failed to power OFF the actuator motors | '\
+                      'Exception = "{}"'.format(e)
+                self.log.error(msg)
+                return False, msg
+            return True, 'motor_off(): Successfully finish!'
+
+    def stop(self, session, params=None):
+        """
+        Emergency stop of the wire-grid actuator (Disable the actuator moving)
+        - This command can be excuted even if the other command is running.
+
+        Parameters:
+            Nothing
+        """
+        self.log.warn('stop(): Try to stop and hold the actuator.')
+        # This will disable move() command in Actuator class
+        # until self.actuator.release() is called.
+        ret = self.actuator.hold()
+        if not ret:
+            msg = 'stop(): ERROR!: Failed to hold the actuator'
+            self.log.error(msg)
+            return False, msg
+        return True, 'stop(): Successfully finish!'
+
+    def release(self, session, params=None):
+        """
+        Enable the actuator moving
+
+        Parameters:
+            Nothing
+        """
+        with self.lock.acquire_timeout(timeout=3, job='release')\
+                as acquired:
+            if not acquired:
+                self.log.warn(
+                        'release(): '
+                        'Lock could not be acquired because it is held by {}.'
+                        .format(self.lock.job))
+                return False, 'release(): Could not acquire lock.'
+            self.log.warn('release(): Try to release the actuator.')
+            # This will enable move() command in Actuator class.
+            try:
+                self.actuator.release()
+            except Exception as e:
+                msg = 'release(): ERROR!: '\
+                      'Failed to release the actuator | '\
+                      'Exception = "{}"'.format(e)
+                self.log.error(msg)
+                return False, msg
+            return True, 'release(): Successfully finish!'
+
+    def reconnect(self, session, params=None):
+        """
+        Reconnect to the actuator controller
+        (This command turn OFF the motor power!)
+
+        Parameters:
+            Nothing
+        """
+        with self.lock.acquire_timeout(timeout=3, job='reconnect')\
+                as acquired:
+            if not acquired:
+                self.log.warn(
+                        'reconnect(): '
+                        'Lock could not be acquired because it is held by {}.'
+                        .format(self.lock.job))
+                return False, 'reconnect(): Could not acquire lock.'
+            self.log.warn('reconnect(): *** Trying to reconnect... ***')
             # reconnect
-            self.controlling = True
-            self.log.warn('Trying to reconnect to the actuator...')
-            ret2, msg2 = self.__reconnect()
-            self.controlling = False
-            return ret2, msg2
-
+            ret = self.actuator.reconnect()
+            if not ret:
+                msg = 'reconnect(): ERROR!: '\
+                      'Failed to reconnect the actuator controller!'
+                self.log.warn(msg)
+                return False, msg
+            # Check connection
+            ret = self.actuator.check_connect()
+            if ret:
+                msg = 'reconnect(): Successfully reconnected to the actuator!'
+                self.log.info(msg)
+                return True, msg
+            else:
+                msg = 'reconnect(): ERROR!: Failed to reconnect to the actuator!'
+                self.log.error(msg)
+                return False, msg
 
     def start_acq(self, session, params=None):
-        if params is None: params = {}
+        """
+        Method to start data acquisition process.
 
-        # Define data taking interval_time 
+        The most recent data collected is stored in session.data in the
+        structure::
+
+            >>> session.data
+            {'fields':
+                {
+                 'motor':
+                    0 or 1
+                 'limitswitch':
+                 {   'LSR1': 0 or 1, (0: OFF, 1:ON)
+                     'LSR2': 0 or 1, (0: OFF, 1:ON)
+                     .
+                     .
+                     },
+                 'stopper':
+                 {   'STR1': 0 or 1, (0: OFF, 1:ON)
+                     'STR2': 0 or 1, (0: OFF, 1:ON)
+                     .
+                     .
+                     ]
+                }
+            }
+
+        Parameters:
+           Nothing
+        """
+        if params is None:
+            params = {}
+        # Define data taking interval_time
         interval_time = params.get('interval-time', None)
         # If interval-time is None, use value passed to Agent init
-        if interval_time is None :
-            self.log.info('Not set by parameter of "interval-time" for start_acq()')
+        if interval_time is None:
+            self.log.info(
+                'start_acq(): '
+                'Not set by parameter of "interval-time" for start_acq()')
             interval_time = self.interval_time
-        else :
+        else:
             try:
                 interval_time = float(interval_time)
-            except ValueError as error:
-                self.log.warn('Parameter of "interval-time" is incorrect : {}'.format(error))
+            except ValueError as e:
+                self.log.warn(
+                    'start_acq(): '
+                    'Parameter of "interval-time" is incorrect | '
+                    'Exception = "{}"'.format(e))
                 interval_time = self.interval_time
-                pass
-        self.log.info('interval time for acquisition of limitswitch&stopper = {} sec'.format(interval_time))
+        self.log.info(
+            'start_acq(): '
+            'interval time for acquisition of limit-switch & stopper = {} sec'
+            .format(interval_time))
 
         with self.lock.acquire_timeout(timeout=0, job='acq') as acquired:
+            self.log.info('start_acq(): Start to take data')
             if not acquired:
-                self.log.warn('Lock could not be acquired because it is held by {}.'.format(self.lock.job))
-                return False, 'Could not acquire lock in start_acq().'
+                self.log.warn(
+                    'start_acq(): '
+                    'Lock could not be acquired because it is held by {}.'
+                    .format(self.lock.job))
+                return False, 'start_acq(): Could not acquire lock.'
+            self.log.info('start_acq(): Got the lock')
 
-        session.set_status('running')
+            session.set_status('running')
 
-        self.run_acq = True
-        session.data = {'fields':{}}
-        while self.run_acq:
-            current_time = time.time()
-            data = {'timestamp': current_time, 'block_name': 'actuator_onoff', 'data': {}}
+            self.run_acq = True
+            last_release = time.time()
+            session.data = {'fields': {}}
+            while self.run_acq:
+                if time.time() - last_release > 1.:
+                    last_release = time.time()
+                    if not self.lock.release_and_acquire(timeout=600):
+                        self.log.warn(
+                            'start_acq(): '
+                            'Could not re-acquire lock now held by {}.'
+                            .format(self.lock.job))
+                        return False,\
+                            'start_acq(): Could not re-acquire lock (timeout)'
 
-            # Take data
-            onoff_dict_ls = {}
-            onoff_dict_st = {}
-            if not self.controlling:
+                current_time = time.time()
+                data = {'timestamp': current_time,
+                        'block_name': 'actuator_onoff',
+                        'data': {}}
+
+                # Take data
+                onoff_mt = None
+                onoff_dict_ls = {}
+                onoff_dict_st = {}
                 # Get onoff
-                onoff_ls = self.limitswitch.get_onoff()
-                onoff_st = self.stopper.get_onoff()
+                onoff_mt = self.actuator.get_motor_onoff()
+                onoff_ls = self.actuator.ls.get_onoff()
+                onoff_st = self.actuator.st.get_onoff()
+                # Data for motor
+                data['data']['motor'] = onoff_mt
                 # Data for limitswitch
-                for onoff, name in zip(onoff_ls, self.limitswitch.pinnames) : 
+                for onoff, name in \
+                        zip(onoff_ls, self.actuator.ls.io_names):
                     data['data']['limitswitch_{}'.format(name)] = onoff
                     onoff_dict_ls[name] = onoff
-                    pass
                 # Data for stopper
-                for onoff, name in zip(onoff_st, self.stopper.pinnames) : 
+                for onoff, name in \
+                        zip(onoff_st, self.actuator.st.io_names):
                     data['data']['stopper_{}'.format(name)] = onoff
                     onoff_dict_st[name] = onoff
-                    pass
-            else :
-                time.sleep(2.+interval_time) # wait for at least 2 sec
-                continue
-                pass
-            # publish data
-            self.agent.publish_to_feed('WGActuator', data)
-            # store session.data
-            field_dict = {'limitswitch': onoff_dict_ls, 'stopper': onoff_dict_st}
-            session.data['timestamp']=current_time
-            session.data['fields']=field_dict
-            #print('data = {}'.format(field_dict))
+                # publish data
+                self.agent.publish_to_feed('WGActuator', data)
+                # store session.data
+                field_dict = {'motor': onoff_mt,
+                              'limitswitch': onoff_dict_ls,
+                              'stopper': onoff_dict_st}
+                session.data['timestamp'] = current_time
+                session.data['fields'] = field_dict
 
-            # wait an interval
-            time.sleep(interval_time)
-            pass
+                # wait an interval
+                time.sleep(interval_time)
+        # End of lock acquire
 
         self.agent.feeds['WGActuator'].flush_buffer()
-        return True, 'Acquisition exited cleanly'
+        return True, 'start_acq(): Acquisition exited cleanly'
 
     def stop_acq(self, session, params=None):
-        if self.run_acq : 
+        if self.run_acq:
             self.run_acq = False
             session.set_status('stopping')
-            return True, 'Stop data acquisition'
+            return True, 'stop_acq(): Stop data acquisition'
         session.set_status('??????')
-        return False, 'acq is not currently running'
-
+        return False, 'stop_acq(): acq is not currently running'
 
     # End of class WiregridActuatorAgent
 
 
-def make_parser(parser = None):
+def make_parser(parser=None):
     if parser is None:
         parser = argparse.ArgumentParser()
 
     pgroup = parser.add_argument_group('Agent Options')
-    pgroup.add_argument('--interval-time', dest='interval_time', type=float, default=1,
-                        help='')
-    pgroup.add_argument('--actuator-dev', dest='actuator_dev', type=str, default='/dev/ttyUSB0',
-                        help='')
-    pgroup.add_argument('--sleep', dest='sleep', type=float, default=0.20,
-                        help='sleep time for every actuator command')
-    pgroup.add_argument('--verbose', dest='verbose', type=int, default=0,
-                        help='')
+    pgroup.add_argument('--interval-time', dest='interval_time',
+                        type=float, default=1.,
+                        help='Interval time for data taking')
+    pgroup.add_argument('--ip-address', dest='ip_address',
+                        type=str, default='192.168.1.100',
+                        help='IP address of the actuator controller')
+    pgroup.add_argument('--sleep', dest='sleep',
+                        type=float, default=0.05,
+                        help='Sleep time for every actuator command')
+    pgroup.add_argument('--verbose', dest='verbose',
+                        type=int, default=0,
+                        help='Verbosity level')
     return parser
 
+
 if __name__ == '__main__':
-    site_parser = site_config.add_arguments()
-    parser = make_parser(site_parser)
 
-    args = parser.parse_args()
+    parser = make_parser()
+    args = site_config.parse_args(
+        agent_class='WGActuatorAgent', parser=parser)
 
-    site_config.reparse_args(args, 'WiregridActuatorAgent')
     agent, runner = ocs_agent.init_site_agent(args)
-    interval_time = args.interval_time
-    actuator_dev  = args.actuator_dev
-    sleep         = args.sleep
-    #print('interval_time = {} (type={})'.format(interval_time, type(interval_time)))
-    #print('actuator_dev  = {} (type={})'.format(actuator_dev , type(actuator_dev)))
-    actuator_agent = WiregridActuatorAgent(agent, actuator_dev, interval_time, sleep=sleep, verbose=args.verbose)
+
+    actuator_agent = WiregridActuatorAgent(
+        agent, ip_address=args.ip_address, interval_time=args.interval_time,
+        sleep=args.sleep, verbose=args.verbose)
+
     agent.register_task('check_limitswitch', actuator_agent.check_limitswitch)
     agent.register_task('check_stopper', actuator_agent.check_stopper)
     agent.register_task('insert', actuator_agent.insert)
     agent.register_task('eject', actuator_agent.eject)
     agent.register_task('insert_homing', actuator_agent.insert_homing)
     agent.register_task('eject_homing', actuator_agent.eject_homing)
+    agent.register_task('insert_test', actuator_agent.insert_test)
+    agent.register_task('eject_test', actuator_agent.eject_test)
+    agent.register_task('motor_on', actuator_agent.motor_on)
+    agent.register_task('motor_off', actuator_agent.motor_off)
     agent.register_task('stop', actuator_agent.stop)
     agent.register_task('release', actuator_agent.release)
     agent.register_task('reconnect', actuator_agent.reconnect)
-    agent.register_process('acq', actuator_agent.start_acq, actuator_agent.stop_acq,startup=True)
+    agent.register_process('acq', actuator_agent.start_acq,
+                           actuator_agent.stop_acq, startup=True)
 
     runner.run(agent, auto_reconnect=True)
-

@@ -38,7 +38,6 @@ class PMX:
             print(
                 "Disconnecting from TCP IP %s at port %d"
                 % (self._tcp_ip, self._tcp_port))
-            pass
         return
 
     def check_connect(self):
@@ -52,7 +51,6 @@ class PMX:
                 self.wait()
                 val = (self.ser.readline().strip())
                 val = int(val)
-                pass
         except Exception as e:
             msg = 'Could not connect to the PMX serial! | Error: "{}"'.format(e)
             return msg, False
@@ -65,8 +63,8 @@ class PMX:
             self.ser.write(str.encode("MEAS:VOLT?\n\r"))
             self.wait()
             val = (self.ser.readline().strip())
-            if len(val)>0 : break
-            pass
+            if len(val)>0: 
+                break
         try :
             val = float(val)
             msg = "Measured voltage = %.3f V" % (val)
@@ -75,7 +73,6 @@ class PMX:
             msg = 'WARNING! Could not get correct voltage value! | Response = "%s"' % (val)
             val = -999
             print(msg)
-            pass
         return msg, val
 
     def check_current(self):
@@ -85,8 +82,8 @@ class PMX:
             self.ser.write(str.encode("MEAS:CURR?\n\r"))
             self.wait()
             val = (self.ser.readline().strip())
-            if len(val)>0 : break
-            pass
+            if len(val)>0: 
+                break
         try :
             val = float(val)
             msg = "Measured current = %.3f A" % (val)
@@ -95,7 +92,6 @@ class PMX:
             msg = 'WARNING! Could not get correct current value! | Response = "%s"' % (val)
             val = -999
             print(msg)
-            pass
         return msg, val
 
     def check_voltage_current(self):
@@ -117,8 +113,8 @@ class PMX:
             self.ser.write(str.encode("VOLT?\n\r"))
             self.wait()
             val = (self.ser.readline().strip())
-            if len(val)>0 : break
-            pass
+            if len(val)>0: 
+                break
         try :
             val = float(val)
             msg = "Voltage setting = %.3f V" % (val)
@@ -127,7 +123,6 @@ class PMX:
             msg = 'WARNING! Could not get correct voltage-setting value! | Response = "%s"' % (val)
             val = -999
             print(msg)
-            pass
         return msg, val
 
     def check_currentsetting(self):
@@ -137,8 +132,8 @@ class PMX:
             self.ser.write(str.encode("CURR?\n\r"))
             self.wait()
             val = (self.ser.readline().strip())
-            if len(val)>0 : break
-            pass
+            if len(val)>0:
+                break
         try :
             val = float(val)
             msg = "Current setting = %.3f A" % (val)
@@ -147,7 +142,6 @@ class PMX:
             msg = 'WARNING! Could not get correct current-setting value! | Response = "%s"' % (val)
             val = -999
             print(msg)
-            pass
         return msg, val
 
     def check_voltage_current_setting(self):
@@ -169,8 +163,8 @@ class PMX:
             self.ser.write(str.encode("OUTP?\n\r"))
             self.wait()
             val = (self.ser.readline().strip())
-            if len(val)>0 : break
-            pass
+            if len(val) > 0:
+                break
         try :
             val = int(val)
         except  ValueError:
@@ -248,7 +242,6 @@ class PMX:
             self.ser.write(str.encode("OUTP ON\n\r"))
             msg = "PMX turned ON perhaps"
             print(msg)
-            pass
         else:
             self.clean_serial()
             self.ser.write(str.encode("OUTP ON\n\r"))
@@ -259,7 +252,6 @@ class PMX:
             msg = "\nOutput state = %s" % (val)
             print(msg)
             return msg
-            pass
 
     def turn_off(self,notmakesure=False):
         """ Turn the PMX off """
@@ -268,7 +260,6 @@ class PMX:
             self.ser.write(str.encode("OUTP OFF\n\r"))
             msg = "PMX turned OFF perhaps"
             print(msg)
-            pass
         else:
             self.clean_serial()
             self.ser.write(str.encode("OUTP OFF\n\r"))

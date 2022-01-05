@@ -151,8 +151,20 @@ services:
   # --------------------------------------------------------------------------
   # Wiregrid KIKUSUI power supply agent
   # --------------------------------------------------------------------------
-  ocs-wg-kikusui:
-    image: "ocs-wg-kikusui"
+  ocs-wgkikusui-agent:
+    image: "ocs-wgkikusui-agent"
     build: ./agents/wiregrid_kikusui/
 
+  # --------------------------------------------------------------------------
+  # Wiregrid encoder agent
+  # --------------------------------------------------------------------------
+  ocs-wgencoder-agent:
+    image: "ocs-wgencoder-agent"
+    build: ./agents/wiregrid_encoder/
 
+  # --------------------------------------------------------------------------
+  # Wiregrid actuator agent
+  # --------------------------------------------------------------------------
+  ocs-wgactuator-agent:
+    image: "ocs-wgactuator-agent"
+    build: ./agents/wiregrid_actuator/

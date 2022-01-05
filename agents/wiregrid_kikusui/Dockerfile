@@ -12,7 +12,7 @@ WORKDIR /app/socs/agents/wiregrid_kikusui/
 COPY . .
 
 # Run agent on container startup
-ENTRYPOINT ["python3", "-u", "kikusui_agent.py"]
+ENTRYPOINT ["dumb-init", "python3", "-u", "kikusui_agent.py"]
 
 CMD ["--site-hub=ws://crossbar:8001/ws", \
      "--site-http=http://crossbar:8001/call"]

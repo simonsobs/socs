@@ -1,22 +1,21 @@
-# SOCS Wire-Grid Actuator Agent
-# socs Agent container for controlling the actuator of wire grid loader 
-# This agent should be run in the beaglebone in the electronics box for wire grid loader.
+FROM simonsobs/socs:latest
 
-# Use socs base image
-#!! This agents should be build from OCS image build in "arm" OS
-#FROM socs:latest
-FROM ocs:latest
+WORKDIR /app/socs/agents/wiregrid_actuator
 
-# Set the working directory to registry directory
-WORKDIR /app/socs/agents/wiregrid_actuator/
+RUN apt-get update \
+ && apt-get install -y apt-utils \
+ && apt-get install -y wget libavahi-common-dev libavahi-client-dev libavahi-core-dev libcap-dev libdaemon-dev avahi-daemon \
+ && wget http://www.galil.com/sw/pub/all/crypto/GALIL-GPG-KEY-E29D0E4B.asc \
+ && apt-key add GALIL-GPG-KEY-E29D0E4B.asc \
+ && wget http://www.galil.com/sw/pub/ubuntu/20.04/galil.list \
+ && cp galil.list /etc/apt/sources.list.d \
+ && apt-get update
 
-## Copy this agent into the app/agents directory
+#COPY wg-actuator-entrypoint.sh /tmp
 COPY . .
 
-RUN python3 -m pip install -r requirements.txt
-
-# Run agent on container startup
-ENTRYPOINT ["dumb-init", "python3", "-u", "wiregrid_actuator.py"]
+#ENTRYPOINT ["/tmp/wg-actuator-entrypoint.sh"]
+ENTRYPOINT ["./wg-actuator-entrypoint.sh"]
 
 CMD ["--site-hub=ws://crossbar:8001/ws", \
      "--site-http=http://crossbar:8001/call"]

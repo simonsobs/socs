@@ -141,7 +141,7 @@ class Command:
                 set_val = self._int(argv.pop(0))
                 if set_val is not None:
                     del self._PMX
-                    self._PMX = px.PMX(set_val)
+                    self._PMX = pmx.PMX(set_val)
                 else:
                     return False
             elif cmd == self._cmds["set_v"]:
