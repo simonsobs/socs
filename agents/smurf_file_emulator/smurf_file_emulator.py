@@ -179,7 +179,7 @@ class SmurfFileEmulator:
         action_time = time.time()
         files = ['freq.txt', 'mask.txt']
         for f in files:
-            self._write_smurf_file(f, 'take_bias_steps',
+            self._write_smurf_file(f, 'take_g3_stream',
                                    action_time=action_time)
 
         end_time = None
@@ -191,30 +191,43 @@ class SmurfFileEmulator:
         session.set_status('running')
         seq = 0
         sid = int(time.time())
+        g3_file_info = None
+
+        file_start = None
         while self.streaming:
-            start = time.time()
-            exit=False
+            if g3_file_info is None:
+                file_start = time.time()
+                g3_file_info = {
+                    'start': file_start,
+                    'seq': seq,
+                    'session_id': sid
+                }
+
+            time.sleep(1)
+
             if end_time is not None:
-                time_remaining = end_time - time.time()
-                if time_remaining < self.file_duration:
-                    time.sleep(max(0, time_remaining))
-                    exit=True
-                else:
-                    time.sleep(self.file_duration)
-            else:
-                time.sleep(self.file_duration)
-            stop = time.time()
+                if time.time() > end_time:
+                    g3_file_info['stop'] = time.time()
+                    self._write_g3_file(**g3_file_info)
+                    break
 
-            self._write_g3_file(session_id=sid, seq=seq, start=start, stop=stop)
-            seq += 1
+            if time.time() - file_start > self.file_duration:
+                g3_file_info['stop'] = time.time()
+                self._write_g3_file(**g3_file_info)
+                g3_file_info = None
+                seq += 1
 
-            if exit: break
+        if g3_file_info is not None:
+            # Write out unwritten file info on stop
+            g3_file_info['stop'] = time.time()
+            self._write_g3_file(**g3_file_info)
 
+        return True, "Finished stream"
 
     def _stop_stream(self, session, params=None):
         if self.streaming:
             session.set_status('stopping')
-            self.streaming= False
+            self.streaming = False
             return True, 'requesting to stop taking data'
         else:
             return False, 'agent is not currently streaming'
