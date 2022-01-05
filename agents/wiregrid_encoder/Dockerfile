@@ -15,5 +15,3 @@ ENTRYPOINT ["dumb-init", "python3", "-u", "wiregrid_encoder.py"]
 # Sensible default arguments
 CMD ["--site-hub=ws://crossbar:8001/ws", \
      "--site-http=http://crossbar:8001/call"]
-
-#EXPOSE 50007/udp
