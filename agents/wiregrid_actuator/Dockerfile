@@ -11,10 +11,8 @@ RUN apt-get update \
  && cp galil.list /etc/apt/sources.list.d \
  && apt-get update
 
-#COPY wg-actuator-entrypoint.sh /tmp
 COPY . .
 
-#ENTRYPOINT ["/tmp/wg-actuator-entrypoint.sh"]
 ENTRYPOINT ["./wg-actuator-entrypoint.sh"]
 
 CMD ["--site-hub=ws://crossbar:8001/ws", \

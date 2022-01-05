@@ -660,7 +660,8 @@ class WiregridActuatorAgent:
                 self.log.info(msg)
                 return True, msg
             else:
-                msg = 'reconnect(): ERROR!: Failed to reconnect to the actuator!'
+                msg = 'reconnect(): ERROR!: '\
+                      'Failed to reconnect to the actuator!'
                 self.log.error(msg)
                 return False, msg
 
@@ -788,9 +789,7 @@ class WiregridActuatorAgent:
     def stop_acq(self, session, params=None):
         if self.run_acq:
             self.run_acq = False
-            session.set_status('stopping')
             return True, 'stop_acq(): Stop data acquisition'
-        session.set_status('??????')
         return False, 'stop_acq(): acq is not currently running'
 
     # End of class WiregridActuatorAgent
