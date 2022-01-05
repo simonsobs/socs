@@ -55,6 +55,42 @@ class WGEncoderAgent:
         self.parser = EncoderParser(beaglebone_port=self.bbport)
 
     def start_acq(self, session, params=None):
+        """
+        Method to start data acquisition process.
+
+        The most recent data collected is stored in session.data in the
+        structure::
+
+        IRIG data case:
+            >>> session.data
+            {'fields':
+                {
+                 'irig_time': irig_time,
+                 'rising_edge_count': PRU clock (Beaglebone clock) count,
+                 'edge_diff': Difference of PRU clock from previous IRIG data,
+                 'irig_sec': IRIG second,
+                 'irig_min': IRIG minuite,
+                 'irig_hour': IRIG hour,
+                 'irig_day': IRIG Day,
+                 'irig_year': IRIG Year
+                }
+            }
+
+        Encoder data case:
+            >>> session.data
+            {'fields':
+                {
+                 'quadrature': [Array] quadrature encoder signals,
+                 'pru_clock': [Array] PRU clock (Beaglebone clock) ,
+                 'reference_degree': [Array] Encoder rotation position [deg.],
+                 'error': [Array] Encoder error flags
+                }
+            }
+
+        Parameters:
+           Nothing
+        """
+
         time_encoder_published = 0
         quad_data = []
         pru_clock = []
@@ -76,7 +112,7 @@ class WGEncoderAgent:
             session.set_status('running')
 
             self.take_data = True
-
+            session.data = {'fields': {}}
             while self.take_data:
 
                 try:
@@ -129,6 +165,20 @@ class WGEncoderAgent:
                     irg_rdata['data']['bbb_clock_freq'] = bbb_clock_freq
 
                     self.agent.publish_to_feed('WGEncoder_rough', irg_rdata)
+                    # store session.data
+                    field_dict = {
+                        'irig_time': irig_time,
+                        'rising_edge_count': rising_edge_count,
+                        'edge_diff': irg_rdata['data']['edge_diff'],
+                        'irig_sec': irg_rdata['data']['irig_sec'],
+                        'irig_min': irg_rdata['data']['irig_min'],
+                        'irig_hour': irg_rdata['data']['irig_hour'],
+                        'irig_day': irg_rdata['data']['irig_day'],
+                        'irig_year': irg_rdata['data']['irig_year']
+                        }
+                    session.data['timestamp'] = sys_time
+                    session.data['fields'] = field_dict
+
                     self.rising_edge_count = rising_edge_count
                     self.irig_time = irig_time
 
@@ -210,6 +260,16 @@ class WGEncoderAgent:
                         enc_rdata['data']['rotation_speed'] = rot_speed  # Hz
                         self.agent.publish_to_feed(
                             'WGEncoder_rough', enc_rdata)
+                        # store session.data
+                        field_dict = {
+                            'quadrature': enc_rdata['data']['quadrature'],
+                            'pru_clock': enc_rdata['data']['pru_clock'],
+                            'reference_degree':
+                                enc_rdata['data']['reference_degree'],
+                            'error': enc_rdata['data']['error'],
+                            }
+                        session.data['timestamps'] = received_time_list
+                        session.data['fields'] = field_dict
 
                         enc_fdata['timestamps'] =\
                             count2time(pru_clock, received_time_list[0])
@@ -260,7 +320,10 @@ if __name__ == '__main__':
     if parser is None:
         parser = argparse.ArgumentParser()
     pgroup = parser.add_argument_group('Agent Options')
-    pgroup.add_argument('--port', default=50007)
+    pgroup.add_argument('--port', dest='port',
+                        type=int, default=50007,
+                        help='Port of the beaglebone '
+                             'running wiregrid encoder DAQ')
     args = parser.parse_args()
 
     site_config.reparse_args(args, 'WGEncoderAgent')
