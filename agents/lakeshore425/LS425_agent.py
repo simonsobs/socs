@@ -186,7 +186,7 @@ def make_parser(parser=None):
                         help="Path to USB node for the lakeshore")
     pgroup.add_argument('--mode', type=str, choices=['init', 'acq'],
                         help="Starting action for the agent.")
-    pgroup.add_argument('--sampling_frequency', type=float,
+    pgroup.add_argument('--sampling-frequency', type=float,
                         help="Sampling frequency for data acquisition")
     return parser
 

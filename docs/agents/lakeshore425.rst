@@ -30,7 +30,7 @@ using all of the available arguments::
        'arguments': [
          ['--port', '/dev/LS425'],
          ['--mode', 'acq'],
-         ['--sampling_frequency', 1.],
+         ['--sampling-frequency', 1.],
        ]},
 
 If you would like to chanege the setting or check the status of the lakeshore 425, the ``--mode`` argument should be ``'init'``.
