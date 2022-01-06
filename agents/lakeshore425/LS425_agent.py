@@ -4,7 +4,7 @@ import argparse
 import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
-import Lakeshore425 as ls 
+from socs.Lakeshore import Lakeshore425 as ls 
 
 txaio.use_twisted()
 
