@@ -156,6 +156,7 @@ class LS425Agent:
             self.dev.set_zero()
             return True, 'Zero calibration is done'
 
+    @ocs_agent.param('command', type=str)
     def any_command(self, session, params=None):
         """
         any_command(command='*IDN?')
