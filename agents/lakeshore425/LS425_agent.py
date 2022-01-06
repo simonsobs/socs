@@ -2,7 +2,6 @@ import time
 import os
 import argparse
 import txaio
-from typing import Optional
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 import Lakeshore425 as ls 
