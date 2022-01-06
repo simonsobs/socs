@@ -65,9 +65,10 @@ class WGEncoderAgent:
             >>> session.data
             {'fields':
                 {
-                 'irig_time': irig_time,
+                 'irig_time': computure unix time in receiving the IRIG packet,
                  'rising_edge_count': PRU clock (Beaglebone clock) count,
-                 'edge_diff': Difference of PRU clock from previous IRIG data,
+                 'edge_diff': Difference of PRU clock
+                              from the previous IRIG data,
                  'irig_sec': IRIG second,
                  'irig_min': IRIG minuite,
                  'irig_hour': IRIG hour,

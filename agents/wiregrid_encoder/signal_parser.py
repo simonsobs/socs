@@ -10,9 +10,12 @@ txaio.use_twisted()
 
 # should be consistent with the software on beaglebone
 COUNTER_INFO_LENGTH = 100
-# header, quad, clock, clock_overflow, refcount, error
+# header, quad, clock[100], clock_overflow[100], refcount[100], error[100]
 COUNTER_PACKET_SIZE = 4 + 4 * 5 * COUNTER_INFO_LENGTH
+# header, clock, clock_overflow, info[10], synch[10], synch_overflow[10]
 IRIG_PACKET_SIZE = 132
+# header, type
+TIMEOUT_PACKET_SIZE = 8
 
 
 class EncoderParser:
@@ -135,8 +138,23 @@ class EncoderParser:
                             self.data = self.data[IRIG_PACKET_SIZE:]
 
                     elif header == 0x1234:
-                        self.log.error('Recieved timeout packet.')
+                        if not self.check_data_length(0, TIMEOUT_PACKET_SIZE):
+                            self.log.error(
+                                'Failed to catch the Timeout data')
+                            self.data = ''
+                            break
+                        timeout_type = self.data[4:TIMEOUT_PACKET_SIZE]
+                        timeout_type = struct.unpack('<I', timeout_type)[0]
+                        if timeout_type == 1:
+                            self.log.error('Recieved Encoder timeout packet.')
+                        elif timeout_type == 2:
+                            self.log.error('Recieved IRIG timeout packet.')
+                        else:
+                            self.log.error('Recieved timeout packet but '
+                                           'timeout-type(={}) is unknown type.'
+                                           .format(timeout_type))
                         self.data = ''
+                        break
                     else:
                         self.log.error('Bad header')
                         self.data = ''
