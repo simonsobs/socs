@@ -39,8 +39,9 @@ class LS425Agent:
                                  buffer_time=1)
 
     # Task functions.
-    def init_lakeshore(self, session, params=None):
-        """init_lakeshore(auto_acquire)
+    @ocs_agent.param('auto_acquire', default=False, type=bool)
+    def init_lakeshore(self, session, params):
+        """init_lakeshore(auto_acquire=False)
 
         **Task** - Perform first time setup of the Lakeshore 425 Module.
 
@@ -52,7 +53,7 @@ class LS425Agent:
         if params is None:
             params = {}
 
-        auto_acquire = params.get('auto_acquire', False)
+        auto_acquire = params['auto_acquire']
 
         if self.initialized:
             return True, "Already Initialized Module"
@@ -76,14 +77,16 @@ class LS425Agent:
 
         return True, 'Lakeshore module initialized.'
 
-    def acq(self, session, params=None):
-        """acq(sampling_frequency=1.)
+    @ocs_agent.param('sampling_frequency', default=None, type=float)
+    def acq(self, session, params):
+        """acq(sampling_frequency=None)
 
         **Process** - Acquire data from the Lakeshore 425.
 
         Parameters:
-            sampling_frequency (float):
-                Sampling frequency for data collection. Defaults to 1.0 Hz
+            sampling_frequency (float, optional):
+                Sampling frequency for data collection. Defaults to the value
+                passed to `--sampling_frequency` on Agent startup
 
         Notes:
             The most recent data collected is stored in session data in the
@@ -99,7 +102,7 @@ class LS425Agent:
         if params is None:
             params = {}
 
-        f_sample = params.get('sampling_frequency')
+        f_sample = params['sampling_frequency']
         # If f_sample is None, use value passed to Agent init
         if f_sample is None:
             f_sample = self.f_sample
@@ -135,7 +138,7 @@ class LS425Agent:
 
         return True, 'Acquisition exited cleanly.'
 
-    def _stop_acq(self, session, params=None):
+    def _stop_acq(self, session, params):
         """
         Stops acq process.
         """
@@ -145,7 +148,8 @@ class LS425Agent:
         else:
             return False, 'acq is not currently running'
 
-    def operational_status(self, session, params=None):
+    @ocs_agent.param('_')
+    def operational_status(self, session, params):
         """operational_status()
 
         **Task** - Check operational status.
@@ -159,7 +163,8 @@ class LS425Agent:
             self.log.info(op_status)
             return True, 'operational status: '+op_status
 
-    def zero_calibration(self, session, params=None):
+    @ocs_agent.param('_')
+    def zero_calibration(self, session, params):
         """zero_calibration()
 
         **Task** - Calibrate the zero point.
@@ -173,7 +178,7 @@ class LS425Agent:
             return True, 'Zero calibration is done'
 
     @ocs_agent.param('command', type=str)
-    def any_command(self, session, params=None):
+    def any_command(self, session, params):
         """any_command(command)
 
         **Process** - Send serial command to Lakeshore 425
