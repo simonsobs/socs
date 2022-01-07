@@ -7,7 +7,9 @@
 # It also uses a slightly modified version of a Pfeiffer Vacuum Protocol package found on GitHub
 
 import serial
-import pfeiffer_vacuum_protocol as pvp
+from pfeiffer_vacuum_protocol.pfeiffer_vacuum_protocol import _send_data_request as send_data_request
+from pfeiffer_vacuum_protocol.pfeiffer_vacuum_protocol import _send_control_command as send_control_command
+from pfeiffer_vacuum_protocol.pfeiffer_vacuum_protocol import _read_gauge_response as read_gauge_response
 
 
 class PfeifferTC400:
@@ -50,8 +52,8 @@ class PfeifferTC400:
             The rotor temperature of the turbo in Celsius.
         """
 
-        pvp._send_data_request(self.ser, self.turbo_address, 346)
-        addr, rw, param_num, motor_temp = pvp._read_gauge_response(self.ser)
+        send_data_request(self.ser, self.turbo_address, 346)
+        addr, rw, param_num, motor_temp = read_gauge_response(self.ser)
 
         return int(motor_temp)
 
@@ -64,9 +66,9 @@ class PfeifferTC400:
             The current rotation speed of the turbo in Hz.
         """
 
-        pvp._send_data_request(self.ser, self.turbo_address, 309)
+        send_data_request(self.ser, self.turbo_address, 309)
 
-        addr, rw, param_num, actual_rotation_speed = pvp._read_gauge_response(self.ser)
+        addr, rw, param_num, actual_rotation_speed = read_gauge_response(self.ser)
 
         return int(actual_rotation_speed)
 
@@ -80,9 +82,9 @@ class PfeifferTC400:
             The rotation speed that the turbo is set to in Hz
         """
 
-        pvp._send_data_request(self.ser, self.turbo_address, 308)
+        send_data_request(self.ser, self.turbo_address, 308)
 
-        addr, rw, param_num, set_rotation_speed = pvp._read_gauge_response(self.ser)
+        addr, rw, param_num, set_rotation_speed = read_gauge_response(self.ser)
 
         return int(set_rotation_speed)
 
@@ -94,9 +96,9 @@ class PfeifferTC400:
         int
             The current error code of the turbo.
         """
-        pvp._send_data_request(self.ser, self.turbo_address, 303)
+        send_data_request(self.ser, self.turbo_address, 303)
 
-        addr, rw, param_num, error_code = pvp._read_gauge_response(self.ser)
+        addr, rw, param_num, error_code = read_gauge_response(self.ser)
 
         return int(error_code)
 
@@ -108,9 +110,9 @@ class PfeifferTC400:
             True for successful, False for failure.
         """
 
-        pvp._send_control_command(self.ser, self.turbo_address, 10, "000000")
+        send_control_command(self.ser, self.turbo_address, 10, "000000")
 
-        addr, rw, param_num, turbo_response = pvp._read_gauge_response(self.ser)
+        addr, rw, param_num, turbo_response = read_gauge_response(self.ser)
 
         return turbo_response
 
@@ -123,9 +125,9 @@ class PfeifferTC400:
             True for successful, False for failure.
         """
 
-        pvp._send_control_command(self.ser, self.turbo_address, 10, "111111")
+        send_control_command(self.ser, self.turbo_address, 10, "111111")
 
-        addr, rw, param_num, turbo_response = pvp._read_gauge_response(self.ser)
+        addr, rw, param_num, turbo_response = read_gauge_response(self.ser)
 
         return turbo_response
 
@@ -139,9 +141,9 @@ class PfeifferTC400:
             True for successful, False for failure.
         """
 
-        pvp._send_control_command(self.ser, self.turbo_address, 23, "111111")
+        send_control_command(self.ser, self.turbo_address, 23, "111111")
 
-        addr, rw, param_num, turbo_response = pvp._read_gauge_response(self.ser)
+        addr, rw, param_num, turbo_response = read_gauge_response(self.ser)
 
         return turbo_response
 
@@ -154,9 +156,9 @@ class PfeifferTC400:
             True for successful, False for failure.
         """
 
-        pvp._send_control_command(self.ser, self.turbo_address, 23, "000000")
+        send_control_command(self.ser, self.turbo_address, 23, "000000")
 
-        addr, rw, param_num, turbo_response = pvp._read_gauge_response(self.ser)
+        addr, rw, param_num, turbo_response = read_gauge_response(self.ser)
 
         return turbo_response
 
@@ -170,8 +172,8 @@ class PfeifferTC400:
             True for successful, False for failure.
         """
 
-        pvp._send_control_command(self.ser, self.turbo_address, 9, "111111")
+        send_control_command(self.ser, self.turbo_address, 9, "111111")
 
-        addr, rw, param_num, turbo_response = pvp._read_gauge_response(self.ser)
+        addr, rw, param_num, turbo_response = read_gauge_response(self.ser)
 
         return turbo_response
