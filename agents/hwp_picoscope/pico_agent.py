@@ -4,14 +4,11 @@ import sys, os
 import argparse
 import warnings
 import txaio
-txaio.use_twisted()
-
+from ocs import ocs_agent, site_config
+from ocs.ocs_twisted import TimeoutLock
 import class_ps3000a as ps 
 
-on_rtd = os.environ.get('READTHEDOCS') == 'True'
-if not on_rtd:
-    from ocs import ocs_agent, site_config
-    from ocs.ocs_twisted import TimeoutLock
+txaio.use_twisted()
 
 class PicoAgent:
     def __init__(self, agent):
@@ -180,12 +177,9 @@ def main():
     # Start logging
     txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
 
-    p = site_config.add_arguments()
-    parser = make_parser(parser=p)
+    parser = make_parser()
+    args = site_config.parse_args(agent_class='PicoAgent', parser=parser)
     
-    args = parser.parse_args()
-    site_config.reparse_args(args, 'PicoAgent')
-
     agent, runner = ocs_agent.init_site_agent(args)
 
     pa = PicoAgent(agent)
