@@ -179,6 +179,15 @@ services:
     build: ./agents/chwp/
     depends_on:
       - "socs"
+  
+  # --------------------------------------------------------------------------
+  # CHWP picoscope agent
+  # --------------------------------------------------------------------------
+  ocs-hwp-picoscope-agent:
+    image: "ocs-hwp-picoscope-agent"
+    build: ./agents/hwp_picoscope/
+    depends_on:
+      - "socs"
 
   # --------------------------------------------------------------------------
   # SOCS Simulators

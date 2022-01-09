@@ -39,6 +39,7 @@ Simulator Reference  Simulators are used to mock software and hardware
     agents/acu_agent
     agents/bluefors_agent
     agents/chwp_encoder
+    agents/hwp_picoscope
     agents/cryomech_cpa
     agents/fts_agent
     agents/labjack
