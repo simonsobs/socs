@@ -10,9 +10,9 @@ The HWP picoscope agent interfaces with Picoscope 3403D MSO to operaate the LC s
 This agent biases the LC sensors and measures the 4 channels of analog input and 8 channlels of digital input.
 
 .. argparse::
-    :filename: ../agents/hwp_picoscope/picoagent.py
+    :filename: ../agents/hwp_picoscope/pico_agent.py
     :func: make_parser
-    :prog: python3 hwpbbb_agent.py
+    :prog: python3 pico_agent.py
 
 Configuration File Examples
 ---------------------------
