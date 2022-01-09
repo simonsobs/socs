@@ -1,0 +1,24 @@
+FROM simonsobs/socs
+
+RUN apt update && apt install -y wget udev libusb-1.0-0 
+
+workdir /make
+# #210810 need to install old version, latest version doesn't work 
+RUN wget https://labs.picotech.com/debian/pool/main/libp/libpicoipp/libpicoipp_1.3.0-4r21_amd64.deb &&\
+    wget https://labs.picotech.com/debian/pool/main/libp/libps3000a/libps3000a_2.1.0-6r570_amd64.deb &&\
+    dpkg -i *deb
+
+RUN git clone https://github.com/picotech/picosdk-python-wrappers.git
+workdir /make/picosdk-python-wrappers
+RUN python3 setup.py install
+
+WORKDIR /app/socs/agents/picoscope/
+
+# Copy this agent into the app/agents directory
+COPY . .
+
+# Run registry on container startup
+ENTRYPOINT ["dumb-init", "python3", "-u", "picoagent.py"]
+
+CMD ["--site-hub=ws://crossbar:8001/ws", \
+     "--site-http=http://crossbar:8001/call"]
