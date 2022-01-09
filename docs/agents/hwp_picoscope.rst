@@ -36,7 +36,7 @@ example of what to insert into your institution's docker-compose file.
 Currently this agent is confirmed to work by privileded true, but this needs to be improved.
 ::
 
-  ocs-hwpbbb-agent-HBA0:
+  picoscope:
     image: simonsobs/ocs-hwp-picoscope-agent:latest
     hostname: ocs-docker
     privileged: true 
@@ -44,6 +44,6 @@ Currently this agent is confirmed to work by privileded true, but this needs to 
       - ${OCS_CONFIG_DIR}:/config:ro
       - /dev:/dev
     command:
-      - "--instance-id=HBA0"
+      - "--instance-id=picoscope"
       - "--site-hub=ws://crossbar:8001/ws"
       - "--site-http=http://crossbar:8001/call"
