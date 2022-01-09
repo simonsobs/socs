@@ -1,5 +1,5 @@
 import numpy as np
-import time, datetime
+import time 
 import sys, os
 import argparse
 import txaio
@@ -26,9 +26,17 @@ class PicoAgent:
         self.agent.register_feed('downsampled_sensors', record=True, agg_params=agg_params)
 
     # Task functions.
+    @ocs_agent.param('Npoints', default=10000, type=int)
+    @ocs_agent.param('samplefreq', default=3.6e6, type=float)
+    @ocs_agent.param('biasfreq', default=150e3, type=float)
     def run_single(self, session, params):
-        #run_single(Npoints, samplefreq, biasfreq)
-
+        """run_single,(Npoints=10000, samplefreq, biasfreq)
+           **Task** - Bias LC probes and perform DAQ.
+           Parameters:
+               Npoints (int): Number of points to measure 
+               samplefreq (float): sampling frequency (Hz), typically 24*biasfreq 
+               biasfrequency (float): LC probe bias frequency (Hz) 
+        """
         Npoints = int(params['Npoints'])
         samplefreq = float(params['samplefreq'])
         biasfreq = float(params['biasfreq'])
@@ -38,7 +46,6 @@ class PicoAgent:
                 self.log.warn("Could not start run_single because "
                               "{} is already running".format(self.lock.job))
                 return False, "Could not acquire lock."
-
         
         current_time = time.time()
         
@@ -117,9 +124,22 @@ class PicoAgent:
             self.agent.feeds['sensors'].flush_buffer()
         
         return True, 'Single acquisition exited cleanly.'
-        
+
+    @ocs_agent.param('freq', default=10., type=float)
+    @ocs_agent.param('duration', default=1., type=float)
     def sig_test(self, session, params):
-        #sig_test(freq, duration)
+        """sig_test(freq, duration)
+           **Task** - For debug and test.
+           Parameters:
+               freq (float): bias frequency (Hz) 
+               duration (float): bias duration time (sec) 
+        """
+        with self.lock.acquire_timeout(0, job='sig_test') as acquired:
+            if not acquired:
+                self.log.warn("Could not start sig_test because "
+                              "{} is already running".format(self.lock.job))
+                return False, "Could not acquire lock."
+
         freq = params['freq']
         duration = params['duration']
         pico = ps.ps3000a(1, 1)
@@ -133,8 +153,8 @@ def make_parser(parser=None):
         parser = argparse.ArgumentParser()
 
     pgroup = parser.add_argument_group('Agent Options')
-    pgroup.add_argument('--mode', type=str, choices=['idle', 'init', 'acq'],
-                        help="Starting action for the agent.")
+    #Fix me after correcting "priviledged true"
+    #pgroup.add_argument('--port', type=stri, help="Path to USB node for the picoscope.")
     return parser
 
 def main():
