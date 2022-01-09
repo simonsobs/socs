@@ -2,7 +2,6 @@ import numpy as np
 import time, datetime
 import sys, os
 import argparse
-import warnings
 import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
@@ -27,41 +26,6 @@ class PicoAgent:
         self.agent.register_feed('downsampled_sensors', record=True, agg_params=agg_params)
 
     # Task functions.
-    def init_picoscope(self, session, params=None):
-        if self.initialized:
-            return True, "Already Initialized Module"
-        
-        self.initialized = True
-
-        self.agent.start('acq')
-
-        return True, 'Picoscope initialized.'
-
-    def start_acq(self, session, params=None):
-        """acq(params=None)
-        Method to start data acquisition process.
-        The most recent data collected is stored in session.data in the
-        structure::
-        """
-        if params is None:
-            params = {}
-
-        session.set_status('running')
-        self.take_data = True
-
-        return True, 'Acquisition exited cleanly.'
-
-    def stop_acq(self, session, params=None):
-        """
-        Stops acq process.
-        """
-        self.dev.close()
-        if self.take_data:
-            self.take_data = False
-            return True, 'requested to stop taking data.'
-        else:
-            return False, 'acq is not currently running'
-    
     def run_single(self, session, params):
         #run_single(Npoints, samplefreq, biasfreq)
 
@@ -183,10 +147,8 @@ def main():
     agent, runner = ocs_agent.init_site_agent(args)
 
     pa = PicoAgent(agent)
-    agent.register_task('init_picoscope', pa.init_picoscope, startup = True)
     agent.register_task('run_single', pa.run_single)
     agent.register_task('sig_test', pa.sig_test)
-    agent.register_process('acq', pa.start_acq, pa.stop_acq)
 
     runner.run(agent, auto_reconnect=True)
 
