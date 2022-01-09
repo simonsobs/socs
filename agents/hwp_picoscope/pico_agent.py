@@ -25,9 +25,9 @@ class PicoAgent:
 
         # Registers Temperature and Voltage feeds
         agg_params = {'frame_length': 60, 'exclude_influx': True}
-        self.agent.register_feed('Sensors', record=True, agg_params=agg_params)
+        self.agent.register_feed('sensors', record=True, agg_params=agg_params)
         agg_params = {'frame_length': 60}
-        self.agent.register_feed('DownsampledSensors', record=True, agg_params=agg_params)
+        self.agent.register_feed('downsampled_sensors', record=True, agg_params=agg_params)
 
     # Task functions.
     def init_picoscope(self, session, params=None):
@@ -36,12 +36,9 @@ class PicoAgent:
         
         self.initialized = True
 
-#        # Start data acquisition if requested
-#        if auto_acquire:
-#            self.agent.start('acq')
         self.agent.start('acq')
 
-        return True, 'Lakeshore module initialized.'
+        return True, 'Picoscope initialized.'
 
     def start_acq(self, session, params=None):
         """acq(params=None)
@@ -54,7 +51,6 @@ class PicoAgent:
 
         session.set_status('running')
         self.take_data = True
-        #session.data = {"fields": {}}
 
         return True, 'Acquisition exited cleanly.'
 
@@ -128,7 +124,7 @@ class PicoAgent:
             #data_downsampled['data']['ch_%d_rise'%i] = rising_edge 
             #data_downsampled['data']['ch_%d_fall'%i] = falling_edge 
             data_downsampled['data']['ch_%d_rate'%i] = (len(rising_edge or [])+len(falling_edge or []))/pico.info['length_sec']  
-        self.agent.publish_to_feed('DownsampledSensors', data_downsampled)
+        self.agent.publish_to_feed('downsampled_sensors', data_downsampled)
         print(data_downsampled['data'])
         
         ## save raw data
@@ -156,8 +152,8 @@ class PicoAgent:
                 data['data']['ch_%d'%j] = ch[i*Np:(i+1)*Np]
 
             self.log.debug('publish {}/{}. {}'.format(i, int(np.ceil(len(t)/Np)), len(t_split)))
-            self.agent.publish_to_feed('Sensors', data)
-            self.agent.feeds['Sensors'].flush_buffer()
+            self.agent.publish_to_feed('sensors', data)
+            self.agent.feeds['sensors'].flush_buffer()
         
         return True, 'Single acquisition exited cleanly.'
         
