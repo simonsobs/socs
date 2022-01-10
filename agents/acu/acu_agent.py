@@ -754,16 +754,12 @@ class ACUAgent:
     def spec_scan_fromfile(self, session, params=None):
         filename = params.get('filename')
         times, azs, els, vas, ves, azflags, elflags = sh.from_file(filename)
-        self.data['scanspec'] = {'times': times,
-                                 'azs': azs,
-                                 'els': els,
-                                 'vas': vas,
-                                 'ves': ves,
-                                 'azflags': azflags,
-                                 'elflags': elflags
-                                 }
-        self.log.info('Scan from file specified')
-        yield True, 'Scan from file specified'
+        if min(azs) <= self.motion_limits['azimuth']['lower'] or max(azs) >= self.motion_limits['azimith']['upper']:
+            return False, 'Azimuth location out of range!'
+        if min(els) <= self.motion_limits['elevation']['lower'] or max(els) >= self.motion_limits['elevation']['upper']:
+            return False, 'Elevation location out of range!'
+        yield self.run_specified_scan(session, times, azs, els, vas, ves, azflags, elflags, azonly=False)
+        yield True, 'Track completed'
 
     @inlineCallbacks
     def linear_turnaround_scan(self, session, params=None):
