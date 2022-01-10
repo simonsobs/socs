@@ -245,20 +245,11 @@ class ACUAgent:
         agent.register_task('run_specified_scan',
                             self.run_specified_scan,
                             blocking=False)
-#        agent.register_task('run_azonly_scan',
-#                            self.run_azonly_scan,
-#                            blocking=False)
         agent.register_task('set_boresight',
                             self.set_boresight,
                             blocking=False)
         agent.register_task('stop_and_clear',
                             self.stop_and_clear,
-                            blocking=False)
-        agent.register_task('find_az_stop_point',
-                            self.find_az_stop_point,
-                            blocking=False)
-        agent.register_task('find_el_stop_point',
-                            self.find_el_stop_point,
                             blocking=False)
 
     # Operation management.  This agent has several Processes that
