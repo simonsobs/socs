@@ -81,7 +81,7 @@ def run_agent(cov):
 
 @pytest.fixture()
 def client():
-    client = MatchedClient('LSASIM')
+    client = MatchedClient('LS425')
     return client
 
 
