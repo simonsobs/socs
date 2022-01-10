@@ -1,17 +1,17 @@
-import argparse
 import os
-from sqlalchemy import (Column, create_engine, Integer, String, BLOB, DateTime,
-                        Float, Boolean)
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.ext.declarative import declarative_base
-from socs.util import get_md5sum
 import time
+import subprocess
+import tempfile
 import txaio
 
-import argparse
-import subprocess
+from sqlalchemy import (Column, create_engine, Integer, String, Float)
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
+
+from socs.util import get_md5sum
 
 TABLE_VERSION = 0
+txaio.use_twisted()
 
 
 def todict(obj):
@@ -78,6 +78,45 @@ class SupRsyncFile(Base):
         return s
 
 
+def create_file(local_path, remote_path, archive_name, local_md5sum=None,
+                timestamp=None):
+    """
+    Creates SupRsyncFiles object.
+
+    Args
+    ----
+        local_path : String
+            Absolute path of the local file to be copied
+        remote_path : String
+            Path of the file on the remote server relative to the base-dir.
+            specified in the SupRsync agent config.
+        archive_name : String
+            Name of the archive, i.e. `timestreams` or `smurf`. Each archive
+            is managed by its own SupRsync instance, so they can be copied to
+            different base-dirs or hosts.
+        local_md5sum : String, optional
+            locally calculated checksum. If not specified, will calculate
+            md5sum automatically.
+        timestamp:
+            Timestamp of file. If None is specified, will use the current
+            time.
+    """
+
+    if local_md5sum is None:
+        local_md5sum = get_md5sum(local_path)
+
+    if timestamp is None:
+        timestamp = time.time()
+
+    file = SupRsyncFile(
+        local_path=local_path, local_md5sum=local_md5sum,
+        remote_path=remote_path, archive_name=archive_name,
+        timestamp=timestamp
+    )
+
+    return file
+
+
 class SupRsyncFilesManager:
     """
     Helper class for accessing and adding entries to the SupRsync
@@ -103,44 +142,6 @@ class SupRsyncFilesManager:
         if create_all:
             Base.metadata.create_all(self._engine)
 
-    def create_file(self, local_path, remote_path, archive_name,
-                    local_md5sum=None, timestamp=None):
-        """
-        Creates SupRsyncFiles object.
-
-        Args
-        ----
-            local_path : String
-                Absolute path of the local file to be copied
-            remote_path : String
-                Path of the file on the remote server relative to the base-dir.
-                specified in the SupRsync agent config.
-            archive_name : String
-                Name of the archive, i.e. `timestreams` or `smurf`. Each archive
-                is managed by its own SupRsync instance, so they can be copied to
-                different base-dirs or hosts.
-            local_md5sum : String, optional
-                locally calculated checksum. If not specified, will calculate
-                md5sum automatically.
-            timestamp:
-                Timestamp of file. If None is specified, will use the current
-                time.
-        """
-
-        if local_md5sum is None:
-            local_md5sum = get_md5sum(local_path)
-
-        if timestamp is None:
-            timestamp = time.time()
-
-        file = SupRsyncFile(
-            local_path=local_path, local_md5sum=local_md5sum,
-            remote_path=remote_path, archive_name=archive_name,
-            timestamp=timestamp
-        )
-
-        return file
-
     def add_file(self, local_path, remote_path, archive_name,
                  local_md5sum=None, timestamp=None):
         """
@@ -161,35 +162,87 @@ class SupRsyncFilesManager:
                 locally calculated checksum. If not specified, will calculate
                 md5sum automatically.
         """
-        file = self.create_file(local_path, remote_path, archive_name,
-                    local_md5sum=local_md5sum, timestamp=timestamp)
+        file = create_file(local_path, remote_path, archive_name,
+                           local_md5sum=local_md5sum, timestamp=timestamp)
 
         session = self.Session()
         session.add(file)
         session.commit()
 
-    def get_next_file(self, archive_name, session=None, delete_after=None,
-                      max_copy_attempts=None):
+    def get_copyable_files(self, archive_name, session=None,
+                           max_copy_attempts=None, num_files=None):
+        """
+        Gets all SupRsyncFiles that are copyable, meaning they satisfy:
+         - local and remote md5sums do not match
+         - Failed copy attempts is below the max number of attempts
+
+        Args
+        ----
+            archive_name (string):
+                Name of archive to get files from
+            session (sqlalchemy session):
+                Session to use to get files. If none is specified, one will
+                be created. You need to specify this if you wish to change
+                file data and commit afterwards.
+            max_copy_attempts (int):
+                Max number of failed copy atempts
+            num_files (int):
+                Number of files to return
+        """
         if session is None:
             session = self.Session()
+
         query = session.query(SupRsyncFile).filter(
             SupRsyncFile.removed == None,
-            SupRsyncFile.archive_name == archive_name
+            SupRsyncFile.archive_name == archive_name,
         )
+
         if max_copy_attempts is not None:
             query.filter(SupRsyncFile.failed_copy_attempts < max_copy_attempts)
 
-        files = query.all()
-        for f in files:
+        files = []
+        for f in query.all():
+            if f.local_md5sum != f.remote_md5sum:
+                files.append(f)
+            if num_files is not None:
+                if len(files) == num_files:
+                    break
+
+        return files
+
+    def get_deletable_files(self, archive_name, delete_after, session=None):
+        """
+        Gets all files that are deletable, meaning that the local and remote
+        md5sums match, and they have existed longer than ``delete_after``
+        seconds.
+
+        Args
+        -----
+            archive_name (str):
+                Name of archive to pull files from
+            delete_after (float):
+                Time since creation (in seconds) for which it's ok to delete
+                files.
+            session (sqlalchemy session):
+                Session to use to query files.
+        """
+        if session is None:
+            session = self.Session()
+
+        query = session.query(SupRsyncFile).filter(
+            SupRsyncFile.removed == None,
+            SupRsyncFile.archive_name == archive_name,
+        )
+
+        files = []
+        now = time.time()
+        for f in query.all():
             if f.local_md5sum == f.remote_md5sum:
-                if delete_after is None:
-                    continue
-                if time.time() - f.timestamp > delete_after:
-                    # This file needs to be removed
-                    return f
-                else:
-                    continue
-            return f
+                print(f.local_path, f.timestamp)
+                if now > f.timestamp + delete_after:
+                    files.append(f)
+
+        return files
 
     def get_session(self):
         """
@@ -203,18 +256,19 @@ class SupRsyncFileHandler:
     Helper class to handle files in the suprsync db and copy them to their
     dest / delete them if enough time has passed.
     """
-    def __init__(self, file_manager, remote_basedir, delete_after=None,
-                 ssh_host=None, ssh_key=None, cmd_timeout=5, copy_timeout=30):
+    def __init__(self, file_manager, archive_name, remote_basedir,
+                 ssh_host=None, ssh_key=None, cmd_timeout=None,
+                 copy_timeout=None):
+        self.srfm = file_manager
+        self.archive_name = archive_name
         self.ssh_host = ssh_host
         self.ssh_key = ssh_key
         self.remote_basedir = remote_basedir
-        self.delete_after = delete_after
         self.log = txaio.make_logger()
         self.cmd_timeout = cmd_timeout
         self.copy_timeout = copy_timeout
 
-
-    def run_on_remote(self, cmd):
+    def run_on_remote(self, cmd, timeout=None):
         """
         Runs a command on the remote server (or locally if none is set)
 
@@ -230,126 +284,102 @@ class SupRsyncFileHandler:
                 _cmd.extend(['-i', self.ssh_key])
         _cmd += cmd
 
+        if timeout is None:
+            timeout = self.cmd_timeout
         self.log.debug(f"Running: {' '.join(_cmd)}")
         res = subprocess.run(_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                             timeout=self.cmd_timeout)
+                             timeout=timeout, check=True)
         if res.stderr:
             self.log.error("stderr for cmd: {cmd}\n{err}",
                            cmd=_cmd, err=res.stderr.decode())
-        # To many ssh commands in to short a period will break things
-        time.sleep(1)
         return res
 
-    def copy_file(self, file):
+    def copy_files(self, max_copy_attempts=None, num_files=None):
         """
-        Attempts to copy a file to its dest.
+        Copies a batch of files, and computes remote md5sums.
 
         Args
         ----
-        file : SupRsyncFile
-            file to be copied
-
-        Returns
-        --------
-        res : str or bool
-            Returns False if unsuccessful, and the md5sum calculated on the
-            remote server if successful.
+            max_copy_attempts (int):
+                Max number of failed copy atempts
+            num_files (int):
+                Number of files to return
         """
-        remote_path = os.path.join(self.remote_basedir, file.remote_path)
-
-        # Creates directory on dest server:
-        res = self.run_on_remote(['mkdir', '-p', os.path.dirname(remote_path)])
-        if res.returncode != 0:
-            self.log.error("remote mkdir failed:\n{e}", e=res.stderr)
-            return False
-
-        if self.ssh_host is not None:
-            dest = self.ssh_host + ':' + remote_path
-        else:
-            dest = remote_path
-
-        cmd = ['rsync', '-t']
-        if self.ssh_key is not None:
-            cmd.extend(['--rsh', f'ssh -i {self.ssh_key}'])
-
-        cmd.extend([file.local_path, dest])
-        self.log.debug("Running: " + ' '.join(cmd))
-        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                             timeout=self.copy_timeout)
-        time.sleep(1)
-
-
-        if res.returncode != 0:
-            self.log.error("Rsync failed for file {path}!\nstderr: {err}",
-                           path=file.local_path, err=res.stderr.decode())
-            return False
-
-        res = self.run_on_remote(['md5sum', remote_path])
-        if res.returncode != 0:
-            return False
-        else:
-            return res.stdout.decode().split()[0]
-
-    def handle_file(self, file, session):
-        """
-        Handles operation of an un-removed SupRsyncFile. Will attempt to copy,
-        calculate the remote md5sum, and remove from the local host if enough
-        time has passed.
-
-        Args
-        ----
-        file : SupRsyncFile
-            file to be copied
-        """
-        # File must have been removed for some reason
-        if not os.path.exists(file.local_path):
-            self.log.warn(
-                "File {path} does not exist! Setting removed time to 0.",
-                path=file.local_path
+        with self.srfm.Session.begin() as session:
+            files = self.srfm.get_copyable_files(
+                self.archive_name, max_copy_attempts=max_copy_attempts,
+                num_files=num_files, session=session
             )
-            file.removed = 0
-            return
 
-        # Check that file md5sum matches whatever it was before
-        current_md5sum = get_md5sum(file.local_path)
-        if current_md5sum != file.local_md5sum:
-            self.log.warn(
-                "Md5sum of {path} has changed! Resetting it in the db and "
-                "trying to copy", path=file.local_path)
-            file.local_md5sum = current_md5sum
-
-        if file.local_md5sum != file.remote_md5sum:
-            self.log.info("Copying file: {path}", path=file.local_path)
-            md5sum = self.copy_file(file)
-            if md5sum is False:  # Copy command failed with exit code != 0
-                self.log.warn(
-                    "Failed to copy {local} (attempts: {c})",
-                    local=file.local_path, c=file.failed_copy_attempts
-                )
-                file.failed_copy_attempts += 1
+            if not files:
                 return
 
-            file.remote_md5sum = md5sum
-            file.copied = time.time()
-            if md5sum != file.local_md5sum:
-                self.log.warn(
-                    "Copied {local} but md5sum does not match (attempts: {c})",
-                    local=file.local_path, c=file.failed_copy_attempts
-                )
-                file.failed_copy_attempts += 1
+            if self.ssh_host is not None:
+                dest = self.ssh_host + ':' + self.remote_basedir
             else:
-                dest = os.path.join(self.remote_basedir, file.remote_path)
-                if self.ssh_host is not None:
-                    dest = self.ssh_host + ':' + dest
-                self.log.info("Successfully copied {local} to {dest}",
-                               local=file.local_path, dest=dest)
+                dest = self.remote_basedir
 
-        if self.delete_after is None:
-            return
+            # Creates temp directory with remote dir structure of symlinks for
+            # rsync to copy.
+            file_map = {}
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                self.log.info("Copying files:")
+                for file in files:
+                    self.log.info(f"- {file.local_path}")
+                    tmp_path = os.path.join(tmp_dir, file.remote_path)
+                    os.makedirs(os.path.dirname(tmp_path), exist_ok=True)
+                    os.symlink(file.local_path, tmp_path)
 
-        if file.local_md5sum == file.remote_md5sum:
-            if time.time() - file.timestamp > self.delete_after:
-                self.log.info(f"Deleting {file.local_path}")
-                os.remove(file.local_path)
-                file.removed = time.time()
+                    remote_path = os.path.normpath(
+                        os.path.join(self.remote_basedir, file.remote_path)
+                    )
+                    file_map[remote_path] = file
 
+                cmd = ['rsync', '-Lr', tmp_dir+'/', dest]
+                subprocess.run(cmd, check=True, timeout=self.copy_timeout)
+
+            for file in files:
+                file.copied = time.time()
+
+            remote_paths = [
+                os.path.join(self.remote_basedir, f.remote_path)
+                for f in files
+            ]
+
+            res = self.run_on_remote(['md5sum'] + remote_paths)
+            for line in res.stdout.decode().split('\n'):
+                split = line.split()
+
+                # If file cannot be found, line will say:
+                # "md5sum: file: No such file or directory
+                if len(split) != 2:
+                    continue
+
+                md5sum, path = line.split()
+                file_map[os.path.normpath(path)].remote_md5sum = md5sum
+
+    def delete_files(self, delete_after):
+        """
+        Gets deletable files, deletes them, and updates file info
+
+        Args
+        -----
+            delete_after (float):
+                Time since creation (in seconds) for which it's ok to delete
+                files.
+        """
+        with self.srfm.Session.begin() as session:
+            files = self.srfm.get_deletable_files(
+                self.archive_name, delete_after, session=session
+            )
+            for file in files:
+                if os.path.exists(file.local_path):
+                    self.log.info(f"Removing file {file.local_path}")
+                    os.remove(file.local_path)
+                    file.removed = time.time()
+                else:
+                    self.log.warn(
+                        "File {file.local_path} no longer exists! "
+                        "Updating remove time to be 0"
+                    )
+                    file.removed = 0

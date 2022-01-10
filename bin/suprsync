@@ -8,7 +8,6 @@ import argparse
 
 def check_func(args):
     srfm = SupRsyncFilesManager(args.db, create_all=False)
-
     session = srfm.Session()
     file = session.query(SupRsyncFile).filter(
         SupRsyncFile.local_path == args.file
@@ -20,29 +19,23 @@ def check_func(args):
 
 def next_func(args):
     srfm = SupRsyncFilesManager(args.db, create_all=False)
-    file = srfm.get_next_file(args.archive_name)
-    if file is None:
+
+    files = srfm.get_copyable_files(args.archive_name, num_files=1)
+    if not files:
         print("No more files left to be copied")
     else:
-        print(file)
+        print(files[0])
 
 
 def list_func(args):
     srfm = SupRsyncFilesManager(args.db, create_all=False)
-    with srfm.Session.begin() as session:
-        query = session.query(SupRsyncFile).filter(
-            SupRsyncFile.removed == None,
-            SupRsyncFile.archive_name == args.archive_name
-        )
-        files = query.all()
-        count = 0
-        for f in files:
-            if f.local_md5sum == f.remote_md5sum:
-                continue
-            print(f"{count}: {f.local_path}")
-            count += 1
-        if count == 0:
-            print(f"No files to be copied")
+    files = srfm.get_copyable_files(args.archive_name)
+    if not files:
+        print("No files left to be copied")
+        return
+
+    for i, f in enumerate(files):
+        print(f"{i}: {f.local_path}")
 
 
 if __name__ == '__main__':
@@ -52,8 +45,7 @@ if __name__ == '__main__':
     default_db = '/data/so/dbs/suprsync.db'
 
     check_parser = subparsers.add_parser(
-        'check',
-        help="Checks suprsync file entry for a given local file.")
+        'check', help="Checks suprsync file entry for a given local file.")
     check_parser.set_defaults(func=check_func)
     check_parser.add_argument('file', type=str,
                               help="File path to check in the suprsync db")

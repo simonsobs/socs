@@ -1,15 +1,13 @@
-from socs.db.suprsync import SupRsyncFilesManager, SupRsyncFile, SupRsyncFileHandler
 import sys
+import os
+import numpy as np
+import txaio
+
 sys.path.insert(0, '../agents/suprsync/')
 from suprsync import SupRsync
-import os
-from argparse import Namespace
+from socs.db.suprsync import SupRsyncFilesManager, SupRsyncFile, SupRsyncFileHandler
 
-from shutil import rmtree
-from ocs.ocs_agent import OpSession
-
-import pytest
-from unittest import mock
+txaio.use_twisted()
 
 
 def test_suprsync_files_manager(tmp_path):
@@ -24,35 +22,41 @@ def test_suprsync_files_manager(tmp_path):
     srfm.add_file(str(fpath.absolute()), 'test.txt', 'test')
 
 
-def test_suprsync_handle_file(tmp_path):
+def test_suprsync_handle_files(tmp_path):
     """
     Tests file handling
     """
+    txaio.start_logging(level='info')
+    log = txaio.make_logger()
     db_path = str(tmp_path / 'test.db')
     dest = tmp_path / 'dest'
     dest.mkdir()
     dest = str(dest)
+
+    data_dir = tmp_path / 'data'
+    data_dir.mkdir()
+
     remote_basedir = dest
 
     srfm = SupRsyncFilesManager(db_path)
-    test_path = str(tmp_path / 'test.txt')
 
-    with open(test_path, 'w') as f:
-        f.write("test")
+    nfiles = 100
+    file_data = np.zeros(10000)
 
     archive_name = 'test'
-    remote_relpath = 'test.txt'
-    srfm.add_file(test_path, remote_relpath, archive_name)
+    for i in range(nfiles):
+        fname = f"{i}.npy"
+        path = str(data_dir/fname)
+        np.save(path, file_data)
+        srfm.add_file(path, f'test_remote/{fname}', archive_name)
 
     # This is done in the suprsync run process
-    handler = SupRsyncFileHandler(srfm, remote_basedir, delete_after=0)
-    with srfm.Session.begin() as session:
-        file = srfm.get_next_file(archive_name, session=session)
-        handler.handle_file(file, session)
+    handler = SupRsyncFileHandler(srfm, 'test', remote_basedir)
+    handler.copy_files()
+    handler.delete_files(0)
 
-    # Check file was successfully copied and removed
-    remote_abspath = os.path.join(remote_basedir, remote_relpath)
-    assert not os.path.exists(test_path)
-    assert os.path.exists(remote_abspath)
-    # Checks that there are no more files left to handle
-    assert srfm.get_next_file(archive_name) is None
+    # Check data path is empty
+    assert len(os.listdir(data_dir)) == 0
+
+    ncopied = len(os.listdir(os.path.join(remote_basedir, 'test_remote')))
+    assert ncopied == nfiles

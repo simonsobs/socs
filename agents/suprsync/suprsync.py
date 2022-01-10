@@ -1,16 +1,13 @@
 import argparse
-from socs.db.suprsync import (SupRsyncFilesManager, SupRsyncFile,
-                              SupRsyncFileHandler)
 import os
 import time
 import subprocess
 import txaio
-import datetime as dt
-import traceback
 
-on_rtd = os.environ.get('READTHEDOCS') == 'True'
-if not on_rtd:
-    from ocs import ocs_agent, site_config
+from ocs import ocs_agent, site_config
+
+from socs.db.suprsync import (SupRsyncFilesManager, SupRsyncFileHandler)
+
 
 class SupRsync:
     """
@@ -47,8 +44,6 @@ class SupRsync:
         Time (sec) for which cmds run on the remote will timeout
     copy_timeout : float
         Time (sec) after which a copy command will timeout
-    timeout_wait : float
-        Time (sec) to sleep after a timeout occurs.
     """
     def __init__(self, agent, args):
         self.agent = agent
@@ -63,7 +58,8 @@ class SupRsync:
         self.running = False
         self.cmd_timeout = args.cmd_timeout
         self.copy_timeout = args.copy_timeout
-        self.timeout_wait = args.timeout_wait
+        self.files_per_batch = args.files_per_batch
+        self.sleep_time = args.sleep_time
 
     def run(self, session, params=None):
         """run()
@@ -74,35 +70,31 @@ class SupRsync:
 
         srfm = SupRsyncFilesManager(self.db_path, create_all=True)
 
+        handler = SupRsyncFileHandler(
+            srfm, self.archive_name, self.remote_basedir, ssh_host=self.ssh_host,
+            ssh_key=self.ssh_key, cmd_timeout=self.cmd_timeout,
+            copy_timeout=self.copy_timeout
+        )
+
         self.running = True
         session.set_status('running')
 
-        handler = SupRsyncFileHandler(
-            srfm, self.remote_basedir, delete_after=self.delete_after,
-            ssh_host=self.ssh_host, ssh_key=self.ssh_key,
-            cmd_timeout=self.cmd_timeout, copy_timeout=self.copy_timeout
-        )
-
         while self.running:
-            with srfm.Session.begin() as session:
-                file = srfm.get_next_file(
-                    self.archive_name, session=session,
-                    delete_after=self.delete_after,
-                    max_copy_attempts=self.max_copy_attempts)
-                if file is not None:
-                    try:
-                        handler.handle_file(file, session)
-                    except subprocess.TimeoutExpired:
-                        self.log.error(
-                            "Timed out when processing {path}",
-                            path=file.local_path)
-                        time.sleep(self.timeout_wait)
-                time.sleep(3)
+            try:
+                handler.copy_files(max_copy_attempts=self.max_copy_attempts,
+                                   num_files=self.files_per_batch)
+            except subprocess.TimeoutExpired as e:
+                self.log.error("Timeout when copying files! {e}", e=e)
+
+            if self.delete_after is not None:
+                handler.delete_files(self.delete_after)
+            time.sleep(self.sleep_time)
+
+        return True, "Stopped run process"
 
     def _stop(self, session, params=None):
         self.running = False
         session.set_status('stopping')
-
 
 
 def make_parser(parser=None):
@@ -130,13 +122,15 @@ def make_parser(parser=None):
     pgroup.add_argument('--max-copy-attempts', type=int,
                         help="Number of failed copy attempts before the agent "
                              "will stop trying to copy a file")
-    pgroup.add_argument('--copy-timeout', type=float, default=30.,
+    pgroup.add_argument('--copy-timeout', type=float,
                         help="Time (sec) before the rsync command will timeout")
-    pgroup.add_argument('--cmd-timeout', type=float, default=5,
+    pgroup.add_argument('--cmd-timeout', type=float,
                         help="Time (sec) before remote commands will timeout")
-    pgroup.add_argument('--timeout-wait', type=float, default=20.,
-                        help="Time (sec) to wait before attempting to re-copy "
-                             "after a timeout.")
+    pgroup.add_argument('--files-per-batch', type=int,
+                        help="Number of files to copy over per batch. Default "
+                        "is None, which will copy over all available files.")
+    pgroup.add_argument('--sleep-time', type=float, default=60
+                        help="Time to sleep (sec) in between copy iterations")
     return parser
 
 
