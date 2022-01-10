@@ -72,7 +72,11 @@ def run_agent(cov):
     # report coverage
     agentcov = coverage.data.CoverageData(basename='.coverage.agent')
     agentcov.read()
-    cov.get_data().update(agentcov)
+    try:
+        cov.get_data().update(agentcov)
+    except AttributeError as e:
+        print(f"Encountered error reporting coverage: {e}")
+        print("Did you forget to throw the '--cov' flag?")
 
 
 @pytest.fixture()
