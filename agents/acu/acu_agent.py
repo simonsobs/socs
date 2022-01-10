@@ -242,9 +242,12 @@ class ACUAgent:
                                  agg_params=basic_agg_params,
                                  buffer_time=1)
         agent.register_task('go_to', self.go_to, blocking=False)
-        agent.register_task('run_specified_scan',
-                            self.run_specified_scan,
+        agent.register_task('linear_turnaround_scan',
+                            self.linear_turnaround_scan,
                             blocking=False)
+#        agent.register_task('run_specified_scan',
+#                            self.run_specified_scan,
+#                            blocking=False)
         agent.register_task('set_boresight',
                             self.set_boresight,
                             blocking=False)
@@ -762,30 +765,26 @@ class ACUAgent:
         self.log.info('Scan from file specified')
         yield True, 'Scan from file specified'
 
-    def _spec_scan_linear_turnaround(self, passparams):
-        print('params received')
-        print(passparams)
-        azpts = passparams['azpts']
-        el = passparams['el']
-        azvel = passparams['azvel']
-        acc = passparams['acc']
-        ntimes = passparams['ntimes']
+    @inlineCallbacks
+    def linear_turnaround_scan(self, session, params=None):
+        azpts = params.get('azpts')
+        el = params.get('el')
+        azvel = params.get('azvel')
+        acc = params.get('acc')
+        ntimes = params.get('ntimes')
+        azonly = params.get('azonly')
+        if abs(acc) > self.motion_limits['acc']:
+            return False, 'Acceleration too great!'
+        if min(azpts) <= self.motion_limits['azimuth']['lower'] or max(azpts) >= self.motion_limits['azimuth']['upper']:
+            return False, 'Azimuth location out of range!'
+        if el <= self.motion_limits['elevation']['lower'] or el >= self.motion_limits['elevation']['upper']:
+            return False, 'Elevation location out of range!'
         times, azs, els, vas, ves, azflags, elflags = sh.linear_turnaround_scanpoints(azpts, el, azvel, acc, ntimes)
-        self.data['scanspec'] = {'times': times,
-                                 'azs': azs,
-                                 'els': els,
-                                 'vas': vas,
-                                 'ves': ves,
-                                 'azflags': azflags,
-                                 'elflags': elflags
-                                 }
-        print('SPECED')
-        self.log.info('Scan linear turnaround scan specified')
-        return True, 'Scan linear turnaround scan specified'
-
+        yield self.run_specified_scan(session, times, azs, els, vas, ves, azflags, elflags, azonly)
+        return True, 'Track completed.'
 
     @inlineCallbacks
-    def run_specified_scan(self, session, params=None):
+    def run_specified_scan(self, session, times, azs, els, vas, ves, azflags, elflags, azonly):
         """TASK run_specified_scan
 
         Upload and execute a scan pattern. The pattern may be specified by a
@@ -802,35 +801,10 @@ class ACUAgent:
             return ok, msg
         self.log.info('try_set_job ok')
 
-        # Move to the starting position for the scan and then switch to Stop
-        # mode
-        scantype = params.get('scantype')
-        scantype_params = {'linear_turnaround': ['azpts', 'el', 'azvel', 'acc', 'ntimes'],
-                           'fromfile': ['filename'],
-                           }
-        passparams = {}
-        for pname in scantype_params[scantype]:
-            pvals = params.get(pname)
-            passparams[pname] = pvals
-        azonly = params.get('azonly')
-#        print('azonly = '+ str(azonly))
-        if abs(passparams['acc']) > self.motion_limits['acc']:
-            return False, 'Acceleration too great!'
-        if scantype == 'linear_turnaround':
-            self._spec_scan_linear_turnaround(passparams)
-        elif scantype == 'fromfile':
-            self._spec_scan_fromfile(passparams)
-        spec = self.data['scanspec']
-        if min(spec['azs']) <= self.motion_limits['azimuth']['lower'] or max(spec['azs']) >= self.motion_limits['azimuth']['upper']:
-            return False, 'Azimuth location out of range!'
-        if min(spec['els']) <= self.motion_limits['elevation']['lower'] or max(spec['els']) >= self.motion_limits['elevation']['upper']:
-            return False, 'Elevation location out of range!'
-
- 
-        start_az = spec['azs'][0]
-        start_el = spec['els'][0]
-        end_az = spec['azs'][-1]
-        end_el = spec['els'][-1]
+        start_az = azs[0]
+        start_el = els[0]
+        end_az = azs[-1]
+        end_el = els[-1]
 
         self.data['uploads']['Start_Azimuth'] = start_az
         self.data['uploads']['Start_Elevation'] = start_el
@@ -843,7 +817,7 @@ class ACUAgent:
         self.agent.publish_to_feed('acu_upload', acu_upload)
 
         # Follow the scan in ProgramTrack mode, then switch to Stop mode
-        all_lines = sh.ptstack_format(spec['times'], spec['azs'], spec['els'], spec['vas'], spec['ves'], spec['azflags'], spec['elflags'])
+        all_lines = sh.ptstack_format(times, azs, els, vas, ves, azflags, elflags)
         self.log.info('all_lines generated')
         self.data['uploads']['PtStack_Lines'] = 'True'
         if azonly:
@@ -854,6 +828,14 @@ class ACUAgent:
         print(m)
         self.log.info('mode is now ProgramTrack')
         group_size = 120
+        spec = {'times': times,
+                'azs': azs,
+                'els': els,
+                'vas': vas,
+                'ves': ves,
+                'azflags': azflags,
+                'elflags': elflags,
+                }
         while len(all_lines):
             upload_lines = all_lines[:group_size]
             all_lines = all_lines[group_size:]
@@ -873,12 +855,8 @@ class ACUAgent:
                               'block_name': 'ACU_upload',
                               'data': self.data['uploads']
                               }
-      #          print(acu_upload)
- #               print(self.data['uploads']['PtStack_Time'])
- #               print(time.time())
                 self.agent.publish_to_feed('acu_upload', acu_upload, from_reactor=True)
             text = ''.join(upload_lines)
-#            all_lines = all_lines[group_size:]
             free_positions = self.data['status']['summary']\
                 ['Free_upload_positions']
             while free_positions < 9899:
@@ -917,7 +895,7 @@ class ACUAgent:
                       }
         self.agent.publish_to_feed('acu_upload', acu_upload)
         self.set_job_done('control')
-        return True, 'Track completed.'
+        return True
 
     @inlineCallbacks
     def generate_scan(self, session, params=None):
