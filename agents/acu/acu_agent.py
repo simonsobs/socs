@@ -910,41 +910,6 @@ class ACUAgent:
         self.log.info('Scan linear turnaround scan specified')
         return True, 'Scan linear turnaround scan specified'
 
-#    @inlineCallbacks
-#    def run_azonly_scan(self, session, params=None):
-#        ok, msg = self.try_set_job('control')
-#        if not ok:
-#            return ok, msg
-#        self.log.info('try_set_job ok')
-#        scantype = params.get('scantype')
-#        scantype_params = {'linear_turnaround': ['azpts', 'el', 'azvel', 'acc', 'ntimes'],
-#                           'fromfile': ['filename'],
-#                           }
-#        passparams = {}
-#        for pname in scantype_params[scantype]:
-#            pvals = params.get(pname)
-#            passparams[pname] = pvals
-#        azonly = params.get('azonly')
-#        if scantype == 'linear_turnaround':
-#            self._spec_scan_linear_turnaround(passparams)
-#        elif scantype == 'fromfile':
-#            self._spec_scan_fromfile(passparams)
-#        spec = self.data['scanspec']
-#        if min(spec['azs']) <= self.motion_limits['azimuth']['lower'] or max(spec['azs']) >= self.motion_limits['azimuth']['upper']:
-#            return False, 'Azimuth location out of range!'
-#        start_az = spec['azs'][0]
-#        end_az = spec['azs'][-1]
-#        all_lines = sh.ptstack_format(spec['times'], spec['azs'], spec['els'], spec['vas'], spec['ves'], spec['azflags'], spec['elflags'])
-#        self.log.info('all_lines generated')
-#        yield self.acu_control.azmode('ProgramTrack')
-#        self.log.info('mode is now ProgramTrack')
-#        group_size = 120
-#        while len(all_lines):
-#            upload_lines = all_lines[:group_size]
-#            all_lines = all_lines[group_size:]
-#            upload_vals = front_group(spec, group_size)
-#            spec = pop_first_vals(spec, group_size)
-#
 
     @inlineCallbacks
     def run_specified_scan(self, session, params=None):
