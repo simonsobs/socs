@@ -245,6 +245,9 @@ class ACUAgent:
         agent.register_task('linear_turnaround_scan',
                             self.linear_turnaround_scan,
                             blocking=False)
+        agent.register_task('fromfile_scan',
+                            self.fromfile_scan,
+                            blocking=False)
 #        agent.register_task('run_specified_scan',
 #                            self.run_specified_scan,
 #                            blocking=False)
@@ -751,7 +754,7 @@ class ACUAgent:
         return True, 'Job completed'
 
     @inlineCallbacks
-    def spec_scan_fromfile(self, session, params=None):
+    def fromfile_scan(self, session, params=None):
         filename = params.get('filename')
         times, azs, els, vas, ves, azflags, elflags = sh.from_file(filename)
         if min(azs) <= self.motion_limits['azimuth']['lower'] or max(azs) >= self.motion_limits['azimith']['upper']:
