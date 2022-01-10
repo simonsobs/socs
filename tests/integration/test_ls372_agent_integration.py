@@ -34,7 +34,7 @@ def wait_for_crossbar(session_scoped_container_getter):
 
     while attempts < 6:
         try:
-            code = urllib.request.urlopen("http://localhost:8001/info").getcode()
+            code = urllib.request.urlopen("http://localhost:18001/info").getcode()
         except (URLError, ConnectionResetError):
             print("Crossbar server not online yet, waiting 5 seconds.")
             time.sleep(5)
