@@ -37,7 +37,7 @@ def test_testing(wait_for_crossbar):
 
 
 @pytest.mark.integtest
-def test_ls425_init_lakeshore(wait_for_crossbar, run_agent, client):
+def test_ls425_init_lakeshore(wait_for_crossbar, responder, run_agent, client):
     resp = client.init_lakeshore()
     # print(resp)
     assert resp.status == ocs.OK
@@ -46,7 +46,11 @@ def test_ls425_init_lakeshore(wait_for_crossbar, run_agent, client):
 
 
 @pytest.mark.integtest
-def test_ls425_start_acq(wait_for_crossbar, run_agent, client):
+def test_ls425_start_acq(wait_for_crossbar, responder, run_agent, client):
+    responses = {'*IDN?': 'LSCI,MODEL425,4250022,1.0',
+                 'RDGFIELD?': '+1.0E-01'}
+    responder.define_responses(responses)
+
     client.init_lakeshore()
     resp = client.acq.start(sample_heater=False, run_once=True)
     assert resp.status == ocs.OK
@@ -59,8 +63,13 @@ def test_ls425_start_acq(wait_for_crossbar, run_agent, client):
 
     # Now we request a formal stop, which should put us in STOPPING
     client.acq.stop()
+    # this is so we get through the acq loop and actually get a stop command in
+    # TODO: get sleep_time in the acq process to be small for testing
+    time.sleep(3)
     resp = client.acq.status()
-    assert resp.session['op_code'] == OpCode.STOPPING.value
+    print(resp)
+    print(resp.session)
+    assert resp.session['op_code'] in [OpCode.STOPPING.value, OpCode.SUCCEEDED.value]
 
 
 # testing the new responder fixture
