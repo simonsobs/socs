@@ -26,3 +26,6 @@ pytest
 pytest-cov
 pytest-docker-compose
 pytest-dependency
+
+# suprsync agent and tests
+sqlalchemy
