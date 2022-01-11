@@ -19,12 +19,15 @@ from integration.util import (
     create_crossbar_fixture
 )
 
+from integration.responder import create_responder_fixture
+
 pytest_plugins = ("docker_compose")
 
 wait_for_crossbar = create_crossbar_fixture()
 run_agent = create_agent_runner_fixture(
     '../agents/lakeshore425/LS425_agent.py', 'ls425_agent')
 client = create_client_fixture('LS425')
+responder = create_responder_fixture({'*IDN?': 'LSCI,MODEL425,4250022,1.0'})
 
 
 @pytest.mark.integtest
@@ -58,3 +61,23 @@ def test_ls425_start_acq(wait_for_crossbar, run_agent, client):
     client.acq.stop()
     resp = client.acq.status()
     assert resp.session['op_code'] == OpCode.STOPPING.value
+
+
+# testing the new responder fixture
+@pytest.mark.integtest
+def test_ls425_generic_responder_demo(wait_for_crossbar, responder, run_agent, client):
+    # Setup so that you get this/these response(s) from the command(s)
+    responses = {'*IDN?': 'LSCI,MODEL425,4250022,1.0',
+                 'RDGFIELD?': '+1.0E-01'}
+    responder.define_responses(responses)
+
+    resp = client.init_lakeshore()
+    assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
+    resp = client.acq.start()
+    # give time for data to collect
+    time.sleep(5)
+    resp = client.acq.status()
+    print(resp)
+    print(resp.session)
