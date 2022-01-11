@@ -7,9 +7,15 @@ import threading
 
 
 def _setup_socat():
-    # Setup the data relay with socat
+    """Setup a data relay with socat.
+
+    The "./responder" link is the external end of the relay, which the Agent
+    should connect to. "./internal" is used within the Responder object to accept
+    commands and to respond to the Agent.
+
+    """
     socat = shutil.which('socat')
-    cmd = [socat, '-d', '-d', 'pty,link=/home/koopman/port1,b57600', 'pty,link=/home/koopman/port2,b57600']
+    cmd = [socat, '-d', '-d', 'pty,link=./responder,b57600', 'pty,link=./internal,b57600']
     proc = subprocess.Popen(cmd,
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE)
@@ -46,7 +52,7 @@ class Responder:
     def create_serial_relay(self):
         self.proc = _setup_socat()
         self.ser = serial.Serial(
-            '/home/koopman/port2',
+            './internal',
             baudrate=57600,
             timeout=5,
         )
