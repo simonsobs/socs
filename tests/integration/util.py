@@ -81,10 +81,10 @@ def create_crossbar_fixture():
     # If tests start interfering with one another this should be changed to
     # "function" scoped and session_scoped_container_getter should be changed to
     # function_scoped_container_getter
-    # @pytest.fixture(scope="session")
-    # def wait_for_crossbar(session_scoped_container_getter):
-    @pytest.fixture(scope="function")
-    def wait_for_crossbar(function_scoped_container_getter):
+    # @pytest.fixture(scope="function")
+    # def wait_for_crossbar(function_scoped_container_getter):
+    @pytest.fixture(scope="session")
+    def wait_for_crossbar(session_scoped_container_getter):
         """Wait for the crossbar server from docker-compose to become
         responsive.
 
