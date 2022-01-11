@@ -32,10 +32,7 @@ def create_responder_fixture(responses):
 
         yield device
 
-        device.stop_reading()
-        device.proc.terminate()
-        out, err = device.proc.communicate()
-        print(out, err)
+        device.shutdown()
 
     return create_device
 
@@ -47,7 +44,7 @@ class Responder:
     """
     def __init__(self, responses):
         self.responses = responses
-        self.read = True
+        self._read = True
 
     def create_serial_relay(self):
         self.proc = _setup_socat()
@@ -60,7 +57,7 @@ class Responder:
         bkg_read.start()
 
     def read_serial(self):
-        while self.read:
+        while self._read:
             if self.ser.in_waiting > 0:
                 msg = self.ser.readline().strip().decode('utf-8')
                 print(f"{msg=}")
@@ -80,10 +77,17 @@ class Responder:
                     print(f"encountered error {e}")
             time.sleep(0.01)
 
-    def stop_reading(self):
+    def __del__(self):
+        self.shutdown()
+
+    def shutdown(self):
         print('shutting down background reading')
-        self.read = False
+        self._read = False
         time.sleep(1)
+        print('shutting down socat relay')
+        self.proc.terminate()
+        out, err = self.proc.communicate()
+        print(out, err)
 
     def create_tcp_relay(self):
         pass
@@ -91,7 +95,3 @@ class Responder:
     def define_responses(self, responses):
         print(f'responses set to {responses}')
         self.responses = responses
-
-
-responses = {'*IDN?': 'LSCI,MODEL425,4250022,1.0',
-             'RDGFIELD?': '+1.0E-01'}
