@@ -112,13 +112,13 @@ class Responder:
         itself.
 
         """
-        print('shutting down background reading')
+        #print('shutting down background reading')
         self._read = False
         time.sleep(1)
-        print('shutting down socat relay')
+        #print('shutting down socat relay')
         self.proc.terminate()
         out, err = self.proc.communicate()
-        print(out, err)
+        #print(out, err)
 
     def create_tcp_relay(self):
         pass
