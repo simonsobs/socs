@@ -40,15 +40,9 @@ An example docker-compose entry might look like::
     ocs-pysmurf-monitor:
         image: simonsobs/ocs-pysmurf-monitor-agent:${SOCS_TAG}
         hostname: ocs-docker
-        user: ocs:ocs
+        user: cryo:smurf
         network_mode: host
         container_name: ocs-pysmurf-monitor
-        environment:
-            MYSQL_HOST: ${DB_HOST}
-            MYSQL_DATABASE: ${DB}
-            MYSQL_USER: ${DB_USER}
-            MYSQL_PASSWORD: ${DB_PW}
-              - env_files/db.env
         volumes:
             - ${OCS_CONFIG_DIR}:/config
             - /data:/data
@@ -93,5 +87,6 @@ Agent API
 
 Supporting APIs
 ---------------
+.. automethod:: agents.pysmurf_monitor.pysmurf_monitor.create_remote_path
 
 .. automethod:: agents.pysmurf_monitor.pysmurf_monitor.PysmurfMonitor.datagramReceived

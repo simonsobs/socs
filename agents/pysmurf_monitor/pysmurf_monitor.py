@@ -1,27 +1,42 @@
 import json
 import time
-from twisted.internet.protocol import DatagramProtocol
-from twisted.internet import reactor
-import datetime
-import socs
-from socs.util import get_md5sum
 import queue
-from socs.db.suprsync import SupRsyncFilesManager, SupRsyncFile
-import datetime as dt
-
-from socs.util import get_md5sum
-from ocs.agent.aggregator import Provider
 import os
 import argparse
 
-on_rtd = os.environ.get('READTHEDOCS') == 'True'
-if not on_rtd:
-    from ocs import ocs_agent, site_config
+from twisted.internet.protocol import DatagramProtocol
+from twisted.internet import reactor
+
+from ocs.agent.aggregator import Provider
+from ocs import ocs_agent, site_config
+
+from socs.db.suprsync import SupRsyncFilesManager
+
 
 
 def create_remote_path(meta, archive_name):
     """
-    <archive_dir>/<5 ctime digits>/<pub_id>/<action_timestamp>_<action>/<plots or outputs>
+    Creates "remote path" for file.
+
+    For pysmurf ancilliary files (in the ``smurf`` archive), paths are
+    generated from the pysmurf action / action timestamp::
+
+        <archive_dir>/<5 ctime digits>/<pub_id>/<action_timestamp>_<action>/<plots or outputs>
+
+    For timestream files, the path will be the relative path of the file
+    from  whatever the g3_dir is.
+
+    Args
+    -----
+        meta (dict):
+            A dict containing file metadata that's sent from the pysmurf
+            publisher when a new file is registered. Contains info such as the
+            pysmurf action, file timestamp, path, publisher id, etc.
+        archive_name (str):
+            Name of the archive the file belongs to. 'smurf' if it is a pysmurf
+            ancilliary file, in which case the path will be generated based on
+            the pysmurf action / timestamp
+
     """
     if archive_name == 'smurf':
         ts = meta['timestamp']
@@ -39,7 +54,6 @@ def create_remote_path(meta, archive_name):
             basename,
         )
     elif archive_name == 'timestreams':
-        print(meta)
         return str(os.path.join(*os.path.normpath(meta['path']).split(os.sep)[-3:]))
 
 
@@ -65,10 +79,15 @@ class PysmurfMonitor(DatagramProtocol):
             OCSAgent object
         log (txaio.tx.Logger):
             txaio logger object created by agent
-        base_file_info (dict):
-            shared file info added to all file entries registered by this agent
-        dbpool (twisted.enterprise.adbapi.ConnectionPool):
-            DB connection pool
+        file_queue (queue.Queue):
+            Queue containing metadata for registered files
+        db_path (str):
+            Path to the suprsync database where files should be entered
+        running (bool):
+            True if the main process is running.
+        echo_sql (bool):
+            If True, will echo all sql statements whenever writing to the
+            suprsync db.
     """
     def __init__(self, agent, args):
         self.agent: ocs_agent.OCSAgent = agent
@@ -135,6 +154,12 @@ class PysmurfMonitor(DatagramProtocol):
             self.agent.publish_to_feed(feed_name, feed_data, from_reactor=True)
 
     def run(self, session, params=None):
+        """run()
+
+        **Process** - Main process for the pysmurf monitor agent. Processes
+        files that have been added to the queue, adding them to the suprsync
+        database.
+        """
         srfm = SupRsyncFilesManager(self.db_path, create_all=True, echo=self.echo_sql)
 
         self.running = True

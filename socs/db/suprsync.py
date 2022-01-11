@@ -14,15 +14,6 @@ TABLE_VERSION = 0
 txaio.use_twisted()
 
 
-def todict(obj):
-    """ Return the object's dict excluding private attributes,
-    sqlalchemy state and relationship attributes.
-    """
-    excl = ('_sa_adapter', '_sa_instance_state')
-    return {k: v for k, v in vars(obj).items() if not k.startswith('_') and
-            not any(hasattr(v, a) for a in excl)}
-
-
 Base = declarative_base()
 
 
@@ -69,7 +60,12 @@ class SupRsyncFile(Base):
     failed_copy_attempts = Column(Integer, default=0)
 
     def __str__(self):
-        d = todict(self)
+        excl = ('_sa_adapter', '_sa_instance_state')
+        d = {
+            k: v for k, v in vars(self).items()
+            if not k.startswith('_') and not any(hasattr(v, a) for a in excl)
+        }
+
         s = "SupRsyncFile:\n"
         s += "\n".join([
             f"    {k}: {v}"
@@ -143,7 +139,7 @@ class SupRsyncFilesManager:
             Base.metadata.create_all(self._engine)
 
     def add_file(self, local_path, remote_path, archive_name,
-                 local_md5sum=None, timestamp=None):
+                 local_md5sum=None, timestamp=None, session=None):
         """
         Adds file to the SupRsyncFiles table.
 
@@ -161,13 +157,17 @@ class SupRsyncFilesManager:
             local_md5sum : String, optional
                 locally calculated checksum. If not specified, will calculate
                 md5sum automatically.
+            session : sqlalchemy session
+                Session to use to add the SupRsyncFile. If None, will create
+                a new session and commit afterwards.
         """
         file = create_file(local_path, remote_path, archive_name,
                            local_md5sum=local_md5sum, timestamp=timestamp)
-
-        session = self.Session()
-        session.add(file)
-        session.commit()
+        if session is None:
+            with self.Session.begin() as session:
+                session.add(file)
+        else:
+            session.add(file)
 
     def get_copyable_files(self, archive_name, session=None,
                            max_copy_attempts=None, num_files=None):
@@ -244,12 +244,6 @@ class SupRsyncFilesManager:
 
         return files
 
-    def get_session(self):
-        """
-        Returns database session
-        """
-        return self.Session()
-
 
 class SupRsyncFileHandler:
     """
@@ -270,7 +264,7 @@ class SupRsyncFileHandler:
 
     def run_on_remote(self, cmd, timeout=None):
         """
-        Runs a command on the remote server (or locally if none is set)
+        Runs a command on the remote server or locally if ssh_host is None.
 
         Parameters
         -----------
@@ -335,7 +329,7 @@ class SupRsyncFileHandler:
                     )
                     file_map[remote_path] = file
 
-                cmd = ['rsync', '-Lr', tmp_dir+'/', dest]
+                cmd = ['rsync', '-Lrt', tmp_dir+'/', dest]
                 subprocess.run(cmd, check=True, timeout=self.copy_timeout)
 
             for file in files:

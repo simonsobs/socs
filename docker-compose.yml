@@ -147,6 +147,8 @@ services:
   ocs-suprsync-agent:
     image: 'ocs-suprsync-agent'
     build: ./agents/suprsync/
+    depends_on:
+      - "socs"
 
   # --------------------------------------------------------------------------
   # SOCS Simulators

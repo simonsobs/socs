@@ -53,7 +53,7 @@ class SupRsync:
         self.ssh_key = args.ssh_key
         self.remote_basedir = args.remote_basedir
         self.db_path = args.db_path
-        self.delete_after = args.delete_after
+        self.delete_after = args.delete_local_after
         self.max_copy_attempts = args.max_copy_attempts
         self.running = False
         self.cmd_timeout = args.cmd_timeout
@@ -115,7 +115,7 @@ def make_parser(parser=None):
                              "'<user>@<host>'). If None, will copy files locally")
     pgroup.add_argument('--ssh-key', type=str,
                         help="Path to ssh-key needed to access remote host")
-    pgroup.add_argument('--delete-after', type=float,
+    pgroup.add_argument('--delete-local-after', type=float,
                         help="Time (sec) after which this agent will delete "
                              "local copies of successfully transfered files. "
                              "If None, will not delete files.")
@@ -129,7 +129,7 @@ def make_parser(parser=None):
     pgroup.add_argument('--files-per-batch', type=int,
                         help="Number of files to copy over per batch. Default "
                         "is None, which will copy over all available files.")
-    pgroup.add_argument('--sleep-time', type=float, default=60
+    pgroup.add_argument('--sleep-time', type=float, default=60,
                         help="Time to sleep (sec) in between copy iterations")
     return parser
 
