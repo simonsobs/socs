@@ -72,21 +72,39 @@ def test_ls425_start_acq(wait_for_crossbar, responder, run_agent, client):
     assert resp.session['op_code'] in [OpCode.STOPPING.value, OpCode.SUCCEEDED.value]
 
 
-# testing the new responder fixture
 @pytest.mark.integtest
-def test_ls425_generic_responder_demo(wait_for_crossbar, responder, run_agent, client):
-    # Setup so that you get this/these response(s) from the command(s)
-    responses = {'*IDN?': 'LSCI,MODEL425,4250022,1.0',
-                 'RDGFIELD?': '+1.0E-01'}
+def test_ls425_operational_status(wait_for_crossbar, responder, run_agent, client):
+    responses = {'OPST?': '001'}
     responder.define_responses(responses)
 
-    resp = client.init_lakeshore()
+    resp = client.operational_status()
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
-    resp = client.acq.start()
-    # give time for data to collect
-    time.sleep(5)
-    resp = client.acq.status()
-    print(resp)
-    print(resp.session)
+
+@pytest.mark.integtest
+def test_ls425_zero_calibration(wait_for_crossbar, responder, run_agent, client):
+    responses = {'ZCLEAR': '',
+                 'ZPROBE': ''}
+    responder.define_responses(responses)
+
+    resp = client.zero_calibration()
+    assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
+
+@pytest.mark.integtest
+def test_ls425_any_command(wait_for_crossbar, responder, run_agent, client):
+    responses = {'UNIT 2': '',
+                 'UNIT?': '2'}
+    responder.define_responses(responses)
+
+    # Send a command that doesn't expect a response
+    resp = client.any_command(command="UNIT 2")
+    assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
+    # And one that does expect a response
+    resp = client.any_command(command="UNIT?")
+    assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
