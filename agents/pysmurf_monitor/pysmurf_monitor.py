@@ -10,7 +10,7 @@ from twisted.internet import reactor
 from ocs.agent.aggregator import Provider
 from ocs import ocs_agent, site_config
 
-from socs.db.suprsync import SupRsyncFilesManager
+from socs.db.suprsync import SupRsyncFilesManager, create_file
 
 
 
@@ -105,8 +105,8 @@ class PysmurfMonitor(DatagramProtocol):
 
         Args:
             _data (str):
-                Raw data passed over UDP port. Pysmurf publisher will send a JSON
-                string
+                Raw data passed over UDP port. Pysmurf publisher will send a
+                JSON string
             addr (tuple):
                 (host, port) of the sender.
         """
@@ -175,8 +175,22 @@ class PysmurfMonitor(DatagramProtocol):
                 try:
                     local_path = meta['path']
                     remote_path = create_remote_path(meta, archive_name)
+
+                    # Only delete files that are in timestamped directories
+                    # /data/smurf_data/<timestamp> and are not IV, channel
+                    # assignment, or tune files. We may want to add more to
+                    # this list of "semi-permanent files" later
+                    deletable = True
+                    if archive_name == 'smurf':
+                        if not local_path.split('/')[3].isdigit():
+                            deletable = False
+                        for key in ["iv", "channel_assignment", "tune"]:
+                            if key in local_path:
+                                deletable = False
+
                     files.append(
-                        srfm.create_file(local_path, remote_path, archive_name)
+                        create_file(local_path, remote_path, archive_name,
+                                    deletable=deletable)
                     )
                 except Exception as e:
                     self.agent.log.error(

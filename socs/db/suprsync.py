@@ -3,8 +3,9 @@ import time
 import subprocess
 import tempfile
 import txaio
+import pathlib
 
-from sqlalchemy import (Column, create_engine, Integer, String, Float)
+from sqlalchemy import (Column, create_engine, Integer, String, Float, Boolean)
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 
@@ -44,7 +45,8 @@ class SupRsyncFile(Base):
             Time at which file was removed from local server.
         failed_copy_attempts : Int
             Number of failed copy attempts
-
+        deletable : Bool
+            Whether file should be deleted after copying
     """
     __tablename__ = f"supersync_v{TABLE_VERSION}"
 
@@ -58,6 +60,7 @@ class SupRsyncFile(Base):
     copied = Column(Float)
     removed = Column(Float)
     failed_copy_attempts = Column(Integer, default=0)
+    deletable = Column(Boolean, default=True)
 
     def __str__(self):
         excl = ('_sa_adapter', '_sa_instance_state')
@@ -75,13 +78,13 @@ class SupRsyncFile(Base):
 
 
 def create_file(local_path, remote_path, archive_name, local_md5sum=None,
-                timestamp=None):
+                timestamp=None, deletable=True):
     """
     Creates SupRsyncFiles object.
 
     Args
     ----
-        local_path : String
+        local_path : String or Path
             Absolute path of the local file to be copied
         remote_path : String
             Path of the file on the remote server relative to the base-dir.
@@ -96,7 +99,11 @@ def create_file(local_path, remote_path, archive_name, local_md5sum=None,
         timestamp:
             Timestamp of file. If None is specified, will use the current
             time.
+        deletable : bool
+            If true, can be deleted by suprsync agent
     """
+    local_path = str(local_path)
+    remote_path = str(remote_path)
 
     if local_md5sum is None:
         local_md5sum = get_md5sum(local_path)
@@ -109,6 +116,9 @@ def create_file(local_path, remote_path, archive_name, local_md5sum=None,
         remote_path=remote_path, archive_name=archive_name,
         timestamp=timestamp
     )
+
+    if deletable is not None:
+        file.deletable = deletable
 
     return file
 
@@ -139,7 +149,8 @@ class SupRsyncFilesManager:
             Base.metadata.create_all(self._engine)
 
     def add_file(self, local_path, remote_path, archive_name,
-                 local_md5sum=None, timestamp=None, session=None):
+                 local_md5sum=None, timestamp=None, session=None,
+                 deletable=True):
         """
         Adds file to the SupRsyncFiles table.
 
@@ -160,9 +171,12 @@ class SupRsyncFilesManager:
             session : sqlalchemy session
                 Session to use to add the SupRsyncFile. If None, will create
                 a new session and commit afterwards.
+            deletable : bool
+                If true, can be deleted by suprsync agent
         """
         file = create_file(local_path, remote_path, archive_name,
-                           local_md5sum=local_md5sum, timestamp=timestamp)
+                           local_md5sum=local_md5sum, timestamp=timestamp,
+                           deletable=deletable)
         if session is None:
             with self.Session.begin() as session:
                 session.add(file)
@@ -232,6 +246,7 @@ class SupRsyncFilesManager:
         query = session.query(SupRsyncFile).filter(
             SupRsyncFile.removed == None,
             SupRsyncFile.archive_name == archive_name,
+            SupRsyncFile.deletable,
         )
 
         files = []

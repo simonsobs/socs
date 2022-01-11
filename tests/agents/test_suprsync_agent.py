@@ -40,7 +40,7 @@ def test_suprsync_handle_files(tmp_path):
 
     srfm = SupRsyncFilesManager(db_path)
 
-    nfiles = 100
+    nfiles = 50
     file_data = np.zeros(10000)
 
     archive_name = 'test'
@@ -48,7 +48,14 @@ def test_suprsync_handle_files(tmp_path):
         fname = f"{i}.npy"
         path = str(data_dir/fname)
         np.save(path, file_data)
-        srfm.add_file(path, f'test_remote/{fname}', archive_name)
+        srfm.add_file(path, f'test_remote/{fname}', archive_name,
+                      deletable=True)
+
+    fname = f"dont_delete.npy"
+    path = str(data_dir/fname)
+    np.save(path, file_data)
+    srfm.add_file(path, f'test_remote/{fname}', archive_name,
+                  deletable=False)
 
     # This is done in the suprsync run process
     handler = SupRsyncFileHandler(srfm, 'test', remote_basedir)
@@ -56,7 +63,7 @@ def test_suprsync_handle_files(tmp_path):
     handler.delete_files(0)
 
     # Check data path is empty
-    assert len(os.listdir(data_dir)) == 0
+    assert len(os.listdir(data_dir)) == 1
 
     ncopied = len(os.listdir(os.path.join(remote_basedir, 'test_remote')))
-    assert ncopied == nfiles
+    assert ncopied == nfiles + 1
