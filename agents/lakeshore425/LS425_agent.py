@@ -73,7 +73,7 @@ class LS425Agent:
         self.initialized = True
         # Start data acquisition if requested
         if auto_acquire:
-            self.agent.start('acq')
+            self.agent.start('acq', params={'sampling_frequency': self.f_sample})
 
         return True, 'Lakeshore module initialized.'
 
