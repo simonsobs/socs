@@ -63,8 +63,13 @@ class Responder:
                     continue
 
                 try:
-                    print('response:', self.responses[msg])
-                    self.ser.write((self.responses[msg] + '\r\n').encode('utf-8'))
+                    if isinstance(self.responses[msg], list):
+                        response = self.responses[msg].pop(0)
+                    else:
+                        response = self.responses[msg]
+
+                    print(f'{response=}')
+                    self.ser.write((response + '\r\n').encode('utf-8'))
                 except Exception as e:
                     print(f"encountered error {e}")
             time.sleep(0.01)
