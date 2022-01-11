@@ -69,8 +69,7 @@ def test_ls425_start_acq(wait_for_crossbar, responder, run_agent, client):
                  'RDGFIELD?': '+1.0E-01'}
     responder.define_responses(responses)
 
-    client.init_lakeshore()
-    resp = client.acq.start(sample_heater=False, run_once=True)
+    resp = client.acq.start(sampling_frequency=1.0)
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.STARTING.value
 
