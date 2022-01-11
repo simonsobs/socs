@@ -485,7 +485,7 @@ class ACUAgent:
             self.agent.publish_to_feed('acu_status_axis_failures', acustatus_axisfail)
             self.agent.publish_to_feed('acu_status_axis_state', acustatus_axisstate)
             self.agent.publish_to_feed('acu_status_osc_alarms', acustatus_oscalarm)
-#            self.agent.publish_to_feed('acu_status_commands', acustatus_commands)
+            self.agent.publish_to_feed('acu_status_commands', acustatus_commands)
             self.agent.publish_to_feed('acu_status_general_errs', acustatus_acufails)
             self.agent.publish_to_feed('acu_status_platform', acustatus_platform)
             self.agent.publish_to_feed('acu_status_emergency', acustatus_emergency)
@@ -865,14 +865,25 @@ class ACUAgent:
             yield self.acu_control.http.UploadPtStack(text)
             self.log.info('Uploaded a group')
         self.log.info('No more lines to upload')
-        current_az = self.data['broadcast']['Corrected_Azimuth']
-        current_el = self.data['broadcast']['Corrected_Elevation']
-        while round(current_az - end_az, 1) != 0. or round(current_el - end_el, 1) != 0.:
+#        current_az = self.data['broadcast']['Corrected_Azimuth']
+#        current_el = self.data['broadcast']['Corrected_Elevation']
+#        while round(current_az - end_az, 1) != 0. or round(current_el - end_el, 1) != 0.:
+        free_positions = self.data['status']['summary']['Free_upload_positions']
+        while free_positions < 9999: 
             yield dsleep(0.1)
             modes = (self.data['status']['summary']['Azimuth_mode'],
                      self.data['status']['summary']['Elevation_mode'])
             if modes != ('ProgramTrack', 'ProgramTrack'):
                 return False, 'Fault triggered (not ProgramTrack)!'
+#            current_az = self.data['broadcast']['Corrected_Azimuth']
+#            current_el = self.data['broadcast']['Corrected_Elevation']
+            free_positions = self.data['status']['summary']['Free_upload_positions']
+        self.log.info('No more points in the queue')
+        current_az = self.data['broadcast']['Corrected_Azimuth']
+        current_el = self.data['broadcast']['Corrected_Elevation']
+        while round(current_az - end_az, 1) != 0. or round(current_el - end_el, 1) != 0.:
+            self.log.info('Waiting to settle at position')
+            yield dsleep(0.1)
             current_az = self.data['broadcast']['Corrected_Azimuth']
             current_el = self.data['broadcast']['Corrected_Elevation']
         yield dsleep(self.sleeptime)
