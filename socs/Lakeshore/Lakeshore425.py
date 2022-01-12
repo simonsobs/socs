@@ -8,7 +8,7 @@ operational_status_key = [
     'Alarm',
     'Invalid probe',
     'None',
-    'Calibration error'
+    'Calibration error',
     'Zero probe done'
 ]
 class LakeShore425:
