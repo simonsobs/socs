@@ -19,8 +19,8 @@ Configuration File Examples
 Below are useful configurations examples for the relevant OCS files and for 
 running the agent in a docker container.
 
-ocs-config
-``````````
+OCS Site Config
+```````````````
 To configure the ocs-lakeshore425-agent we need to add a Lakeshore425Agent 
 block to our ocs configuration file. Here is an example configuration block
 using all of the available arguments::
@@ -35,8 +35,8 @@ using all of the available arguments::
 
 If you would like to chanege the setting or check the status of the lakeshore 425, the ``--mode`` argument should be ``'init'``.
 
-Docker
-``````
+Docker Compose
+``````````````
 The ocs-lakeshore425-agent can be run via a Docker container. The following is an 
 example of what to insert into your institution's docker-compose file.::
 
@@ -51,3 +51,9 @@ example of what to insert into your institution's docker-compose file.::
       - "--instance-id=LS425"
       - "--site-hub=ws://crossbar:8001/ws"
       - "--site-http=http://crossbar:8001/call"
+
+Agent API
+---------
+
+.. autoclass:: agents.lakeshore425.LS425_agent.LS425Agent
+    :members:

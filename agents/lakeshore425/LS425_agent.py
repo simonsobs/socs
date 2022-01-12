@@ -9,6 +9,14 @@ from socs.Lakeshore import Lakeshore425 as ls
 txaio.use_twisted()
 
 class LS425Agent:
+    """Agent for interfacing with a single Lakeshore 425 device.
+
+    Args:
+        agent (ocs.ocs_agent.OCSAgent): Instantiated OCSAgent class for this Agent
+        port (int): Path to USB device in `/dev/`
+        f_sample (float): Default sampling rate for the acq Process
+
+    """
     def __init__(self, agent, port, f_sample=1.):
 
         self.agent: ocs_agent.OCSAgent = agent
@@ -31,20 +39,21 @@ class LS425Agent:
                                  buffer_time=1)
 
     # Task functions.
-    def init_lakeshore_task(self, session, params=None):
-        """init_lakeshore_task(params=None)
-        Perform first time setup of the Lakeshore 425 Module.
-        Args:
-            params (dict): Parameters dictionary for passing parameters to task.
+    @ocs_agent.param('auto_acquire', default=False, type=bool)
+    def init_lakeshore(self, session, params):
+        """init_lakeshore(auto_acquire=False)
+
+        **Task** - Perform first time setup of the Lakeshore 425 Module.
+
         Parameters:
             auto_acquire (bool, optional): Default is False. Starts data
                 acquisition after initialization if True.
-        """
 
+        """
         if params is None:
             params = {}
 
-        auto_acquire = params.get('auto_acquire', False)
+        auto_acquire = params['auto_acquire']
 
         if self.initialized:
             return True, "Already Initialized Module"
@@ -64,29 +73,36 @@ class LS425Agent:
         self.initialized = True
         # Start data acquisition if requested
         if auto_acquire:
-            self.agent.start('acq')
+            self.agent.start('acq', params={'sampling_frequency': self.f_sample})
 
         return True, 'Lakeshore module initialized.'
 
-    def start_acq(self, session, params=None):
-        """acq(sampling_frequency=1.)
+    @ocs_agent.param('sampling_frequency', default=None, type=float)
+    def acq(self, session, params):
+        """acq(sampling_frequency=None)
+
         **Process** - Acquire data from the Lakeshore 425.
+
         Parameters:
-            sampling_frequency (float):
-                Sampling frequency for data collection. Defaults to 1.0 Hz
+            sampling_frequency (float, optional):
+                Sampling frequency for data collection. Defaults to the value
+                passed to `--sampling_frequency` on Agent startup
+
         Notes:
             The most recent data collected is stored in session data in the
             structure::
+
                 >>> response.session['data']
                 {"fields":
                     {"mag_field": {"Bfield": 270.644},
                      "timestamp": 1601924466.6130798}
                 }
+
         """
         if params is None:
             params = {}
 
-        f_sample = params.get('sampling_frequency')
+        f_sample = params['sampling_frequency']
         # If f_sample is None, use value passed to Agent init
         if f_sample is None:
             f_sample = self.f_sample
@@ -122,7 +138,7 @@ class LS425Agent:
 
         return True, 'Acquisition exited cleanly.'
 
-    def stop_acq(self, session, params=None):
+    def _stop_acq(self, session, params):
         """
         Stops acq process.
         """
@@ -132,36 +148,55 @@ class LS425Agent:
         else:
             return False, 'acq is not currently running'
 
-    def operational_status(self, session, params=None):
+    @ocs_agent.param('_')
+    def operational_status(self, session, params):
+        """operational_status()
+
+        **Task** - Check operational status.
+
         """
-        check operational status.
-        """
-        with self.lock.acquire_timeout(0, job = 'any_command') as acquired:
+        with self.lock.acquire_timeout(0, job = 'operational_status') as acquired:
             if not acquired:
-                self.log.warn('Could not any_command because {} is already running'.format(self.lock.job))
+                self.log.warn('Could not start operational_status because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
             op_status = self.dev.get_op_status()
             self.log.info(op_status)
             return True, 'operational status: '+op_status
 
-    def zero_calibration(self, session, params=None):
+    @ocs_agent.param('_')
+    def zero_calibration(self, session, params):
+        """zero_calibration()
+
+        **Task** - Calibrate the zero point.
+
         """
-        calibrate zero point.
-        """
-        with self.lock.acquire_timeout(0, job = 'any_command') as acquired:
+        with self.lock.acquire_timeout(0, job = 'zero_calibration') as acquired:
             if not acquired:
-                self.log.warn('Could not any_command because {} is already running'.format(self.lock.job))
+                self.log.warn('Could not start zero_calibration because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
             self.dev.set_zero()
             return True, 'Zero calibration is done'
 
     @ocs_agent.param('command', type=str)
-    def any_command(self, session, params=None):
-        """
-        any_command(command='*IDN?')
+    def any_command(self, session, params):
+        """any_command(command)
+
         **Process** - Send serial command to Lakeshore 425
+
         Parameters:
             command (str): any serial command
+
+        Examples:
+            Example for calling in a client::
+
+                >>> client.any_command(command='*IDN?')
+
+        Notes:
+            An example of the session data::
+
+                >>> response.session['data']
+                {'response': 'LSA1234'}
+
         """
         command = params['command']
         with self.lock.acquire_timeout(0, job = 'any_command') as acquired:
@@ -171,10 +206,13 @@ class LS425Agent:
             print('Input command: ' + command)
             if '?' in command:
                 out = self.dev.query(command)
+                session.data = {'response': out}
                 return True, 'any_command is finished cleanly. Results: {}'.format(out)
             else:
                 self.dev.command(command)
+                session.data = {'response': None}
                 return True, 'any_command is finished cleanly'
+
 
 def make_parser(parser=None):
     if parser is None:
@@ -211,11 +249,11 @@ def main():
         kwargs['f_sample'] = float(args.sampling_frequency)
     gauss = LS425Agent(agent, **kwargs)
 
-    agent.register_task('init_lakeshore', gauss.init_lakeshore_task, startup=init_params)
+    agent.register_task('init_lakeshore', gauss.init_lakeshore, startup=init_params)
     agent.register_task('operational_status', gauss.operational_status)
     agent.register_task('zero_calibration', gauss.zero_calibration)
     agent.register_task('any_command', gauss.any_command)
-    agent.register_process('acq', gauss.start_acq, gauss.stop_acq)
+    agent.register_process('acq', gauss.acq, gauss._stop_acq)
 
     runner.run(agent, auto_reconnect=True)
 
