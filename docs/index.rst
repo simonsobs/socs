@@ -47,6 +47,7 @@ Simulator Reference  Simulators are used to mock software and hardware
     agents/lakeshore336
     agents/lakeshore370
     agents/lakeshore372
+    agents/lakeshore425
     agents/latrt_xy_stage
     agents/meinberg_m1000_agent
     agents/pfeiffer

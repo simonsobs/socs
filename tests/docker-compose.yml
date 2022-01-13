@@ -3,7 +3,7 @@ services:
   crossbar:
     image: simonsobs/ocs-crossbar:v0.7.0-9-g1d136a3-dev
     ports:
-      - "8001:8001"
+      - "18001:18001"
     volumes:
       - ./config.json:/app/crossbar/config.json
     environment:
