@@ -5,7 +5,7 @@ import argparse
 import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
-import class_ps3000a as ps 
+from socs.agent import class_ps3000a as ps 
 
 txaio.use_twisted()
 
