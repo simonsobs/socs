@@ -1,9 +1,9 @@
 FROM simonsobs/socs
 
-RUN apt update && apt install -y wget udev libusb-1.0-0 
+RUN apt update && apt install -y wget udev libusb-1.0-0
 
 WORKDIR /make
-# need to install old version, latest version doesn't work 
+# need to install old version, latest version doesn't work
 RUN wget https://labs.picotech.com/debian/pool/main/libp/libpicoipp/libpicoipp_1.3.0-4r21_amd64.deb &&\
     wget https://labs.picotech.com/debian/pool/main/libp/libps3000a/libps3000a_2.1.0-6r570_amd64.deb &&\
     dpkg -i *deb

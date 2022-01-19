@@ -33,12 +33,15 @@ class PicoAgent:
     @ocs_agent.param('samplefreq', default=3.6e6, type=float)
     @ocs_agent.param('biasfreq', default=150e3, type=float)
     def run_single(self, session, params):
-        """run_single,(Npoints=10000, samplefreq, biasfreq)
+        """run_single(Npoints=10000, samplefreq=3.6e6, biasfreq=150e3)
+
            **Task** - Bias LC probes and perform DAQ.
+
            Parameters:
-               Npoints (int): Number of points to measure 
-               samplefreq (float): sampling frequency (Hz), typically 24*biasfreq 
-               biasfrequency (float): LC probe bias frequency (Hz) 
+               Npoints (int): Number of points to measure
+               samplefreq (float): sampling frequency (Hz), typically 24*biasfreq
+               biasfrequency (float): LC probe bias frequency (Hz)
+
         """
         Npoints = int(params['Npoints'])
         samplefreq = float(params['samplefreq'])
@@ -131,11 +134,14 @@ class PicoAgent:
     @ocs_agent.param('freq', default=10., type=float)
     @ocs_agent.param('duration', default=1., type=float)
     def sig_test(self, session, params):
-        """sig_test(freq, duration)
+        """sig_test(freq=10., duration=1.)
+
            **Task** - For debug and test.
+
            Parameters:
-               freq (float): bias frequency (Hz) 
-               duration (float): bias duration time (sec) 
+               freq (float): bias frequency (Hz)
+               duration (float): bias duration time (sec)
+
         """
         with self.lock.acquire_timeout(0, job='sig_test') as acquired:
             if not acquired:
