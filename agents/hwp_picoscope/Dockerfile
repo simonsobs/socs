@@ -10,6 +10,7 @@ RUN wget https://labs.picotech.com/debian/pool/main/libp/libpicoipp/libpicoipp_1
 
 RUN git clone https://github.com/picotech/picosdk-python-wrappers.git
 WORKDIR /make/picosdk-python-wrappers
+RUN git switch -c 89003868b5bc52511ee57419f0afbfade25f1882
 RUN python3 setup.py install
 
 WORKDIR /app/socs/agents/picoscope/
