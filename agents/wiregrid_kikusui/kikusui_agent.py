@@ -37,7 +37,6 @@ class KikusuiAgent:
         # self.feedback_time = [0.151, 0.241, 0.271, 0.301, 0.331]
         self.feedback_time = [0.151, 0.241, 0.271, 0.361, 0.451]
         self.feedback_cut = [1., 2., 3., 5.0, 8.0]
-        self.operation_time = 0.401
         self.feedback_steps = 8
         self.num_laps = 2
         self.stopped_time = 10
@@ -192,19 +191,21 @@ class KikusuiAgent:
             mid_position = self._get_position(
                 self.position_path, self.open_trial, self.Deg)
             if goal_position + wanted_angle < mid_position:
-                self.operation_time =\
+                operation_time =\
                     self._get_exectime(
                         goal_position - (mid_position - 360),
                         self.feedback_cut,
                         feedback_time)
             else:
-                self.operation_time =\
+                operation_time =\
                     self._get_exectime(
                         goal_position - mid_position,
                         self.feedback_cut,
                         feedback_time)
 
-            self._rotate_alittle(self.operation_time)
+            if operation_time == 0.:
+                break
+            self._rotate_alittle(operation_time)
 
         writelog(logfile, 'OFF', 0,
                  self._get_position(
@@ -437,7 +438,7 @@ class KikusuiAgent:
 
             logfile = openlog(self.action_path)
 
-            for i in range(self.num_laps*16):
+            for i in range(int(self.num_laps*16.)):
                 self._move_next(
                     logfile, self.feedback_steps, self.feedback_time)
                 time.sleep(self.stopped_time)

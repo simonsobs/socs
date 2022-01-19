@@ -251,7 +251,7 @@ class PMX:
             val = self.ser.readline()
             msg = "\nOutput state = %s" % (val)
             print(msg)
-            return msg
+        return msg
 
     def turn_off(self,notmakesure=False):
         """ Turn the PMX off """
@@ -269,7 +269,7 @@ class PMX:
             val = self.ser.readline()
             msg = "\nOutput state = %s" % (val)
             print(msg)
-            return msg
+        return msg
 
     # ***** Helper Methods *****
     def __conn(self, rtu_port=None, tcp_ip=None, tcp_port=None, timeout=None):
