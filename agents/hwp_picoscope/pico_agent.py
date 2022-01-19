@@ -22,7 +22,7 @@ class PicoAgent:
         self.initialized = False
         self.take_data = False
 
-        # Registers Temperature and Voltage feeds
+        # Registers raw data and down sampled data feeds
         agg_params = {'frame_length': 60, 'exclude_influx': True}
         self.agent.register_feed('sensors', record=True, agg_params=agg_params)
         agg_params = {'frame_length': 60}
