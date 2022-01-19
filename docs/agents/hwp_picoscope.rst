@@ -6,8 +6,8 @@
 HWP Picoscope Agent
 ======================
 
-The HWP picoscope agent interfaces with Picoscope 3403D MSO to operaate the LC sensors which remotely measures the 3 dimentional position and temperature of hwp.
-This agent biases the LC sensors and measures the 4 channels of analog input and 8 channlels of digital input.
+The HWP picoscope agent interfaces with Picoscope 3403D MSO to operate the LC sensors which remotely measures the 3 dimentional position and temperature of hwp.
+This agent biases the LC sensors and measures the 4 channels of analog input and 8 channels of digital input.
 
 .. argparse::
     :filename: ../agents/hwp_picoscope/pico_agent.py
