@@ -397,45 +397,6 @@ class ps3000a():
                                                             0)
         assert_pico_ok(self.status["SetDataBuffers"])
 
-    def get_digital_values(self):
-        # Creates a overflow location for data
-        overflow = (ctypes.c_int16 * 10)()
-        # Creates converted types totalSamples
-        cTotalSamples = ctypes.c_int32(self.totalSamples)
-
-        # Checks data collection to finish the capture
-        ready = ctypes.c_int16(0)
-        check = ctypes.c_int16(0)
-
-        while ready.value == check.value:
-            self.status["isReady"] = ps.ps3000aIsReady(self.chandle, ctypes.byref(ready))
-
-        # Handle = chandle
-        # start index = 0
-        # noOfSamples = ctypes.byref(cTotalSamples)
-        # DownSampleRatio = 1
-        # DownSampleRatioMode = 0
-        # SegmentIndex = 0
-        # Overflow = ctypes.byref(overflow)
-
-        self.status["GetValues"] = ps.ps3000aGetValues(
-            self.chandle, 
-            0, 
-            ctypes.byref(cTotalSamples), 
-            1,
-            0,
-            0, 
-            ctypes.byref(overflow))
-        assert_pico_ok(self.status["GetValues"])
-
-        print ("Data collection complete.")
-
-        # Obtain binary for Digital Port 0
-        # The tuple returned contains the channels in order (D7, D6, D5, ... D0).
-        bufferDPort0 = splitMSODataFast(cTotalSamples, self.bufferDPort0Max)
-
-        return bufferDPort0
-
     def get_digital_values_simple(self):
         # Obtain binary for Digital Port 0
         # The tuple returned contains the channels in order (D7, D6, D5, ... D0).
@@ -520,6 +481,3 @@ class ps3000a():
         self.nextSample += noOfSamples
         if autoStop:
             self.autoStopOuter = True
-
-    def save_raw_value_AD(self, dir):
-        np.savez(dir, t=self.t, A=self.adc2mVChAMax, B=self.adc2mVChBMax, C=self.adc2mVChCMax, D=self.adc2mVChDMax, Dport0=self.bufferDport0)
