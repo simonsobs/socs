@@ -296,7 +296,7 @@ class WGEncoderAgent:
                         pass
                     pass
 
-                with open('/data/wg-data/position.log', 'a') as f:
+                with open('/data/wg-data/position.log', 'w') as f:
                     f.write(str(shared_time)+' '+str(shared_position)+'\n')
                     f.flush()
                     pass
