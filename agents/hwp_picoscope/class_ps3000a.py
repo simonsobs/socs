@@ -1,23 +1,22 @@
+import numpy as np
+import time
 import ctypes
 from picosdk.ps3000a import ps3000a as ps
 from picosdk.functions import adc2mV, assert_pico_ok, splitMSODataFast
-import time
-import datetime
-import numpy as np
 
 class ps3000a():
     def __init__(self, sizeofbuffer, samplerate):
         self.status = {}
         self.chandle = ctypes.c_int16()
         self.interval = int(1./samplerate*1e9) # unit ns
-        
+
         # Size of capture
         self.sizeOfOneBuffer = sizeofbuffer
         self.numBuffersToCapture = 1
         self.totalSamples = self.sizeOfOneBuffer * self.numBuffersToCapture
-        
+
         print('sample points: {}, sampling rate: {} (MHz), length: {} (sec)'.format(self.totalSamples, samplerate*1e-6, self.totalSamples*self.interval*1e-9))
-        
+
         # Opens the device/s
         self.status["openunit"] = ps.ps3000aOpenUnit(ctypes.byref(self.chandle), None)
 
@@ -44,13 +43,13 @@ class ps3000a():
             else:
                 raise
             assert_pico_ok(self.status["ChangePowerSource"])
-            
+
     def close(self):
         # Closes the unit
         # Handle = chandle
         self.status["close"] = ps.ps3000aCloseUnit(self.chandle)
         assert_pico_ok(self.status["close"])
-    
+
         '''
         ##### Signal Generator
         ### wavetype
@@ -64,35 +63,35 @@ class ps3000a():
         PS3000A_SINC sin (x)/x
         PS3000A_GAUSSIAN Gaussian
         PS3000A_HALF_SINE
-        
+
         ###sweep type
         PS3000A_UP
         PS3000A_DOWN
         PS3000A_UPDOWN
         PS3000A_DOWNUP
-        
+
         ###
         increment: the amount of frequency increase or decrease in sweep mode
         dwell time: the time for which the sweep stays at each frequency, in seconds
         '''
-    
+
     def SigGenSingle(self, frequency, ptp=2000000):
         wavetype = ctypes.c_int16(0)
         sweepType = ctypes.c_int32(0)
         triggertype = ctypes.c_int32(0)
         triggerSource = ctypes.c_int32(0)
-        
+
         offsetVoltage = 0
         pkToPk = ptp #(uV)
         print('Drive frequency: {} (Hz), PKtoPK: {} (V)'.format(frequency, pkToPk*1e-6))
         self.info['Drive_frequency_Hz'] = frequency
         self.info['PKtoPk'] = pkToPk*1e-6
-        
+
         start_frequency = frequency #Hz
         stop_frequency = frequency #Hz
         increment = 0
         dwelltime = 1 
-    
+
         self.status["SetSigGenBuiltIn"] = ps.ps3000aSetSigGenBuiltIn(
             self.chandle, offsetVoltage, pkToPk, 
             wavetype, start_frequency, stop_frequency, increment, dwelltime, sweepType, 
@@ -104,13 +103,13 @@ class ps3000a():
             1, #extInThreshold
         )
         assert_pico_ok(self.status["SetSigGenBuiltIn"])
-        
+
     def SigGenSweep(self, start_frequency=100e3, stop_frequency=300e3, increment=5e2, dwelltime=1e-3):
         wavetype = ctypes.c_int16(0)
         sweepType = ctypes.c_int32(0)
         triggertype = ctypes.c_int32(0)
         triggerSource = ctypes.c_int32(0)
-        
+
         offsetVoltage = 0
         pkToPk = 2000000 #(uV)
 
@@ -125,7 +124,7 @@ class ps3000a():
             1, #extInThreshold
         )
         assert_pico_ok(self.status["SetSigGenBuiltIn"])
-    
+
     def SetScope(self):
         enabled = 1
         disabled = 0
@@ -139,17 +138,17 @@ class ps3000a():
         # range = PS3000A_2V = 7
         # analogue offset = 0 V
         self.channel_range = ps.PS3000A_RANGE['PS3000A_2V']
-        
+
         self.status["setChA"] = ps.ps3000aSetChannel(
             self.chandle,
-            ps.PS3000A_CHANNEL['PS3000A_CHANNEL_A'],                            
-            enabled,                            
-            ps.PS3000A_COUPLING['PS3000A_DC'],                         
-            self.channel_range,                           
+            ps.PS3000A_CHANNEL['PS3000A_CHANNEL_A'],
+            enabled,
+            ps.PS3000A_COUPLING['PS3000A_DC'],
+            self.channel_range,
             analogue_offset
         )
         assert_pico_ok(self.status["setChA"])
-        
+
     def SetScopeAll(self):
         enabled = 1
         disabled = 0
@@ -163,18 +162,18 @@ class ps3000a():
         # range = PS3000A_2V = 7
         # analogue offset = 0 V
         self.channel_range = ps.PS3000A_RANGE['PS3000A_2V']
-        
+
         for ch in ['A', 'B', 'C', 'D']:
             self.status['setCh'+ch] = ps.ps3000aSetChannel(
                 self.chandle,
-                ps.PS3000A_CHANNEL['PS3000A_CHANNEL_'+ch],                            
-                enabled,                            
-                ps.PS3000A_COUPLING['PS3000A_DC'],                         
-                self.channel_range,                           
+                ps.PS3000A_CHANNEL['PS3000A_CHANNEL_'+ch],
+                enabled,
+                ps.PS3000A_COUPLING['PS3000A_DC'],
+                self.channel_range,
                 analogue_offset
             )
             assert_pico_ok(self.status['setCh'+ch])
-        
+
     def SetBuffer(self):
         # Create buffers ready for assigning pointers for data collection
         self.bufferAMax = np.zeros(shape=self.sizeOfOneBuffer, dtype=np.int16)
@@ -200,7 +199,7 @@ class ps3000a():
             ps.PS3000A_RATIO_MODE['PS3000A_RATIO_MODE_NONE']
         )
         assert_pico_ok(self.status["setDataBuffersA"])
-        
+
     def SetBufferAll(self):
         # Create buffers ready for assigning pointers for data collection
         self.bufferAMax = np.zeros(shape=self.sizeOfOneBuffer, dtype=np.int16)
@@ -218,7 +217,7 @@ class ps3000a():
         # buffer length = maxSamples
         # segment index = 0
         # ratio mode = PS3000A_RATIO_MODE_NONE = 0
-        
+
         self.status["setDataBuffersA"] = ps.ps3000aSetDataBuffers(
             self.chandle,
             ps.PS3000A_CHANNEL['PS3000A_CHANNEL_A'],
@@ -229,7 +228,7 @@ class ps3000a():
             ps.PS3000A_RATIO_MODE['PS3000A_RATIO_MODE_NONE']
         )
         assert_pico_ok(self.status["setDataBuffersA"])
-        
+
         self.status["setDataBuffersB"] = ps.ps3000aSetDataBuffers(
             self.chandle,
             ps.PS3000A_CHANNEL['PS3000A_CHANNEL_B'],
@@ -240,7 +239,7 @@ class ps3000a():
             ps.PS3000A_RATIO_MODE['PS3000A_RATIO_MODE_NONE']
         )
         assert_pico_ok(self.status["setDataBuffersB"])
-        
+
         self.status["setDataBuffersC"] = ps.ps3000aSetDataBuffers(
             self.chandle,
             ps.PS3000A_CHANNEL['PS3000A_CHANNEL_C'],
@@ -251,7 +250,7 @@ class ps3000a():
             ps.PS3000A_RATIO_MODE['PS3000A_RATIO_MODE_NONE']
         )
         assert_pico_ok(self.status["setDataBuffersC"])
-        
+
         self.status["setDataBuffersD"] = ps.ps3000aSetDataBuffers(
             self.chandle,
             ps.PS3000A_CHANNEL['PS3000A_CHANNEL_D'],
@@ -262,7 +261,7 @@ class ps3000a():
             ps.PS3000A_RATIO_MODE['PS3000A_RATIO_MODE_NONE']
         )
         assert_pico_ok(self.status["setDataBuffersD"])
-    
+
     def Stream(self):
         # Begin streaming mode:
         sampleInterval = ctypes.c_int32(500)
@@ -274,14 +273,14 @@ class ps3000a():
         # No downsampling:
         downsampleRatio = 1
         self.status["runStreaming"] = ps.ps3000aRunStreaming(
-            self.chandle,                                             
-            ctypes.byref(sampleInterval),                                           
-            sampleUnits,                                         
-            maxPreTriggerSamples,                                                      
-            self.totalSamples,                                                       
-            autoStopOn,                                                     
-            downsampleRatio,                                                     
-            ps.PS3000A_RATIO_MODE['PS3000A_RATIO_MODE_NONE'],                                           
+            self.chandle,
+            ctypes.byref(sampleInterval),
+            sampleUnits,
+            maxPreTriggerSamples,
+            self.totalSamples,
+            autoStopOn,
+            downsampleRatio,
+            ps.PS3000A_RATIO_MODE['PS3000A_RATIO_MODE_NONE'],
             self.sizeOfOneBuffer
         )
         assert_pico_ok(self.status["runStreaming"])
@@ -291,7 +290,7 @@ class ps3000a():
         self.actualSampleIntervalNs = actualSampleInterval * 1000
 
         print("Capturing at sample interval %s ns" % self.actualSampleIntervalNs)
-        
+
         # We need a big buffer, not registered with the driver, to keep our complete capture in.
         self.bufferCompleteA = np.zeros(shape=self.totalSamples, dtype=np.int16)
         self.bufferCompleteB = np.zeros(shape=self.totalSamples, dtype=np.int16)
@@ -305,12 +304,12 @@ class ps3000a():
 
         # Fetch data from the driver in a loop, 
         #copying it out of the registered buffers and into our complete one.
-        
+
         while self.nextSample < self.totalSamples and not self.autoStopOuter:
             self.wasCalledBack = False
             self.status["getStreamingLastestValues"] = ps.ps3000aGetStreamingLatestValues(
-                self.chandle, 
-                cFuncPtr, 
+                self.chandle,
+                cFuncPtr,
                 None
             )
             if not self.wasCalledBack:
@@ -321,7 +320,7 @@ class ps3000a():
 
         print("Done grabbing values.")
         print("Capturing interval %s sec" %(actualSampleInterval * 1000 * self.totalSamples/1e12) )
-        
+
     def _streaming_callback(self, handle, noOfSamples, startIndex, overflow, triggerAt, triggered, autoStop, param):
         #global nextSample, autoStopOuter, wasCalledBack
         self.wasCalledBack = True
@@ -353,10 +352,10 @@ class ps3000a():
         self.t = np.linspace(0, (self.totalSamples) * self.actualSampleIntervalNs, self.totalSamples)
 
         return self.t, self.adc2mVChAMax, self.adc2mVChBMax, self.adc2mVChCMax, self.adc2mVChDMax
-    
+
     def save_value(self, dir):
         np.savez(dir, t=self.t, A=self.adc2mVChAMax, B=self.adc2mVChBMax, C=self.adc2mVChCMax, D=self.adc2mVChDMax)
-    
+
     #### code-related-digital Input
     def set_digital_port(self):
         # Set up digital port
@@ -367,7 +366,7 @@ class ps3000a():
         self.status["SetDigitalPort"] = ps.ps3000aSetDigitalPort(self.chandle, ps.PS3000A_DIGITAL_PORT["PS3000A_DIGITAL_PORT0"], 1, 10000)
         #self.status["SetDigitalPort"] = ps.ps3000aSetDigitalPort(self.chandle, ps.PS3000A_DIGITAL_PORT["PS3000A_DIGITAL_PORT1"], 1, 10000)
         assert_pico_ok(self.status["SetDigitalPort"])
-        
+
     def set_digital_buffer(self):
         # Create buffers ready for assigning pointers for data collection
         self.bufferDPort0Max = (ctypes.c_int16 * self.totalSamples)()
@@ -389,20 +388,20 @@ class ps3000a():
                                                             0,
                                                             0)
         assert_pico_ok(self.status["SetDataBuffers"])
-    
+
     def get_digital_values(self):
         # Creates a overflow location for data
         overflow = (ctypes.c_int16 * 10)()
         # Creates converted types totalSamples
         cTotalSamples = ctypes.c_int32(self.totalSamples)
-        
+
         # Checks data collection to finish the capture
         ready = ctypes.c_int16(0)
         check = ctypes.c_int16(0)
 
         while ready.value == check.value:
             self.status["isReady"] = ps.ps3000aIsReady(self.chandle, ctypes.byref(ready))
-        
+
         # Handle = chandle
         # start index = 0
         # noOfSamples = ctypes.byref(cTotalSamples)
@@ -426,18 +425,17 @@ class ps3000a():
         # Obtain binary for Digital Port 0
         # The tuple returned contains the channels in order (D7, D6, D5, ... D0).
         bufferDPort0 = splitMSODataFast(cTotalSamples, self.bufferDPort0Max)
-        
+
         return bufferDPort0
-    
+
     def get_digital_values_simple(self):
         # Obtain binary for Digital Port 0
         # The tuple returned contains the channels in order (D7, D6, D5, ... D0).
         cTotalSamples = ctypes.c_int32(self.totalSamples)
         self.bufferDPort0 = splitMSODataFast(cTotalSamples, self.bufferDPort0Max)
-        
+
         return self.bufferDPort0
 
-    
     def Stream_AD(self):
         # Begin streaming mode:
         sampleInterval = ctypes.c_int32(self.interval)
@@ -449,14 +447,14 @@ class ps3000a():
         # No downsampling:
         downsampleRatio = 1
         self.status["runStreaming"] = ps.ps3000aRunStreaming(
-            self.chandle,                                             
-            ctypes.byref(sampleInterval),                                           
-            sampleUnits,                                         
-            maxPreTriggerSamples,                                                      
-            self.totalSamples,                                                       
-            autoStopOn,                                                     
-            downsampleRatio,                                                     
-            ps.PS3000A_RATIO_MODE['PS3000A_RATIO_MODE_NONE'],                                           
+            self.chandle,
+            ctypes.byref(sampleInterval),
+            sampleUnits,
+            maxPreTriggerSamples,
+            self.totalSamples,
+            autoStopOn,
+            downsampleRatio,
+            ps.PS3000A_RATIO_MODE['PS3000A_RATIO_MODE_NONE'],
             self.sizeOfOneBuffer
         )
         assert_pico_ok(self.status["runStreaming"])
@@ -466,7 +464,7 @@ class ps3000a():
         self.actualSampleIntervalNs = actualSampleInterval * 1000
 
         print("Capturing at sample interval %s ns" % self.actualSampleIntervalNs)
-        
+
         # We need a big buffer, not registered with the driver, to keep our complete capture in.
         self.bufferCompleteA = np.zeros(shape=self.totalSamples, dtype=np.int16)
         self.bufferCompleteB = np.zeros(shape=self.totalSamples, dtype=np.int16)
@@ -474,7 +472,7 @@ class ps3000a():
         self.bufferCompleteD = np.zeros(shape=self.totalSamples, dtype=np.int16)
         self.bufferCompleteDport0M = np.zeros(shape=self.totalSamples, dtype=np.int16)
         self.bufferCompleteDport0m = np.zeros(shape=self.totalSamples, dtype=np.int16)
-        
+
         self.nextSample = 0
         self.autoStopOuter = False
         self.wasCalledBack = False
@@ -483,7 +481,7 @@ class ps3000a():
 
         # Fetch data from the driver in a loop, 
         #copying it out of the registered buffers and into our complete one.
-        
+
         while self.nextSample < self.totalSamples and not self.autoStopOuter:
             self.wasCalledBack = False
             self.status["getStreamingLastestValues"] = ps.ps3000aGetStreamingLatestValues(
@@ -499,7 +497,7 @@ class ps3000a():
 
         print("Done grabbing values.")
         print("Capturing interval %s sec" %(actualSampleInterval * 1000 * self.totalSamples/1e12) )
-        
+
     def _streaming_callback_AD(self, handle, noOfSamples, startIndex, overflow, triggerAt, triggered, autoStop, param):
         #global nextSample, autoStopOuter, wasCalledBack
         self.wasCalledBack = True
@@ -514,6 +512,6 @@ class ps3000a():
         self.nextSample += noOfSamples
         if autoStop:
             self.autoStopOuter = True
-            
+
     def save_raw_value_AD(self, dir):
         np.savez(dir, t=self.t, A=self.adc2mVChAMax, B=self.adc2mVChBMax, C=self.adc2mVChCMax, D=self.adc2mVChDMax, Dport0=self.bufferDport0)
