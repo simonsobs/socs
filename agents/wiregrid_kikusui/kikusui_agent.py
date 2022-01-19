@@ -183,9 +183,7 @@ class KikusuiAgent:
                 ]
             )
 
-        with open('feedback.log', 'a') as f:
-            f.write('start: {}, goal: {}\n'
-                    .format(round(start_position, 3), round(goal_position, 3)))
+        writelog(logfile, 'ON', 0, start_position, 'stepwise')
 
         self._rotate_alittle(feedback_time[-1]+0.1)
         time.sleep(self.agent_interval)
@@ -206,11 +204,12 @@ class KikusuiAgent:
                         self.feedback_cut,
                         feedback_time)
 
-            with open('operation_time.log', 'a') as f:
-                f.write(str(step)+':'+str(round(mid_position, 3))
-                        + ' '+str(self.operation_time)+'\n')
-
             self._rotate_alittle(self.operation_time)
+
+        writelog(logfile, 'OFF', 0,
+                 self._get_position(
+                    self.position_path, self.open_trial, self.Deg),
+                 'stepwise')
 
     ##################
     # Main functions #
@@ -229,7 +228,14 @@ class KikusuiAgent:
                               .format(self.lock.job))
                 return False, 'Could not acquire lock'
 
+            logfile = openlog(self.action_path)
+            writelog(logfile, 'ON', 0,
+                     self._get_position(
+                        self.position_path, self.open_trial, self.Deg),
+                     'continuous')
+
             self.cmd.user_input('on')
+            logfile.close()
             return True, 'Set Kikusui on'
 
     def set_off(self, session, params=None):
@@ -245,7 +251,14 @@ class KikusuiAgent:
                               .format(self.lock.job))
                 return False, 'Could not acquire lock'
 
+            logfile = openlog(self.action_path)
+            writelog(logfile, 'OFF', 0,
+                     self._get_position(
+                        self.position_path, self.open_trial, self.Deg),
+                     'continuous')
+
             self.cmd.user_input('off')
+            logfile.close()
             return True, 'Set Kikusui off'
 
     def set_c(self, session, params=None):
@@ -367,22 +380,24 @@ class KikusuiAgent:
 
                     writelog(logfile, 'ON', tperiod,
                              self._get_position(
-                                self.position_path, self.open_trial, self.Deg))
+                                self.position_path, self.open_trial, self.Deg),
+                             'calibration')
                     self._rotate_alittle(tperiod)
                     time.sleep(self.agent_interval+1.)
-                    writelog(
-                        logfile, 'OFF', 0.,
-                        self._get_position(
-                            self.position_path, self.open_trial, self.Deg))
-                    writelog(
-                        logfile, 'ON', 0.70,
-                        self._get_position(
-                            self.position_path, self.open_trial, self.Deg))
+                    writelog(logfile, 'OFF', 0.,
+                             self._get_position(
+                                self.position_path, self.open_trial, self.Deg),
+                             'calibration')
+                    writelog(logfile, 'ON', 0.70,
+                             self._get_position(
+                                self.position_path, self.open_trial, self.Deg),
+                             'calibration')
                     self._rotate_alittle(0.70)
                     time.sleep(self.agent_interval+1.)
                     writelog(logfile, 'OFF', 0.,
                              self._get_position(
-                                self.position_path, self.open_trial, self.Deg))
+                                self.position_path, self.open_trial, self.Deg),
+                             'calibration')
                     cycle += 1
 
             logfile.close()

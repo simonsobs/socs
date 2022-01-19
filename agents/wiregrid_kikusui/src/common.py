@@ -20,13 +20,13 @@ def openlog(log_dir):
     return logfile
 
 
-# for calibration_wg() in kikusui_agent.py
+# onoff: 'ON' or 'OFF'
+# position: encoder current angle [deg.]
+# mode: 'calibration', 'stepwise', 'continuous'
 def writelog(logfile, onoff, timeperiod=0., position=0., mode='stepping_rot'):
     if timeperiod > 0.:
         log = '{:.6f} {:3s} {:8.3f} {:8.3f} {:14s}\n'\
               .format(time.time(), onoff, timeperiod, position, mode)
-        log = '{:.6f} {:3s} {:8.3f} {:8.3f}\n'\
-              .format(time.time(), onoff, timeperiod, position)
     else:
         log = '{:.6f} {:3s} {:8s} {:8.3f} {:14s}\n'\
               .format(time.time(), onoff, '--------', position, mode)
