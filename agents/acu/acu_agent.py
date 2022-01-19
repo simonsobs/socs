@@ -146,17 +146,17 @@ class ACUAgent:
 
         agent.register_process('monitor',
                                self.start_monitor,
-                               lambda: self.set_job_stop('monitor'),
+                               lambda session, params: self.set_job_stop('monitor'),
                                blocking=False,
                                startup=True)
         agent.register_process('broadcast',
                                self.start_udp_monitor,
-                               lambda: self.set_job_stop('broadcast'),
+                               lambda session, params: self.set_job_stop('broadcast'),
                                blocking=False,
                                startup=True)
         agent.register_process('generate_scan',
                                self.generate_scan,
-                               lambda: self.set_job_stop('generate_scan'),
+                               lambda session, params: self.set_job_stop('generate_scan'),
                                blocking=False,
                                startup=False)
         basic_agg_params = {'frame_length': 60}
@@ -287,19 +287,24 @@ class ACUAgent:
         Args:
             job_name (str): Name of the process you are trying to stop.
         """
+        print('try to acquire stop')
+#        return (False, 'Could not stop')
         with self.lock.acquire_timeout(timeout=1.0, job=job_name) as acquired:
             if not acquired:
                 self.log.warn("Lock could not be acquired because it is"
                               f" held by {self.lock.job}")
                 return False
-            self.jobs[job_name] = 'stop'
+            try:
+                self.jobs[job_name] = 'stop'
 #            state = self.jobs.get(job_name, 'idle')
 #            if state == 'idle':
 #                return False, 'Job not running.'
 #            if state == 'stop':
 #                return False, 'Stop already requested.'
 #            self.jobs[job_name] = 'stop'
-            return True, 'Requested Process stop.'
+                return True, 'Requested Process stop.'
+            except Exception as e:
+                print(str(e)) 
 
     def set_job_done(self, job_name):
         """
@@ -496,7 +501,9 @@ class ACUAgent:
             except:
 #                print(acustatus_influx)
                 print('failed')
-        self.set_job_done('monitor')
+#        self.set_job_stop('monitor')
+#        yield dsleep(1)
+#        self.set_job_done('monitor')
         return True, 'Acquisition exited cleanly.'
 
     @inlineCallbacks
