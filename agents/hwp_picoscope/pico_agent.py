@@ -1,6 +1,6 @@
 import numpy as np
 import time 
-import sys, os
+import os
 import argparse
 import txaio
 from ocs import ocs_agent, site_config
@@ -43,15 +43,15 @@ class PicoAgent:
         Npoints = int(params['Npoints'])
         samplefreq = float(params['samplefreq'])
         biasfreq = float(params['biasfreq'])
-        
+
         with self.lock.acquire_timeout(0, job='run_single') as acquired:
             if not acquired:
                 self.log.warn("Could not start run_single because "
                               "{} is already running".format(self.lock.job))
                 return False, "Could not acquire lock."
-        
+
         current_time = time.time()
-        
+
         pico = ps.ps3000a(Npoints, samplefreq)
         pico.SigGenSingle(biasfreq)
         pico.SetScopeAll()
@@ -63,7 +63,7 @@ class PicoAgent:
         Digital = pico.get_digital_values_simple()
         info = pico.info
         pico.close()
-        
+
         ## save downsampled data and metadata.
         data_downsampled = {
             'block_name': 'sens',
@@ -94,10 +94,10 @@ class PicoAgent:
             falling_edge = list(np.flatnonzero((ch[:-1] > .5) & (ch[1:] < .5))+1)
             #data_downsampled['data']['ch_%d_rise'%i] = rising_edge 
             #data_downsampled['data']['ch_%d_fall'%i] = falling_edge 
-            data_downsampled['data']['ch_%d_rate'%i] = (len(rising_edge or [])+len(falling_edge or []))/pico.info['length_sec']  
+            data_downsampled['data']['ch_%d_rate'%i] = (len(rising_edge or [])+len(falling_edge or []))/pico.info['length_sec']
         self.agent.publish_to_feed('downsampled_sensors', data_downsampled)
         print(data_downsampled['data'])
-        
+
         ## save raw data
         ## split data and publish one by one 
         Np = 10000
@@ -111,7 +111,7 @@ class PicoAgent:
             B_split = list(B[i*Np:(i+1)*Np])
             C_split = list(C[i*Np:(i+1)*Np])
             D_split = list(D[i*Np:(i+1)*Np])
-            
+
             data['data']['timestamp'] = t_split 
             data['data']['ch_A'] = A_split
             data['data']['ch_B'] = B_split
@@ -125,7 +125,7 @@ class PicoAgent:
             self.log.debug('publish {}/{}. {}'.format(i, int(np.ceil(len(t)/Np)), len(t_split)))
             self.agent.publish_to_feed('sensors', data)
             self.agent.feeds['sensors'].flush_buffer()
-        
+
         return True, 'Single acquisition exited cleanly.'
 
     @ocs_agent.param('freq', default=10., type=float)
@@ -166,7 +166,7 @@ def main():
 
     parser = make_parser()
     args = site_config.parse_args(agent_class='PicoAgent', parser=parser)
-    
+
     agent, runner = ocs_agent.init_site_agent(args)
 
     pa = PicoAgent(agent)
