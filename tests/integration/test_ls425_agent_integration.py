@@ -19,7 +19,7 @@ from integration.util import (
     create_crossbar_fixture
 )
 
-from integration.responder import create_responder_fixture
+from socs.testing.device_emulator import create_device_emulator
 
 pytest_plugins = ("docker_compose")
 
@@ -29,7 +29,7 @@ run_agent = create_agent_runner_fixture(
 run_agent_acq = create_agent_runner_fixture(
     '../agents/lakeshore425/LS425_agent.py', 'ls425_agent', args=['--mode', 'acq'])
 client = create_client_fixture('LS425')
-responder = create_responder_fixture({'*IDN?': 'LSCI,MODEL425,4250022,1.0'})
+emulator = create_device_emulator({'*IDN?': 'LSCI,MODEL425,4250022,1.0'})
 
 
 @pytest.mark.integtest
@@ -39,7 +39,7 @@ def test_testing(wait_for_crossbar):
 
 
 @pytest.mark.integtest
-def test_ls425_init_lakeshore(wait_for_crossbar, responder, run_agent, client):
+def test_ls425_init_lakeshore(wait_for_crossbar, emulator, run_agent, client):
     resp = client.init_lakeshore()
     # print(resp)
     assert resp.status == ocs.OK
@@ -48,7 +48,7 @@ def test_ls425_init_lakeshore(wait_for_crossbar, responder, run_agent, client):
 
 
 @pytest.mark.integtest
-def test_ls425_auto_start_acq(wait_for_crossbar, responder, run_agent_acq, client):
+def test_ls425_auto_start_acq(wait_for_crossbar, emulator, run_agent_acq, client):
     resp = client.init_lakeshore.status()
     #print(resp)
     assert resp.status == ocs.OK
@@ -64,10 +64,10 @@ def test_ls425_auto_start_acq(wait_for_crossbar, responder, run_agent_acq, clien
 
 
 @pytest.mark.integtest
-def test_ls425_start_acq(wait_for_crossbar, responder, run_agent, client):
+def test_ls425_start_acq(wait_for_crossbar, emulator, run_agent, client):
     responses = {'*IDN?': 'LSCI,MODEL425,4250022,1.0',
                  'RDGFIELD?': '+1.0E-01'}
-    responder.define_responses(responses)
+    emulator.define_responses(responses)
 
     resp = client.acq.start(sampling_frequency=1.0)
     assert resp.status == ocs.OK
@@ -90,9 +90,9 @@ def test_ls425_start_acq(wait_for_crossbar, responder, run_agent, client):
 
 
 @pytest.mark.integtest
-def test_ls425_operational_status(wait_for_crossbar, responder, run_agent, client):
+def test_ls425_operational_status(wait_for_crossbar, emulator, run_agent, client):
     responses = {'OPST?': '001'}
-    responder.define_responses(responses)
+    emulator.define_responses(responses)
 
     resp = client.operational_status()
     assert resp.status == ocs.OK
@@ -100,10 +100,10 @@ def test_ls425_operational_status(wait_for_crossbar, responder, run_agent, clien
 
 
 @pytest.mark.integtest
-def test_ls425_zero_calibration(wait_for_crossbar, responder, run_agent, client):
+def test_ls425_zero_calibration(wait_for_crossbar, emulator, run_agent, client):
     responses = {'ZCLEAR': '',
                  'ZPROBE': ''}
-    responder.define_responses(responses)
+    emulator.define_responses(responses)
 
     resp = client.zero_calibration()
     assert resp.status == ocs.OK
@@ -111,10 +111,10 @@ def test_ls425_zero_calibration(wait_for_crossbar, responder, run_agent, client)
 
 
 @pytest.mark.integtest
-def test_ls425_any_command(wait_for_crossbar, responder, run_agent, client):
+def test_ls425_any_command(wait_for_crossbar, emulator, run_agent, client):
     responses = {'UNIT 2': '',
                  'UNIT?': '2'}
-    responder.define_responses(responses)
+    emulator.define_responses(responses)
 
     # Send a command that doesn't expect a response
     resp = client.any_command(command="UNIT 2")
