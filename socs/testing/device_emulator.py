@@ -6,7 +6,28 @@ import pytest
 import threading
 
 
-def create_device_emulator(responses):
+def create_device_emulator(responses, relay_type='serial'):
+    """Create a device emulator fixture.
+
+    This provides a device emulator that can be used to mock a device during
+    testing.
+
+    Args:
+        responses (dict): Dictionary with commands as keys, and responses as
+            values. See :class:`.DeviceEmulator` for details.
+        relay_type (str): Currently only 'serial' is implemented. A TCP type
+            will be introduced in future versions.
+
+    Returns:
+        function:
+            A pytest fixture that creates a Device emulator of the specified
+            type.
+
+    """
+    if relay_type != 'serial':
+        raise NotImplementedError(f"relay_type '{relay_type}' is not" +
+                                  "implemented or is an invalid type")
+
     @pytest.fixture()
     def create_device():
         device = DeviceEmulator(responses)
@@ -135,9 +156,9 @@ class DeviceEmulator:
         Examples:
             The given responses might look like::
 
-            >>> responses = {'KRDG? 1': '+1.7E+03'}
-            >>> responses = {'*IDN?': 'LSCI,MODEL425,4250022,1.0',
-                             'RDGFIELD?': ['+1.0E-01', '+1.2E-01', '+1.4E-01']}
+                >>> responses = {'KRDG? 1': '+1.7E+03'}
+                >>> responses = {'*IDN?': 'LSCI,MODEL425,4250022,1.0',
+                                 'RDGFIELD?': ['+1.0E-01', '+1.2E-01', '+1.4E-01']}
 
         """
         print(f'responses set to {responses}')
