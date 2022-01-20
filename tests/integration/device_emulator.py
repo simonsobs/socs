@@ -6,10 +6,10 @@ import pytest
 import threading
 
 
-def create_responder_fixture(responses):
+def create_device_emulator(responses):
     @pytest.fixture()
     def create_device():
-        device = Responder(responses)
+        device = DeviceEmulator(responses)
         device.create_serial_relay()
 
         yield device
@@ -19,7 +19,7 @@ def create_responder_fixture(responses):
     return create_device
 
 
-class Responder:
+class DeviceEmulator:
     """A mocked device which knows how to respond on various communication
     channels.
 
@@ -28,7 +28,7 @@ class Responder:
             startup, if any.
 
     Attributes:
-        responses (dict): Current set of responses the Responder would give
+        responses (dict): Current set of responses the DeviceEmulator would give
 
     """
     def __init__(self, responses):
@@ -40,7 +40,7 @@ class Responder:
         """Setup a data relay with socat.
 
         The "./responder" link is the external end of the relay, which the Agent
-        should connect to. "./internal" is used within the Responder object to accept
+        should connect to. "./internal" is used within the DeviceEmulator object to accept
         commands and to respond to the Agent.
 
         """
@@ -63,7 +63,7 @@ class Responder:
 
         Next it creates a thread to read commands sent to the serial relay in
         the background. This allows responses to be defined within a test using
-        Responder.define_responses() after instantiation of the Responder
+        DeviceEmulator.define_responses() after instantiation of the DeviceEmulator
         object within a given test.
 
         """
