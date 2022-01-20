@@ -80,7 +80,9 @@ class DeviceEmulator:
 
         This first uses ``socat`` to setup a relay. It then connects to the
         "internal" end of the relay, ready to receive communications sent to the
-        "responder" end of the relay.
+        "responder" end of the relay. This end of the relay is located at
+        ``./responder``. You will need to configure your Agent to use that path for
+        communication.
 
         Next it creates a thread to read commands sent to the serial relay in
         the background. This allows responses to be defined within a test using
