@@ -20,3 +20,8 @@ Running Tests
 
 .. include:: ../../tests/README.rst
     :start-line: 2
+
+API
+---
+.. automodule:: socs.testing.device_emulator
+    :members:
