@@ -32,7 +32,7 @@ run_agent = create_agent_runner_fixture(
 run_agent_acq = create_agent_runner_fixture(
     '../agents/lakeshore425/LS425_agent.py', 'ls425_agent', args=['--mode', 'acq'])
 client = create_client_fixture('LS425')
-emulator = create_device_emulator({'*IDN?': 'LSCI,MODEL425,4250022,1.0'})
+emulator = create_device_emulator({'*IDN?': 'LSCI,MODEL425,LSA425T,1.3'})
 
 
 @pytest.mark.integtest
@@ -68,7 +68,7 @@ def test_ls425_auto_start_acq(wait_for_crossbar, emulator, run_agent_acq, client
 
 @pytest.mark.integtest
 def test_ls425_start_acq(wait_for_crossbar, emulator, run_agent, client):
-    responses = {'*IDN?': 'LSCI,MODEL425,4250022,1.0',
+    responses = {'*IDN?': 'LSCI,MODEL425,LSA425T,1.3',
                  'RDGFIELD?': '+1.0E-01'}
     emulator.define_responses(responses)
 
@@ -94,7 +94,7 @@ def test_ls425_start_acq(wait_for_crossbar, emulator, run_agent, client):
 
 @pytest.mark.integtest
 def test_ls425_operational_status(wait_for_crossbar, emulator, run_agent, client):
-    responses = {'OPST?': '001'}
+    responses = {'OPST?': '132'}
     emulator.define_responses(responses)
 
     resp = client.operational_status()
