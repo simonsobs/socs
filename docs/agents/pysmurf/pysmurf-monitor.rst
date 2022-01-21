@@ -31,10 +31,6 @@ Example site-config entry::
 
 Docker Compose
 ````````````````
-
-You can set the sql config info with the environment variables MYSQL_HOST,
-MYSQL_DATABASE, MYSQL_USER and MYSQL_PASSWORD.
-
 An example docker-compose entry might look like::
 
     ocs-pysmurf-monitor:
@@ -50,9 +46,8 @@ An example docker-compose entry might look like::
             - "--site-hub=ws://${CB_HOST}:8001/ws"
             - "--site-http=http://${CB_HOST}:8001/call"
 
-Where DB_HOST, DB, DB_USER, and DB_PW, SOCS_TAG, and CB_HOST are set in the
-``.env`` file in the same dir as the docker-compose file.
-
+Where SOCS_TAG and CB_HOST are set in the ``.env`` file in the same dir as the
+docker-compose file.
 
 Description
 -----------

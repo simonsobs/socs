@@ -108,14 +108,15 @@ SuprSync docker::
            - "--site-http=http://${CB_HOST}:8001/call"
 
 .. note::
-   If using an ssh key (recommended) and running the agent in the docker,
-   it is required that the key is mounted into the docker, that it belongs
-   to the user in the container, and has permission 600. The configuration
-   above works because the cryo user in the container is the same as the one on
-   the host, so the .ssh directory is properly configured. For instance if
-   using an ocs user in the docker, you may want to add a .ssh directory for
-   the ocs user on the host (with correct permissions) and mount that directory
-   into the docker.
+
+   If copying to a remote host from a docker container it is required that the
+   corresponding ssh-key is also mounted into the container, and that it
+   belongs to the user inside of the container with permission 600. The
+   configuration above works because the cryo user in the container is the same
+   as the one on the host, so the .ssh directory is already properly
+   configured. For instance if using an ocs user in the docker, you may want to
+   add a .ssh directory for the ocs user on the host (with correct permissions)
+   and mount that directory into the container.
 
 
 Copying Files

@@ -3,7 +3,6 @@ import time
 import subprocess
 import tempfile
 import txaio
-import pathlib
 
 from sqlalchemy import (Column, create_engine, Integer, String, Float, Boolean)
 from sqlalchemy.orm import sessionmaker
@@ -192,15 +191,15 @@ class SupRsyncFilesManager:
 
         Args
         ----
-            archive_name (string):
+            archive_name : string
                 Name of archive to get files from
-            session (sqlalchemy session):
+            session : sqlalchemy session
                 Session to use to get files. If none is specified, one will
                 be created. You need to specify this if you wish to change
                 file data and commit afterwards.
-            max_copy_attempts (int):
+            max_copy_attempts : int
                 Max number of failed copy atempts
-            num_files (int):
+            num_files : int
                 Number of files to return
         """
         if session is None:
@@ -232,12 +231,12 @@ class SupRsyncFilesManager:
 
         Args
         -----
-            archive_name (str):
+            archive_name : str
                 Name of archive to pull files from
-            delete_after (float):
+            delete_after : float
                 Time since creation (in seconds) for which it's ok to delete
                 files.
-            session (sqlalchemy session):
+            session : sqlalchemy session
                 Session to use to query files.
         """
         if session is None:
@@ -309,9 +308,9 @@ class SupRsyncFileHandler:
 
         Args
         ----
-            max_copy_attempts (int):
+            max_copy_attempts : int
                 Max number of failed copy atempts
-            num_files (int):
+            num_files : int
                 Number of files to return
         """
         with self.srfm.Session.begin() as session:
@@ -373,7 +372,7 @@ class SupRsyncFileHandler:
 
         Args
         -----
-            delete_after (float):
+            delete_after : float
                 Time since creation (in seconds) for which it's ok to delete
                 files.
         """
@@ -383,9 +382,14 @@ class SupRsyncFileHandler:
             )
             for file in files:
                 if os.path.exists(file.local_path):
-                    self.log.info(f"Removing file {file.local_path}")
-                    os.remove(file.local_path)
-                    file.removed = time.time()
+                    try:
+                        self.log.info(f"Removing file {file.local_path}")
+                        os.remove(file.local_path)
+                        file.removed = time.time()
+                    except PermissionError:
+                        self.log.error(
+                            f"Permission error: Could not remove {file.local_path}"
+                        )
                 else:
                     self.log.warn(
                         "File {file.local_path} no longer exists! "
