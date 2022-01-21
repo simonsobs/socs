@@ -18,16 +18,17 @@ if not ON_RTD:
 # This will be populated when the first frame comes in
 primary_idxs = {}
 
+
 def load_frame_data(frame):
     if len(primary_idxs) == 0:
         for i, name in enumerate(frame['primary'].names):
             primary_idxs[name] = i
 
     times = np.array(frame['primary'].data[primary_idxs['UnixTime']]) / 1e9
-    data = frame['data'].data
+    # Convert to phi0
+    data = frame['data'].data * (2*np.pi) / 2**16
 
     return times, data
-
 
 
 class FIRFilter:
@@ -41,7 +42,7 @@ class FIRFilter:
     def lfilt(self, data):
         """Filters data in place"""
         n = len(data)
-        data[:, :], self.z[:n] = signal.lfilter(self.b, self.a, data, axis=1, zi=self.z[:n])
+        data[:, :], self.z[:n] = signal.lfilter(self.b, self.a, data, axis=1,)
 
     @classmethod
     def butter_highpass(cls, cutoff, fs, order=5):
@@ -58,6 +59,38 @@ class FIRFilter:
         return cls(b, a)
 
 
+class RollingAvg:
+    """
+    Class for calculating rolling averages across multiple frames. Useful
+    for simple filtering and calculating the rms.
+
+    Args
+    -----
+        N (int):
+            Number of samples to average together
+        nchans (int):
+            Number of channels this will be operating on.
+    """
+    def __init__(self, N, nchans):
+        self.N = N
+        self.nchans = nchans
+        self.rollover = np.zeros((nchans, N))
+
+    def apply(self, data):
+        """
+        Apply rolling avg to data array.
+
+        Args
+        -----
+            data (np.ndarray):
+                Array of data. Must be of shape (nchans, nsamps)
+        """
+        summed = 1./self.N * np.cumsum(
+            np.concatenate((self.rollover, data), axis=1), axis=1)
+        self.rollover = data[:, -self.N:]
+        return summed[:, self.N:] - summed[:, :-self.N]
+
+
 class FocalplaneConfig:
     def __init__(self, ndets=0):
         self.num_dets = ndets
@@ -70,6 +103,7 @@ class FocalplaneConfig:
         self.templates = ['' for _ in range(ndets)]
 
         self.chan_mask = np.arange(ndets)
+        self.eq_keys = None
 
     def config_frame(self):
         frame = core.G3Frame(core.G3FrameType.Wiring)
@@ -80,6 +114,8 @@ class FocalplaneConfig:
         frame['equations'] = core.G3VectorString(self.eqs)
         frame['cmaps'] = core.G3VectorString(self.cmaps)
         frame['templates'] = core.G3VectorString(self.templates)
+        if self.eq_keys is not None:
+            frame['eq_keys'] = core.G3VectorString(self.eq_keys)
         return frame
 
     @classmethod
@@ -87,6 +123,7 @@ class FocalplaneConfig:
         fp = cls()
         xs, ys = range(xdim), range(ydim)
         i = 0
+        fp.eq_keys = ['a', 'b']
         for y in ys:
             for x in xs:
                 name = f"channel_{i}"
@@ -98,12 +135,18 @@ class FocalplaneConfig:
                 fp.ys.append(_y)
                 fp.rots.append(0)
                 fp.cnames.append(name)
-                fp.eqs.append(f"{name}")
-
+                #fp.eqs.append(f"{name}_equation_0")
+                #fp.eqs.append(f"{name}_equation_0")
+                for k in fp.eq_keys:
+                    fp.eqs.append(f"* {name}/{k} rms_scale")
+                #fp.eqs.append(f"speed_tuner")
                 fp.cmaps.append("red_cmap")
+                fp.cmaps.append("blue_cmap")
+
                 fp.templates.append("box")
                 i += 1
 
+        print(fp.eqs)
         fp.num_dets = len(fp.xs)
         fp.chan_mask = np.arange(fp.num_dets)
         return fp
@@ -222,7 +265,7 @@ class MagpieAgent:
         self.sent_cfg = False
         self.num_dets = self.fp.num_dets
         self.mask = np.arange(self.num_dets)
-        self.mask = np.arange(4960)
+        self.mask = np.arange(4096)
 
         self.reader = core.G3Reader(args.src)
         self.sender = core.G3NetworkSender(
@@ -235,38 +278,8 @@ class MagpieAgent:
         self.lowpass = FIRFilter.butter_lowpass(
             self.target_rate, self.target_rate * 2 + 1, order=4)
         self.send_config_flag = True
-        self.scale = 1
-        self.offsets = np.zeros(self.fp.num_dets)
-        self.zero_flag = True
 
-        self.demodulate = False
-        #self.demod_filter = FIRFilter.butter_lowpass(1, 200., order=4)
-        self.demod_freq = 4
-
-    def set_scale(self, session, params=None):
-        """
-        Task to set the scaling factor by which timestreams should be
-        multiplied by. This is currently necessary while we are still fine
-        tuning the color scale, we may soon be able to remove it.
-
-        Args:
-            scale (float):
-                scale factor to multiple det timestreams before sending to
-                lyrebird
-        """
-        if params is None:
-            params = {}
-        self.scale = params['scale']
-        return True, f"Set scale to {self.scale}"
-
-    def zero_dets(self, session, params=None):
-        """
-        Task to zero out detector timestreams if they've drifted too far,
-        messing up the color scale. Again, this might not be needed if we
-        improve how the color mapping of detector data.
-        """
-        self.zero_flag = True
-        return True, "Zeroing detectors"
+        self.avg1, self.avg2 = None, None
 
     def set_target_rate(self, session, params=None):
         """
@@ -280,30 +293,6 @@ class MagpieAgent:
             params = {}
         self.target_rate = params['target_rate']
         return True, f'Set target rate to {self.target_rate}'
-
-    def set_demod(self, session, params=None):
-        """
-        Sets demodulation parameters. Detector demodulation is still in
-        development and needs more testing.
-
-        Args:
-            state (bool, optional):
-                Enables or disables the demod filters freq (float, optional):
-                Sets the demodulation frequency
-            lowpass_order: (int, optional):
-                Sets the order of the demod filter
-        """
-        if params is None:
-            params = {}
-        if 'state' in params:
-            self.demodulate = params['state']
-        if 'freq' in params:
-            self.demod_freq = params['freq']
-        if ('lowpass_order' in params) or ('lowpass_cutoff'):
-            order = params.get('lowpass_order', 4)
-            cutoff = params.get('lowpass_cutoff', 1)
-            self.demod_filter = FIRFilter.butter_lowpass(cutoff, 200., order=order)
-        return True, f"set demod {params}"
 
     def process_status(self, frame):
         """
@@ -331,45 +320,48 @@ class MagpieAgent:
         nsamps = len(times_in)
         nchans = len(data_in)
 
+        if self.avg1 is None:
+            self.avg1 = RollingAvg(200, nchans)
+            self.avg2 = RollingAvg(200, nchans)
+
+        # Calc RMS
+        hpf_data = data_in - self.avg1.apply(data_in)  # To high-pass filter
+        rms = np.sqrt(self.avg2.apply(hpf_data**2))  # To calc rolling rms
+
         ds_factor = sample_rate // self.target_rate
         if np.isnan(ds_factor):  # There is only one element in the timestream
             ds_factor = 1
         ds_factor = max(int(ds_factor), 1)  # Prevents downsample factors < 1
 
-        # Filter and process data
+        # Arrange output data structure
         sample_idxs = np.arange(0, nsamps, ds_factor, dtype=np.int32)
         num_frames = len(sample_idxs)
 
         data_out = np.zeros((num_frames, np.max(self.fp.chan_mask)+1))
+        rms_out = np.zeros((num_frames, np.max(self.fp.chan_mask)+1))
         times_out = times_in[sample_idxs]
 
         chans = self.mask[np.arange(nchans)]
-
-        if self.demodulate:
-            template = np.sin(2*np.pi*self.demod_freq * times_in)
-            data_in *= template
-            self.demod_filter.lfilt(data_in)
-        else:
-            self.lowpass.lfilt(data_in)
-
-        if self.zero_flag:
-            self.offsets = np.mean(data_in, axis=1)
-            self.zero_flag = False
-
         for i, c in enumerate(chans):
             if c >= len(self.fp.chan_mask):
                 continue
             idx = self.fp.chan_mask[c]
             if idx >= 0:
-                data_out[:, idx] = (data_in[i, sample_idxs]-self.offsets[i]) * self.scale
+                data_out[:, idx] = (data_in[i, sample_idxs])
+                rms_out[:, idx] = (rms[i, sample_idxs])
 
         out = []
-
-        print("Queue size: ", self.out_queue.qsize())
         for i in range(num_frames):
             fr = core.G3Frame(core.G3FrameType.Scan)
+            fr['eq_idx'] = 0
             fr['timestamp'] = core.G3Time(times_out[i] * core.G3Units.s)
             fr['data'] = core.G3VectorDouble(data_out[i, :])
+            out.append(fr)
+
+            fr = core.G3Frame(core.G3FrameType.Scan)
+            fr['eq_idx'] = 1
+            fr['timestamp'] = core.G3Time(times_out[i] * core.G3Units.s)
+            fr['data'] = core.G3VectorDouble(rms_out[i, :])
             out.append(fr)
         return out
 
@@ -394,7 +386,6 @@ class MagpieAgent:
             for f in out:
                 self.out_queue.put(f)
         return True, "Stopped run process"
-
 
     def _process_stop(self, session, params=None):
         self._running = False
@@ -464,8 +455,5 @@ if __name__ == '__main__':
     agent.register_process('process', magpie.process, magpie._process_stop, startup=True)
     agent.register_process('send', magpie.send, magpie._send_stop, startup=True)
     agent.register_task('set_target_rate', magpie.set_target_rate)
-    agent.register_task('set_scale', magpie.set_scale)
-    agent.register_task('zero', magpie.zero_dets)
-    agent.register_task('set_demod', magpie.set_demod)
 
     runner.run(agent, auto_reconnect=True)
