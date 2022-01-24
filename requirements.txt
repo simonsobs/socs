@@ -18,6 +18,9 @@ scipy
 pysnmp
 pysmi
 
+# suprsync agent and tests
+sqlalchemy
+
 # Docs
 # see docs/requirements.txt
 
@@ -26,6 +29,4 @@ pytest
 pytest-cov
 pytest-docker-compose
 pytest-dependency
-
-# suprsync agent and tests
-sqlalchemy
+pytest-order

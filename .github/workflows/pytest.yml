@@ -7,9 +7,13 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
 
     steps:
+    - name: Install system packages
+      run: |
+        sudo apt-get install -y socat
+
     - name: Set up Python 3.8
       uses: actions/setup-python@v2
       with:
@@ -46,7 +50,7 @@ jobs:
 
     - name: Test with spt3g dependent tests wtihin a docker container
       run: |
-        docker run -v $PWD:/coverage --rm -w="/app/socs/tests/" socs sh -c "COVERAGE_FILE=/coverage/.coverage.docker python3 -m pytest --cov -m 'spt3g'"
+        docker run -v $PWD:/coverage --rm -w="/app/socs/tests/" socs sh -c "COVERAGE_FILE=/coverage/.coverage.docker python3 -m pytest --cov --order-dependencies -m 'spt3g'"
 
     # Integration Tests
     - name: Build images for integration tests
