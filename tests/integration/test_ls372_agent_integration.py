@@ -119,15 +119,9 @@ def test_ls372_start_acq(wait_for_crossbar, run_agent, client):
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.STARTING.value
 
-    # We stopped the process with run_once=True, but that will leave us in the
-    # RUNNING state
     resp = client.acq.status()
-    assert resp.session['op_code'] == OpCode.RUNNING.value
-
-    # Now we request a formal stop, which should put us in STOPPING
-    client.acq.stop()
-    resp = client.acq.status()
-    assert resp.session['op_code'] == OpCode.STOPPING.value
+    assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 
 @pytest.mark.integtest
