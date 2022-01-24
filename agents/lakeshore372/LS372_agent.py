@@ -238,7 +238,7 @@ class LS372_Agent:
 
         """
         pm = Pacemaker(10, quantize=True)
-        
+
         with self._acq_proc_lock.acquire_timeout(timeout=0, job='acq') \
              as acq_acquired, \
              self._lock.acquire_timeout(job='acq') as acquired:
@@ -261,7 +261,7 @@ class LS372_Agent:
             self.take_data = True
             while self.take_data:
                 pm.sleep()
-                
+
                 # Relinquish sampling lock occasionally.
                 if time.time() - last_release > 1.:
                     last_release = time.time()
