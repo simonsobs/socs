@@ -270,10 +270,6 @@ class LS372:
             self.com.send(msg_str)
             resp = ''
 
-        #if 'RDG' in message:
-        #    time.sleep(0.1)  # Instrument sampling rate of 10 readings/s max (pg 34)
-        #else:
-        #    time.sleep(0.061)  # No comms for 61ms after sending message after trial & error (manual says50ms)
         return resp
 
     def get_id(self):
