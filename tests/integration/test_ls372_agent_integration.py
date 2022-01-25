@@ -60,7 +60,8 @@ def test_ls372_start_acq(wait_for_crossbar, run_agent, client):
 
     resp = client.acq.status()
     assert resp.status == ocs.OK
-    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+    assert resp.session['op_code'] in [OpCode.SUCCEEDED.value,
+                                       OpCode.RUNNING.value]
 
 
 @pytest.mark.integtest
