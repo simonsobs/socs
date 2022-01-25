@@ -148,30 +148,7 @@ def ptstack_format(conctimes, concaz, concel, concva, concve, az_flags, el_flags
 
     return all_lines
 
-#def ptstack_format_generator(conctimes, concaz, concel, concva, concve, az_flags, el_flags):
-#    """
-#    Produces a list of lines in the format necessary to upload to the ACU to complete a 
-#    generated scan. Params are the outputs of generate.
-#
-#    Params:
-#        conctimes (list): List of times starting at most recently used time for the ACU 
-#                          to reach associated positions
-#        concaz (list): List of azimuth positions associated with times
-#        concel (list): List of elevation positions associated with times
-#        concva (list): List of azimuth velocities associated with times
-#        concve (list): List of elevation velocities associated with times
-#        az_flags (list): List of flags associated with azimuth motions at associated times
-#        el_flags (list): List of flags associated with elevation motions at associated times
-#    """
-#    fmt = '%j, %H:%M:%S'
-#    start_time = 10.
-#    true_times = [start_time + i for i in conctimes]
-#    fmt_times = [time.strftime(fmt, time.gmtime(t)) + ('%.6f' % (t%1.))[1:] for t in true_times]
-#
-#    all_lines = [('%s;%.4f;%.4f;%.4f;%.4f;%i;%i\r\n' % (fmt_times[n], concaz[n], concel[n], concva[n], concve[n], az_flags[n], el_flags[n])) for n in range(len(fmt_times))]
-#    return all_lines
-
-def generate_linear_turnaround(stop_iter, az_endpoint1, az_endpoint2, az_speed, acc, el_endpoint1, el_endpoint2, el_speed):
+def generate_linear_turnaround(az_endpoint1, az_endpoint2, az_speed, acc, el_endpoint1, el_endpoint2, el_speed, stop_iter=1000000000, wait_to_start=10., step_time=0.1, batch_size=500):
     """
     Python generator to produce times, azimuth and elevation positions, azimuth and elevation 
     velocities, azimuth and elevation flags for arbitrarily long constant-velocity azimuth 
@@ -190,12 +167,14 @@ def generate_linear_turnaround(stop_iter, az_endpoint1, az_endpoint2, az_speed, 
     """
     az_min = min(az_endpoint1, az_endpoint2)
     az_max = max(az_endpoint1, az_endpoint2)
-    t0 = time.time() + 10.
+    t0 = time.time() + wait_to_start
     t = 0
     turntime = 2.0 * az_speed / acc
     az = az_endpoint1
     el = el_endpoint1
-    daz = 0.1 * az_speed
+    if step_time < 0.05:
+        raise ValueError('Step size too small, must be at least 0.05 seconds')
+    daz = step_time * az_speed
     el_vel = el_speed
     az_flag = 0
     if az < az_endpoint2:
@@ -205,59 +184,65 @@ def generate_linear_turnaround(stop_iter, az_endpoint1, az_endpoint2, az_speed, 
         increasing = False
         az_vel = -1*az_speed
     else:
-        print('Error: need two different motion endpoints.')
-        return
+        raise ValueError('Need two different motion endpoints')
+    az_remainder = (az_max - az_min) % 1
+    if az_remainder == 0.0:
+        leftover_az = 0.0
+        leftover_time = 0.0
+    else:
+        leftover_az = az_remainder
+        leftover_time = az_remainder / az_speed
+    print(daz)
     for i in range(stop_iter):
         point_block = [[],[],[],[],[],[],[]]
-        for j in range(500):
+        for j in range(batch_size):
+            t += step_time
             if increasing:
-                if round(az, 4) <= (az_max-daz):
-                    t += 0.1
+                if az < (az_max-(2*daz+leftover_az)):
                     az += daz
                     az_vel = az_speed
                     el_vel = el_speed
                     az_flag = 1
-                    el_flag = 0
-                    increasing = True
-                elif round(az, 4) == (az_max-daz):
-                    t += 0.1
-                    az += daz
-                    az_vel = az_speed
-                    el_vel = el_speed
-                    az_flag = 2
                     el_flag = 0
                     increasing = True
                 elif round(az, 4) == az_max:
-                    t += 0.1 + turntime
+                    t += turntime
                     az_vel = -1*az_speed
                     el_vel = el_speed
                     az_flag = 1
                     el_flag = 0
                     increasing = False
-            else:
-                if round(az, 4) > az_min:
-                    t += 0.1
-                    az -= daz
-                    az_vel = -1*az_speed
-                    el_vel = el_speed
-                    az_flag = 1
-                    el_flag = 0
-                    increasing = False
-                elif round(az, 4) == (az_min + daz):
-                    t += 0.1
-                    az -= daz
-                    az_vel = -1*az_speed
+                else:
+                    az += daz + leftover_az
+                    t += leftover_time
+                    az_vel = az_speed
                     el_vel = el_speed
                     az_flag = 2
                     el_flag = 0
+                    increasing = True
+            else:
+                if az > (az_min + (daz+leftover_az)):
+                    az -= daz
+                    az_vel = -1*az_speed
+                    el_vel = el_speed
+                    az_flag = 1
+                    el_flag = 0
                     increasing = False
                 elif round(az, 4) == az_min:
-                    t += 0.1 + turntime
+                    t += turntime
                     az_vel = az_speed
                     el_vel = el_speed
                     az_flag = 1
                     el_flag = 0
                     increasing = True
+                else:
+                    az -= (daz + leftover_az)
+                    t += leftover_time
+                    az_vel = -1*az_speed
+                    el_vel = el_speed
+                    az_flag = 2
+                    el_flag = 0
+                    increasing = False
             point_block[0].append(t + t0)
             point_block[1].append(az)
             point_block[2].append(el)
@@ -265,7 +250,7 @@ def generate_linear_turnaround(stop_iter, az_endpoint1, az_endpoint2, az_speed, 
             point_block[4].append(el_vel)
             point_block[5].append(az_flag)
             point_block[6].append(el_flag)
-        yield write_generator_lines(point_block[0], point_block[1], point_block[2], point_block[3], point_block[4], point_block[5], point_block[6])
+        yield (point_block[0], point_block[1], point_block[2], point_block[3], point_block[4], point_block[5], point_block[6])
 
 
 if __name__ == "__main__":
