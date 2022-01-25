@@ -276,7 +276,8 @@ def main():
     parser.add_argument('--fake-data', help=argparse.SUPPRESS)
     parser.add_argument('--num-channels', help=argparse.SUPPRESS)
 
-    args = parser.parse_args()
+    # Interpret options in the context of site_config.
+    args = site_config.parse_args(agent_class='Lakeshore240Agent', parser=parser)
 
     if args.fake_data is not None:
         warnings.warn("WARNING: the --fake-data parameter is deprecated, please "
@@ -285,9 +286,6 @@ def main():
     if args.num_channels is not None:
         warnings.warn("WARNING: the --num-channels parameter is deprecated, please "
             "remove from your site-config file", DeprecationWarning)
-
-    # Interpret options in the context of site_config.
-    args = site_config.parse_args(agent_class='Lakeshore240Agent', parser=parser)
 
     # Automatically acquire data if requested (default)
     init_params = False

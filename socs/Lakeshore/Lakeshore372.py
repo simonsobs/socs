@@ -258,7 +258,6 @@ class LS372:
             # Try once, if we timeout, try again. Usually gets around single event glitches.
             for attempt in range(2):
                 try:
-                    time.sleep(0.061)
                     resp = str(self.com.recv(4096), 'utf-8').strip()
                     break
                 except socket.timeout:
@@ -271,10 +270,6 @@ class LS372:
             self.com.send(msg_str)
             resp = ''
 
-        if 'RDG' in message:
-            time.sleep(0.1)  # Instrument sampling rate of 10 readings/s max (pg 34)
-        else:
-            time.sleep(0.061)  # No comms for 61ms after sending message after trial & error (manual says50ms)
         return resp
 
     def get_id(self):

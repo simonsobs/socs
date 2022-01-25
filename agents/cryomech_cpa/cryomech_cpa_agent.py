@@ -45,7 +45,7 @@ def time_limit(seconds):
 class PTC:
     def __init__(self, ip_address, port=502, timeout=10, fake_errors=False):
         self.ip_address = ip_address
-        self.port = port
+        self.port = int(port)
         self.fake_errors = fake_errors
 
         self.model = None

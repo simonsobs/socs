@@ -48,6 +48,13 @@ services:
       - "socs"
 
   # --------------------------------------------------------------------------
+  # The Lakeshore 425 Agent
+  # --------------------------------------------------------------------------
+  ocs-lakeshore425-agent:
+    image: "ocs-lakeshore425-agent"
+    build: ./agents/lakeshore425/
+
+  # --------------------------------------------------------------------------
   # The Pysmurf Controller Agent
   # --------------------------------------------------------------------------
   ocs-pysmurf-agent:
@@ -179,6 +186,13 @@ services:
     build: ./agents/chwp/
     depends_on:
       - "socs"
+
+  # --------------------------------------------------------------------------
+  # Smurf file emulator agent
+  # --------------------------------------------------------------------------
+  ocs-smurf-file-emulator-agent:
+    image: "ocs-smurf-file-emulator-agent"
+    build: ./agents/smurf_file_emulator/
 
   # --------------------------------------------------------------------------
   # SOCS Simulators

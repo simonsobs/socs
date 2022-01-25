@@ -11,7 +11,7 @@ from twisted.internet import reactor
 from socs.Lakeshore.Lakeshore372 import LS372
 
 from ocs import ocs_agent, site_config
-from ocs.ocs_twisted import TimeoutLock
+from ocs.ocs_twisted import TimeoutLock, Pacemaker
 
 
 class YieldingLock:
@@ -237,6 +237,8 @@ class LS372_Agent:
                 }
 
         """
+        pm = Pacemaker(10, quantize=True)
+
         with self._acq_proc_lock.acquire_timeout(timeout=0, job='acq') \
              as acq_acquired, \
              self._lock.acquire_timeout(job='acq') as acquired:
@@ -258,6 +260,7 @@ class LS372_Agent:
 
             self.take_data = True
             while self.take_data:
+                pm.sleep()
 
                 # Relinquish sampling lock occasionally.
                 if time.time() - last_release > 1.:
