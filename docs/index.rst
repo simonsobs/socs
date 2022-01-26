@@ -54,6 +54,7 @@ Simulator Reference  Simulators are used to mock software and hardware
     agents/scpi_psu
     agents/smurf_crate_monitor
     agents/smurf_recorder
+    agents/suprsync
     agents/synacc
     agents/tektronix3021c
     agents/vantage_pro2

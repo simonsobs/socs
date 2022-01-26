@@ -194,6 +194,12 @@ services:
     image: "ocs-smurf-file-emulator-agent"
     build: ./agents/smurf_file_emulator/
 
+  ocs-suprsync-agent:
+    image: 'ocs-suprsync-agent'
+    build: ./agents/suprsync/
+    depends_on:
+      - "socs"
+
   # --------------------------------------------------------------------------
   # SOCS Simulators
   # --------------------------------------------------------------------------
