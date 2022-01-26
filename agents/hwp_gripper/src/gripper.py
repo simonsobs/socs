@@ -1,16 +1,10 @@
 # Built-in python modules
 import datetime as dt
-import sys as sy
 import numpy as np
 import os
 
-# CHWP Gripper modules
+# CHWP modules
 import motor as mt  # noqa: E402
-import C000DRD as c0  # noqa: E402
-import JXC831 as jx  # noqa: E402
-import control as ct  # noqa: E402
-import command_gripper as cd  # noqa: E402
-
 
 class Gripper:
     """
@@ -33,11 +27,10 @@ class Gripper:
         self.log = self.CTL.log
 
         # Position file
-        self.pos_dir = os.path.join(
-            os.path.dirname(os.path.realpath(__file__)), "POS")
+        self.this_dir = os.path.dirname(__file__)
         self.pos_file = os.path.join(
-            self.pos_dir, "chwpGripper_positionLog.txt")
-        self.posf = open(self.pos_file, 'a+')
+            self.this_dir, "chwp_gripper_pos.txt")
+        self.posf = open(self.pos_file, 'w+')
 
         # Read initial positions
         self._read_pos()
@@ -104,10 +97,7 @@ class Gripper:
         dist (float): distance to move the motor [mm]
         axis_no (int): axis to move (1-3)
         """
-        # Calculate target position
         motor = self.motors[str(axis_no)]
-        start_pos = motor.pos
-        target_pos = start_pos + dist
 
         # Execute steps
         steps = self._select_steps(mode, dist, axis_no)
@@ -126,6 +116,11 @@ class Gripper:
                 self.log.err(
                     "MOVE aborted in Gripper.MOVE() due to "
                     "CTL.STEP() returning False")
+                self.motors[str(axis_no)].pos = motor.pos
+                if abs(dist) - abs(dist)//1 == 0:
+                    self.motors[str(axis_no)].max_pos_err += 1.0
+                else:
+                    self.motors[str(axis_no)].max_pos_err += 0.1
                 self._write_pos()
                 # self.INP()
                 return False
@@ -133,6 +128,7 @@ class Gripper:
             "MOVE in Gripper.MOVE() completed successfully")
 
         # Write new position and return whether in position
+        self.motors[str(axis_no)].pos = motor.pos
         self._write_pos()
         return self.INP()
 
@@ -145,6 +141,7 @@ class Gripper:
             # Store homed positions
             for k in self.motors.keys():
                 self.motors[k].pos = self.motors[k].home_pos
+                self.motors[k].max_pos_err = 0.
             self._write_pos()
             return True
         else:
@@ -171,11 +168,11 @@ class Gripper:
         elif group == "B" or group == "C":
             self.log.log(
                 "Clearing Alarm group '%s' via a RESET." % (group))
-            result = self.CTL.RESET()
+            return self.CTL.RESET()
         elif group == "D":
             self.log.log(
                 "Clearing Alarm group '%s' via a RESET" % (group))
-            result = self.CTL.RESET()
+            return self.CTL.RESET()
         elif group == "E":
             self.log.err(
                 "RESET failed in Gripper.RESET() due to alarm group '%s' "
@@ -202,12 +199,11 @@ class Gripper:
 
     def SETPOS(self, axis_no, value):
         """ Set a user-defined position for a specific motor """
-        mot = self.motors[str(axis_no)]
-        start_pos = mot.pos
         self.log.out(
-            "Axis %d old position = %.02f" % (axis_no, start_pos))
-        mot.pos = value
-        mot.max_pos_err = 0
+            "Axis %d old position = %.02f" % (axis_no, self.motors[str(axis_no)].pos))
+        self.motors[str(axis_no)].pos = float(value)
+        self.motors[str(axis_no)].max_pos_err = 0.
+        self._write_pos()
         self.log.out(
             "Axis %d new position set manually = %.02f"
             % (axis_no, value))
@@ -235,7 +231,7 @@ class Gripper:
             self.motors["2"].pos = 0.
             self.motors["3"].pos = 0.
         else:
-            lastWrite = [-1]
+            lastWrite = lines[-1]
             date, time = lastWrite.split('[')[1].split(']')[0].split()
             pos1, pos2, pos3 = lastWrite.split()[2:]
             self.motors["1"].pos = float(pos1)
@@ -254,6 +250,7 @@ class Gripper:
                self.motors["1"].pos,
                self.motors["2"].pos,
                self.motors["3"].pos))
+        self.posf.truncate(0)
         self.posf.write(wrmsg)
         return True
 
