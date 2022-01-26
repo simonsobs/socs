@@ -1,13 +1,13 @@
 # Built-in python modules
-import time as tm
-import serial as sr
-import sys as sy
+import time
+import serial
+import sys
 import os
 
 # CHWP Control modules
 this_dir = os.path.dirname(__file__)
-sy.path.append(os.path.join(
-    this_dir, "..", "..","..", "MOXA"))
+sys.path.append(this_dir)
+
 import moxaSerial as mx  # noqa: E402
 
 class PMX:
@@ -18,6 +18,7 @@ class PMX:
     rtu_port (str): Serial RTU port
     tcp_ip (str): TCP IP address
     tcp_port (int): TCP port
+    timeout (int): Connection timeout
     """
     def __init__(self, rtu_port=None, tcp_ip=None, tcp_port=None, timeout=None):
         # Connect to device
@@ -48,7 +49,7 @@ class PMX:
         self.wait()
         val = float(self.ser.readline())
         msg = "Measured voltage = %.3f V" % (val)
-        print(msg)
+        #print(msg)
         return msg, val
 
     def check_current(self):
@@ -58,7 +59,7 @@ class PMX:
         self.wait()
         val = float(self.ser.readline())
         msg = "Measured current = %.3f A" % (val)
-        print(msg)
+        #print(msg)
         return msg, val
 
     def check_voltage_current(self):
@@ -70,7 +71,7 @@ class PMX:
             "Measured voltage = %.3f V\n"
             "Measured current = %.3f A\n"
             % (voltage, current))
-#        print(msg)
+        #print(msg)
         return voltage, current
 
     def check_output(self):
@@ -85,7 +86,7 @@ class PMX:
             msg = "Measured output state = ON"
         else:
             msg = "Failed to measure output..."
-        print(msg)
+        #print(msg)
         return msg, val
 
     def set_voltage(self, val, silent=False):
@@ -142,6 +143,34 @@ class PMX:
 
         return msg
 
+    def set_voltage_limit(self, val, silent = False):
+        """ Set the PMX voltage limit """
+        self.clean_serial()
+        self.ser.write(str.encode("VOLT:PROT %f\n\r" % (float(val))))
+        self.wait()
+        self.ser.write(str.encode("VOLT:PROT?\n\r"))
+        self.wait()
+        val = self.ser.readline()
+        msg = "Voltage limit set = %.3f V" % (float(val))
+        if (silent != True):
+            print(msg)
+
+        return msg
+
+    def set_current_limit(self, val, silent=False):
+        """ Set the PMX current limit """
+        self.clean_serial()
+        self.ser.write(str.encode("CURR:PROT %f\n\r" % (float(val))))
+        self.wait()
+        self.ser.write(str.encode("CURR:PROT?\n\r"))
+        self.wait()
+        val = self.ser.readline()
+        msg = "Current limit set = %.3f A\n" % (float(val))
+        if (silent != True):
+            print(msg)
+
+        return msg
+
     def turn_on(self):
         """ Turn the PMX on """
         self.clean_serial()
@@ -177,6 +206,7 @@ class PMX:
         rtu_port (str): Serial RTU port
         tcp_ip (str): TCP IP address
         tcp_port (int): TCP port
+        timeout (int): Connection timeout
         """
         if rtu_port is None and (tcp_ip is None or tcp_port is None):
             raise Exception(
@@ -188,7 +218,7 @@ class PMX:
                 "Aborted PMX._conn() due to RTU and TCP port both being "
                 "specified. Can only have one or the other.")
         elif rtu_port is not None:
-            self.ser = sr.Serial(
+            self.ser = serial.Serial(
                 port=rtu_port, baudrate=19200, bytesize=8,
                 parity='N', stopbits=1, timeout=timeout)
             self._rtu_port = rtu_port
@@ -207,7 +237,7 @@ class PMX:
 
     def wait(self):
         """ Sleep """
-        tm.sleep(0.05)
+        time.sleep(0.05)
         return True
 
     def clean_serial(self):
@@ -227,3 +257,178 @@ class PMX:
         self.ser.write(str.encode('SYST:REM\n\r'))
         self.wait()
         return True
+
+
+class Command:
+    """
+    The Command object is used to command the PMX
+
+    Args:
+    PMX (src.PMX): PMX object
+    """
+    def __init__(self, input_PMX):
+        # PMX connection
+        if input_PMX is not None:
+            self._PMX = input_PMX
+        else:
+            raise Exception(
+                "PMX object not passed to Command constructor\n")
+
+        # Dict of commands
+        self._cmds = {
+            "set_port": "P",
+            "check_v": "V?",
+            "check_c": "C?",
+            "check_vc": "VC?",
+            "check_out": "O?",
+            "set_v": "V",
+            "set_c": "C",
+            "set_v_lim": "VL",
+            "set_c_lim": "CL",
+            "set_on": "ON",
+            "set_off": "OFF",
+            "get_help": "H",
+            "use_ext": "U",
+            "ign_ext": "I",
+            "stop": "Q"}
+
+    def get_help(self):
+        """ Print possible commands """
+        wrstr = (
+            "\nChange ttyUSB port = '%s'\n"
+            "Check output voltage = '%s'\n"
+            "Check output current = '%s'\n"
+            "Check output voltage and current = '%s'\n"
+            "Check output state = '%s'\n"
+            "Set output voltage = '%s' [setting]\n"
+            "Set output current = '%s' [setting]\n"
+            "Set output voltage limit = '%s'\n"
+            "Set output current limit = '%s'\n"
+            "Turn output on = '%s'\n"
+            "Turn output off = '%s'\n"
+            "Print possible commands = '%s'\n"
+            "Use external voltage = '%s'\n"
+            "Ignore external voltage = '%s'\n"
+            "Quit program = '%s'\n"
+            % (self._cmds["set_port"],
+               self._cmds["check_v"],
+               self._cmds["check_c"],
+               self._cmds["check_vc"],
+               self._cmds["check_out"],
+               self._cmds["set_v"],
+               self._cmds["set_c"],
+               self._cmds["set_v_lim"],
+               self._cmds["set_c_lim"],
+               self._cmds["set_on"],
+               self._cmds["set_off"],
+               self._cmds["get_help"],
+               self._cmds["use_ext"],
+               self._cmds["ign_ext"],
+               self._cmds["stop"]))
+        return wrstr
+
+    def user_input(self, arg):
+        """ Take user input and execute PMX command """
+        argv = arg.split()
+        #if len(args) > 0:
+            #value = float(args[0])
+        
+        while len(argv):
+            cmd = str(argv.pop(0)).upper()
+            # No command
+            if cmd == '':
+                return
+            # Check voltage
+            elif cmd == self._cmds["check_v"]:
+                return self._PMX.check_voltage()
+            # Check current
+            elif cmd == self._cmds["check_c"]:
+                return self._PMX.check_current()
+            # Check voltage and current
+            elif cmd == self._cmds["check_vc"]:
+                return self._PMX.check_voltage_current()
+            # Check output state
+            elif cmd == self._cmds["check_out"]:
+                return self._PMX.check_output()
+            # Turn output state ON
+            elif cmd == self._cmds["set_on"]:
+                return self._PMX.turn_on()
+            # Turn output state OFF
+            elif cmd == self._cmds["set_off"]:
+                return self._PMX.turn_off()
+            # Get HELP
+
+            #elif cmd == self._cmds["set_v"]:
+                #print(value)
+                #ret = self._PMX.set_voltage(value)
+
+            #elif cmd == self._cmds["set_c"]:
+                #ret = self._PMX.set_current(value)
+
+            elif cmd == self._cmds["use_ext"]:
+                return self._PMX.use_external_voltage()
+            elif cmd == self._cmds["ign_ext"]:
+                return self._PMX.ign_external_voltage()
+            elif cmd == self._cmds["get_help"]:
+                ret = self.get_help()
+                print(ret)
+            # Exit the program
+            elif cmd == self._cmds["stop"]:
+                sys.exit("\nExiting...")
+            # Set the RTU port
+            elif cmd == self._cmds["set_port"]:
+                if self._PMX.using_tcp:
+                    print("Connected via TCP rather than RTU. Cannot set RTU port")
+                    return False
+                set_val = self._int(argv.pop(0))
+                if set_val is not None:
+                    del self._PMX
+                    self._PMX = PMX(set_val)
+                else:
+                    return False
+            elif cmd == self._cmds["set_v"]:
+                set_val = self._float(argv.pop(0))
+                if set_val is not None:
+                    self._PMX.set_voltage(set_val)
+                else:
+                    return False
+            elif cmd.lower() == self._cmds["set_c"].lower():
+                set_val = self._float(argv.pop(0))
+                if set_val is not None:
+                    self._PMX.set_current(set_val)
+                else:
+                    return False
+            elif cmd == self._cmds["set_v_lim"]:
+                set_val = self._float(argv.pop(0))
+                if set_val is not None:
+                    self._PMX.set_voltage_limit(set_val)
+                else:
+                    return False
+            elif cmd.lower() == self._cmds["set_c_lim"].lower():
+                set_val = self._float(argv.pop(0))
+                if set_val is not None:
+                    self._PMX.set_current_limit(set_val)
+                else:
+                    return False
+            else:
+                print("Command '%s' not understood..." % (cmd))
+                return False
+        return True
+
+    # ***** Helper Methods *****
+    def _float(self, val):
+        """ Try to convert a value to a float """
+        try:
+            return float(val)
+        except ValueError:
+            print("Input '%s' not understood, must be a float..." % (val))
+            return None
+
+    def _int(self, val):
+        """ Try to convert a value to an int """
+        try:
+            return int(val)
+        except ValueError:
+            print("Input '%s' not understood, must be a int..." % (val))
+            return None
+

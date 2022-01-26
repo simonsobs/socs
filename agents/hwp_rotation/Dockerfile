@@ -1,9 +1,10 @@
-# SOCS AWG Agent
-# socs Agent container for interacting with AWG over GPIB to Ethernet
-# converts.
+# SOCS Agent container for controlling the HWP rotation speed and direction
 
 # Use socs base image
 FROM socs:latest
+
+# Install telnet for PID communication
+RUN apt-get install telnet
 
 # Set the working directory to registry directory
 WORKDIR /app/socs/agents/hwp_rotation/
@@ -12,9 +13,8 @@ WORKDIR /app/socs/agents/hwp_rotation/
 COPY . .
 
 # Run agent on container startup
-ENTRYPOINT ["python3", "-u", "rotation_agent.py"]
+ENTRYPOINT ["dumb-init", "python3", "-u", "rotation_agent.py"]
 
-CMD ["--site-hub=ws://sisock-crossbar:8001/ws", \
-     "--site-http=http://sisock-crossbar:8001/call"]
+CMD ["--site-hub=ws://crossbar:8001/ws", \
+     "--site-http=http://crossbar:8001/call"]
 
-RUN apt-get install telnet

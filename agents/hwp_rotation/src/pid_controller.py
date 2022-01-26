@@ -3,7 +3,10 @@
 # Imports
 ########################################################################################################################
 
-import subprocess, sys, os, fcntl, time
+import subprocess
+import os
+import fcntl
+import time
 this_dir = os.path.dirname(__file__)
 
 ########################################################################################################################
@@ -19,16 +22,16 @@ class PID:
         self.PID_INFO = [pid_ip, pid_port]
         self.hex_freq = '00000'
         self.cur_freq = 0
-        self.stopping = True
+        self.cur_direction = 0
         self.stop_params = [0.2, 0, 0]
         self.tune_params = [0.2, 63, 0]
-
+        self.set_direction('0')
 
 ########################################################################################################################
 # Subprocesses
 ########################################################################################################################
 
-    # Converts the user input inrto a format the PID controller can read
+    # Converts the user input into a format the PID controller can read
     def convert_to_hex(self, value, decimal):
         temp_value = hex(int(10**decimal*float(value)))
         return ('0000' + str(temp_value)[2:].upper())[-4:]
@@ -48,6 +51,16 @@ class PID:
         fcntl.flock(self.lock_file, fcntl.LOCK_UN)
         self.lock_file.close()
 
+    # Gets the exponent in scientific notation
+    def get_scale_hex(self, num, corr):
+        expo = int(str(num*10**40 + 0.01).split('+')[1])-40
+        digits = round(num*10**(-expo+4))
+
+        expo_hex = str(hex(corr-expo))[2:]
+        digits_hex = ('00000'+str(hex(digits))[2:])[-5:]
+
+        return expo_hex + digits_hex
+
 ########################################################################################################################
 # Main Processes
 ########################################################################################################################
@@ -59,11 +72,11 @@ class PID:
                          direction], stderr = subprocess.DEVNULL)
         if direction == '0':
             print('Forward')
-            self.stopping = False
+            self.direction = 0
         elif direction == '1':
             print('Reverse')
-            self.stopping = True
-    
+            self.direction = 1
+
         self.return_messages()
         self.close_line()
 
@@ -104,9 +117,19 @@ class PID:
             print('Finding CHWP Frequency')
         subprocess.call([os.path.join(self.script_dir, './get_freq'), self.PID_INFO[0], self.PID_INFO[1]],
                          stderr = subprocess.DEVNULL)
-        self.open_line()
         self.return_messages()
+        self.close_line()
         return self.cur_freq
+
+    # Returns the current rotation direction
+    def get_direction(self):
+        self.open_line()
+        if self.verb:
+            print('Finding CHWP Direction')
+        subprocess.call([os.path.join(self.script_dir, './get_direction'), self.PID_INFO[0], self.PID_INFO[1]],
+                         stderr = subprocess.DEVNULL)
+        self.return_messages()
+        self.close_line()
 
     # Sets the PID parameters of the controller
     def set_pid(self, params):
@@ -119,6 +142,14 @@ class PID:
                         i_value, d_value], stderr = subprocess.DEVNULL)
         self.return_messages()
 
+    # Sets the conversion between feedback voltage and approximate frequency
+    def set_scale(self, slope, offset):
+        self.open_line()
+        slope_hex = get_scale_hex(slope, 1)
+        offset_hex = get_scale_hex(offset, 2)
+        subprocess.call([os.path.join(self.script_dir, './set_scale'), self.PID_INFO[0], self.PID_INFO[1],
+                         slope_hex, offset_hex], stderr = subprocess.DEVNULL)
+        self.close_line()
 
 ########################################################################################################################
 # Messaging
@@ -166,6 +197,13 @@ class PID:
         read_type = string[1:3]
         if read_type == '01':
             return 'Setpoint = ' + str(int(string[4:], 16)/1000.)
+        elif read_type == '02':
+            if int(string[4:], 16)/1000. > 2.5:
+                print('Direction = Reverse')
+                self.direction = 1
+            else:
+                print('Direction = Forward')
+                self.direction = 0
         else:
             return 'Unrecognized Read'
 
