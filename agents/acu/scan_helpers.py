@@ -163,8 +163,8 @@ def generate_linear_turnaround(az_endpoint1, az_endpoint2, az_speed, acc, el_end
         el_endpoint2 (float): second elevation endpoint of the scan. For development, this 
                               must be equal to el_endpoint1.
         el_speed (float): speed of the elevation motion. For development, set to 0.0
-        stop_iter (float): sets the number of iterations for the generator. Default value
-                           is infinity.
+        stop_iter (float or int): sets the number of iterations for the generator.
+                                  Default value is infinity.
         wait_to_start (float): number of seconds to wait between time.time() and the real 
                                start time. Default is 10 seconds.
         step_time (float): time between points on the constant-velocity parts of the motion.
