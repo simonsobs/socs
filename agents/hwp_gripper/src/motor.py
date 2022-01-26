@@ -5,11 +5,8 @@ class Motor:
     Args:
     name (str): motor name (default "Unnamed Motor")
     """
-    def __init__(self, name=None):
-        if name is None:
-            self.name = "Unnamed Motor"
-        else:
-            self.name = name
+    def __init__(self, name = 'Unnamed Motor'):
+        self.name = name
 
         self.is_home = False  # is homed
         self.is_in_pos = False  # is in position
@@ -18,6 +15,6 @@ class Motor:
         self.pos = 0.  # position
         self.max_pos_err = 0.  # maximum possible position error
 
-        self.max_pos = 35.  # mm
+        self.max_pos = 20.  # mm
         self.min_pos = -2.  # mm
         self.home_pos = 0.  # mm

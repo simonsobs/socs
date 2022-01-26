@@ -125,10 +125,10 @@ class Command:
 
     def _move(self, args):
         if not len(args) == 4:
-                self.log.err(
-                    "Cannot understand 'MOVE' argument: %s"
-                    % (' '.join(args[1:])))
-                return False
+            self.log.err(
+                "Cannot understand 'MOVE' argument: %s"
+                % (' '.join(args[1:])))
+            return False
         else:
             mode = str(args[1]).upper()
             if not (mode == 'PUSH' or mode == 'POS'):
@@ -162,10 +162,10 @@ class Command:
 
     def _set_pos(self, args):
         if not len(args) == 3:
-                self.log.err(
-                    "Cannot understand 'MOVE' argument: %s"
-                    % (' '.join(args[1:])))
-                return False
+            self.log.err(
+                "Cannot understand 'MOVE' argument: %s"
+                % (' '.join(args[1:])))
+            return False
         try:
             axis = int(args[1])
         except ValueError:

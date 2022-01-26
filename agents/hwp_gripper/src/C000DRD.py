@@ -122,7 +122,7 @@ class C000DRD:
         addr (int): PLC address from which to read
         """
         return self.client.write_coils(
-            self._addr(addr), [not read_pin(addr)], unit=self._unit)
+            self._addr(addr), [not self.read_pin(addr)], unit=self._unit)
 
     # ***** Helper Methods *****
     def _addr(self, addr):
