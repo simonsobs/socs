@@ -148,14 +148,13 @@ def ptstack_format(conctimes, concaz, concel, concva, concve, az_flags, el_flags
 
     return all_lines
 
-def generate_linear_turnaround(az_endpoint1, az_endpoint2, az_speed, acc, el_endpoint1, el_endpoint2, el_speed, stop_iter=1000000000, wait_to_start=10., step_time=0.1, batch_size=500):
+def generate_linear_turnaround(az_endpoint1, az_endpoint2, az_speed, acc, el_endpoint1, el_endpoint2, el_speed, stop_iter=float('inf'), wait_to_start=10., step_time=0.1, batch_size=500, ptstack_fmt=True):
     """
     Python generator to produce times, azimuth and elevation positions, azimuth and elevation 
     velocities, azimuth and elevation flags for arbitrarily long constant-velocity azimuth 
     scans.
 
     Params:
-        stop_iter (int): maximum number of times the generator should produce new points.
         az_endpoint1 (float): the azimuth endpoint at which to start the scan
         az_endpoint2 (float): the second azimuth endpoint of the scan
         az_speed (float): speed of the constant-velocity azimuth motion
@@ -164,6 +163,17 @@ def generate_linear_turnaround(az_endpoint1, az_endpoint2, az_speed, acc, el_end
         el_endpoint2 (float): second elevation endpoint of the scan. For development, this 
                               must be equal to el_endpoint1.
         el_speed (float): speed of the elevation motion. For development, set to 0.0
+        stop_iter (float): sets the number of iterations for the generator. Default value
+                           is infinity.
+        wait_to_start (float): number of seconds to wait between time.time() and the real 
+                               start time. Default is 10 seconds.
+        step_time (float): time between points on the constant-velocity parts of the motion.
+                           Default value is 0,1 seconds. Minimum value is 0.05 seconds.
+        batch_size (int): number of values to produce in each iteration. Default is 500.
+        ptstack_fmt (bool): determine whether values are produced with the necessary format
+                            to upload to the ACU. If False, this function will produce 
+                            lists of time, azimuth, elevation, azimuth velocity, elevation
+                            velocity, azimuth flags, and elevation flags. Default is True.
     """
     az_min = min(az_endpoint1, az_endpoint2)
     az_max = max(az_endpoint1, az_endpoint2)
@@ -173,8 +183,8 @@ def generate_linear_turnaround(az_endpoint1, az_endpoint2, az_speed, acc, el_end
     az = az_endpoint1
     el = el_endpoint1
     if step_time < 0.05:
-        raise ValueError('Step size too small, must be at least 0.05 seconds')
-    daz = step_time * az_speed
+        raise ValueError('Time step size too small, must be at least 0.05 seconds')
+    daz = round(step_time*az_speed, 4)
     el_vel = el_speed
     az_flag = 0
     if az < az_endpoint2:
@@ -185,20 +195,21 @@ def generate_linear_turnaround(az_endpoint1, az_endpoint2, az_speed, acc, el_end
         az_vel = -1*az_speed
     else:
         raise ValueError('Need two different motion endpoints')
-    az_remainder = (az_max - az_min) % 1
+    az_remainder = (az_max - az_min) % daz
     if az_remainder == 0.0:
         leftover_az = 0.0
         leftover_time = 0.0
     else:
-        leftover_az = az_remainder
+        leftover_az = round(az_remainder, 4)
         leftover_time = az_remainder / az_speed
-    print(daz)
-    for i in range(stop_iter):
+    i = 0
+    while i < stop_iter:
+        i += 1
         point_block = [[],[],[],[],[],[],[]]
         for j in range(batch_size):
             t += step_time
             if increasing:
-                if az < (az_max-(2*daz+leftover_az)):
+                if round(az, 4) <= (az_max-(2*daz+leftover_az)):
                     az += daz
                     az_vel = az_speed
                     el_vel = el_speed
@@ -212,8 +223,8 @@ def generate_linear_turnaround(az_endpoint1, az_endpoint2, az_speed, acc, el_end
                     az_flag = 1
                     el_flag = 0
                     increasing = False
-                else:
-                    az += daz + leftover_az
+                elif round(az, 4) == (az_max-(daz+leftover_az)):
+                    az = az_max
                     t += leftover_time
                     az_vel = az_speed
                     el_vel = el_speed
@@ -221,7 +232,7 @@ def generate_linear_turnaround(az_endpoint1, az_endpoint2, az_speed, acc, el_end
                     el_flag = 0
                     increasing = True
             else:
-                if az > (az_min + (daz+leftover_az)):
+                if round(az, 4) >= (az_min + (2*daz+leftover_az)):
                     az -= daz
                     az_vel = -1*az_speed
                     el_vel = el_speed
@@ -235,8 +246,8 @@ def generate_linear_turnaround(az_endpoint1, az_endpoint2, az_speed, acc, el_end
                     az_flag = 1
                     el_flag = 0
                     increasing = True
-                else:
-                    az -= (daz + leftover_az)
+                elif round(az, 4) == az_min+(daz+leftover_az):
+                    az = az_min
                     t += leftover_time
                     az_vel = -1*az_speed
                     el_vel = el_speed
@@ -250,7 +261,10 @@ def generate_linear_turnaround(az_endpoint1, az_endpoint2, az_speed, acc, el_end
             point_block[4].append(el_vel)
             point_block[5].append(az_flag)
             point_block[6].append(el_flag)
-        yield (point_block[0], point_block[1], point_block[2], point_block[3], point_block[4], point_block[5], point_block[6])
+        if ptstack_fmt:
+            yield ptstack_format(point_block[0], point_block[1], point_block[2], point_block[3], point_block[4], point_block[5], point_block[6], generator=True)
+        else:
+            yield (point_block[0], point_block[1], point_block[2], point_block[3], point_block[4], point_block[5], point_block[6])
 
 
 if __name__ == "__main__":
