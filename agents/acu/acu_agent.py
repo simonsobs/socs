@@ -927,10 +927,6 @@ class ACUAgent:
         with fixed elevation.
 
         Args:
-            scantype (str): type of scan you are generating. For dev, preset to
-                'linear'.
-            stop_iter (float): how many times the generator should generate a
-                new set of points before forced to stop
             az_endpoint1 (float): first endpoint of a linear azimuth scan
             az_endpoint2 (float): second endpoint of a linear azimuth scan
             az_speed (float): azimuth speed for constant-velocity scan
@@ -946,9 +942,6 @@ class ACUAgent:
         if not ok:
             return ok, msg
         self.log.info('try_set_job ok')
-#        scantype = params.get('scantype')
-        scantype = 'linear'
-        stop_iter = params.get('stop_iter')
         az_endpoint1 = params.get('az_endpoint1')
         az_endpoint2 = params.get('az_endpoint2')
         az_speed = params.get('az_speed')
@@ -957,13 +950,8 @@ class ACUAgent:
         el_endpoint2 = params.get('el_endpoint2')
         el_speed = params.get('el_speed')
 
-        self.log.info('scantype is ' + str(scantype))
-
         yield self.acu_control.stop()
-        if scantype != 'linear':
-            self.log.warn('Scan type not supported')
-            return False
-        g = sh.generate(stop_iter, az_endpoint1, az_endpoint2,
+        g = sh.generate_linear_turnaround(az_endpoint1, az_endpoint2,
                         az_speed, acc, el_endpoint1, el_endpoint2, el_speed)
         self.acu_control.mode('ProgramTrack')
         while True:
