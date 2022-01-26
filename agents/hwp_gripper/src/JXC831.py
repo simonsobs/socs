@@ -1,6 +1,3 @@
-import sys as sy
-import os
-
 class JXC831:
     """
     JXC831 object is for reading and writing addresses on the

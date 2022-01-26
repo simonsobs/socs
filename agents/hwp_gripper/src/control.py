@@ -1,12 +1,12 @@
 # Built-in python modules
 import time as tm
-import sys as sy
+import sys
 import os
 
 # Gripper modules
 this_dir = os.path.dirname(__file__)
-sy.path.append(this_dir)
-import log_gripper as lg  # noqa: E402
+sys.path.append(this_dir)
+import log_gripper # noqa: E402
 
 
 class Control:
@@ -27,7 +27,7 @@ class Control:
         self._JXC = JXC
 
         # Logging object
-        self.log = lg.Logging()
+        self.log = log_gripper.Logging()
 
         # Timout and timestep
         self._tout = 25.0  # sec
@@ -103,7 +103,7 @@ class Control:
             "28": [self._JXC.OUT2, self._JXC.OUT3, self._JXC.OUT4],
             "29": [self._JXC.OUT0, self._JXC.OUT2, self._JXC.OUT3,
                    self._JXC.OUT4],
-            "30": [self._JXC.OUT1, self._JXC.OUT1, self._JXC.OUT3,
+            "30": [self._JXC.OUT1, self._JXC.OUT2, self._JXC.OUT3,
                    self._JXC.OUT4]}
 
         # Dictionary of Alarm OUTputs
@@ -157,7 +157,7 @@ class Control:
             self.log.err("Failed to engage brakes in Control.OFF()")
             return False
         else:
-            self.log.log("Brakes disengaged in Control.OFF()")
+            self.log.log("Brakes engaged in Control.OFF()")
 
         # Turn SVON off
         if self._JXC.read(self._JXC.SVON):

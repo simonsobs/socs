@@ -1,17 +1,13 @@
 # Built-in python modules
-import time as tm
-import datetime as dt
 import os
-
+import datetime as dt
 
 class Logging:
     """ The Logging object saves logging messages """
     def __init__(self):
-        now = dt.datetime.now()
-        date = "%04d_%02d_%02d" % (now.year, now.month, now.day)
-        fname = "log_%s.txt" % (date)
-        log_dir = os.path.join(os.path.dirname(__file__), "..", "LOG")
-        f = os.path.join(log_dir, fname)
+        fname = 'log_file.txt'
+        this_dir = os.path.dirname(__file__)
+        f = os.path.join(this_dir, fname)
         if os.path.exists(f):
             self._log_file = open(f, 'a')
         else:
