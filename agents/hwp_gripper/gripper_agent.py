@@ -66,8 +66,8 @@ class GripperAgent:
 
             return self.CMD.CMD('OFF'), 'Grippers off'
 
-#    @ocs_agent.param('state', default = 'ON', choices = ['ON', 'OFF'])
-#    @ocs_agent.param('actuator', default = 0, choices = [0, 1, 2, 3])
+    @ocs_agent.param('state', default = 'ON', choices = ['ON', 'OFF'])
+    @ocs_agent.param('actuator', default = 0, choices = [0, 1, 2, 3])
     def grip_brake(self, session, params = None):
         """grip_brake(parmas = None)
 
@@ -93,9 +93,9 @@ class GripperAgent:
 
         return True, 'Gripper {} Brake {}'.format(params['actuator'], params['state'])
 
-#    @ocs_agent.param('mode', default = 'PUSH', choices = ['PUSH', 'POS'])
-#    @ocs_agent.param('actuator', default = 0, choices = [0, 1, 2, 3])
-#    @ocs_agent.param('distance', default = 0., check = lambda x: -10. <= x <= 20.)
+    @ocs_agent.param('mode', default = 'PUSH', choices = ['PUSH', 'POS'])
+    @ocs_agent.param('actuator', default = 0, choices = [0, 1, 2, 3])
+    @ocs_agent.param('distance', default = 0., check = lambda x: -10. <= x <= 20.)
     def grip_move(self, session, params = None):
         """grip_move(parmas = None)
 
@@ -185,8 +185,8 @@ class GripperAgent:
 
             return self.CMD.CMD('POSITION'), 'Fetched position'
 
-#    @ocs_agent.param('actuator', default = 1, choices = [1, 2, 3])
-#    @ocs_agent.param('distance', default = 0., check = lambda x: -10. <= x <= 20.)
+    @ocs_agent.param('actuator', default = 1, choices = [1, 2, 3])
+    @ocs_agent.param('distance', default = 0., check = lambda x: -10. <= x <= 20.)
     def grip_setpos(self, session, params = None):
         """grip_setpos(parmas = None)
 
