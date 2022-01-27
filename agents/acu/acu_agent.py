@@ -632,7 +632,7 @@ class ACUAgent:
 
         # Check whether the telescope is already at the point
         self.log.info('Checking current position')
-        if current_az == az and current_el == el:
+        if round(current_az, 1) == az and round(current_el, 1) == el:
             self.log.info('Already positioned at %.2f, %.2f'
                           % (current_az, current_el))
             self.set_job_done('control')
