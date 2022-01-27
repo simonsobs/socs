@@ -8,7 +8,6 @@ import scan_helpers as sh
 from soaculib.twisted_backend import TwistedHttpBackend
 import argparse
 import soaculib.status_keys as status_keys
-#import pickle
 from twisted.internet import reactor, protocol
 from twisted.internet.defer import inlineCallbacks
 import twisted.web.client as tclient
@@ -349,6 +348,8 @@ class ACUAgent:
                     'ProgramTrack': 2,
                     'Stow': 3,
                     'SurvivalMode': 4,
+                    'Rate': 5,
+                    'StarTrack': 6,
                     }
         tfn_key = {'None': float('nan'),
                    'False': 0,
@@ -613,6 +614,8 @@ class ACUAgent:
         if el <= self.motion_limits['elevation']['lower'] or el >= self.motion_limits['elevation']['upper']:
             return False, 'Elevation location out of range!'
         wait_for_motion = params.get('wait', 1)
+        self.log.info('Azimuth commanded position: ' + str(az))
+        self.log.info('Elevation commanded position: ' + str(el))
         current_az = round(self.data['broadcast']['Corrected_Azimuth'], 4)
         current_el = round(self.data['broadcast']['Corrected_Elevation'], 4)
         self.data['uploads']['Start_Azimuth'] = current_az
@@ -872,27 +875,30 @@ class ACUAgent:
             yield self.acu_control.http.UploadPtStack(text)
             self.log.info('Uploaded a group')
         self.log.info('No more lines to upload')
-#        current_az = self.data['broadcast']['Corrected_Azimuth']
-#        current_el = self.data['broadcast']['Corrected_Elevation']
-#        while round(current_az - end_az, 1) != 0. or round(current_el - end_el, 1) != 0.:
         free_positions = self.data['status']['summary']['Free_upload_positions']
         while free_positions < 9999: 
             yield dsleep(0.1)
             modes = (self.data['status']['summary']['Azimuth_mode'],
                      self.data['status']['summary']['Elevation_mode'])
-            if modes != ('ProgramTrack', 'ProgramTrack'):
-                return False, 'Fault triggered (not ProgramTrack)!'
-#            current_az = self.data['broadcast']['Corrected_Azimuth']
-#            current_el = self.data['broadcast']['Corrected_Elevation']
+            if azonly:
+                if modes[0] != 'ProgramTrack':
+                    return False, 'Azimuth mode no longer ProgramTrack!!'
+            else:
+                if modes != ('ProgramTrack', 'ProgramTrack'):
+                    return False, 'Fault triggered (not ProgramTrack)!'
             free_positions = self.data['status']['summary']['Free_upload_positions']
         self.log.info('No more points in the queue')
         current_az = self.data['broadcast']['Corrected_Azimuth']
         current_el = self.data['broadcast']['Corrected_Elevation']
-        while round(current_az - end_az, 1) != 0. or round(current_el - end_el, 1) != 0.:
-            self.log.info('Waiting to settle at position')
+        while round(current_az - end_az, 1) != 0.:
+            self.log.info('Waiting to settle at azimuth position')
             yield dsleep(0.1)
             current_az = self.data['broadcast']['Corrected_Azimuth']
-            current_el = self.data['broadcast']['Corrected_Elevation']
+        if not azonly:
+            while round(current_el - end_el, 1) != 0.:
+                self.log.info('Waiting to settle at elevation position')
+                yield dsleep(0.1)
+                current_el = self.data['broadcast']['Corrected_Elevation']
         yield dsleep(self.sleeptime)
         yield self.acu_control.stop()
         self.data['uploads']['Start_Azimuth'] = 0.0
