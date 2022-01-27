@@ -204,6 +204,10 @@ class ACUAgent:
                                   record=True,
                                   agg_params=fullstatus_agg_params,
                                   buffer_time=1)
+        self.agent.register_feed('acu_status_commands',
+                                  record=True,
+                                  agg_params=fullstatus_agg_params,
+                                  buffer_time=1)
         self.agent.register_feed('acu_status_general_errs',
                                   record=True,
                                   agg_params=fullstatus_agg_params,
