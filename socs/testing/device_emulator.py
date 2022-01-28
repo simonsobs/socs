@@ -109,7 +109,7 @@ class DeviceEmulator:
         while self._read:
             if self.ser.in_waiting > 0:
                 msg = self.ser.readline().strip().decode('utf-8')
-                print(f"{msg=}")
+                print(f"msg={msg}")
 
                 if self.responses is None:
                     continue
@@ -120,7 +120,7 @@ class DeviceEmulator:
                     else:
                         response = self.responses[msg]
 
-                    print(f'{response=}')
+                    print(f'response={response}')
                     self.ser.write((response + '\r\n').encode('utf-8'))
                 except Exception as e:
                     print(f"encountered error {e}")
