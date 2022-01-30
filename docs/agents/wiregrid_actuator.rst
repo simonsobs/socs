@@ -75,14 +75,14 @@ Functions
 The agent have many functions, however most of them are for a test.
 The main functions are ``insert()`` and ``eject()``.
 
-Main Functions
+**Main Functions**
  - insert(): Insert the wire-grid into the inside of the forebaffle, which includes unlocking the stoppers
  - eject(): Eject the wire-grid from the inside of the forebaffle, which includes unlocking the stoppers
 
 In the both of the functions, after the inserting/ejecting, the stopper locks the actuators again.
 However, the motor power is not turned ON or OFF during the both functions.
 
-Test Functions
+**Test Functions**
  - check_limitswitch(): Check ON/OFF of the limit switches
  - check_stopper(): Check ON/OFF (lock/unlock) of the stoppers
  - insert_homing(): Insert very slowly
@@ -98,6 +98,11 @@ Test Functions
  - release(): Release the agent to receive the functions if it is locked in the software
    (Change a STOP flag in Actuator class to False)
  - reconnect(): Reconnect to the actuator controller
+
+In the test mode, you can choose the moving distance [mm] and speed rate.
+The parameter details are here:
+ - distance: Actuator moving distance [mm] (default: 10)
+ - speedrate: Actuator speed rate [0.0, 1.0] (default: 0.1)
 
 
 Hardware Configurations
