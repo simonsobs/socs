@@ -73,7 +73,7 @@ Functions
 `````````
 
 The agent have many functions, however most of them are for a test.
-The main functions are **insert()** and **eject()**.
+The main functions are ``insert()`` and ``eject()``.
 
 Main Functions
  - insert(): Insert the wire-grid into the inside of the forebaffle, which includes unlocking the stoppers
@@ -104,7 +104,7 @@ Hardware Configurations
 ```````````````````````
 
 There are several limit-switches and stoppers.
-These list are configured in *limitswitch_config.py* and *stopper_config.py*.
+These list are configured in ``limitswitch_config.py`` and ``stopper_config.py``.
 
 
 Agent API
@@ -113,7 +113,7 @@ Agent API
 .. autoclass:: agents.wiregrid_actuator.wiregrid_actuator.WiregridActuatorAgent
     :members: check_limitswitch, check_stopper, 
               insert, eject, insert_homing, eject_homing, insert_test, eject_test, 
-              motor_on, motor_off, stop, release, reconnect
+              motor_on, motor_off, stop, release, reconnect, start_acq
 
 
 Example Clients
