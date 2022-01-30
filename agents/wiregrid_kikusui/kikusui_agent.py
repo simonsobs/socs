@@ -220,7 +220,7 @@ class KikusuiAgent:
         """
         Set output ON
 
-        Paramters:
+        Parameters:
             Nothing
         """
         with self.lock.acquire_timeout(timeout=5, job='set_on') as acquired:
@@ -243,7 +243,7 @@ class KikusuiAgent:
         """
         Set output OFF
 
-        Paramters:
+        Parameters:
             Nothing
         """
         with self.lock.acquire_timeout(timeout=5, job='set_off') as acquired:
@@ -266,7 +266,7 @@ class KikusuiAgent:
         """
         Set current [A]
 
-        Paramters:
+        Parameters:
             current: set current [A] (should be [0.0, 3.0])
         """
         if params is None:
@@ -295,7 +295,7 @@ class KikusuiAgent:
         """
         Set voltage [V]
 
-        Paramters:
+        Parameters:
             volt: set voltage [V] (should be ONLY 12)
         """
         if params is None:
@@ -322,7 +322,7 @@ class KikusuiAgent:
         """
         Show voltage [V], current [A], output on/off
 
-        Paramters:
+        Parameters:
             Nothing
         """
         with self.lock.acquire_timeout(timeout=5, job='get_vc') as acquired:
@@ -356,7 +356,7 @@ class KikusuiAgent:
         """
         Run rotation-motor calibration for wire-grid
 
-        Paramters:
+        Parameters:
             storepath: path for log file
         """
         if params is None:
@@ -413,7 +413,7 @@ class KikusuiAgent:
         In each step, seveal small-rotations are occurred
         to rotate 22.5-deg.
 
-        Paramters:
+        Parameters:
             feedback_steps: number of small rotations for each 22.5-deg step
             num_laps: number of laps (revolutions)
             stopped_time: stopped time [sec] for each 22.5-deg step
