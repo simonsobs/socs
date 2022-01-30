@@ -81,14 +81,13 @@ class WiregridActuatorAgent:
                 self.log.info(
                     '_move(): LSL={}, LSR={}, run={}'.format(LSL, LSR, isrun))
         # Stop the actuator moving
-        self.actuator.hold()
+        self.actuator.stop()
         LSonoff = LSL or LSR
         if LSonoff:
             self.log.info(
                 '_move(): Stopped moving because '
                 'one of {} limit-switches is ON (LSL1={}, LSR1={})!'
                 .format(LSlabel, LSL, LSR))
-        self.actuator.release()
         return True, \
             '_move(): Finish move(distance={}, speedrate={}, limit-switch={})'\
             .format(distance, speedrate, LSonoff), \

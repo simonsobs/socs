@@ -351,22 +351,29 @@ class Actuator:
         return True
 
     # Return: success (True) or failure (False)
-    def hold(self):
+    def stop(self):
         if self.verbose > 0:
-            print('Actuator:hold(): Hold the actuator')
-        self.STOP = True
+            print('Actuator:stop(): Stop the actuator')
         for i in range(self.maxwaitloop):
             self._command('ST')
             isrun = self.is_run()
             if not isrun:
                 if self.verbose > 0:
-                    print('Actuator:hold(): Successfully hold the actuator!')
+                    print('Actuator:stop(): Successfully stop the actuator!')
                 return True
-            print('Actuator:hold(): WARNING!: '
-                  'Could not hold the actuator! --> Retry')
-        print('Actuator:hold(): ERROR!: '
+            print('Actuator:stop(): WARNING!: '
+                  'Could not stop the actuator! --> Retry')
+        print('Actuator:stop(): ERROR!: '
               'Exceed the max. number of retries ({} times).'.format(i))
         return False
+
+    # Return: success (True) or failure (False)
+    def hold(self):
+        if self.verbose > 0:
+            print('Actuator:hold(): Hold the actuator')
+        self.STOP = True
+        ret = self.stop()
+        return ret
 
     # Release(unhold) the hold state
     def release(self):
