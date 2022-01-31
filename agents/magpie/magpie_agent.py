@@ -1,6 +1,6 @@
 import argparse
-from spt3g import core
 import so3g
+from spt3g import core
 import txaio
 import os
 import numpy as np
@@ -9,6 +9,7 @@ import ast
 from scipy import signal
 import queue
 import time
+import pandas as pd
 ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 
 if not ON_RTD:
@@ -20,13 +21,33 @@ primary_idxs = {}
 
 
 def load_frame_data(frame):
-    if len(primary_idxs) == 0:
-        for i, name in enumerate(frame['primary'].names):
-            primary_idxs[name] = i
+    """
+    Returns detector data from a G3Stream.
 
-    times = np.array(frame['primary'].data[primary_idxs['UnixTime']]) / 1e9
-    # Convert to phi0
-    data = frame['data'].data * (2*np.pi) / 2**16
+    Returns:
+        times : np.ndarray
+            Array with shape (nsamps) of timestamps (sec)
+        data : np.ndarray
+            Array with shape (nchans, nsamps) of detector phase data (phi0)
+    """
+    primary = frame['primary']
+    if isinstance(primary, core.G3TimesampleMap):
+        times = np.array(primary['UnixTime']) / 1e9
+    else:
+        if len(primary_idxs) == 0:
+            for i, name in enumerate(frame['primary'].names):
+                primary_idxs[name] = i
+        times = np.array(primary.data[primary_idxs['UnixTime']]) / 1e9
+
+    d = frame['data']
+    if isinstance(d, core.G3TimestreamMap):
+        nchans, nsamps = len(d), d.n_samples
+        data = np.ndarray((nchans, nsamps), dtype=np.float32)
+        for i in range(nchans):
+            data[i] = d[f'r{i:0>4}'] * (2*np.pi) / 2**16
+
+    else:  # G3SuperTimestream probably
+        data = d.data * (2*np.pi) / 2**16
 
     return times, data
 
@@ -85,25 +106,45 @@ class RollingAvg:
             data (np.ndarray):
                 Array of data. Must be of shape (nchans, nsamps)
         """
+        nsamps = data.shape[1]
         summed = 1./self.N * np.cumsum(
             np.concatenate((self.rollover, data), axis=1), axis=1)
-        self.rollover = data[:, -self.N:]
+        if self.N <= nsamps:
+            # Replace entire rollover array
+            self.rollover = data[:, -self.N:]
+        else:
+            # Roll back and just update with samples available
+            self.rollover = np.roll(self.rollover, -nsamps)
+            self.rollover[:, -nsamps:] = data[:, :]
+
+        print(data.shape, (summed[:, self.N:] - summed[:, :-self.N]).shape)
+
+
         return summed[:, self.N:] - summed[:, :-self.N]
 
 
-class FocalplaneConfig:
-    def __init__(self, ndets=0):
-        self.num_dets = ndets
-        self.xs = [0 for _ in range(ndets)]
-        self.ys = [0. for _ in range(ndets)]
-        self.rots = [0. for _ in range(ndets)]
-        self.cnames = ['' for _ in range(ndets)]
-        self.eqs = ['' for _ in range(ndets)]
-        self.cmaps = ['' for _ in range(ndets)]
-        self.templates = ['' for _ in range(ndets)]
 
-        self.chan_mask = np.arange(ndets)
-        self.eq_keys = None
+class FocalplaneConfig:
+    def __init__(self):
+        """
+        Object to configure the focal-plane layout.
+
+        Attributes
+        -------------
+        chan_mask : np.ndarray
+            Map from absolute_smurf_chan --> Visual Element index
+        """
+        self.num_dets = 0
+        self.xs = []
+        self.ys = []
+        self.rots = []
+        self.cnames = []
+        self.eqs = []
+        self.cmaps = []
+        self.templates = []
+        self.chan_mask = np.arange(0)
+        self.eq_keys = []
+        self.chan_mask = np.full(4096, -1)
 
     def config_frame(self):
         frame = core.G3Frame(core.G3FrameType.Wiring)
@@ -117,126 +158,70 @@ class FocalplaneConfig:
         if self.eq_keys is not None:
             frame['eq_keys'] = core.G3VectorString(self.eq_keys)
         return frame
+        
+    def add_vis_elem(self, name, x, y, rot, cmaps, eqs, template,
+                     abs_smurf_chan):
+        self.cnames.append(name)
+        self.xs.append(float(x))
+        self.ys.append(float(y))
+        self.rots.append(rot)
+        self.cmaps.extend(cmaps)
+        self.eqs.extend(eqs)
+        self.templates.append(template)
+        self.chan_mask[abs_smurf_chan] = self.num_dets
+        self.num_dets += 1
 
     @classmethod
     def grid(cls, xdim, ydim, ygap=0):
         fp = cls()
-        xs, ys = range(xdim), range(ydim)
-        i = 0
-        fp.eq_keys = ['a', 'b']
-        for y in ys:
-            for x in xs:
-                name = f"channel_{i}"
-                _y = y
-                if ygap > 0:
-                    _y += 0.5 * (y // ygap)
+        xs, ys = np.arange(xdim), np.arange(ydim)
 
-                fp.xs.append(x)
-                fp.ys.append(_y)
-                fp.rots.append(0)
-                fp.cnames.append(name)
-                #fp.eqs.append(f"{name}_equation_0")
-                #fp.eqs.append(f"{name}_equation_0")
-                for k in fp.eq_keys:
-                    fp.eqs.append(f"* {name}/{k} rms_scale")
-                #fp.eqs.append(f"speed_tuner")
-                fp.cmaps.append("red_cmap")
-                fp.cmaps.append("blue_cmap")
+        # Adds gaps every ygap rows
+        if ygap > 0:
+            ys = ys + 0.5 * ys // ygap
 
-                fp.templates.append("box")
-                i += 1
+        template = 'box'
+        cmaps = ['red_cmap', 'blue_cmap']
+        fp.eq_keys = ['raw', 'rms']
+        for i in range(xdim * ydim):
+            x, y = xs[i % xdim], ys[i // xdim]
+            name = f"channel_{i}"
+            eqs = [f'{name}/raw', f'* {name}/rms rms_scale']
+            fp.add_vis_elem(name, x, y, 0, cmaps, eqs, template, i)
 
-        print(fp.eqs)
-        fp.num_dets = len(fp.xs)
-        fp.chan_mask = np.arange(fp.num_dets)
         return fp
 
     @classmethod
-    def from_tune_csv(cls, tune_csv, wafer_scale=50):
-        det_map = np.genfromtxt(
-            tune_csv, delimiter=',', skip_header=1, dtype=None
-        )
-
+    def from_csv(cls, csv_file, wafer_scale=1.):
+        fp = cls()
+        fp.eq_keys = ['raw', 'rms']
+        df = pd.read_csv(csv_file)
         cmaps = {
-            90: "red_cmap",
-            150: "blue_cmap",
+            90: ['red_cmap', 'blue_cmap'],
+            150: ['blue_cmap', 'red_cmap']
         }
         templates = {
-            90: 'csv_template_c0_p0',
-            150: 'csv_template_c1_p0',
+            'A': "template_c0_p0",
+            'B': "template_c0_p1",
         }
-        fp = cls(ndets=len(det_map))
-        eq = '/ + 1 s {} 2'
-        map_inv = []  # Mapping from fp idx to channel number
-        for i, det in enumerate(det_map):
-            band, chan, freq, x, y, pol_angle = [
-                det[idx] for idx in [1, 2, 12, 17, 18, 19]
-            ]
+
+        for i, row in df.iterrows():
             try:
-                freq = int(freq)
-            except:
-                freq = 90
-            abschan = band * 512 + chan
-            map_inv.append(abschan)
-            fp.xs[i] = x * wafer_scale
-            fp.ys[i] = y * wafer_scale
-            fp.rots[i] = np.deg2rad(pol_angle)
-            fp.cnames[i] = f"chan_{abschan}"
-            fp.eqs[i] = eq.format(fp.cnames[i])
-            fp.cmaps[i] = cmaps[freq]
-            fp.templates[i] = templates[freq]
-        map_inv = np.array(map_inv)
-        # Mapping form channel no. to fp-idx
-        fp.chan_mask = np.full(np.max(map_inv)+1, -1)
-        for idx, chan in enumerate(map_inv):
-            fp.chan_mask[chan] = idx
+                bandpass = int(row['bandpass'])
+                template = templates[row['pol']]
+            except ValueError:
+                continue
+            abs_chan = row['smurf_band'] * 512 + row['smurf_channel']
+            x, y = row['det_x'] * wafer_scale, row['det_y'] * wafer_scale
+
+            name = f"det_{i}"
+            eqs = [f'{name}/raw', f'* {name}/rms rms_scale']
+
+            fp.add_vis_elem(
+                name, x, y, 0, cmaps[bandpass], eqs, template, abs_chan
+            )
 
         return fp
-
-    @classmethod
-    def from_wafer_file(cls, wafer_file, wafer_scale=50):
-        import quaternionarray as qa
-        import toml
-
-        dets = toml.load(wafer_file)
-        fp = cls(ndets=len(dets))
-        band_idxs = {}
-        bands_seen = 0
-
-        xaxis = np.array([1., 0., 0.])
-        zaxis = np.array([0., 0., 1.])
-        cmaps = ["red_cmap", "blue_cmap"]
-
-        def det_coords(det):
-            quat =np.array(det['quat']).astype(np.float64)
-            rdir = qa.rotate(quat, zaxis).flatten()
-            ang = np.arctan2(rdir[1], rdir[0])
-            orient = qa.rotate(quat, xaxis).flatten()
-            polang = np.arctan2(orient[1], orient[0])
-            mag = np.arccos(rdir[2]) * 180 / np.pi
-            xpos = mag * np.cos(ang)
-            ypos = mag * np.sin(ang)
-            return (xpos, ypos), polang
-
-        for key, det in dets.items():
-            chan = det['channel']
-            (x, y), polangle = det_coords(det)
-
-            if det['band'] not in band_idxs:
-                band_idxs[det['band']] = bands_seen
-                bands_seen += 1
-            color_idx = band_idxs[det['band']]
-
-            fp.xs[chan] = x * wafer_scale
-            fp.ys[chan] = y * wafer_scale
-            fp.rots[chan] = polangle
-            fp.cnames[chan] = key
-            fp.eqs[chan] = f"/ + 1 s {key} 2"
-            fp.cmaps[chan] = cmaps[color_idx]
-            fp.templates[chan] = f"template_c{color_idx}_p0"
-
-        return fp
-
 
 
 class MagpieAgent:
@@ -244,6 +229,7 @@ class MagpieAgent:
 
     def __init__(self, agent, args):
         self.agent = agent
+        self.log = self.agent.log
         self._running = False
 
         self.target_rate = args.target_rate
@@ -254,17 +240,12 @@ class MagpieAgent:
             )
         elif layout == 'wafer':
             if args.csv_file is not None:
-                self.fp = FocalplaneConfig.from_tune_csv(
+                self.fp = FocalplaneConfig.from_csv(
                     args.csv_file, wafer_scale=args.wafer_scale
-                )
-            else:
-                self.fp = FocalplaneConfig.from_wafer_file(
-                    args.wafer_file, wafer_scale=args.wafer_scale
                 )
 
         self.sent_cfg = False
         self.num_dets = self.fp.num_dets
-        self.mask = np.arange(self.num_dets)
         self.mask = np.arange(4096)
 
         self.reader = core.G3Reader(args.src)
@@ -323,6 +304,10 @@ class MagpieAgent:
         if self.avg1 is None:
             self.avg1 = RollingAvg(200, nchans)
             self.avg2 = RollingAvg(200, nchans)
+        elif self.avg1.nchans != nchans:
+            self.log.warn(f"Channel count has changed! {self.avg1.nchans}->{nchans}")
+            self.avg1 = RollingAvg(200, nchans)
+            self.avg2 = RollingAvg(200, nchans)
 
         # Calc RMS
         hpf_data = data_in - self.avg1.apply(data_in)  # To high-pass filter
@@ -372,6 +357,7 @@ class MagpieAgent:
 
         while self._running:
             if self.send_config_flag:
+                print(self.fp.config_frame)
                 self.sender.Process(self.fp.config_frame())
                 self.send_config_flag = False
 
@@ -435,11 +421,9 @@ def make_parser(parser=None):
                         help="Number of pixesl in x-dimension for grid layout")
     parser.add_argument('--ydim', type=int, default=64,
                         help="Number of pixesl in y-dimension for grid layout")
-    parser.add_argument('--wafer-file', '--wf', '-f', type=str,
-                        help="Wafer file to pull detector info from")
     parser.add_argument('--wafer-scale', '--ws', type=float, default=50.,
                         help="scale of wafer coordinates")
-    parser.add_argument('--csv-file', type=str, help="Tune csv file")
+    parser.add_argument('--csv-file', type=str, help="Detmap CSV file")
     return parser
 
 
