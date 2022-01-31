@@ -12,13 +12,27 @@ if not on_rtd:
     from ocs import ocs_agent, site_config
     from ocs.ocs_twisted import TimeoutLock, Pacemaker
 
+# class SAT1XYStageAgent:
 class MotorControlAgent:
-    def __init__(self, agent, motor1_Ip, motor1_Port, motor1_isLin, motor2_Ip, motor2_Port, motor2_isLin,  mRes, samp=2):
-        self.agent = agent
-        self.log = agent.log
-        self.lock = TimeoutLock()
+    """
+    Agent for connecting to the SAT1 XY Stages. Differs from LATRt agent in that motors/controllers are seen as arguments.
+    Motor1 can be the X axis OR the Y axis, same with Motor2. Depends on setup (ip address + port). 
+    
+    Args: 
+        motor1_Ip (str) -- the IP address associated with Motor1
+        motor1_Port (int) -- the port address associated with Motor1
+        motor1_isLin (bool) -- Boolean that determines if Motor1 is a linear motor.
+        motor2_Ip (str) -- the IP address associated with Motor2
+        motor2_Port (int) -- the port address associated with Motor2
+        motor2_isLin (bool) -- Boolean that determines if Motor2 is a linear motor.
+        mode: 'acq': Start data acquisition on initialize
+        mRes (bool) -- True if manual resolution, False if default (res=8) ???
+        samp: default sampling frequency in Hz
+    """
+    
+    def __init__(self, agent, motor1_Ip, motor1_Port, motor1_isLin, motor2_Ip, motor2_Port, motor2_isLin, mode=None, mRes, samp=2):
 
-        self.job = None
+#         self.job = None
         # Pass these through site config
         self.motor1_Ip = motor1_Ip
         self.motor1_Port = motor1_Port
@@ -33,7 +47,11 @@ class MotorControlAgent:
         self.initialized = False
         self.take_data = False
         self.move_status = False
-
+        
+        self.agent = agent
+        self.log = agent.log
+        self.lock = TimeoutLock()
+        
         ### register the position feeds
         agg_params = {
             'frame_length' : 10*60, #[sec] 
