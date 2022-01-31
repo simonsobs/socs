@@ -13,6 +13,29 @@ from ocs import ocs_agent, site_config
 from socs.db.suprsync import SupRsyncFilesManager, create_file
 
 
+def cleanse_message(data):
+    """
+    Cleanse data so that it can be passed over an OCS feed.
+
+    Replaces bool with int throughout the data-structure.
+
+    Args
+    -----
+    data : dict
+        Data to be passed over the ocs feed
+    """
+    if isinstance(data, dict):
+        return {
+            k: cleanse_message(v)
+            for k, v in data.items()
+        }
+    if isinstance(data, list):
+        return [cleanse_message(d) for d in data]
+    elif isinstance(data, bool):
+        return int(data)
+    else:
+        return data
+
 
 def create_remote_path(meta, archive_name):
     """
@@ -120,7 +143,8 @@ class PysmurfMonitor(DatagramProtocol):
 
         elif data['type'] == "session_data" or data['type'] == "session_log":
             self.agent.publish_to_feed(
-                "pysmurf_session_data", data, from_reactor=True
+                "pysmurf_session_data", cleanse_message(data),
+                from_reactor=True
             )
 
         # Handles published metadata from the streamer
@@ -151,7 +175,8 @@ class PysmurfMonitor(DatagramProtocol):
                          'timestamp': data['time'],
                          'data': {field_name: val}}
 
-            self.agent.publish_to_feed(feed_name, feed_data, from_reactor=True)
+            self.agent.publish_to_feed(feed_name, cleanse_message(feed_data),
+                                       from_reactor=True)
 
     def run(self, session, params=None):
         """run()
