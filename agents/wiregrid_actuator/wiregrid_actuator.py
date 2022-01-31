@@ -8,8 +8,8 @@ from ocs import site_config
 from ocs.ocs_twisted import TimeoutLock
 
 # add PATH to ./src directory
-this_dir = os.path.dirname(__file__)
-sys.path.append(os.path.join(this_dir, 'src'))
+#this_dir = os.path.dirname(os.path.abspath(__file__))
+#sys.path.append(os.path.join(this_dir, 'src'))
 
 # import classes / configs
 from src.Actuator import Actuator

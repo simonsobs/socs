@@ -2,7 +2,7 @@
 import time
 # Specific module for actuator controller
 import gclib
-import DigitalIO
+from src.DigitalIO import DigitalIO
 
 
 class Actuator:
@@ -40,9 +40,9 @@ class Actuator:
 
         # Initialize Digital IO classes
         # for limit-switch & stopper
-        self.ls = DigitalIO.DigitalIO(
+        self.ls = DigitalIO(
             'limit-switch', ls_list, self.g, get_onoff_reverse=False)
-        self.st = DigitalIO.DigitalIO(
+        self.st = DigitalIO(
             'stopper', st_list, self.g,
             get_onoff_reverse=False, set_onoff_reverse=False)
 
@@ -128,7 +128,7 @@ class Actuator:
     # Args: onoff = True or False
     def _set_motor_onoff(self, onoff):
         if onoff:  # ON
-            self._command('SH ABN')
+            self._command('SH AB')
         else:  # OFF
             self._command('MO')
         return True
@@ -311,10 +311,13 @@ class Actuator:
     def get_motor_onoff(self):
         try:
             # 0: ON, 1:OFF
-            ret = self._command('MG _MON')
-            onoff = int(float(ret))
+            retA = self._command('MG _MOA')
+            retB = self._command('MG _MOB')
+            onoffA = int(float(retA))
+            onoffB = int(float(retB))
             # invert to 0: OFF, 1: ON
-            onoff = int(not onoff)
+            onoffA = int(not onoffA)
+            onoffB = int(not onoffB)
         except Exception as e:
             msg =\
                 'Actuator:get_motor_onoff(): ERROR!: '\
@@ -322,7 +325,19 @@ class Actuator:
                 'Exception = "{}"'.format(e)
             print(msg)
             raise
-        return onoff
+        if onoffA == 1 and onoffB == 1:
+            return 1
+        elif onoffA == 0 and onoffB == 0:
+            return 0
+        else:
+            msg =\
+                'Actuator:get_motor_onoff(): ERROR!: '\
+                'Strange status of motor on/off! '\
+                'motor A = {} / motor B = {}'.format(
+                    'ON' if onoffA else 'OFF',
+                    'ON' if onoffB else 'OFF')
+            print(msg)
+            raise RuntimeError(msg)
 
     # Set motor ON/OFF
     # Args: onoff = True or False
