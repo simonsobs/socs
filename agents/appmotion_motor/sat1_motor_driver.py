@@ -346,7 +346,7 @@ class MotControl(object):
                 self.killAllCommands(motor)
 
 
-        def seekHomeLinearStage(self, motor=MOTOR1):
+        def seekHomeLinearStage(self, motor=ALL):
                 """Move the linear stage to its home position (using the home limit switch)."""
                 
                 # Check if either motor is moving, and if yes exit function with an error message

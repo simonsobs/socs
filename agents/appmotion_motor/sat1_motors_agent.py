@@ -295,7 +295,6 @@ class SAT1MotorsAgent:
 
     def seekHomeLinearStage(self, session, params=None):
         """
-        NOTE: Really unsure if this works as intended - code in sat1_motor_driver has weird variables...
         Move the linear stage to its home position (using the home limit switch).
         Parameters:
             parms: {'motor': int, 'isLin': bool}
