@@ -84,3 +84,7 @@ def get_pwv():
             'pwv': pwv}
 
     return jsonify(data)
+
+
+if __name__ == "__main__":
+    app.run()
