@@ -1,4 +1,5 @@
 import os
+import glob
 import time
 import datetime
 
@@ -39,10 +40,39 @@ def read_data_from_textfile(filename, year):
         return _data
 
 
+def get_latest_pwv_file(data_dir=None):
+    """Get the latest PWV data file.
+
+    This assumes a couple of things:
+        - File names all start with "PWV_UCSC", have the ".txt" extension, and
+          contain the year they are written.
+        - You want this year's data.
+        - The latest file is the last file when the list of this year's files
+          are sorted.
+
+    Args:
+        data_dir (str): The data directory where the PWV data is stored.
+
+    Returns:
+        str: The full path to the latest text file containing PWV data.
+
+    """
+    if data_dir is None:
+        dir_ = os.getenv("PWV_DATA_DIR")
+    else:
+        dir_ = data_dir
+
+    year = datetime.datetime.now().year
+    files = glob.glob(os.path.join(dir_, f"PWV_UCSC*{year}*.txt"))
+    files.sort()
+    return files[-1]
+
+
 @app.route("/")
 def get_pwv():
-    dir_ = os.getenv("PWV_DATA_DIR")
-    pwv, timestamp = read_data_from_textfile(os.path.join(dir_, "PWV_UCSC_2Seg_2021-108.txt"), 2021)
+    file_ = get_latest_pwv_file()
+    year = int(os.path.basename(file_).replace('-', '_').split('_')[3])
+    pwv, timestamp = read_data_from_textfile(file_, year)
 
     data = {'timestamp': timestamp,
             'pwv': pwv}
