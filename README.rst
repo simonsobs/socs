@@ -61,7 +61,7 @@ configured host if it does not already exist:
 
 See the `ocs docs`_ for more details.
 
-.. _`ocs docs`: https://ocs.readthedocs.io/en/latest/site_config.html
+.. _`ocs docs`: https://ocs.readthedocs.io/en/develop/developer/site_config.html
 
 Docker Images
 -------------
