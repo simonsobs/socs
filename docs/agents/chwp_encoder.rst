@@ -11,6 +11,11 @@ boards with the IRIG-B timing reference.
 This agent receives and decodes UDP packets from BBB and publishes the data
 feeds.
 
+.. argparse::
+    :filename: ../agents/chwp/hwpbbb_agent.py
+    :func: make_parser
+    :prog: python3 hwpbbb_agent.py
+
 Configuration File Examples
 ---------------------------
 Below are useful configurations examples for the relevant OCS files and for 

@@ -28,9 +28,9 @@ def get_sensors(shm_addr):
             List of sensor identification names, same length as ipmbs list.
     """
     # SSH to shelf manager
-    cmd = ['ssh', f'{shm_addr}\n']
+    cmd = ['ssh', f'{shm_addr}']
     # Send command to shelf manager
-    cmd += ['clia', 'sensordata\n']
+    cmd += ['clia', 'sensordata']
     # Intialize output data
     ipmbs = []
     sensids = []
@@ -88,6 +88,10 @@ def get_channel_names(ipmbs):
             chan_names[i] = 'pwr_mgmt'
             continue
         slot = int('0x'+ipmb, 16)//2-64
+        if slot < 1:
+            # Not exactly sure what this corresponds to...
+            chan_names[i] = f"ipmb{ipmb}"
+            continue
         if slot == 1:
             chan_names[i] = 'switch'
             continue
@@ -121,7 +125,7 @@ def get_data_dict(shm_addr, ipmbs, sensids, chan_names,
             keys match the influxdb feedname requirements
     """
     data_dict = {}
-    cmd = ['ssh', f'{shm_addr}\n', 'clia', 'sensordata\n']
+    cmd = ['ssh', f'{shm_addr}', 'clia', 'sensordata']
     ssh = subprocess.Popen(cmd,
                            shell=False,
                            stdout=subprocess.PIPE,
@@ -145,6 +149,7 @@ def get_data_dict(shm_addr, ipmbs, sensids, chan_names,
                         sid = sid.replace(":", "")
                         sid = sid.replace("+", "")
                         sid = sid.replace(".", "p")
+                        sid = sid.replace("-", "_")
                         line = r.strip().decode("utf-8")
                         if line.split(':')[-1].split(' ')[0] == '':
                             val = float(line.split(':')[-1].split(' ')[1])
@@ -199,7 +204,7 @@ class SmurfCrateMonitor:
         you will see an error in the logs and acquistion won't start.
         """
         self.log.info(self.shm_addr)
-        cmd = ['ssh', f'{self.shm_addr}\n', 'pwd\n']
+        cmd = ['ssh', f'{self.shm_addr}', 'pwd']
         self.log.info("command run: {c}", c=cmd)
         ssh = subprocess.Popen(cmd,
                                shell=False,

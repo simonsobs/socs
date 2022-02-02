@@ -7,20 +7,20 @@ Pysmurf Monitor
 ====================
 
 The pysmurf_monitor agent listens to the UDP messages that the
-*pysmurf publisher* sends and acts on them.
-Currently, its main job is to wait until the publisher registers a new file
-that pysmurf has created, and it puts the file info into a database so that
-the file can be copied over by the *archiver* running on the storage node.
-
-This agent has no registered operations.
-
-Site Options
-------------
+*pysmurf publisher* sends and acts on them. It will add newly registered filse
+to the pysmurf_files database, and send session info to pysmurf-controller
+agents through an OCS Feed.
 
 .. argparse::
     :filename: ../agents/pysmurf_monitor/pysmurf_monitor.py
     :func: make_parser
     :prog: python3 pysmurf_monitor.py
+
+Configuration File Examples
+---------------------------
+
+OCS Site Config
+````````````````
 
 Example site-config entry::
 
@@ -29,115 +29,59 @@ Example site-config entry::
        'arguments': [['--udp-port', 8200],
                      ['--create-table', True]]},
 
-
-
-.. _pysmurf_files_db:
-
-Database
---------
-
-
-The database is located in a MariaDB docker container running on the crossbar
-system. The database name is ``files``, and it is also used to index hk files
-written by the hk-aggregator.
-
-The table containing the pysmurf file info is called ``pysmurf_files_v<VERSION>``
-where ``VERSION`` is the current iteration of the table.
-This version number will increment anytime the table schema is changed, so
-we don't lose information about old files.
-The pysmurf-monitor agent will create the newest version of the ``pysmurf_files``
-table automatically if it does not yet exist, but you can also create and drop this table
-outside of OCS using the ``socs.db.pysmurf_files_manager`` module by calling::
-
-    python3 socs/db/pysmurf_files_manager.py create
-
-and entering the db password at the prompt.
-
-Below are the columns that exist in ``pysmurf_files_v1``:
-
-..  list-table:: ``pysmurf_files_v1`` columns
-    :widths: 10 10 60
-
-    * - path (required)
-      - str
-      - Filepath. At first it is the path on the smurf-server, and
-        once copied it is the path on the storage node.
-
-    * - action
-      - str
-      - `Pysmurf action` corresponding to the file. All files with the same
-        action will be grouped together once archived.
-
-    * - timestamp
-      - datetime
-      - Time at which file was written
-
-    * - action_timestamp
-      - int
-      - unix timestamp corresponding to the start of the pysmurf action.
-        This determines how files are grouped once archived.
-
-    * - format
-      - str
-      - File format. **E.g.** "npy" or "txt"
-
-    * - plot
-      - bool
-      - True if file is a plot
-
-    * - site
-      - str
-      - Site name
-
-    * - pub_id
-      - str
-      - Pysmurf publisher ID. (Set by :ref:`SMURFPUB_ID <pysmurf_publisher_opts>`)
-
-    * - instance_id
-      - str
-      - Instance id of monitor agent that recorded file.
-
-    * - copied
-      - bool
-      - True if successfully copied by archiver
-
-    * - failed_copy_attempts
-      - int
-      - Number of failed copy attempts
-
-    * - md5sum (required)
-      - binary
-      - md5sum of file
-
-    * - pysmurf_version
-      - str
-      - version id for pysmurf
-
-    * - socs_version
-      - str
-      - version id for socs
-
-
-Docker Configuration
---------------------
-
-You can set the sql config info with the environment variables MYSQL_HOST,
-MYSQL_DATABASE, MYSQL_USER and MYSQL_PASSWORD.
-
+Docker Compose
+````````````````
 An example docker-compose entry might look like::
 
     ocs-pysmurf-monitor:
         image: simonsobs/ocs-pysmurf-monitor-agent:${SOCS_TAG}
-        user: "9000"    # ocs user id
+        hostname: ocs-docker
+        user: cryo:smurf
+        network_mode: host
         container_name: ocs-pysmurf-monitor
-        environment:
-            MYSQL_HOST: ${DB_HOST}
-            MYSQL_DATABASE: ${DB}
-            MYSQL_USER: ${DB_USER}
-            MYSQL_PASSWORD: ${DB_PW}
         volumes:
             - ${OCS_CONFIG_DIR}:/config
             - /data:/data
+        command:
+            - "--site-hub=ws://${CB_HOST}:8001/ws"
+            - "--site-http=http://${CB_HOST}:8001/call"
 
-Where DB_HOST, DB, DB_USER, and DB_PW are set in the ``.env`` file in the same dir as
-the docker-compose file.
+Where SOCS_TAG and CB_HOST are set in the ``.env`` file in the same dir as the
+docker-compose file.
+
+Description
+-----------
+
+.. _pysmurf_monitor_suprsync_db:
+
+Interfacing with the SupRsync Database
+````````````````````````````````````````
+The pysmurf-monitor agent now adds files
+to a specified suprsync database when a new pysmurf file is registered, or it
+receives a message from the publisher built into the smurf-streamer saying that
+a g3 file has been closed and finalized.
+
+Pysmurf auxiliary files will be written using the archive name "smurf",
+and g3 timestreams will have the archive name "timestreams". The
+pysmurf-monitor will determine the remote relative path based on the pysmurf
+action / action timestamp, so it will conform to the directory structure
+previously used by the pysmurf archiver::
+
+    <remote_base_dir>/<5 ctime digits>/<pub_id>/<action_timestamp>_<action>/<plots or outputs>
+
+The SupRsync agents on the smurf-server will use these database entries to know
+what files to copy over to a daq node or simons1.
+
+
+Agent API
+---------
+
+.. autoclass:: agents.pysmurf_monitor.pysmurf_monitor.PysmurfMonitor
+    :members:
+    :exclude-members: datagramReceived
+
+Supporting APIs
+---------------
+.. automethod:: agents.pysmurf_monitor.pysmurf_monitor.create_remote_path
+
+.. automethod:: agents.pysmurf_monitor.pysmurf_monitor.PysmurfMonitor.datagramReceived

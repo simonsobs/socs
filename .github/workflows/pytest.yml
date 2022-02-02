@@ -7,32 +7,68 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - name: Install system packages
+      run: |
+        sudo apt-get install -y socat
+
     - name: Set up Python 3.8
       uses: actions/setup-python@v2
       with:
         python-version: 3.8
 
-    - name: Build docker images
-      run: |
-        docker-compose build
+    # Install
+    - name: clone ocs
+      uses: actions/checkout@v2
+      with:
+        repository: 'simonsobs/ocs'
 
-    - name: Test with pytest wtihin a docker container
+    - name: Install ocs
       run: |
-        docker run -v $PWD:/coverage --rm socs sh -c "COVERAGE_FILE=/coverage/.coverage.docker python3 -m pytest -p no:wampy --cov /app/socs/socs/ ./tests/"
+        pip3 install -r requirements.txt
+        pip3 install .
 
+    - name: clone socs
+      uses: actions/checkout@v2
+
+    - name: Install socs
+      run: |
+        pip3 install -r requirements.txt
+        pip3 install -e .
+
+    # Unit Tests
+    - name: Run unit tests
+      working-directory: ./tests
+      run: |
+        COVERAGE_FILE=.coverage.unit python3 -m pytest --cov -m 'not (integtest or spt3g)'
+
+    - name: Build docker test images
+      run: |
+        docker-compose build socs
+
+    - name: Test with spt3g dependent tests wtihin a docker container
+      run: |
+        docker run -v $PWD:/coverage --rm -w="/app/socs/tests/" socs sh -c "COVERAGE_FILE=/coverage/.coverage.docker python3 -m pytest --cov --order-dependencies -m 'spt3g'"
+
+    # Integration Tests
+    - name: Build images for integration tests
+      run: |
+        docker-compose build ocs-lakeshore372-simulator
+
+    - name: Run integration tests
+      working-directory: ./tests
+      run: |
+        COVERAGE_FILE=.coverage.int python3 -m pytest --cov -m 'integtest'
+
+    # Coverage
     - name: Report test coverage
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
+        mv ./tests/.coverage.* ./
         pip install coveralls
         coverage combine
         coverage report
         coveralls --service=github
-
-    - name: Test documentation build
-      run: |
-        docker run --rm -e READTHEDOCS=True socs sh -c "make -C docs/ html"

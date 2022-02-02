@@ -17,32 +17,30 @@ if not on_rtd:
 
 def create_local_path(file, data_dir):
     """
-        Creates local path from file database entry.
-        If subdirectories do not exist, they will be created.
+    Creates local path from file database entry.
+    If subdirectories do not exist, they will be created.
 
-        The file path will be:
+    The file path will be:
 
-            data_dir/<5 ctime digits>/<pub_id>/<action_timestamp>_<action>/<plots or outputs>
+        data_dir/<5 ctime digits>/<pub_id>/<action_timestamp>_<action>/<plots or outputs>
 
-        E.g.
+    E.g.
 
-            /data/pysmurf/15647/crate1slot2/1564799250_tune_band/outputs/1564799250_tuning_b1.txt
+        /data/pysmurf/15647/crate1slot2/1564799250_tune_band/outputs/1564799250_tuning_b1.txt
 
-        In the case of duplicate datafiles being registered, the duplicates
-        will still be copied over to the location `new_path_name.{i}` where
-        `i` is the next unique index.
+    In the case of duplicate datafiles being registered, the duplicates
+    will still be copied over to the location `new_path_name.{i}` where
+    `i` is the next unique index.
 
 
-        Arguments
-        ---------
-        file: dict
+    Args:
+        file (dict):
             Database entry for file.
-        data_dir: string
+        data_dir (string):
             Path to base directory where files should be copied.
 
-        Returns
-        -------
-        path: string
+    Returns:
+        path (string):
             Local pathname for file
     """
 
@@ -100,43 +98,41 @@ class PysmurfArchiverAgent:
         data_dir/<5 ctime digits>/<file_type>/<file_name>
 
     Where data_dir is specified in the site-config or command line. For instance,
-    if `data_dir = /data/pysmurf`, tuning dat for band 1 might be written to
+    if ``data_dir = /data/pysmurf``, tuning dat for band 1 might be written to
 
         /data/pysmurf/15647/tuning/1564799250_tuning_b1.txt
 
-    Arguments
-    ---------
-    agent: ocs.ocs_agent.OCSAgent
-        OCSAgent object which is running
-    data_dir: string
-        Path to base directory where files will be copied.
-    targets: List[string]
-        list of instance-id's of pysmurf-monitors who publish the files
-        that should be copied over
-    host: string
-        Host name of the smurf-server that host original files
-    user: string
-        username on host to use for copying
+    Args:
+        agent (ocs.ocs_agent.OCSAgent):
+            OCSAgent object which is running
+        data_dir (string):
+            Path to base directory where files will be copied.
+        targets (List[string]):
+            list of instance-id's of pysmurf-monitors who publish the files
+            that should be copied over
+        host (string):
+            Host name of the smurf-server that host original files
+        user (string):
+            username on host to use for copying
 
-    Attributes
-    -----------
-    agent: ocs.ocs_agent.OCSAgent
-        OCSAgent object which is running
-    log: txaio.tx.Logger
-        txaio logger object created by agent
-    data_dir: string
-        Path to base directory where files will be copied.
-    targets: List[string]
-        list of instance-id's of pysmurf-monitors who publish the files
-        that should be copied over
-    host: string
-        Host name of the smurf-server that host original files
-    user: string
-        username on host to use for copying
-    running: bool
-        If run task is currently running
-    sql_config: dict
-        sql login info
+    Attributes:
+        agent (ocs.ocs_agent.OCSAgent):
+            OCSAgent object which is running
+        log (txaio.tx.Logger):
+            txaio logger object created by agent
+        data_dir (string):
+            Path to base directory where files will be copied.
+        targets (List[string]):
+            list of instance-id's of pysmurf-monitors who publish the files
+            that should be copied over
+        host (string):
+            Host name of the smurf-server that host original files
+        user (string):
+            username on host to use for copying
+        running (bool):
+            If run task is currently running
+        sql_config (dict):
+            sql login info
     """
     def __init__(self, agent, data_dir=None, targets=[], host=None, user=None):
         self.agent: ocs_agent.OCSAgent = agent
@@ -166,19 +162,17 @@ class PysmurfArchiverAgent:
         If md5sum is specified, the md5sum of the new file will be checked against
         the old one. If it does not match, copied file will be deleted.
 
-        Arguments
-        ---------
-        old_path: string
-            Path to file on remote computer
-        new_path: string
-            Path to file on local computer
-        md5sum: string, optional
-            md5sum of file on remote computer.
+        Args:
+            old_path (string):
+                Path to file on remote computer
+            new_path (string):
+                Path to file on local computer
+            md5sum (string, optional):
+                md5sum of file on remote computer.
 
-        Returns
-        -------
-        success: bool
-            True if file copied successfully. False otherwise
+        Returns:
+            success (bool):
+                True if file copied successfully. False otherwise
         """
         # Copies file over from computer
         cmd = ["rsync"]
@@ -213,14 +207,18 @@ class PysmurfArchiverAgent:
 
 
     def run(self, session, params=None):
-        """
-        Run process.
+        """run()
 
-        Queries database to find any uncopied files from specified targets,
-        and attempts to copy them to the local computer. On success, it'll
-        update the path to the local path and set `copied=1`. On failure,
-        it'll increment the `failed_copy_attempts` counter.
+        **Process** - Main run process.
+
+        Each iteration this will query the pysmurf_files database to find any
+        uncopied files from specified targets, and attempts to copy them to the
+        local computer. On success, it'll update the path to the local path and
+        set `copied=1`. On failure, it'll increment the `failed_copy_attempts`
+        counter.
+
         """
+
         self.running = True
         session.set_status('running')
         while self.running:
@@ -267,7 +265,7 @@ class PysmurfArchiverAgent:
 
         return True, "Stopped archiving data."
 
-    def stop(self, session, params=None):
+    def _stop(self, session, params=None):
         """ Stopper for run process """
         session.set_status('stopping')
         self.running = False
@@ -277,7 +275,7 @@ def make_parser(parser=None):
     if parser is None:
         parser = argparse.ArgumentParser()
 
-    pgroup = parser.add_argument_group('Agent Config')
+    pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--data-dir', type=str,
                         help="Directory where pysmurf data should be copied")
     pgroup.add_argument('--user',  type=str,
@@ -292,12 +290,10 @@ def make_parser(parser=None):
     return parser
 
 
-def main():
-    parser = site_config.add_arguments()
-    parser = make_parser(parser)
-
-    args = parser.parse_args()
-    site_config.reparse_args(args, 'PysmurfArchiverAgent')
+if __name__ == '__main__':
+    parser = make_parser()
+    args = site_config.parse_args(agent_class='PysmurfArchiverAgent',
+                                  parser=parser)
 
     if args.target is None:
         raise Exception("Argument --target is required")
@@ -310,10 +306,6 @@ def main():
                                     targets=args.target,
                                     host=args.host)
 
-    agent.register_process('run', archiver.run, archiver.stop, startup=True)
+    agent.register_process('run', archiver.run, archiver._stop, startup=True)
 
     runner.run(agent, auto_reconnect=True)
-
-
-if __name__ == '__main__':
-    main()

@@ -1,3 +1,5 @@
+import argparse
+
 from ocs import ocs_agent, site_config, client_t
 # import random
 import time
@@ -109,17 +111,13 @@ class HWPSimulatorAgent:
 
 
 if __name__ == '__main__':
-    parser = site_config.add_arguments()
-
-    pgroup = parser.add_argument_group('Agent Options')
-    
-    args = parser.parse_args()
-
-    site_config.reparse_args(args, 'HWPSimulatorAgent')
+    parser = argparse.ArgumentParser()
+    args = site_config.parse_args(agent_class='HWPSimulatorAgent',
+                                  parser=parser)
 
     agent, runner = ocs_agent.init_site_agent(args)
     
-    arduino_agent = ArduinoAgent(agent)
+    arduino_agent = HWPSimulatorAgent(agent)
 
     agent.register_task('init_arduino', arduino_agent.init_arduino)
     agent.register_process('acq', arduino_agent.start_acq, arduino_agent.stop_acq, startup=True)

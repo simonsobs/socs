@@ -144,19 +144,17 @@ units_key = {1: 'K', 2: 'C', 3: 'S', 4: 'F'}
 
 
 class Channel:
-    """
-        Object for each channel of the lakeshore module
+    """Object for each channel of the lakeshore module
 
-        Properties
-        --------------
-        :channel_num: The number of the channel (1-8). This should not be changed once set
-        :name: Specifies name of channel
-        :sensor (int): 1 = Diode, 2 = PlatRTC, 3 = NTC RTD
-        :auto_range: Specifies if channel should use autorange (1,0).
-        :range: Specifies range if auto_range is false (0-8). Range is accoriding to Lakeshore docs.
-        :current_reversal: Specifies if current reversal should be used (0, 1). Should be 0 for diode.
-        :unit: 1 = K, 2 = C, 3 = Sensor, 4 = F
-        :enabled: Sets whether channel is enabled. (1,0)
+    Attributes:
+        channel_num (int): The number of the channel (1-8). This should not be changed once set
+        name (str): Specifies name of channel
+        sensor (int): 1 = Diode, 2 = PlatRTC, 3 = NTC RTD
+        auto_range (int): Specifies if channel should use autorange (1,0).
+        range (int): Specifies range if auto_range is false (0-8). Range is accoriding to Lakeshore docs.
+        current_reversal (int): Specifies if current reversal should be used (0, 1). Should be 0 for diode.
+        unit (int): 1 = K, 2 = C, 3 = Sensor, 4 = F
+        enabled (int): Sets whether channel is enabled. (1,0)
 
     """
     def __init__(self, ls, channel_num):
@@ -179,8 +177,70 @@ class Channel:
 
     def set_values(self, sensor=None, auto_range=None, range=None,
                    current_reversal=None, unit=None, enabled=None, name=None):
-        """
-            Sets Channel parameters after validation.
+        """Sets Channel parameters after validation.
+
+        Args:
+            channel (int):
+                Channel number to set. Valid choices are 1-8.
+            sensor (int, optional):
+                Specifies sensor type:
+
+                    +---+---------+
+                    | 1 | Diode   |
+                    +---+---------+
+                    | 2 | PlatRTC |
+                    +---+---------+
+                    | 3 | NTC RTD |
+                    +---+---------+
+
+            auto_range (int, optional):
+                Specifies if channel should use autorange. Must be 0 or 1.
+            range (int, optional):
+                Specifies range if auto_range is false. Only settable for NTC
+                RTD:
+
+                    +---+--------------------+
+                    | 0 | 10 Ohms (1 mA)     |
+                    +---+--------------------+
+                    | 1 | 30 Ohms (300 uA)   |
+                    +---+--------------------+
+                    | 2 | 100 Ohms (100 uA)  |
+                    +---+--------------------+
+                    | 3 | 300 Ohms (30 uA)   |
+                    +---+--------------------+
+                    | 4 | 1 kOhm (10 uA)     |
+                    +---+--------------------+
+                    | 5 | 3 kOhms (3 uA)     |
+                    +---+--------------------+
+                    | 6 | 10 kOhms (1 uA)    |
+                    +---+--------------------+
+                    | 7 | 30 kOhms (300 nA)  |
+                    +---+--------------------+
+                    | 8 | 100 kOhms (100 nA) |
+                    +---+--------------------+
+
+            current_reversal (int, optional):
+                Specifies if input current reversal is on or off.
+                Always 0 if input is a diode.
+            units (int, optional):
+                Specifies preferred units parameter, and sets the units for
+                alarm settings:
+
+                    +---+------------+
+                    | 1 | Kelvin     |
+                    +---+------------+
+                    | 2 | Celsius    |
+                    +---+------------+
+                    | 3 | Sensor     |
+                    +---+------------+
+                    | 4 | Fahrenheit |
+                    +---+------------+
+
+            enabled (int, optional):
+                Sets if channel is enabled.
+            name (str, optional):
+                Sets name of channel.
+
         """
         # Checks to see if values are valid
         if sensor is not None:
@@ -340,14 +400,15 @@ class Channel:
 
 class Curve:
     """
-    Header for calibration curve
-    ----------------
-    :Sensor Model:      Name of curve
-    :Serial Number:        Serial Number
-    :Data Format:    2 = V:K, 3 = Ohms:K, 4 = log(Ohms):K
-    :SetPoint Limit:     Temperature Limit (in K)
-    :Temperature Coefficient:     1 = negative, 2 = positive
-    :Number of Breakpoints:     Number of curve points
+    Header for calibration curve::
+
+        :Sensor Model:      Name of curve
+        :Serial Number:        Serial Number
+        :Data Format:    2 = V:K, 3 = Ohms:K, 4 = log(Ohms):K
+        :SetPoint Limit:     Temperature Limit (in K)
+        :Temperature Coefficient:     1 = negative, 2 = positive
+        :Number of Breakpoints:     Number of curve points
+
     """
     def __init__(self, filename=None, header=None, breakpoints=None):
 

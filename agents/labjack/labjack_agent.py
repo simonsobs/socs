@@ -154,8 +154,18 @@ class LabJackFunctions:
         return values, units
 
 
-# LabJack agent class
 class LabJackAgent:
+    """Agent to collect data from LabJack device.
+
+    Parameters:
+        agent (OCSAgent): OCSAgent object for the Agent.
+        ip_address (str): IP Address for the LabJack device.
+        active_channels (str or list): Active channel description, i.e.
+            'T7-all', 'T4-all', or list of channels in form ['AIN0', 'AIN1'].
+        function_file (str): Path to file for unit conversion.
+        sampling_frequency (float): Sampling rate in Hz.
+
+    """
     def __init__(self, agent, ip_address, active_channels, function_file,
                  sampling_frequency):
         self.active = True
@@ -168,9 +178,9 @@ class LabJackAgent:
         self.sampling_frequency = sampling_frequency
 
         # Labjack channels to read
-        if active_channels == 'T7-all':
+        if active_channels[0] == 'T7-all':
             self.chs = ['AIN{}'.format(i) for i in range(14)]
-        elif active_channels == 'T4-all':
+        elif active_channels[0] == 'T4-all':
             self.chs = ['AIN{}'.format(i) for i in range(12)]
         else:
             self.chs = active_channels
@@ -215,11 +225,16 @@ class LabJackAgent:
                                  buffer_time = 1.)
 
     # Task functions
-    def init_labjack_task(self, session, params=None):
-        """
-        task to initialize labjack module
-        """
+    def init_labjack(self, session, params=None):
+        """init_labjack(auto_acquire=False)
 
+        **Task** - Initialize LabJack module.
+
+        Parameters:
+            auto_acquire (bool): Automatically start acq process after
+                initialization. Defaults to False.
+
+        """
         if self.initialized:
             return True, "Already initialized module"
 
@@ -252,14 +267,15 @@ class LabJackAgent:
             self.agent.start('acq_reg')
         return True, 'LabJack module initialized.'
 
-    def start_acq(self, session, params=None):
-        """
-        Task to start data acquisition.
+    def acq(self, session, params=None):
+        """acq(sampling_freq=2.5)
 
-        Args:
-        -----
-        sampling_frequency (float):
-            Sampling frequency for data collection. Defaults to 2.5 Hz
+        **Process** - Acquire data from the Labjack.
+
+        Parameters:
+            sampling_frequency (float):
+                Sampling frequency for data collection. Defaults to 2.5 Hz.
+
         """
         if params is None:
             params = {}
@@ -345,7 +361,7 @@ class LabJackAgent:
 
         return True, 'Acquisition exited cleanly.'
 
-    def stop_acq(self, session, params=None):
+    def _stop_acq(self, session, params=None):
         if self.take_data:
             self.take_data = False
             return True, 'requested to stop taking data.'
@@ -453,16 +469,16 @@ def make_parser(parser=None):
 
     # Add options specific to this agent.
     pgroup = parser.add_argument_group('Agent Options')
-    
+
     ip_txt = 'ip-address of LabJack'
     pgroup.add_argument('--ip-address', help=ip_txt)
     achan_txt = 'Channels or register names to readout default is to read out all'
     achan_txt += 'available outputs. But typically you would want to pass a list of'
-    achan_txt += 'analog inputs (i.e. AIN0_1, AIN0_2, AIN0_3) or a list of custom'
+    achan_txt += 'analog inputs (i.e. ["AIN0", "AIN1", "AIN2"]) or a list of custom'
     achan_txt += 'registers if using `mode=acq_reg`'
     pgroup.add_argument('--active-channels',
-                        default='T7-all', help=achan_txt)
-    ffile_txt = 'Name of file that defines functions for converting analog inputs to'
+                        default=['T7-all'], nargs='+', help=achan_txt)
+    ffile_txt = 'Path to file that defines functions for converting analog inputs to'
     ffile_txt += 'useful units (i.e. temp, pressure, etc.)'
     pgroup.add_argument('--function-file', default='None', help=ffile_txt)
     fs_txt = 'This is the rate each channel in the `active-channels` list is sampled'
@@ -470,8 +486,10 @@ def make_parser(parser=None):
     fs_txt += 'faster O(kHz) in `mode=acq`.'
     pgroup.add_argument('--sampling-frequency', default='2.5', help=fs_txt)
     acq_txt = 'Options are:\n**acq** : reads out analog inputs and can stream quickly'
-    acq_txt += 'or **acq_reg** : reads out custom configured registers.'
-    pgroup.add_argument('--mode', default='acq', help=acq_txt)
+    acq_txt += ', **acq_reg** : reads out custom configured registers.'
+    acq_txt += ', or **idle** : will just leave it idle.'
+    pgroup.add_argument('--mode', default='acq',
+                        choices=['idel','acq','acq_reg'], help=acq_txt)
 
     return parser
 
@@ -480,12 +498,8 @@ if __name__ == '__main__':
     # Start logging
     txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
 
-    site_parser = site_config.add_arguments()
-    parser = make_parser(site_parser)
-
-    args = parser.parse_args()
-
-    site_config.reparse_args(args, 'LabJackAgent')
+    parser = make_parser()
+    args = site_config.parse_args(agent_class='LabJackAgent', parser=parser)
 
     init_params = False
     if args.mode == 'acq':
@@ -507,7 +521,7 @@ if __name__ == '__main__':
                            sampling_frequency=sampling_frequency)
 
     agent.register_task('init_labjack',
-                        sensors.init_labjack_task,
+                        sensors.init_labjack,
                         startup=init_params)
     agent.register_process('acq', sensors.start_acq, sensors.stop_acq)
     agent.register_process('acq_reg', sensors.start_acq_reg,
