@@ -92,10 +92,13 @@ class LabJackFunctions:
         Given a voltage array and function information from the
         labjack_config.yaml file, applies a unit conversion.
         Returns the converted value and its units.
+
         Args:
-            v_array (numpy array): The voltages to be converted.
-            function_info (dict): Specifies the type of function.
-                If custom, also gives the function.
+        -----
+        v_array (numpy array):
+            The voltages to be converted.
+        function_info (dict):
+            Specifies the type of function. If custom, also gives the function.
         """
         if function_info["user_defined"] == 'False':
             function = getattr(self, function_info['type'])
@@ -209,8 +212,8 @@ class LabJackAgent:
         self.agent.register_feed('registers',
                                  record = True,
                                  agg_params = {'frame_length':10*60},
-                                 buffer_time = 0.)
-        
+                                 buffer_time = 1.)
+
     # Task functions
     def init_labjack_task(self, session, params=None):
         """
@@ -242,7 +245,7 @@ class LabJackAgent:
         # Start data acquisition if requested in site-config
         auto_acquire = params.get('auto_acquire', False)
         auto_acquire_reg = params.get('auto_acquire_reg',False)
-        
+
         if auto_acquire:
             self.agent.start('acq')
         if auto_acquire_reg:
@@ -254,9 +257,9 @@ class LabJackAgent:
         Task to start data acquisition.
 
         Args:
-            sampling_frequency (float):
-                Sampling frequency for data collection. Defaults to 2.5 Hz
-
+        -----
+        sampling_frequency (float):
+            Sampling frequency for data collection. Defaults to 2.5 Hz
         """
         if params is None:
             params = {}
@@ -354,20 +357,20 @@ class LabJackAgent:
         Task to start data acquisition when you want to read out
         non-standard registers. In particular the custom registers
         labjack has built for reading out thermocouples. Maximum is
-        about 2.5 Hz but is set by the register read time which is 
+        about 2.5 Hz but is set by the register read time which is
         estimated at the beginning of the acq_reg setup step.
 
         Args:
-            sampling_frequency (float):
-                Sampling frequency for data collection. Defaults to 2.5 Hz
-                Maximum set by the register read time. Will reset to lower
-                rate if faster than possible read time.
-
+        -----
+        sampling_frequency (float):
+            Sampling frequency for data collection. Defaults to 2.5 Hz
+            Maximum set by the register read time. Will reset to lower
+            rate if faster than possible read time.
         """
         if params is None:
             params = {}
-        #Determine the read time latency to set the max allowable 
-        #sampling rate by reading the register 100 times in a row 
+        #Determine the read time latency to set the max allowable
+        #sampling rate by reading the register 100 times in a row
         #and recording the time it takes to read each time. Then
         #setting the max sample rate to be 50mS greater than the median
         #of the time it took to read.
@@ -377,7 +380,7 @@ class LabJackAgent:
             times.append(time.time())
             ljm.eReadNames(self.handle,num_chs,self.chs)[0]
         read_dt = np.round(np.median(np.diff(times)),2)+0.05
-        max_fsamp = 1/read_dt
+        max_fsamp = min(2.5,1/read_dt)
         # Setup streaming parameters. Data is collected and published in
         # blocks at 1 Hz or the scan rate, whichever is less.
         scan_rate_input = params.get('sampling_frequency',
@@ -395,9 +398,8 @@ class LabJackAgent:
             scan_rate_dt = 0
         else:
             scan_rate_dt = (1/scan_rate_input) - read_dt
-            
-        scans_per_read = max(1, int(scan_rate_input))
-        with self.lock.acquire_timeout(0, job='acq') as acquired:
+
+        with self.lock.acquire_timeout(0, job='acq_reg') as acquired:
             if not acquired:
                 self.log.warn("Could not start acq because "
                               "{} is already running".format(self.lock.job))
@@ -441,30 +443,35 @@ class LabJackAgent:
             self.log.info("Data stream stopped")
         return True, 'Acquisition exited cleanly.'
 
-    def stop_acq_reg(self, session, params=None):
-        if self.take_data:
-            self.take_data = False
-            return True, 'requested to stop taking data.'
-        else:
-            return False, 'acq is not currently running'
-
 def make_parser(parser=None):
     """
     Build the argument parser for the Agent. Allows sphinx to automatically
     build documentation based on this function.
-
     """
     if parser is None:
         parser = argparse.ArgumentParser()
 
     # Add options specific to this agent.
     pgroup = parser.add_argument_group('Agent Options')
-
-    pgroup.add_argument('--ip-address')
+    
+    ip_txt = 'ip-address of LabJack'
+    pgroup.add_argument('--ip-address', help=ip_txt)
+    achan_txt = 'Channels or register names to readout default is to read out all'
+    achan_txt += 'available outputs. But typically you would want to pass a list of'
+    achan_txt += 'analog inputs (i.e. AIN0_1, AIN0_2, AIN0_3) or a list of custom'
+    achan_txt += 'registers if using `mode=acq_reg`'
     pgroup.add_argument('--active-channels',
-                        default='T7-all')
-    pgroup.add_argument('--function-file', default='None')
-    pgroup.add_argument('--sampling-frequency', default='2.5')
+                        default='T7-all', help=achan_txt)
+    ffile_txt = 'Name of file that defines functions for converting analog inputs to'
+    ffile_txt += 'useful units (i.e. temp, pressure, etc.)'
+    pgroup.add_argument('--function-file', default='None', help=ffile_txt)
+    fs_txt = 'This is the rate each channel in the `active-channels` list is sampled'
+    fs_txt += 'at. In `mode=acq_reg` the maximum for this is 2.5 Hz can sample much'
+    fs_txt += 'faster O(kHz) in `mode=acq`.'
+    pgroup.add_argument('--sampling-frequency', default='2.5', help=fs_txt)
+    acq_txt = 'Options are:\n**acq** : reads out analog inputs and can stream quickly'
+    acq_txt += 'or **acq_reg** : reads out custom configured registers.'
+    pgroup.add_argument('--mode', default='acq', help=acq_txt)
 
     return parser
 
@@ -504,5 +511,5 @@ if __name__ == '__main__':
                         startup=init_params)
     agent.register_process('acq', sensors.start_acq, sensors.stop_acq)
     agent.register_process('acq_reg', sensors.start_acq_reg,
-                           sensors.stop_acq_reg)
+                           sensors.stop_acq)
     runner.run(agent, auto_reconnect=True)
