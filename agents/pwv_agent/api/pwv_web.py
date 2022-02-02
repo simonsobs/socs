@@ -8,7 +8,7 @@ from flask import Flask, jsonify
 app = Flask(__name__)
 
 
-def julian_day_year_to_unixtime(day, year):
+def _julian_day_year_to_unixtime(day, year):
     """
     Convert water vapor radiometer's output Julian Day to unix timestamp.
 
@@ -23,6 +23,16 @@ def julian_day_year_to_unixtime(day, year):
 
 
 def read_data_from_textfile(filename, year):
+    """Read the UCSC PWV data files.
+
+    Args:
+        filename (str): Path to file
+        year (int): Year the data is from
+
+    Returns:
+        tuple: (pwv, timestamp)
+
+    """
     with open(filename, 'r') as f:
         i = 0
         for l in f.readlines():
@@ -30,7 +40,7 @@ def read_data_from_textfile(filename, year):
                 pass  # skip header
             else:
                 line = l.strip().split()
-                timestamp = julian_day_year_to_unixtime(float(line[0]), year)
+                timestamp = _julian_day_year_to_unixtime(float(line[0]), year)
 
                 pwv = float(line[1])
 
@@ -40,7 +50,7 @@ def read_data_from_textfile(filename, year):
         return _data
 
 
-def get_latest_pwv_file(data_dir=None):
+def get_latest_pwv_file(data_dir):
     """Get the latest PWV data file.
 
     This assumes a couple of things:
@@ -57,20 +67,16 @@ def get_latest_pwv_file(data_dir=None):
         str: The full path to the latest text file containing PWV data.
 
     """
-    if data_dir is None:
-        dir_ = os.getenv("PWV_DATA_DIR")
-    else:
-        dir_ = data_dir
-
     year = datetime.datetime.now().year
-    files = glob.glob(os.path.join(dir_, f"PWV_UCSC*{year}*.txt"))
+    files = glob.glob(os.path.join(data_dir, f"PWV_UCSC*{year}*.txt"))
     files.sort()
     return files[-1]
 
 
 @app.route("/")
 def get_pwv():
-    file_ = get_latest_pwv_file()
+    dir_ = os.getenv("PWV_DATA_DIR")
+    file_ = get_latest_pwv_file(dir_)
     year = int(os.path.basename(file_).replace('-', '_').split('_')[3])
     pwv, timestamp = read_data_from_textfile(file_, year)
 
