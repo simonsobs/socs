@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 import pytest
 
 try:
-    from spt3g import core
+    from so3g.spt3g import core
 
     from socs.agent.smurf_recorder import FrameRecorder, FlowControl
 except ModuleNotFoundError as e:

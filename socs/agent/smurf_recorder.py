@@ -11,7 +11,7 @@ txaio.use_twisted()
 
 on_rtd = os.environ.get('READTHEDOCS') == 'True'
 if not on_rtd:
-    from spt3g import core
+    from so3g.spt3g import core
 
 
 class FlowControl(Enum):
