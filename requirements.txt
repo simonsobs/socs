@@ -1,4 +1,6 @@
 ocs
+autobahn[serialization]
+twisted
 mysql-connector>=2.1.6
 
 # Lakeshore240

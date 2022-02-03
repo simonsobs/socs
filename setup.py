@@ -29,6 +29,8 @@ setup(name = 'socs',
       python_requires=">=3.6",
       install_requires=[
           'ocs',
+          'autobahn[serialization]',
+          'twisted',
           'pyserial',
           'sqlalchemy',
           'pysnmp',
