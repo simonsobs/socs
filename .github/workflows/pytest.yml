@@ -21,16 +21,6 @@ jobs:
         python-version: 3.8
 
     # Install
-    - name: clone ocs
-      uses: actions/checkout@v2
-      with:
-        repository: 'simonsobs/ocs'
-
-    - name: Install ocs
-      run: |
-        pip3 install -r requirements.txt
-        pip3 install .
-
     - name: Install so3g
       run: |
         pip3 install so3g
