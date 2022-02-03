@@ -94,11 +94,10 @@ class LabJackFunctions:
         Returns the converted value and its units.
 
         Args:
-        -----
-        v_array (numpy array):
-            The voltages to be converted.
-        function_info (dict):
-            Specifies the type of function. If custom, also gives the function.
+            v_array (np.array):
+                The voltages to be converted.
+            function_info (dict):
+                Specifies the type of function. If custom, also gives the function.
         """
         if function_info["user_defined"] == 'False':
             function = getattr(self, function_info['type'])
@@ -377,11 +376,10 @@ class LabJackAgent:
         estimated at the beginning of the acq_reg setup step.
 
         Args:
-        -----
-        sampling_frequency (float):
-            Sampling frequency for data collection. Defaults to 2.5 Hz
-            Maximum set by the register read time. Will reset to lower
-            rate if faster than possible read time.
+            sampling_frequency (float):
+                Sampling frequency for data collection. Defaults to 2.5 Hz
+                Maximum set by the register read time. Will reset to lower
+                rate if faster than possible read time.
         """
         if params is None:
             params = {}
@@ -472,22 +470,22 @@ def make_parser(parser=None):
 
     ip_txt = 'ip-address of LabJack'
     pgroup.add_argument('--ip-address', help=ip_txt)
-    achan_txt = 'Channels or register names to readout default is to read out all'
-    achan_txt += 'available outputs. But typically you would want to pass a list of'
-    achan_txt += 'analog inputs (i.e. ["AIN0", "AIN1", "AIN2"]) or a list of custom'
-    achan_txt += 'registers if using `mode=acq_reg`'
+    achan_txt = 'Channels or register names to readout default is to read out all '
+    achan_txt += 'available outputs. But typically you would want to pass a list of '
+    achan_txt += 'analog inputs (i.e. ["AIN0", "AIN1", "AIN2"]) or a list of custom '
+    achan_txt += 'registers if using ``--mode=acq_reg``.'
     pgroup.add_argument('--active-channels',
                         default=['T7-all'], nargs='+', help=achan_txt)
-    ffile_txt = 'Path to file that defines functions for converting analog inputs to'
+    ffile_txt = 'Path to file that defines functions for converting analog inputs to '
     ffile_txt += 'useful units (i.e. temp, pressure, etc.)'
     pgroup.add_argument('--function-file', default='None', help=ffile_txt)
-    fs_txt = 'This is the rate each channel in the `active-channels` list is sampled'
-    fs_txt += 'at. In `mode=acq_reg` the maximum for this is 2.5 Hz can sample much'
-    fs_txt += 'faster O(kHz) in `mode=acq`.'
+    fs_txt = 'This is the rate each channel in the `active-channels` list is sampled '
+    fs_txt += 'at. In ``--mode=acq_reg`` the maximum for this is 2.5 Hz can sample much '
+    fs_txt += 'faster O(kHz) in ``--mode=acq``.'
     pgroup.add_argument('--sampling-frequency', default='2.5', help=fs_txt)
-    acq_txt = 'Options are:\n**acq** : reads out analog inputs and can stream quickly'
-    acq_txt += ', **acq_reg** : reads out custom configured registers.'
-    acq_txt += ', or **idle** : will just leave it idle.'
+    acq_txt = 'Options are **acq**: read out analog inputs (can stream quickly)'
+    acq_txt += ', **acq_reg**: read out custom configured registers'
+    acq_txt += ', or **idle**: leave device idle at startup.'
     pgroup.add_argument('--mode', default='acq',
                         choices=['idel','acq','acq_reg'], help=acq_txt)
 
