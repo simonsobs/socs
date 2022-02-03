@@ -11,4 +11,4 @@ WORKDIR /app/socs/
 
 # Install socs
 RUN pip3 install -r requirements.txt && \
-    pip3 install -e .
+    pip3 install .
