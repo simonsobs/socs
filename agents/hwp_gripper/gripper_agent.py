@@ -5,11 +5,13 @@ import time
 
 this_dir = os.path.dirname(__file__)
 
-import src.C000DRD as c0
-import src.JXC831 as jx
-import src.control as ct
-import src.gripper as gp
-import src.command_gripper as cg
+ON_RTD = os.environ.get('READTHEDOCS') == 'True'
+if not ON_RTD:
+    import src.C000DRD as c0
+    import src.JXC831 as jx
+    import src.control as ct
+    import src.gripper as gp
+    import src.command_gripper as cg
 
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
