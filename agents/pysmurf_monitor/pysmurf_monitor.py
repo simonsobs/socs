@@ -7,8 +7,7 @@ import argparse
 from twisted.internet.protocol import DatagramProtocol
 from twisted.internet import reactor
 
-from ocs.agent.aggregator import Provider
-from ocs import ocs_agent, site_config
+from ocs import ocs_agent, site_config, ocs_feed
 
 from socs.db.suprsync import SupRsyncFilesManager, create_file
 
@@ -141,7 +140,7 @@ class PysmurfMonitor(DatagramProtocol):
             val = data['payload']['value']
             val_type = data['payload']['type']
 
-            field_name = Provider._enforce_field_name_rules(path)
+            field_name = ocs_feed.Feed.enforce_field_name_rules(path)
             feed_name = f'{stream_id}_meta'
 
             if feed_name not in self.agent.feeds:
