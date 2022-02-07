@@ -343,7 +343,11 @@ class SupRsyncFileHandler:
                     )
                     file_map[remote_path] = file
 
-                cmd = ['rsync', '-Lrt', tmp_dir+'/', dest]
+                cmd = ['rsync', '-Lrt']
+                if self.ssh_key is not None:
+                    cmd.extend(['--rsh', f'ssh -i {self.ssh_key}'])
+                cmd.extend([tmp_dir+'/', dest])
+
                 subprocess.run(cmd, check=True, timeout=self.copy_timeout)
 
             for file in files:
