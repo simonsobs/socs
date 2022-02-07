@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 import pytest
 
 try:
+    import so3g
     from spt3g import core
 
     from socs.agent.smurf_recorder import FrameRecorder, FlowControl

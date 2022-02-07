@@ -64,9 +64,9 @@ Description
 -----------
 
 The archiver's role is to copy files from from the smurf-server over to a
-storage node. It does this by continuously monitoring the
-:ref:`pysmurf_files database <pysmurf_files_db>`, and finding any uncopied files
-writen by the target specified in the site args.
+storage node. It does this by continuously monitoring the pysmurf_files
+database, and finding any uncopied files writen by the target specified in the
+site args.
 
 It then rsync's the files over to a new location on the storage node,
 setting ``copied=1`` if successful, and incrementing the failure counter if

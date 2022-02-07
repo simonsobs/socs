@@ -16,6 +16,10 @@ SOCS - Simons Observatory Control System
 .. image:: https://img.shields.io/badge/dockerhub-latest-blue
     :target: https://hub.docker.com/r/simonsobs/ocs/tags
 
+.. image:: https://img.shields.io/pypi/v/socs
+   :target: https://pypi.org/project/socs/
+   :alt: PyPI Package
+
 Overview
 --------
 
@@ -29,13 +33,23 @@ by `OCS`_.
 Installation
 ------------
 
-To install SOCS, clone the repository and install with `pip`:
+Install and update with pip::
+
+    $ pip3 install -U socs
+
+Installing from Source
+``````````````````````
+
+If you are considering contributing to SOCS, or would like to use the
+development branch, you will want to install from source. To do so,
+clone the repository and install using pip:
 
 .. code-block:: bash
 
     git clone https://github.com/simonsobs/socs.git
     cd socs/
-    pip3 install -r requirements.txt .
+    pip3 install -r requirements.txt
+    pip3 install .
 
 In order for OCS tools to find these agents, you must add the full
 path to the agents directory, e.g. ``/home/simons/code/socs/agents/``,
@@ -51,7 +65,7 @@ configured host if it does not already exist:
 
 See the `ocs docs`_ for more details.
 
-.. _`ocs docs`: https://ocs.readthedocs.io/en/latest/site_config.html
+.. _`ocs docs`: https://ocs.readthedocs.io/en/develop/developer/site_config.html
 
 Docker Images
 -------------
@@ -93,17 +107,17 @@ The tests for SOCS are run using pytest, and should be run from the
 
 For more details see `tests/README.rst <tests_>`_.
 
-.. _tests: tests/README.rst
+.. _tests: https://github.com/simonsobs/socs/blob/master/tests/README.rst
 
 Contributing
 ------------
 For guidelines on how to contribute to OCS see `CONTRIBUTING.rst`_.
 
-.. _CONTRIBUTING.rst: CONTRIBUTING.rst
+.. _CONTRIBUTING.rst: https://github.com/simonsobs/socs/blob/master/CONTRIBUTING.rst
 
 License
 --------
 This project is licensed under the BSD 2-Clause License - see the 
 `LICENSE.txt`_ file for details.
 
-.. _LICENSE.txt: LICENSE.txt
+.. _LICENSE.txt: https://github.com/simonsobs/socs/blob/master/LICENSE.txt

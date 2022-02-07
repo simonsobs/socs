@@ -58,6 +58,7 @@ def test_ls372_start_acq(wait_for_crossbar, run_agent, client):
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.STARTING.value
 
+    client.acq.wait()
     resp = client.acq.status()
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value

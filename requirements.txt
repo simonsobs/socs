@@ -1,12 +1,10 @@
-sphinx-argparse
-numpy
+ocs
 autobahn[serialization]
 twisted
+mysql-connector>=2.1.6
 
 # Lakeshore240
 pyserial
-
-mysql-connector>=2.1.6
 
 # LabJack Agent
 pymodbus
@@ -18,12 +16,11 @@ scipy
 pysnmp
 pysmi
 
+# suprsync agent and tests
+sqlalchemy
+
 # Docs
 # see docs/requirements.txt
 
 # testing
-pytest
-pytest-cov
-pytest-docker-compose
-pytest-dependency
-pytest-order
+-r requirements/testing.txt
