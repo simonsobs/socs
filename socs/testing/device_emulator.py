@@ -52,7 +52,8 @@ class DeviceEmulator:
         responses (dict): Current set of responses the DeviceEmulator would give
         default_response (str): Default response to send if a command is
             unrecognized. No response is sent and an error message is logged if
-            set to None. Defaults to None.
+            a command is unrecognized and the default response is set to None.
+            Defaults to None.
 
     """
     def __init__(self, responses):
@@ -183,7 +184,8 @@ class DeviceEmulator:
                 until depleted.
             default_response (str): Default response to send if a command is
                 unrecognized. No response is sent and an error message is logged if
-                set to None. Defaults to None.
+                a command is unrecognized and the default response is set to None.
+                Defaults to None.
 
         Examples:
             The given responses might look like::
