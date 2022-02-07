@@ -3,10 +3,6 @@ name: Deploy Builds
 on:
   release:
     types: [ released ]
-  # temporary for testing workflow with rc tags
-  push:
-    tags:
-      - '*'
 
 jobs:
   test:
