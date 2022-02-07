@@ -23,5 +23,12 @@ hosts:
         ['--mode', 'init'],
         ['--sampling-frequency', 1.],
       ]},
+      {'agent-class': 'Lakeshore240Agent',
+       'instance-id': 'LSA240S',
+       'arguments': [['--serial-number', 'LSA240S'],
+                     ['--mode', 'idle'],
+                     ['--port', './responder'],
+                    ]
+      },
     ]
   }

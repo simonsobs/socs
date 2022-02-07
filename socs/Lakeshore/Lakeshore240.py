@@ -91,7 +91,7 @@ class Module:
             Return response (within timeout) if message is a query.
         """
         if self.simulator:
-            message_string = "{};".format(msg)
+            message_string = "{}".format(msg)
             self.com.send(message_string.encode())
             resp = ''
             if '?' in msg:
@@ -100,7 +100,7 @@ class Module:
 
         else:
             # Writes message
-            message_string = "{}\r\n;".format(msg).encode()
+            message_string = "{}\r\n".format(msg).encode()
 
             # write(message_string)
             self.com.write(message_string)

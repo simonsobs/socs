@@ -50,10 +50,15 @@ class DeviceEmulator:
 
     Attributes:
         responses (dict): Current set of responses the DeviceEmulator would give
+        default_response (str): Default response to send if a command is
+            unrecognized. No response is sent and an error message is logged if
+            a command is unrecognized and the default response is set to None.
+            Defaults to None.
 
     """
     def __init__(self, responses):
         self.responses = responses
+        self.default_response = None
         self._read = True
 
     @staticmethod
@@ -99,6 +104,34 @@ class DeviceEmulator:
         bkg_read = threading.Thread(name='background', target=self._read_serial)
         bkg_read.start()
 
+    def _get_response(self, msg):
+        """Determine the response to a given message.
+
+        Args:
+            msg (str): Command string to get the response for.
+
+        Returns:
+            str: Response string. Will return None if a valid response is not
+                 found.
+
+        """
+        if self.responses is None:
+            return
+
+        if msg not in self.responses and self.default_response is not None:
+            return self.default_response
+
+        try:
+            if isinstance(self.responses[msg], list):
+                response = self.responses[msg].pop(0)
+            else:
+                response = self.responses[msg]
+        except Exception as e:
+            print(f"encountered error {e}")
+            response = None
+
+        return response
+
     def _read_serial(self):
         """Loop until shutdown, reading any commands sent over the relay.
         Respond immediately to a command with the response in self.responses.
@@ -109,21 +142,16 @@ class DeviceEmulator:
         while self._read:
             if self.ser.in_waiting > 0:
                 msg = self.ser.readline().strip().decode('utf-8')
-                print(f"msg={msg}")
+                print(f"msg='{msg}'")
 
-                if self.responses is None:
+                response = self._get_response(msg)
+
+                if response is None:
                     continue
 
-                try:
-                    if isinstance(self.responses[msg], list):
-                        response = self.responses[msg].pop(0)
-                    else:
-                        response = self.responses[msg]
+                print(f"response='{response}'")
+                self.ser.write((response + '\r\n').encode('utf-8'))
 
-                    print(f'response={response}')
-                    self.ser.write((response + '\r\n').encode('utf-8'))
-                except Exception as e:
-                    print(f"encountered error {e}")
             time.sleep(0.01)
 
     def __del__(self):
@@ -146,7 +174,7 @@ class DeviceEmulator:
     def create_tcp_relay(self):
         pass
 
-    def define_responses(self, responses):
+    def define_responses(self, responses, default_response=None):
         """Define what responses are available to reply with on the configured
         communication relay.
 
@@ -154,6 +182,10 @@ class DeviceEmulator:
             responses (dict): Dictionary of commands: response. Values can be a
                 list, in which case the responses in the list are popped and given in order
                 until depleted.
+            default_response (str): Default response to send if a command is
+                unrecognized. No response is sent and an error message is logged if
+                a command is unrecognized and the default response is set to None.
+                Defaults to None.
 
         Examples:
             The given responses might look like::
@@ -163,5 +195,7 @@ class DeviceEmulator:
                                  'RDGFIELD?': ['+1.0E-01', '+1.2E-01', '+1.4E-01']}
 
         """
-        print(f'responses set to {responses}')
+        print(f"responses set to {responses}")
         self.responses = responses
+        print(f"default response set to '{default_response}'")
+        self.default_response = default_response
