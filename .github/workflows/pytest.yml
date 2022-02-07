@@ -6,7 +6,8 @@ on:
   pull_request:
 
 jobs:
-  build:
+  test:
+    name: pytest with coverage
     runs-on: ubuntu-latest
 
     steps:
@@ -20,15 +21,9 @@ jobs:
         python-version: 3.8
 
     # Install
-    - name: clone ocs
-      uses: actions/checkout@v2
-      with:
-        repository: 'simonsobs/ocs'
-
-    - name: Install ocs
+    - name: Install so3g
       run: |
-        pip3 install -r requirements.txt
-        pip3 install .
+        pip3 install so3g
 
     - name: clone socs
       uses: actions/checkout@v2
@@ -42,15 +37,11 @@ jobs:
     - name: Run unit tests
       working-directory: ./tests
       run: |
-        COVERAGE_FILE=.coverage.unit python3 -m pytest --cov -m 'not (integtest or spt3g)'
+        COVERAGE_FILE=.coverage.unit python3 -m pytest --cov -m 'not integtest'
 
     - name: Build docker test images
       run: |
         docker-compose build socs
-
-    - name: Test with spt3g dependent tests wtihin a docker container
-      run: |
-        docker run -v $PWD:/coverage --rm -w="/app/socs/tests/" socs sh -c "COVERAGE_FILE=/coverage/.coverage.docker python3 -m pytest --cov --order-dependencies -m 'spt3g'"
 
     # Integration Tests
     - name: Build images for integration tests
