@@ -112,3 +112,38 @@ def test_ls240_set_values(wait_for_crossbar, emulator, run_agent, client):
                              name="Channel 01")
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
+
+@pytest.mark.integtest
+def test_ls240_upload_cal_curve(wait_for_crossbar, emulator, run_agent, client,
+                                tmp_path):
+    client.init_lakeshore()
+
+    # Write small calibration curve
+    content = "Sensor Model:   DT-670-SD-1.4L\n" + \
+              "Serial Number:  D60STND\n" + \
+              "Data Format:    2      (Volts/Kelvin)\n" + \
+              "SetPoint Limit: 325.0      (Kelvin)\n" + \
+              "Temperature coefficient:  1 (Negative)\n" + \
+              "Number of Breakpoints:   3\n" + \
+              "\n" + \
+              "No.   Units      Temperature (K)\n" + \
+              "\n" + \
+              "  1  0.090681    500.0\n" + \
+              "  2  0.112553    490.0\n" + \
+              "  3  0.135480    480.0\n"
+
+    cal_file = tmp_path / 'test_cal.340'
+    cal_file.write_text(content)
+    print(cal_file)
+    print(cal_file.read_text())
+    assert cal_file.read_text() == content
+
+    # No queries are sent during upload, so rely on the default response of ''
+    responses = {'CRVHDR 1,DT-670-SD-1.4L,D60STND,2,325.0,1': ''}
+    emulator.define_responses(responses, default_response='')
+
+    resp = client.upload_cal_curve(channel=1,
+                                   filename=str(cal_file))
+    assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
