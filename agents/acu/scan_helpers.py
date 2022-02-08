@@ -223,7 +223,7 @@ def generate_linear_turnaround(az_endpoint1, az_endpoint2, az_speed, acc, el_end
                     az_flag = 1
                     el_flag = 0
                     increasing = False
-                elif round(az, 4) == (az_max-(daz+leftover_az)):
+                elif round(az, 4) == round((az_max-(daz+leftover_az)), 4):
                     az = az_max
                     t += leftover_time
                     az_vel = az_speed
@@ -246,7 +246,7 @@ def generate_linear_turnaround(az_endpoint1, az_endpoint2, az_speed, acc, el_end
                     az_flag = 1
                     el_flag = 0
                     increasing = True
-                elif round(az, 4) == az_min+(daz+leftover_az):
+                elif round(az, 4) == round(az_min+(daz+leftover_az), 4):
                     az = az_min
                     t += leftover_time
                     az_vel = -1*az_speed
