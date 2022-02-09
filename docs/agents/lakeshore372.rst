@@ -34,7 +34,7 @@ configuration block::
    'arguments': [['--serial-number', 'LSA22YG'],
                  ['--ip-address', '10.10.10.2'],
                  ['--dwell-time-delay', 0],
-                 ['--auto-acquire'],
+                 ['--mode', 'acq'],
                  ['--sample-heater', False],
                  ['--enable-control-chan']]},
 
