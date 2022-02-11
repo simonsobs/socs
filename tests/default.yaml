@@ -31,5 +31,10 @@ hosts:
                      ['--port', './responder'],
                     ]
       },
+      {'agent-class': 'PfeifferTC400Agent',
+       'instance-id': 'pfeifferturboA',
+       'arguments': [['--ip-address', '127.0.0.1'],
+                       ['--port-number', '9001'],
+                       ['--turbo-address', '1']]},
     ]
   }
