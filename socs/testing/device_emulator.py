@@ -6,7 +6,7 @@ import pytest
 import threading
 
 
-def create_device_emulator(responses, relay_type='serial'):
+def create_device_emulator(responses, relay_type):
     """Create a device emulator fixture.
 
     This provides a device emulator that can be used to mock a device during
