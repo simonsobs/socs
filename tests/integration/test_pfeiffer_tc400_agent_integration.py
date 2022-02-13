@@ -76,14 +76,19 @@ def test_pfeiffer_tc400_init_lakeshore(wait_for_crossbar, emulator, run_agent, c
 #    assert resp.session['op_code'] in [OpCode.STOPPING.value,
 #                                       OpCode.SUCCEEDED.value]
 
+def chksum_msg(msg):
+    """Create and append the checksum ot a message."""
+    msg += "{:03d}\r".format(sum([ord(x) for x in msg])%256)
+    return msg
 
 @pytest.mark.integtest
 def test_pfeiffer_tc400_turn_turbo_on(wait_for_crossbar, emulator, run_agent, client):
     client.init()
 
     #responses = {'001 10 010 06 111111 015': '00110'}
-    responses = {'0011001006111111015': '0011001006111111015\r',  # ready_turbo()
-                 '0011002306111111019': '0011001006111111015\r',  # turn_turbo_motor_on()
+    responses = {'0011001006111111015': chksum_msg('0011001006111111'),  # ready_turbo()
+                 '0011002306111111019': chksum_msg('0011001006000000'),  # turn_turbo_motor_on()
+                 #'0011002306111111019': '0011001006111111015\r',  # turn_turbo_motor_on()
     }
     emulator.define_responses(responses)
 
