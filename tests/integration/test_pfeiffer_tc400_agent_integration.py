@@ -1,3 +1,4 @@
+import os
 import time
 import pytest
 
@@ -16,6 +17,9 @@ from integration.util import (
 from socs.testing.device_emulator import create_device_emulator
 
 pytest_plugins = ("docker_compose")
+
+# Set the OCS_CONFIG_DIR so we read the local default.yaml file always
+os.environ['OCS_CONFIG_DIR'] = os.getcwd()
 
 wait_for_crossbar = create_crossbar_fixture()
 run_agent = create_agent_runner_fixture(
