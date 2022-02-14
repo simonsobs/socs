@@ -112,7 +112,6 @@ def test_pfeiffer_tc400_turn_turbo_on(wait_for_crossbar, emulator, run_agent, cl
 
     responses = {'0011001006111111015': format_reply('111111'),  # ready_turbo()
                  '0011002306111111019': format_reply('111111'),  # turn_turbo_motor_on()
-                 #'0011002306111111019': '0011001006111111015\r',  # turn_turbo_motor_on()
     }
     emulator.define_responses(responses)
 
@@ -120,4 +119,103 @@ def test_pfeiffer_tc400_turn_turbo_on(wait_for_crossbar, emulator, run_agent, cl
     print(resp)
     assert resp.status == ocs.OK
     print(resp.session)
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
+
+@pytest.mark.integtest
+def test_pfeiffer_tc400_turn_turbo_on_not_ready(wait_for_crossbar, emulator, run_agent, client):
+    client.init()
+
+    responses = {'0011001006111111015': format_reply('000000'),  # ready_turbo()
+                 '0011002306111111019': format_reply('111111'),  # turn_turbo_motor_on()
+    }
+    emulator.define_responses(responses)
+
+    resp = client.turn_turbo_on()
+    assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.FAILED.value
+
+
+@pytest.mark.integtest
+def test_pfeiffer_tc400_turn_turbo_on_failed(wait_for_crossbar, emulator, run_agent, client):
+    client.init()
+
+    responses = {'0011001006111111015': format_reply('111111'),  # ready_turbo()
+                 '0011002306111111019': format_reply('000000'),  # turn_turbo_motor_on()
+    }
+    emulator.define_responses(responses)
+
+    resp = client.turn_turbo_on()
+    assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.FAILED.value
+
+
+@pytest.mark.integtest
+def test_pfeiffer_tc400_turn_turbo_off(wait_for_crossbar, emulator, run_agent, client):
+    client.init()
+
+    responses = {'0011002306000000013': format_reply('111111'),  # turn_turbo_motor_on()
+                 '0011001006000000009': format_reply('111111'),  # unready_turbo()
+    }
+    emulator.define_responses(responses)
+
+    resp = client.turn_turbo_off()
+    assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
+
+@pytest.mark.integtest
+def test_pfeiffer_tc400_turn_turbo_off_failed(wait_for_crossbar, emulator, run_agent, client):
+    client.init()
+
+    responses = {'0011002306000000013': format_reply('000000'),  # turn_turbo_motor_on()
+                 '0011001006000000009': format_reply('111111'),  # unready_turbo()
+    }
+    emulator.define_responses(responses)
+
+    resp = client.turn_turbo_off()
+    assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.FAILED.value
+
+
+@pytest.mark.integtest
+def test_pfeiffer_tc400_turn_turbo_off_failed_unready(wait_for_crossbar, emulator, run_agent, client):
+    client.init()
+
+    responses = {'0011002306000000013': format_reply('111111'),  # turn_turbo_motor_on()
+                 '0011001006000000009': format_reply('000000'),  # unready_turbo()
+    }
+    emulator.define_responses(responses)
+
+    resp = client.turn_turbo_off()
+    assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.FAILED.value
+
+
+@pytest.mark.integtest
+def test_pfeiffer_tc400_acknowledge_turbo_errors(wait_for_crossbar, emulator, run_agent, client):
+    client.init()
+
+    responses = {'0011000906111111023': format_reply('111111'),  # acknowledge_turbo_errors()
+    }
+    emulator.define_responses(responses)
+
+    resp = client.acknowledge_turbo_errors()
+    assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
+
+@pytest.mark.integtest
+def test_pfeiffer_tc400_acq(wait_for_crossbar, emulator, run_agent, client):
+    client.init()
+
+    responses = {'0010034602=?108': format_reply('000300'),  # get_turbo_motor_temperature()
+                 '0010030902=?107': format_reply('000800'),  # get_turbo_actual_rotation_speed()
+                 '0010030302=?101': format_reply('Err001'),  # get_turbo_error_code()
+    }
+    emulator.define_responses(responses)
+
+    resp = client.acq.start(test_mode=True, wait=0)
+    resp = client.acq.wait()
+    assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
