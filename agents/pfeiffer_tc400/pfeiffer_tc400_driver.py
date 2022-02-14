@@ -11,6 +11,10 @@ from pfeiffer_vacuum_protocol.pfeiffer_vacuum_protocol import _send_data_request
 from pfeiffer_vacuum_protocol.pfeiffer_vacuum_protocol import _send_control_command as send_control_command
 from pfeiffer_vacuum_protocol.pfeiffer_vacuum_protocol import _read_gauge_response as read_gauge_response
 
+# Data type 0 from TC400 Manual Section 8.3 - Applied data types
+PFEIFFER_BOOL = {'111111': True,
+                 '000000': False}
+
 
 class PfeifferTC400:
     """Initiates a TCP connection with the Moxa serial to ethernet converter to send serial communications.
@@ -114,7 +118,10 @@ class PfeifferTC400:
 
         addr, rw, param_num, turbo_response = read_gauge_response(self.ser)
 
-        return turbo_response
+        if turbo_response not in PFEIFFER_BOOL:
+            raise ValueError(f"Unrecognized response from turbo: {turbo_response}")
+        else:
+            return turbo_response == "111111"
 
     def ready_turbo(self):
         """Readies the turbo for spinning. Does not cause the turbo to spin up.
@@ -129,7 +136,10 @@ class PfeifferTC400:
 
         addr, rw, param_num, turbo_response = read_gauge_response(self.ser)
 
-        return turbo_response
+        if turbo_response not in PFEIFFER_BOOL:
+            raise ValueError(f"Unrecognized response from turbo: {turbo_response}")
+        else:
+            return turbo_response == "111111"
 
     def turn_turbo_motor_on(self):
         """Turns the turbo motor on. The turbo must be readied before the motor will turn on.
@@ -145,7 +155,10 @@ class PfeifferTC400:
 
         addr, rw, param_num, turbo_response = read_gauge_response(self.ser)
 
-        return turbo_response
+        if turbo_response not in PFEIFFER_BOOL:
+            raise ValueError(f"Unrecognized response from turbo: {turbo_response}")
+        else:
+            return turbo_response == "111111"
 
     def turn_turbo_motor_off(self):
         """Turns the turbo motor off.
@@ -160,7 +173,10 @@ class PfeifferTC400:
 
         addr, rw, param_num, turbo_response = read_gauge_response(self.ser)
 
-        return turbo_response
+        if turbo_response not in PFEIFFER_BOOL:
+            raise ValueError(f"Unrecognized response from turbo: {turbo_response}")
+        else:
+            return turbo_response == "111111"
 
     def acknowledge_turbo_errors(self):
         """Acknowledges the turbo errors. This is analagous to clearing the errors.
@@ -176,4 +192,7 @@ class PfeifferTC400:
 
         addr, rw, param_num, turbo_response = read_gauge_response(self.ser)
 
-        return turbo_response
+        if turbo_response not in PFEIFFER_BOOL:
+            raise ValueError(f"Unrecognized response from turbo: {turbo_response}")
+        else:
+            return turbo_response == "111111"
