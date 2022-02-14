@@ -48,9 +48,9 @@ docker-compose service configuration is shown here::
     image: simonsobs/ocs-lakeshore240-simulator:latest
     hostname: ocs-docker
 
-It is helpful to have other live monitor components such as Grafana and either
-the sisock quick look components or an InfluxDB container for quickly
-visualizing whether the 240 Agent is getting data from the simulator.
+It is helpful to have other live monitor components such as Grafana and an
+InfluxDB container for quickly visualizing whether the 240 Agent is getting
+data from the simulator.
 
 Running Outside of Docker
 -------------------------

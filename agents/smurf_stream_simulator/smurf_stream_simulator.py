@@ -15,6 +15,7 @@ txaio.use_twisted()
 ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 if not ON_RTD:
     from ocs import ocs_agent, site_config
+    import so3g
     from spt3g import core
 
 
@@ -220,7 +221,6 @@ class SmurfStreamSimulator:
             f['sostream_id'] = self.stream_id
             self.writer.Process(f)
 
-
     def _send_end_flowcontrol_frame(self):
         """Send END flowcontrol frame."""
         if self.writer is not None:
@@ -347,6 +347,8 @@ def make_parser(parser=None):
                         help="Port to listen on.")
     pgroup.add_argument("--num-chans", default=528,
                         help="Number of detector channels to simulate.")
+    pgroup.add_argument("--stream-id", default="stream_sim",
+                        help="Stream ID for the simulator.")
 
     return parser
 
@@ -355,16 +357,15 @@ if __name__ == '__main__':
     # Start logging
     txaio.start_logging(level=environ.get("LOGLEVEL", "info"))
 
-    site_parser = site_config.add_arguments()
-    parser = make_parser(site_parser)
-
-    args = parser.parse_args()
-    site_config.reparse_args(args, 'SmurfStreamSimulator')
+    parser = make_parser()
+    args = site_config.parse_args(agent_class='SmurfStreamSimulator',
+                                  parser=parser)
 
     agent, runner = ocs_agent.init_site_agent(args)
     sim = SmurfStreamSimulator(agent, target_host=args.target_host,
                                port=int(args.port),
-                               num_chans=int(args.num_chans))
+                               num_chans=int(args.num_chans),
+                               stream_id=args.stream_id)
 
     agent.register_process('stream', sim.start_background_streamer,
                            sim.stop_background_streamer,

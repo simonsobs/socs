@@ -11,6 +11,7 @@ txaio.use_twisted()
 
 on_rtd = os.environ.get('READTHEDOCS') == 'True'
 if not on_rtd:
+    import so3g
     from spt3g import core
 
 

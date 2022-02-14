@@ -11,6 +11,10 @@ The Pfeiffer TPG 366 Controller is a six channel pressure gauge monitor. The
 Pfeiffer agent communicates with the Controller module, and reads out 
 pressure readingss from the six different channels.
 
+.. argparse::
+    :filename: ../agents/pfeiffer_tpg366/pfeiffer_tpg366_agent.py
+    :func: make_parser
+    :prog: python3 pfeiffer_tpg366_agent.py
 
 Configuration File Examples
 ---------------------------

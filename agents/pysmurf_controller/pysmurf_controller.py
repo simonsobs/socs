@@ -73,23 +73,21 @@ class PysmurfController:
     """
     Controller object for running pysmurf scripts and functions.
 
-    Arguments
-    ---------
-    agent: ocs.ocs_agent.OCSAgent
-        OCSAgent object which is running
-    args: Namespace
-        argparse namespace with site_config and agent specific arguments
+    Args:
+        agent (ocs.ocs_agent.OCSAgent):
+            OCSAgent object which is running
+        args (Namespace):
+            argparse namespace with site_config and agent specific arguments
 
-    Attributes
-    ----------
-    agent: ocs.ocs_agent.OCSAgent
-        OCSAgent object which is running
-    log: txaio.tx.Logger
-        txaio logger object created by agent
-    prot: PysmurfScriptProtocol
-        protocol used to call and monitor external pysmurf scripts
-    protocol_lock: ocs.ocs_twisted.TimeoutLock
-        lock to protect multiple pysmurf scripts from running simultaneously.
+    Attributes:
+        agent (ocs.ocs_agent.OCSAgent):
+            OCSAgent object which is running
+        log (txaio.tx.Logger):
+            txaio logger object created by agent
+        prot (PysmurfScriptProtocol):
+            protocol used to call and monitor external pysmurf scripts
+        protocol_lock (ocs.ocs_twisted.TimeoutLock):
+            lock to protect multiple pysmurf scripts from running simultaneously.
     """
     def __init__(self, agent, args):
         self.agent: ocs_agent.OCSAgent = agent
@@ -126,17 +124,16 @@ class PysmurfController:
         """
         Runs a pysmurf control script. Can only run from the reactor.
 
-        Arguments
-        ----------
-        script: string
-            path to the script you wish to run
-        args: list, optional
-            List of command line arguments to pass to the script.
-            Defaults to [].
-        log: string/bool, optional
-            Determines if and how the process's stdout should be logged.
-            You can pass the path to a logfile, True to use the agent's log,
-            or False to not log at all.
+        Args:
+            script (string):
+                path to the script you wish to run
+            args (list, optional):
+                List of command line arguments to pass to the script.
+                Defaults to [].
+            log (string or bool, optional):
+                Determines if and how the process's stdout should be logged.
+                You can pass the path to a logfile, True to use the agent's log,
+                or False to not log at all.
         """
 
         with self.protocol_lock.acquire_timeout(0, job=script) as acquired:
@@ -179,25 +176,45 @@ class PysmurfController:
                 self.current_session = None
 
     @inlineCallbacks
-    def run_script(self, session, params=None):
-        """run(params=None)
+    def run(self, session, params=None):
+        """run(script, args=[], log=True)
 
-        Run task.
-        Runs a pysmurf control script.
+        **Task** - Runs a pysmurf control script.
 
-        Arguments
-        ----------
-        script: string
-            path to the script you wish to run
-        args: list, optional
-            List of command line arguments to pass to the script.
-            Defaults to [].
-        log: string/bool, optional
-            Determines if and how the process's stdout should be logged.
-            You can pass the path to a logfile, True to use the agent's log,
-            or False to not log at all.
+        Parameters:
+            script (string):
+                Path of the pysmurf script to run.
+            args (list, optional):
+                List of command line arguments to pass to the script.  Defaults
+                to [].
+            log (string/bool, optional):
+                Determines if and how the process's stdout should be logged.
+                You can pass the path to a logfile, True to use the agent's
+                log, or False to not log at all.
+
+        Notes:
+            Data and logs may be passed from the pysmurf control script to the
+            session object by publishing it via the Pysmurf Publisher using the
+            message types ``session_data`` and ``session_logs`` respectively.
+
+            For example, below is a simple script which starts the data stream
+            and returns the datfile path and the list of active channels to the
+            session::
+
+                active_channels = S.which_on(0)
+                datafile = S.stream_data_on()
+                S.pub.publish({
+                    'datafile': datafile, 'active_channels': active_channels
+                }, msgtype='session_data')
+
+            This would result in the following session.data object::
+
+                >>> {
+                    'datafile': '/data/smurf_data/20200316/1584401673/outputs/1584402020.dat',
+                    'active_channels': [0,1,2,3,4]
+                }
+
         """
-
         ok, msg = yield self._run_script(
             params['script'],
             params.get('args', []),
@@ -207,27 +224,30 @@ class PysmurfController:
 
         return ok, msg
 
-    def abort_script(self, session, params=None):
-        """
-        Aborts the currently running script
+    def abort(self, session, params=None):
+        """abort()
+
+        **Task** - Aborts the actively running script.
+
         """
         self.prot.transport.signalProcess('KILL')
         return True, "Aborting process"
 
     @inlineCallbacks
     def tune_squids(self, session, params=None):
-        """
-        Task to run /config/scripts/pysmurf/tune_squids.py
+        """tune_squids(args=[], log=True)
 
-        Arguments
-        ---------
-        args: list, optional
-            List of command line arguments to pass to the script.
-            Defaults to [].
-        log: string/bool, optional
-            Determines if and how the process's stdout should be logged.
-            You can pass the path to a logfile, True to use the agent's log,
-            or False to not log at all.
+        **Task** - Runs the fake script /config/scripts/pysmurf/tune_squids.py
+
+        Args:
+            args (list, optional):
+                List of command line arguments to pass to the script.
+                Defaults to [].
+            log (string/bool, optional):
+                Determines if and how the process's stdout should be logged.
+                You can pass the path to a logfile, True to use the agent's log,
+                or False to not log at all.
+
         """
         if params is None:
             params = {}
@@ -249,8 +269,7 @@ def make_parser(parser=None):
     if parser is None:
         parser = argparse.ArgumentParser()
 
-    pgroup = parser.add_argument_group('Agent Config')
-    pgroup.add_argument('--plugin', action='store_true')
+    pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--monitor-id', '-m', type=str,
                         help="Instance id for pysmurf-monitor corresponding to "
                              "this pysmurf instance.")
@@ -259,19 +278,14 @@ def make_parser(parser=None):
 
 
 if __name__ == '__main__':
-    parser = site_config.add_arguments()
-
-    parser = make_parser(parser)
-
-    args = parser.parse_args()
-
-    site_config.reparse_args(args, 'PysmurfController')
+    parser = make_parser()
+    args = site_config.parse_args(agent_class='PysmurfController', parser=parser)
 
     agent, runner = ocs_agent.init_site_agent(args)
     controller = PysmurfController(agent, args)
 
-    agent.register_task('run', controller.run_script, blocking=False)
-    agent.register_task('abort', controller.abort_script, blocking=False)
+    agent.register_task('run', controller.run, blocking=False)
+    agent.register_task('abort', controller.abort, blocking=False)
     agent.register_task('tune_squids', controller.tune_squids, blocking=False)
 
     runner.run(agent, auto_reconnect=True)

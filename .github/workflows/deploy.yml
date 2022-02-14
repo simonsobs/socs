@@ -1,0 +1,146 @@
+name: Deploy Builds
+
+on:
+  release:
+    types: [ released ]
+
+jobs:
+  test:
+    name: pytest with coverage
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Install system packages
+      run: |
+        sudo apt-get install -y socat
+
+    - name: Set up Python 3.8 
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.8 
+
+    # (start steps from pytest workflow)
+    # Install
+    - name: Install so3g
+      run: |
+        pip3 install so3g
+
+    # Fetch all history for all tags and branches
+    - name: clone socs
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+
+    - name: Install socs
+      run: |
+        pip3 install -r requirements.txt
+        pip3 install -e .
+
+    # Unit Tests
+    - name: Run unit tests
+      working-directory: ./tests
+      run: |
+        COVERAGE_FILE=.coverage.unit python3 -m pytest --cov -m 'not integtest'
+
+    - name: Build docker test images
+      run: |
+        docker-compose build socs
+
+    # Integration Tests
+    - name: Build images for integration tests
+      run: |
+        docker-compose build ocs-lakeshore372-simulator
+
+    - name: Run integration tests
+      working-directory: ./tests
+      run: |
+        COVERAGE_FILE=.coverage.int python3 -m pytest --cov -m 'integtest'
+
+    # Coverage
+    - name: Report test coverage
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        mv ./tests/.coverage.* ./
+        pip install coveralls
+        coverage combine
+        coverage report
+        coveralls --service=github
+    # (end steps from pytest workflow)
+
+  docker:
+    name: build and deploy docker images
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+    # Fetch all history for all tags and branches
+    - name: clone socs
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+
+    # Dockerize
+    - name: Build docker images
+      run: |
+        docker-compose build
+
+    - name: Build and push official docker image
+      env:
+        REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+        REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
+        DOCKERHUB_ORG: "simonsobs"
+      run: |
+        export DOCKER_TAG=`git describe --tags --always`
+        echo "${REGISTRY_PASSWORD}" | docker login -u "${REGISTRY_USER}" --password-stdin;
+
+        # Tag all images for upload to the registry
+        docker-compose config | grep 'image: ' | awk -F ': ' '{ print $2 }' | xargs -I {} docker tag {}:latest ${DOCKERHUB_ORG}/{}:latest
+        docker-compose config | grep 'image: ' | awk -F ': ' '{ print $2 }' | xargs -I {} docker tag {}:latest ${DOCKERHUB_ORG}/{}:${DOCKER_TAG}
+
+        # Upload to docker registry
+        docker-compose config | grep 'image: ' | awk -F ': ' '{ print $2 }' | xargs -I {} docker push ${DOCKERHUB_ORG}/{}:latest
+        docker-compose config | grep 'image: ' | awk -F ': ' '{ print $2 }' | xargs -I {} docker push ${DOCKERHUB_ORG}/{}:${DOCKER_TAG}
+        docker-compose config | grep 'image: ' | awk -F ': ' '{ print $2 }' | xargs -I {} echo ${DOCKERHUB_ORG}/{}:${DOCKER_TAG} pushed
+
+  wheel:
+    name: build and deploy to PyPI
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      TWINE_USERNAME: __token__
+      TWINE_PASSWORD: ${{ secrets.TWINE_TOKEN }}
+
+    steps:
+    - name: Set up Python 3.8
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.8
+
+    - name: clone socs
+      uses: actions/checkout@v2
+
+    - name: install build dependencies
+      run: |
+        python3 -m pip install --upgrade build twine
+
+    - name: build wheel
+      run: |
+        python3 -m build
+
+    - name: install wheel
+      run: |
+        python3 -m pip install dist/socs*.whl
+
+    - name: install testing requirements
+      run: |
+        pip3 install -r requirements/testing.txt
+
+    - name: Run unit tests
+      working-directory: ./tests
+      run: |
+        python3 -m pytest -m 'not (integtest or spt3g)'
+
+    - name: upload to PyPI
+      run: |
+        python3 -m twine upload dist/*

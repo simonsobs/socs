@@ -17,6 +17,17 @@ services:
   ocs-lakeshore372-agent:
     image: "ocs-lakeshore372-agent"
     build: ./agents/lakeshore372/
+    depends_on:
+      - "socs"
+
+  # --------------------------------------------------------------------------
+  # The Lakeshore 370 Agent
+  # --------------------------------------------------------------------------
+  ocs-lakeshore370-agent:
+    image: "ocs-lakeshore370-agent"
+    build: ./agents/lakeshore370/
+    depends_on:
+      - "socs"
 
   # --------------------------------------------------------------------------
   # The Lakeshore 240 Agent
@@ -24,6 +35,24 @@ services:
   ocs-lakeshore240-agent:
     image: "ocs-lakeshore240-agent"
     build: ./agents/lakeshore240/
+    depends_on:
+      - "socs"
+
+  # --------------------------------------------------------------------------
+  # The Lakeshore 336 Agent
+  # --------------------------------------------------------------------------
+  ocs-lakeshore336-agent:
+    image: "ocs-lakeshore336-agent"
+    build: ./agents/lakeshore336/
+    depends_on:
+      - "socs"
+
+  # --------------------------------------------------------------------------
+  # The Lakeshore 425 Agent
+  # --------------------------------------------------------------------------
+  ocs-lakeshore425-agent:
+    image: "ocs-lakeshore425-agent"
+    build: ./agents/lakeshore425/
 
   # --------------------------------------------------------------------------
   # The Pysmurf Controller Agent
@@ -38,6 +67,8 @@ services:
   ocs-pysmurf-monitor-agent:
     image: "ocs-pysmurf-monitor-agent"
     build: ./agents/pysmurf_monitor/
+    depends_on:
+      - "socs"
 
   # --------------------------------------------------------------------------
   # The Pysmurf Archiver Agent
@@ -45,6 +76,8 @@ services:
   ocs-pysmurf-archiver-agent:
     image: "ocs-pysmurf-archiver-agent"
     build: ./agents/pysmurf_archiver/
+    depends_on:
+      - "socs"
 
   # --------------------------------------------------------------------------
   # Smurf stream simulator agent
@@ -52,6 +85,8 @@ services:
   ocs-smurf-stream-sim-agent:
     image: "ocs-smurf-stream-sim"
     build: ./agents/smurf_stream_simulator/
+    depends_on:
+      - "socs"
 
   # --------------------------------------------------------------------------
   # SMuRF timestream aggregator
@@ -59,6 +94,8 @@ services:
   ocs-smurf-recorder:
     image: "ocs-smurf-recorder"
     build: ./agents/smurf_recorder/
+    depends_on:
+      - "socs"
 
   # --------------------------------------------------------------------------
   # The Bluefors log tracking Agent
@@ -66,6 +103,8 @@ services:
   ocs-bluefors-agent:
     image: "ocs-bluefors-agent"
     build: ./agents/bluefors/
+    depends_on:
+      - "socs"
 
   # --------------------------------------------------------------------------
   # Power Supply control Agent
@@ -73,6 +112,8 @@ services:
   ocs-scpi-psu-agent:
     image: "ocs-scpi-psu-agent"
     build: ./agents/scpi_psu/
+    depends_on:
+      - "socs"
 
   # --------------------------------------------------------------------------
   # Cryomech CPA compressor log agent
@@ -80,6 +121,8 @@ services:
   ocs-cryomech-cpa-agent:
     image: "ocs-cryomech-cpa-agent"
     build: ./agents/cryomech_cpa/
+    depends_on:
+      - "socs"
 
   # --------------------------------------------------------------------------
   # LabJack Agent
@@ -87,6 +130,8 @@ services:
   ocs-labjack-agent:
     image: "ocs-labjack-agent"
     build: ./agents/labjack/
+    depends_on:
+      - "socs"
     
   # --------------------------------------------------------------------------
   # Pfeiffer tpg366 agent
@@ -94,6 +139,8 @@ services:
   ocs-pfeiffer-tpg366-agent:
     image: "ocs-pfeiffer-tpg366-agent"
     build: ./agents/pfeiffer_tpg366/
+    depends_on:
+      - "socs"
     
   # --------------------------------------------------------------------------
   # Synaccess power strip agent
@@ -101,6 +148,8 @@ services:
   ocs-synaccess-agent:
     image: "ocs-synaccess-agent"
     build: ./agents/synacc/
+    depends_on:
+      - "socs"
 
   # --------------------------------------------------------------------------
   # Meinberg M1000
@@ -108,6 +157,8 @@ services:
   ocs-meinberg-m1000-agent:
     image: "ocs-meinberg-m1000-agent"
     build: ./agents/meinberg_m1000/
+    depends_on:
+      - "socs"
 
   # -------------------------------------------------------------------------
   # SMuRF Crate Monitor
@@ -115,6 +166,8 @@ services:
   ocs-smurf-crate-monitor:
     image: "ocs-smurf-crate-monitor"
     build: ./agents/smurf_crate_monitor/
+    depends_on:
+      - "socs"
 
   # --------------------------------------------------------------------------
   # Tektronix3021c
@@ -122,6 +175,8 @@ services:
   ocs-tektronix3021c-agent:
     image: "ocs-tektronix3021c-agent"
     build: ./agents/tektronix3021c/
+    depends_on:
+      - "socs"
     
   # --------------------------------------------------------------------------
   # Pfeiffer Turbo Controller
@@ -129,6 +184,30 @@ services:
   ocs-pfeiffer-tc400-agent:
     image: "ocs-pfeiffer-tc400-agent"
     build: ./agents/pfeiffer_tc400/
+    depends_on:
+      - "socs"
+
+  # --------------------------------------------------------------------------
+  # CHWP Encoder BBB agent
+  # --------------------------------------------------------------------------
+  ocs-hwpbbb-agent:
+    image: "ocs-hwpbbb-agent"
+    build: ./agents/chwp/
+    depends_on:
+      - "socs"
+
+  # --------------------------------------------------------------------------
+  # Smurf file emulator agent
+  # --------------------------------------------------------------------------
+  ocs-smurf-file-emulator-agent:
+    image: "ocs-smurf-file-emulator-agent"
+    build: ./agents/smurf_file_emulator/
+
+  ocs-suprsync-agent:
+    image: 'ocs-suprsync-agent'
+    build: ./agents/suprsync/
+    depends_on:
+      - "socs"
 
   # --------------------------------------------------------------------------
   # SOCS Simulators
@@ -140,10 +219,11 @@ services:
   ocs-lakeshore240-simulator:
     image: "ocs-lakeshore240-simulator"
     build: ./simulators/lakeshore240/
-    
-  # --------------------------------------------------------------------------
-  # Lakeshore240 Simulator
-  # --------------------------------------------------------------------------
-  ocs-lakeshore240-simulator:
-    image: "ocs-lakeshore240-simulator"
-    build: ./simulators/lakeshore240/    
+    depends_on:
+      - "socs"
+
+  ocs-lakeshore372-simulator:
+    image: "ocs-lakeshore372-simulator"
+    build: ./simulators/lakeshore372/
+    depends_on:
+      - "socs"
