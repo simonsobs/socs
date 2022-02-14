@@ -97,14 +97,14 @@ class PfeifferTC400:
 
         Returns
         -------
-        int
+        str
             The current error code of the turbo.
         """
         send_data_request(self.ser, self.turbo_address, 303)
 
         addr, rw, param_num, error_code = read_gauge_response(self.ser)
 
-        return int(error_code)
+        return error_code
 
     def unready_turbo(self):
         """Unreadies the turbo. Does not cause the turbo to spin up.
