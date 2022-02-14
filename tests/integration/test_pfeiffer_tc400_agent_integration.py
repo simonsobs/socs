@@ -24,7 +24,7 @@ os.environ['OCS_CONFIG_DIR'] = os.getcwd()
 
 def chksum_msg(msg):
     """Create and append the checksum ot a message."""
-    msg += "{:03d}\r".format(sum([ord(x) for x in msg])%256)
+    msg += "{:03d}\r".format(sum([ord(x) for x in msg]) % 256)
     return msg
 
 
@@ -34,7 +34,8 @@ def format_reply(data):
 
     The driver code reads the response, and only inspects the data section of
     the telegram. This function is meant to make preparing the responses a bit
-    easier, by putting in something somewhat sensible for the rest of the telegram.
+    easier, by putting in something somewhat sensible for the rest of the
+    telegram.
 
     Parameters:
         data (str): Data string to package into telegram.
@@ -49,13 +50,14 @@ def format_reply(data):
 
 wait_for_crossbar = create_crossbar_fixture()
 run_agent = create_agent_runner_fixture(
-    '../agents/pfeiffer_tc400/pfeiffer_tc400_agent.py', 'tc400_agent', args=['--log-dir', './logs'])
+    '../agents/pfeiffer_tc400/pfeiffer_tc400_agent.py', 'tc400_agent')
 client = create_client_fixture('pfeifferturboA')
 emulator = create_device_emulator({}, relay_type='tcp')
 
 
 @pytest.mark.integtest
-def test_pfeiffer_tc400_init_lakeshore(wait_for_crossbar, emulator, run_agent, client):
+def test_pfeiffer_tc400_init_lakeshore(wait_for_crossbar, emulator, run_agent,
+                                       client):
     resp = client.init()
     print(resp)
     assert resp.status == ocs.OK
@@ -63,56 +65,14 @@ def test_pfeiffer_tc400_init_lakeshore(wait_for_crossbar, emulator, run_agent, c
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 
-#@pytest.mark.integtest
-#def test_pfeiffer_tc400_start_acq(wait_for_crossbar, emulator, run_agent, client):
-#    client.init_lakeshore()
-#
-#    responses = {'*IDN?': 'LSCI,MODEL240,LSA240S,1.3',
-#                 'KRDG? 1': '+1.0E-03',
-#                 'SRDG? 1': '+1.0E+03',
-#                 'KRDG? 2': '+1.0E-03',
-#                 'SRDG? 2': '+1.0E+03',
-#                 'KRDG? 3': '+1.0E-03',
-#                 'SRDG? 3': '+1.0E+03',
-#                 'KRDG? 4': '+1.0E-03',
-#                 'SRDG? 4': '+1.0E+03',
-#                 'KRDG? 5': '+1.0E-03',
-#                 'SRDG? 5': '+1.0E+03',
-#                 'KRDG? 6': '+1.0E-03',
-#                 'SRDG? 6': '+1.0E+03',
-#                 'KRDG? 7': '+1.0E-03',
-#                 'SRDG? 7': '+1.0E+03',
-#                 'KRDG? 8': '+1.0E-03',
-#                 'SRDG? 8': '+1.0E+03'}
-#    emulator.define_responses(responses)
-#
-#    resp = client.acq.start(sampling_frequency=1.0)
-#    assert resp.status == ocs.OK
-#    assert resp.session['op_code'] == OpCode.STARTING.value
-#
-#    # We stopped the process with run_once=True, but that will leave us in the
-#    # RUNNING state
-#    resp = client.acq.status()
-#    assert resp.session['op_code'] == OpCode.RUNNING.value
-#
-#    # Now we request a formal stop, which should put us in STOPPING
-#    client.acq.stop()
-#    # this is so we get through the acq loop and actually get a stop command in
-#    # TODO: get sleep_time in the acq process to be small for testing
-#    time.sleep(3)
-#    resp = client.acq.status()
-#    print(resp)
-#    print(resp.session)
-#    assert resp.session['op_code'] in [OpCode.STOPPING.value,
-#                                       OpCode.SUCCEEDED.value]
-
 @pytest.mark.integtest
-def test_pfeiffer_tc400_turn_turbo_on(wait_for_crossbar, emulator, run_agent, client):
+def test_pfeiffer_tc400_turn_turbo_on(wait_for_crossbar, emulator, run_agent,
+                                      client):
     client.init()
 
     responses = {'0011001006111111015': format_reply('111111'),  # ready_turbo()
                  '0011002306111111019': format_reply('111111'),  # turn_turbo_motor_on()
-    }
+                 }
     emulator.define_responses(responses)
 
     resp = client.turn_turbo_on()
@@ -123,12 +83,13 @@ def test_pfeiffer_tc400_turn_turbo_on(wait_for_crossbar, emulator, run_agent, cl
 
 
 @pytest.mark.integtest
-def test_pfeiffer_tc400_turn_turbo_on_not_ready(wait_for_crossbar, emulator, run_agent, client):
+def test_pfeiffer_tc400_turn_turbo_on_not_ready(wait_for_crossbar, emulator,
+                                                run_agent, client):
     client.init()
 
     responses = {'0011001006111111015': format_reply('000000'),  # ready_turbo()
                  '0011002306111111019': format_reply('111111'),  # turn_turbo_motor_on()
-    }
+                 }
     emulator.define_responses(responses)
 
     resp = client.turn_turbo_on()
@@ -137,12 +98,13 @@ def test_pfeiffer_tc400_turn_turbo_on_not_ready(wait_for_crossbar, emulator, run
 
 
 @pytest.mark.integtest
-def test_pfeiffer_tc400_turn_turbo_on_failed(wait_for_crossbar, emulator, run_agent, client):
+def test_pfeiffer_tc400_turn_turbo_on_failed(wait_for_crossbar, emulator,
+                                             run_agent, client):
     client.init()
 
     responses = {'0011001006111111015': format_reply('111111'),  # ready_turbo()
                  '0011002306111111019': format_reply('000000'),  # turn_turbo_motor_on()
-    }
+                 }
     emulator.define_responses(responses)
 
     resp = client.turn_turbo_on()
@@ -151,12 +113,13 @@ def test_pfeiffer_tc400_turn_turbo_on_failed(wait_for_crossbar, emulator, run_ag
 
 
 @pytest.mark.integtest
-def test_pfeiffer_tc400_turn_turbo_off(wait_for_crossbar, emulator, run_agent, client):
+def test_pfeiffer_tc400_turn_turbo_off(wait_for_crossbar, emulator, run_agent,
+                                       client):
     client.init()
 
     responses = {'0011002306000000013': format_reply('111111'),  # turn_turbo_motor_on()
                  '0011001006000000009': format_reply('111111'),  # unready_turbo()
-    }
+                 }
     emulator.define_responses(responses)
 
     resp = client.turn_turbo_off()
@@ -165,12 +128,13 @@ def test_pfeiffer_tc400_turn_turbo_off(wait_for_crossbar, emulator, run_agent, c
 
 
 @pytest.mark.integtest
-def test_pfeiffer_tc400_turn_turbo_off_failed(wait_for_crossbar, emulator, run_agent, client):
+def test_pfeiffer_tc400_turn_turbo_off_failed(wait_for_crossbar, emulator,
+                                              run_agent, client):
     client.init()
 
     responses = {'0011002306000000013': format_reply('000000'),  # turn_turbo_motor_on()
                  '0011001006000000009': format_reply('111111'),  # unready_turbo()
-    }
+                 }
     emulator.define_responses(responses)
 
     resp = client.turn_turbo_off()
@@ -179,12 +143,14 @@ def test_pfeiffer_tc400_turn_turbo_off_failed(wait_for_crossbar, emulator, run_a
 
 
 @pytest.mark.integtest
-def test_pfeiffer_tc400_turn_turbo_off_failed_unready(wait_for_crossbar, emulator, run_agent, client):
+def test_pfeiffer_tc400_turn_turbo_off_failed_unready(wait_for_crossbar,
+                                                      emulator, run_agent,
+                                                      client):
     client.init()
 
     responses = {'0011002306000000013': format_reply('111111'),  # turn_turbo_motor_on()
                  '0011001006000000009': format_reply('000000'),  # unready_turbo()
-    }
+                 }
     emulator.define_responses(responses)
 
     resp = client.turn_turbo_off()
@@ -193,11 +159,12 @@ def test_pfeiffer_tc400_turn_turbo_off_failed_unready(wait_for_crossbar, emulato
 
 
 @pytest.mark.integtest
-def test_pfeiffer_tc400_acknowledge_turbo_errors(wait_for_crossbar, emulator, run_agent, client):
+def test_pfeiffer_tc400_acknowledge_turbo_errors(wait_for_crossbar, emulator,
+                                                 run_agent, client):
     client.init()
 
     responses = {'0011000906111111023': format_reply('111111'),  # acknowledge_turbo_errors()
-    }
+                 }
     emulator.define_responses(responses)
 
     resp = client.acknowledge_turbo_errors()
@@ -212,7 +179,7 @@ def test_pfeiffer_tc400_acq(wait_for_crossbar, emulator, run_agent, client):
     responses = {'0010034602=?108': format_reply('000300'),  # get_turbo_motor_temperature()
                  '0010030902=?107': format_reply('000800'),  # get_turbo_actual_rotation_speed()
                  '0010030302=?101': format_reply('Err001'),  # get_turbo_error_code()
-    }
+                 }
     emulator.define_responses(responses)
 
     resp = client.acq.start(test_mode=True, wait=0)
