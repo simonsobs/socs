@@ -1,4 +1,5 @@
 import serial
+import socket
 import time
 import subprocess
 import shutil
@@ -6,7 +7,7 @@ import pytest
 import threading
 
 
-def create_device_emulator(responses, relay_type='serial'):
+def create_device_emulator(responses, relay_type, port=9001):
     """Create a device emulator fixture.
 
     This provides a device emulator that can be used to mock a device during
@@ -15,8 +16,9 @@ def create_device_emulator(responses, relay_type='serial'):
     Args:
         responses (dict): Dictionary with commands as keys, and responses as
             values. See :class:`.DeviceEmulator` for details.
-        relay_type (str): Currently only 'serial' is implemented. A TCP type
-            will be introduced in future versions.
+        relay_type (str): Communication relay type. Either 'serial' or 'tcp'.
+        port (int): Port for the TCP relay to listen for connections on.
+            Defaults to 9001. Only used if relay_type is 'tcp'.
 
     Returns:
         function:
@@ -24,14 +26,18 @@ def create_device_emulator(responses, relay_type='serial'):
             type.
 
     """
-    if relay_type != 'serial':
+    if relay_type not in ['serial', 'tcp']:
         raise NotImplementedError(f"relay_type '{relay_type}' is not" +
                                   "implemented or is an invalid type")
 
     @pytest.fixture()
     def create_device():
         device = DeviceEmulator(responses)
-        device.create_serial_relay()
+
+        if relay_type == 'serial':
+            device.create_serial_relay()
+        elif relay_type == 'tcp':
+            device.create_tcp_relay(port)
 
         yield device
 
@@ -49,16 +55,21 @@ class DeviceEmulator:
             startup, if any.
 
     Attributes:
-        responses (dict): Current set of responses the DeviceEmulator would give
+        responses (dict): Current set of responses the DeviceEmulator would
+            give
         default_response (str): Default response to send if a command is
             unrecognized. No response is sent and an error message is logged if
             a command is unrecognized and the default response is set to None.
             Defaults to None.
+        _type (str): Relay type, either 'serial' or 'tcp'.
+        _read (bool): Used to stop the background reading of data recieved on
+            the relay.
 
     """
     def __init__(self, responses):
         self.responses = responses
         self.default_response = None
+        self._type = None
         self._read = True
 
     @staticmethod
@@ -95,6 +106,7 @@ class DeviceEmulator:
         object within a given test.
 
         """
+        self._type = 'serial'
         self.proc = self._setup_socat()
         self.ser = serial.Serial(
             './internal',
@@ -166,13 +178,66 @@ class DeviceEmulator:
         #print('shutting down background reading')
         self._read = False
         time.sleep(1)
-        #print('shutting down socat relay')
-        self.proc.terminate()
-        out, err = self.proc.communicate()
-        #print(out, err)
+        if self._type == 'serial':
+            #print('shutting down socat relay')
+            self.proc.terminate()
+            out, err = self.proc.communicate()
+            #print(out, err)
 
-    def create_tcp_relay(self):
-        pass
+    def _read_socket(self, port):
+        """Loop until shutdown, reading any commands sent over the relay.
+        Respond immediately to a command with the response in self.responses.
+
+        Args:
+            port (int): Port for the TCP relay to listen for connections on.
+
+        """
+        self._read = True
+
+        # Listen for connections
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.bind(('127.0.0.1', port))
+        sock.listen(1)
+        print("Device emulator waiting for tcp client connection")
+        conn, client_address = sock.accept()
+        print(f"Client connection made from {client_address}")
+
+        while self._read:
+            msg = conn.recv(4096).strip().decode('utf-8')
+            if msg:
+                print(f"msg='{msg}'")
+
+                response = self._get_response(msg)
+
+                if response is None:
+                    continue
+
+                print(f"response='{response}'")
+                conn.sendall((response).encode('utf-8'))
+
+            time.sleep(0.01)
+
+        conn.close()
+        sock.close()
+
+    def create_tcp_relay(self, port):
+        """Create the TCP relay, emulating a hardware device connected over
+        TCP.
+
+        Creates a thread to read commands sent to the TCP relay in the
+        background. This allows responses to be defined within a test using
+        DeviceEmulator.define_responses() after instantiation of the
+        DeviceEmulator object within a given test.
+
+        Args:
+            port (int): Port for the TCP relay to listen for connections on.
+
+        """
+        self._type = 'tcp'
+        bkg_read = threading.Thread(name='background',
+                                    target=self._read_socket,
+                                    kwargs={'port': port})
+        bkg_read.start()
 
     def define_responses(self, responses, default_response=None):
         """Define what responses are available to reply with on the configured
@@ -180,12 +245,12 @@ class DeviceEmulator:
 
         Args:
             responses (dict): Dictionary of commands: response. Values can be a
-                list, in which case the responses in the list are popped and given in order
-                until depleted.
+                list, in which case the responses in the list are popped and
+                given in order until depleted.
             default_response (str): Default response to send if a command is
-                unrecognized. No response is sent and an error message is logged if
-                a command is unrecognized and the default response is set to None.
-                Defaults to None.
+                unrecognized. No response is sent and an error message is
+                logged if a command is unrecognized and the default response is
+                set to None. Defaults to None.
 
         Examples:
             The given responses might look like::

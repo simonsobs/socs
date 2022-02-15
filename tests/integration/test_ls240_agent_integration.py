@@ -21,24 +21,26 @@ wait_for_crossbar = create_crossbar_fixture()
 run_agent = create_agent_runner_fixture(
     '../agents/lakeshore240/LS240_agent.py', 'ls240_agent')
 client = create_client_fixture('LSA240S')
-emulator = create_device_emulator({'*IDN?': 'LSCI,MODEL240,LSA240S,1.3',
-                                   'MODNAME?': 'LSA240S',
-                                   'INTYPE? 1': '1,1,0,0,1,1',
-                                   'INNAME? 1': 'Channel 1',
-                                   'INTYPE? 2': '1,1,0,0,1,1',
-                                   'INNAME? 2': 'Channel 2',
-                                   'INTYPE? 3': '1,1,0,0,1,1',
-                                   'INNAME? 3': 'Channel 3',
-                                   'INTYPE? 4': '1,1,0,0,1,1',
-                                   'INNAME? 4': 'Channel 4',
-                                   'INTYPE? 5': '1,1,0,0,1,1',
-                                   'INNAME? 5': 'Channel 5',
-                                   'INTYPE? 6': '1,1,0,0,1,1',
-                                   'INNAME? 6': 'Channel 6',
-                                   'INTYPE? 7': '1,1,0,0,1,1',
-                                   'INNAME? 7': 'Channel 7',
-                                   'INTYPE? 8': '1,1,0,0,1,1',
-                                   'INNAME? 8': 'Channel 8'})
+
+initial_responses = {'*IDN?': 'LSCI,MODEL240,LSA240S,1.3',
+                     'MODNAME?': 'LSA240S',
+                     'INTYPE? 1': '1,1,0,0,1,1',
+                     'INNAME? 1': 'Channel 1',
+                     'INTYPE? 2': '1,1,0,0,1,1',
+                     'INNAME? 2': 'Channel 2',
+                     'INTYPE? 3': '1,1,0,0,1,1',
+                     'INNAME? 3': 'Channel 3',
+                     'INTYPE? 4': '1,1,0,0,1,1',
+                     'INNAME? 4': 'Channel 4',
+                     'INTYPE? 5': '1,1,0,0,1,1',
+                     'INNAME? 5': 'Channel 5',
+                     'INTYPE? 6': '1,1,0,0,1,1',
+                     'INNAME? 6': 'Channel 6',
+                     'INTYPE? 7': '1,1,0,0,1,1',
+                     'INNAME? 7': 'Channel 7',
+                     'INTYPE? 8': '1,1,0,0,1,1',
+                     'INNAME? 8': 'Channel 8'}
+emulator = create_device_emulator(initial_responses, relay_type='serial')
 
 
 @pytest.mark.integtest
