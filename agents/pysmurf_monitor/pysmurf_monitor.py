@@ -173,6 +173,8 @@ class PysmurfMonitor(DatagramProtocol):
                 archive_name = meta.get('archive_name', 'smurf')
                 try:
                     local_path = meta['path']
+                    if (meta['format']  == 'npy') and (not meta['path'].endswith('.npy')):
+                        local_path += '.npy'
                     remote_path = create_remote_path(meta, archive_name)
 
                     # Only delete files that are in timestamped directories
