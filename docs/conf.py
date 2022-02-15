@@ -42,8 +42,14 @@ extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.napoleon',
     'sphinx.ext.todo',
+    'sphinx.ext.viewcode',
 ]
 extensions += ['sphinxarg.ext']
+
+# Present auto-documented members in source order (rather than alphabetical).
+autodoc_default_options = {
+    'member-order': 'bysource',
+}
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -72,10 +78,32 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
 
-autodoc_mock_imports = ['spt3g', 'so3g', 'labjack']
+autodoc_mock_imports = ['spt3g',
+                        'so3g',
+                        'labjack',
+                        'labjack.ljm',
+                        'labjack.ljm.ljm',
+                        'ocs',
+                        'ocs.agent',
+                        'ocs.ocs_twisted',
+                        'ocs.ocs_agent',
+                        'ocs.agent.aggregator',
+                        'xy_agent',
+                        'xy_agent.xy_connect',
+                        'soaculib',
+                        'scan_helpers',
+                        'soaculib.twisted_backend',
+                        ]
 from unittest import mock
 for m in autodoc_mock_imports:
     sys.modules[m] = mock.Mock()
+
+# Mock the ocs_agent.param decorator to preserve docstrings
+def wrap(*args, **kw):
+    return lambda f: f
+
+import ocs
+ocs.ocs_agent.param = wrap
 
 # -- Options for HTML output -------------------------------------------------
 
@@ -95,12 +123,9 @@ html_theme = 'sphinx_rtd_theme'
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 
-html_context = {
-    'css_files': [
-        '_static/theme_overrides.css',  # override wide tables in RTD theme
-        ],
-     }
-
+html_css_files = [
+    'theme_overrides.css',  # override wide tables in RTD theme
+]
 
 # Custom sidebar templates, must be a dictionary that maps document names
 # to template names.

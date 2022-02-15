@@ -76,7 +76,7 @@ example docker-compose service configuration is shown here::
 
   ocs-smurf-crate-monitor:
     <<: *ocs-base
-    image: ocs-smurf-crate-monitor:latest
+    image: simonsobs/ocs-smurf-crate-monitor:latest
     hostname: adaq1-docker
     network_mode: "host"
     volumes:

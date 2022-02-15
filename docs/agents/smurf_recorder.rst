@@ -115,7 +115,7 @@ Agent API
 ---------
 
 .. autoclass:: agents.smurf_recorder.smurf_recorder.SmurfRecorder
-    :members: start_recording
+    :members: start_record
 
 Developer Info
 --------------

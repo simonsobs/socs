@@ -14,4 +14,6 @@ COPY . .
 ENTRYPOINT ["dumb-init", "python3", "-u", "bluefors_log_tracker.py"]
 
 # Sensible default instance-id
-CMD ["--instance-id=bluefors"]
+CMD ["--instance-id=bluefors", \
+     "--site-hub=ws://crossbar:8001/ws", \
+     "--site-http=http://crossbar:8001/call"]

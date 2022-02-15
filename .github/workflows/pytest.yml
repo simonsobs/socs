@@ -6,33 +6,65 @@ on:
   pull_request:
 
 jobs:
-  build:
-    runs-on: ubuntu-18.04
+  test:
+    name: pytest with coverage
+    runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - name: Cancel Previous Runs
+      uses: styfle/cancel-workflow-action@0.9.1
+      with:
+        access_token: ${{ github.token }}
+
+    - name: Install system packages
+      run: |
+        sudo apt-get install -y socat
+
     - name: Set up Python 3.8
       uses: actions/setup-python@v2
       with:
         python-version: 3.8
 
-    - name: Build docker images
+    # Install
+    - name: Install so3g
       run: |
-        docker-compose build
+        pip3 install so3g
 
-    - name: Test with pytest wtihin a docker container
+    - name: clone socs
+      uses: actions/checkout@v2
+
+    - name: Install socs
       run: |
-        docker run -v $PWD:/coverage --rm socs sh -c "COVERAGE_FILE=/coverage/.coverage.docker python3 -m pytest -p no:wampy --cov /app/socs/socs/ ./tests/"
+        pip3 install -r requirements.txt
+        pip3 install -e .
 
+    # Unit Tests
+    - name: Run unit tests
+      working-directory: ./tests
+      run: |
+        COVERAGE_FILE=.coverage.unit python3 -m pytest --cov -m 'not integtest'
+
+    - name: Build docker test images
+      run: |
+        docker-compose build socs
+
+    # Integration Tests
+    - name: Build images for integration tests
+      run: |
+        docker-compose build ocs-lakeshore372-simulator
+
+    - name: Run integration tests
+      working-directory: ./tests
+      run: |
+        COVERAGE_FILE=.coverage.int python3 -m pytest --cov -m 'integtest'
+
+    # Coverage
     - name: Report test coverage
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
+        mv ./tests/.coverage.* ./
         pip install coveralls
         coverage combine
         coverage report
         coveralls --service=github
-
-    - name: Test documentation build
-      run: |
-        docker run --rm -e READTHEDOCS=True socs sh -c "make -C docs/ html"

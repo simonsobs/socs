@@ -50,6 +50,8 @@ HWPEncoder_full: separated feed for full-sample HWP encoder data,
    counter_index: index numbers for detected edges by BBB
 """
 
+import argparse
+import os
 import socket
 import struct
 import time
@@ -654,14 +656,22 @@ class HWPBBBAgent:
 
         return False, 'acq is not currently running.'
 
+
+def make_parser(parser=None):
+    if parser is None:
+        parser = argparse.ArgumentParser()
+
+    # Add options specific to this agent.
+    pgroup = parser.add_argument_group('Agent Options')
+    pgroup.add_argument('--port', type=int, default=8080)
+
+    return parser
+
+
 # Portion of the code that runs
 if __name__ == '__main__':
-    parser = site_config.add_arguments()
-    pgroup = parser.add_argument_group('Agent Options')
-    pgroup.add_argument('--port', default=8080)
-    args = parser.parse_args()
-
-    site_config.reparse_args(args, 'HWPBBBAgent')
+    parser = make_parser()
+    args = site_config.parse_args(agent_class='HWPBBBAgent', parser=parser)
     agent, runner = ocs_agent.init_site_agent(args)
     hwp_bbb_agent = HWPBBBAgent(agent, port=args.port)
     agent.register_process('acq', hwp_bbb_agent.start_acq, hwp_bbb_agent.stop_acq, startup=True)

@@ -171,6 +171,36 @@ heater_display_key = { '1': 'current',
                 '2': 'power'}
 heater_display_lock = {v: k for k,v in heater_display_key.items()}
 
+def _establish_socket_connection(ip, timeout, port=7777):
+    """Establish socket connection to the LS372.
+
+    Parameters
+    ----------
+    ip : str
+        IP address of the LS372
+    timeout : int
+        timeout period for the socket connection in seconds
+    port : int
+        Port for the connection, defaults to the default LS372 port of 7777
+
+    Returns
+    -------
+    socket.socket
+        The socket object with open connection to the 372
+
+    """
+    com = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        com.connect((ip, port))
+    except OSError as e:
+        if 'No route to host' in e.strerror:
+            raise ConnectionError("Cannot connect to LS372")
+        else:
+            raise e
+    com.settimeout(timeout)
+
+    return com
+
 
 class LS372:
     """
@@ -181,9 +211,7 @@ class LS372:
                    index 0 corresponding to the control channel, 'A'
     """
     def __init__(self, ip, timeout=10, num_channels=16):
-        self.com = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.com.connect((ip, 7777))
-        self.com.settimeout(timeout)
+        self.com = _establish_socket_connection(ip, timeout)
         self.num_channels = num_channels
 
         self.id = self.get_id()
@@ -230,7 +258,6 @@ class LS372:
             # Try once, if we timeout, try again. Usually gets around single event glitches.
             for attempt in range(2):
                 try:
-                    time.sleep(0.061)
                     resp = str(self.com.recv(4096), 'utf-8').strip()
                     break
                 except socket.timeout:
@@ -243,10 +270,6 @@ class LS372:
             self.com.send(msg_str)
             resp = ''
 
-        if 'RDG' in message:
-            time.sleep(0.1)  # Instrument sampling rate of 10 readings/s max (pg 34)
-        else:
-            time.sleep(0.061)  # No comms for 61ms after sending message after trial & error (manual says50ms)
         return resp
 
     def get_id(self):
@@ -1638,6 +1661,19 @@ class Heater:
                 print("Still heater output must be between 0 and 100%")
                 return False
 
+    def get_sample_heater_output(self):
+        """Get sample heater output in percent of current or in actual power,
+        depending on the heater output selection.
+
+        :return: Sample heater output percentage.
+
+        """
+        # Sample Heater
+        if self.output == 0:
+            resp = self.ls.msg("HTR?")
+
+        return float(resp)
+
     def get_heater_setup(self):
         """Gets Heater setup params with the HTRSET? command.
 
@@ -1674,8 +1710,9 @@ class Heater:
     def set_heater_range(self, _range):
         """Set heater range with RANGE command.
 
-        :param _range: heater range
-        :type _range: float or str (for "On" "Off")
+        :param _range: heater range in amps. Valid values are: "off", "on",
+            31.6e-6, 100e-6, 316e-6, 1e-3, 3.16e-3, 10e-3, 31.6e-3, 100e-3
+        :type _range: float or str
 
         :returns: heater range in amps
         :rtype: float
