@@ -34,5 +34,6 @@ setup(name = 'socs',
           'pyserial',
           'sqlalchemy',
           'pysnmp',
+          'mysql-connector>=2.1.6',
       ],
 )
