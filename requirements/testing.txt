@@ -3,3 +3,4 @@ pytest-cov
 pytest-docker-compose
 pytest-dependency
 pytest-order
+so3g
