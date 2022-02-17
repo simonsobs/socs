@@ -5,12 +5,13 @@ import txaio
 import argparse
 import numpy as np
 
-from sat1_motor_driver import MotControl
+from sat1_motors_driver import MotControl
 
 on_rtd = os.environ.get('READTHEDOCS') == 'True'
 if not on_rtd:
     from ocs import ocs_agent, site_config
     from ocs.ocs_twisted import TimeoutLock, Pacemaker
+
 
 class SAT1MotorsAgent:
     """
@@ -67,8 +68,7 @@ class SAT1MotorsAgent:
                                  record = True,
                                  agg_params = agg_params,
                                  buffer_time = 0)
-
-
+        
     def init_motors_task(self, session, params=None):
         """init_xy_stage_task(params=None)
         Task to connect to the motors, either one or both
@@ -80,7 +80,6 @@ class SAT1MotorsAgent:
 
         if params is None:
             params = {}
-
         self.log.debug("Trying to acquire lock")
         with self.lock.acquire_timeout(timeout=0, job='init') as acquired:
             # Locking mechanism stops code from proceeding if no lock acquired
@@ -89,9 +88,7 @@ class SAT1MotorsAgent:
                 return False, "Could not acquire lock."
             # Run the function you want to run
             self.log.debug("Lock Acquired Connecting to Stages")
-            
             self.motors = MotControl(motor1_Ip=self.motor1_Ip, motor1_Port=self.motor1_Port, motor1_isLin=self.motor1_isLin, motor2_Ip=self.motor2_Ip, motor2_Port=self.motor2_Port, motor2_isLin=self.motor2_isLin, mRes = self.mRes)            
-            print("Motor(s) Initialized")
             
         # This part is for the record and to allow future calls to proceed,
         # so does not require the lock
@@ -106,7 +103,7 @@ class SAT1MotorsAgent:
         NOTE: If moving multiple axes, function will assume linStage value for all axes.
         Parameters:
             params: {'motor': int, 'pos': float, 'posIsInches': bool, 'linStage': bool}
-            motor: 1,2,3. Determines which motor, 3 is for all motors.
+            motor: 1,2,3. Determines which motor, 3 is for all motors. (default 1)
             pos: float. The desired position in counts or in inches, positive indicates away from the motor (default 0)
             posIsInches: bool. True if pos was specified in inches, False if in counts (default False)
             linStage: bool. True if the specified motor is for the linear stage, False if not (default True)    
@@ -114,6 +111,8 @@ class SAT1MotorsAgent:
 
         linStage = params.get('linStage',True)
         motor = params.get('motor', 1)
+        posIsInches = params.get('posIsInches', False)
+        pos = params.get('pos', 0)
         self.move_status = self.motors.isMoving(motor)
         if self.move_status:
             return False, "Motors are already moving."
@@ -122,9 +121,9 @@ class SAT1MotorsAgent:
             if not acquired:
                     self.log.warn(f"Could not move motor{motor} because lock held by {self.lock.job}")
                     return False, "Could not acquire lock"
-            self.motor.moveAxisToPosition(motor,params['pos'],params['posIsInches'],linStage)
+            self.motors.moveAxisToPosition(motor, pos, posIsInches, linStage)
 
-        return True, "Moved motor {} to {}".format(params['motor'],params['pos'])
+        return True, "Moved motor {} to {}".format(motor, pos)
 
     def moveAxisByLength(self, session, params=None):
         """
@@ -132,7 +131,7 @@ class SAT1MotorsAgent:
         NOTE: If moving multiple axes, function will assume linStage value for all axes.
         Parameters:
             params: {'motor': int, 'pos': float, 'posIsInches': bool, 'linStage': bool}
-            motor: 1,2,3. Determines which motor, 3 is for all motors.
+            motor: 1,2,3. Determines which motor, 3 is for all motors. (default 1)
             pos: float. The desired position in counts or in inches, positive indicates away from the motor (default 0)
             posIsInches: bool. True if pos was specified in inches, False if in counts (default False)
             linStage: bool. True if the specified motor is for the linear stage, False if not (default True)    
@@ -140,6 +139,8 @@ class SAT1MotorsAgent:
 
         linStage = params.get('linStage',True)
         motor = params.get('motor', 1)
+        pos = params.get('pos', 0)
+        posIsInches = params.get('posIsInches', False)
         self.move_status = self.motors.isMoving(motor)
         if self.move_status:
             return False, "Motors are already moving."
@@ -148,12 +149,11 @@ class SAT1MotorsAgent:
             if not acquired:
                     self.log.warn(f"Could not move motor{motor} because lock held by {self.lock.job}")
                     return False, "Could not acquire lock"
-            self.motor.moveAxisByLength(motor,params['pos'],params['posIsInches'],linStage)
-
-        return True, "Moved motor {} by {}".format(params['motor'],params['pos'])
-
+            self.motors.moveAxisByLength(motor, pos, posIsInches, linStage)
+                
+        return True, "Moved motor {} by {}".format(motor, pos)
     
-    ###################################################################
+    ###################################################################    
     # I created an alternative move_motors function below. 
     # Perhaps this is more useful? Will check with Joe...
     ###################################################################    
@@ -199,7 +199,7 @@ class SAT1MotorsAgent:
                 if 'move_method' == 'by_length':
                     self.motors.moveAxisByLength(idx+1,pos[idx],pos_is_inches,lin_stages[idx])
                 elif 'move_method' == 'by_position':
-                    self.motor.moveAxisToPosition(idx+1,pos[idx],pos_is_inches,lin_stages[idx])
+                    self.motors.moveAxisToPosition(idx+1,pos[idx],pos_is_inches,lin_stages[idx])
                 else:
                     raise Exception("{params['move_method']} is not a valid movement method!")
                         
@@ -225,11 +225,12 @@ class SAT1MotorsAgent:
         """
         Set velocity of motors driving stages
         params: {'motor': int, 'velocity': float}
-        motor : 1,2,3. Determines which motor, 3 is for all motors.
-        velocity: [0.25,50]. Sets velocity of motor in revolutions/second
+        motor : 1,2,3. Determines which motor, 3 is for all motors. (default 3)
+        velocity: [0.25,50]. Sets velocity of motor in revolutions/second (default 12.0)
         """
         
         motor = params.get('motor',3)
+        velocity = params.get('velocity', 12.0)
         self.move_status = self.motors.isMoving(motor)
         if self.move_status:
             return False, "Motors are already moving."
@@ -238,19 +239,20 @@ class SAT1MotorsAgent:
             if not acquired: 
                 self.log.warn(f"Could not setVelocity because lock held by {self.lock.job}")
                 return False, "Could not acquire lock"
-            self.motor.setVelocity(params['motor'],params['velocity'])
+            self.motors.setVelocity(motor, velocity)
         
-        return True, "Set velocity of motor {} to {}".format(params['motor'],params['velocity'])
+        return True, "Set velocity of motor {} to {}".format(motor, velocity)
 
     def setAcceleration(self, session, params=None):
         """
         Set acceleration of motors driving stages
         params: {'motor': int, 'accel': int}
-        motor : 1,2,3. Determines which motor, 3 is for all motors.
-        accel: [1,3000]. Sets acceleration in revolutions/second/second
+        motor : 1,2,3. Determines which motor, 3 is for all motors. (default 3)
+        accel: [1,3000]. Sets acceleration in revolutions/second/second (default 1.0)
         """
         
-        motor = params.get('motor',3)
+        motor = params.get('motor', 3)
+        accel = params.get('accel', 1.0)
         self.move_status = self.motors.isMoving(motor)
         if self.move_status:
             return False, "Motors are already moving."
@@ -259,48 +261,51 @@ class SAT1MotorsAgent:
             if not acquired: 
                 self.log.warn(f"Could not setAcceleration because lock held by {self.lock.job}")
                 return False, "Could not acquire lock"
-            self.motor.setAcceleration(params['motor'],params['accel'])
+            self.motors.setAcceleration(motor, accel)
             
-        return True, "Set acceleration of motor {} to {}".format(params['motor'],params['accel'])
+        return True, "Set acceleration of motor {} to {}".format(motor, accel)
     
     def startJogging(self, session, params=None):
         """
         Jogs the motor(s) set by params
         params: {'motor': int}
-        motor : 1,2,3. Determines which motor, 3 is for all motors.
+        motor : 1,2,3. Determines which motor, 3 is for all motors. (default 1)
         """
-
-        with self.lock.acquire_timeout(1, job=f"startJogging_motor{params['motor']}") as acquired:
+        
+        motor = params.get('motor', 1)
+        with self.lock.acquire_timeout(1, job=f"startJogging_motor{motor}") as acquired:
             if not acquired:
                 self.log.warn(f'Could not startJogging because lock held by {self.lock.job}')
                 return False, 'Could not acquire lock'
-            self.motor.startJogging(params['motor'])
+            self.motors.startJogging(motor)
 
-        return True, "Started jogging motor {}".format(params['motor'])
+        return True, "Started jogging motor {}".format(motor)
 
     def stopJogging(self, session, params=None):
         """
         Stops the jogging of motor(s) set by params
         params: {'motor': int}
-        motor : 1,2,3. Determines which motor, 3 is for all motors.
+        motor : 1,2,3. Determines which motor, 3 is for all motors. (default 1)
         """
-
-        with self.lock.acquire_timeout(1, job=f"stopJogging_motor{params['motor']}") as acquired:
+        
+        motor = params.get('motor', 1)
+        with self.lock.acquire_timeout(1, job=f"stopJogging_motor{motor}") as acquired:
             if not acquired:
                 self.log.warn(f'Could not stopJogging because lock held by {self.lock.job}')
                 return False, 'Could not acquire lock'                
-            self.motor.stopJogging(params['motor'])
+            self.motors.stopJogging(motor)
 
-        return True, "Stopped jogging motor {}".format(params['motor'])
+        return True, "Stopped jogging motor {}".format(motor)
 
     def seekHomeLinearStage(self, session, params=None):
         """
         Move the linear stage to its home position (using the home limit switch).
         Parameters:
             parms: {'motor': int, 'isLin': bool}
-            motor: 1,2,3. Determines which motor, 3 is for all motors.
+            motor: 1,2,3. Determines which motor, 3 is for all motors. (default 1)
         """
         
+        motor = params.get('motor',1)
         self.move_status = self.motors.isMoving(motor)
         if self.move_status:
             return False, "Motors are already moving."
@@ -309,28 +314,29 @@ class SAT1MotorsAgent:
             if not acquired: 
                 self.log.warn(f"Could not seekHomeLinearStage because lock held by {self.lock.job}")
                 return False, "Could not acquire lock"
-            self.motor.seekHomeLinearStage(params['motor'])
+            self.motors.seekHomeLinearStage(motor)
             
-        return True, "Moving motor {} to home".format(params['motor'])
+        return True, "Moving motor {} to home".format(motor)
     
     def setZero(self, session, params=None):
         """
         Sets the zero position (AKA home) for motor(s) specified in params
         params: {'motor': int}
-        motor : 1,2,3. Determines which motor, 3 is for all motors.
+        motor : 1,2,3. Determines which motor, 3 is for all motors. (default 1)
         """
-        
+
+        motor = params.get('motor',1)
         self.move_status = self.motors.isMoving(motor)
         if self.move_status:
             return False, "Motors are already moving."
 
-        with self.lock.acquire_timeout(1, job=f"setZero_motor{params['motor']}") as acquired:
+        with self.lock.acquire_timeout(1, job=f"setZero_motor{motor}") as acquired:
             if not acquired:
                 self.log.warn(f'Could not setZero because lock held by {self.lock.job}')
                 return False, 'Could not acquire lock'                
-            self.motor.setZero(params['motor'])
-            
-        return True, "Zeroing motor {} position".format(params['motor'])
+            self.motors.setZero(motor)
+
+        return True, "Zeroing motor {} position".format(motor)
 
     def runPositions(self, session, params=None):
         """
@@ -338,19 +344,22 @@ class SAT1MotorsAgent:
         must be the x-data, and the second column the y-data.  Each position will be attained.
         xPosition and yPosition will be specified as in the file.        
         params: {'motor': int, 'posData': .tsv file, 'posIsInches': bool}
-        motor : 1,2,3. Determines which motor, 3 is for all motors.
+        motor: 1,2,3. Determines which motor, 3 is for all motors. (default 1)
         posData: tab-delimited list of entries. first column is x-data, second column is y-data.
+        posIsInches: Boolean. (default True)
         """
         
+        motor = params.get('motor', 1)
+        posIsInches = params.get('posIsInches', True)
         self.move_status = self.motors.isMoving(motor)
         if self.move_status:
             return False, "Motors are already moving."
         
-        with self.lock.acquire_timeout(1, job=f"runPositions_motor{params['motor']}") as acquired:
+        with self.lock.acquire_timeout(1, job=f"runPositions_motor{motor}") as acquired:
             if not acquired:
                 self.log.warn(f'Could not runPositions because lock held by {self.lock.job}')
                 return False, 'Could not acquire lock'                                    
-            self.motor.runPositions(params['posData'],params['motor'],params['posIsInches'])
+            self.motors.runPositions(params['posData'], motor, posIsInches)
             
         return True, "Moving stage to {}".format(params['posData'])
 
@@ -358,32 +367,36 @@ class SAT1MotorsAgent:
         """
         Start rotating motor of polarizer. NOTE: Give acceleration and velocity values as arguments here.
         params: {'motor': int, 'velocity': float, 'accel': float}
-        motor : 1,2,3. Determines which motor, 3 is for all motors.
+        motor : 1,2,3. Determines which motor, 3 is for all motors. (default 1)
         velocity: float. [0.25,50] The rotation velocity in revolutions/second (default 12.0)
         accel: float. [1,3000] -- The acceleration in revolutions/second/second (default 1.0)
         """
         
-        with self.lock.acquire_timeout(1, job=f"startRotation_motor{params['motor']}") as acquired:
+        motor = params.get('motor', 1)
+        velocity = params.get('velocity', 12.0)
+        accel = params.get('accel', 1.0)
+        with self.lock.acquire_timeout(1, job=f"startRotation_motor{motor}") as acquired:
             if not acquired:
                 self.log.warn(f"Could not startRotation because lock held by {self.lock.job}")
                 return False, "Could not acquire lock"
-            self.motor.startRotation(params['motor'],params['velocity'],params['accel'])
+            self.motors.startRotation(motor, velocity, accel)
             
-        return True, "Started rotating motor at velocity {} and acceleration {}".format(params['velocity'],params['accel'])
+        return True, "Started rotating motor at velocity {} and acceleration {}".format(velocity, accel)
 
     def stopRotation(self, session, params=None):
         """
         Stop rotating motor of polarizer.
         params: {'motor': int}
-        motor : 1,2,3. Determines which motor, 3 is for all motors.
+        motor : 1,2,3. Determines which motor, 3 is for all motors. (default 1)
         """
         
-        with self.lock.acquire_timeout(1, job=f"stopRotation_motor{params['motor']}") as acquired:
+        motor = params.get('motor', 1)
+        with self.lock.acquire_timeout(1, job=f"stopRotation_motor{motor}") as acquired:
             if not acquired:
                 self.log.warn(f"Could not stopRotation because lock held by {self.lock.job}")
                 return False, "Could not acquire lock"
-            self.motor.stopRotation(params['motor'])
-        
+            self.motors.stopRotation(motor)
+
         return True, "Stopped rotating motor"
    
     def closeConnection(self, session, params=None):
@@ -395,69 +408,74 @@ class SAT1MotorsAgent:
         ########################################
         
         params: {'motor': int}
-        motor : 1,2,3. Determines which motor, 3 is for all motors.
+        motor : 1,2,3. Determines which motor, 3 is for all motors. (default 3)
         """
         
-        with self.lock.acquire_timeout(1, job=f"closeConnection_motor{params['motor']}") as acquired:
+        motor = params.get('motor', 3) 
+        with self.lock.acquire_timeout(1, job=f"closeConnection_motor{motor}") as acquired:
             if not acquired:
                 self.log.warn(f'Could not close connection because lock held by {self.lock.job}')
                 return False, "Could not acquire lock"                
-            self.motor.closeConnection(params['motor'])
+            self.motors.closeConnection(motor)
 
-        return True, "Closed connection to motor {}".format(params['motor'])
+        return True, "Closed connection to motor {}".format(motor)
 
     def blockWhileMoving(self, session, params=None):
         """
         Block until the specified axes/motor have stop moving.  Checks each axis every updatePeriod seconds.
         params: {'motor': int, 'updatePeriod': float, 'verbose': bool}
-        motor: 1,2,3. Determines which motor, 3 is for all motors.
+        motor: 1,2,3. Determines which motor, 3 is for all motors. (default 1)
         updatePeriod: float. Time after which to check each motor in seconds (default .1)
         verbose: bool. Prints output from motor requests if True (default False)
         """
 
+        motor = params.get('motors', 1)
+        updatePeriod = params.get('updatePeriod', .1)
         verbose = params.get('verbose',False)
-
-        with self.lock.acquire_timeout(1, job=f"blockWhileMoving_motor{params['motor']}") as acquired:
+        with self.lock.acquire_timeout(1, job=f"blockWhileMoving_motor{motor}") as acquired:
             if not acquired:
                 self.log.warn(f'Could not blockWhileMoving because lock held by {self.lock.job}')
                 return False, "Could not acquire lock"                                
-            self.motor.blockWhileMoving(params['motor'],params['updatePeriod'],verbose)
+            self.motors.blockWhileMoving(motor, updatePeriod, verbose)
 
-        return True, "Motor {} stopped moving".format(params['motor'])
+        return True, "Motor {} stopped moving".format(motor)
 
     def killAllCommands(self, session, params=None):
         """
-        Stops all active commands on the device.
+        Stops all active commands on the device. Does not interact with lock file...
         params: {'motor': int}
-        motor: 1,2,3. Determines which motor, 3 is for all motors.
+        motor: 1,2,3. Determines which motor, 3 is for all motors. (default 3)
         """
-
-        with self.lock.acquire_timeout(1, job=f"killAllCommands_motor{params['motor']}") as acquired:
+        
+        motor = params.get('motor', 3)
+        with self.lock.acquire_timeout(1, job=f"killAllCommands_motor{motor}") as acquired:
             if not acquired:
                 self.log.warn(f'Could not killAllCommands because lock held by {self.lock.job}')
                 return False, "Could not acquire lock"                                
-            self.motor.killAllCommands(params['motor'])
+            self.motors.killAllCommands(motor)
     
-        return True, "Killing all active commands on motor {}".format(params['motor'])
+        return True, "Killing all active commands on motor {}".format(motor)
     
     def setEncoderValue(self, session, params=None):
         """
         Set the encoder values in order to keep track of absolute position
         Parameters:
             params: {'motor': int, 'value': float}
-            motor: 1,2,3. Determines which motor, 3 is for all motors.
-            value: Sets encoder value, defaults to 0
+            motor: 1,2,3. Determines which motor, 3 is for all motors. (default 1)
+            value: Sets encoder value. (default 0)
         """
 
+        motor = params.get('motor', 1)
+        value = params.get('value', 0)
         self.move_status = self.motors.isMoving(motor)
         if self.move_status:
             return False, "Motors are already moving."
         
-        with self.lock.acquire_timeout(1, job=f"setEncoderValue_motor{params['motor']}") as acquired:
+        with self.lock.acquire_timeout(1, job=f"setEncoderValue_motor{motor}") as acquired:
             if not acquired:
                 self.log.warn(f'Could not setEncoderValue because lock held by {self.lock.job}')
                 return False, 'Could not acquire lock'                                    
-            ePositions = self.motor.setEncoderValue(params['motor'],params['value'])
+            ePositions = self.motors.setEncoderValue(motor, value)
 
         return True, "Setting encoder position to {}".format(ePositions)
 
@@ -466,15 +484,16 @@ class SAT1MotorsAgent:
         Retrieve all motor step counts to verify movement.
         Parameters:
             params: {'motor': int}
-            motor: 1,2,3. Determines which motor, 3 is for all motors. (default = 3)
+            motor: 1,2,3. Determines which motor, 3 is for all motors. (default 3)
         """
-
-        with self.lock.acquire_timeout(1, job=f"getEncoderInfo_motor{params['motor']}") as acquired:
+        
+        motor = params.get('motor', 3)
+        with self.lock.acquire_timeout(1, job=f"getEncoderInfo_motor{motor}") as acquired:
             if not acquired:
                 self.log.warn(f'Could not getEncoderInfo because lock held by {self.lock.job}')
                 return False, 'Could not acquire lock'                                    
-            ePositions = self.motor.retrieveEncoderInfo(params['motor'])
-            
+            ePositions = self.motors.retrieveEncoderInfo(motor)
+
         return True, ("Current encoder positions: {}".format(ePositions),ePositions)    
     
     def getPositions(self, session, params = None):
@@ -483,20 +502,22 @@ class SAT1MotorsAgent:
         
         Parameters:
             params: {'motor': int, 'inches': bool}
-            motor: 1,2,3. Determines which motor, 3 is for all motors.
-            inches: bool. Whether to return positions in inches or not.
+            motor: 1,2,3. Determines which motor, 3 is for all motors. (default 1)
+            inches: bool. Whether to return positions in inches or not. (default True)
         Returns:
             positions (list) -- the positions of the specified motors
         """
-
-        with self.lock.acquire_timeout(1, job=f"getPositions_motor{params['motor']}") as acquired:
+        
+        motor = params.get('motor', 1)
+        inches = params.get('inches', True)
+        with self.lock.acquire_timeout(1, job=f"getPositions_motor{motor}") as acquired:
             if not acquired:
                 self.log.warn(f'Could not getPositions because lock held by {self.lock.job}')
                 return False, "Could not acquire lock"                                
-            if params['inches']:
-                positions = self.motor.getPositionInInches(params['motor'])
-            elif not params['inches']:
-                positions = self.motor.getPosition(params['motor'])
+            if inches:
+                positions = self.motors.getPositionInInches(motor)
+            elif not inches:
+                positions = self.motors.getPosition(motor)
             else: 
                 return False, "Invalid choice for inches parameter, must be boolean"
 
@@ -509,19 +530,19 @@ class SAT1MotorsAgent:
         
         Parameters:
             params: {'motor': int, 'inches': bool}
-            motor: 1,2,3. Determines which motor, 3 is for all motors.
+            motor: 1,2,3. Determines which motor, 3 is for all motors. (default 1)
             inches: bool. Whether to return positions in inches or not. (default True)
         Returns:
             positions (list) -- the positions of the specified motors
         """
         
         inches = params.get('inches',True)
-
-        with self.lock.acquire_timeout(1, job=f"posWhileMoving_motor{params['motor']}") as acquired:
+        motor = params.get('motor', 1)
+        with self.lock.acquire_timeout(1, job=f"posWhileMoving_motor{motor}") as acquired:
             if not acquired:
                 self.log.warn(f'Could not posWhileMoving because lock held by {self.lock.job}')
                 return False, "Could not acquire lock"                                
-            iPositions = self.motor.getImmediatePosition(params['motor'],inches)
+            iPositions = self.motors.getImmediatePosition(motor,inches)
 
         return True, "Current motor positions: {}".format(iPositions)
 
@@ -536,14 +557,15 @@ class SAT1MotorsAgent:
         ########################################
         
         params{'motor' : int, 'verbose' : bool}
-        motor : 1,2,3. Determines which motor, 3 is for all motors.
+        motor : 1,2,3. Determines which motor, 3 is for all motors. (default 1)
         """
         verbose = params.get('verbose',True)
-        with self.lock.acquire_timeout(1, job=f"isMoving_motor{params['motor']}") as acquired:
+        motor = params.get('motor', 1)
+        with self.lock.acquire_timeout(1, job=f"isMoving_motor{motor}") as acquired:
             if not acquired:
                 self.log.warn(f"Could not check because lock held by {self.lock.job}")
                 return False
-            self.move_status = self.motor.isMoving(params['motor'],verbose)
+            self.move_status = self.motors.isMoving(motor,verbose)
 
         if self.move_status:
             return True, ("Motors are moving.",self.move_status)
@@ -554,29 +576,31 @@ class SAT1MotorsAgent:
         """
         Resets alarm codes present. Only advised if you have checked what the alarm is first!
         params: {'motor': int}
-        motor : 1,2,3. Determines which motor, 3 is for all motors.
+        motor : 1,2,3. Determines which motor, 3 is for all motors. (default 1)
         """
         
-        with self.lock.acquire_timeout(1, job=f"resetAlarms_motor{params['motor']}") as acquired:
+        motor = params.get('motor', 1)
+        with self.lock.acquire_timeout(1, job=f"resetAlarms_motor{motor}") as acquired:
             if not acquired:
                 self.log.warn(f"Could not resetAlarms because lock held by {self.lock.job}")
                 return False
-            self.motor.resetAlarms(params['motor'])
+            self.motors.resetAlarms(motor)
 
-        return True, "Alarms reset for motor {}".format(params['motor'])
+        return True, "Alarms reset for motor {}".format(motor)
 
     def homeWithLimits(self, session, params = None):
         """
         Moves stages to home based on location from limits. One inch from the limit switch.
         params: {'motor': int}
-        motor : 1,2,3. Determines which motor, 3 is for all motors.
+        motor : 1,2,3. Determines which motor, 3 is for all motors. (default 1)
         """
         
-        with self.lock.acquire_timeout(1, job=f"homeWithLimits_motor{params['motor']}") as acquired:
+        motor = params.get('motor', 1)
+        with self.lock.acquire_timeout(1, job=f"homeWithLimits_motor{motor}") as acquired:
             if not acquired:
-                self.log.warn(f"Could not move motor{params['motor']} to home because lock held by {self.lock.job}")
+                self.log.warn(f"Could not move motor{motor} to home because lock held by {self.lock.job}")
                 return False
-            self.motor.homeWithLimits(params['motor'])
+            self.motors.homeWithLimits(motor)
 
         return True, "Zeroed stages using limit switches"
 
@@ -597,30 +621,32 @@ class SAT1MotorsAgent:
 
         motor = params.get('motor',3)
         verbose = params.get('verbose',False)
-
         f_sample = params.get('sampling_frequency', self.sampling_frequency)
         pm = Pacemaker(f_sample, quantize=True)
 
-        if not self.initialized or self.motor is None:
+        if not self.initialized or self.motors is None:
             raise Exception("Connection to motors is not initialized")
 
         with self.lock.acquire_timeout(timeout=0, job='acq') as acquired:
             if not acquired:
                 self.log.warn("Could not start acq because {} is already running".format(self.lock.job))
                 return False, "Could not acquire lock."
-            
             self.log.info(f"Starting data acquisition for stages at {f_sample} Hz")
             session.set_status('running')
             self.take_data = True
             last_release = time.time()
 
-            mList = self.motor.genMotorList(motor)
-            # Check that each motor in the list is valid
-            for mot in mList:
-                if not mot:
-                    print("Specified motor is invalid, removing from list")
-                    mList.remove(mot)
-                    continue
+# ************CODE BELOW DOES 'NOTHING', NOTHING WE WANT ANYWAYS*****************************
+
+#             mList = self.motors.genMotorList(motor)
+#             # Check that each motor in the list is valid
+#             for mot in mList:
+#                 if not mot:
+#                     print("Specified motor is invalid, removing from list")
+#                     mList.remove(mot)
+#                     continue
+
+# **********************************END******************************************************
 
             while self.take_data:
                 if time.time()-last_release > 1.:
@@ -629,31 +655,57 @@ class SAT1MotorsAgent:
                         return False, "could not re-acquire lock"
                     last_release = time.time()
                 pm.sleep()
-
-                self.move_status = self.motor.isMoving(motor,verbose)
-
+                
                 # Using list of initialized motors generated at the start of acq
                 data = {'timestamp':time.time(), 'block_name':'positions','data':{}}
 
                 # get immediate position for motor, one at a time
                 # this makes sure that no matter how many motors 
                 # are initialized, it appends the right number
-                for i,mot in enumerate(mList):
+                mList = self.motors.genMotorList(motor)
+                
+                
+#                 for i,mot in enumerate(mList):
+#                     mot_id = mot.propDict['motor']
+#                     if self.move_status:
+#                         pos = self.motor.getImmediatePosition(motor=mot_id)
+#                         data['data'][f'motor{mot_id}_stepper'] = pos[0]
+#                         data['data'][f'motor{mot_id}_encoder'] = -1
+
+
+#                     if not self.move_status:
+#                         pos = self.motor.getImmediatePosition(motor=i+1)
+#                         data['data'][f'motor{mot_id}_stepper'] = pos[0]
+#                         ePos = self.motor.retrieveEncoderInfo(motor=i+1)
+#                         data['data'][f'motor{mot_id}_encoder'] = ePos[0]
+
+                
+                # new thought: put move status outside of for loop, but still have to try...except
+                self.move_status = self.motors.isMoving(motor, verbose)
+                for mot in mList:
                     mot_id = mot.propDict['motor']
-                    if self.move_status:
-                        pos = self.motor.getImmediatePosition(motor=mot_id)
-                        data['data'][f'motor{mot_id}_stepper'] = pos[0]
-                        data['data'][f'motor{mot_id}_encoder'] = -1
+                    try:
+                        self.log.warn(f"getting position/move status of motor{mot_id}")
+                        self.move_status = self.motors.isMoving(mot_id,verbose)
+                        pos = self.motors.getImmediatePosition(motor=mot_id)
+                        if self.move_status:
+                            data['data'][f'motor{mot_id}_encoder'] = -1
+                        else:
+                            ePos = self.motors.retrieveEncoderInfo(motor=mot_id)
+                            data['data'][f'motor{mot_id}_encoder'] = ePos[0]
+                            data['data'][f'motor{mot_id}_stepper'] = pos[0]
+                            data['data'][f'motor{mot_id}_connection'] = True
 
+                    except Exception as e:
+                        self.log.warn(f'error: {e}')
+                        self.log.warn(f"could not get position/move status of motor{mot_id}")
+                        data['data'][f'motor{mot_id}_stepper'] = -10000
+                        data['data'][f'motor{mot_id}_encoder'] = -10000
+                        data['data'][f'motor{mot_id}_connection'] = False
+                        continue
 
-                    if not self.move_status:
-                        pos = self.motor.getImmediatePosition(motor=i+1)
-                        data['data'][f'motor{mot_id}_stepper'] = pos[0]
-                        ePos = self.motor.retrieveEncoderInfo(motor=i+1)
-                        data['data'][f'motor{mot_id}_encoder'] = ePos[0]
-
-                self.agent.publish_to_feed('positions',data)
-
+                self.agent.publish_to_feed('positions',data)        
+            
         return True, 'Acquisition exited cleanly.'
 
     def stop_acq(self, session, params=None):
@@ -693,7 +745,7 @@ def make_parser(parser=None):
                         help="Whether or not motor 2 is connected to a linear stage")
     pgroup.add_argument('--mRes', help="Manually enter microstep resolution",action='store_true')
     pgroup.add_argument('--sampling_frequency', help="Frequency to sample at for data acq",type=float)
-    pgroup.add_argument('--mode')
+    pgroup.add_argument('--mode',help="puts mode into auto acquisition or not...",type=str)
 
     
     return parser 

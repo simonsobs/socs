@@ -67,11 +67,11 @@ class Serial_TCPServer(object):
 	def __init__(self,port,timeout=MOXA_DEFAULT_TIMEOUT):
 		# port is a tuple of form (IP addr, TCP port)
 		self.port = port
-
 		self.sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
 		self.sock.setblocking(0)
 		self.settimeout(timeout)
 		self.sock.connect(self.port)
+
 
 	# Reads exactly n bytes, waiting up to timeout.
 	def readexactly(self,n):
