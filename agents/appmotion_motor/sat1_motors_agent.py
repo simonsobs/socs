@@ -664,24 +664,7 @@ class SAT1MotorsAgent:
                 # are initialized, it appends the right number
                 mList = self.motors.genMotorList(motor)
                 
-                
-#                 for i,mot in enumerate(mList):
-#                     mot_id = mot.propDict['motor']
-#                     if self.move_status:
-#                         pos = self.motor.getImmediatePosition(motor=mot_id)
-#                         data['data'][f'motor{mot_id}_stepper'] = pos[0]
-#                         data['data'][f'motor{mot_id}_encoder'] = -1
-
-
-#                     if not self.move_status:
-#                         pos = self.motor.getImmediatePosition(motor=i+1)
-#                         data['data'][f'motor{mot_id}_stepper'] = pos[0]
-#                         ePos = self.motor.retrieveEncoderInfo(motor=i+1)
-#                         data['data'][f'motor{mot_id}_encoder'] = ePos[0]
-
-                
-                # new thought: put move status outside of for loop, but still have to try...except
-                self.move_status = self.motors.isMoving(motor, verbose)
+#                 Note: if motor is moving, can't retrieve encoder info. But can always get immediate position!
                 for mot in mList:
                     mot_id = mot.propDict['motor']
                     try:
@@ -693,8 +676,8 @@ class SAT1MotorsAgent:
                         else:
                             ePos = self.motors.retrieveEncoderInfo(motor=mot_id)
                             data['data'][f'motor{mot_id}_encoder'] = ePos[0]
-                            data['data'][f'motor{mot_id}_stepper'] = pos[0]
-                            data['data'][f'motor{mot_id}_connection'] = True
+                        data['data'][f'motor{mot_id}_stepper'] = pos[0]
+                        data['data'][f'motor{mot_id}_connection'] = True
 
                     except Exception as e:
                         self.log.warn(f'error: {e}')
