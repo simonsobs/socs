@@ -50,7 +50,7 @@ class PfeifferTC400Agent:
                                  buffer_time=0)
 
     @ocs_agent.param('auto_acquire', default=False, type=bool)
-    def init(self, session, params=None):
+    def init(self, session, params):
         """init(auto_acquire=False)
 
         **Task** - Initialize the connection to the turbo controller.
@@ -85,7 +85,7 @@ class PfeifferTC400Agent:
 
     @ocs_agent.param('test_mode', default=False, type=bool)
     @ocs_agent.param('wait', default=1, type=float)
-    def acq(self, session, params=None):
+    def acq(self, session, params):
         """acq(wait=1, test_mode=False)
 
         **Process** - Continuously monitor turbo motor temp and rotation speed
@@ -144,7 +144,7 @@ class PfeifferTC400Agent:
 
         return True, "Finished monitoring turbo"
 
-    def _stop_acq(self, session, params=None):
+    def _stop_acq(self, session, params):
         """Stop monitoring the turbo output."""
         if self.monitor:
             self.monitor = False
@@ -153,7 +153,7 @@ class PfeifferTC400Agent:
             return False, 'acq is not currently running'
 
     @ocs_agent.param('_')
-    def turn_turbo_on(self, session, params=None):
+    def turn_turbo_on(self, session, params):
         """turn_turbo_on()
 
         **Task** - Turns the turbo on.
@@ -175,7 +175,7 @@ class PfeifferTC400Agent:
         return True, 'Turned turbo on'
 
     @ocs_agent.param('_')
-    def turn_turbo_off(self, session, params=None):
+    def turn_turbo_off(self, session, params):
         """turn_turbo_off()
 
         **Task** - Turns the turbo off.
@@ -197,7 +197,7 @@ class PfeifferTC400Agent:
         return True, 'Turned turbo off'
 
     @ocs_agent.param('_')
-    def acknowledge_turbo_errors(self, session, params=None):
+    def acknowledge_turbo_errors(self, session, params):
         """acknowledge_turbo_errors()
 
         **Task** - Sends an acknowledgment of the error code to the turbo.
