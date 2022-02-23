@@ -3,3 +3,5 @@ pytest-cov
 pytest-docker-compose
 pytest-dependency
 pytest-order
+
+-r ../agents/pfeiffer_tc400/requirements.txt

@@ -7,7 +7,13 @@
 # It also uses a slightly modified version of a Pfeiffer Vacuum Protocol package found on GitHub
 
 import serial
-import pfeiffer_vacuum_protocol as pvp
+from pfeiffer_vacuum_protocol.pfeiffer_vacuum_protocol import _send_data_request as send_data_request
+from pfeiffer_vacuum_protocol.pfeiffer_vacuum_protocol import _send_control_command as send_control_command
+from pfeiffer_vacuum_protocol.pfeiffer_vacuum_protocol import _read_gauge_response as read_gauge_response
+
+# Data type 0 from TC400 Manual Section 8.3 - Applied data types
+PFEIFFER_BOOL = {'111111': True,
+                 '000000': False}
 
 
 class PfeifferTC400:
@@ -50,8 +56,8 @@ class PfeifferTC400:
             The rotor temperature of the turbo in Celsius.
         """
 
-        pvp._send_data_request(self.ser, self.turbo_address, 346)
-        addr, rw, param_num, motor_temp = pvp._read_gauge_response(self.ser)
+        send_data_request(self.ser, self.turbo_address, 346)
+        addr, rw, param_num, motor_temp = read_gauge_response(self.ser)
 
         return int(motor_temp)
 
@@ -64,9 +70,9 @@ class PfeifferTC400:
             The current rotation speed of the turbo in Hz.
         """
 
-        pvp._send_data_request(self.ser, self.turbo_address, 309)
+        send_data_request(self.ser, self.turbo_address, 309)
 
-        addr, rw, param_num, actual_rotation_speed = pvp._read_gauge_response(self.ser)
+        addr, rw, param_num, actual_rotation_speed = read_gauge_response(self.ser)
 
         return int(actual_rotation_speed)
 
@@ -80,9 +86,9 @@ class PfeifferTC400:
             The rotation speed that the turbo is set to in Hz
         """
 
-        pvp._send_data_request(self.ser, self.turbo_address, 308)
+        send_data_request(self.ser, self.turbo_address, 308)
 
-        addr, rw, param_num, set_rotation_speed = pvp._read_gauge_response(self.ser)
+        addr, rw, param_num, set_rotation_speed = read_gauge_response(self.ser)
 
         return int(set_rotation_speed)
 
@@ -91,14 +97,14 @@ class PfeifferTC400:
 
         Returns
         -------
-        int
+        str
             The current error code of the turbo.
         """
-        pvp._send_data_request(self.ser, self.turbo_address, 303)
+        send_data_request(self.ser, self.turbo_address, 303)
 
-        addr, rw, param_num, error_code = pvp._read_gauge_response(self.ser)
+        addr, rw, param_num, error_code = read_gauge_response(self.ser)
 
-        return int(error_code)
+        return error_code
 
     def unready_turbo(self):
         """Unreadies the turbo. Does not cause the turbo to spin up.
@@ -108,11 +114,14 @@ class PfeifferTC400:
             True for successful, False for failure.
         """
 
-        pvp._send_control_command(self.ser, self.turbo_address, 10, "000000")
+        send_control_command(self.ser, self.turbo_address, 10, "000000")
 
-        addr, rw, param_num, turbo_response = pvp._read_gauge_response(self.ser)
+        addr, rw, param_num, turbo_response = read_gauge_response(self.ser)
 
-        return turbo_response
+        if turbo_response not in PFEIFFER_BOOL:
+            raise ValueError(f"Unrecognized response from turbo: {turbo_response}")
+        else:
+            return turbo_response == "111111"
 
     def ready_turbo(self):
         """Readies the turbo for spinning. Does not cause the turbo to spin up.
@@ -123,11 +132,14 @@ class PfeifferTC400:
             True for successful, False for failure.
         """
 
-        pvp._send_control_command(self.ser, self.turbo_address, 10, "111111")
+        send_control_command(self.ser, self.turbo_address, 10, "111111")
 
-        addr, rw, param_num, turbo_response = pvp._read_gauge_response(self.ser)
+        addr, rw, param_num, turbo_response = read_gauge_response(self.ser)
 
-        return turbo_response
+        if turbo_response not in PFEIFFER_BOOL:
+            raise ValueError(f"Unrecognized response from turbo: {turbo_response}")
+        else:
+            return turbo_response == "111111"
 
     def turn_turbo_motor_on(self):
         """Turns the turbo motor on. The turbo must be readied before the motor will turn on.
@@ -139,11 +151,14 @@ class PfeifferTC400:
             True for successful, False for failure.
         """
 
-        pvp._send_control_command(self.ser, self.turbo_address, 23, "111111")
+        send_control_command(self.ser, self.turbo_address, 23, "111111")
 
-        addr, rw, param_num, turbo_response = pvp._read_gauge_response(self.ser)
+        addr, rw, param_num, turbo_response = read_gauge_response(self.ser)
 
-        return turbo_response
+        if turbo_response not in PFEIFFER_BOOL:
+            raise ValueError(f"Unrecognized response from turbo: {turbo_response}")
+        else:
+            return turbo_response == "111111"
 
     def turn_turbo_motor_off(self):
         """Turns the turbo motor off.
@@ -154,11 +169,14 @@ class PfeifferTC400:
             True for successful, False for failure.
         """
 
-        pvp._send_control_command(self.ser, self.turbo_address, 23, "000000")
+        send_control_command(self.ser, self.turbo_address, 23, "000000")
 
-        addr, rw, param_num, turbo_response = pvp._read_gauge_response(self.ser)
+        addr, rw, param_num, turbo_response = read_gauge_response(self.ser)
 
-        return turbo_response
+        if turbo_response not in PFEIFFER_BOOL:
+            raise ValueError(f"Unrecognized response from turbo: {turbo_response}")
+        else:
+            return turbo_response == "111111"
 
     def acknowledge_turbo_errors(self):
         """Acknowledges the turbo errors. This is analagous to clearing the errors.
@@ -170,8 +188,11 @@ class PfeifferTC400:
             True for successful, False for failure.
         """
 
-        pvp._send_control_command(self.ser, self.turbo_address, 9, "111111")
+        send_control_command(self.ser, self.turbo_address, 9, "111111")
 
-        addr, rw, param_num, turbo_response = pvp._read_gauge_response(self.ser)
+        addr, rw, param_num, turbo_response = read_gauge_response(self.ser)
 
-        return turbo_response
+        if turbo_response not in PFEIFFER_BOOL:
+            raise ValueError(f"Unrecognized response from turbo: {turbo_response}")
+        else:
+            return turbo_response == "111111"

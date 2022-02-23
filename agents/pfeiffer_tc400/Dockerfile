@@ -8,6 +8,10 @@ FROM socs:latest
 # Set the working directory to registry directory
 WORKDIR /app/socs/agents/pfeiffer_tc400/
 
+# Copy and install requirements
+COPY requirements.txt .
+RUN pip3 install -r requirements.txt
+
 ## Copy this agent into the app/agents directory
 COPY . .
 

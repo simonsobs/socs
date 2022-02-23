@@ -93,6 +93,8 @@ autodoc_mock_imports = ['spt3g',
                         'soaculib',
                         'scan_helpers',
                         'soaculib.twisted_backend',
+                        'pfeiffer_vacuum_protocol',
+                        'pfeiffer_vacuum_protocol.pfeiffer_vacuum_protocol',
                         ]
 from unittest import mock
 for m in autodoc_mock_imports:

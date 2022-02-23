@@ -5,10 +5,11 @@ import argparse
 import txaio
 from os import environ
 
+from ocs import ocs_agent, site_config
+from ocs.ocs_twisted import TimeoutLock
+
 on_rtd = os.environ.get('READTHEDOCS') == 'True'
 if not on_rtd:
-    from ocs import ocs_agent, site_config
-    from ocs.ocs_twisted import TimeoutLock
     from pfeiffer_tc400_driver import PfeifferTC400
 
 
@@ -79,6 +80,8 @@ class PfeifferTC400Agent:
 
         return True, 'Initialized Turbo Controller.'
 
+    @ocs_agent.param('test_mode', default=False, type=bool)
+    @ocs_agent.param('wait', default=1, type=float)
     def start_acq(self, session, params=None):
         """Process to continuously monitor turbo motor temp and rotation speed and
         send info to aggregator.
@@ -102,11 +105,6 @@ class PfeifferTC400Agent:
             time to wait between measurements [seconds]. Default=1s.
 
         """
-        if params is None:
-            params = {}
-
-        wait_time = params.get('wait', 1)
-
         self.monitor = True
 
         while self.monitor:
@@ -122,7 +120,6 @@ class PfeifferTC400Agent:
                         data['data']["Turbo_Motor_Temp"] = self.turbo.get_turbo_motor_temperature()
                         data['data']["Rotation_Speed"] = self.turbo.get_turbo_actual_rotation_speed()
                         data['data']['error_code'] = self.turbo.get_turbo_error_code()
-
                     except ValueError as e:
                         self.log.error(f"Error in collecting data: {e}")
                         continue
@@ -135,7 +132,10 @@ class PfeifferTC400Agent:
                 else:
                     self.log.warn("Could not acquire in monitor turbo")
 
-            time.sleep(wait_time)
+            time.sleep(params['wait'])
+
+            if params['test_mode']:
+                break
 
         return True, "Finished monitoring turbo"
 
