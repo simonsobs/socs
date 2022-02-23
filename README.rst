@@ -37,6 +37,10 @@ Install and update with pip::
 
     $ pip3 install -U socs
 
+If you need to install the optional so3g module you can do so via::
+
+    $ pip3 install -U socs[so3g]
+
 Installing from Source
 ``````````````````````
 

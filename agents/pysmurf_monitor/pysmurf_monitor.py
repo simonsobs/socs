@@ -172,6 +172,8 @@ class PysmurfMonitor(DatagramProtocol):
                 # archive_name to "timestreams"
                 archive_name = meta.get('archive_name', 'smurf')
                 try:
+                    if (meta['format']  == 'npy') and (not meta['path'].endswith('.npy')):
+                        meta['path'] += '.npy'
                     local_path = meta['path']
                     remote_path = create_remote_path(meta, archive_name)
 
