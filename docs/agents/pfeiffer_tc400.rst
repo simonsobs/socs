@@ -16,8 +16,11 @@ integrated into OCS using a serial-to-ethernet converter.
     :func: make_parser
     :prog: python3 pfeiffer_tc400_agent.py
 
+Description
+-----------
+
 Serial Configuration
---------------------
+````````````````````
 ::
 
     baudrate=9600
@@ -33,8 +36,8 @@ Configuration File Examples
 Below are configuration examples for the ocs config file and for running the
 Agent in a docker container.
 
-ocs-config
-``````````
+OCS Site Config
+```````````````
 To configure the Pfeiffer TC400 Agent we need to add a PfeifferTC400Agent
 block to our ocs configuration file. The IP address and port 
 number are from the serial-to-ethernet converter. The turbo address is 
@@ -44,12 +47,12 @@ block using all of the available arguments::
  {'agent-class': 'PfeifferTC400Agent',
   'instance-id': 'pfeifferturboA',
   'arguments': [['--ip-address', '10.10.10.129'],
-                  ['--port-number', '4002'],
-                  ['--turbo-address', '1']]},
+                ['--port-number', '4002'],
+                ['--turbo-address', '1']]},
 
 
-Docker
-``````
+Docker Compose
+``````````````
 The agent should be configured to run in a Docker container. An
 example docker-compose service configuration is shown here::
 
@@ -66,43 +69,37 @@ example docker-compose service configuration is shown here::
 Since the agent within the container needs to communicate with hardware on the
 host network you must use ``network_mode: "host"`` in your compose file.
 
-Example Client
---------------
-The turbo agent can start and stop a turbo, acknowledge an 
-error (this is required to start again after an error occurs), and acquire turbo
-data. This example client shows all of this functionality::
-
-
-    from ocs import matched_client
-    turbo_name="pfeifferturboA"
-    turbo = matched_client.MatchedClient(turbo_name, args=[])
-    
-    #Start data acq
-    status, message, session = turbo.acq.start()
-    print(session)
-    
-    #Stop data acq
-    turbo.acq.stop()
-    turbo.acq.wait()
-
-    #Start the turbo
-    turbo.turn_turbo_on.start()
-    turbo.turn_turbo_on.wait()
-
-    #Stop the turbo
-    turbo.turn_turbo_off.start()
-    turbo.turn_turbo_off.wait()
-    
-    #Acknowledge errors
-    turbo.acknowledge_turbo_errors.start()
-    turbo.acknowledge_turbo_errors.wait()    
-    
-
 Agent API
 ---------
 
 .. autoclass:: agents.pfeiffer_tc400.pfeiffer_tc400_agent.PfeifferTC400Agent
-    :members: init_turbo, turn_turbo_on, turn_turbo_off, acknowledge_turbo_errors, start_acq
+    :members:
+
+Example Clients
+---------------
+The turbo agent can start and stop a turbo, acknowledge an error (this is
+required to start again after an error occurs), and acquire turbo data. This
+example client shows all of this functionality::
+
+    from ocs.ocs_client import OCSClient
+    client = OCSClient("pfeifferturboA)
+    
+    # Start data acq
+    status, message, session = client.acq.start()
+    print(session)
+    
+    # Stop data acq
+    client.acq.stop()
+    client.acq.wait()
+
+    # Start the turbo
+    client.turn_turbo_on()
+
+    # Stop the turbo
+    client.turn_turbo_off()
+    
+    # Acknowledge errors
+    client.acknowledge_turbo_errors()
 
 Driver API
 ----------

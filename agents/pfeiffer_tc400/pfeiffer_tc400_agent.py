@@ -49,8 +49,11 @@ class PfeifferTC400Agent:
                                  agg_params=agg_params,
                                  buffer_time=0)
 
-    def init_turbo(self, session, params=None):
-        """ Task to connect to the turbo controller
+    @ocs_agent.param('auto_acquire', default=False, type=bool)
+    def init(self, session, params=None):
+        """init(auto_acquire=False)
+
+        **Task** - Initialize the connection to the turbo controller.
 
         Parameters
         ----------
@@ -82,9 +85,11 @@ class PfeifferTC400Agent:
 
     @ocs_agent.param('test_mode', default=False, type=bool)
     @ocs_agent.param('wait', default=1, type=float)
-    def start_acq(self, session, params=None):
-        """Process to continuously monitor turbo motor temp and rotation speed and
-        send info to aggregator.
+    def acq(self, session, params=None):
+        """acq(wait=1, test_mode=False)
+
+        **Process** - Continuously monitor turbo motor temp and rotation speed
+        and send info to aggregator.
 
         The ``session.data`` object stores the most recent published values
         in a dictionary. For example::
@@ -139,7 +144,7 @@ class PfeifferTC400Agent:
 
         return True, "Finished monitoring turbo"
 
-    def stop_acq(self, session, params=None):
+    def _stop_acq(self, session, params=None):
         """Stop monitoring the turbo output."""
         if self.monitor:
             self.monitor = False
@@ -147,8 +152,13 @@ class PfeifferTC400Agent:
         else:
             return False, 'acq is not currently running'
 
+    @ocs_agent.param('_')
     def turn_turbo_on(self, session, params=None):
-        """Turns the turbo on."""
+        """turn_turbo_on()
+
+        **Task** - Turns the turbo on.
+
+        """
 
         with self.lock.acquire_timeout(1) as acquired:
             if acquired:
@@ -164,8 +174,13 @@ class PfeifferTC400Agent:
 
         return True, 'Turned turbo on'
 
+    @ocs_agent.param('_')
     def turn_turbo_off(self, session, params=None):
-        """Turns the turbo off."""
+        """turn_turbo_off()
+
+        **Task** - Turns the turbo off.
+
+        """
 
         with self.lock.acquire_timeout(1) as acquired:
             if acquired:
@@ -181,8 +196,12 @@ class PfeifferTC400Agent:
 
         return True, 'Turned turbo off'
 
+    @ocs_agent.param('_')
     def acknowledge_turbo_errors(self, session, params=None):
-        """Sends an acknowledgment of the error code to the turbo.
+        """acknowledge_turbo_errors()
+
+        **Task** - Sends an acknowledgment of the error code to the turbo.
+
         """
         with self.lock.acquire_timeout(1) as acquired:
             if acquired:
@@ -236,10 +255,10 @@ if __name__ == '__main__':
                            int(args.port_number),
                            int(args.turbo_address))
 
-    agent.register_task('init', p.init_turbo, startup=init_params)
+    agent.register_task('init', p.init, startup=init_params)
     agent.register_task('turn_turbo_on', p.turn_turbo_on)
     agent.register_task('turn_turbo_off', p.turn_turbo_off)
     agent.register_task('acknowledge_turbo_errors', p.acknowledge_turbo_errors)
-    agent.register_process('acq', p.start_acq, p.stop_acq)
+    agent.register_process('acq', p.acq, p._stop_acq)
 
     runner.run(agent, auto_reconnect=True)
