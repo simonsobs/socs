@@ -34,7 +34,7 @@ def load_frame_data(frame):
     if isinstance(primary, core.G3TimesampleMap):
         times = np.array(primary['UnixTime']) / 1e9
     else:
-        if len(primary_idxs) == 0:
+        if not primary_idxs:
             for i, name in enumerate(frame['primary'].names):
                 primary_idxs[name] = i
         times = np.array(primary.data[primary_idxs['UnixTime']]) / 1e9
@@ -53,6 +53,10 @@ def load_frame_data(frame):
 
 
 class FIRFilter:
+    """
+    Class for Finite Input Response filter. Filter phases are preserved between
+    `lfilt` calls so you can filter frame-based data.
+    """
     def __init__(self, b, a, nchans=None):
         if nchans is None:
             nchans = 4096
@@ -67,6 +71,18 @@ class FIRFilter:
 
     @classmethod
     def butter_highpass(cls, cutoff, fs, order=5):
+        """
+        Creates an highpass butterworth FIR filter
+
+        Args
+        ----
+        cutoff : float
+            Cutoff freq (Hz)
+        fs : float
+            sample frequency (Hz)
+        order : int
+            Order of the filter
+        """
         nyq = 0.5 * fs
         normal_cutoff = cutoff / nyq
         b, a = signal.butter(order, normal_cutoff, btype='high', analog=False)
@@ -74,6 +90,18 @@ class FIRFilter:
 
     @classmethod
     def butter_lowpass(cls, cutoff, fs, order=5):
+        """
+        Creates an lowpass butterworth FIR filter
+
+        Args
+        ----
+        cutoff : float
+            Cutoff freq (Hz)
+        fs : float
+            sample frequency (Hz)
+        order : int
+            Order of the filter
+        """
         nyq = 0.5 * fs
         normal_cutoff = cutoff / nyq
         b, a = signal.butter(order, normal_cutoff, btype='low', analog=False)
@@ -139,35 +167,40 @@ class FocalplaneConfig:
         self.ys = []
         self.rots = []
         self.cnames = []
-        self.eqs = []
-        self.cmaps = []
         self.templates = []
-        self.chan_mask = np.arange(0)
-        self.eq_keys = []
+        self.value_names = []
+        self.eqs = []
+        self.eq_labels = []
+        self.eq_color_is_dynamic = []
+        self.cmaps = []
         self.chan_mask = np.full(4096, -1)
 
     def config_frame(self):
         frame = core.G3Frame(core.G3FrameType.Wiring)
         frame['x'] = core.G3VectorDouble(self.xs)
         frame['y'] = core.G3VectorDouble(self.ys)
-        frame['rotation'] = core.G3VectorDouble(self.rots)
         frame['cname'] = core.G3VectorString(self.cnames)
-        frame['equations'] = core.G3VectorString(self.eqs)
-        frame['cmaps'] = core.G3VectorString(self.cmaps)
+        frame['rotation'] = core.G3VectorDouble(self.rots)
         frame['templates'] = core.G3VectorString(self.templates)
-        if self.eq_keys is not None:
-            frame['eq_keys'] = core.G3VectorString(self.eq_keys)
+        frame['values'] = core.G3VectorString(self.value_names)
+        frame['color_is_dynamic'] = core.G3VectorBool(self.eq_color_is_dynamic)
+        frame['equations'] = core.G3VectorString(self.eqs)
+        frame['eq_labels'] = core.G3VectorString(self.eq_labels)
+        frame['cmaps'] = core.G3VectorString(self.cmaps)
         return frame
         
-    def add_vis_elem(self, name, x, y, rot, cmaps, eqs, template,
-                     abs_smurf_chan):
+    def add_vis_elem(self, name, x, y, rot, value_names, eqs, eq_labels, cmaps,
+                     template, abs_smurf_chan, eq_color_is_dynamic):
         self.cnames.append(name)
         self.xs.append(float(x))
         self.ys.append(float(y))
         self.rots.append(rot)
+        self.templates.append(template)
+        self.value_names.extend(value_names)
         self.cmaps.extend(cmaps)
         self.eqs.extend(eqs)
-        self.templates.append(template)
+        self.eq_labels.extend(eq_labels)
+        self.eq_color_is_dynamic.extend(eq_color_is_dynamic)
         self.chan_mask[abs_smurf_chan] = self.num_dets
         self.num_dets += 1
 
@@ -182,19 +215,21 @@ class FocalplaneConfig:
 
         template = 'box'
         cmaps = ['red_cmap', 'blue_cmap']
-        fp.eq_keys = ['raw', 'rms']
+        eq_color_is_dynamic = [True, False]
         for i in range(xdim * ydim):
             x, y = xs[i % xdim], ys[i // xdim]
             name = f"channel_{i}"
+            value_names = [f'{name}/raw', f'{name}/rms']
             eqs = [f'{name}/raw', f'* {name}/rms rms_scale']
-            fp.add_vis_elem(name, x, y, 0, cmaps, eqs, template, i)
+            eq_labels = ['raw', 'rms']
+            fp.add_vis_elem(name, x, y, 0, value_names, eqs, eq_labels, cmaps,
+                            template, i, eq_color_is_dynamic)
 
         return fp
 
     @classmethod
     def from_csv(cls, csv_file, wafer_scale=1.):
         fp = cls()
-        fp.eq_keys = ['raw', 'rms']
         df = pd.read_csv(csv_file)
         cmaps = {
             90: ['red_cmap', 'blue_cmap'],
@@ -326,27 +361,30 @@ class MagpieAgent:
         rms_out = np.zeros((num_frames, np.max(self.fp.chan_mask)+1))
         times_out = times_in[sample_idxs]
 
-        chans = self.mask[np.arange(nchans)]
-        for i, c in enumerate(chans):
+        abs_chans = self.mask[np.arange(nchans)]
+        data_idxs = np.full(2*nchans, -1)
+        raw_out = np.zeros((num_frames, np.max(self.fp.chan_mask)))
+        rms_out = np.zeros((num_frames, np.max(self.fp.chan_mask)))
+        for i, c in enumerate(abs_chans):
             if c >= len(self.fp.chan_mask):
                 continue
             idx = self.fp.chan_mask[c]
             if idx >= 0:
-                data_out[:, idx] = (data_in[i, sample_idxs])
-                rms_out[:, idx] = (rms[i, sample_idxs])
+                raw_out[:, idx] = data_in[i, sample_idxs]
+                rms_out[:, idx] = rms[i, sample_idxs]
 
         out = []
         for i in range(num_frames):
             fr = core.G3Frame(core.G3FrameType.Scan)
-            fr['eq_idx'] = 0
+            fr['idx'] = 0
+            fr['data'] = core.G3VectorDouble(raw_out[i])
             fr['timestamp'] = core.G3Time(times_out[i] * core.G3Units.s)
-            fr['data'] = core.G3VectorDouble(data_out[i, :])
             out.append(fr)
 
             fr = core.G3Frame(core.G3FrameType.Scan)
-            fr['eq_idx'] = 1
+            fr['idx'] = 1
+            fr['data'] = core.G3VectorDouble(rms_out[i])
             fr['timestamp'] = core.G3Time(times_out[i] * core.G3Units.s)
-            fr['data'] = core.G3VectorDouble(rms_out[i, :])
             out.append(fr)
         return out
 
@@ -357,7 +395,6 @@ class MagpieAgent:
 
         while self._running:
             if self.send_config_flag:
-                print(self.fp.config_frame)
                 self.sender.Process(self.fp.config_frame())
                 self.send_config_flag = False
 
