@@ -95,7 +95,7 @@ class PfeifferTC400Agent:
                 'data': {
                     "Turbo_Motor_Temp": 40.054,
                     "Rotation_Speed": 823.655,
-                    "turbo_error_code": 0,
+                    "Error_Code": "Err001",
                 }
             }
 
@@ -119,7 +119,7 @@ class PfeifferTC400Agent:
                     try:
                         data['data']["Turbo_Motor_Temp"] = self.turbo.get_turbo_motor_temperature()
                         data['data']["Rotation_Speed"] = self.turbo.get_turbo_actual_rotation_speed()
-                        data['data']['error_code'] = self.turbo.get_turbo_error_code()
+                        data['data']['Error_Code'] = self.turbo.get_turbo_error_code()
                     except ValueError as e:
                         self.log.error(f"Error in collecting data: {e}")
                         continue
