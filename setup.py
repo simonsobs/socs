@@ -34,5 +34,9 @@ setup(name = 'socs',
           'pyserial',
           'sqlalchemy',
           'pysnmp',
+          'mysql-connector>=2.1.6',
       ],
+      extras_require={
+          "so3g": ["so3g"],
+      },
 )
