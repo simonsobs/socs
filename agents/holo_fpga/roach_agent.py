@@ -2,6 +2,7 @@ import os
 import argparse
 import time
 import txaio
+import numpy as np
 
 ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 if not ON_RTD:
@@ -21,7 +22,7 @@ class FPGAAgent:
         
         self.fpga = None
         self.initialized = False
-        self.take_data = False
+        # self.take_data = False
 
         self.agent = agent
         self.log = agent.log
@@ -35,16 +36,19 @@ class FPGAAgent:
         self.sampling_frequency = float(samp)
 
         ### register the position feeds
-        agg_params = {
-            'frame_length' : 10*60, #[sec] 
-        }
+
         ### Agent registers data feed, things published to feed go to grafana and .g3 files
         ### pick a good name for feeds, once it's registered it's kinda permanent
+        
+        """
+        agg_params = {
+                'frame_length' : 10*60, #[sec] 
+            }
         self.agent.register_feed('fpga',
                                  record = True,
                                  agg_params = agg_params,
                                  buffer_time = 0)
-        """
+
     def init_FPGA(self, session, params=None):
         """init_synth(params=None)
         Perform first time setup for communication with Synth.
@@ -72,6 +76,8 @@ class FPGAAgent:
             assert err == 0
 
             self.fpga = casperfpga.CasperFpga(self.roach)
+            # acc_n = self.fpga.read_uint("acc_num")
+            # print(acc_n)
 
 
         # This part is for the record and to allow future calls to proceed,
@@ -83,63 +89,51 @@ class FPGAAgent:
 
 
     def take_data(self, session, params=None):
+        """
+        params: 
+            dict: {'freq0': float
+                   'freq1': float}
+        """
+        # f1 = params.get('freq1', 0)
 
-        if params is None:
-            params = {}
-
-        self.log.debug("Trying to acquire lock")
-        with self.lock.acquire_timeout(timeout=1, job='take_data') as acquired:
-            # Locking mechanism stops code from proceeding if no lock acquired
+        with self.lock.acquire_timeout(timeout=3, job='take_data') as acquired:
             if not acquired:
-                self.log.warn("Could not start init because {} is already running".format(self.lock.job))
-                return False, "Could not acquire lock."
-            # Run the function you want to run
-            self.log.debug("Lock Acquired initializing the FPGA")
-
-
-        # This part is for the record and to allow future calls to proceed,
-        # so does not require the lock
-        self.initialized = True
-        #if self.auto_acq:
-        #    self.agent.start('acq')
-        return True, 'FPGA connected.'
-
-
-    # def take_data(self, session, params=None):
-    #     """
-    #     params: 
-    #         dict: {'freq0': float
-    #                'freq1': float}
-    #     """
-    #     # f1 = params.get('freq1', 0)
-
-    #     with self.lock.acquire_timeout(timeout=3, job='take_data') as acquired:
-    #         if not acquired:
-    #             self.log.warn(f"Could not set position because lock held by {self.lock.job}")
-    #             return False, "Could not acquire lock"
+                self.log.warn(f"Could not set position because lock held by {self.lock.job}")
+                return False, "Could not acquire lock"
                         
-    #         ## this is where you would talk to self.fpga and tell is to give you
-    #         ## some data 
-    #         self.roach, self.opts, self.baseline = fpga_daq3.roach2_init()
-    #         print('initial ROACH settings')
-    #         self.synth_settings = synth3.SynthOpt()
-    #         print('class of synthesizer settings acquired')
-    #         out = fpga_daq3.TakeAvgData(self.baseline, self.fpga, self.synth_settings)
-                        
-    #         # data dictionary is what we will send to the data feed
-    #         #data = {'timestamp':time.time(), 'block_name':'fpga','data':{}}
+            ## this is where you would talk to self.fpga and tell is to give you
+            ## some data 
+            self.roach, self.opts, self.baseline = fpga_daq3.roach2_init()
+            self.synth_settings = synth3.SynthOpt()
+            arr_aa, arr_bb, arr_ab, arr_phase, arr_index = fpga_daq3.TakeAvgData(self.baseline, self.fpga, self.synth_settings)
+
+            # data dictionary is what we will send to the data feed
+            data = {'timestamp':time.time(), 'block_name':'fpga','data':{}}
             
-    #         #THING, THING2 = self.fpga.give_me_data()
+            arr_AA = np.array(fpga_daq3.running_mean(arr_aa.tolist(),1))
+            arr_BB = np.array(fpga_daq3.running_mean(arr_bb.tolist(),1))
+            arr_AB = np.array(fpga_daq3.running_mean(arr_ab.tolist(),1))
+            arr_P = np.array(fpga_daq3.running_mean(arr_phase.tolist(),1))
 
-    #         #data['data']['THING'] = THING
-    #         #data['data']['OTHER_THING'] = THING2
+            n_channels = np.size(arr_AA)
 
-    #         #self.agent.publish_to_feed('fpga',data)
-    #         #session.data.update( data['data'] )
+            amp_AA = arr_AA[int(n_channels/2)]
+            amp_BB = arr_BB[int(n_channels/2)]
+            amp_AB = np.power(arr_AB[int(n_channels/2)], 1)
+            amp_P = np.remainder(arr_P[int(n_channels/2)],360.)
 
-    #         pass
 
-    #     return True, "Data acquired."
+            data['data']['amp_AA'] = amp_AA
+            data['data']['amp_BB'] = amp_BB
+            data['data']['amp_AB'] = amp_AB
+            data['data']['amp_P'] = amp_P
+
+            self.agent.publish_to_feed('fpga',data)
+            session.data.update( data['data'] )
+
+            pass
+
+        return True, "Data acquired."
     
 def make_parser(parser=None):
     """Build the argument parser for the Agent. Allows sphinx to automatically

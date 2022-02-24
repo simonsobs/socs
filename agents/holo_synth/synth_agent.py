@@ -106,9 +106,6 @@ class SynthAgent:
             if not acquired:
                 self.log.warn(f"Could not set position because lock held by {self.lock.job}")
                 return False, "Could not acquire lock"
-                        
-            synth3.set_f(0, f0, self.lo_id)
-            synth3.set_f(1, f1, self.lo_id)
 
         return True, "Frequencies Updated"
 
@@ -144,5 +141,6 @@ if __name__ == '__main__':
 
     agent.register_task('init_synth', synth_agent.init_synth)
     agent.register_task('set_frequencies', synth_agent.set_frequencies)
+    agent.register_task('read_frequencies', synth_agent.read_frequencies)
 
     runner.run(agent, auto_reconnect=True)
