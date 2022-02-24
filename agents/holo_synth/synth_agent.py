@@ -7,8 +7,6 @@ ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 if not ON_RTD:
     from ocs import ocs_agent, site_config
     from ocs.ocs_twisted import TimeoutLock, Pacemaker
-
-    ## yes I shouldn't have named that module agent
     from holog_daq import synth3
 
 class SynthAgent:
@@ -96,6 +94,24 @@ class SynthAgent:
             synth3.set_f(1, f1, self.lo_id)
 
         return True, "Frequencies Updated"
+
+    def read_frequencies(self, session, params=None):
+        """
+        params: 
+            dict: {'freq0': float
+                   'freq1': float}
+        """
+
+        with self.lock.acquire_timeout(timeout=3, job='read_frqeuencies') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not set position because lock held by {self.lock.job}")
+                return False, "Could not acquire lock"
+                        
+            synth3.set_f(0, f0, self.lo_id)
+            synth3.set_f(1, f1, self.lo_id)
+
+        return True, "Frequencies Updated"
+
     
 def make_parser(parser=None):
     """Build the argument parser for the Agent. Allows sphinx to automatically
@@ -128,7 +144,5 @@ if __name__ == '__main__':
 
     agent.register_task('init_synth', synth_agent.init_synth)
     agent.register_task('set_frequencies', synth_agent.set_frequencies)
-    
-    #agent.register_process('acq', xy_agent.start_acq, xy_agent.stop_acq)
 
     runner.run(agent, auto_reconnect=True)

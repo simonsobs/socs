@@ -7,9 +7,8 @@ ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 if not ON_RTD:
     from ocs import ocs_agent, site_config
     from ocs.ocs_twisted import TimeoutLock, Pacemaker
-
     import casperfpga
-    from holog_daq import poco3, fpga_daq3
+    from holog_daq import poco3, fpga_daq3, synth3
 
 class FPGAAgent:
     """
@@ -39,8 +38,9 @@ class FPGAAgent:
         agg_params = {
             'frame_length' : 10*60, #[sec] 
         }
-        
-        self.agent.register_feed('frequency',
+        ### Agent registers data feed, things published to feed go to grafana and .g3 files
+        ### pick a good name for feeds, once it's registered it's kinda permanent
+        self.agent.register_feed('fpga',
                                  record = True,
                                  agg_params = agg_params,
                                  buffer_time = 0)
@@ -58,20 +58,20 @@ class FPGAAgent:
             params = {}
 
         self.log.debug("Trying to acquire lock")
-        with self.lock.acquire_timeout(timeout=0, job='init') as acquired:
+        with self.lock.acquire_timeout(timeout=1, job='init') as acquired:
             # Locking mechanism stops code from proceeding if no lock acquired
             if not acquired:
                 self.log.warn("Could not start init because {} is already running".format(self.lock.job))
                 return False, "Could not acquire lock."
             # Run the function you want to run
-            self.log.debug("Lock Acquired Connecting to Stages")
+            self.log.debug("Lock Acquired initializing the FPGA")
             
             self.roach, self.opts, self.baseline = fpga_daq3.roach2_init()
             print("Programming FPGA with python2")
             err = os.system("/opt/anaconda2/bin/python2 /home/chesmore/Desktop/holog_daq/scripts/upload_fpga_py2.py")
             assert err == 0
 
-            self.fpga = casperfpga.CasperFpga(roach)
+            self.fpga = casperfpga.CasperFpga(self.roach)
 
 
         # This part is for the record and to allow future calls to proceed,
@@ -79,26 +79,67 @@ class FPGAAgent:
         self.initialized = True
         #if self.auto_acq:
         #    self.agent.start('acq')
-        return True, 'FPGA Initialized.'
+        return True, 'FPGA connected.'
 
-    def set_frequencies(self, session, params):
-        """
-        params: 
-            dict: {'freq0': float
-                   'freq1': float}
-        """
-        f0 = params.get('freq0', 0)
-        f1 = params.get('freq1', 0)
 
-        with self.lock.acquire_timeout(timeout=3, job='set_frqeuencies') as acquired:
+    def take_data(self, session, params=None):
+
+        if params is None:
+            params = {}
+
+        self.log.debug("Trying to acquire lock")
+        with self.lock.acquire_timeout(timeout=1, job='take_data') as acquired:
+            # Locking mechanism stops code from proceeding if no lock acquired
             if not acquired:
-                self.log.warn(f"Could not set position because lock held by {self.lock.job}")
-                return False, "Could not acquire lock"
-                        
-            synth3.set_f(0, f0, self.lo_id)
-            synth3.set_f(1, f1, self.lo_id)
+                self.log.warn("Could not start init because {} is already running".format(self.lock.job))
+                return False, "Could not acquire lock."
+            # Run the function you want to run
+            self.log.debug("Lock Acquired initializing the FPGA")
 
-        return True, "Frequencies Updated"
+
+        # This part is for the record and to allow future calls to proceed,
+        # so does not require the lock
+        self.initialized = True
+        #if self.auto_acq:
+        #    self.agent.start('acq')
+        return True, 'FPGA connected.'
+
+
+    # def take_data(self, session, params=None):
+    #     """
+    #     params: 
+    #         dict: {'freq0': float
+    #                'freq1': float}
+    #     """
+    #     # f1 = params.get('freq1', 0)
+
+    #     with self.lock.acquire_timeout(timeout=3, job='take_data') as acquired:
+    #         if not acquired:
+    #             self.log.warn(f"Could not set position because lock held by {self.lock.job}")
+    #             return False, "Could not acquire lock"
+                        
+    #         ## this is where you would talk to self.fpga and tell is to give you
+    #         ## some data 
+    #         self.roach, self.opts, self.baseline = fpga_daq3.roach2_init()
+    #         print('initial ROACH settings')
+    #         self.synth_settings = synth3.SynthOpt()
+    #         print('class of synthesizer settings acquired')
+    #         out = fpga_daq3.TakeAvgData(self.baseline, self.fpga, self.synth_settings)
+                        
+    #         # data dictionary is what we will send to the data feed
+    #         #data = {'timestamp':time.time(), 'block_name':'fpga','data':{}}
+            
+    #         #THING, THING2 = self.fpga.give_me_data()
+
+    #         #data['data']['THING'] = THING
+    #         #data['data']['OTHER_THING'] = THING2
+
+    #         #self.agent.publish_to_feed('fpga',data)
+    #         #session.data.update( data['data'] )
+
+    #         pass
+
+    #     return True, "Data acquired."
     
 def make_parser(parser=None):
     """Build the argument parser for the Agent. Allows sphinx to automatically
@@ -123,15 +164,13 @@ if __name__ == '__main__':
     parser = make_parser()
 
     # Interpret options in the context of site_config.
-    args = site_config.parse_args(agent_class = 'SynthAgent', parser=parser)
+    args = site_config.parse_args(agent_class = 'FPGAAgent', parser=parser)
    
     agent, runner = ocs_agent.init_site_agent(args)
 
-    synth_agent = SynthAgent(agent,)
+    fpga_agent = FPGAAgent(agent,)
 
-    agent.register_task('init_synth', synth_agent.init_synth)
-    agent.register_task('set_frequencies', synth_agent.set_frequencies)
+    agent.register_task('init_FPGA', fpga_agent.init_FPGA)
+    agent.register_task('take_data', fpga_agent.take_data)
     
-    #agent.register_process('acq', xy_agent.start_acq, xy_agent.stop_acq)
-
     runner.run(agent, auto_reconnect=True)
