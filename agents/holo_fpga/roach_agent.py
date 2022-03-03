@@ -3,6 +3,7 @@ import argparse
 import time
 import txaio
 import numpy as np
+import yaml
 
 ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 if not ON_RTD:
@@ -18,7 +19,7 @@ class FPGAAgent:
     Args: 
     """
 
-    def __init__( self, agent ):
+    def __init__( self, agent,config_file ):
         
         self.fpga = None
         self.initialized = False
@@ -49,6 +50,32 @@ class FPGAAgent:
                                  agg_params = agg_params,
                                  buffer_time = 0)
 
+        # Load dictionary of specific mirror paramters, since some parameters
+        # like limits and translate vary over different FTSes This is loaded
+        # from a yaml file, which is assumed to be in the $OCS_CONFIG_DIR
+        # directory.
+        if config_file == 'None':
+            raise Exception(
+                "No config file specified for the FTS mirror config")
+        else:
+            config_file_path = os.path.join(os.environ['OCS_CONFIG_DIR'],
+                                            config_file)
+            print(config_file_path)
+            with open(config_file_path) as stream:
+                self.holog_configs = yaml.safe_load(stream)
+                if self.holog_configs is None:
+                    raise Exception( "No mirror configs in config file.")
+                self.log.info(
+                    f"Loaded mirror configs from file {config_file_path}")
+                self.baseline = self.holog_configs.pop('baseline', None)
+                self.roach = self.holog_configs.pop('roach', None)
+                # self.limits = self.mirror_configs.pop('limits', None)
+                # # The other mirror configs (speed, timeout) are optional and
+                # # have defaults so we leave them as the dictionary.
+                # if self.translate is None or self.limits is None:
+                #     raise Exception("translate and limits must be included "
+                #                     "in the mirror configuration keys")
+
     def init_FPGA(self, session, params=None):
         """init_synth(params=None)
         Perform first time setup for communication with Synth.
@@ -69,22 +96,17 @@ class FPGAAgent:
                 return False, "Could not acquire lock."
             # Run the function you want to run
             self.log.debug("Lock Acquired initializing the FPGA")
-            
-            self.roach, self.opts, self.baseline = fpga_daq3.roach2_init()
+
             print("Programming FPGA with python2")
             err = os.system("/opt/anaconda2/bin/python2 /home/chesmore/Desktop/holog_daq/scripts/upload_fpga_py2.py")
             assert err == 0
 
             self.fpga = casperfpga.CasperFpga(self.roach)
-            # acc_n = self.fpga.read_uint("acc_num")
-            # print(acc_n)
-
 
         # This part is for the record and to allow future calls to proceed,
         # so does not require the lock
         self.initialized = True
-        #if self.auto_acq:
-        #    self.agent.start('acq')
+
         return True, 'FPGA connected.'
 
 
@@ -103,7 +125,7 @@ class FPGAAgent:
                         
             ## this is where you would talk to self.fpga and tell is to give you
             ## some data 
-            self.roach, self.opts, self.baseline = fpga_daq3.roach2_init()
+
             self.synth_settings = synth3.SynthOpt()
             arr_aa, arr_bb, arr_ab, arr_phase, arr_index = fpga_daq3.TakeAvgData(self.baseline, self.fpga, self.synth_settings)
 
@@ -144,6 +166,8 @@ def make_parser(parser=None):
 
     # Add options specific to this agent.
     pgroup = parser.add_argument_group('Agent Options')
+    pgroup.add_argument('--config_file')
+
     return parser
 
 
@@ -162,7 +186,7 @@ if __name__ == '__main__':
    
     agent, runner = ocs_agent.init_site_agent(args)
 
-    fpga_agent = FPGAAgent(agent,)
+    fpga_agent = FPGAAgent(agent,args.config_file)
 
     agent.register_task('init_FPGA', fpga_agent.init_FPGA)
     agent.register_task('take_data', fpga_agent.take_data)

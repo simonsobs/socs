@@ -2,6 +2,8 @@ import os
 import argparse
 import time
 import txaio
+import numpy as np
+import yaml
 
 ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 if not ON_RTD:
@@ -16,7 +18,7 @@ class SynthAgent:
     Args: 
     """
 
-    def __init__( self, agent ):
+    def __init__( self, agent ,config_file):
         
         self.lo_id = None
         self.initialized = False
@@ -43,6 +45,22 @@ class SynthAgent:
                                  agg_params = agg_params,
                                  buffer_time = 0)
         """
+        if config_file == 'None':
+            raise Exception(
+                "No config file specified for the FTS mirror config")
+        else:
+            config_file_path = os.path.join(os.environ['OCS_CONFIG_DIR'],
+                                            config_file)
+            print(config_file_path)
+            with open(config_file_path) as stream:
+                self.holog_configs = yaml.safe_load(stream)
+                if self.holog_configs is None:
+                    raise Exception( "No mirror configs in config file.")
+                self.log.info(
+                    f"Loaded mirror configs from file {config_file_path}")
+                self.N_MULT = self.holog_configs.pop('N_MULT', None)
+                self.ghz_to_mhz = self.holog_configs.pop('ghz_to_mhz', None)
+
     def init_synth(self, session, params=None):
         """init_synth(params=None)
         Perform first time setup for communication with Synth.
@@ -82,16 +100,22 @@ class SynthAgent:
             dict: {'freq0': float
                    'freq1': float}
         """
+
         f0 = params.get('freq0', 0)
         f1 = params.get('freq1', 0)
+
+        F_0 = int(f0*self.ghz_to_mhz/self.N_MULT)
+        F_1 = int(f1*self.ghz_to_mhz/self.N_MULT)
+        
+        print(F_1)
 
         with self.lock.acquire_timeout(timeout=3, job='set_frqeuencies') as acquired:
             if not acquired:
                 self.log.warn(f"Could not set position because lock held by {self.lock.job}")
                 return False, "Could not acquire lock"
                         
-            synth3.set_f(0, f0, self.lo_id)
-            synth3.set_f(1, f1, self.lo_id)
+            synth3.set_f(0, F_0, self.lo_id)
+            synth3.set_f(1, F_1, self.lo_id)
 
         return True, "Frequencies Updated"
 
@@ -119,6 +143,8 @@ def make_parser(parser=None):
 
     # Add options specific to this agent.
     pgroup = parser.add_argument_group('Agent Options')
+    pgroup.add_argument('--config_file')
+
     return parser
 
 
@@ -137,7 +163,7 @@ if __name__ == '__main__':
    
     agent, runner = ocs_agent.init_site_agent(args)
 
-    synth_agent = SynthAgent(agent,)
+    synth_agent = SynthAgent(agent,args.config_file)
 
     agent.register_task('init_synth', synth_agent.init_synth)
     agent.register_task('set_frequencies', synth_agent.set_frequencies)
