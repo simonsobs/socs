@@ -18,6 +18,7 @@ for n, f in [
         ('HWPSimulatorAgent', 'hwp_sim/hwp_simulator_agent.py'),
         ('CryomechCPAAgent', 'cryomech_cpa/cryomech_cpa_agent.py'),
         ('LATRtXYStageAgent', 'xy_stage/xy_latrt_agent.py'),
+        ('ACUAgent', 'acu/acu_agent.py'),
         ('FTSAerotechAgent', 'fts_aerotech_stage/fts_aerotech_agent.py'),
         ('VantagePro2Agent', 'vantagePro2_agent/vantage_pro2_agent.py')
 ]:

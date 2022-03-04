@@ -1,3 +1,4 @@
+import argparse
 import time
 import threading
 import glob
@@ -451,7 +452,12 @@ class BlueforsAgent:
         with self.lock:
             self.job = None
 
-    def start_acq(self, session, params=None):
+    def acq(self, session, params=None):
+        """acq()
+
+        **Process** - Monitor and publish data from the Bluefors log files.
+
+        """
 
         ok, msg = self.try_set_job('acq')
         if not ok:
@@ -492,7 +498,7 @@ class BlueforsAgent:
         self.set_job_done()
         return True, 'Acquisition exited cleanly.'
 
-    def stop_acq(self, session, params=None):
+    def _stop_acq(self, session, params=None):
         ok = False
         with self.lock:
             if self.job == 'acq':
@@ -502,29 +508,35 @@ class BlueforsAgent:
                      False: 'Failed to request process stop.'}[ok])
 
 
-if __name__ == '__main__':
-    # Start logging
-    txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
+def make_parser(parser=None):
+    """Build the argument parser for the Agent. Allows sphinx to automatically
+    build documentation based on this function.
 
-    # Get the default ocs argument parser.
-    parser = site_config.add_arguments()
+    """
+    if parser is None:
+        parser = argparse.ArgumentParser()
 
     # Add options specific to this agent.
     pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--log-directory')
 
-    # Parse comand line.
-    args = parser.parse_args()
+    return parser
 
-    # Interpret options in the context of site_config.
-    site_config.reparse_args(args, 'BlueforsAgent')
-    print('I am following logs located at : %s' % args.log_directory)
+
+if __name__ == '__main__':
+    # Start logging
+    txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
+
+    # Setup argument parser
+    parser = make_parser()
+    args = site_config.parse_args(agent_class='BlueforsAgent', parser=parser)
+    LOG.info('I am following logs located at : %s' % args.log_directory)
 
     agent, runner = ocs_agent.init_site_agent(args)
 
     bluefors_agent = BlueforsAgent(agent, args.log_directory)
 
-    agent.register_process('acq', bluefors_agent.start_acq, 
-                           bluefors_agent.stop_acq, startup=True)
+    agent.register_process('acq', bluefors_agent.acq,
+                           bluefors_agent._stop_acq, startup=True)
 
     runner.run(agent, auto_reconnect=True)

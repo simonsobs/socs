@@ -3,9 +3,6 @@
 */dot_crossbar/key.pub
 */dot_crossbar/node.pid
 
-# site_config
-default.yaml
-
 ## github's .gitignore
 
 # tmp files

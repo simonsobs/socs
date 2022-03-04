@@ -14,13 +14,9 @@ Diodes at 1K and above.
     :func: make_parser
     :prog: python3 LS240_agent.py
 
-
-    These options can be included in the site-config entry for the agent,
-    or can be specified manually from the command line.
-
-
-Driver Setup
+Dependencies
 ------------
+
 The Lakeshore 240 requires USB drivers to be compiled for your machine. A
 private repository, `ls240_drivers`, with the required drivers is available on
 the Simons Observatory Github. This repository provides some other helpful
@@ -51,8 +47,14 @@ permissions appropriately. Once you complete this step they will be recongized
 on reboots, and the udev rules will not need to be reinstalled unless you add a
 new device.
 
-OCS Configuration
------------------
+Configuration File Examples
+---------------------------
+
+Below are configuration examples for the ocs config file and for running the
+Agent in a docker container.
+
+OCS Site Config
+```````````````
 
 To configure your Lakeshore 240 for use with OCS you need to add a
 Lakeshore240Agent block to your ocs configuration file. Here is an example
@@ -66,8 +68,8 @@ configuration block that will automatically start data acquisition::
 Each device requires configuration under 'agent-instances'. See the OCS site
 configs documentation for more details.
 
-Docker Configuration
---------------------
+Docker Compose
+``````````````
 
 The Lakeshore 240 Agent can (and probably should) be configured to run in a
 Docker container. An example configuration is::
@@ -89,18 +91,22 @@ should also match your configured host in your OCS configuration file. The
 site-hub and site-http need to point to your crossbar server, as described in
 the OCS documentation.
 
-Initial Setup
--------------
+
+Example Clients
+---------------
+
+Device Configuration
+````````````````````
 
 Out of the box, the Lakeshore 240 channels are not enabled or configured
-to correctly measure thermometers. To enable, you can use the ``set_values`` task
-of the LS240 agent to configure a particular channel. Below is an example of a
-client script that uses the ``ocs.matched_client`` functionality to
-set channel 1 of a lakeshore module to read a diode::
+to correctly measure thermometers. To enable, you can use the
+:func:`agents.lakeshore240.LS240_agent.LS240_Agent.set_values` Task of the
+LS240 Agent to configure a particular channel. Below is an example of a
+client that sets Channel 1 of a 240 to read a diode::
 
     from ocs.matched_client import MatchedClient
 
-    ls_client = MatchedClient("LSA24MA", args=[])
+    ls_client = MatchedClient("LSA24MA")
 
     diode_params = {
         'sensor': 1,
@@ -114,7 +120,19 @@ set channel 1 of a lakeshore module to read a diode::
 
 Agent API
 ---------
-The following tasks are registered for the LS240 agent.
 
 .. autoclass:: agents.lakeshore240.LS240_agent.LS240_Agent
-    :members: init_lakeshore_task, set_values, upload_cal_curve, acq, start_acq
+    :members:
+
+Supporting APIs
+---------------
+
+.. autoclass:: socs.Lakeshore.Lakeshore240.Module
+    :members:
+
+.. autoclass:: socs.Lakeshore.Lakeshore240.Channel
+    :members:
+
+.. autoclass:: socs.Lakeshore.Lakeshore240.Curve
+    :members:
+
