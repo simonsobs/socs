@@ -42,7 +42,7 @@ from MoxaSerial import Serial_TCPServer
 from time import sleep
 import numpy as np
 import traceback
-# from pylab import load
+
 
 # Time to wait for the user to power on the controllers and to see the power-on signature from the serial port
 DEFAULT_WAIT_START_TIME = 15.0 #seconds
@@ -56,34 +56,14 @@ ALL = 3
 AXIS_THREADS_PER_INCH_STAGE = 10.0 #Conversion for the FTS Linear Stage - Check for factor of two later
 AXIS_THREADS_PER_INCH_XYZ = 10.0 #Measured on stepper, Check for factor of two later
 #AXIS_THREADS_PER_INCH = 10.0 #Measured on stepper
-#MR_CODE_TO_STEPS_PER_REV = {
-#        '3': 2000.0,
-#        '4': 5000.0,
-#        '5': 10000.0,
-#        '6': 12800.0,
-#        '7': 18000.0,
-#        '8': 20000.0,
-#        '9': 21600.0,
-#        '10': 25000.0,
-#        '11': 25400.0,
-#       '12': 25600.0,
-#        '13': 36000.0,
-#        '14': 50000.0,
-#        '15': 50800.0
-#
-#}
+
 
 
 class MotControl(object):
         """Object for controlling up to 2 motors - all functions will work for linear stages, some will work if motors are attached
         to non-linear stages. 
         """
-#         ********************************************BEGIN FUNCTION NOTES********************************************************************************
-#         Implement below functions for "with ... as" use. The plan is to connect and disconnect for every agent task.
-#         def __enter__()
-#         def __exit__()
-#         ISSUE: how would this affect data_acquisition? We also wouldn't be able to 'ping' if a motor is still connected -- always disconnected until task called...
-#         ********************************************END FUNCTION NOTES**********************************************************************************
+
         def __init__(self, motor1_Ip=None, motor1_Port=None, motor1_isLin = True, motor2_Ip=None, motor2_Port=None, motor2_isLin = True, mRes=False):
                 """Initialize a MotControl object.
 
@@ -185,48 +165,27 @@ class MotControl(object):
                                         msg = motor.writeread(b'EG\r')
                                         motor.flushInput()
                                         if(len(msg) <= 4):    # Need at least MR=X + \r, which is 5 characters
-                                                print("Couldn't get microstep resolution for %s.  Assuming 8." % (motor.propDict['name']))    # keeps params from initialization?
+                                                print("Couldn't get microstep resolution for %s.  Assuming 8." % (motor.propDict['name']))
                                         else:
                                                 print(msg)
 #                                                 msInfo = msg.rstrip('\r')[3:]
                                                 motor.propDict['sPRev'] = float(msInfo)
-    
-#                               Read electronic gearing from motor, assign values in propDict based on that. MR_CODE_TO_STEPS_PER_REV is likely unneeded/depreciated now... 
                                 else:
                                         msg = motor.writeread(b'EG\r')
                                         motor.flushInput()
                                         if (len(msg) <= 4):
-                                                print("Couldn't get microstep resolution for %s. Disconnect and retry." % (motor.propDict['name']))    # keeps params from initialization?
+                                                print("Couldn't get microstep resolution for %s. Disconnect and retry." % (motor.propDict['name']))
                                         else:
                                                 print(msg)
                                                 msInfo = msg[3:]
                                                 motor.propDict['sPRev'] = float(msInfo)
                                                 msInfo = float(msInfo)
-#                                                for key, value in MR_CODE_TO_STEPS_PER_REV.items():
-#                                                        if msInfo == value:
-#                                                                motor.propDict['res'] = key
-#
-#                                         msg = motor.writeread(b'MR\r') #MR = Microstep Resolution
-#                                         motor.flushInput()
-#                                         if(len(msg) <= 3):    # Need at least MR=X + \r, which is 5 characters
-#                                                 print("Couldn't get microstep resolution for %s.  Assuming 8." % (motor.propDict['name']))    # keeps params from initialization?
-#                                         else:
-#                                                 msInfo = msg.rstrip(b'\r')[3:]
-#                                                 msInfo = msInfo.decode('utf-8')
-#                                                 print(msInfo)
-#                                                 if msInfo not in MR_CODE_TO_STEPS_PER_REV:
-#                                                     print(f'msInfo: {msInfo} not in dictionary, setting to 5')
-#                                                     msInfo = '5'
-#                                                 motor.propDict['res'] = msInfo
-#                                                 motor.propDict['sPRev'] = MR_CODE_TO_STEPS_PER_REV[msInfo]
-
-                        # Set up the limit switches (as normally closed) and check the operating current for the stage motor
-
                         if (motor != None) and (motor.propDict['isLin']):
-                                msg = motor.writeread(b'DL\r') #DL = Define Limits
+                                msg = motor.writeread(b'DL\r') #DL1 = Define Limits for closed input (definition unclear in manual, however)
+                                print(f"msg: {msg}")
                                 if msg != b'DL=2':
                                         print("Limits not defined as normally open. Resetting...")
-                                        motor.write(b'DL2\r')
+                                        motor.write(b'DL2\r') #DL2 = Define Limits for open input 
                                         sleep(0.1)
                                         motor.flushInput()
                                 msg = motor.writeread(b'CC\r') #CC = Change Current
@@ -298,8 +257,35 @@ class MotControl(object):
                                 return True
                 if verbose:
                     print('Neither motor is moving.')
-                return False
+                return False 
         
+        def moveOffLimit(self, motor=ALL):
+            """
+            Ignores alarm to be able to move off the limit switch if unexpectedly hit, and resets alarm.
+            Function should be used when not able to move off limit switch due to alarm.
+            
+            Parameters:
+            motor (int/motor name) -- MOTOR1, MOTOR2, or ALL (default ALL)
+            """
+            
+            mList = self.genMotorList(motor)
+            
+            for motor in(mList):
+                mot_id = motor.propDict['motor']
+                msg = motor.writeread(b'AL\r')
+                if (msg == b'AL=0002'):
+                    print('CCW limit switch hit unexpectedly. Moving one inch away from switch.')
+                    self.moveAxisByLength(motor=mot_id, pos=1, posIsInches=True)
+                    sleep(3)
+                    self.resetAlarms(motor=mot_id)
+                elif (msg == b'AL=0004'):
+                    print('CW limit switch hit unexpectedly. Moving one inch away from switch.')
+                    self.moveAxisByLength(motor=mot_id, pos=-1, posIsInches=True)
+                    sleep(3)
+                    self.resetAlarms(motor=mot_id)  
+                else:
+                    print(f'Motor{motor} not on either switch')
+                            
         def homeWithLimits(self, motor=ALL):
                 """Uses the limit switches to zero all motor positions. 
                 This function should only be used if the linear stages do not have 
@@ -346,6 +332,7 @@ class MotControl(object):
                                 if not self.isMoving(motor=mot_id):
                                         # zero motor and encoder
                                         print(f'Zeroing {motor}')
+                                        sleep(1)
                                         self.setZero(motor=mot_id)
                                         self.setEncoderValue(motor=mot_id)
                                         # move on to next stage
@@ -384,7 +371,6 @@ class MotControl(object):
                                 print("Specified motor is invalid - no motion.")
                                 continue
 
-                        # Perhaps generalize to 'if not motor' print message... (isLin bool variable probably)
                         elif not motor.propDict['isLin']:
                                 print("Motor isn't connected to a linear stage.")
                                 continue
@@ -495,8 +481,6 @@ class MotControl(object):
                         positions.append(iPos)
                        
                 return positions
-
-
                 
         
         def moveAxisToPosition(self, motor=MOTOR1, pos=0, posIsInches=False, linStage=True):
@@ -609,12 +593,6 @@ class MotControl(object):
                         motor.write(b'SK\r') #SK = Stop & Kill - Stop/kill all commands, turn off waiting for input
                         motor.flushInput()
 
-
-###################################################################################################################
-# UNSURE HOW TO EDIT THIS FUNCTION TO HANDLE SOCKET CRASH...how does while interact with closed connection...
-# so...as long as an element exists in the list, while(list) will return true.
-# PLAN: TRY UNDER mLIST, IF ERROR, BREAK THE LOOP!!
-###################################################################################################################
         def blockWhileMoving(self, motor=ALL, updatePeriod=.1, verbose=False):
                 """Block until the specified axes have stop moving.  Checks each axis every updatePeriod seconds.
 
@@ -662,16 +640,16 @@ class MotControl(object):
                         #This is for the 2-axis case.  In the 1-axis case, posData[0] will just be a floating point value
                         if motor == ALL and len(posData) < 2:
                                 raise Exception("You specified that both axes would be moving, but didn't provide data for both.")
-                for pos in posData:
-                        if motor == ALL:
-                                self.moveAxisToPosition(MOTOR1, posData[0], posIsInches=posIsInches)
-                                self.moveAxisToPosition(MOTOR2, posData[1], posIsInches=posIsInches)
-                        elif motor == MOTOR1:
-                                self.moveAxisToPosition(MOTOR1, pos, posIsInches=posIsInches) #Should be a scalar for pos
-                        elif motor == MOTOR2:
-                                self.moveAxisToPosition(MOTOR2, pos, posIsInches=posIsInches) #Should be a scalar for pos
+                                
+                if motor == ALL:
+                        self.moveAxisToPosition(MOTOR1, posData[0], posIsInches=posIsInches)
+                        self.moveAxisToPosition(MOTOR2, posData[1], posIsInches=posIsInches)
+                elif motor == MOTOR1:
+                        self.moveAxisToPosition(MOTOR1, posData, posIsInches=posIsInches)
+                elif motor == MOTOR2:
+                        self.moveAxisToPosition(MOTOR2, posData, posIsInches=posIsInches)
 
-                print(f'Moving position to {pos}')
+                print(f'Moving position to {posData}')
 
 
         def setMotorEnable(self, motor=ALL, enable=True):
@@ -689,9 +667,7 @@ class MotControl(object):
         def retrieveEncoderInfo(self, motor=ALL):
                 """Retrieve all motor step counts to verify movement."""
                 move_status = self.isMoving(motor)
-
                 mList = self.genMotorList(motor)
-
                 ePositions = []
 
                 # If the motors are moving, return NaNs to keep from querying the
@@ -805,28 +781,21 @@ class MotControl(object):
                         motor.sock.close()
                 print("Connection to serial controller disconnected.")
 
-                
-#  ##################################################################################################               
-#       Try to reset socket connection!! - current code does not work, I do *not* set motorX.propdict
-#       this causes exceptions in all other lines of code.
-#  ##################################################################################################
-#         def reconnectMotor(self, motor=ALL, m1_Ip=None, m1_Port=None, m2_Ip=None, m2_Port=None):
-#                 """
-#                 Open the connection to the serial controller for the specified motor.
-#                 m1_Ip = Ip address of motor1 (default None)
-#                 m1_Port = Port of motor1 (default None)
-#                 m2_Ip = Ip address of motor2 (default None)
-#                 m2_Port = Port of motor2 (default None)
-#                 """
-#                 if motor == 1:
-#                         self.motor1 = Serial_TCPServer((m1_Ip, m1_Port))
-#                 elif motor == 2:
-#                         self.motor2 = Serial_TCPServer((m2_Ip, m2_Port))
-#                 else:
-#                         self.motor1 = Serial_TCPServer((m1_Ip, m1_Port))
-#                         self.motor2 = Serial_TCPServer((m2_Ip, m2_Port))
-#                 print(f'motor{motor} connected.\nmotor1 at {self.motor1}\nmotor2 at: {self.motor2}')
-                
+        def reconnectMotor(self, motor=ALL):
+                """
+                Reestablish connection with specified motor.
+                motor = 1,2,3. 3 is all motors. (Default 3)
+                """
+                mList = self.genMotorList(motor)
+                for mot in mList:
+                        if not mot:
+                                print("Specified motor is invalid - no connection to close.")
+                                continue   
+                        print(f"port: {mot.port}")
+                        mot.sock.connect(mot.port)
+                print(f"Connection with motor{motor} has been reestablished.")
+
+
 class PowerControl(object):
         def __init__(self, PowerIP=None, PowerPort=None):
                 self.Power = None

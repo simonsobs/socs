@@ -153,73 +153,6 @@ class SAT1MotorsAgent:
                 
         return True, "Moved motor {} by {}".format(motor, pos)
     
-    ###################################################################    
-    # I created an alternative move_motors function below. 
-    # Perhaps this is more useful? Will check with Joe...
-    ###################################################################    
-    def move_motors(self, session, params):
-        """
-        Moves up to 2 motors. Specified by the params['pos'] value. First element controls motor1, second element
-        controls motor2. If the element is 0, then does NOT move that motor.
-        
-        params: 
-        
-            params: {'motor': int, 'lin1'}
-        
-        
-            dict: { 'lin1': (bool,bool), 'move_method': str, 'pos': (float>=0,float>=0), 'pos_is_inches': bool}  
-            'lin_stages' : Determines if motor1 or motor2 controls a linear stage. 
-            'move_method' : 'by_position' or 'by_length'. Determines how to move the motor(s)
-            'pos' : Determines how far to move motor1 (1st element) and motor2 (2nd element). 
-                If a value is 0, then don't move that motor.
-            'pos_is_inches' : Determines to convert steps to inches or not for both movement methods and motors.
-            
-        """
-        
-        # Set variables and handle easy errors
-        lin_stages = params.get('lin_stages', (True, True))
-        if not isinstance(lin_stages, tuple):
-            raise Exception("params['lin_stages'] must be a tuple of floats!")
-        move_method = params.get('move_method', 'by_position')
-        pos = params.get('pos', (0,0))
-        if not isinstance(pos, tuple):
-            raise Exception("params['pos'] must be a tuple of floats!")        
-        pos_is_inches = params.get('pos_is_inches', False)
-
-        # move both motors ONE AT A TIME, while checking lock files.
-        # NOTE: I'm essentially getting rid of the 'MOTOR3==ALL' argument. Just specify via params['pos'] values.
-        for idx,position in enumerate(pos):
-            with self.lock.acquire_timeout(timeout=3, job=f'move_motor{idx+1}') as acquired:
-                if not acquired:
-                    self.log.warn(f"Could not start motor {idx+1} move because lock held by {self.lock.job}")
-                    return False
-                if position == 0:
-                    print(f'not moving motor{idx+1} because position = 0')
-                    continue
-                if 'move_method' == 'by_length':
-                    self.motors.moveAxisByLength(idx+1,pos[idx],pos_is_inches,lin_stages[idx])
-                elif 'move_method' == 'by_position':
-                    self.motors.moveAxisToPosition(idx+1,pos[idx],pos_is_inches,lin_stages[idx])
-                else:
-                    raise Exception("{params['move_method']} is not a valid movement method!")
-                        
-            time.sleep(1)
-            while True:
-                ## data acquisition updates the moving field if it is running
-                if not self.take_data:
-                    with self.lock.acquire_timeout(timeout=3, job=f'move_motor{idx+1}') as acquired:
-                        if not acquired:
-                            self.log.warn(f"Could not check because lock held by {self.lock.job}")
-                            return False, "Could not acquire lock"
-                        self.move_status = self.motors.isMoving(idx+1)
-
-                if not self.move_status:
-                    break                    
-            
-        return True, "Move Complete"
-    ###################################################################
-    #                      move_motors END
-    ###################################################################    
 
     def setVelocity(self, session, params=None):
         """
@@ -343,7 +276,7 @@ class SAT1MotorsAgent:
         Runs a tab-delimited list of entries as positions from a text file.  For motor=3, the first column
         must be the x-data, and the second column the y-data.  Each position will be attained.
         xPosition and yPosition will be specified as in the file.        
-        params: {'motor': int, 'posData': .tsv file, 'posIsInches': bool}
+        params: {'motor': int, 'posData': list of positions from .tsv file - elements should be TUPlE if motors=3, 'posIsInches': bool}
         motor: 1,2,3. Determines which motor, 3 is for all motors. (default 1)
         posData: tab-delimited list of entries. first column is x-data, second column is y-data.
         posIsInches: Boolean. (default True)
@@ -419,6 +352,21 @@ class SAT1MotorsAgent:
             self.motors.closeConnection(motor)
 
         return True, "Closed connection to motor {}".format(motor)
+    
+    def reconnectMotor(self, session, params=None):
+        """
+        Reestablish a connection to a motor if connection is lost.
+        params: {'motor': int}
+        motor : 1,2,3. Determines which motor, 3 for all motors. (default 1)
+        """
+        
+        motor = params.get('motor', 1)
+        with self.lock.acquire_timeout(1, job=f"reconnectMotor_motor{motor}") as acquired:
+            if not acquired:
+                self.log.warn(f'Could not reestablish connection because lock held by {self.lock.job}')
+                return False, "Could not acquire lock"
+            self.motors.reconnectMotor(motor)            
+        return True, "Reestablished connection with motor{}".format(motor)
 
     def blockWhileMoving(self, session, params=None):
         """
@@ -546,8 +494,6 @@ class SAT1MotorsAgent:
 
         return True, "Current motor positions: {}".format(iPositions)
 
-    # NOTE: I do not understand point of this function really. 
-    # perhaps just for the user to query movement status on a whim?
     def isMoving(self, session, params = None):
         """
         Checks if motors are moving OR if limit switches are tripped.
@@ -571,7 +517,25 @@ class SAT1MotorsAgent:
             return True, ("Motors are moving.",self.move_status)
         else:
             return True, ("Motors are not moving.",self.move_status)
-
+    
+    def moveOffLimit(self, session, params = None):
+        """
+        Moves motor off limit switch if unexpectedly hit, resetting alarms.
+        
+        params: {'motor':int}
+        motor : 1,2,3. Determines which motor, 3 is for all motors. (default 3)
+        """
+        
+        motor = params.get('motor', 3)
+        with self.lock.acquire_timeout(1, job=f"moveOffLimit{motor}") as acquired:
+            if not acquired:
+                self.log.warn(f"Could not moveOffLimit because lock held by {self.lock.job}")
+                return False
+            self.motors.moveOffLimit(motor)
+            
+        return True, "Motor {} moved off limit switch".format(motor)
+        
+        
     def resetAlarms(self, session, params = None):
         """
         Resets alarm codes present. Only advised if you have checked what the alarm is first!
@@ -596,7 +560,7 @@ class SAT1MotorsAgent:
         """
         
         motor = params.get('motor', 1)
-        with self.lock.acquire_timeout(1, job=f"homeWithLimits_motor{motor}") as acquired:
+        with self.lock.acquire_timeout(30, job=f"homeWithLimits_motor{motor}") as acquired:
             if not acquired:
                 self.log.warn(f"Could not move motor{motor} to home because lock held by {self.lock.job}")
                 return False
@@ -611,10 +575,6 @@ class SAT1MotorsAgent:
         motor: 1,2,3. Determines which motor, 3 is for all motors. (default 3)
         verbose: bool. Prints output from motor requests if True (default False)
         sampling_frequency: float, sampling rate in Hz (default 2)
-        
-        ########################################
-        still need to think about this!
-        ########################################
         """
         if params is None:
             params = {}
@@ -623,7 +583,7 @@ class SAT1MotorsAgent:
         verbose = params.get('verbose',False)
         f_sample = params.get('sampling_frequency', self.sampling_frequency)
         pm = Pacemaker(f_sample, quantize=True)
-
+        
         if not self.initialized or self.motors is None:
             raise Exception("Connection to motors is not initialized")
 
@@ -636,18 +596,7 @@ class SAT1MotorsAgent:
             self.take_data = True
             last_release = time.time()
 
-# ************CODE BELOW DOES 'NOTHING', NOTHING WE WANT ANYWAYS*****************************
-
-#             mList = self.motors.genMotorList(motor)
-#             # Check that each motor in the list is valid
-#             for mot in mList:
-#                 if not mot:
-#                     print("Specified motor is invalid, removing from list")
-#                     mList.remove(mot)
-#                     continue
-
-# **********************************END******************************************************
-
+            mList = self.motors.genMotorList(motor)
             while self.take_data:
                 if time.time()-last_release > 1.:
                     if not self.lock.release_and_acquire(timeout=10):
@@ -655,50 +604,37 @@ class SAT1MotorsAgent:
                         return False, "could not re-acquire lock"
                     last_release = time.time()
                 pm.sleep()
-                
-                # Using list of initialized motors generated at the start of acq
                 data = {'timestamp':time.time(), 'block_name':'positions','data':{}}
 
-                # get immediate position for motor, one at a time
-                # this makes sure that no matter how many motors 
-                # are initialized, it appends the right number
-                mList = self.motors.genMotorList(motor)
-                
-#                 Note: if motor is moving, can't retrieve encoder info. But can always get immediate position!
                 for mot in mList:
                     mot_id = mot.propDict['motor']
                     try:
-                        self.log.warn(f"getting position/move status of motor{mot_id}")
+                        self.log.debug(f"getting position/move status of motor{mot_id}")
                         self.move_status = self.motors.isMoving(mot_id,verbose)
-                        pos = self.motors.getImmediatePosition(motor=mot_id)
+                        pos = self.motors.getPositionInInches(motor=mot_id)
                         if self.move_status:
                             data['data'][f'motor{mot_id}_encoder'] = -1
                         else:
                             ePos = self.motors.retrieveEncoderInfo(motor=mot_id)
                             data['data'][f'motor{mot_id}_encoder'] = ePos[0]
                         data['data'][f'motor{mot_id}_stepper'] = pos[0]
-                        data['data'][f'motor{mot_id}_connection'] = True
+                        data['data'][f'motor{mot_id}_connection'] = 1
 
                     except Exception as e:
-                        self.log.warn(f'error: {e}')
-                        self.log.warn(f"could not get position/move status of motor{mot_id}")
-                        data['data'][f'motor{mot_id}_stepper'] = -10000
-                        data['data'][f'motor{mot_id}_encoder'] = -10000
-                        data['data'][f'motor{mot_id}_connection'] = False
-                        continue
+                        self.log.debug(f'error: {e}')
+                        self.log.debug(f"could not get position/move status of motor{mot_id}")
+                        data['data'][f'motor{mot_id}_encoder'] = 0
+                        data['data'][f'motor{mot_id}_stepper'] = 0.0
+                        data['data'][f'motor{mot_id}_connection'] = 0
 
-                self.agent.publish_to_feed('positions',data)        
-            
+                self.agent.publish_to_feed('positions',data)
+
         return True, 'Acquisition exited cleanly.'
 
     def stop_acq(self, session, params=None):
         """
         Stop data acquisition.
         params: {}
-        
-        ########################################
-        still need to think about this!
-        ########################################
         """
 
         if self.take_data:
@@ -763,6 +699,7 @@ if __name__ == '__main__':
     agent.register_task('start_rotation', m.startRotation)
     agent.register_task('stop_rotation', m.stopRotation)
     agent.register_task('close_connect', m.closeConnection)
+    agent.register_task('reconnect_motor', m.reconnectMotor)
     agent.register_task('block_while_moving', m.blockWhileMoving)
     agent.register_task('kill_all', m.killAllCommands)
     agent.register_task('set_encoder', m.setEncoderValue)
@@ -770,6 +707,7 @@ if __name__ == '__main__':
     agent.register_task('get_position', m.getPositions)
     agent.register_task('is_moving', m.isMoving)
     agent.register_task('get_imm_position', m.posWhileMoving)
+    agent.register_task('move_off_limit', m.moveOffLimit)
     agent.register_task('reset_alarm', m.resetAlarms)
     agent.register_task('home_with_limits', m.homeWithLimits)
 
