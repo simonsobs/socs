@@ -9,13 +9,13 @@ import ast
 from scipy import signal
 import queue
 import time
-import pandas as pd
 ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 
 if not ON_RTD:
     from ocs import ocs_agent, site_config
 
 
+# Map from primary key-names to their index in the SuperTimestream
 # This will be populated when the first frame comes in
 primary_idxs = {}
 
@@ -145,9 +145,6 @@ class RollingAvg:
             self.rollover = np.roll(self.rollover, -nsamps)
             self.rollover[:, -nsamps:] = data[:, :]
 
-        print(data.shape, (summed[:, self.N:] - summed[:, :-self.N]).shape)
-
-
         return summed[:, self.N:] - summed[:, :-self.N]
 
 
@@ -176,6 +173,9 @@ class FocalplaneConfig:
         self.chan_mask = np.full(4096, -1)
 
     def config_frame(self):
+        """
+        Generates a config frame for lyrebird
+        """
         frame = core.G3Frame(core.G3FrameType.Wiring)
         frame['x'] = core.G3VectorDouble(self.xs)
         frame['y'] = core.G3VectorDouble(self.ys)
@@ -191,6 +191,46 @@ class FocalplaneConfig:
         
     def add_vis_elem(self, name, x, y, rot, value_names, eqs, eq_labels, cmaps,
                      template, abs_smurf_chan, eq_color_is_dynamic):
+        """
+        Adds a visual element to the focal-plane.
+
+        Args
+        ----
+        name : str
+            Name of the channel
+        x : float
+            x -oord of the element
+        y : float
+            y-coord of the element
+        rot : float
+            Rotation angle of the element (rads)
+        value_names : List[str]
+            List containing the names of the data values corresponding to this
+            visual element. All vis-elems must have the same number of
+            data-values. Data-values must be unique, such as
+            ``<channel_name>/rms``
+        eqs : List[str]
+            List of equations to be displayed by the visual element. Equations
+            are written in Polish Notation, and may contain a combination of
+            numbers and data-values. Data-values can be global as defined in
+            the lyrebird config file, or channel values as defined in the
+            ``value_names`` argument. There must be the same number of eqs per
+            visual element.
+        eq_labels : List[str]
+            List of strings used to label equations in the lyrebird gui. This
+            list must have the same size as the ``eqs`` array.
+        cmaps : List[str]
+            List of colormaps to use for each equation. This must be the same
+            size as the ``eqs`` array.
+        template : str
+            Template used for this vis-elem. Templates are defined in the
+            lyrebird cfg file.
+        abs_smurf_chan : int
+            Absolute smurf-channel corresponding to this visual element.
+        eq_color_is_dynamic : List[bool]
+            List of booleans that determine if each equation's color-scale is
+            dynamic or fixed. This must be the same size as the ``eqs`` array.
+        """
         self.cnames.append(name)
         self.xs.append(float(x))
         self.ys.append(float(y))
@@ -229,6 +269,7 @@ class FocalplaneConfig:
 
     @classmethod
     def from_csv(cls, csv_file, wafer_scale=1.):
+        import pandas as pd
         fp = cls()
         df = pd.read_csv(csv_file)
         cmaps = {
@@ -236,30 +277,37 @@ class FocalplaneConfig:
             150: ['blue_cmap', 'red_cmap']
         }
         templates = {
-            'A': "template_c0_p0",
-            'B': "template_c0_p1",
+            90: "template_c0_p0",
+            150: "template_c1_p0",
         }
 
         for i, row in df.iterrows():
+            rot = 0
             try:
                 bandpass = int(row['bandpass'])
-                template = templates[row['pol']]
+                template = templates[bandpass]
+                if row['pol'].strip() == 'B':
+                    rot = np.pi / 2
+
             except ValueError:
                 continue
-            abs_chan = row['smurf_band'] * 512 + row['smurf_channel']
             x, y = row['det_x'] * wafer_scale, row['det_y'] * wafer_scale
 
             name = f"det_{i}"
             eqs = [f'{name}/raw', f'* {name}/rms rms_scale']
+            value_names = [f'{name}/raw', f'{name}/rms']
+            eq_labels = ['raw', 'rms']
 
-            fp.add_vis_elem(
-                name, x, y, 0, cmaps[bandpass], eqs, template, abs_chan
-            )
+            fp.add_vis_elem(name, x, y, rot, value_names, eqs, eq_labels,
+                            cmaps[bandpass], template, i, [True, False])
 
         return fp
 
 
 class MagpieAgent:
+    """
+    Agent for processing streamed G3Frames, and sending data to lyrebird.
+    """
     mask_register = 'AMCc.SmurfProcessor.ChannelMapper.Mask'
 
     def __init__(self, agent, args):
@@ -278,8 +326,12 @@ class MagpieAgent:
                 self.fp = FocalplaneConfig.from_csv(
                     args.csv_file, wafer_scale=args.wafer_scale
                 )
+            else:
+                raise ValueError("CSV file must be set using the csv-file arg if "
+                                 "using wafer layout")
 
-        self.sent_cfg = False
+        self.send_config_flag = True
+
         self.num_dets = self.fp.num_dets
         self.mask = np.arange(4096)
 
@@ -289,11 +341,7 @@ class MagpieAgent:
         )
 
         self.out_queue = queue.Queue()
-        self.delay = 0
-
-        self.lowpass = FIRFilter.butter_lowpass(
-            self.target_rate, self.target_rate * 2 + 1, order=4)
-        self.send_config_flag = True
+        self.delay = 5
 
         self.avg1, self.avg2 = None, None
 
@@ -312,7 +360,8 @@ class MagpieAgent:
 
     def process_status(self, frame):
         """
-        Processes a status frame.
+        Processes a status frame. This will set or update the channel
+        mask whenever the smurf metadata is updated.
         """
         if 'session_id' not in frame:
             return
@@ -357,14 +406,13 @@ class MagpieAgent:
         sample_idxs = np.arange(0, nsamps, ds_factor, dtype=np.int32)
         num_frames = len(sample_idxs)
 
-        data_out = np.zeros((num_frames, np.max(self.fp.chan_mask)+1))
-        rms_out = np.zeros((num_frames, np.max(self.fp.chan_mask)+1))
         times_out = times_in[sample_idxs]
 
         abs_chans = self.mask[np.arange(nchans)]
-        data_idxs = np.full(2*nchans, -1)
-        raw_out = np.zeros((num_frames, np.max(self.fp.chan_mask)))
-        rms_out = np.zeros((num_frames, np.max(self.fp.chan_mask)))
+
+        raw_out = np.zeros((num_frames, self.fp.num_dets))
+        rms_out = np.zeros((num_frames, self.fp.num_dets))
+
         for i, c in enumerate(abs_chans):
             if c >= len(self.fp.chan_mask):
                 continue
@@ -389,10 +437,15 @@ class MagpieAgent:
         return out
 
 
-    def process(self, session, params=None):
+    def listen(self, session, params=None):
+        """
+        Process operation. This processes incoming G3Frames, processes them,
+        and adds the outgoing frames to a queue to be sent to lyrebird using
+        the ``send`` process.
+        """
+
         self._running = True
         session.set_status('running')
-
         while self._running:
             if self.send_config_flag:
                 self.sender.Process(self.fp.config_frame())
@@ -410,17 +463,69 @@ class MagpieAgent:
                 self.out_queue.put(f)
         return True, "Stopped run process"
 
-    def _process_stop(self, session, params=None):
+    def _listen_stop(self, session, params=None):
         self._running = False
         return True, "Stopping run process"
 
+
+    def stream_file(self, session, params=None):
+        
+
+
+
+    def stream_fake_data(self, session, params=None):
+        """
+
+        """
+        self._run_fake_stream = True
+        ndets = self.fp.num_dets
+        chans = np.arange(ndets)
+        while self._run_fake_stream:
+            if self.send_config_flag:
+                self.sender.Process(self.fp.config_frame())
+                self.send_config_flag = False
+            frame_start = time.time()
+            time.sleep(2)
+            frame_stop = time.time()
+            ts = np.arange(frame_start, frame_stop, 1./self.target_rate)
+            nframes = len(ts)
+
+            data_out = np.random.normal(0, 1, (nframes, ndets))
+            data_out += np.sin(2*np.pi*ts[:, None] + .2 * chans[None, :])
+
+            for t, d in zip(ts, data_out):
+                fr = core.G3Frame(core.G3FrameType.Scan)
+                fr['idx'] = 0
+                fr['data'] = core.G3VectorDouble(d)
+                fr['timestamp'] = core.G3Time(t * core.G3Units.s)
+                self.out_queue.put(fr)
+
+                fr = core.G3Frame(core.G3FrameType.Scan)
+                fr['idx'] = 1
+                fr['data'] = core.G3VectorDouble(np.sin(d))
+                fr['timestamp'] = core.G3Time(t * core.G3Units.s)
+                self.out_queue.put(fr)
+
+        return True, "Stopped fake stream process"
+
+
+    def _stop_stream_fake_data(self, session, params=None):
+        self._run_fake_stream = False
+        return True, "Stopping fake stream process"
+
+
     def send(self, session, params=None):
+        """
+        Process for sending outgoing G3Frames. This will query the out_queue
+        for frames to be sent to lyrebird. This will try to regulate how fast
+        it sends frames such that the delay between when the frames are sent,
+        and the timestamp of the frames are fixed.
+        """
         self._send_running = True
         session.set_status('running')
 
         first_frame_time = None
         stream_start_time = None
-        self.delay = 5
         while self._send_running:
             f = self.out_queue.get(block=True)
             t = f['timestamp'].time / core.G3Units.s
@@ -461,6 +566,9 @@ def make_parser(parser=None):
     parser.add_argument('--wafer-scale', '--ws', type=float, default=50.,
                         help="scale of wafer coordinates")
     parser.add_argument('--csv-file', type=str, help="Detmap CSV file")
+    parser.add_argument('--fake-data', action='store_true',
+                        help="If set, will stream fake data instead of listening to "
+                             "a G3 stream.")
     return parser
 
 
@@ -473,7 +581,10 @@ if __name__ == '__main__':
     agent, runner = ocs_agent.init_site_agent(args)
     magpie = MagpieAgent(agent, args)
 
-    agent.register_process('process', magpie.process, magpie._process_stop, startup=True)
+    agent.register_process('listen', magpie.listen, magpie._listen_stop,
+                           startup=(not args.fake_data))
+    agent.register_process('stream_fake_data', magpie.stream_fake_data, 
+                           magpie._stop_stream_fake_data, startup=args.fake_data)
     agent.register_process('send', magpie.send, magpie._send_stop, startup=True)
     agent.register_task('set_target_rate', magpie.set_target_rate)
 

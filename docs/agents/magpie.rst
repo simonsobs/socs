@@ -6,10 +6,6 @@
 Magpie Agent
 ===============
 
-.. image:: ../_static/images/magpie.jpeg
-  :width: 400
-  :alt: Alternative text
-
 The magpie is an incredibly intelligent bird, with a decent ability to mimic
 other bird calls, though not as good as `the superb lyrebird
 <https://www.youtube.com/watch?v=mSB71jNq-yQ>`_. In the context of OCS, the job
