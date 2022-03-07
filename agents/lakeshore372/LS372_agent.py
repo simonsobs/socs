@@ -987,33 +987,25 @@ class LS372_Agent:
     def input_configfile(self, session, params):
         """ things to say here 
         """
-        with self._lock.acquire_timeout(job='input_configfile') as acquired:
-            if not acquired:
-                self.log.warn(f"Could not start Task because "
-                              f"{self._lock.job} is already running")
-                return False, "Could not acquire lock"
-
-            configfile = params['configfile']
-            with open(configfile) as f:
-                config = yaml.safe_load(f)
+        configfile = params['configfile']
+        with open(configfile) as f:
+            config = yaml.safe_load(f)
         
-            lakeshoreID = self.module.id # this is the resp from LS372.get_id();  
-            print('self.module.id: ', lakeshoreID) #TODO: get rid of 
-            lakeshoreID = lakeshoreID.split(',')
-            lakeshore_serialnum = lakeshoreID[2]
+        lakeshoreID = self.module.id # resp from LS372.get_id();  
+        print('self.module.id: ', lakeshoreID) #TODO: get rid of 
+        lakeshoreID = lakeshoreID.split(',')
+        lakeshore_serialnum = lakeshoreID[2]
 
-            #would be good to assert instance id in config file is the 372 serial number  
+        #would be good to assert instance id in config file is the 372 serial number  
        
-            # only changing dwell for now as a quick check
-            for i in config[lakeshore_serialnum]['channel']:
-                lschann = Channel(self.module, i) 
+        # only changing dwell for now as a quick check
+        for i in config[lakeshore_serialnum]['channel']:
+            lschann = Channel(self.module, i) 
 
-                dwell = config[lakeshore_serialnum]['channel'][i]['dwell']
-                lschann.set_dwell(dwell)
+            dwell = config[lakeshore_serialnum]['channel'][i]['dwell']
+            lschann.set_dwell(dwell)
             
-                time.sleep(0.061)
-
-            session.set_status('running')
+            time.sleep(0.061)
 
         return True, "Configurations uploaded from {}".format(configfile)
 
