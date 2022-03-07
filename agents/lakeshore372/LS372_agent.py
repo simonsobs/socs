@@ -8,7 +8,7 @@ import threading
 from contextlib import contextmanager
 from twisted.internet import reactor
 
-from socs.Lakeshore.Lakeshore372 import LS372
+from socs.Lakeshore.Lakeshore372 import LS372, Channel
 
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock, Pacemaker
@@ -145,6 +145,7 @@ class LS372_Agent:
     @ocs_agent.param('auto_acquire', default=False, type=bool)
     @ocs_agent.param('acq_params', type=dict, default=None)
     @ocs_agent.param('force', default=False, type=bool)
+    @ocs_agent.param('configfile', type=str)
     def init_lakeshore(self, session, params=None):
         """init_lakeshore(auto_acquire=False, acq_params=None, force=False)
 
@@ -157,6 +158,7 @@ class LS372_Agent:
                 auto_acquire is True.
             force (bool, optional): Force initialization, even if already
                 initialized. Defaults to False.
+            FIX: configfile
 
         """
         if params is None:
@@ -200,6 +202,10 @@ class LS372_Agent:
                 session.add_message("Lakeshore initilized with ID: %s"%self.module.id)
 
                 self.thermometers = [channel.name for channel in self.module.channels]
+
+                configfile = params['configfile'] 
+                self.input_configfile(configfile)
+                session.add_message("Lakeshore initial configurations uploaded using: %s"%configfile)
 
             self.initialized = True
 
@@ -977,6 +983,42 @@ class LS372_Agent:
 
         return True, "Current still output is {}".format(still_output)
 
+    @ocs_agent.param('configfile', type=str) 
+    def input_configfile(self, session, params):
+        """ things to say here 
+        """
+        with self._lock.acquire_timeout(job='input_configfile') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            configfile = params['configfile']
+            with open(configfile) as f:
+                config = yaml.safe_load(f)
+        
+            lakeshoreID = self.module.id # this is the resp from LS372.get_id();  
+            print('self.module.id: ', lakeshoreID) #TODO: get rid of 
+            lakeshoreID = lakeshoreID.split(',')
+            lakeshore_serialnum = lakeshoreID[2]
+
+            #would be good to assert instance id in config file is the 372 serial number  
+       
+            # only changing dwell for now as a quick check
+            for i in config[lakeshore_serialnum]['channel']:
+                lschann = Channel(self.module, i) 
+
+                dwell = config[lakeshore_serialnum]['channel'][i]['dwell']
+                lschann.set_dwell(dwell)
+            
+                time.sleep(0.061)
+
+            session.set_status('running')
+
+        return True, "Configurations uploaded from {}".format(configfile)
+
+
+
 def make_parser(parser=None):
     """Build the argument parser for the Agent. Allows sphinx to automatically
     build documentation based on this function.
@@ -1007,6 +1049,8 @@ def make_parser(parser=None):
                         help='Record sample heater output during acquisition.')
     pgroup.add_argument('--enable-control-chan', action='store_true',
                         help='Enable reading of the control input each acq cycle')
+    #config file
+    pgroup.add_argument('--configfile', type=str, help='Yaml file for initializing 372 settings')
 
     return parser
 
@@ -1020,6 +1064,7 @@ if __name__ == '__main__':
 
     parser = make_parser()
     args = site_config.parse_args(agent_class='Lakeshore372Agent', parser=parser)
+    print('args: ', args)
 
     # Automatically acquire data if requested (default)
     init_params = False
@@ -1035,7 +1080,7 @@ if __name__ == '__main__':
 
     agent, runner = ocs_agent.init_site_agent(args)
 
-    lake_agent = LS372_Agent(agent, args.serial_number, args.ip_address,
+    lake_agent = LS372_Agent(agent, args.serial_number, args.ip_address, 
                              fake_data=args.fake_data,
                              dwell_time_delay=args.dwell_time_delay,
                              enable_control_chan=args.enable_control_chan)
