@@ -1,15 +1,17 @@
-import os
 import argparse
+import os
 import time
-import txaio
+
 import numpy as np
+import txaio
 import yaml
 
-ON_RTD = os.environ.get('READTHEDOCS') == 'True'
+ON_RTD = os.environ.get("READTHEDOCS") == "True"
 if not ON_RTD:
-    from ocs import ocs_agent, site_config
-    from ocs.ocs_twisted import TimeoutLock, Pacemaker
     from holog_daq import synth3
+    from ocs import ocs_agent, site_config
+    from ocs.ocs_twisted import Pacemaker, TimeoutLock
+
 
 class SynthAgent:
     """
@@ -18,8 +20,8 @@ class SynthAgent:
     Args: 
     """
 
-    def __init__( self, agent ,config_file):
-        
+    def __init__(self, agent, config_file):
+
         self.lo_id = None
         self.initialized = False
         self.take_data = False
@@ -27,7 +29,7 @@ class SynthAgent:
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
-        
+
         """
         if mode == 'acq':
             self.auto_acq = True
@@ -45,21 +47,18 @@ class SynthAgent:
                                  agg_params = agg_params,
                                  buffer_time = 0)
         """
-        if config_file == 'None':
-            raise Exception(
-                "No config file specified for the FTS mirror config")
+        if config_file == "None":
+            raise Exception("No config file specified for the FTS mirror config")
         else:
-            config_file_path = os.path.join(os.environ['OCS_CONFIG_DIR'],
-                                            config_file)
+            config_file_path = os.path.join(os.environ["OCS_CONFIG_DIR"], config_file)
             print(config_file_path)
             with open(config_file_path) as stream:
                 self.holog_configs = yaml.safe_load(stream)
                 if self.holog_configs is None:
-                    raise Exception( "No mirror configs in config file.")
-                self.log.info(
-                    f"Loaded mirror configs from file {config_file_path}")
-                self.N_MULT = self.holog_configs.pop('N_MULT', None)
-                self.ghz_to_mhz = self.holog_configs.pop('ghz_to_mhz', None)
+                    raise Exception("No mirror configs in config file.")
+                self.log.info(f"Loaded mirror configs from file {config_file_path}")
+                self.N_MULT = self.holog_configs.pop("N_MULT", None)
+                self.ghz_to_mhz = self.holog_configs.pop("ghz_to_mhz", None)
 
     def init_synth(self, session, params=None):
         """init_synth(params=None)
@@ -74,25 +73,29 @@ class SynthAgent:
             params = {}
 
         self.log.debug("Trying to acquire lock")
-        with self.lock.acquire_timeout(timeout=0, job='init') as acquired:
+        with self.lock.acquire_timeout(timeout=0, job="init") as acquired:
             # Locking mechanism stops code from proceeding if no lock acquired
             if not acquired:
-                self.log.warn("Could not start init because {} is already running".format(self.lock.job))
+                self.log.warn(
+                    "Could not start init because {} is already running".format(
+                        self.lock.job
+                    )
+                )
                 return False, "Could not acquire lock."
             # Run the function you want to run
             self.log.debug("Lock Acquired Connecting to Stages")
-            
+
             self.lo_id = synth3.get_LOs()
             print(self.lo_id)
             synth3.set_RF_output(0, 1, self.lo_id)
             synth3.set_RF_output(1, 1, self.lo_id)
-            
+
         # This part is for the record and to allow future calls to proceed,
         # so does not require the lock
         self.initialized = True
-        #if self.auto_acq:
+        # if self.auto_acq:
         #    self.agent.start('acq')
-        return True, 'Synth Initialized.'
+        return True, "Synth Initialized."
 
     def set_frequencies(self, session, params):
         """
@@ -101,19 +104,21 @@ class SynthAgent:
                    'freq1': float}
         """
 
-        f0 = params.get('freq0', 0)
-        f1 = params.get('freq1', 0)
+        f0 = params.get("freq0", 0)
+        f1 = params.get("freq1", 0)
 
-        F_0 = int(f0*self.ghz_to_mhz/self.N_MULT)
-        F_1 = int(f1*self.ghz_to_mhz/self.N_MULT)
-        
+        F_0 = int(f0 * self.ghz_to_mhz / self.N_MULT)
+        F_1 = int(f1 * self.ghz_to_mhz / self.N_MULT)
+
         print(F_1)
 
-        with self.lock.acquire_timeout(timeout=3, job='set_frqeuencies') as acquired:
+        with self.lock.acquire_timeout(timeout=3, job="set_frqeuencies") as acquired:
             if not acquired:
-                self.log.warn(f"Could not set position because lock held by {self.lock.job}")
+                self.log.warn(
+                    f"Could not set position because lock held by {self.lock.job}"
+                )
                 return False, "Could not acquire lock"
-                        
+
             synth3.set_f(0, F_0, self.lo_id)
             synth3.set_f(1, F_1, self.lo_id)
 
@@ -126,14 +131,16 @@ class SynthAgent:
                    'freq1': float}
         """
 
-        with self.lock.acquire_timeout(timeout=3, job='read_frqeuencies') as acquired:
+        with self.lock.acquire_timeout(timeout=3, job="read_frqeuencies") as acquired:
             if not acquired:
-                self.log.warn(f"Could not set position because lock held by {self.lock.job}")
+                self.log.warn(
+                    f"Could not set position because lock held by {self.lock.job}"
+                )
                 return False, "Could not acquire lock"
 
         return True, "Frequencies Updated"
 
-    
+
 def make_parser(parser=None):
     """Build the argument parser for the Agent. Allows sphinx to automatically
     build documentation based on this function.
@@ -142,13 +149,13 @@ def make_parser(parser=None):
         parser = argparse.ArgumentParser()
 
     # Add options specific to this agent.
-    pgroup = parser.add_argument_group('Agent Options')
-    pgroup.add_argument('--config_file')
+    pgroup = parser.add_argument_group("Agent Options")
+    pgroup.add_argument("--config_file")
 
     return parser
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # For logging
     txaio.use_twisted()
     LOG = txaio.make_logger()
@@ -159,14 +166,14 @@ if __name__ == '__main__':
     parser = make_parser()
 
     # Interpret options in the context of site_config.
-    args = site_config.parse_args(agent_class = 'SynthAgent', parser=parser)
-   
+    args = site_config.parse_args(agent_class="SynthAgent", parser=parser)
+
     agent, runner = ocs_agent.init_site_agent(args)
 
-    synth_agent = SynthAgent(agent,args.config_file)
+    synth_agent = SynthAgent(agent, args.config_file)
 
-    agent.register_task('init_synth', synth_agent.init_synth)
-    agent.register_task('set_frequencies', synth_agent.set_frequencies)
-    agent.register_task('read_frequencies', synth_agent.read_frequencies)
+    agent.register_task("init_synth", synth_agent.init_synth)
+    agent.register_task("set_frequencies", synth_agent.set_frequencies)
+    agent.register_task("read_frequencies", synth_agent.read_frequencies)
 
     runner.run(agent, auto_reconnect=True)
