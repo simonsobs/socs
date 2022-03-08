@@ -77,13 +77,6 @@ class FPGAAgent:
                 #                     "in the mirror configuration keys")
 
     def init_FPGA(self, session, params=None):
-        """init_synth(params=None)
-        Perform first time setup for communication with Synth.
-
-        Args:
-            params (dict): Parameters dictionary for passing parameters to
-                task.
-        """
 
         if params is None:
             params = {}
@@ -144,11 +137,11 @@ class FPGAAgent:
             amp_AB = np.power(arr_AB[int(n_channels/2)], 1)
             amp_P = np.remainder(arr_P[int(n_channels/2)],360.)
 
-
             data['data']['amp_AA'] = amp_AA
             data['data']['amp_BB'] = amp_BB
             data['data']['amp_AB'] = amp_AB
             data['data']['amp_P'] = amp_P
+            print(data['data']['amp_AA'])
 
             self.agent.publish_to_feed('fpga',data)
             session.data.update( data['data'] )
