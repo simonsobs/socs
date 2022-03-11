@@ -245,20 +245,41 @@ class FocalplaneConfig:
         self.num_dets += 1
 
     @classmethod
-    def grid(cls, xdim, ydim, ygap=0):
+    def grid(cls, stream_id, xdim, ydim, ygap=0, offset=(0., 0.)):
+        """
+        Creates a FocalplaneConfig object for a grid of channels.
+
+        Args
+        ----
+        stream_id : str
+            Stream-id for the magpie agent. This will be prepended to all
+            lyrebird data-val names.
+        xdim : int
+            Number of channels in the x-dim of the grid
+        ydim : int
+            Number of channels in the y-dim of the grid
+        ygap : int
+            A small gap will be added every ``ygap`` rows, to better organize
+            channels.
+        offset : Tuple(float, float)
+            Global offset of the grid with respect to the lyrebird
+            coordinate-system
+        """
         fp = cls()
         xs, ys = np.arange(xdim), np.arange(ydim)
+        xs = xs + offset[0]
+        ys = ys + offset[1]
 
         # Adds gaps every ygap rows
         if ygap > 0:
-            ys = ys + 0.5 * ys // ygap
+            ys = ys + .5 * (ys // ygap)
 
         template = 'box'
         cmaps = ['red_cmap', 'blue_cmap']
         eq_color_is_dynamic = [True, False]
         for i in range(xdim * ydim):
             x, y = xs[i % xdim], ys[i // xdim]
-            name = f"channel_{i}"
+            name = f"{stream_id}/channel_{i}"
             value_names = [f'{name}/raw', f'{name}/rms']
             eqs = [f'{name}/raw', f'* {name}/rms rms_scale']
             eq_labels = ['raw', 'rms']
@@ -268,7 +289,26 @@ class FocalplaneConfig:
         return fp
 
     @classmethod
-    def from_csv(cls, csv_file, wafer_scale=1.):
+    def from_csv(cls, stream_id, csv_file, wafer_scale=1., offset=(0, 0)):
+        """
+        Creatse a FocalplaneConfig object from a detmap csv file.
+
+        Args
+        -----
+        stream_id : str
+            Stream-id for the magpie agent. This will be prepended to all
+            lyrebird data-val names.
+        csv_file : str
+            Path to detmap csv file.
+        wafer_scale : int
+            Scalar to multiply against det x and y positions when translating
+            to lyrebird positions. Defaults to 1, meaning that the lyrebird
+            coordinate system will be the same as the det-map coordinate system,
+            so x and y will be in um.
+        offset : Tuple(float, float)
+            Global offset of the grid with respect to the lyrebird
+            coordinate-system. If wafer_scale is 1, this should be in um.
+        """
         import pandas as pd
         fp = cls()
         df = pd.read_csv(csv_file)
@@ -290,10 +330,13 @@ class FocalplaneConfig:
                     rot = np.pi / 2
 
             except ValueError:
+                # Just skip detctors with unknown bandpass
                 continue
             x, y = row['det_x'] * wafer_scale, row['det_y'] * wafer_scale
+            x += offset[0]
+            y += offset[1]
 
-            name = f"det_{i}"
+            name = f"{stream_id}/det_{i}"
             eqs = [f'{name}/raw', f'* {name}/rms rms_scale']
             value_names = [f'{name}/raw', f'{name}/rms']
             eq_labels = ['raw', 'rms']
@@ -307,6 +350,31 @@ class FocalplaneConfig:
 class MagpieAgent:
     """
     Agent for processing streamed G3Frames, and sending data to lyrebird.
+
+    Attributes
+    -----------
+    target_rate : float
+        This is the target sample rate of data to be sent to lyrebird.
+        Incoming data will be downsampled to this rate before being sent out.
+    fp : FocalplaneConfig
+        This is the FocalplaneConfig object that contains info about what
+        channels are present in the focal-plane representation, and their
+        positions.
+    mask : np.ndarray
+        This is a channel mask that maps readout channel to
+        absolute-smurf-chan. Before a status frame containing the ChannelMask
+        is seen in the G3Stream, this defaults to being an identity mapping
+        which just sends the readout channel no. to itself. Once a status
+        frame with the channel mask is seen, this will be updated
+    out_queue : Queue
+        This is a queue containing outgoing G3Frames to be sent to lyrebird.
+    delay : float
+        The outgoing stream will attempt to enforce this delay between the
+        relative timestamps in the G3Frames and the real time to ensure a
+        smooth flow of data. This must be greater than the frame-aggregation
+        time of the SmurfStreamer or else lyrebird will update data in spurts.
+    avg1, avg2 : RollingAvg
+        Two Rolling Averagers which are used to calculate the rolling RMS data.
     """
     mask_register = 'AMCc.SmurfProcessor.ChannelMapper.Mask'
 
@@ -319,33 +387,26 @@ class MagpieAgent:
         layout = args.layout.lower()
         if layout == 'grid':
             self.fp = FocalplaneConfig.grid(
-                args.xdim, args.ydim, ygap=8
+                args.stream_id, args.xdim, args.ydim, ygap=8, offset=args.offset
             )
         elif layout == 'wafer':
             if args.csv_file is not None:
                 self.fp = FocalplaneConfig.from_csv(
-                    args.csv_file, wafer_scale=args.wafer_scale
+                    args.stream_id, args.csv_file, wafer_scale=args.wafer_scale, offset=args.offset
                 )
             else:
                 raise ValueError("CSV file must be set using the csv-file arg if "
                                  "using wafer layout")
 
-        self.send_config_flag = True
-
-        self.num_dets = self.fp.num_dets
         self.mask = np.arange(4096)
-
-        self.reader = core.G3Reader(args.src)
-        self.sender = core.G3NetworkSender(
-            hostname='*', port=args.dest, max_queue_size=1000
-        )
-
-        self.out_queue = queue.Queue()
-        self.delay = 5
+        self.out_queue = queue.Queue(1000)
+        self.delay = args.delay
 
         self.avg1, self.avg2 = None, None
 
-    def set_target_rate(self, session, params=None):
+
+    @ocs_agent.param('target_rate', type=float)
+    def set_target_rate(self, session, params):
         """
         Sets the target downsampled sample-rate of the data sent to lyrebird
 
@@ -353,10 +414,22 @@ class MagpieAgent:
             target_rate : float
                 Target sample rate for lyrebird (Hz)
         """
-        if params is None:
-            params = {}
         self.target_rate = params['target_rate']
         return True, f'Set target rate to {self.target_rate}'
+
+
+    @ocs_agent.param('delay', type=float)
+    def set_delay(self, session, params):
+        """
+        Sets the target downsampled sample-rate of the data sent to lyrebird
+
+        Args:
+            target_rate : float
+                Target sample rate for lyrebird (Hz)
+        """
+        self.delay = params['delay']
+        return True, f'Set delay param to {self.delay}'
+
 
     def process_status(self, frame):
         """
@@ -437,21 +510,37 @@ class MagpieAgent:
         return out
 
 
-    def listen(self, session, params=None):
-        """
-        Process operation. This processes incoming G3Frames, processes them,
-        and adds the outgoing frames to a queue to be sent to lyrebird using
-        the ``send`` process.
+    def read(self, session, params=None):
+        """read(src='tcp://localhost:4532')
+
+        **Process** - Process for reading in G3Frames from a source or list of
+        sources. If this source is an address that begins with ``tcp://``, the
+        agent will attempt to connect to a G3NetworkSender at the specified
+        location. The ``src`` param can also be a filepath or list of filepaths
+        pointing to G3Files to be streamed. If a list of filenames is passed,
+        once the first file is finished streaming, subsequent files will be
+        streamed.
         """
 
         self._running = True
         session.set_status('running')
-        while self._running:
-            if self.send_config_flag:
-                self.sender.Process(self.fp.config_frame())
-                self.send_config_flag = False
 
-            frame = self.reader.Process(None)[0]
+        src_idx = 0 
+        if isinstance(params['src'], str):
+            sources = [params['src']]
+        else:
+            sources = params['src']
+
+        reader = core.G3Reader(sources[src_idx])
+        while self._running:
+            frames = reader.Process(None)
+            if not frames:
+                src_idx += 1
+                # Rotate files if no more frames
+                reader = core.G3Reader(sources[src_idx])
+                frames = reader.Process(None)
+
+            frame = frames[0]
             if frame.type == core.G3FrameType.Wiring:
                 self.process_status(frame)
                 continue
@@ -459,35 +548,34 @@ class MagpieAgent:
                 out = self.process_data(frame)
             else:
                 continue
+
             for f in out:
+                # This will block until there's a free spot in the queue.
+                # This is useful if the src is a file and reader.Process does
+                # not block
                 self.out_queue.put(f)
-        return True, "Stopped run process"
+        return True, "Stopped read process"
 
-    def _listen_stop(self, session, params=None):
+    def _stop_read(self, session, params=None):
         self._running = False
-        return True, "Stopping run process"
-
-
-    def stream_file(self, session, params=None):
-        
-
+        return True, "Stopping read process"
 
 
     def stream_fake_data(self, session, params=None):
-        """
+        """stream_fake_data()
 
+        **Process** - Process for streaming fake data. This will queue up
+        G3Frames full of fake data to be sent to lyrebird.
         """
         self._run_fake_stream = True
         ndets = self.fp.num_dets
         chans = np.arange(ndets)
+        frame_start = time.time()
         while self._run_fake_stream:
-            if self.send_config_flag:
-                self.sender.Process(self.fp.config_frame())
-                self.send_config_flag = False
-            frame_start = time.time()
             time.sleep(2)
             frame_stop = time.time()
             ts = np.arange(frame_start, frame_stop, 1./self.target_rate)
+            frame_start = frame_stop
             nframes = len(ts)
 
             data_out = np.random.normal(0, 1, (nframes, ndets))
@@ -514,18 +602,26 @@ class MagpieAgent:
         return True, "Stopping fake stream process"
 
 
+    @ocs_agent.param('dest', type=int)
     def send(self, session, params=None):
         """
-        Process for sending outgoing G3Frames. This will query the out_queue
-        for frames to be sent to lyrebird. This will try to regulate how fast
-        it sends frames such that the delay between when the frames are sent,
-        and the timestamp of the frames are fixed.
+        **Process** - Process for sending outgoing G3Frames. This will query
+        the out_queue for frames to be sent to lyrebird. This will try to
+        regulate how fast it sends frames such that the delay between when the
+        frames are sent, and the timestamp of the frames are fixed.
+
         """
         self._send_running = True
         session.set_status('running')
 
         first_frame_time = None
         stream_start_time = None
+
+        sender = core.G3NetworkSender(
+            hostname='*', port=params['dest'], max_queue_size=1000
+        )
+
+        sender.Process(self.fp.config_frame())
         while self._send_running:
             f = self.out_queue.get(block=True)
             t = f['timestamp'].time / core.G3Units.s
@@ -537,38 +633,49 @@ class MagpieAgent:
             this_frame_time = stream_start_time + (t - first_frame_time) + self.delay
             if this_frame_time > now:
                 time.sleep(this_frame_time - now)
-            self.sender.Process(f)
+            sender.Process(f)
 
         return True, "Stopped send process"
-
 
     def _send_stop(self, session, params=None):
         self._send_running = False
         return True, "Stopping send process"
 
 
-
 def make_parser(parser=None):
     if parser is None:
         parser = argparse.ArgumentParser()
 
-    parser.add_argument('--src', default='tcp://localhost:4532',
+    parser.add_argument('--src', nargs='+', default='tcp://localhost:4532',
                         help="Address of incoming G3Frames.")
     parser.add_argument('--dest', type=int, default=8675,
                         help="Port to server lyrebird frames")
-    parser.add_argument('--target-rate', '-t', type=float, default=200)
+    parser.add_argument('--stream-id', type=str, default='none',
+                        help="Stream-id to use to distinguish magpie streams."
+                             "This will be prepended to data-val names in lyrebird.")
+    parser.add_argument('--target-rate', '-t', type=float, default=20)
+    parser.add_argument(
+        '--delay', type=float, default=5,
+        help="Delay (sec) between the timestamp of a G3Frame relative to the "
+             "initial frame, and when the frame should be sent to lyrebird. "
+             "This must be larger than the frame-aggregation time for smooth "
+             "update times in lyrebird."
+    )
     parser.add_argument('--layout', '-l', default='grid', choices=['grid', 'wafer'],
                         help="Focal plane layout style")
     parser.add_argument('--xdim', type=int, default=64,
-                        help="Number of pixesl in x-dimension for grid layout")
+                        help="Number of pixels in x-dimension for grid layout")
     parser.add_argument('--ydim', type=int, default=64,
-                        help="Number of pixesl in y-dimension for grid layout")
+                        help="Number of pixels in y-dimension for grid layout")
     parser.add_argument('--wafer-scale', '--ws', type=float, default=50.,
                         help="scale of wafer coordinates")
     parser.add_argument('--csv-file', type=str, help="Detmap CSV file")
     parser.add_argument('--fake-data', action='store_true',
                         help="If set, will stream fake data instead of listening to "
-                             "a G3 stream.")
+                             "a G3stream.")
+    parser.add_argument('--offset', nargs=2, default=[0, 0], type=float,
+                        help="Offset of detector coordinates with respect to "
+                             "lyrebird coordinate system")
     return parser
 
 
@@ -581,11 +688,18 @@ if __name__ == '__main__':
     agent, runner = ocs_agent.init_site_agent(args)
     magpie = MagpieAgent(agent, args)
 
-    agent.register_process('listen', magpie.listen, magpie._listen_stop,
-                           startup=(not args.fake_data))
+    if args.fake_data:
+        read_startup = False
+    else:
+        read_startup = {'src': args.src}
+
+    agent.register_process('read', magpie.read, magpie._stop_read,
+                           startup=read_startup)
     agent.register_process('stream_fake_data', magpie.stream_fake_data, 
                            magpie._stop_stream_fake_data, startup=args.fake_data)
-    agent.register_process('send', magpie.send, magpie._send_stop, startup=True)
+    agent.register_process('send', magpie.send, magpie._send_stop,
+                           startup={'dest': args.dest})
     agent.register_task('set_target_rate', magpie.set_target_rate)
+    agent.register_task('set_delay', magpie.set_delay)
 
     runner.run(agent, auto_reconnect=True)
