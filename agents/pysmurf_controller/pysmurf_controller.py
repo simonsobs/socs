@@ -5,6 +5,9 @@ from twisted.internet.defer import inlineCallbacks, Deferred
 from autobahn.twisted.util import sleep as dsleep
 from twisted.logger import Logger, FileLogObserver
 
+import sodetlib as sdl
+from sodetlib.det_config import DetConfig
+
 import sys
 from typing import Optional
 import time
@@ -86,7 +89,7 @@ class PysmurfController:
             txaio logger object created by agent
         prot (PysmurfScriptProtocol):
             protocol used to call and monitor external pysmurf scripts
-        protocol_lock (ocs.ocs_twisted.TimeoutLock):
+        lock (ocs.ocs_twisted.TimeoutLock):
             lock to protect multiple pysmurf scripts from running simultaneously.
     """
     def __init__(self, agent, args):
@@ -94,9 +97,13 @@ class PysmurfController:
         self.log = agent.log
 
         self.prot = None
-        self.protocol_lock = TimeoutLock()
+        self.lock = TimeoutLock()
 
         self.current_session = None
+
+        self.slot = args.slot
+        if self.slot is None:
+            self.slot = os.environ['SLOT']
 
         if args.monitor_id is not None:
             self.agent.subscribe_on_start(
@@ -119,6 +126,16 @@ class PysmurfController:
                     if isinstance(data['payload'], str):
                         self.current_session.add_message(data['payload'])
 
+    def _get_smurf_control(self):
+        """
+        Gets pysmurf and detconfig instances for sodetlib functions.
+        """
+        cfg = DetConfig()
+        cfg.load_config_files(slot=self.slot)
+        S = cfg.get_smurf_control()
+        return S, cfg
+
+
     @inlineCallbacks
     def _run_script(self, script, args, log, session):
         """
@@ -136,10 +153,10 @@ class PysmurfController:
                 or False to not log at all.
         """
 
-        with self.protocol_lock.acquire_timeout(0, job=script) as acquired:
+        with self.lock.acquire_timeout(0, job=script) as acquired:
             if not acquired:
                 return False, "The requested script cannot be run because " \
-                              "script {} is already running".format(self.protocol_lock.job)
+                              "script {} is already running".format(self.lock.job)
 
             self.current_session = session
             try:
@@ -233,34 +250,162 @@ class PysmurfController:
         self.prot.transport.signalProcess('KILL')
         return True, "Aborting process"
 
-    @inlineCallbacks
-    def tune_squids(self, session, params=None):
-        """tune_squids(args=[], log=True)
+    @ocs_agent.param("duration", default=None, type=float)
+    def stream(self, session, params):
+        """stream(duration=30)
 
-        **Task** - Runs the fake script /config/scripts/pysmurf/tune_squids.py
+        **Process** - Process to stream smurf data. If a duration is specified,
+        stream will end after that amount of time. If unspecified, the stream
+        will run until the stop function is called.
 
-        Args:
-            args (list, optional):
-                List of command line arguments to pass to the script.
-                Defaults to [].
-            log (string/bool, optional):
-                Determines if and how the process's stdout should be logged.
-                You can pass the path to a logfile, True to use the agent's log,
-                or False to not log at all.
+        Args
+        -----
+        duration : float, optional
+            If set, determines how many seconds to stream data. By default,
+            will leave stream open until stop function is called.
+        """
+        with self.lock.acquire_timeout(0, job='stream') as acquired:
+            if not acquired:
+                return False, f"Operation failed: {self.lock.job} is running."
+
+            session.set_status('starting')
+            S, cfg = self._get_smurf_control()
+
+            stop_time = None
+            if params['duration'] is not None:
+                stop_time = time.time() + params.duration
+
+            session.data['sid'] = sdl.stream_g3_on(S)
+            while session.status == 'running':
+                if stop_time is not None:
+                    if time.time() > stop_time:
+                        break
+                time.sleep(1)
+            sdl.stream_g3_off(S)
+
+        return True, 'Finished streaming data'
+
+    def _stream_stop(self, session, params=None):
+        session.status = 'stopping'
+        return True, "Requesting to end stream"
+
+    @ocs_agent.param('bands', default=None)
+    @ocs_agent.param('setup_kwargs', default=None)
+    def uxm_setup(self, session, params):
+        """
+        **Task** - Task to run first-time setup procedure for a UXM. This
+        will run the following operations:
+
+            1. Setup Amps
+            2. Estimate attens
+            3. Estimate phase delay
+            4. Setup tune
+            5. setup tracking params
+            6. Measure noise
+        """
+        if params['setup_kwargs'] is None:
+            params['setup_kwargs'] = {}
+
+        with self.lock.acquire_timeout(0, job='uxm_setup') as acquired:
+            if not acquired:
+                return False, f"Operation failed: {self.lock.job} is running."
+
+            session.set_status('starting')
+            S, cfg = self._get_smurf_control()
+            self.log.info("Starting UXM setup")
+            self.log.info(f"Writing logs to {S.logfile}")
+            success, summary = sdl.operations.uxm_setup(
+                S, cfg, params['bands'], show_plots=False, update_cfg=True
+            )
+            session.data = summary
+            return success, "Finished UXM-setup procedure"
+
+    @ocs_agent.param('bands', default=None)
+    @ocs_agent.param('relock_kwargs', default=None)
+    def uxm_relock(self, session, params):
+        if params['relock_kwargs'] is None:
+            params['relock_kwargs'] = {}
+
+        with self.lock.acquire_timeout(0, job='uxm_relock') as acquired:
+            if not acquired:
+                return False, f"Operation failed: {self.lock.job} is running."
+
+            session.set_status('starting')
+            S, cfg = self._get_smurf_control()
+            success, summary = sdl.operations.uxm_relock(
+                S, cfg, **params['op_kwargs']
+            )
+            session.data= summary
+            return success, "Finished UXM Relock"
+
+    @ocs_agent.param('bgmap_kwargs', default=None)
+    def take_bgmap(self, session, params):
+        if params['bgmap_kwargs'] is None:
+            params['bgmap_kwargs'] = {}
+
+        with self.lock.acquire_timeout(0, job='take_bgmap') as acquired:
+            if not acquired:
+                return False, f"Operation failed: {self.lock.job} is running."
+
+            session.set_status('starting')
+            S, cfg = self._get_smurf_control()
+            bsa = sdl.operations.take_bgmap(S, cfg, **params['bgmap_kwargs'])
+
+            session.data = {
+                'bgmap': bsa.bgmap.tolist(),
+                'bands': bsa.bands.tolist(),
+                'channels': bsa.channels.tolist(),
+                'Rtes': bsa.R0.tolist(),
+            }
+            return True, "Finished taking bgmap"
+
+    @ocs_agent.param('iv_kwargs', default=None)
+    def take_iv(self, session, params):
+        """take_iv(iv_kwargs=None)
+
+        Takes an IV. 
+
 
         """
-        if params is None:
-            params = {}
+        if params['iv_kwargs'] is None:
+            params['iv_kwargs'] = {}
 
-        ok, msg = yield self._run_script(
-            '/config/scripts/pysmurf/tune_squids.py',
-            params.get('args', []),
-            params.get('log', True),
-            session
-        )
+        with self.lock.acquire_timeout(0, job='uxm_setup') as acquired:
+            if not acquired:
+                return False, f"Operation failed: {self.lock.job} is running."
 
-        return ok, msg
+            session.set_status('starting')
+            S, cfg = self._get_smurf_control()
+            iva = sdl.operations.take_iv(S, cfg, **params['iv_kwargs'])
+            session.data = {
+                'bands': iva.bands.tolist(),
+                'channels': iva.channels.tolist(),
+                'bgmap': iva.bgmap.tolist(),
+                'R_n': iva.R_n.tolist(),
+            }
+            return True, "Finished taking IV"
 
+    @ocs_agent.param('bias_step_kwargs', default=None)
+    def take_bias_steps(self, session, params):
+        if params['bias_step_kwargs'] is None:
+            params['bias_step_kwargs'] = {}
+
+        with self.lock.acquire_timeout(0, job='bias_steps') as acquired:
+            if not acquired:
+                return False, f"Operation failed: {self.lock.job} is running."
+
+            session.set_status('starting')
+            S, cfg = self._get_smurf_control()
+            bsa = sdl.operations.take_bias_steps(
+                S, cfg, **params['bias_step_kwargs']
+            )
+            session.data = {
+                'bgmap': bsa.bgmap.tolist(),
+                'bands': bsa.bands.tolist(),
+                'channels': bsa.channels.tolist(),
+                'Rtes': bsa.R0.tolist(),
+            }
+            return True, "Finished taking bias steps"
 
 def make_parser(parser=None):
     """
@@ -273,9 +418,11 @@ def make_parser(parser=None):
     pgroup.add_argument('--monitor-id', '-m', type=str,
                         help="Instance id for pysmurf-monitor corresponding to "
                              "this pysmurf instance.")
+    pgroup.add_argument('--slot', type=int,
+                        help="Smurf slot that this agent will be controlling")
+
 
     return parser
-
 
 if __name__ == '__main__':
     parser = make_parser()
@@ -286,6 +433,13 @@ if __name__ == '__main__':
 
     agent.register_task('run', controller.run, blocking=False)
     agent.register_task('abort', controller.abort, blocking=False)
-    agent.register_task('tune_squids', controller.tune_squids, blocking=False)
+    agent.register_process(
+        'stream', controller.stream, controller._stream_stop
+    )
+    agent.register_task('uxm_setup', controller.uxm_setup)
+    agent.register_task('uxm_relock', controller.uxm_relock)
+    agent.register_task('take_bgmap', controller.take_bgmap)
+    agent.register_task('take_iv', controller.take_iv)
+    agent.register_task('take_bias_steps', controller.take_bias_steps)
 
     runner.run(agent, auto_reconnect=True)
