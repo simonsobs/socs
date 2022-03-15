@@ -16,8 +16,6 @@ if not ON_RTD:
 class SynthAgent:
     """
     Agent for connecting to the Synths for holography
-    
-    Args: 
     """
 
     def __init__(self, agent, config_file):
@@ -38,14 +36,6 @@ class SynthAgent:
         self.sampling_frequency = float(samp)
 
         ### register the position feeds
-        agg_params = {
-            'frame_length' : 10*60, #[sec] 
-        }
-        
-        self.agent.register_feed('frequency',
-                                 record = True,
-                                 agg_params = agg_params,
-                                 buffer_time = 0)
         """
         if config_file == "None":
             raise Exception("No config file specified for the FTS mirror config")
@@ -63,10 +53,6 @@ class SynthAgent:
     def init_synth(self, session, params=None):
         """init_synth(params=None)
         Perform first time setup for communication with Synth.
-
-        Args:
-            params (dict): Parameters dictionary for passing parameters to
-                task.
         """
 
         if params is None:
@@ -84,17 +70,15 @@ class SynthAgent:
                 return False, "Could not acquire lock."
             # Run the function you want to run
             self.log.debug("Lock Acquired Connecting to Stages")
-
             self.lo_id = synth3.get_LOs()
-            print(self.lo_id)
-            synth3.set_RF_output(0, 1, self.lo_id)
-            synth3.set_RF_output(1, 1, self.lo_id)
+
+            synth3.set_RF_output(0, 1, self.lo_id) # LO ID, On=1, USB connection ID
+            synth3.set_RF_output(1, 1, self.lo_id) # LO ID, On=1, USB connection ID
 
         # This part is for the record and to allow future calls to proceed,
         # so does not require the lock
         self.initialized = True
-        # if self.auto_acq:
-        #    self.agent.start('acq')
+
         return True, "Synth Initialized."
 
     def set_frequencies(self, session, params):
@@ -107,10 +91,10 @@ class SynthAgent:
         f0 = params.get("freq0", 0)
         f1 = params.get("freq1", 0)
 
-        F_0 = int(f0 * self.ghz_to_mhz / self.N_MULT)
-        F_1 = int(f1 * self.ghz_to_mhz / self.N_MULT)
+        F_0 = int(f0 * self.ghz_to_mhz / self.N_MULT) # Convert GHz -> MHz for synthesizers
+        F_1 = int(f1 * self.ghz_to_mhz / self.N_MULT) # Convert GHz -> MHz for synthesizers
 
-        print(F_1)
+        print(F_0,F_1)
 
         with self.lock.acquire_timeout(timeout=3, job="set_frqeuencies") as acquired:
             if not acquired:
@@ -124,12 +108,8 @@ class SynthAgent:
 
         return True, "Frequencies Updated"
 
+    # This function is not finished, need to figure out how to read out frequency from USB connection.
     def read_frequencies(self, session, params=None):
-        """
-        params: 
-            dict: {'freq0': float
-                   'freq1': float}
-        """
 
         with self.lock.acquire_timeout(timeout=3, job="read_frqeuencies") as acquired:
             if not acquired:

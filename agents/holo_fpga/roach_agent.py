@@ -105,12 +105,6 @@ class FPGAAgent:
         return True, "FPGA connected."
 
     def take_data(self, session, params=None):
-        """
-        params: 
-            dict: {'freq0': float
-                   'freq1': float}
-        """
-        # f1 = params.get('freq1', 0)
 
         with self.lock.acquire_timeout(timeout=3, job="take_data") as acquired:
             if not acquired:
@@ -119,15 +113,14 @@ class FPGAAgent:
                 )
                 return False, "Could not acquire lock"
 
-            ## this is where you would talk to self.fpga and tell is to give you
-            ## some data
-
+            # Grab synthesizer settings here (which FPGA bins to integrate over)
             self.synth_settings = synth3.SynthOpt()
+            # Take data here
             arr_aa, arr_bb, arr_ab, arr_phase, arr_index = fpga_daq3.TakeAvgData(
                 self.baseline, self.fpga, self.synth_settings
             )
 
-            # data dictionary is what we will send to the data feed
+            # Data dictionary is what we will send to the data feed:
             data = {"timestamp": time.time(), "block_name": "fpga", "data": {}}
 
             arr_AA = np.array(fpga_daq3.running_mean(arr_aa.tolist(), 1))
