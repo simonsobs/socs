@@ -5,6 +5,7 @@ import time
 import numpy as np
 import txaio
 import threading
+import yaml
 from contextlib import contextmanager
 from twisted.internet import reactor
 
@@ -147,7 +148,8 @@ class LS372_Agent:
     @ocs_agent.param('force', default=False, type=bool)
     @ocs_agent.param('configfile', type=str)
     def init_lakeshore(self, session, params=None):
-        """init_lakeshore(auto_acquire=False, acq_params=None, force=False)
+        """init_lakeshore(auto_acquire=False, acq_params=None, force=False,
+                          configfile='lsa22yg_config.yaml')
 
         **Task** - Perform first time setup of the Lakeshore 372 communication.
 
@@ -158,12 +160,12 @@ class LS372_Agent:
                 auto_acquire is True.
             force (bool, optional): Force initialization, even if already
                 initialized. Defaults to False.
-            FIX: configfile
+            configfile (str): .yaml file for initializing 372 channel
+                settings
 
         """
         if params is None:
             params = {}
-
         if self.initialized and not params.get('force', False):
             self.log.info("Lakeshore already initialized. Returning...")
             return True, "Already initialized"
@@ -203,7 +205,9 @@ class LS372_Agent:
 
                 self.thermometers = [channel.name for channel in self.module.channels]
 
-                configfile = params['configfile'] 
+                configfile = params['configfile']
+                print('type(configfile)', type(configfile))
+                print('configfile', configfile)
                 self.input_configfile(configfile)
                 session.add_message("Lakeshore initial configurations uploaded using: %s"%configfile)
 
@@ -983,16 +987,18 @@ class LS372_Agent:
 
         return True, "Current still output is {}".format(still_output)
 
-    @ocs_agent.param('configfile', type=str) 
-    def input_configfile(self, session, params):
+    def input_configfile(self, configfile, filepath='/ls372configs/'): #session?
         """ things to say here 
         """
-        configfile = params['configfile']
-        with open(configfile) as f:
+        # in docker, we point to a path /ls372configs/ so we have to include that
+        ls372config = os.path.join(filepath, configfile)
+        print('ls372config which joins docker path: ', ls372config)
+
+        with open(ls372config) as f:
             config = yaml.safe_load(f)
         
-        lakeshoreID = self.module.id # resp from LS372.get_id();  
-        print('self.module.id: ', lakeshoreID) #TODO: get rid of 
+        lakeshoreID = self.module.id
+        print('self.module.id: ', lakeshoreID)
         lakeshoreID = lakeshoreID.split(',')
         lakeshore_serialnum = lakeshoreID[2]
 
@@ -1006,9 +1012,6 @@ class LS372_Agent:
             lschann.set_dwell(dwell)
             
             time.sleep(0.061)
-
-        return True, "Configurations uploaded from {}".format(configfile)
-
 
 
 def make_parser(parser=None):
@@ -1062,7 +1065,9 @@ if __name__ == '__main__':
     init_params = False
     if args.mode == 'init':
         init_params = {'auto_acquire': False,
-                       'acq_params': {'sample_heater': args.sample_heater}}
+                       'acq_params': {'sample_heater': args.sample_heater},
+                       'configfile': args.configfile}
+        print('params for init_lakeshore: ', init_params)
     elif args.mode == 'acq':
         init_params = {'auto_acquire': True,
                        'acq_params': {'sample_heater': args.sample_heater}}
