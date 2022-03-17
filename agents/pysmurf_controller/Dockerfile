@@ -3,7 +3,7 @@ FROM simonsobs/sodetlib:v0.3.0-101-gccbc921
 WORKDIR /app
 
 # SOCS installation
-RUN python3 -m pip install -e git+https://github.com/simonsobs/socs.git#egg=socs
+RUN python3 -m pip install --src=/app/ -e git+https://github.com/simonsobs/socs.git#egg=socs
 
 ENV OCS_CONFIG_DIR /config
 
