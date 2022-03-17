@@ -1006,12 +1006,37 @@ class LS372_Agent:
        
         # only changing dwell for now as a quick check
         for i in config[lakeshore_serialnum]['channel']:
-            lschann = Channel(self.module, i) 
+            lschann = Channel(self.module, i)
 
+            if config[lakeshore_serialnum]['channel'][i]['autorange'] == 'on':
+                lschann.enable_autorange()
+                print("Turning autorange on")
+            elif config[lakeshore_serialnum]['channel'][i]['autorange'] == 'off':
+                lschann.disable_autorange()
+                print("Turning autorange off")
+                
             dwell = config[lakeshore_serialnum]['channel'][i]['dwell']
             lschann.set_dwell(dwell)
+            print("Changing dwell setting to FIX")
             
-            time.sleep(0.061)
+            pause = config[lakeshore_serialnum]['channel'][i]['pause']
+            lschann.set_pause(pause)
+            print("Changing pause setting to FIX")
+
+            tempco = config[lakeshore_serialnum]['channel'][i]['temperature_coeff']
+            lschann.set_temperature_coefficient(tempco)
+
+            excitation_mode = config[lakeshore_serialnum]['channel'][i]['excitation_mode']
+            lschann.set_excitation_mode(excitation_mode)
+
+            excitation_value = config[lakeshore_serialnum]['channel'][i]['excitation_value']
+            lschann.set_excitation(excitation_value)
+
+            calibration_curvenum = config[lakeshore_serialnum]['channel'][i]['calibration_curve_num']
+            lschann.set_calibration_curve(calibration_curvenum)
+
+            
+            #time.sleep(0.061)
 
 
 def make_parser(parser=None):
