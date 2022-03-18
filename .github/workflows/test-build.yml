@@ -1,0 +1,21 @@
+name: Test Docker Build
+
+on:
+  pull_request:
+
+jobs:
+  build:
+    name: test image build
+    runs-on: ubuntu-latest
+
+    steps:
+    # Fetch all history for all tags and branches
+    - name: clone socs
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+
+    # Dockerize
+    - name: Build docker images
+      run: |
+        docker-compose build
