@@ -14,7 +14,7 @@ RUN useradd -d /home/cryo -M cryo -u 1000 && \
 # Set the working directory to registry directory
 WORKDIR /app/socs/agents/suprsync
 # Copy this agent into the app/agents directory
-RUN apt-get install rsync -y
+RUN apt-get update && apt-get install -y rsync
 COPY . .
 RUN pip3 install -r requirements.txt
 
