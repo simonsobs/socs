@@ -31,6 +31,7 @@ Simulator Reference  Simulators are used to mock software and hardware
     user/network
     user/new_agents
     user/webserver
+    user/sequencer
 
 .. toctree::
     :caption: Agent Reference
