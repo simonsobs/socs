@@ -214,11 +214,10 @@ class KikusuiAgent:
     ##################
 
     def set_on(self, session, params=None):
-        """
-        Set output ON
+        """set_on()
 
-        Parameters:
-            Nothing
+        **Task** - Set output ON.
+
         """
         with self.lock.acquire_timeout(timeout=5, job='set_on') as acquired:
             if not acquired:
@@ -237,11 +236,10 @@ class KikusuiAgent:
             return True, 'Set Kikusui on'
 
     def set_off(self, session, params=None):
-        """
-        Set output OFF
+        """set_off()
 
-        Parameters:
-            Nothing
+        **Task** - Set output OFF.
+
         """
         with self.lock.acquire_timeout(timeout=5, job='set_off') as acquired:
             if not acquired:
@@ -260,11 +258,12 @@ class KikusuiAgent:
             return True, 'Set Kikusui off'
 
     def set_c(self, session, params=None):
-        """
-        Set current [A]
+        """set_c(current=0)
+
+        **Task** - Set current [A]
 
         Parameters:
-            current: set current [A] (should be [0.0, 3.0])
+            current (float): set current [A] (should be [0.0, 3.0])
         """
         if params is None:
             params = {'current': 0}
@@ -289,8 +288,9 @@ class KikusuiAgent:
             return True, 'Set Kikusui current to {} A'.format(current)
 
     def set_v(self, session, params=None):
-        """
-        Set voltage [V]
+        """set_v(volt=12)
+
+        **Task** - Set voltage [V].
 
         Parameters:
             volt: set voltage [V] (should be ONLY 12)
@@ -316,11 +316,10 @@ class KikusuiAgent:
             return True, 'Set Kikusui voltage to 12 V'
 
     def get_vc(self, session, params=None):
-        """
-        Show voltage [V], current [A], output on/off
+        """get_vc()
 
-        Parameters:
-            Nothing
+        **Task** - Show voltage [V], current [A], output on/off.
+
         """
         with self.lock.acquire_timeout(timeout=5, job='get_vc') as acquired:
             if not acquired:
@@ -350,11 +349,12 @@ class KikusuiAgent:
                 .format(v_val, c_val, s_val)
 
     def calibrate_wg(self, session, params=None):
-        """
-        Run rotation-motor calibration for wire-grid
+        """calibrate_wg(storepath='/data/wg-data/action/')
+
+        **Task** - Run rotation-motor calibration for wire-grid.
 
         Parameters:
-            storepath: path for log file
+            storepath (str): Path for log file.
         """
         if params is None:
             params = {'storepath': self.action_path}
@@ -405,16 +405,17 @@ class KikusuiAgent:
                 'Please calibrate and take feedback params.'
 
     def stepwise_rotation(self, session, params=None):
-        """
-        Run step-wise rotation for wire-grid calibration
-        In each step, seveal small-rotations are occurred
-        to rotate 22.5-deg.
+        """stepwise_rotation(feedback_steps=8, num_laps=1, stopped_time=10, \
+                             feedback_time=[0.181, 0.221, 0.251, 0.281, 0.301])
+
+        **Task** - Run step-wise rotation for wire-grid calibration. In each
+        step, seveal small-rotations are performed to rotate 22.5-deg.
 
         Parameters:
-            feedback_steps: number of small rotations for each 22.5-deg step
-            num_laps: number of laps (revolutions)
-            stopped_time: stopped time [sec] for each 22.5-deg step
-            feedback_time: calibration constants for the 22.5-deg rotation
+            feedback_steps (int): Number of small rotations for each 22.5-deg step.
+            num_laps (int): Number of laps (revolutions).
+            stopped_time (float): Stopped time [sec] for each 22.5-deg step.
+            feedback_time (list): Calibration constants for the 22.5-deg rotation.
         """
         if params is None:
             params = {'feedback_steps': 8, 'num_laps': 1, 'stopped_time': 10,
@@ -444,34 +445,34 @@ class KikusuiAgent:
 
             return True, 'Step-wise rotation finished'
 
-    def start_IV_acq(self, session, params=None):
-        """
-        Method to start data acquisition process.
+    def IV_acq(self, session, params=None):
+        """IV_acq()
 
-        The most recent data collected is stored in session.data in the
-        structure::
+        **Process** - Run data acquisition.
 
-            >>> session.data
-            {'fields':
-                {
-                 'kikusui':
-                    {'volt': voltage [V],
-                     'curr': current [A],
-                     'voltset': voltage setting [V],
-                     'currset': current setting [A],
-                     'status': output power status 1(on) or 0(off)
-                     }
+        Notes:
+            The most recent data collected is stored in session.data in the
+            structure::
+
+                >>> response.session['data']
+                {'fields':
+                    {
+                     'kikusui':
+                        {'volt': voltage [V],
+                         'curr': current [A],
+                         'voltset': voltage setting [V],
+                         'currset': current setting [A],
+                         'status': output power status 1(on) or 0(off)
+                         }
+                    }
                 }
-            }
 
-        Parameters:
-           Nothing
         """
 
         # timeout is long because calibrate_wg will take a long time (> hours)
         with self.lock.acquire_timeout(timeout=1000, job='IV_acq') as acquired:
             if not acquired:
-                self.log.warn('Could not run start_IV_acq '
+                self.log.warn('Could not run IV_acq '
                               'because {} is already running'
                               .format(self.lock.job))
                 return False, 'Could not acquire lock'
@@ -486,12 +487,12 @@ class KikusuiAgent:
                     last_release = time.time()
                     if not self.lock.release_and_acquire(timeout=1000):
                         self.log.warn(
-                            'start_IV_acq(): '
+                            'IV_acq(): '
                             'Could not re-acquire lock now held by {}.'
                             .format(self.lock.job))
                         if self.lock.job == 'calibrate_wg':
                             self.log.warn(
-                                'start_IV_acq(): '
+                                'IV_acq(): '
                                 'Continue to wait for {}()'
                                 .format(self.lock.job))
                             # Wait for lock acquisition forever
@@ -500,18 +501,18 @@ class KikusuiAgent:
                             if acquired:
                                 self.log.info(
                                     'Succcessfully got the lock '
-                                    'for start_IV_acq()!')
+                                    'for IV_acq()!')
                             else:
                                 self.log.warn(
                                     'Failed to aquire the lock '
-                                    'for start_IV_acq()!')
+                                    'for IV_acq()!')
                                 return False,\
                                     'Could not re-acquire lock '\
-                                    'for start_IV_acq() (timeout=-1)'
+                                    'for IV_acq() (timeout=-1)'
                         else:
                             return False,\
                                 'Could not re-acquire lock '\
-                                'for start_IV_acq() (timeout=1000 sec)'
+                                'for IV_acq() (timeout=1000 sec)'
 
                 current_time = time.time()
                 data = {'timestamp': time.time(),
@@ -586,7 +587,7 @@ if __name__ == '__main__':
     agent, runner = ocs_agent.init_site_agent(args)
     kikusui_agent = KikusuiAgent(agent, kikusui_ip=args.kikusui_ip,
                                  kikusui_port=args.kikusui_port)
-    agent.register_process('IV_acq', kikusui_agent.start_IV_acq,
+    agent.register_process('IV_acq', kikusui_agent.IV_acq,
                            kikusui_agent.stop_IV_acq, startup=True)
     agent.register_task('set_on', kikusui_agent.set_on)
     agent.register_task('set_off', kikusui_agent.set_off)
