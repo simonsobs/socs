@@ -27,6 +27,9 @@ and starting services(dbus, avahi-daemon, and gcapsd) in the docker.
 These preparations are implemented in Dockerfile and wg-actuator-entrypoint.sh.
 Probably, the host machine requires the installation of gcapsd.
 Please install it via (in Ubuntu):
+
+.. code-block:: bash
+
     $ sudo apt install gcapsd
 
 Configuration File Examples
@@ -101,8 +104,8 @@ However, the motor power is not turned ON or OFF during the both functions.
 
 In the test mode, you can choose the moving distance [mm] and speed rate.
 The parameter details are here:
- - distance: Actuator moving distance [mm] (default: 10)
- - speedrate: Actuator speed rate [0.0, 1.0] (default: 0.1)
+- distance: Actuator moving distance [mm] (default: 10)
+- speedrate: Actuator speed rate [0.0, 1.0] (default: 0.1)
 
 
 Hardware Configurations
@@ -116,10 +119,7 @@ Agent API
 ---------
 
 .. autoclass:: agents.wiregrid_actuator.wiregrid_actuator.WiregridActuatorAgent
-    :members: check_limitswitch, check_stopper, 
-              insert, eject, insert_homing, eject_homing, insert_test, eject_test, 
-              motor_on, motor_off, stop, release, reconnect, start_acq
-
+    :members:
 
 Example Clients
 ---------------
