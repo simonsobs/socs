@@ -208,13 +208,6 @@ services:
     build: ./agents/wiregrid_kikusui/
 
   # --------------------------------------------------------------------------
-  # Wiregrid encoder agent
-  # --------------------------------------------------------------------------
-  ocs-wgencoder-agent:
-    image: "ocs-wgencoder-agent"
-    build: ./agents/wiregrid_encoder/
-
-  # --------------------------------------------------------------------------
   # Wiregrid actuator agent
   # --------------------------------------------------------------------------
   ocs-wgactuator-agent:
