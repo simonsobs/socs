@@ -987,56 +987,56 @@ class LS372_Agent:
 
         return True, "Current still output is {}".format(still_output)
 
-    def input_configfile(self, configfile, filepath='/ls372configs/'): #session?
+    def input_configfile(self, configfile, filepath='/ls372configs/'):
         """ things to say here 
         """
-        # in docker, we point to a path /ls372configs/ so we have to include that
+        # include /ls372configs/ dir where configfiles are in docker container
         ls372config = os.path.join(filepath, configfile)
-        print('ls372config which joins docker path: ', ls372config)
-
         with open(ls372config) as f:
             config = yaml.safe_load(f)
         
-        lakeshoreID = self.module.id
-        print('self.module.id: ', lakeshoreID)
-        lakeshoreID = lakeshoreID.split(',')
-        lakeshore_serialnum = lakeshoreID[2]
+        ls_id = self.module.id
+        ls_info = ls_id.split(',')
+        ls_serial = ls_info[2]
+        
+        ls_chann_settings = config[ls_serial]['channel']
 
-        #would be good to assert instance id in config file is the 372 serial number  
+        # TODO: assert 372 instance id == serial num?  
        
-        # only changing dwell for now as a quick check
-        for i in config[lakeshore_serialnum]['channel']:
+        for i in ls_chann_settings:
             lschann = Channel(self.module, i)
 
-            if config[lakeshore_serialnum]['channel'][i]['autorange'] == 'on':
+            # TODO: enable channel
+
+            if ls_chann_settings[i]['autorange'] == 'on':
                 lschann.enable_autorange()
                 print("Turning autorange on")
-            elif config[lakeshore_serialnum]['channel'][i]['autorange'] == 'off':
+            elif ls_chann_settings[i]['autorange'] == 'off':
                 lschann.disable_autorange()
                 print("Turning autorange off")
-                
-            dwell = config[lakeshore_serialnum]['channel'][i]['dwell']
-            lschann.set_dwell(dwell)
-            print("Changing dwell setting to FIX")
             
-            pause = config[lakeshore_serialnum]['channel'][i]['pause']
-            lschann.set_pause(pause)
-            print("Changing pause setting to FIX")
-
-            tempco = config[lakeshore_serialnum]['channel'][i]['temperature_coeff']
-            lschann.set_temperature_coefficient(tempco)
-
-            excitation_mode = config[lakeshore_serialnum]['channel'][i]['excitation_mode']
+            excitation_mode = ls_chann_settings[i]['excitation_mode']
             lschann.set_excitation_mode(excitation_mode)
-
-            excitation_value = config[lakeshore_serialnum]['channel'][i]['excitation_value']
+            print("Excitation mode for CH.{channel} set to {exc_mode}".format(channel=i,exc_mode=excitation_mode))
+                
+            excitation_value = ls_chann_settings[i]['excitation_value']
             lschann.set_excitation(excitation_value)
-
-            calibration_curvenum = config[lakeshore_serialnum]['channel'][i]['calibration_curve_num']
-            lschann.set_calibration_curve(calibration_curvenum)
-
+            print("Excitation for CH.{channel} set to {exc}".format(channel=i,exc=excitation))
             
-            #time.sleep(0.061)
+            dwell = ls_chann_settings[i]['dwell']
+            lschann.set_dwell(dwell)
+            print("Dwell for CH.{channel} is set to {dwell}".format(channel=i, dwell=dwell))
+            
+            pause = ls_chann_settings[i]['pause']
+            lschann.set_pause(pause)
+            print("Pause for CH.{channel} is set to {pause}".format(channel=i, pause=pause))
+
+            calibration_curvenum = ls_chann_settings[i]['calibration_curve_num']
+            lschann.set_calibration_curve(calibration_curvenum)
+            print("Calibration curve for CH.{channel} set to {cal_curve}".format(channel=i,cal_curve=calibration_curvenum))
+            tempco = ls_chann_settings[i]['temperature_coeff']
+            lschann.set_temperature_coefficient(tempco)
+            print("Temperature coefficient for CH.{channel} set to {tempco}".format(channel=i,tempco=tempco))
 
 
 def make_parser(parser=None):
