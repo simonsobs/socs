@@ -206,8 +206,7 @@ class LS372_Agent:
                 self.thermometers = [channel.name for channel in self.module.channels]
 
                 configfile = params['configfile']
-                print('type(configfile)', type(configfile))
-                print('configfile', configfile)
+                print('configfile', configfile) # TODO: FIX: get rid of
                 self.input_configfile(configfile)
                 session.add_message("Lakeshore initial configurations uploaded using: %s"%configfile)
 
@@ -1001,7 +1000,7 @@ class LS372_Agent:
         
         ls_chann_settings = config[ls_serial]['channel']
 
-        # TODO: assert 372 instance id == serial num?  
+        # TODO: assert 372 instance id == serial num? 
        
         for i in ls_chann_settings:
             lschann = Channel(self.module, i)
@@ -1021,7 +1020,7 @@ class LS372_Agent:
                 
             excitation_value = ls_chann_settings[i]['excitation_value']
             lschann.set_excitation(excitation_value)
-            print("Excitation for CH.{channel} set to {exc}".format(channel=i,exc=excitation))
+            print("Excitation for CH.{channel} set to {exc}".format(channel=i,exc=excitation_value))
             
             dwell = ls_chann_settings[i]['dwell']
             lschann.set_dwell(dwell)
