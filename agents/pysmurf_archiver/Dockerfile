@@ -9,7 +9,7 @@ WORKDIR /app/socs/agents/pysmurf_archiver/
 # Copy this agent into the app/agents directory
 COPY . .
 
-RUN apt-get install rsync -y
+RUN apt-get update && apt-get install -y rsync
 
 RUN pip3 install -r requirements.txt
 
