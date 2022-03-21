@@ -137,3 +137,12 @@ Below is an example client to insert and eject the actuator::
     wgactuator.eject.start()
     wgactuator.eject.wait()
 
+Supporting APIs
+---------------
+
+.. autoclass:: agents.wiregrid_actuator.src.Actuator.Actuator
+    :members:
+
+.. autoclass:: agents.wiregrid_actuator.src.DigitalIO.DigitalIO
+    :members:
+
