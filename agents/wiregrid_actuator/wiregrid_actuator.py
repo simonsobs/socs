@@ -262,6 +262,57 @@ class WiregridActuatorAgent:
     ##################
     # Return: status(True or False), message
 
+    def insert(self, session, params=None):
+        """insert()
+
+        **Task** - Insert the wire-grid into the forebaffle interface above the
+        SAT.
+
+        """
+        with self.lock.acquire_timeout(timeout=3, job='insert') as acquired:
+            if not acquired:
+                self.log.warn(
+                    'insert(): '
+                    'Lock could not be acquired because it is held by {}.'
+                    .format(self.lock.job))
+                return False, 'insert(): Could not acquire lock'
+            # Wait for a second before moving
+            time.sleep(1)
+            # Moving commands
+            ret, msg = self._insert(920, 1.0)
+            if not ret:
+                msg = 'insert(): '\
+                      'ERROR!: Failed insert() in _insert(850,1.0) | {}'\
+                      .format(msg)
+                self.log.error(msg)
+                return False, msg
+            return True, 'insert(): Successfully finish!'
+
+    def eject(self, session, params=None):
+        """eject()
+
+        **Task** - Eject the wire-grid from the forebaffle interface above the
+        SAT.
+
+        """
+        with self.lock.acquire_timeout(timeout=3, job='eject') as acquired:
+            if not acquired:
+                self.log.warn(
+                        'eject(): '
+                        'Lock could not be acquired because it is held by {}.'
+                        .format(self.lock.job))
+                return False, 'eject(): Could not acquire lock'
+            # Wait for a second before moving
+            time.sleep(1)
+            # Moving commands
+            ret, msg = self._eject(920, 1.0)
+            if not ret:
+                msg = 'eject(): ERROR!: Failed in _eject(850,1.0) | {}'\
+                    .format(msg)
+                self.log.error(msg)
+                return False, msg
+            return True, 'eject(): Successfully finish!'
+
     def check_limitswitch(self, session, params=None):
         """check_limitswitch(io_name)
 
@@ -331,57 +382,6 @@ class WiregridActuatorAgent:
                     .format(io_name, io_label, 'ON' if onoffs[i] else 'OFF')
             self.log.info(msg)
             return True, msg
-
-    def insert(self, session, params=None):
-        """insert()
-
-        **Task** - Insert the wire-grid into the forebaffle interface above the
-        SAT.
-
-        """
-        with self.lock.acquire_timeout(timeout=3, job='insert') as acquired:
-            if not acquired:
-                self.log.warn(
-                    'insert(): '
-                    'Lock could not be acquired because it is held by {}.'
-                    .format(self.lock.job))
-                return False, 'insert(): Could not acquire lock'
-            # Wait for a second before moving
-            time.sleep(1)
-            # Moving commands
-            ret, msg = self._insert(920, 1.0)
-            if not ret:
-                msg = 'insert(): '\
-                      'ERROR!: Failed insert() in _insert(850,1.0) | {}'\
-                      .format(msg)
-                self.log.error(msg)
-                return False, msg
-            return True, 'insert(): Successfully finish!'
-
-    def eject(self, session, params=None):
-        """eject()
-
-        **Task** - Eject the wire-grid from the forebaffle interface above the
-        SAT.
-
-        """
-        with self.lock.acquire_timeout(timeout=3, job='eject') as acquired:
-            if not acquired:
-                self.log.warn(
-                        'eject(): '
-                        'Lock could not be acquired because it is held by {}.'
-                        .format(self.lock.job))
-                return False, 'eject(): Could not acquire lock'
-            # Wait for a second before moving
-            time.sleep(1)
-            # Moving commands
-            ret, msg = self._eject(920, 1.0)
-            if not ret:
-                msg = 'eject(): ERROR!: Failed in _eject(850,1.0) | {}'\
-                    .format(msg)
-                self.log.error(msg)
-                return False, msg
-            return True, 'eject(): Successfully finish!'
 
     def insert_homing(self, session, params=None):
         """insert_homing()
