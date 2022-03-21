@@ -11,10 +11,12 @@ from ocs.ocs_twisted import TimeoutLock
 #this_dir = os.path.dirname(os.path.abspath(__file__))
 #sys.path.append(os.path.join(this_dir, 'src'))
 
-# import classes / configs
-from src.Actuator import Actuator
-import limitswitch_config
-import stopper_config
+on_rtd = os.environ.get('READTHEDOCS') == 'True'
+if not on_rtd:
+    # import classes / configs
+    from src.Actuator import Actuator
+    import limitswitch_config
+    import stopper_config
 
 
 class WiregridActuatorAgent:

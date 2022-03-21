@@ -8,15 +8,12 @@ import traceback
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
-# add PATH to ./src directory
-this_dir = os.path.dirname(__file__)
-sys.path.append(
-        os.path.join(this_dir, 'src'))
-
-# import classes
-import pmx
-import command
-from common import openlog, writelog
+ON_RTD = os.environ.get('READTHEDOCS') == 'True'
+if not ON_RTD:
+    # import classes
+    from src import pmx
+    from src import command
+    from src.common import openlog, writelog
 
 
 class KikusuiAgent:
