@@ -2,6 +2,7 @@ import socket
 import os
 import time
 import txaio
+import yaml
 import argparse
 from twisted.internet import reactor
 
@@ -21,14 +22,9 @@ class FTSAerotechStage:
         timeout: communication timeout
         speed: speed in mm/s, defaults to 25 mm/s if None
     """
-    TRANSLATE = 1, 74.87
-    LIMS = (-74.8, 74.8)
-    SPEED = 25  # mm/s
-    INFLATION = 1.10
-    SETTLE_T = 0.2
-    MIN_WAIT = 0.1
 
-    def __init__(self, ip_address, port, timeout=10, speed=None):
+    def __init__(self, ip_address, port, translate=None, limits=None,
+                 timeout=10, speed=25):
         self.ip_address = ip_address
         self.port = int(port)
 
@@ -45,9 +41,11 @@ class FTSAerotechStage:
             self.initialized = False
 
         self.pos = None
-        if speed is not None:
-            self.SPEED = speed
-        self.speed_code = 'F%i' % self.SPEED
+        self.speed = speed
+        self.speed_code = 'F%i' % self.speed
+
+        self.translate = translate
+        self.limits = limits
 
     def send(self, msg):
         self.comm.sendall(bytes(msg, 'utf-8'))
@@ -69,18 +67,18 @@ class FTSAerotechStage:
         time.sleep(0.1)
         out = self.read()
         try:
-            M, B = self.TRANSLATE
-            self.pos = (float(out[1:]) - B) / M
+            M, B = self.translate
+            self.pos = (float(out[1:])-B)/M
             return True, self.pos
         except BaseException:
             return False, None
 
     def move_to(self, position):
-        lims = self.LIMS
-        if position < lims[0] or position > lims[1]:
+        limits = self.limits
+        if position < limits[0] or position > limits[1]:
             return False, 'Move out of bounds!'
-        M, B = self.TRANSLATE
-        stage_pos = position * M + B
+        M, B = self.translate
+        stage_pos = position*M + B
         cmd = ('MOVEABS X%.2f %s\n' % (stage_pos, self.speed_code))
         self.send(cmd)
         out = None
@@ -109,7 +107,7 @@ class FTSAerotechAgent:
 
     """
 
-    def __init__(self, agent, ip_addr, port, mode=None, samp=2):
+    def __init__(self, agent, ip_addr, port, config_file, mode=None, samp=2):
 
         self.ip_addr = ip_addr
         self.port = int(port)
@@ -138,6 +136,30 @@ class FTSAerotechAgent:
                                  agg_params=agg_params,
                                  buffer_time=0)
 
+        # Load dictionary of specific mirror paramters, since some parameters
+        # like limits and translate vary over different FTSes This is loaded
+        # from a yaml file, which is assumed to be in the $OCS_CONFIG_DIR
+        # directory.
+        if config_file == 'None':
+            raise Exception(
+                "No config file specified for the FTS mirror config")
+        else:
+            config_file_path = os.path.join(os.environ['OCS_CONFIG_DIR'],
+                                            config_file)
+            with open(config_file_path) as stream:
+                self.mirror_configs = yaml.safe_load(stream)
+                if self.mirror_configs is None:
+                    raise Exception("No mirror configs in config file.")
+                self.log.info(
+                    f"Loaded mirror configs from file {config_file_path}")
+                self.translate = self.mirror_configs.pop('translate', None)
+                self.limits = self.mirror_configs.pop('limits', None)
+                # The other mirror configs (speed, timeout) are optional and
+                # have defaults so we leave them as the dictionary.
+                if self.translate is None or self.limits is None:
+                    raise Exception("translate and limits must be included "
+                                    "in the mirror configuration keys")
+
     def init_stage_task(self, session, params=None):
         """init_stage_task(params=None)
         Perform first time setup for communication with FTS stage.
@@ -163,7 +185,9 @@ class FTSAerotechAgent:
             # Run the function you want to run
             self.log.debug("Lock Acquired Connecting to Stages")
             try:
-                self.stage = FTSAerotechStage(self.ip_addr, self.port)
+                self.stage = FTSAerotechStage(
+                    self.ip_addr, self.port, self.translate, self.limits,
+                    **self.mirror_configs)
             except Exception as e:
                 self.log.error(f"Error while connecting to FTS: {e}")
                 reactor.callFromThread(reactor.stop)
@@ -284,6 +308,7 @@ def make_parser(parser=None):
     pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--ip-address')
     pgroup.add_argument('--port')
+    pgroup.add_argument('--config_file')
     pgroup.add_argument('--mode')
     pgroup.add_argument('--sampling_frequency')
     return parser
@@ -307,7 +332,8 @@ if __name__ == '__main__':
     agent, runner = ocs_agent.init_site_agent(args)
 
     fts_agent = FTSAerotechAgent(agent, args.ip_address, args.port,
-                                 args.mode, args.sampling_frequency)
+                                 args.config_file, args.mode,
+                                 args.sampling_frequency)
 
     agent.register_task('init_stage', fts_agent.init_stage_task)
     agent.register_task('move_to', fts_agent.move_to)
