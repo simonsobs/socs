@@ -5,8 +5,14 @@ from twisted.internet.defer import inlineCallbacks, Deferred
 from autobahn.twisted.util import sleep as dsleep
 from twisted.logger import Logger, FileLogObserver
 
+import matplotlib
+matplotlib.use('Agg')
 import sodetlib as sdl
+from sodetlib.operations import (
+    uxm_setup, uxm_relock, bias_steps, iv, tracking, bias_dets
+)
 from sodetlib.det_config import DetConfig
+import numpy as np
 
 import sys
 from typing import Optional
@@ -126,13 +132,15 @@ class PysmurfController:
                     if isinstance(data['payload'], str):
                         self.current_session.add_message(data['payload'])
 
-    def _get_smurf_control(self):
+    def _get_smurf_control(self, session=None):
         """
         Gets pysmurf and detconfig instances for sodetlib functions.
         """
         cfg = DetConfig()
         cfg.load_config_files(slot=self.slot)
         S = cfg.get_smurf_control()
+        S.load_tune(cfg.dev.exp['tunefile'])
+        S._ocs_session = session
         return S, cfg
 
 
@@ -268,15 +276,15 @@ class PysmurfController:
             if not acquired:
                 return False, f"Operation failed: {self.lock.job} is running."
 
-            session.set_status('starting')
-            S, cfg = self._get_smurf_control()
+            S, cfg = self._get_smurf_control(session=session)
 
             stop_time = None
             if params['duration'] is not None:
-                stop_time = time.time() + params.duration
+                stop_time = time.time() + params['duration']
 
             session.data['sid'] = sdl.stream_g3_on(S)
-            while session.status == 'running':
+            session.set_status('running')
+            while session.status in ['starting', 'running']:
                 if stop_time is not None:
                     if time.time() > stop_time:
                         break
@@ -286,11 +294,11 @@ class PysmurfController:
         return True, 'Finished streaming data'
 
     def _stream_stop(self, session, params=None):
-        session.status = 'stopping'
+        session.set_status('stopping')
         return True, "Requesting to end stream"
 
     @ocs_agent.param('bands', default=None)
-    @ocs_agent.param('setup_kwargs', default=None)
+    @ocs_agent.param('kwargs', default=None)
     def uxm_setup(self, session, params):
         """
         **Task** - Task to run first-time setup procedure for a UXM. This
@@ -302,73 +310,136 @@ class PysmurfController:
             4. Setup tune
             5. setup tracking params
             6. Measure noise
+
+        Args
+        -----
+        bands : list, int
+            Bands to set up.
+        kwargs : dict
+            Dict containing additional keyword args to pass to the uxm_setup
+            function.
         """
-        if params['setup_kwargs'] is None:
-            params['setup_kwargs'] = {}
+        if params['kwargs'] is None:
+            params['kwargs'] = {}
 
         with self.lock.acquire_timeout(0, job='uxm_setup') as acquired:
             if not acquired:
                 return False, f"Operation failed: {self.lock.job} is running."
 
-            session.set_status('starting')
-            S, cfg = self._get_smurf_control()
+            S, cfg = self._get_smurf_control(session=session)
+            session.set_status('running')
             self.log.info("Starting UXM setup")
-            self.log.info(f"Writing logs to {S.logfile}")
-            success, summary = sdl.operations.uxm_setup(
-                S, cfg, params['bands'], show_plots=False, update_cfg=True
+            success, summary = uxm_setup.uxm_setup(
+                S, cfg, bands=params['bands'], **params['kwargs']
             )
-            session.data = summary
             return success, "Finished UXM-setup procedure"
 
     @ocs_agent.param('bands', default=None)
-    @ocs_agent.param('relock_kwargs', default=None)
+    @ocs_agent.param('kwargs', default=None)
     def uxm_relock(self, session, params):
-        if params['relock_kwargs'] is None:
-            params['relock_kwargs'] = {}
+        """
+        **Task** - Task to relock detectors to existing tune if setup has
+        already been run. Runs the following operations:
+
+            1. Setup Amps
+            2. Relocks detectors, setup notches (if requested), and serial
+               gradient descent / eta scan
+            3. Tracking setup
+            4. Noise check
+
+        Args
+        -----
+        bands : list, int
+            Bands to set up.
+        kwargs : dict
+            Dict containing additional keyword args to pass to the uxm_relock
+            function.
+        """
+        if params['kwargs'] is None:
+            params['kwargs'] = {}
 
         with self.lock.acquire_timeout(0, job='uxm_relock') as acquired:
             if not acquired:
                 return False, f"Operation failed: {self.lock.job} is running."
 
-            session.set_status('starting')
-            S, cfg = self._get_smurf_control()
-            success, summary = sdl.operations.uxm_relock(
-                S, cfg, **params['op_kwargs']
+            session.set_status('running')
+            S, cfg = self._get_smurf_control(session=session)
+            success, summary = uxm_relock.uxm_relock(
+                S, cfg, bands=params['bands'], **params['kwargs']
             )
-            session.data= summary
             return success, "Finished UXM Relock"
 
-    @ocs_agent.param('bgmap_kwargs', default=None)
+    @ocs_agent.param('duration', default=30., type=float)
+    @ocs_agent.param('kwargs', default=None)
+    def take_noise(self, session, params):
+        """
+        **Task** - Task to take a short timestream and calculate noise
+        statistics. Puts band medians into the session data.
+
+        Args
+        -----
+        duration : float
+            Bands to set up.
+        kwargs : dict
+            Dict containing additional keyword args to pass to the uxm_relock
+            function.
+        """
+        if params['kwargs'] is None:
+            params['kwargs'] = {}
+
+        with self.lock.acquire_timeout(0, job='take_noise') as acquired:
+            if not acquired:
+                return False, f"Operation failed: {self.lock.job} is running."
+
+            session.set_status('running')
+            S, cfg = self._get_smurf_control(session=session)
+            sdl.noise.take_noise(S, cfg, params['duration'], **params['kwargs'])
+            return True, "Finished taking noise"
+
+    @ocs_agent.param('kwargs', default=None)
     def take_bgmap(self, session, params):
-        if params['bgmap_kwargs'] is None:
-            params['bgmap_kwargs'] = {}
+        """
+        **Task** - Takes a bias-group map.
+
+        Args
+        ----
+        kwargs : dict
+            Additional kwargs to pass to take_bgmap function.
+        """
+        if params['kwargs'] is None:
+            params['kwargs'] = {}
 
         with self.lock.acquire_timeout(0, job='take_bgmap') as acquired:
             if not acquired:
                 return False, f"Operation failed: {self.lock.job} is running."
 
-            session.set_status('starting')
-            S, cfg = self._get_smurf_control()
-            bsa = sdl.operations.take_bgmap(S, cfg, **params['bgmap_kwargs'])
+            session.set_status('running')
+            S, cfg = self._get_smurf_control(session=session)
+            bsa = bias_steps.take_bgmap(S, cfg, **params['kwargs'])
+            nchans_per_bg = [0 for _ in range(13)]
+            for bg in range(12):
+                nchans_per_bg[bg] = int(np.sum(bsa.bgmap == bg))
+            nchans_per_bg[-1] = int(np.sum(bsa.bgmap == -1))
 
             session.data = {
-                'bgmap': bsa.bgmap.tolist(),
-                'bands': bsa.bands.tolist(),
-                'channels': bsa.channels.tolist(),
-                'Rtes': bsa.R0.tolist(),
+                'nchans_per_bg': nchans_per_bg,
+                'filepath': bsa.filepath,
             }
             return True, "Finished taking bgmap"
 
-    @ocs_agent.param('iv_kwargs', default=None)
+    @ocs_agent.param('kwargs', default=None)
     def take_iv(self, session, params):
-        """take_iv(iv_kwargs=None)
+        """take_iv(kwargs=None)
 
-        Takes an IV. 
+        Takes an IV.
 
-
+        Args
+        ----
+        kwargs : dict
+            Additional kwargs to pass to take_bgmap function.
         """
-        if params['iv_kwargs'] is None:
-            params['iv_kwargs'] = {}
+        if params['kwargs'] is None:
+            params['kwargs'] = {}
 
         with self.lock.acquire_timeout(0, job='uxm_setup') as acquired:
             if not acquired:
@@ -376,19 +447,30 @@ class PysmurfController:
 
             session.set_status('starting')
             S, cfg = self._get_smurf_control()
-            iva = sdl.operations.take_iv(S, cfg, **params['iv_kwargs'])
+            iva = iv.take_iv(S, cfg, **params['kwargs'])
             session.data = {
                 'bands': iva.bands.tolist(),
                 'channels': iva.channels.tolist(),
                 'bgmap': iva.bgmap.tolist(),
                 'R_n': iva.R_n.tolist(),
+                'filepath': iva.filepath,
             }
             return True, "Finished taking IV"
 
-    @ocs_agent.param('bias_step_kwargs', default=None)
+    @ocs_agent.param('kwargs', default=None)
     def take_bias_steps(self, session, params):
-        if params['bias_step_kwargs'] is None:
-            params['bias_step_kwargs'] = {}
+        """take_iv(kwargs=None)
+
+        Takes bias_steps
+
+        Args
+        ----
+        kwargs : dict
+            Additional kwargs to pass to take_bgmap function.
+        """
+
+        if params['kwargs'] is None:
+            params['kwargs'] = {}
 
         with self.lock.acquire_timeout(0, job='bias_steps') as acquired:
             if not acquired:
@@ -396,15 +478,13 @@ class PysmurfController:
 
             session.set_status('starting')
             S, cfg = self._get_smurf_control()
-            bsa = sdl.operations.take_bias_steps(
-                S, cfg, **params['bias_step_kwargs']
+            bsa = bias_steps.take_bias_steps(
+                S, cfg, **params['kwargs']
             )
             session.data = {
-                'bgmap': bsa.bgmap.tolist(),
-                'bands': bsa.bands.tolist(),
-                'channels': bsa.channels.tolist(),
-                'Rtes': bsa.R0.tolist(),
+                'filepath': bsa.filepath
             }
+
             return True, "Finished taking bias steps"
 
 def make_parser(parser=None):
@@ -420,8 +500,6 @@ def make_parser(parser=None):
                              "this pysmurf instance.")
     pgroup.add_argument('--slot', type=int,
                         help="Smurf slot that this agent will be controlling")
-
-
     return parser
 
 if __name__ == '__main__':
@@ -441,5 +519,6 @@ if __name__ == '__main__':
     agent.register_task('take_bgmap', controller.take_bgmap)
     agent.register_task('take_iv', controller.take_iv)
     agent.register_task('take_bias_steps', controller.take_bias_steps)
+    agent.register_task('take_noise', controller.take_noise)
 
     runner.run(agent, auto_reconnect=True)
