@@ -65,12 +65,12 @@ class FPGAAgent:
                 self.log.info(f"Loaded mirror configs from file {config_file_path}")
                 self.baseline = self.holog_configs.pop("baseline", None)
                 self.roach = self.holog_configs.pop("roach", None)
-                # self.limits = self.mirror_configs.pop('limits', None)
-                # # The other mirror configs (speed, timeout) are optional and
-                # # have defaults so we leave them as the dictionary.
-                # if self.translate is None or self.limits is None:
-                #     raise Exception("translate and limits must be included "
-                #                     "in the mirror configuration keys")
+
+                # The other mirror configs (speed, timeout) are optional and
+                # have defaults so we leave them as the dictionary.
+                if self.roach is None or self.baseline is None:
+                    raise Exception("IP address and channels must be included "
+                                    "in the holography configuration keys.")
 
     def init_FPGA(self, session, params=None):
 
@@ -115,6 +115,9 @@ class FPGAAgent:
 
             # Grab synthesizer settings here (which FPGA bins to integrate over)
             self.synth_settings = synth3.SynthOpt()
+
+            self.synth_settings.IGNORE_PEAKS_BELOW = int(738)
+            self.synth_settings.IGNORE_PEAKS_ABOVE = int(740)
             # Take data here
             arr_aa, arr_bb, arr_ab, arr_phase, arr_index = fpga_daq3.TakeAvgData(
                 self.baseline, self.fpga, self.synth_settings
