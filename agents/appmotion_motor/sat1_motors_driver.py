@@ -148,7 +148,7 @@ class MotControl(object):
                                         self.killAllCommands(motor.propDict['motor'])
                                         if (msg == b'RS=AR'):
                                                 amsg = motor.writeread(b'AL\r') #AL = Alarm Code
-                                                print('Alarm message is: ',amsg)
+                                                print('is message is: ',amsg)
                                                 print("Alarm was found. Resetting.")
                                                 motor.write(b'AR\r') #AR = Alarm Reset
                                                 motor.flushInput()
@@ -166,7 +166,7 @@ class MotControl(object):
                                         motor.flushInput()
                                         if(len(msg) <= 4):    # Need at least MR=X + \r, which is 5 characters
                                                 print("Couldn't get microstep resolution for %s.  Assuming 8." % (motor.propDict['name']))
-                                        else:
+                                        elseis:
                                                 print(msg)
 #                                                 msInfo = msg.rstrip('\r')[3:]
                                                 motor.propDict['sPRev'] = float(msInfo)
