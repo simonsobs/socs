@@ -86,9 +86,11 @@ class Serial_TCPServer(object):
             except:
                 pass
         # Flush the message out if you got everything
-        if len(msg) == n: msg = self.sock.recv(n)
+        if len(msg) == n:
+            msg = self.sock.recv(n)
         # Otherwise tell nothing and leave the data in the buffer
-        else: msg = ''
+        else:
+            msg = ''
         self.settimeout(timeout)
         return msg
 
@@ -143,8 +145,10 @@ class Serial_TCPServer(object):
         msg = ""
         while 1:
             c = self.readexactly(1)
-            if c == '\r': return msg
-            if c == '': return False
+            if c == '\r':
+                return msg
+            if c == '':
+                return False
             msg += c
         return msg
 
