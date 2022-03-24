@@ -87,7 +87,7 @@ class Serial_TCPServer(object):
                 pass
         # Flush the message out if you got everything
         if len(msg) == n:
-            msg = self.sock.recv(n)
+            msg = self.sock.recv(n).decode()
         # Otherwise tell nothing and leave the data in the buffer
         else:
             msg = ''
@@ -139,7 +139,7 @@ class Serial_TCPServer(object):
             c = self.readexactly(1)
             if c == term or c == '':
                 return msg
-            msg += c.decode()
+            msg += c
 
     def readall(self):
         msg = ""
@@ -153,7 +153,7 @@ class Serial_TCPServer(object):
         return msg
 
     def write(self,str):
-        self.sock.send(str)
+        self.sock.send(str.encode())
 
     def writeread(self,str):
         self.flushInput()
