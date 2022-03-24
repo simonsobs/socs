@@ -45,7 +45,7 @@ class PMX:
     def check_voltage(self):
         """ Check the voltage """
         self.clean_serial()
-        bts = self.ser.write(str.encode("MEAS:VOLT?\n\r"))
+        bts = self.ser.write("MEAS:VOLT?\n\r")
         self.wait()
         val = float(self.ser.readline())
         msg = "Measured voltage = %.3f V" % (val)
@@ -55,7 +55,7 @@ class PMX:
     def check_current(self):
         """ Check the current """
         self.clean_serial()
-        self.ser.write(str.encode("MEAS:CURR?\n\r"))
+        self.ser.write("MEAS:CURR?\n\r")
         self.wait()
         val = float(self.ser.readline())
         msg = "Measured current = %.3f A" % (val)
@@ -77,7 +77,7 @@ class PMX:
     def check_output(self):
         """ Return the output status """
         self.clean_serial()
-        self.ser.write(str.encode("OUTP?\n\r"))
+        self.ser.write("OUTP?\n\r")
         self.wait()
         val = int(self.ser.readline())
         if val == 0:
@@ -92,9 +92,9 @@ class PMX:
     def set_voltage(self, val, silent=False):
         """ Set the PMX voltage """
         self.clean_serial()
-        self.ser.write(str.encode("VOLT %f\n\r" % (float(val))))
+        self.ser.write("VOLT %f\n\r" % (float(val)))
         self.wait()
-        self.ser.write(str.encode("VOLT?\n\r"))
+        self.ser.write("VOLT?\n\r")
         self.wait()
         val = self.ser.readline()
         msg = "Voltage set = %.3f V" % (float(val))
@@ -106,9 +106,9 @@ class PMX:
     def set_current(self, val, silent=False):
         """ Set the PMX on """
         self.clean_serial()
-        self.ser.write(str.encode("CURR %f\n\r" % (float(val))))
+        self.ser.write("CURR %f\n\r" % (float(val)))
         self.wait()
-        self.ser.write(str.encode("CURR?\n\r"))
+        self.ser.write("CURR?\n\r")
         self.wait()
         val = self.ser.readline()
         msg = "Current set = %.3f A\n" % (float(val))
@@ -120,9 +120,9 @@ class PMX:
     def use_external_voltage(self):
         """ Set PMX to use external voltage """
         self.clean_serial()
-        self.ser.write(str.encode("VOLT:EXT:SOUR VOLT\n\r"))
+        self.ser.write("VOLT:EXT:SOUR VOLT\n\r")
         self.wait()
-        self.ser.write(str.encode("VOLT:EXT:SOUR?\n\r"))
+        self.ser.write("VOLT:EXT:SOUR?\n\r")
         self.wait()
         val = self.ser.readline()
         msg = "External source = %s" % (val)
@@ -133,9 +133,9 @@ class PMX:
     def ign_external_voltage(self):
         """ Set PMX to ignore external voltage """
         self.clean_serial()
-        self.ser.write(str.encode("VOLT:EXT:SOUR NONE\n\r"))
+        self.ser.write("VOLT:EXT:SOUR NONE\n\r")
         self.wait()
-        self.ser.write(str.encode("VOLT:EXT:SOUR?\n\r"))
+        self.ser.write("VOLT:EXT:SOUR?\n\r")
         self.wait()
         val = self.ser.readline()
         msg = "External source = %s" % (val)
@@ -146,9 +146,9 @@ class PMX:
     def set_voltage_limit(self, val, silent = False):
         """ Set the PMX voltage limit """
         self.clean_serial()
-        self.ser.write(str.encode("VOLT:PROT %f\n\r" % (float(val))))
+        self.ser.write("VOLT:PROT %f\n\r" % (float(val)))
         self.wait()
-        self.ser.write(str.encode("VOLT:PROT?\n\r"))
+        self.ser.write("VOLT:PROT?\n\r")
         self.wait()
         val = self.ser.readline()
         msg = "Voltage limit set = %.3f V" % (float(val))
@@ -160,9 +160,9 @@ class PMX:
     def set_current_limit(self, val, silent=False):
         """ Set the PMX current limit """
         self.clean_serial()
-        self.ser.write(str.encode("CURR:PROT %f\n\r" % (float(val))))
+        self.ser.write("CURR:PROT %f\n\r" % (float(val)))
         self.wait()
-        self.ser.write(str.encode("CURR:PROT?\n\r"))
+        self.ser.write("CURR:PROT?\n\r")
         self.wait()
         val = self.ser.readline()
         msg = "Current limit set = %.3f A\n" % (float(val))
@@ -174,9 +174,9 @@ class PMX:
     def turn_on(self):
         """ Turn the PMX on """
         self.clean_serial()
-        self.ser.write(str.encode("OUTP ON\n\r"))
+        self.ser.write("OUTP ON\n\r")
         self.wait()
-        self.ser.write(str.encode("OUTP?\n\r"))
+        self.ser.write("OUTP?\n\r")
         self.wait()
         val = self.ser.readline()
         msg = "Output state = %s" % (val)
@@ -187,9 +187,9 @@ class PMX:
     def turn_off(self):
         """ Turn the PMX off """
         self.clean_serial()
-        self.ser.write(str.encode("OUTP OFF\n\r"))
+        self.ser.write("OUTP OFF\n\r")
         self.wait()
-        self.ser.write(str.encode("OUTP?\n\r"))
+        self.ser.write("OUTP?\n\r")
         self.wait()
         val = self.ser.readline()
         msg = "Output state = %s" % (val)
@@ -254,7 +254,7 @@ class PMX:
     def _remote_Mode(self):
         """ Enable remote control """
         self.clean_serial()
-        self.ser.write(str.encode('SYST:REM\n\r'))
+        self.ser.write('SYST:REM\n\r')
         self.wait()
         return True
 
