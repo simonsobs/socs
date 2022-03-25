@@ -393,24 +393,31 @@ class MeinbergM1000Agent:
         if params is None:
             params = {}
 
+        # Make an initial attempt at connection.
+        # Allows us to fail early if misconfigured.
+        try:
+            yield self.meinberg.run_snmp_get(session)
+        # This is a TypeError due to nothing coming back from the yield in
+        # run_snmp_get, so it tries iterating over None.
+        except TypeError as e:
+            self.log.error('No initial SNMP response.')
+            self.log.error('Either there is a network connection issue, ' +
+                           'or maybe you are using the wrong SNMP ' +
+                           'version. Either way, we are exiting.')
+
+            self.log.debug(repr(e))  # Not really relevant, see above.
+
+            reactor.callFromThread(reactor.stop)
+            return False, 'acq process failed'
+
         self.is_streaming = True
 
         while self.is_streaming:
             try:
                 yield self.meinberg.run_snmp_get(session)
-            # This is a TypeError due to nothing coming back from the yield in
-            # run_snmp_get, so it tries iterating over None.
-            except TypeError as e:
+            except TypeError:
                 self.log.error('No SNMP response.')
-                self.log.error('Either there is a network connection issue, ' +
-                               'or maybe you are using the wrong SNMP ' +
-                               'version. Either way, we are exiting.')
-
-                self.log.debug(repr(e))  # Not really relevant, see above.
-
-                reactor.callFromThread(reactor.stop)
-                return False, 'acq process failed'
-
+                self.log.error('Check your network connection.')
             self.log.debug("{data}", data=session.data)
             yield dsleep(0.1)
 
