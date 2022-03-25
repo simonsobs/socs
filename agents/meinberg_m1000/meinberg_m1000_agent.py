@@ -7,6 +7,7 @@ import txaio
 
 from autobahn.twisted.util import sleep as dsleep
 from twisted.internet.defer import inlineCallbacks
+from twisted.internet import reactor
 
 from socs.snmp import SNMPTwister
 
@@ -175,7 +176,7 @@ class MeinbergSNMP:
 
         return field_name, oid_value, oid_description
 
-    def update_cache(self, get_result, time):
+    def update_cache(self, get_result, timestamp):
         """Update the OID Value Cache.
 
         The OID Value Cache is used to store each unique OID, the latest value,
@@ -192,25 +193,40 @@ class MeinbergSNMP:
                  "description": "disabled",
                  "lastGet": 1598543397.689727}}
 
+        Additionally there is connection status information under::
+
+            {"m1000_connection":
+                {"last_attempt": 1598543359.6326838,
+                "connected": True}
+
         This method modifies self.oid_cache.
 
         Parameters
         ----------
         get_result : pysnmp.smi.rfc1902.ObjectType
             Result from a pysnmp GET command.
-        time : float
+        timestamp : float
             Timestamp for when the SNMP GET was issued.
 
         """
-        for item in get_result:
-            field_name, oid_value, oid_description = self._extract_oid_field_and_value(item)
-            if oid_value is None:
-                continue
+        try:
+            for item in get_result:
+                field_name, oid_value, oid_description = self._extract_oid_field_and_value(item)
+                if oid_value is None:
+                    continue
 
-            # Update OID Cache for session.data
-            self.oid_cache[field_name] = {"status": oid_value}
-            self.oid_cache[field_name]["lastGet"] = time
-            self.oid_cache[field_name]["description"] = oid_description
+                # Update OID Cache for session.data
+                self.oid_cache[field_name] = {"status": oid_value}
+                self.oid_cache[field_name]["lastGet"] = timestamp
+                self.oid_cache[field_name]["description"] = oid_description
+                self.oid_cache['m1000_connection'] = {'last_attempt': time.time(),
+                                                      'connected': True}
+        # This is a TypeError due to nothing coming back from the yield in
+        # run_snmp_get, so get_result is None here and can't be iterated.
+        except TypeError:
+            self.oid_cache['m1000_connection'] = {'last_attempt': time.time(),
+                                                  'connected': False}
+            raise ConnectionError('No SNMP response. Check your connection.')
 
     def get_cache(self):
         """Return the current cache. Should be used to pass cached values to
@@ -227,7 +243,7 @@ class MeinbergSNMP:
         return self.oid_cache
 
     def _build_message(self, interval, get_result, time):
-        """Built the message for publication on an OCS Feed.
+        """Build the message for publication on an OCS Feed.
 
         For a given MIB timing interval, build a message for Feed publication.
         Each interval contains only the OIDs that are sampled on the same timing
@@ -292,16 +308,22 @@ class MeinbergSNMP:
             result = yield self.snmp.get(get_list, self.version)
             read_time = time.time()
 
-            self.update_cache(result, read_time)
-            message = self._build_message(interval, result, read_time)
+            # Do not publish if M1000 connection has dropped
+            try:
+                self.update_cache(result, read_time)
+                message = self._build_message(interval, result, read_time)
 
-            # Update lastGet time
-            for mib in self.mib_timings:
-                if mib['oid'] in get_list:
-                    mib['lastGet'] = read_time
+                # Update lastGet time
+                for mib in self.mib_timings:
+                    if mib['oid'] in get_list:
+                        mib['lastGet'] = read_time
 
-            self.log.debug("{msg}", msg=message)
-            session.app.publish_to_feed('m1000', message)
+                self.log.debug("{msg}", msg=message)
+                session.app.publish_to_feed('m1000', message)
+            except ConnectionError as e:
+                self.log.error(f'{e}')
+
+            # Update connection status in session.data
             session.data = self.get_cache()
 
 
@@ -384,7 +406,10 @@ class MeinbergM1000Agent:
                  "mbgLtNgEthPortLinkState_1":
                     {"status": 1,
                      "description": "up",
-                     "lastGet": 1598543359.6326838}}
+                     "lastGet": 1598543359.6326838}
+                 "m1000_connection":
+                    {"last_attempt": 1598543359.6326838,
+                     "connected": True}}
 
             Note that session.data is populated within the :func:`MeinbergSNMP.run_snmp_get` call.
 
@@ -392,12 +417,24 @@ class MeinbergM1000Agent:
         if params is None:
             params = {}
 
+        # Make an initial attempt at connection.
+        # Allows us to fail early if misconfigured.
+        yield self.meinberg.run_snmp_get(session)
+        if not self.meinberg.oid_cache['m1000_connection'].get('connected', False):
+            self.log.error('No initial SNMP response.')
+            self.log.error('Either there is a network connection issue, ' +
+                           'or maybe you are using the wrong SNMP ' +
+                           'version. Either way, we are exiting.')
+
+            reactor.callFromThread(reactor.stop)
+            return False, 'acq process failed - No connection to M1000'
+
         self.is_streaming = True
 
         while self.is_streaming:
             yield self.meinberg.run_snmp_get(session)
             self.log.debug("{data}", data=session.data)
-            yield dsleep(0.1)
+            yield dsleep(1)
 
         return True, "Finished Recording"
 
