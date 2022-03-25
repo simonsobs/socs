@@ -7,6 +7,7 @@ import txaio
 
 from autobahn.twisted.util import sleep as dsleep
 from twisted.internet.defer import inlineCallbacks
+from twisted.internet import reactor
 
 from socs.snmp import SNMPTwister
 
@@ -395,7 +396,21 @@ class MeinbergM1000Agent:
         self.is_streaming = True
 
         while self.is_streaming:
-            yield self.meinberg.run_snmp_get(session)
+            try:
+                yield self.meinberg.run_snmp_get(session)
+            # This is a TypeError due to nothing coming back from the yield in
+            # run_snmp_get, so it tries iterating over None.
+            except TypeError as e:
+                self.log.error('No SNMP response.')
+                self.log.error('Either there is a network connection issue, ' +
+                               'or maybe you are using the wrong SNMP ' +
+                               'version. Either way, we are exiting.')
+
+                self.log.debug(repr(e))  # Not really relevant, see above.
+
+                reactor.callFromThread(reactor.stop)
+                return False, 'acq process failed'
+
             self.log.debug("{data}", data=session.data)
             yield dsleep(0.1)
 
