@@ -60,7 +60,7 @@ using all of the available arguments::
        'instance-id': 'meinberg-m1000',
        'arguments': [['--address', '10.10.10.101'],
                      ['--port', 161],
-                     ['--autostart', True]]},
+                     ['--auto-start', True]]},
 
 .. note::
     The ``--address`` argument should be the address of the M1000 on the network.
@@ -74,7 +74,7 @@ The Meinberg M1000 Agent should be configured to run in a Docker container. An
 example docker-compose service configuration is shown here::
 
   ocs-m1000:
-    image: simonsobs/meinberg-m1000-agent
+    image: simonsobs/ocs-meinberg-m1000-agent
     hostname: ocs-docker
     network_mode: "host"
     volumes:
