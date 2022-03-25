@@ -28,6 +28,8 @@ class MeinbergSNMP:
         Address of the M1000.
     port : int
         SNMP port to issue GETs to, default to 161.
+    version : int
+        SNMP version for communication (1, 2, or 3), defaults to 3.
 
     Attributes
     ----------
@@ -48,10 +50,11 @@ class MeinbergSNMP:
         session.data.
 
     """
-    def __init__(self, address, port=161):
+    def __init__(self, address, port=161, version=3):
         self.log = txaio.make_logger()
         self.address = address
         self.port = port
+        self.version = version
         self.snmp = SNMPTwister(address, port)
 
         # OIDs and how often to query them
@@ -286,7 +289,7 @@ class MeinbergSNMP:
                 continue
 
             # Issue SNMP GET command
-            result = yield self.snmp.get(get_list)
+            result = yield self.snmp.get(get_list, self.version)
             read_time = time.time()
 
             self.update_cache(result, read_time)
@@ -313,6 +316,8 @@ class MeinbergM1000Agent:
         Address of the M1000.
     port : int
         SNMP port to issue GETs to, default to 161.
+    version : int
+        SNMP version for communication (1, 2, or 3), defaults to 3.
 
     Attributes
     ----------
@@ -325,12 +330,13 @@ class MeinbergM1000Agent:
         txaio logger object, created by the OCSAgent
 
     """
-    def __init__(self, agent, address, port=161):
+    def __init__(self, agent, address, port=161, version=3):
         self.agent = agent
         self.is_streaming = False
         self.log = self.agent.log
 
-        self.meinberg = MeinbergSNMP(address, port)
+        self.log.info(f'Using SNMP version {version}.')
+        self.meinberg = MeinbergSNMP(address, port, version)
 
         agg_params = {
             'frame_length': 10*60  # [sec]
@@ -421,6 +427,9 @@ def make_parser(parser=None):
     pgroup.add_argument("--address", help="Address to listen to.")
     pgroup.add_argument("--port", default=161,
                         help="Port to listen on.")
+    pgroup.add_argument("--snmp-version", default='3', choices=['1', '2', '3'],
+                        help="SNMP version for communication. Must match " +
+                             "configuration on the M1000.")
 
     return parser
 
@@ -435,7 +444,8 @@ if __name__ == "__main__":
     agent, runner = ocs_agent.init_site_agent(args)
     listener = MeinbergM1000Agent(agent,
                                   address=args.address,
-                                  port=int(args.port))
+                                  port=int(args.port),
+                                  version=int(args.snmp_version))
 
     agent.register_process("acq",
                            listener.acq,

@@ -60,7 +60,8 @@ using all of the available arguments::
        'instance-id': 'meinberg-m1000',
        'arguments': [['--address', '10.10.10.101'],
                      ['--port', 161],
-                     ['--auto-start', True]]},
+                     ['--auto-start', True],
+                     ['--snmp-version', 3]]},
 
 .. note::
     The ``--address`` argument should be the address of the M1000 on the network.
