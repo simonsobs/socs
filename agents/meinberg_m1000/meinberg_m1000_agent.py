@@ -47,8 +47,8 @@ class MeinbergSNMP:
         float, respectively. "lastGet" is initialized as None, since no SNMP
         GET commands have been issued.
     oid_cache : dict
-        Cache of OID values and corresponding decoded values. Meant to pass to
-        session.data.
+        Cache of OID values and corresponding decoded values. Meant to be
+        passed directly to session.data.
 
     """
     def __init__(self, address, port=161, version=3):
@@ -228,20 +228,6 @@ class MeinbergSNMP:
                                                   'connected': False}
             raise ConnectionError('No SNMP response. Check your connection.')
 
-    def get_cache(self):
-        """Return the current cache. Should be used to pass cached values to
-        session.data. See MeinbergSNMP.update_cache() for a description of the cache
-        data structure.
-
-        Returns
-        -------
-        dict
-            The OID Value Cache, containing each OID, their latest status
-            value, description, and last updated time.
-
-        """
-        return self.oid_cache
-
     def _build_message(self, interval, get_result, time):
         """Build the message for publication on an OCS Feed.
 
@@ -324,7 +310,7 @@ class MeinbergSNMP:
                 self.log.error(f'{e}')
 
             # Update connection status in session.data
-            session.data = self.get_cache()
+            session.data = self.oid_cache
 
 
 class MeinbergM1000Agent:
