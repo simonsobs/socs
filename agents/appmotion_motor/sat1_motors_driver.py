@@ -38,7 +38,7 @@
 
 
 import sys
-from MoxaSerial import Serial_TCPServer
+from socs.agent.moxaSerial import Serial_TCPServer
 from time import sleep
 import numpy as np
 import traceback

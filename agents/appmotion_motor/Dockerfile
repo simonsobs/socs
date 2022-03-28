@@ -12,7 +12,7 @@ WORKDIR /app/socs/agents/app_motionmotor/
 COPY . /app/socs/agents/app_motionmotor/
 
 # Run agent on container startup
-ENTRYPOINT ["python3", "-u", "sat1_motors_agent.py"]
+ENTRYPOINT ["dumb-init", "python3", "-u", "sat1_motors_agent.py"]
 
-CMD ["--site-hub=ws://sisock-crossbar:8001/ws", \
-     "--site-http=http://sisock-crossbar:8001/call"]
+CMD ["--site-hub=ws://crossbar:8001/ws", \
+     "--site-http=http://crossbar:8001/call"]

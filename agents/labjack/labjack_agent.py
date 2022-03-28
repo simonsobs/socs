@@ -266,7 +266,7 @@ class LabJackAgent:
             self.agent.start('acq_reg')
         return True, 'LabJack module initialized.'
 
-    def start_acq(self, session, params=None):
+    def acq(self, session, params=None):
         """acq(sampling_freq=2.5)
 
         **Process** - Acquire data from the Labjack.
@@ -360,7 +360,7 @@ class LabJackAgent:
 
         return True, 'Acquisition exited cleanly.'
 
-    def stop_acq(self, session, params=None):
+    def _stop_acq(self, session, params=None):
         if self.take_data:
             self.take_data = False
             return True, 'requested to stop taking data.'
@@ -521,7 +521,7 @@ if __name__ == '__main__':
     agent.register_task('init_labjack',
                         sensors.init_labjack,
                         startup=init_params)
-    agent.register_process('acq', sensors.start_acq, sensors.stop_acq)
+    agent.register_process('acq', sensors.acq, sensors._stop_acq)
     agent.register_process('acq_reg', sensors.start_acq_reg,
-                           sensors.stop_acq)
+                           sensors._stop_acq)
     runner.run(agent, auto_reconnect=True)
