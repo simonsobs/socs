@@ -1,0 +1,24 @@
+LSASIM:
+  device_settings:
+    autoscan: 'off'
+  channel:
+    1:
+      enable: 'on' 
+      excitation_mode: 'voltage'
+      excitation_value: 2.0e-6
+      autorange: 'on'
+      dwell: 188 # seconds
+      pause: 10 # seconds
+      calibration_curve_num: 23
+      temperature_coeff: 'negative' 
+    2:
+      enable: 'off' 
+      excitation_mode: 'voltage'
+      excitation_value: 2.0e-6
+      autorange: 'on'
+      dwell: 177 # seconds
+      pause: 10 # seconds
+      calibration_curve_num: 28
+      temperature_coeff: 'negative' 
+
+# TODO: excitation frequency?
