@@ -89,15 +89,6 @@ services:
       - "socs"
 
   # --------------------------------------------------------------------------
-  # SMuRF timestream aggregator
-  # --------------------------------------------------------------------------
-  ocs-smurf-recorder:
-    image: "ocs-smurf-recorder"
-    build: ./agents/smurf_recorder/
-    depends_on:
-      - "socs"
-
-  # --------------------------------------------------------------------------
   # The Bluefors log tracking Agent
   # --------------------------------------------------------------------------
   ocs-bluefors-agent:
