@@ -521,7 +521,7 @@ if __name__ == '__main__':
     agent.register_task('init_labjack',
                         sensors.init_labjack,
                         startup=init_params)
-    agent.register_process('acq', sensors.start_acq, sensors.stop_acq)
+    agent.register_process('acq', sensors.acq, sensors._stop_acq)
     agent.register_process('acq_reg', sensors.start_acq_reg,
                            sensors.stop_acq)
     runner.run(agent, auto_reconnect=True)
