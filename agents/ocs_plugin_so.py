@@ -15,7 +15,6 @@ for n, f in [
         ('Keithley2230G-PSU', 'keithley2230G-psu/keithley_agent.py'),
         ('PysmurfController', 'pysmurf_controller/pysmurf_controller.py'),
         ('BlueforsAgent', 'bluefors/bluefors_log_tracker.py'),
-        ('HWPSimulatorAgent', 'hwp_sim/hwp_simulator_agent.py'),
         ('CryomechCPAAgent', 'cryomech_cpa/cryomech_cpa_agent.py'),
         ('LATRtXYStageAgent', 'xy_stage/xy_latrt_agent.py'),
         ('ACUAgent', 'acu/acu_agent.py'),
