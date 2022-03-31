@@ -367,13 +367,15 @@ class LabJackAgent:
         else:
             return False, 'acq is not currently running'
 
-    def start_acq_reg(self, session, params=None):
-        """
-        Task to start data acquisition when you want to read out
-        non-standard registers. In particular the custom registers
-        labjack has built for reading out thermocouples. Maximum is
-        about 2.5 Hz but is set by the register read time which is
-        estimated at the beginning of the acq_reg setup step.
+    def acq_reg(self, session, params=None):
+        """acq_reg(sampling_frequency=2.5)
+
+        **Task** - Start data acquisition when you want to read out
+        non-standard registers.
+
+        In particular the custom registers labjack was built for reading out
+        thermocouples. Maximum is about 2.5 Hz but is set by the register read
+        time which is estimated at the beginning of the acq_reg setup step.
 
         Args:
             sampling_frequency (float):
@@ -521,7 +523,7 @@ if __name__ == '__main__':
     agent.register_task('init_labjack',
                         sensors.init_labjack,
                         startup=init_params)
-    agent.register_process('acq', sensors.start_acq, sensors.stop_acq)
-    agent.register_process('acq_reg', sensors.start_acq_reg,
-                           sensors.stop_acq)
+    agent.register_process('acq', sensors.acq, sensors._stop_acq)
+    agent.register_process('acq_reg', sensors.acq_reg,
+                           sensors._stop_acq)
     runner.run(agent, auto_reconnect=True)
