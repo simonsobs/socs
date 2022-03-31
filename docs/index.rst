@@ -28,8 +28,6 @@ Simulator Reference  Simulators are used to mock software and hardware
 
     user/intro
     user/installation
-    user/network
-    user/new_agents
     user/webserver
     user/sequencer
 
