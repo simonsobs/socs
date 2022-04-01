@@ -4,53 +4,6 @@
 #  readbuf() dumps current buffer contents
 #  readpacket() has old broken behavior of read() - lowest level / fastest
 
-
-# Class to speak with the moxa serial / Ethernet converter
-# Set up the moxa box ports according to the specifications of the device
-# hooked into each serial port.
-
-# A typical sequence of messages for dealing with a device
-# Create the socket once:
-#  moxa = moxa_serial.Serial_TCPServer(('IP',port),timeout=1.0)
-
-# Then do this sequence, complicated in some way by an individual device's hand
-# shaking needs.  I write a "cmd" methods that handle the proper sequence with
-# checksums etc.
-
-#  moxa.flushInput():  Before I ask for new info from a device, I flush my
-#                      receive buffer to make sure I don't get any garbage in
-#                      front.
-
-#  moxa.write(msg):  Sends message to the moxa box.  Most devices need a
-#                    message terminator like '\r\n'.
-
-#  moxa.readexactly(n):  Tries to read n bytes within the timeout.  If it
-#                        doesn't get n bytes, it returns nothing!
-
-
-# Other methods:
-
-#  moxa.readbuf(n):  Returns whatever is currently in the buf.
-
-# moxa.readpacket(n):  Like moxa.read(), but may not return everything if the
-#                      moxa box flushes too soon
-
-#  moxa.read(n):  Like moxa.readexactly(), but returns whatever is in the
-#                 buffer if it can't fill up.
-#                 This replicates the behavior of the read method in pyserial.
-#                 I feel that moxa.readexactly has better behavior for most
-#                 applications though.
-
-
-#  moxa.timeout = <newtimeout> to set timeout. Only use timeout mode with
-#                 timeout >0.0.
-
-
-# Most devices require a certain delay between commands.
-# Multithreading:  Wrap your delays in mutexes
-# See ls218.py for a simple example
-# See des232.py for a complicated example
-
 import time
 import socket
 
@@ -76,8 +29,33 @@ MOXA_DEFAULT_TIMEOUT = 1.0
 
 
 class Serial_TCPServer(object):
+    """Class to speak with the moxa serial / Ethernet converter.
+    Set up the moxa box ports according to the specifications of the device
+    hooked into each serial port.
+
+    A typical sequence of messages for dealing with a device. Create the
+    socket once::
+
+        >>> moxa = moxa_serial.Serial_TCPServer(('IP',port),timeout=1.0)
+
+    Then do this sequence, complicated in some way by an individual device's hand
+    shaking needs::
+
+        >>> moxa.flushInput()
+        >>> moxa.write(msg)
+        >>> moxa.readexactly(n)
+
+    I write a "cmd" methods that handle the proper sequence with checksums etc.
+    Most devices require a certain delay between commands, which is left to the
+    user. If using multithreading, wrap your delays in mutexes.
+
+    Args:
+        port (tuple): (IP addr, TCP port)
+        timeout (float): Timeout for reading from the moxa box
+
+    """
+
     def __init__(self, port, timeout=MOXA_DEFAULT_TIMEOUT):
-        # port is a tuple of form (IP addr, TCP port)
         self.port = port
 
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -85,8 +63,17 @@ class Serial_TCPServer(object):
         self.settimeout(timeout)
         self.sock.connect(self.port)
 
-    # Reads exactly n bytes, waiting up to timeout.
     def readexactly(self, n):
+        """Tries to read exactly n bytes within the timeout.
+
+        Args:
+            n: Number of bytes to read.
+
+        Returns:
+            str: Returned message if n bytes were read. Empty string if
+            ``len(message) != n``.
+
+        """
         t0 = time.time()
         msg = ""
         timeout = self.gettimeout()
@@ -108,8 +95,14 @@ class Serial_TCPServer(object):
         self.settimeout(timeout)
         return msg
 
-    # Reads whatever is in the buffer right now, but is O(N) in buffer size.
     def readbuf_slow(self, n):
+        """Reads whatever is in the buffer right now, but is O(N) in buffer
+        size.
+
+        Args:
+            n: Number of bytes to read.
+
+        """
         msg = ''
         self.sock.setblocking(0)
         try:
@@ -121,8 +114,14 @@ class Serial_TCPServer(object):
         self.settimeout(self.__timeout)
         return msg
 
-    # Log recode of readbuf.  Usable for large buffers.
     def readbuf(self, n):
+        """Returns whatever is currently in the buffer. Suitable for large
+        buffers.
+
+        Args:
+            n: Number of bytes to read.
+
+        """
         if n == 0:
             return ''
         try:
@@ -132,17 +131,35 @@ class Serial_TCPServer(object):
         n2 = min(n-len(msg), n/2)
         return msg + self.readbuf(n2)
 
-    # Will probably read whatever arrives in the buffer, up to n or the timeout
-    # Use read for certainty
     def readpacket(self, n):
+        """Like ``read()``, but may not return everything if the moxa box
+        flushes too soon.
+
+        Will probably read whatever arrives in the buffer, up to n or the
+        timeout. Use ``read()`` for certainty.
+
+        """
         try:
             msg = self.sock.recv(n)
         except:
             msg = ''
         return msg
 
-    # Will read whatever arrives in the buffer, up to n or the timeout
     def read(self, n):
+        """Like ``readexactly()``, but returns whatever is in the buffer if it
+        can't fill up.
+
+        This replicates the behavior of the read method in pyserial. I feel
+        that ``readexactly()`` has better behavior for most applications
+        though.
+
+        Args:
+            n: Number of bytes to read. Will read at most n bytes.
+
+        Returns:
+            str: Returned message of up to n bytes.
+
+        """
         msg = self.readexactly(n)
         n2 = n-len(msg)
         if n2 > 0:
@@ -168,16 +185,29 @@ class Serial_TCPServer(object):
             msg += c
         return msg
 
-    def write(self, str):
-        self.sock.send(str.encode())
+    def write(self, msg):
+        """Sends message to the moxa box.
 
-    def writeread(self, str):
+        Args:
+            msg (str): Message to send, including terminator (i.e. ``\\r\\n``) if
+                needed.
+
+        """
+        self.sock.send(msg.encode())
+
+    def writeread(self, msg):
         self.flushInput()
-        self.write(str)
+        self.write(msg)
         return self.readall()
 
-    # Erases the input buffer at this moment
     def flushInput(self):
+        """Erases the input buffer at this moment.
+
+        Before I ask for new info from a device, I flush my
+        receive buffer to make sure I don't get any garbage in
+        front.
+
+        """
         self.sock.setblocking(0)
         try:
             while len(self.sock.recv(1)) > 0:
@@ -187,15 +217,18 @@ class Serial_TCPServer(object):
         self.sock.setblocking(1)
         self.sock.settimeout(self.__timeout)
 
-    # Sets the socket in timeout mode
     def settimeout(self, timeout):
+        """Sets the socket in timeout mode."""
         assert timeout > 0.0
         self.__timeout = timeout
         self.sock.settimeout(timeout)
-    # We don't query the socket's timeout or check that they're still correct
-    # Since self.sock e is public this could be the wrong timeout!
+        # We don't query the socket's timeout or check that they're still
+        # correct. Since self.sock e is public this could be the wrong
+        # timeout!
 
     def gettimeout(self):
         return self.__timeout
 
-    timeout = property(gettimeout, settimeout)
+    timeout = property(gettimeout, settimeout,
+                       doc='Communication timeout. Only use timeout mode ' +
+                           'with ``timeout > 0.0``.')
