@@ -1,14 +1,9 @@
-# Built-in python modules
 import time
 import serial
 import sys
 import os
 
-# CHWP Control modules
-this_dir = os.path.dirname(__file__)
-sys.path.append(this_dir)
-
-import moxaSerial as mx  # noqa: E402
+from . import moxaSerial as mx
 
 class PMX:
     """
