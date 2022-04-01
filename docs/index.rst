@@ -76,6 +76,12 @@ Simulator Reference  Simulators are used to mock software and hardware
     developer/snmp
     developer/testing
 
+.. toctree::
+    :caption: API Reference
+    :maxdepth: 2
+
+    api
+
 Indices and tables
 ==================
 
