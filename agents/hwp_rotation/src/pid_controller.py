@@ -145,8 +145,8 @@ class PID:
     # Sets the conversion between feedback voltage and approximate frequency
     def set_scale(self, slope, offset):
         self.open_line()
-        slope_hex = get_scale_hex(slope, 1)
-        offset_hex = get_scale_hex(offset, 2)
+        slope_hex = self.get_scale_hex(slope, 1)
+        offset_hex = self.get_scale_hex(offset, 2)
         subprocess.call([os.path.join(self.script_dir, './set_scale'), self.PID_INFO[0], self.PID_INFO[1],
                          slope_hex, offset_hex], stderr = subprocess.DEVNULL)
         self.close_line()
