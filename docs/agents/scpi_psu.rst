@@ -49,6 +49,7 @@ An example docker-compose service configuration is shown here::
   ocs-psuK:
     image: simonsobs/ocs-scpi-psu-agent:latest
     hostname: ocs-docker
+    network_mode: "host"
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
     command:
@@ -93,3 +94,4 @@ Agent API
 
 .. autoclass:: agents.scpi_psu.scpi_psu_agent.ScpiPsuAgent
     :members: monitor_output, set_voltage, set_current, set_output
+

@@ -1,3 +1,5 @@
+import argparse
+
 from ocs import ocs_agent, site_config
 from spt3g import core
 import numpy as np
@@ -103,9 +105,9 @@ class G3StreamSimulator:
 
 
 if __name__ == '__main__':
-    parser = site_config.add_arguments()
-    args = parser.parse_args()
-    site_config.reparse_args(args, 'G3StreamSimulator')
+    parser = argparse.ArgumentParser()
+    args = site_config.parse_args(agent_class='G3StreamSimulator',
+                                  parser=parser)
 
     agent, runner = ocs_agent.init_site_agent(args)
     ss = G3StreamSimulator(agent, port=int(args.port))

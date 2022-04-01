@@ -115,14 +115,8 @@ def make_parser(parser=None):
 
 
 if __name__ == '__main__':
-    site_parser = site_config.add_arguments()
-    parser = make_parser(site_parser)
-
-    # Get the parser to process the command line.
-    args = parser.parse_args()
-
-    # Interpret options in the context of site_config.
-    site_config.reparse_args(args, 'SynAccAgent')
+    parser = make_parser()
+    args = site_config.parse_args(agent_class='SynAccAgent', parser=parser)
 
     agent, runner = ocs_agent.init_site_agent(args)
 

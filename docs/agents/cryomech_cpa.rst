@@ -23,8 +23,9 @@ Configuration File Examples
 Below are configuration examples for the ocs config file and for running the
 Agent in a docker container.
 
-ocs-config
-``````````
+OCS Site Config
+```````````````
+
 To configure the Cryomech CPA Agent we need to add a CryomechCPAAgent
 block to our ocs configuration file. Here is an example configuration block
 using all of the available arguments::
@@ -42,8 +43,9 @@ A few things to keep in mind. You should assign your compressor a static IP,
 you'll need to know that here. Port 502 is the default communication port. You
 should not need to change that unless you have reconfigured your compressor.
 
-Docker
-``````
+Docker Compose
+``````````````
+
 The Cryomech CPA Agent should be configured to run in a Docker container.
 An example docker-compose service configuration is shown here::
 
@@ -59,8 +61,9 @@ An example docker-compose service configuration is shown here::
 Since the agent within the container needs to communicate with hardware on the
 host network you must use ``network_mode: "host"`` in your compose file.
 
-Example Client
---------------
+Example Clients
+---------------
+
 Below is an example client to start data acquisition::
 
     from ocs.matched_client import MatchedClient
@@ -81,4 +84,11 @@ Agent API
 ---------
 
 .. autoclass:: agents.cryomech_cpa.cryomech_cpa_agent.PTCAgent
-    :members: start_acq
+    :members:
+
+Supporting APIs
+---------------
+
+.. autoclass:: agents.cryomech_cpa.cryomech_cpa_agent.PTC
+    :members:
+

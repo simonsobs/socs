@@ -49,8 +49,9 @@ Configuration File Examples
 Below are configuration examples for the ocs config file and for running the
 Agent in a docker container.
 
-ocs-config
-``````````
+OCS Site Config
+```````````````
+
 To configure the Meinberg M1000 Agent we need to add a MeinbergM1000Agent
 block to our ocs configuration file. Here is an example configuration block
 using all of the available arguments::
@@ -59,19 +60,22 @@ using all of the available arguments::
        'instance-id': 'meinberg-m1000',
        'arguments': [['--address', '10.10.10.101'],
                      ['--port', 161],
-                     ['--autostart', True]]},
+                     ['--auto-start', True],
+                     ['--snmp-version', 3]]},
 
-The ``--address`` argument should be the address of the M1000 on the network.
-This is the main network interface for the device, not the PTP interface,
-which is different.
+.. note::
+    The ``--address`` argument should be the address of the M1000 on the network.
+    This is the main network interface for the device, not the PTP interface,
+    which is different.
 
-Docker
-``````
+Docker Compose
+``````````````
+
 The Meinberg M1000 Agent should be configured to run in a Docker container. An
 example docker-compose service configuration is shown here::
 
   ocs-m1000:
-    image: simonsobs/meinberg-m1000-agent
+    image: simonsobs/ocs-meinberg-m1000-agent
     hostname: ocs-docker
     network_mode: "host"
     volumes:
@@ -87,14 +91,15 @@ example docker-compose service configuration is shown here::
 The ``LOGLEVEL`` environment variable can be used to set the log level for
 debugging. The default level is "info".
 
-MeinbergSNMP API
+Agent API
+---------
+
+.. autoclass:: agents.meinberg_m1000.meinberg_m1000_agent.MeinbergM1000Agent
+    :members:
+
+Supporting APIs
 ----------------
 
 .. autoclass:: agents.meinberg_m1000.meinberg_m1000_agent.MeinbergSNMP
     :members:
 
-Agent API
----------
-
-.. autoclass:: agents.meinberg_m1000.meinberg_m1000_agent.MeinbergM1000Agent
-    :members: start_acq

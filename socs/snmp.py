@@ -1,7 +1,7 @@
 import txaio
 
 from pysnmp.hlapi.twisted import getCmd, SnmpEngine, CommunityData, UdpTransportTarget,\
-                                 ContextData, ObjectType, ObjectIdentity
+                                 ContextData, ObjectType, ObjectIdentity, UsmUserData
 
 # For logging
 txaio.use_twisted()
@@ -79,7 +79,7 @@ class SNMPTwister:
         """
         self.log.error('%s failure: %s' % (self.address, error_indication))
 
-    def get(self, oid_list):
+    def get(self, oid_list, version):
         """Issue a getCmd to get SNMP OID states.
 
         Example
@@ -111,6 +111,14 @@ class SNMPTwister:
 
             .. _Specifying MIB Objects:
                http://snmplabs.com/pysnmp/docs/pysnmp-hlapi-tutorial.html#specifying-mib-object
+        version : int
+            SNMP version for communicaton (1, 2, or 3). All versions supported
+            here without auth or privacy. If using v3 the configured username
+            on the SNMP device should be 'ocs'. For details on version
+            implementation in pysnmp see `SNMP Versions`_.
+
+            .. _SNMP Versions:
+               https://pysnmp.readthedocs.io/en/latest/examples/hlapi/v3arch/asyncore/sync/manager/cmdgen/snmp-versions.html
 
         Returns
         ------
@@ -122,8 +130,17 @@ class SNMPTwister:
         """
         oid_list = [ObjectType(ObjectIdentity(*x)) if isinstance(x, tuple) else x for x in oid_list]
 
+        if version == 1:
+            version_object = CommunityData('public', mpModel=0)  # SNMPv1
+        elif version == 2:
+            version_object = CommunityData('public')  # SNMPv2c
+        elif version == 3:
+            version_object = UsmUserData('ocs')  # SNMPv3 (no auth, no privacy)
+        else:
+            raise ValueError(f'SNMP version {version} not supported.')
+
         datagram = getCmd(self.snmp_engine,
-                          CommunityData('public', mpModel=0),  # SNMPv1
+                          version_object,
                           self.udp_transport,
                           ContextData(),
                           *oid_list)

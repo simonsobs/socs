@@ -1,26 +1,9 @@
-FROM simonsobs/sodetlib:v0.1.0
-
-# Set locale
-ENV LANG C.UTF-8
-
-# Installs Jupyter requirements
-RUN pip3 install jupyter
+FROM simonsobs/sodetlib:v0.3.0-101-gccbc921
 
 WORKDIR /app
 
-# Installs OCS requirements
-#COPY requirements.txt .
-#RUN pip3 install -r requirements.txt
-
-# OCS installation
-RUN git clone https://github.com/simonsobs/ocs.git \
-    && pip3 install -r ocs/requirements.txt \
-    && pip3 install -e ocs
-
 # SOCS installation
-RUN git clone https://github.com/simonsobs/socs.git \
-    && pip3 install -r socs/requirements.txt \
-    && pip3 install -e socs
+RUN python3 -m pip install --src=/app/ -e git+https://github.com/simonsobs/socs.git#egg=socs
 
 ENV OCS_CONFIG_DIR /config
 

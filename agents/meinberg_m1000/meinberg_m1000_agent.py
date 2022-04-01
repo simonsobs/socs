@@ -7,6 +7,7 @@ import txaio
 
 from autobahn.twisted.util import sleep as dsleep
 from twisted.internet.defer import inlineCallbacks
+from twisted.internet import reactor
 
 from socs.snmp import SNMPTwister
 
@@ -28,6 +29,8 @@ class MeinbergSNMP:
         Address of the M1000.
     port : int
         SNMP port to issue GETs to, default to 161.
+    version : int
+        SNMP version for communication (1, 2, or 3), defaults to 3.
 
     Attributes
     ----------
@@ -44,14 +47,15 @@ class MeinbergSNMP:
         float, respectively. "lastGet" is initialized as None, since no SNMP
         GET commands have been issued.
     oid_cache : dict
-        Cache of OID values and corresponding decoded values. Meant to pass to
-        session.data.
+        Cache of OID values and corresponding decoded values. Meant to be
+        passed directly to session.data.
 
     """
-    def __init__(self, address, port=161):
+    def __init__(self, address, port=161, version=3):
         self.log = txaio.make_logger()
         self.address = address
         self.port = port
+        self.version = version
         self.snmp = SNMPTwister(address, port)
 
         # OIDs and how often to query them
@@ -172,7 +176,7 @@ class MeinbergSNMP:
 
         return field_name, oid_value, oid_description
 
-    def update_cache(self, get_result, time):
+    def update_cache(self, get_result, timestamp):
         """Update the OID Value Cache.
 
         The OID Value Cache is used to store each unique OID, the latest value,
@@ -189,42 +193,43 @@ class MeinbergSNMP:
                  "description": "disabled",
                  "lastGet": 1598543397.689727}}
 
+        Additionally there is connection status information under::
+
+            {"m1000_connection":
+                {"last_attempt": 1598543359.6326838,
+                "connected": True}
+
         This method modifies self.oid_cache.
 
         Parameters
         ----------
         get_result : pysnmp.smi.rfc1902.ObjectType
             Result from a pysnmp GET command.
-        time : float
+        timestamp : float
             Timestamp for when the SNMP GET was issued.
 
         """
-        for item in get_result:
-            field_name, oid_value, oid_description = self._extract_oid_field_and_value(item)
-            if oid_value is None:
-                continue
+        try:
+            for item in get_result:
+                field_name, oid_value, oid_description = self._extract_oid_field_and_value(item)
+                if oid_value is None:
+                    continue
 
-            # Update OID Cache for session.data
-            self.oid_cache[field_name] = {"status": oid_value}
-            self.oid_cache[field_name]["lastGet"] = time
-            self.oid_cache[field_name]["description"] = oid_description
-
-    def get_cache(self):
-        """Return the current cache. Should be used to pass cached values to
-        session.data. See MeinbergSNMP.update_cache() for a description of the cache
-        data structure.
-
-        Returns
-        -------
-        dict
-            The OID Value Cache, containing each OID, their latest status
-            value, description, and last updated time.
-
-        """
-        return self.oid_cache
+                # Update OID Cache for session.data
+                self.oid_cache[field_name] = {"status": oid_value}
+                self.oid_cache[field_name]["lastGet"] = timestamp
+                self.oid_cache[field_name]["description"] = oid_description
+                self.oid_cache['m1000_connection'] = {'last_attempt': time.time(),
+                                                      'connected': True}
+        # This is a TypeError due to nothing coming back from the yield in
+        # run_snmp_get, so get_result is None here and can't be iterated.
+        except TypeError:
+            self.oid_cache['m1000_connection'] = {'last_attempt': time.time(),
+                                                  'connected': False}
+            raise ConnectionError('No SNMP response. Check your connection.')
 
     def _build_message(self, interval, get_result, time):
-        """Built the message for publication on an OCS Feed.
+        """Build the message for publication on an OCS Feed.
 
         For a given MIB timing interval, build a message for Feed publication.
         Each interval contains only the OIDs that are sampled on the same timing
@@ -286,20 +291,26 @@ class MeinbergSNMP:
                 continue
 
             # Issue SNMP GET command
-            result = yield self.snmp.get(get_list)
+            result = yield self.snmp.get(get_list, self.version)
             read_time = time.time()
 
-            self.update_cache(result, read_time)
-            message = self._build_message(interval, result, read_time)
+            # Do not publish if M1000 connection has dropped
+            try:
+                self.update_cache(result, read_time)
+                message = self._build_message(interval, result, read_time)
 
-            # Update lastGet time
-            for mib in self.mib_timings:
-                if mib['oid'] in get_list:
-                    mib['lastGet'] = read_time
+                # Update lastGet time
+                for mib in self.mib_timings:
+                    if mib['oid'] in get_list:
+                        mib['lastGet'] = read_time
 
-            self.log.debug("{msg}", msg=message)
-            session.app.publish_to_feed('m1000', message)
-            session.data = self.get_cache()
+                self.log.debug("{msg}", msg=message)
+                session.app.publish_to_feed('m1000', message)
+            except ConnectionError as e:
+                self.log.error(f'{e}')
+
+            # Update connection status in session.data
+            session.data = self.oid_cache
 
 
 class MeinbergM1000Agent:
@@ -313,6 +324,8 @@ class MeinbergM1000Agent:
         Address of the M1000.
     port : int
         SNMP port to issue GETs to, default to 161.
+    version : int
+        SNMP version for communication (1, 2, or 3), defaults to 3.
 
     Attributes
     ----------
@@ -325,12 +338,13 @@ class MeinbergM1000Agent:
         txaio logger object, created by the OCSAgent
 
     """
-    def __init__(self, agent, address, port=161):
+    def __init__(self, agent, address, port=161, version=3):
         self.agent = agent
         self.is_streaming = False
         self.log = self.agent.log
 
-        self.meinberg = MeinbergSNMP(address, port)
+        self.log.info(f'Using SNMP version {version}.')
+        self.meinberg = MeinbergSNMP(address, port, version)
 
         agg_params = {
             'frame_length': 10*60  # [sec]
@@ -341,63 +355,79 @@ class MeinbergM1000Agent:
                                  buffer_time=1)
 
     @inlineCallbacks
-    def start_acq(self, session, params=None):
-        """start_acq(params=None)
+    def acq(self, session, params=None):
+        """acq()
 
-        OCS Process for fetching values from the M1000 via SNMP.
+        **Process** - Fetch values from the M1000 via SNMP.
 
-        The session.data object stores each unique OID with its latest status,
-        decoded value, and the last time the value was retrived. This will look like
-        the example here::
+        Notes:
+            The session.data object stores each unique OID with its latest status,
+            decoded value, and the last time the value was retrived. This will look like
+            the example here::
 
-            >>> session.data
-            {"mbgLtNgRefclockLeapSecondDate_1":
-                {"status": "not announced",
-                 "lastGet":1598626144.5365012},
-             "mbgLtNgPtpPortState_1":
-                {"status": 3,
-                 "description": "disabled",
-                 "lastGet": 1598543397.689727},
-             "mbgLtNgNtpCurrentState_0":
-                {"status": 1,
-                 "description": "not synchronized",
-                 "lastGet": 1598543363.289597},
-             "mbgLtNgRefclockState_1":
-                {"status": 2,
-                 "description": "not synchronized",
-                 "lastGet": 1598543359.6326838},
-             "mbgLtNgSysPsStatus_1":
-                {"status": 2,
-                 "description": "up",
-                 "lastGet": 1598543359.6326838},
-             "mbgLtNgSysPsStatus_2":
-                {"status": 2,
-                 "description": "up",
-                 "lastGet": 1598543359.6326838},
-             "mbgLtNgEthPortLinkState_1":
-                {"status": 1,
-                 "description": "up",
-                 "lastGet": 1598543359.6326838}}
+                >>> response.session['data']
+                {"mbgLtNgRefclockLeapSecondDate_1":
+                    {"status": "not announced",
+                     "lastGet":1598626144.5365012},
+                 "mbgLtNgPtpPortState_1":
+                    {"status": 3,
+                     "description": "disabled",
+                     "lastGet": 1598543397.689727},
+                 "mbgLtNgNtpCurrentState_0":
+                    {"status": 1,
+                     "description": "not synchronized",
+                     "lastGet": 1598543363.289597},
+                 "mbgLtNgRefclockState_1":
+                    {"status": 2,
+                     "description": "not synchronized",
+                     "lastGet": 1598543359.6326838},
+                 "mbgLtNgSysPsStatus_1":
+                    {"status": 2,
+                     "description": "up",
+                     "lastGet": 1598543359.6326838},
+                 "mbgLtNgSysPsStatus_2":
+                    {"status": 2,
+                     "description": "up",
+                     "lastGet": 1598543359.6326838},
+                 "mbgLtNgEthPortLinkState_1":
+                    {"status": 1,
+                     "description": "up",
+                     "lastGet": 1598543359.6326838}
+                 "m1000_connection":
+                    {"last_attempt": 1598543359.6326838,
+                     "connected": True}}
 
-        Note that session.data is populated within the self.meinberg.run_snmp_get() call.
+            Note that session.data is populated within the :func:`MeinbergSNMP.run_snmp_get` call.
 
         """
         if params is None:
             params = {}
+
+        # Make an initial attempt at connection.
+        # Allows us to fail early if misconfigured.
+        yield self.meinberg.run_snmp_get(session)
+        if not self.meinberg.oid_cache['m1000_connection'].get('connected', False):
+            self.log.error('No initial SNMP response.')
+            self.log.error('Either there is a network connection issue, ' +
+                           'or maybe you are using the wrong SNMP ' +
+                           'version. Either way, we are exiting.')
+
+            reactor.callFromThread(reactor.stop)
+            return False, 'acq process failed - No connection to M1000'
 
         self.is_streaming = True
 
         while self.is_streaming:
             yield self.meinberg.run_snmp_get(session)
             self.log.debug("{data}", data=session.data)
-            yield dsleep(0.1)
+            yield dsleep(1)
 
         return True, "Finished Recording"
 
-    def stop_acq(self, session, params=None):
-        """stop_acq(params=None)
+    def _stop_acq(self, session, params=None):
+        """_stop_acq()
 
-        Stop method associated with start_acq process.
+        **Task** - Stop task associated with acq process.
 
         """
         self.is_streaming = False
@@ -420,6 +450,9 @@ def make_parser(parser=None):
     pgroup.add_argument("--address", help="Address to listen to.")
     pgroup.add_argument("--port", default=161,
                         help="Port to listen on.")
+    pgroup.add_argument("--snmp-version", default='3', choices=['1', '2', '3'],
+                        help="SNMP version for communication. Must match " +
+                             "configuration on the M1000.")
 
     return parser
 
@@ -428,23 +461,18 @@ if __name__ == "__main__":
     # Start logging
     txaio.start_logging(level=environ.get("LOGLEVEL", "info"))
 
-    # Get the default ocs agrument parser
-    site_parser = site_config.add_arguments()
-    parser = make_parser(site_parser)
-
-    # Parse commandline
-    args = parser.parse_args()
-
-    site_config.reparse_args(args, "MeinbergM1000Agent")
+    parser = make_parser()
+    args = site_config.parse_args(agent_class="MeinbergM1000Agent", parser=parser)
 
     agent, runner = ocs_agent.init_site_agent(args)
     listener = MeinbergM1000Agent(agent,
                                   address=args.address,
-                                  port=int(args.port))
+                                  port=int(args.port),
+                                  version=int(args.snmp_version))
 
     agent.register_process("acq",
-                           listener.start_acq,
-                           listener.stop_acq,
+                           listener.acq,
+                           listener._stop_acq,
                            startup=bool(args.auto_start), blocking=False)
 
     runner.run(agent, auto_reconnect=True)
