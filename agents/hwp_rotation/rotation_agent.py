@@ -3,11 +3,7 @@ import os
 import argparse
 import time
 
-this_dir = os.path.dirname(__file__)
-sys.path.append(
-        os.path.join(this_dir, 'src'))
-
-import pid_controller as pd
+import src.pid_controller as pd
 from socs.agent.pmx import PMX, Command
 
 from ocs import ocs_agent, site_config, client_t
