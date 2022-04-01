@@ -7,14 +7,13 @@ from . import moxaSerial as mx
 
 
 class PMX:
-    """
-    The PMX object is for communicating with the Kikusui PMX power supplies
+    """The PMX object is for communicating with the Kikusui PMX power supplies.
 
     Args:
-    rtu_port (str): Serial RTU port
-    tcp_ip (str): TCP IP address
-    tcp_port (int): TCP port
-    timeout (int): Connection timeout
+        rtu_port (str): Serial RTU port
+        tcp_ip (str): TCP IP address
+        tcp_port (int): TCP port
+        timeout (int): Connection timeout
     """
 
     def __init__(self, rtu_port=None, tcp_ip=None, tcp_port=None, timeout=None):
@@ -40,7 +39,7 @@ class PMX:
         return
 
     def check_voltage(self):
-        """ Check the voltage """
+        """Check the voltage."""
         self.clean_serial()
         bts = self.ser.write("MEAS:VOLT?\n\r")
         self.wait()
@@ -50,7 +49,7 @@ class PMX:
         return msg, val
 
     def check_current(self):
-        """ Check the current """
+        """Check the current."""
         self.clean_serial()
         self.ser.write("MEAS:CURR?\n\r")
         self.wait()
@@ -60,7 +59,7 @@ class PMX:
         return msg, val
 
     def check_voltage_current(self):
-        """ Check both the voltage and current """
+        """Check both the voltage and current."""
         self.clean_serial()
         voltage = self.check_voltage()[1]
         current = self.check_current()[1]
@@ -72,7 +71,7 @@ class PMX:
         return voltage, current
 
     def check_output(self):
-        """ Return the output status """
+        """Return the output status."""
         self.clean_serial()
         self.ser.write("OUTP?\n\r")
         self.wait()
@@ -87,7 +86,7 @@ class PMX:
         return msg, val
 
     def set_voltage(self, val, silent=False):
-        """ Set the PMX voltage """
+        """Set the PMX voltage."""
         self.clean_serial()
         self.ser.write("VOLT %f\n\r" % (float(val)))
         self.wait()
@@ -101,7 +100,7 @@ class PMX:
         return msg
 
     def set_current(self, val, silent=False):
-        """ Set the PMX on """
+        """Set the PMX on."""
         self.clean_serial()
         self.ser.write("CURR %f\n\r" % (float(val)))
         self.wait()
@@ -115,7 +114,7 @@ class PMX:
         return msg
 
     def use_external_voltage(self):
-        """ Set PMX to use external voltage """
+        """Set PMX to use external voltage."""
         self.clean_serial()
         self.ser.write("VOLT:EXT:SOUR VOLT\n\r")
         self.wait()
@@ -128,7 +127,7 @@ class PMX:
         return msg
 
     def ign_external_voltage(self):
-        """ Set PMX to ignore external voltage """
+        """Set PMX to ignore external voltage."""
         self.clean_serial()
         self.ser.write("VOLT:EXT:SOUR NONE\n\r")
         self.wait()
@@ -141,7 +140,7 @@ class PMX:
         return msg
 
     def set_voltage_limit(self, val, silent=False):
-        """ Set the PMX voltage limit """
+        """Set the PMX voltage limit."""
         self.clean_serial()
         self.ser.write("VOLT:PROT %f\n\r" % (float(val)))
         self.wait()
@@ -155,7 +154,7 @@ class PMX:
         return msg
 
     def set_current_limit(self, val, silent=False):
-        """ Set the PMX current limit """
+        """Set the PMX current limit."""
         self.clean_serial()
         self.ser.write("CURR:PROT %f\n\r" % (float(val)))
         self.wait()
@@ -169,7 +168,7 @@ class PMX:
         return msg
 
     def turn_on(self):
-        """ Turn the PMX on """
+        """Turn the PMX on."""
         self.clean_serial()
         self.ser.write("OUTP ON\n\r")
         self.wait()
@@ -182,7 +181,7 @@ class PMX:
         return msg
 
     def turn_off(self):
-        """ Turn the PMX off """
+        """Turn the PMX off."""
         self.clean_serial()
         self.ser.write("OUTP OFF\n\r")
         self.wait()
@@ -196,14 +195,13 @@ class PMX:
 
     # ***** Helper Methods *****
     def __conn(self, rtu_port=None, tcp_ip=None, tcp_port=None, timeout=None):
-        """
-        Connect to the PMX module
+        """Connect to the PMX module.
 
         Args:
-        rtu_port (str): Serial RTU port
-        tcp_ip (str): TCP IP address
-        tcp_port (int): TCP port
-        timeout (int): Connection timeout
+            rtu_port (str): Serial RTU port
+            tcp_ip (str): TCP IP address
+            tcp_port (int): TCP port
+            timeout (int): Connection timeout
         """
         if rtu_port is None and (tcp_ip is None or tcp_port is None):
             raise Exception(
@@ -233,12 +231,12 @@ class PMX:
         return msg
 
     def wait(self):
-        """ Sleep """
+        """Sleep."""
         time.sleep(0.05)
         return True
 
     def clean_serial(self):
-        """ Flush the serial buffer """
+        """Flush the serial buffer."""
         # if not False:
         #    self.ser.reset_input_buffer()
         #    self.ser.reset_output_buffer()
@@ -249,7 +247,7 @@ class PMX:
         return True
 
     def _remote_Mode(self):
-        """ Enable remote control """
+        """Enable remote control."""
         self.clean_serial()
         self.ser.write('SYST:REM\n\r')
         self.wait()
@@ -257,11 +255,11 @@ class PMX:
 
 
 class Command:
-    """
-    The Command object is used to command the PMX
+    """The Command object is used to command the PMX.
 
     Args:
-    PMX (src.PMX): PMX object
+        PMX (PMX): PMX object
+
     """
 
     def __init__(self, input_PMX):
@@ -291,7 +289,7 @@ class Command:
             "stop": "Q"}
 
     def get_help(self):
-        """ Print possible commands """
+        """Print possible commands."""
         wrstr = (
             "\nChange ttyUSB port = '%s'\n"
             "Check output voltage = '%s'\n"
@@ -326,7 +324,7 @@ class Command:
         return wrstr
 
     def user_input(self, arg):
-        """ Take user input and execute PMX command """
+        """Take user input and execute PMX command."""
         argv = arg.split()
         # if len(args) > 0:
         #value = float(args[0])
@@ -415,7 +413,7 @@ class Command:
 
     # ***** Helper Methods *****
     def _float(self, val):
-        """ Try to convert a value to a float """
+        """Try to convert a value to a float."""
         try:
             return float(val)
         except ValueError:
@@ -423,7 +421,7 @@ class Command:
             return None
 
     def _int(self, val):
-        """ Try to convert a value to an int """
+        """Try to convert a value to an int."""
         try:
             return int(val)
         except ValueError:
