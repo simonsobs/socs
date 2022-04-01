@@ -408,15 +408,9 @@ def make_parser(parser = None):
     return parser
 
 if __name__ == '__main__':
-    # Get the default ocs argument parser
-    site_parser = site_config.add_arguments()
-    parser = make_parser(site_parser)
+    parser = make_parser()
+    args = site_config.parse_args(agent_class='RotationAgent', parser=parser)
 
-    # Parse the command line
-    args = parser.parse_args()
-
-    # Interpret options in the context of site_config
-    site_config.reparse_args(args, 'RotationAgent')
     agent, runner = ocs_agent.init_site_agent(args)
     rotation_agent = RotationAgent(agent, kikusui_ip = args.kikusui_ip, 
                                           kikusui_port = args.kikusui_port,
