@@ -5,6 +5,7 @@ import os
 
 from . import moxaSerial as mx
 
+
 class PMX:
     """
     The PMX object is for communicating with the Kikusui PMX power supplies
@@ -15,6 +16,7 @@ class PMX:
     tcp_port (int): TCP port
     timeout (int): Connection timeout
     """
+
     def __init__(self, rtu_port=None, tcp_ip=None, tcp_port=None, timeout=None):
         # Connect to device
         msg = self.__conn(rtu_port, tcp_ip, tcp_port, timeout)
@@ -44,7 +46,7 @@ class PMX:
         self.wait()
         val = float(self.ser.readline())
         msg = "Measured voltage = %.3f V" % (val)
-        #print(msg)
+        # print(msg)
         return msg, val
 
     def check_current(self):
@@ -54,7 +56,7 @@ class PMX:
         self.wait()
         val = float(self.ser.readline())
         msg = "Measured current = %.3f A" % (val)
-        #print(msg)
+        # print(msg)
         return msg, val
 
     def check_voltage_current(self):
@@ -66,7 +68,7 @@ class PMX:
             "Measured voltage = %.3f V\n"
             "Measured current = %.3f A\n"
             % (voltage, current))
-        #print(msg)
+        # print(msg)
         return voltage, current
 
     def check_output(self):
@@ -138,7 +140,7 @@ class PMX:
 
         return msg
 
-    def set_voltage_limit(self, val, silent = False):
+    def set_voltage_limit(self, val, silent=False):
         """ Set the PMX voltage limit """
         self.clean_serial()
         self.ser.write("VOLT:PROT %f\n\r" % (float(val)))
@@ -237,12 +239,12 @@ class PMX:
 
     def clean_serial(self):
         """ Flush the serial buffer """
-        #if not False:
+        # if not False:
         #    self.ser.reset_input_buffer()
         #    self.ser.reset_output_buffer()
         #    self.ser.flush()
-        #else:
-            #self.ser.flushInput()
+        # else:
+        # self.ser.flushInput()
         self.ser.flushInput()
         return True
 
@@ -261,6 +263,7 @@ class Command:
     Args:
     PMX (src.PMX): PMX object
     """
+
     def __init__(self, input_PMX):
         # PMX connection
         if input_PMX is not None:
@@ -325,9 +328,9 @@ class Command:
     def user_input(self, arg):
         """ Take user input and execute PMX command """
         argv = arg.split()
-        #if len(args) > 0:
-            #value = float(args[0])
-        
+        # if len(args) > 0:
+        #value = float(args[0])
+
         while len(argv):
             cmd = str(argv.pop(0)).upper()
             # No command
@@ -353,11 +356,11 @@ class Command:
                 return self._PMX.turn_off()
             # Get HELP
 
-            #elif cmd == self._cmds["set_v"]:
-                #print(value)
+            # elif cmd == self._cmds["set_v"]:
+                # print(value)
                 #ret = self._PMX.set_voltage(value)
 
-            #elif cmd == self._cmds["set_c"]:
+            # elif cmd == self._cmds["set_c"]:
                 #ret = self._PMX.set_current(value)
 
             elif cmd == self._cmds["use_ext"]:
@@ -426,4 +429,3 @@ class Command:
         except ValueError:
             print("Input '%s' not understood, must be a int..." % (val))
             return None
-
