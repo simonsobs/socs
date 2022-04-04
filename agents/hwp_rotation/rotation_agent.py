@@ -165,7 +165,7 @@ class RotationAgent:
 
         return self.pid.direction, 'Current Direction = {}'.format(['Forward', 'Reverse'][self.pid.direction])
 
-    @ocs_agent.param('direction', default = '0', choices = ['0', '1'])
+    @ocs_agent.param('direction', type = str, default = '0', choices = ['0', '1'])
     def set_direction(self, session, params):
         """set_direction(direction='0')
         
