@@ -3,11 +3,14 @@ import os
 import argparse
 import time
 
-import src.pid_controller as pd
-from socs.agent.pmx import PMX, Command
-
 from ocs import ocs_agent, site_config, client_t
 from ocs.ocs_twisted import TimeoutLock
+
+from socs.agent.pmx import PMX, Command
+
+on_rtd = os.environ.get('READTHEDOCS') == 'True'
+if not on_rtd:
+    import src.pid_controller as pd
 
 class RotationAgent:
     """Agent to control the rotation speed of the CHWP
