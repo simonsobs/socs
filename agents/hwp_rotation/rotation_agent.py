@@ -43,16 +43,16 @@ class RotationAgent:
             self.pmx = PMX(tcp_ip=self.kikusui_ip,
                            tcp_port=self.kikusui_port, timeout=0.5)
             self.cmd = Command(self.pmx)
-            print('Connected to Kikusui power supply')
+            self.log.info('Connected to Kikusui power supply')
         except:
-            print('Could not establish connection to Kikusui power supply')
+            self.log.error('Could not establish connection to Kikusui power supply')
             sys.exit(1)
 
         try:
             self.pid = pd.PID(pid_ip=self.pid_ip, pid_port=self.pid_port)
-            print('Connected to PID controller')
+            self.log.info('Connected to PID controller')
         except:
-            print('Could not establish connection to PID controller')
+            self.log.error('Could not establish connection to PID controller')
             sys.exit(1)
 
     def tune_stop(self, session, params):
@@ -150,9 +150,9 @@ class RotationAgent:
                     'Could not get freq because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            self.pid.get_freq()
+            freq = self.pid.get_freq()
 
-        return self.pid.cur_freq, 'Current frequency = {}'.format(self.pid.cur_freq)
+        return True, 'Current frequency = {}'.format(freq)
 
     def get_direction(self, session, params):
         """get_direction()
@@ -165,10 +165,11 @@ class RotationAgent:
             if not acquired:
                 self.log.warn(
                     'Could not get freq because {} is already running'.format(self.lock.job))
+                return False, 'Could not acquire lock'
 
-            self.pid.get_direction()
+            direction = self.pid.get_direction()
 
-        return self.pid.direction, 'Current Direction = {}'.format(['Forward', 'Reverse'][self.pid.direction])
+        return True, 'Current Direction = {}'.format(['Forward', 'Reverse'][direction])
 
     @ocs_agent.param('direction', type=str, default='0', choices=['0', '1'])
     def set_direction(self, session, params):
@@ -184,15 +185,16 @@ class RotationAgent:
             if not acquired:
                 self.log.warn(
                     'Could not set direction because {} is already running'.format(self.lock.job))
+                return False, 'Could not acquire lock'
 
             self.pid.set_direction(params['direction'])
 
         return True, 'Set direction'
 
     @ocs_agent.param('slope', default=1., type=float, check=lambda x: -10. < x < 10.)
-    @ocs_agent.param('offset', default=0., type=float, check=lambda x: -10. < x < 10.)
+    @ocs_agent.param('offset', default=0.1, type=float, check=lambda x: -10. < x < 10.)
     def set_scale(self, session, params):
-        """set_scale(slope=1, offset=0)
+        """set_scale(slope=1, offset=0.1)
 
         **Task** - Set the PID's internal conversion from input voltage to
         rotation frequency.
@@ -208,6 +210,7 @@ class RotationAgent:
             if not acquired:
                 self.log.warn(
                     'Could not set scale because {} is already running'.format(self.lock.job))
+                return False, 'Could not acquire lock'
 
             self.pid.set_scale(params['slope'], params['offset'])
 
