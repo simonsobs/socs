@@ -343,10 +343,14 @@ class RotationAgent:
 
         **Process** - Start Kikusui data acquisition.
 
-        The most recent data collected is stored in the structure::
+        Notes:
+            The most recent data collected is stored in the session data in the
+            structure::
 
-            >>> data
-            {'kikusui_volt': 0, 'kikusui_curr': 0}
+                >>> response.session['data']
+                {'kikusui_volt': 0,
+                 'kikusui_curr': 0,
+                 'last_updated': 1649085992.719602}
 
         """
         with self.lock.acquire_timeout(timeout=0, job='iv_acq') as acquired:
@@ -372,6 +376,10 @@ class RotationAgent:
 
                 if type(data['data']['kikusui_curr']) == float and type(data['data']['kikusui_volt']) == float:
                     self.agent.publish_to_feed('hwprotation', data)
+
+                session.data = {'kikusui_volt': v_val,
+                                'kikusui_curr': i_val,
+                                'last_updated': time.time()}
 
             time.sleep(1)
 
