@@ -32,7 +32,8 @@ class PID:
 ########################################################################################################################
 
     # Converts the user input into a format the PID controller can read
-    def convert_to_hex(self, value, decimal):
+    @staticmethod
+    def convert_to_hex(value, decimal):
         temp_value = hex(int(10**decimal*float(value)))
         return ('0000' + str(temp_value)[2:].upper())[-4:]
 
@@ -52,7 +53,8 @@ class PID:
         self.lock_file.close()
 
     # Gets the exponent in scientific notation
-    def get_scale_hex(self, num, corr):
+    @staticmethod
+    def get_scale_hex(num, corr):
         expo = int(str(num*10**40 + 0.01).split('+')[1])-40
         digits = round(num*10**(-expo+4))
 
@@ -160,12 +162,14 @@ class PID:
         self.return_list = self.decode_array(temp_return)
         self.remove_log()
 
-    def read_log(self):
+    @staticmethod
+    def read_log():
         with open('output.txt', 'rb') as log_file:
             return_string = log_file.read().split(b'\n')[-1]
             return return_string.decode('ascii').split('\r')[:-1]
 
-    def remove_log(self):
+    @staticmethod
+    def remove_log():
         subprocess.call(['rm', 'output.txt'])
 
     def decode_array(self, input_array):
@@ -207,7 +211,8 @@ class PID:
         else:
             return 'Unrecognized Read'
 
-    def decode_write(self, string):
+    @staticmethod
+    def decode_write(string):
         write_type = string[1:]
         if write_type == '01':
             return 'Changed Setpoint'
