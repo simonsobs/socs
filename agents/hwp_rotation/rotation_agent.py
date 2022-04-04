@@ -128,9 +128,9 @@ class RotationAgent:
                 return False, 'Could not acquire lock'
 
             print('set_pid() called')
-            self.pid.set_pid([p_param, i_param, d_param])
+            self.pid.set_pid([params['p_param'], params['i_param'], params['d_param']])
 
-        return True, 'Set PID params to p: {}, i: {}, d: {}'.format(p_param, i_param, d_param)
+        return True, f"Set PID params to p: {params['p_param']}, i: {params['i_param']}, d: {params['d_param']}"
 
     def get_freq(self, session, params):
         """get_freq()
