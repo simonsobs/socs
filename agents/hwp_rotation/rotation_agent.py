@@ -68,7 +68,6 @@ class RotationAgent:
                     'Could not tune stop because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            print('tune_stop() called')
             self.pid.tune_stop()
 
         return True, 'Reversing Direction'
@@ -86,7 +85,6 @@ class RotationAgent:
                     'Could not tune freq because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            print('tune_freq() called')
             self.pid.tune_freq()
 
         return True, 'Tuning to setpoint'
@@ -108,7 +106,6 @@ class RotationAgent:
                     'Could not declare freq because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            print('declare_freq() called')
             self.pid.declare_freq(params['freq'])
 
         return True, 'Setpoint at {} Hz'.format(params['freq'])
@@ -135,7 +132,6 @@ class RotationAgent:
                     'Could not set pid because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            print('set_pid() called')
             self.pid.set_pid(
                 [params['p_param'], params['i_param'], params['d_param']])
 
@@ -154,7 +150,6 @@ class RotationAgent:
                     'Could not get freq because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            print('get_freq() called')
             self.pid.get_freq()
 
         return self.pid.cur_freq, 'Current frequency = {}'.format(self.pid.cur_freq)
@@ -171,7 +166,6 @@ class RotationAgent:
                 self.log.warn(
                     'Could not get freq because {} is already running'.format(self.lock.job))
 
-            print('get_direction() called')
             self.pid.get_direction()
 
         return self.pid.direction, 'Current Direction = {}'.format(['Forward', 'Reverse'][self.pid.direction])
@@ -191,7 +185,6 @@ class RotationAgent:
                 self.log.warn(
                     'Could not set direction because {} is already running'.format(self.lock.job))
 
-            print('set_direction() called')
             self.pid.set_direction(params['direction'])
 
         return True, 'Set direction'
@@ -216,7 +209,6 @@ class RotationAgent:
                 self.log.warn(
                     'Could not set scale because {} is already running'.format(self.lock.job))
 
-            print('set_scale() called')
             self.pid.set_scale(params['slope'], params['offset'])
 
         return True, 'Set scale'
@@ -235,7 +227,6 @@ class RotationAgent:
 
             self.switching = True
             time.sleep(1)
-            print('set_on() called')
             self.cmd.user_input('on')
             self.switching = False
 
@@ -255,7 +246,6 @@ class RotationAgent:
 
             self.switching = True
             time.sleep(1)
-            print('set_off() called')
             self.cmd.user_input('off')
             self.switching = False
 
@@ -279,7 +269,6 @@ class RotationAgent:
 
             self.switching = True
             time.sleep(1)
-            print('set_v() called')
             self.cmd.user_input('V {}'.format(params['volt']))
             self.switching = False
 
@@ -303,7 +292,6 @@ class RotationAgent:
 
             self.switching = True
             time.sleep(1)
-            print('set_v_lim() called')
             print(params['volt'])
             self.cmd.user_input('VL {}'.format(params['volt']))
             self.switching = False
@@ -325,7 +313,6 @@ class RotationAgent:
 
             self.switching = True
             time.sleep(1)
-            print('use_ext() called')
             self.cmd.user_input('U')
             self.switching = False
 
@@ -346,7 +333,6 @@ class RotationAgent:
 
             self.switching = True
             time.sleep(1)
-            print('ign_ext() called')
             self.cmd.user_input('I')
             self.switching = False
 
@@ -373,7 +359,6 @@ class RotationAgent:
 
         self.take_data = True
 
-        print('Starting IV acq')
         while self.take_data:
             data = {'timestamp': time.time(),
                     'block_name': 'HWPKikusui_IV', 'data': {}}
@@ -398,7 +383,6 @@ class RotationAgent:
         Stop iv_acq process.
         """
         if self.take_data:
-            print('Stopping IV acq')
             self.take_data = False
             return True, 'requested to stop taking data'
 
