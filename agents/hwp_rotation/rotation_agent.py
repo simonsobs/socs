@@ -51,10 +51,11 @@ class RotationAgent:
             print('Could not establish connection to PID controller')
             sys.exit(0)
 
-    def tune_stop(self, session, params = None):
-        """tune_stop(params = None)
+    def tune_stop(self, session, params):
+        """tune_stop()
         
-        Reverses the drive direction of the PID controller and optimizes the PID parameters for deceleration
+        **Task** - Reverse the drive direction of the PID controller and
+        optimize the PID parameters for deceleration.
 
         """
         with self.lock.acquire_timeout(0, job = 'tune_stop') as acquired:
@@ -67,10 +68,11 @@ class RotationAgent:
         
         return True, 'Reversing Direction'
 
-    def tune_freq(self, session, params = None):
-        """tune_freq(params = None)
+    def tune_freq(self, session, params):
+        """tune_freq()
         
-        Tunes the PID controller setpoint to the rotation frequency and optimizes the PID parameters for rotation
+        **Task** - Tune the PID controller setpoint to the rotation frequency
+        and optimize the PID parameters for rotation.
 
         """
         with self.lock.acquire_timeout(0, job = 'tune_freq') as acquired:
@@ -84,13 +86,11 @@ class RotationAgent:
         return True, 'Tuning to setpoint'
 
     @ocs_agent.param('freq', default = 0., check = lambda x: 0. <= x <= 3.0)
-    def declare_freq(self, session, params = None):
-        """declare_freq(params = None)
+    def declare_freq(self, session, params):
+        """declare_freq(freq=0)
         
-        Stores the entered frequency as the PID setpoint when tune_freq is next called
-
-        Args:
-            params (dict): Parameters dictionary for passing parameters to task
+        **Task** - Store the entered frequency as the PID setpoint when
+        ``tune_freq()`` is next called.
 
         Parameters:
             freq (float): Desired HWP rotation frequency 
@@ -106,21 +106,19 @@ class RotationAgent:
 
         return True, 'Setpoint at {} Hz'.format(params['freq'])
 
-    @ocs_agent.param('p_param', default = 0.2, check = lambda x: 0. < x <= 8.)
+    @ocs_agent.param('p_param', default = 0.2, type = float, check = lambda x: 0. < x <= 8.)
     @ocs_agent.param('i_param', default = 63, type = int, check = lambda x: 0 <= x <= 200)
     @ocs_agent.param('d_param', default = 0., type = float, check = lambda x: 0. <= x < 10.)
-    def set_pid(self, session, params = None):
-        """set_pid(params = None)
+    def set_pid(self, session, params):
+        """set_pid(p_param=0.2, i_param=63, d_param=0.)
         
-        Sets the PID parameters. Note these changes are for the current session only and will change 
-        whenever the agent container is reloaded
-
-        Args:
-            params (dict): Parameters dictionary for passing parameters to task
+        **Task** - Set the PID parameters. Note these changes are for the
+        current session only and will change whenever the agent container is
+        reloaded.
 
         Parameters:
             p_param (float): Proportional PID value
-            i_param (float): Integral PID value
+            i_param (int): Integral PID value
             d_param (float): Derivative PID value
 
         """
@@ -134,10 +132,11 @@ class RotationAgent:
 
         return True, 'Set PID params to p: {}, i: {}, d: {}'.format(p_param, i_param, d_param)
 
-    def get_freq(self, session, params = None):
-        """get_freq(params = None)
+    def get_freq(self, session, params):
+        """get_freq()
         
-        Returns the current HWP frequency as seen by the PID controller
+        **Task** - Return the current HWP frequency as seen by the PID
+        controller.
 
         """
         with self.lock.acquire_timeout(0, job = 'get_freq') as acquired:
@@ -150,10 +149,11 @@ class RotationAgent:
 
         return self.pid.cur_freq, 'Current frequency = {}'.format(self.pid.cur_freq)
 
-    def get_direction(self, session, params = None):
-        """get_direction(params = None
+    def get_direction(self, session, params):
+        """get_direction()
 
-        Returns the current HWP tune direction as seen by the PID controller 
+        **Task** - Return the current HWP tune direction as seen by the PID
+        controller.
 
         """
         with self.lock.acquire_timeout(0, job = 'get_direction') as acquired:
@@ -166,16 +166,13 @@ class RotationAgent:
         return self.pid.direction, 'Current Direction = {}'.format(['Forward', 'Reverse'][self.pid.direction])
 
     @ocs_agent.param('direction', default = '0', choices = ['0', '1'])
-    def set_direction(self, session, params = None):
-        """set_direction(params = None)
+    def set_direction(self, session, params):
+        """set_direction(direction='0')
         
-        Sets the HWP rotation direction
-
-        Args:
-            params (dict): Parameters dictionary for passing parameters to task
+        **Task** - Set the HWP rotation direction.
 
         Parameters:
-            direction (str, optional): '0' for forward and '1' for reverse. Default is '0'
+            direction (str): '0' for forward and '1' for reverse.
 
         """
         with self.lock.acquire_timeout(0, job = 'set_direction') as acquired:
@@ -187,19 +184,19 @@ class RotationAgent:
 
         return True, 'Set direction'
 
-    @ocs_agent.param('slope', default = 1., check = lambda x: -10. < x < 10.)
-    @ocs_agent.param('offset', default = 0., check = lambda x: -10. < x < 10.)
-    def set_scale(self, session, params = None):
-        """set_scale(params = None)
+    @ocs_agent.param('slope', default = 1., type = float, check = lambda x: -10. < x < 10.)
+    @ocs_agent.param('offset', default = 0., type = float, check = lambda x: -10. < x < 10.)
+    def set_scale(self, session, params):
+        """set_scale(slope=1, offset=0)
         
-        Sets the PID's internal conversion from input voltage to rotation frequency
-
-        Args:
-            params (dict): Parameters dictionary for passing parameters to task
+        **Task** - Set the PID's internal conversion from input voltage to
+        rotation frequency.
 
         Parameters:
-            slope (float): Slope of the "rotation frequency vs input voltage" relationship
-            offset (float): y-intercept of the "rotation frequency vs input voltage" relationship
+            slope (float): Slope of the "rotation frequency vs input voltage"
+                relationship
+            offset (float): y-intercept of the "rotation frequency vs input
+                voltage" relationship
 
         """
         with self.lock.acquire_timeout(0, job = 'set_scale') as acquired:
@@ -211,10 +208,10 @@ class RotationAgent:
 
         return True, 'Set scale'
 
-    def set_on(self, session, params = None):
-        """set_on(params = None)
+    def set_on(self, session, params):
+        """set_on()
         
-        Turns on the Kikusui drive voltage
+        **Task** - Turn on the Kikusui drive voltage.
 
         """
         with self.lock.acquire_timeout(0, job = 'set_on') as acquired:
@@ -230,10 +227,10 @@ class RotationAgent:
 
         return True, 'Set Kikusui on'
 
-    def set_off(self, session, params = None):
-        """set_off(params = None)
+    def set_off(self, session, params):
+        """set_off()
         
-        Turns off the Kikusui drive voltage
+        **Task** - Turn off the Kikusui drive voltage.
 
         """
         with self.lock.acquire_timeout(0, job = 'set_off') as acquired:
@@ -249,14 +246,11 @@ class RotationAgent:
 
         return True, 'Set Kikusui off'
 
-    @ocs_agent.param('volt', default = 0, check = lambda x: 0 <= x <= 35)
-    def set_v(self, session, params = None):
-        """set_v(params = None)
+    @ocs_agent.param('volt', default = 0, type = float, check = lambda x: 0 <= x <= 35)
+    def set_v(self, session, params):
+        """set_v(volt=0)
         
-        Sets the Kikusui drive voltage
-
-        Args:
-            params (dict): Parameters dictionary for passing parameters to task
+        **Task** - Set the Kikusui drive voltage.
 
         Parameters:
             volt (float): Kikusui set voltage
@@ -275,14 +269,11 @@ class RotationAgent:
 
         return True, 'Set Kikusui voltage to {} V'.format(params['volt'])
 
-    @ocs_agent.param('volt', default = 32., check = lambda x: 0. <= x <= 35.)
-    def set_v_lim(self, session, params = None):
-        """set_v_lim(params = None)
+    @ocs_agent.param('volt', default = 32., type = float, check = lambda x: 0. <= x <= 35.)
+    def set_v_lim(self, session, params):
+        """set_v_lim(volt=32)
         
-        Sets the Kikusui drive voltage limit
-
-        Args:
-            params (dict): Parameters dictionary for passing parameters to task
+        **Task** - Set the Kikusui drive voltage limit.
 
         Parameters:
             volt (float): Kikusui limit voltage
@@ -302,10 +293,11 @@ class RotationAgent:
 
         return True, 'Set Kikusui voltage limit to {} V'.format(params['volt'])
 
-    def use_ext(self, session, params = None): 
-        """use_ext(params = None)
+    def use_ext(self, session, params):
+        """use_ext()
         
-        Set's the Kikusui to use an external voltage control. Doing so enables PID control
+        **Task** - Set the Kikusui to use an external voltage control. Doing so
+        enables PID control.
 
         """
         with self.lock.acquire_timeout(0, job = 'use_ext') as acquired:
@@ -321,10 +313,11 @@ class RotationAgent:
 
         return True, 'Set Kikusui voltage to PID control'
 
-    def ign_ext(self, session, params = None):
-        """ign_ext(params = None)
+    def ign_ext(self, session, params):
+        """ign_ext()
         
-        Set's the Kiksui to ignore external voltage control. Doing so disables the PID and switches to direct control
+        **Task** - Set the Kiksui to ignore external voltage control. Doing so
+        disables the PID and switches to direct control.
 
         """
         with self.lock.acquire_timeout(0, job = 'ign_ext') as acquired:
@@ -340,12 +333,13 @@ class RotationAgent:
 
         return True, 'Set Kikusui voltage to direct control'
 
-    def start_iv_acq(self, session, params = None):
-        """start_iv_acq(params = None)
+    def iv_acq(self, session, params):
+        """iv_acq()
 
-        Method to start Kikusui data acquisition process
+        **Process** - Start Kikusui data acquisition.
 
-        The most recent data collected is stored in the structure:
+        The most recent data collected is stored in the structure::
+
             >>> data
             {'kikusui_volt': 0, 'kikusui_curr': 0}
 
@@ -379,9 +373,9 @@ class RotationAgent:
         self.agent.feeds['hwprotation'].flush_buffer()
         return True, 'Acqusition exited cleanly'
 
-    def stop_iv_acq(self, session, params = None):
+    def _stop_iv_acq(self, session, params):
         """
-        Stops acq process
+        Stop iv_acq process.
         """
         if self.take_data:
             print('Stopping IV acq')
@@ -415,8 +409,8 @@ if __name__ == '__main__':
                                           kikusui_port = args.kikusui_port,
                                           pid_ip = args.pid_ip,
                                           pid_port = args.pid_port)
-    agent.register_process('iv_acq', rotation_agent.start_iv_acq,
-                           rotation_agent.stop_iv_acq, startup = True)
+    agent.register_process('iv_acq', rotation_agent.iv_acq,
+                           rotation_agent._stop_iv_acq, startup = True)
     agent.register_task('tune_stop', rotation_agent.tune_stop)
     agent.register_task('tune_freq', rotation_agent.tune_freq)
     agent.register_task('declare_freq', rotation_agent.declare_freq)
