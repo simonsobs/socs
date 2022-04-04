@@ -374,8 +374,7 @@ class RotationAgent:
                 data['data']['kikusui_volt'] = v_val
                 data['data']['kikusui_curr'] = i_val
 
-                if type(data['data']['kikusui_curr']) == float and type(data['data']['kikusui_volt']) == float:
-                    self.agent.publish_to_feed('hwprotation', data)
+                self.agent.publish_to_feed('hwprotation', data)
 
                 session.data = {'kikusui_volt': v_val,
                                 'kikusui_curr': i_val,
