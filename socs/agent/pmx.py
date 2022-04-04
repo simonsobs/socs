@@ -3,8 +3,7 @@ import serial
 import sys
 import os
 
-from . import moxaSerial as mx
-
+from socs.agent import moxaSerial as mx
 
 class PMX:
     """The PMX object is for communicating with the Kikusui PMX power supplies.
