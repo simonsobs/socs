@@ -42,6 +42,7 @@ Simulator Reference  Simulators are used to mock software and hardware
     agents/chwp_encoder
     agents/cryomech_cpa
     agents/fts_agent
+    agents/hwp_rotation_agent
     agents/labjack
     agents/lakeshore240
     agents/lakeshore336
