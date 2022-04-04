@@ -42,14 +42,14 @@ class RotationAgent:
             print('Connected to Kikusui power supply')
         except:
             print('Could not establish connection to Kikusui power supply')
-            sys.exit(0)
+            sys.exit(1)
 
         try:
             self.pid = pd.PID(pid_ip = self.pid_ip, pid_port = self.pid_port)
             print('Connected to PID controller')
         except:
             print('Could not establish connection to PID controller')
-            sys.exit(0)
+            sys.exit(1)
 
     def tune_stop(self, session, params):
         """tune_stop()
