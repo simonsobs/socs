@@ -5,6 +5,8 @@ import subprocess
 import shutil
 import pytest
 import threading
+import asyncio
+import telnetlib3
 
 
 def create_device_emulator(responses, relay_type, port=9001):
@@ -16,9 +18,10 @@ def create_device_emulator(responses, relay_type, port=9001):
     Args:
         responses (dict): Dictionary with commands as keys, and responses as
             values. See :class:`.DeviceEmulator` for details.
-        relay_type (str): Communication relay type. Either 'serial' or 'tcp'.
+        relay_type (str): Communication relay type. Either 'serial', 'tcp', or
+            'telnet'.
         port (int): Port for the TCP relay to listen for connections on.
-            Defaults to 9001. Only used if relay_type is 'tcp'.
+            Defaults to 9001. Only used if relay_type is 'tcp' or 'telnet'.
 
     Returns:
         function:
@@ -26,7 +29,7 @@ def create_device_emulator(responses, relay_type, port=9001):
             type.
 
     """
-    if relay_type not in ['serial', 'tcp']:
+    if relay_type not in ['serial', 'tcp', 'telnet']:
         raise NotImplementedError(f"relay_type '{relay_type}' is not" +
                                   "implemented or is an invalid type")
 
@@ -38,6 +41,8 @@ def create_device_emulator(responses, relay_type, port=9001):
             device.create_serial_relay()
         elif relay_type == 'tcp':
             device.create_tcp_relay(port)
+        elif relay_type == 'telnet':
+            device.create_telnet_relay(port)
 
         yield device
 
@@ -175,7 +180,7 @@ class DeviceEmulator:
         itself.
 
         """
-        #print('shutting down background reading')
+        print('shutting down background reading')
         self._read = False
         time.sleep(1)
         if self._type == 'serial':
@@ -183,6 +188,12 @@ class DeviceEmulator:
             self.proc.terminate()
             out, err = self.proc.communicate()
             #print(out, err)
+        if self._type == 'telnet':
+            print(dir(self.telnet_server))
+            print('closing telnet server')
+            self.telnet_server.close()
+            print('closing telnet server')
+            #self.coro.close()
 
     def _read_socket(self, port):
         """Loop until shutdown, reading any commands sent over the relay.
@@ -236,6 +247,50 @@ class DeviceEmulator:
         self._type = 'tcp'
         bkg_read = threading.Thread(name='background',
                                     target=self._read_socket,
+                                    kwargs={'port': port})
+        bkg_read.start()
+
+    def _create_telnet_server(self, port):
+        async def shell(reader, writer):
+            inp = await reader.readline()
+            print(inp)
+            print('LOOK', inp)
+            print(self.responses)
+            if inp in self.responses:
+                #writer.echo(inp)
+                response = self._get_response(inp)
+                writer.write(response)
+                await writer.drain()
+            else:
+                #writer.echo(inp)
+                #writer.write('\r\nI dont understand.\r\n')
+                print('I dont understand')
+            writer.close()
+
+        print('starting telnet server')
+        loop = asyncio.get_event_loop_policy().new_event_loop()
+        self.coro = telnetlib3.create_server(port=port, shell=shell)
+        self.telnet_server = loop.run_until_complete(self.coro)
+        loop.run_until_complete(self.telnet_server.wait_closed())
+        print('telnet server closed')
+
+    def create_telnet_relay(self, port):
+        """Create the telnet relay, emulating a hardware device connected over
+        telnet.
+
+        Creates a telnet server running in a thread, ready to accept commands.
+        Expected responses can be defined within a test using
+        DeviceEmulator.define_responses() after instantiation of the
+        DeviceEmulator object within a given test.
+
+        Args:
+            port (int): Port for the telnet relay to listen for connections on.
+
+        """
+        self._type = 'telnet'
+        print("Device emulator backgrounding telnet server")
+        bkg_read = threading.Thread(name='telnet_background',
+                                    target=self._create_telnet_server,
                                     kwargs={'port': port})
         bkg_read.start()
 

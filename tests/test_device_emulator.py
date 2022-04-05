@@ -1,12 +1,15 @@
 import time
 import socket
 import pytest
+from telnetlib import Telnet
 
 from socs.testing import device_emulator
 
 
 tcp_emulator = device_emulator.create_device_emulator({'ping': 'pong'},
                                                       'tcp', 9001)
+telnet_emulator = device_emulator.create_device_emulator({'ping': 'pong'},
+                                                         'telnet', 9002)
 
 
 def test_create_device_emulator_invalid_type():
@@ -27,3 +30,19 @@ def test_create_device_emulator_tcp_relay(tcp_emulator):
         s.sendall(b'ping')
         data = s.recv(1024).decode()
     assert data == 'pong'
+
+
+def test_create_device_emulator_telnet_relay(telnet_emulator):
+    with Telnet() as tn:
+        for i in range(5):
+            try:
+                tn.open('localhost', 9002)
+                break
+            except ConnectionRefusedError:
+                print("Could not connect, waiting and trying again.")
+                time.sleep(1)
+        tn.write(b'ping\r\n')
+        response = tn.read_some()
+        print(response)
+
+    print('outside')

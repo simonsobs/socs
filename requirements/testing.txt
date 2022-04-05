@@ -4,5 +4,6 @@ pytest-docker-compose
 pytest-dependency
 pytest-order
 so3g
+telnetlib3
 
 -r ../agents/pfeiffer_tc400/requirements.txt
