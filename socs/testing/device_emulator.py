@@ -252,6 +252,7 @@ class DeviceEmulator:
 
     def _create_telnet_server(self, port):
         async def shell(reader, writer):
+            print('before readline')
             inp = await reader.readline()
             print(inp)
             print('LOOK', inp)
@@ -261,6 +262,10 @@ class DeviceEmulator:
                 response = self._get_response(inp)
                 writer.write(response)
                 await writer.drain()
+            elif inp.strip() == 'exit':
+                # We can successfully close within this shell...
+                print('ABORTING')
+                self.telnet_server.close()
             else:
                 #writer.echo(inp)
                 #writer.write('\r\nI dont understand.\r\n')
@@ -293,6 +298,7 @@ class DeviceEmulator:
                                     target=self._create_telnet_server,
                                     kwargs={'port': port})
         bkg_read.start()
+        print("Post thread start")
 
     def define_responses(self, responses, default_response=None):
         """Define what responses are available to reply with on the configured
