@@ -180,7 +180,7 @@ class DeviceEmulator:
         itself.
 
         """
-        print('shutting down background reading')
+        #print('shutting down background reading')
         self._read = False
         time.sleep(1)
         if self._type == 'serial':
@@ -188,12 +188,13 @@ class DeviceEmulator:
             self.proc.terminate()
             out, err = self.proc.communicate()
             #print(out, err)
-        if self._type == 'telnet':
-            print(dir(self.telnet_server))
-            print('closing telnet server')
-            self.telnet_server.close()
-            print('closing telnet server')
-            #self.coro.close()
+        # This doesn't work, I think maybe because close() needs to be awaited,
+        # but the event loop is in a separate thread...would be nice to figure
+        # out, but we have a work around in place with sending an exit message
+        # to shutdown within the server shell.
+        #if self._type == 'telnet':
+        #    self.telnet_server.close()
+        #    print('closing telnet server')
 
     def _read_socket(self, port):
         """Loop until shutdown, reading any commands sent over the relay.
@@ -252,27 +253,22 @@ class DeviceEmulator:
 
     def _create_telnet_server(self, port):
         async def shell(reader, writer):
-            print('before readline')
-            inp = await reader.readline()
-            print(inp)
-            print('LOOK', inp)
-            print(self.responses)
-            if inp in self.responses:
-                #writer.echo(inp)
-                response = self._get_response(inp)
-                writer.write(response)
-                await writer.drain()
-            elif inp.strip() == 'exit':
-                # We can successfully close within this shell...
-                print('ABORTING')
-                self.telnet_server.close()
-            else:
-                #writer.echo(inp)
-                #writer.write('\r\nI dont understand.\r\n')
-                print('I dont understand')
+            read_loop = True
+            while read_loop:
+                inp = await reader.readline()
+                print(f'telnet server received: {inp}')
+                if inp in self.responses:
+                    response = self._get_response(inp)
+                    writer.write(response)
+                    await writer.drain()
+                elif inp.strip() == 'exit':
+                    # We can successfully close within this shell...
+                    print('shutting down telnet server')
+                    self.telnet_server.close()
+                    read_loop = False
+                await asyncio.sleep(1)
             writer.close()
 
-        print('starting telnet server')
         loop = asyncio.get_event_loop_policy().new_event_loop()
         self.coro = telnetlib3.create_server(port=port, shell=shell)
         self.telnet_server = loop.run_until_complete(self.coro)
