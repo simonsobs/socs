@@ -51,6 +51,31 @@ def load_frame_data(frame):
     return times, data
 
 
+def sleep_while_running(duration, session, interval=1):
+    """
+    Sleeps for a certain duration as long as a session object's status is
+    'starting' or 'running'. If the session is changed to 'stopping',
+    this will quickly return False. If the sleep is completed without
+    interruption this will return True.
+
+    Args
+    ----
+    duration : float
+        Amount of time (sec) to sleep for.
+    session : OpSessions
+        Session whose status should be monitored
+    interval : float, optional
+        Polling interval (sec) to check the session status. Defaults to 1 sec.
+    """
+    end_time = time.time() + duration
+    while session.status in ['starting', 'running']:
+        now = time.time()
+        if now >= end_time:
+            return True
+        time.sleep(min(interval, end_time - now))
+    return False
+
+
 class FIRFilter:
     """
     Class for Finite Input Response filter. Filter phases are preserved between
@@ -318,23 +343,29 @@ class FocalplaneConfig:
         import pandas as pd
         fp = cls()
         df = pd.read_csv(detmap_file)
-        cmaps = {
-            90: ['red_cmap', 'blue_cmap'],
-            150: ['blue_cmap', 'red_cmap']
-        }
-        templates = {
-            90: "template_c0_p0",
-            150: "template_c1_p0",
-        }
 
+        cmaps = [
+            ['red_cmap', 'blue_cmap'],
+            ['blue_cmap', 'red_cmap'],
+        ]
+        templates = ["template_c0_p0", "template_c1_p0",]
+
+        color_idxs = {}
+        ncolors = 0
         for i, row in df.iterrows():
             rot = 0
             try:
                 bandpass = int(row['bandpass'])
-                template = templates[bandpass]
+                if bandpass in color_idxs:
+                    cidx = color_idxs[bandpass]
+                else:
+                    color_idxs[bandpass] = ncolors
+                    ncolors += 1
+                    cidx = color_idxs[bandpass]
+
+                template = templates[cidx]
                 if row['pol'].strip() == 'B':
                     rot = np.pi / 2
-
             except ValueError:
                 # Just skip detctors with unknown bandpass
                 continue
@@ -348,7 +379,7 @@ class FocalplaneConfig:
             eq_labels = ['raw', 'rms']
 
             fp.add_vis_elem(name, x, y, rot, value_names, eqs, eq_labels,
-                            cmaps[bandpass], template, i, [True, False])
+                            cmaps[cidx], template, i, [True, False])
 
         return fp
 
@@ -618,7 +649,6 @@ class MagpieAgent:
 
         """
         self._send_running = True
-        session.set_status('running')
 
         first_frame_time = None
         stream_start_time = None
@@ -628,7 +658,8 @@ class MagpieAgent:
         )
 
         sender.Process(self.fp.config_frame())
-        while self._send_running:
+        session.set_status('running')
+        while session.status in ['starting', 'running']:
             f = self.out_queue.get(block=True)
             t = f['timestamp'].time / core.G3Units.s
             now = time.time()
@@ -637,8 +668,7 @@ class MagpieAgent:
                 stream_start_time = now
 
             this_frame_time = stream_start_time + (t - first_frame_time) + self.delay
-            if this_frame_time > now:
-                time.sleep(this_frame_time - now)
+            res = sleep_while_running(this_frame_time - now, session)
             sender.Process(f)
 
         return True, "Stopped send process"
