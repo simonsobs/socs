@@ -29,7 +29,7 @@ Site Config
 ````````````
 Below is the site-config entry for the magpie instance we have running at UCSD
 on K2SO. We are displaying detectors using a wafer layout, determined by
-a tune map csv file, with a target sample rate of 20 Hz::
+a detmap csv file, with a target sample rate of 20 Hz::
 
       {'agent-class': 'MagpieAgent',
        'instance-id': 'magpie-crate1slot2',
@@ -40,17 +40,19 @@ a tune map csv file, with a target sample rate of 20 Hz::
 
          '--dest', 8675,
          '--delay', 5,
-         '--target-rate', 20
-         '--layout', 'wafer',
+         '--target-rate', 20,
 
+         '--layout', 'wafer',
          # Detmap CSV file
-         '--csv-file', '/home/jlashner/lyrebird_demo/detmap.csv',
+         '--det-map', '/home/jlashner/lyrebird_demo/detmap.csv',
          '--offset', 0, 0,
        ]},
 
 Docker
 ```````
-Below is an example docker-compose entry for running magpie::
+Below is an example docker-compose entry for running magpie. If crossbar
+is being run on a different server, you'll have to modify the ``site-hub``
+and ``site-http`` args accordingly::
 
     ocs-magpie:
         image: simonsobs/ocs-magpie:${SOCS_TAG}
@@ -62,8 +64,8 @@ Below is an example docker-compose entry for running magpie::
             - ${OCS_CONFIG_DIR}:/config
             - /data:/data
         command:
-            - "--site-hub=ws://${CB_HOST}:8001/ws"
-            - "--site-http=http://${CB_HOST}:8001/call"
+            - "--site-hub=ws://localhost:8001/ws"
+            - "--site-http=http://localhost:8001/call"
 
 Lyrebird
 ------------
@@ -122,8 +124,163 @@ To get lyrebird running, you must bring software up in the following order:
 
       run_lyrebird --port 8675 8676
 
-   and this will start lyrebird for the two corresponding slots.
+   and this will start lyrebird for the two corresponding slotkjs.
 
+
+Operation
+``````````````
+This section will describe the main operation of the SO fork is lyrebird.
+This isn't necessary for running magpie, but this isn't well documented in
+the lyrebird repo so this may be useful for future development.
+
+On startup, lyrebird will attempt to connect to a G3NetworkSender streaming
+on any ports specified in the lyrebird config file. The first frame read
+from the port must be a config frame containing details on how lyrebird
+should display the focal-plane.
+
+A config file for a focal-plane with `nchans` channels will contain the
+following fields:
+
+ - ``x``: Array of len ``nchans`` with the x-coords of the visual element for
+   each channel
+ - ``y``: Array of len ``nchans`` with the y-coords of the visual element for
+   each channel
+ - ``cname``: Array of len ``nchans`` the base name for each channel. This is something
+   like ``<magpie-instance-id>/channel_10``
+ - ``rotation``: Array of len ``nchans`` containing how many rads each vis elem should
+   be rotated when drawn.
+ - ``templates``: Array of len ``nchans`` containing the det template (defined in the
+ - ``values``: Array of len ``n * nchans`` containing data values corresponding
+   to a given channel. These must be unique, and are of the form
+   ``<cname>/<value_name>``
+ - ``eqs``: Array of len ``m * nchans`` containing the equation descriptions for
+   each channel. See below for a full description, but these will be something
+   like ``/ + 1 s <cname>/<valuename> 2``.
+ - ``eq_labels``: Array of len ``m * nchans`` containing the labels for each
+   individual equation. These are what will be displayed in the lyrebird menu
+   gui, and can be something like ``osc-tod`` or ``rms``.
+ - ``color_is_dynamic``: Array of len ``m * nchans`` containing bools that
+   determined if the eq values should be dynamically adjusted before passing
+   to the colormap. If this is False, the eq output will be sent directly to the
+   colormap. If True, the eq output will first be mapped to a value in the
+   range (0, 1) by interpolating between the min/max values in the lyrebird
+   data buffer.
+ - ``cmaps``: Array of len ``m * nchans`` containing the name of the colormap
+   to use to display each equation.
+
+Data Values
+""""""""""""
+**data values** are named values that lyrebird buffers and tracks internally,
+and can be used in equation evaluations.
+
+A number of data values can be stored per detector channel (as long as this
+number is the same for all detector channels). So for instance if you want
+to keep track of the detector TOD, rms, bias-group, and whether the channel
+is flagged, you'll need to register the data values ``<cname>/tod``,
+``<cname>/bg``, ``<cname>/rms``, ``<cname>/flagged`` for each detector.
+
+Equations
+""""""""""
+Lyrebird can also store any number of **equations** for each detector channel.
+This number can be different from the number of data values, but the number
+of equations must be the same for each detector.
+These equations are what are actually visualized for each channel in the
+lyrebird GUI. 
+
+The equations are registered as strings in the 
+`Polish Notation <https://en.wikipedia.org/wiki/Polish_notation>`_. This is
+a method of describing equations where the operator comes before the operands,
+and is a notation that is very easy to parse and evaluate. For example, the
+operation :math:`a + b` will be ``+ a b`` in polish notation, and :math:`(a +
+b) / 2` can be written as ``/ + a b 2``. Operands can either be numeric values
+or registered data values, including both channel-specific data values such
+as ``<cname>/tod`` and global data values that are registered in the lyrebird
+config variable.
+
+Below is a full table of operators that can be interpreted by lyrebird:
+
+.. list-table:: Lyrebird Equation Operations
+   :widths: 25 25 25 25
+   :header-rows: 0
+
+   * - ``+ x y``
+     - :math:`x + y`
+     - ``| x y``
+     - :math:`x \;\mathrm{or}\; y`
+   * - ``- x y``
+     - :math:`x - y`
+     - ``= x y``
+     - :math:`x == y`
+   * - ``* x y``
+     - :math:`x * y`
+     - ``! x``
+     - :math:`\mathrm{not}\; x`
+   * - ``/ x y``
+     - :math:`x / y`
+     - ``& x y``
+     - :math:`x \;\mathrm{and}\; y`
+   * - ``% x y``
+     - :math:`x % y`
+     - ``c x``
+     - :math:`\cos(x)`
+   * - ``a x``
+     - :math:`\left|x\right|`
+     - ``t x``
+     - :math:`\tan(x)`
+   * - ``^ x y``
+     - :math:`x^y`
+     - ``T x``
+     - :math:`\arctan(x)`
+   * - ``s x``
+     - :math:`\sin(x)`
+     - ``q x``
+     - :math:`\sqrt{x}`
+
+
+For a more complex equation you might want to do something like display the
+TOD value if a channel is not flagged, and if it is flagged send it to -1.
+This example is done with the string::
+
+    + * ! flagged tod * -1 flagged
+
+which describes the equation:
+
+.. math::
+
+   \mathrm{tod} \times (! \mathrm{flagged}) + -1 \times \mathrm{flagged}
+
+The displayed equation can be selected by changing the **displayed_eq** idx in the
+lyrebird GUI.
+
+Color Maps
+""""""""""""
+
+After equations are evaluated, the results will be passed to the specified
+color map to determine what color the visual element should be drawn with.
+
+Below are the colormaps available in lyrebird. Generally these take in
+arbitrary floats, but will clamp them into the range [0, 1]. Along with the
+standard cmaps, there are additional *bolo_cmaps*, that map different regions
+of the range [0, 1] to varying colors to for different purposes. If the value
+is 0 or infinite, the vis-elem will be colored grey. The range (0, 0.3) will be
+colored bright red, and then the range (.3, 1) will be a gradient from black
+to a base color to white as pictured below..
+
+.. image:: ../_static/images/lyrebird_cmaps.png
+  :width: 1200
+  :alt: Lyrebird Colormaps
+
+There are additional colormaps ``white_cmap_fs`` and ``rainbow_cmap_fs`` that
+are identical to their counterparts above but instead map onto the range [-1, 1].
+The colormap ``phase_cmap`` is identical to ``rainbow_cmap`` but maps the range
+:math:`[0, \pi]`.
+
+
+If an equation's color is set to be dynamic, each equation value will be mapped
+to the range [0, 1] by interpolating between the min and max value in the
+equation's data buffer. This allows you to view changes equations that span a
+large range with a high dynamic-range, but makes direct channel-to-channel
+comparison impossible.
 
 Detector Layouts
 -----------------
@@ -202,6 +359,7 @@ you don't need to provide a data-source::
          '--offset', 0, 0,
          '--fake-data',
        ]},
+
 
 
 API

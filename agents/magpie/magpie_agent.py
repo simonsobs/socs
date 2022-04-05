@@ -9,10 +9,9 @@ import ast
 from scipy import signal
 import queue
 import time
-ON_RTD = os.environ.get('READTHEDOCS') == 'True'
+from ocs import ocs_agent, site_config
 
-if not ON_RTD:
-    from ocs import ocs_agent, site_config
+MAX_CHANS = 4096
 
 
 # Map from primary key-names to their index in the SuperTimestream
@@ -59,7 +58,7 @@ class FIRFilter:
     """
     def __init__(self, b, a, nchans=None):
         if nchans is None:
-            nchans = 4096
+            nchans = MAX_CHANS
         self.b = b
         self.a = a
         self.z = np.zeros((nchans, len(b)-1))
@@ -170,7 +169,7 @@ class FocalplaneConfig:
         self.eq_labels = []
         self.eq_color_is_dynamic = []
         self.cmaps = []
-        self.chan_mask = np.full(4096, -1)
+        self.chan_mask = np.full(MAX_CHANS, -1)
 
     def config_frame(self):
         """
@@ -216,6 +215,13 @@ class FocalplaneConfig:
             the lyrebird config file, or channel values as defined in the
             ``value_names`` argument. There must be the same number of eqs per
             visual element.
+
+            Polish notation is a method of writing equations where operators
+            precede the operands, making it easier to parse and evaluate. For
+            example, the operation :math:`a + b` will be ``+ a b`` in polish
+            notation, and :math:`(a + b) / 2` can be written as ``/ + a b 2``.
+            See the magpie docs page for a full list of operators that are
+            accepted by lyrebird.
         eq_labels : List[str]
             List of strings used to label equations in the lyrebird gui. This
             list must have the same size as the ``eqs`` array.
@@ -289,7 +295,7 @@ class FocalplaneConfig:
         return fp
 
     @classmethod
-    def from_csv(cls, stream_id, csv_file, wafer_scale=1., offset=(0, 0)):
+    def from_csv(cls, stream_id, detmap_file, wafer_scale=1., offset=(0, 0)):
         """
         Creatse a FocalplaneConfig object from a detmap csv file.
 
@@ -298,7 +304,7 @@ class FocalplaneConfig:
         stream_id : str
             Stream-id for the magpie agent. This will be prepended to all
             lyrebird data-val names.
-        csv_file : str
+        detmap_file : str
             Path to detmap csv file.
         wafer_scale : int
             Scalar to multiply against det x and y positions when translating
@@ -311,7 +317,7 @@ class FocalplaneConfig:
         """
         import pandas as pd
         fp = cls()
-        df = pd.read_csv(csv_file)
+        df = pd.read_csv(detmap_file)
         cmaps = {
             90: ['red_cmap', 'blue_cmap'],
             150: ['blue_cmap', 'red_cmap']
@@ -390,15 +396,15 @@ class MagpieAgent:
                 args.stream_id, args.xdim, args.ydim, ygap=8, offset=args.offset
             )
         elif layout == 'wafer':
-            if args.csv_file is not None:
+            if args.det_map is not None:
                 self.fp = FocalplaneConfig.from_csv(
-                    args.stream_id, args.csv_file, wafer_scale=args.wafer_scale, offset=args.offset
+                    args.stream_id, args.det_map, wafer_scale=args.wafer_scale, offset=args.offset
                 )
             else:
-                raise ValueError("CSV file must be set using the csv-file arg if "
+                raise ValueError("CSV file must be set using the det-map arg if "
                                  "using wafer layout")
 
-        self.mask = np.arange(4096)
+        self.mask = np.arange(MAX_CHANS)
         self.out_queue = queue.Queue(1000)
         self.delay = args.delay
 
@@ -653,7 +659,9 @@ def make_parser(parser=None):
     parser.add_argument('--stream-id', type=str, default='none',
                         help="Stream-id to use to distinguish magpie streams."
                              "This will be prepended to data-val names in lyrebird.")
-    parser.add_argument('--target-rate', '-t', type=float, default=20)
+    parser.add_argument('--target-rate', '-t', type=float, default=20,
+                        help="Target sample rate for data being sent to Lyrebird. "
+                             "Detector data will be downsampled to this rate.")
     parser.add_argument(
         '--delay', type=float, default=5,
         help="Delay (sec) between the timestamp of a G3Frame relative to the "
@@ -669,7 +677,7 @@ def make_parser(parser=None):
                         help="Number of pixels in y-dimension for grid layout")
     parser.add_argument('--wafer-scale', '--ws', type=float, default=50.,
                         help="scale of wafer coordinates")
-    parser.add_argument('--csv-file', type=str, help="Detmap CSV file")
+    parser.add_argument('--det-map', type=str, help="Path to det-map csv file")
     parser.add_argument('--fake-data', action='store_true',
                         help="If set, will stream fake data instead of listening to "
                              "a G3stream.")
