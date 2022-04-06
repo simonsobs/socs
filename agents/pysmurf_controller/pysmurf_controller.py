@@ -20,11 +20,9 @@ import time
 import os
 import argparse
 
-on_rtd = os.environ.get('READTHEDOCS') == 'True'
-if not on_rtd:
-    from ocs import ocs_agent, site_config, ocs_twisted
-    from ocs.ocs_agent import log_formatter
-    from ocs.ocs_twisted import TimeoutLock
+from ocs import ocs_agent, site_config
+from ocs.ocs_agent import log_formatter
+from ocs.ocs_twisted import TimeoutLock
 
 
 class PysmurfScriptProtocol(protocol.ProcessProtocol):
@@ -311,6 +309,11 @@ class PysmurfController:
             5. setup tracking params
             6. Measure noise
 
+        See the :ref:`sodetlib setup docs 
+        <https://simons1.princeton.edu/docs/sodetlib/operations/setup.html#first-time-setup'>`_
+        for more information on the sodetlib setup procedure and allowed
+        keyword arguments.
+
         Args
         -----
         bands : list, int
@@ -347,6 +350,11 @@ class PysmurfController:
             3. Tracking setup
             4. Noise check
 
+        See the :ref:`sodetlib relock docs 
+        <https://simons1.princeton.edu/docs/sodetlib/operations/setup.html#relocking'>`_
+        for more information on the sodetlib relock procedure and allowed
+        keyword arguments.
+
         Args
         -----
         bands : list, int
@@ -374,7 +382,10 @@ class PysmurfController:
     def take_noise(self, session, params):
         """
         **Task** - Task to take a short timestream and calculate noise
-        statistics. Puts band medians into the session data.
+        statistics. Median white noise level for each band will be stored in
+        the session data. See the :ref:`sodetlib noise docs 
+        <https://simons1.princeton.edu/docs/sodetlib/noise.html>`_ for more
+        information on the noise function and possible keyword arguments.
 
         Args
         -----
@@ -398,8 +409,15 @@ class PysmurfController:
 
     @ocs_agent.param('kwargs', default=None)
     def take_bgmap(self, session, params):
-        """
-        **Task** - Takes a bias-group map.
+        """take_bgmap(kwargs=None)
+
+        **Task** - Takes a bias-group map. This will calculate the number of
+        channels assigned to each bias group and put that into the session data
+        object along with the filepath to the analyzed bias-step output. See
+        the :ref:`bias steps docs page
+        <https://simons1.princeton.edu/docs/sodetlib/operations/bias_steps.html>`_
+        for more information on what additional keyword arguments can be
+        passed.
 
         Args
         ----
@@ -431,12 +449,17 @@ class PysmurfController:
     def take_iv(self, session, params):
         """take_iv(kwargs=None)
 
-        Takes an IV.
+        Takes an IV. This will add the normal resistance array and channel info
+        to the session data object along with the analyzed IV filepath.
+        See the :ref:`sodetlib IV docs page
+        <https://simons1.princeton.edu/docs/sodetlib/operations/iv.html>`_
+        for more information on what additional keyword arguments can be passed
+        in.
 
         Args
         ----
         kwargs : dict
-            Additional kwargs to pass to take_bgmap function.
+            Additional kwargs to pass to the ``take_iv`` function.
         """
         if params['kwargs'] is None:
             params['kwargs'] = {}
@@ -459,14 +482,17 @@ class PysmurfController:
 
     @ocs_agent.param('kwargs', default=None)
     def take_bias_steps(self, session, params):
-        """take_iv(kwargs=None)
+        """take_bias_steps(kwargs=None)
 
-        Takes bias_steps
+        Takes bias_steps and saves the output filepath to the session data
+        object. See the :ref:`sodetlib bias step docs page
+        <https://simons1.princeton.edu/docs/sodetlib/operations/bias_steps.html>`_
+        for more information on bias steps and what kwargs can be passed in.
 
         Args
         ----
         kwargs : dict
-            Additional kwargs to pass to take_bgmap function.
+            Additional kwargs to pass to ``take_bais_steps`` function.
         """
 
         if params['kwargs'] is None:
@@ -486,6 +512,16 @@ class PysmurfController:
             }
 
             return True, "Finished taking bias steps"
+
+    @ocs_agent.param('rfrac')
+    @ocs_agent.param('kwargs', default=None)
+    def bias_dets(self, session, params):
+        """"""
+        
+
+
+        
+
 
 def make_parser(parser=None):
     """
