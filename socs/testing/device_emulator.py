@@ -188,18 +188,6 @@ class DeviceEmulator:
             self.proc.terminate()
             out, err = self.proc.communicate()
             #print(out, err)
-        # This doesn't work, I think maybe because close() needs to be awaited,
-        # but the event loop is in a separate thread...would be nice to figure
-        # out, but we have a work around in place with sending an exit message
-        # to shutdown within the server shell.
-        if self._type == 'telnet':
-            self.read_loop = False
-            #print('running:', self.loop.is_running())
-            #time.sleep(1)
-            #self.loop.close()
-            #async def shutdown():
-            #    await self.telnet_server.close()
-            #    print('closing telnet server')
 
     def _read_socket(self, port):
         """Loop until shutdown, reading any commands sent over the relay.
@@ -258,28 +246,29 @@ class DeviceEmulator:
 
     def _create_telnet_server(self, port):
         async def shell(reader, writer):
-            self.read_loop = True
-            while self.read_loop:
+            self._read = True
+            while self._read:
                 inp = await reader.readline()
                 print(f'telnet server received: {inp}')
                 if inp in self.responses:
                     response = self._get_response(inp)
+                    print(f'telnet responding with: {response}')
                     writer.write(response)
                     await writer.drain()
-                #elif inp.strip() == 'exit':
-                #    # We can successfully close within this shell...
-                #    print('shutting down telnet server')
-                #    self.telnet_server.close()
-                #    self.read_loop = False
+
                 await asyncio.sleep(1)
             print("shutting down server")
             writer.close()
-            self.telnet_server.close()
+            # I've only gotten this to work within this shell, maybe because
+            # .close() must be awaited? I also tried doing this in the
+            # shutdown() function. I could get it to stop accepting new
+            # connections, but it wouldn't shutdown properly.
+            self._telnet_server.close()
 
         loop = asyncio.get_event_loop_policy().new_event_loop()
-        self.coro = telnetlib3.create_server(port=port, shell=shell)
-        self.telnet_server = loop.run_until_complete(self.coro)
-        loop.run_until_complete(self.telnet_server.wait_closed())
+        coro = telnetlib3.create_server(port=port, shell=shell)
+        self._telnet_server = loop.run_until_complete(coro)
+        loop.run_until_complete(self._telnet_server.wait_closed())
         print('telnet server closed')
 
     def create_telnet_relay(self, port):
