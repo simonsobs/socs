@@ -49,7 +49,4 @@ def test_create_device_emulator_telnet_relay(telnet_emulator):
         response = tn.read_some()
         print('second', response)
 
-        tn.write(b'exit\r\n')
-        response = tn.read_some()  # server doesn't shutdown properly without this?
-        print('third', response)
         tn.close()
