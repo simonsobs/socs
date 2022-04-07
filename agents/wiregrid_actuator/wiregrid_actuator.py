@@ -354,7 +354,7 @@ class WiregridActuatorAgent:
             ret, msg = self._insert(920, 1.0)
             if not ret:
                 msg = 'insert(): '\
-                      'ERROR!: Failed insert() in _insert(850,1.0) | {}'\
+                      'ERROR!: Failed insert() in _insert(920,1.0) | {}'\
                       .format(msg)
                 self.log.error(msg)
                 return False, msg
@@ -379,7 +379,7 @@ class WiregridActuatorAgent:
             # Moving commands
             ret, msg = self._eject(920, 1.0)
             if not ret:
-                msg = 'eject(): ERROR!: Failed in _eject(850,1.0) | {}'\
+                msg = 'eject(): ERROR!: Failed in _eject(920,1.0) | {}'\
                     .format(msg)
                 self.log.error(msg)
                 return False, msg
