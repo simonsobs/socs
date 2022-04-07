@@ -10,8 +10,10 @@ RUN apt-get update \
  && wget http://www.galil.com/sw/pub/ubuntu/20.04/galil.list \
  && cp galil.list /etc/apt/sources.list.d \
  && apt-get update \
- && apt-get install gclib \
+ && apt-get install -y gclib \
+ && ls /usr/share/doc/gclib/src \
  && python3 setup.py install
+# && tar -xvf /usr/share/doc/gclib/src/gclib_python.tar.gz \
 
 COPY . .
 
