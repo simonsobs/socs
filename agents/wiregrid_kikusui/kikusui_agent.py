@@ -34,8 +34,9 @@ class KikusuiAgent:
             multiple devices connected via serial communication.
             Communicating device is determined
             by the ethernet port number of the converter.
+        debug (bool): ON/OFF of writing a log file
     """
-    def __init__(self, agent, kikusui_ip, kikusui_port):
+    def __init__(self, agent, kikusui_ip, kikusui_port, debug=False):
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
@@ -43,6 +44,7 @@ class KikusuiAgent:
         self.take_data = False
         self.kikusui_ip = kikusui_ip
         self.kikusui_port = int(kikusui_port)
+        self.debug = debug
 
         self.position_path = '/data/wg-data/position.log'
         self.action_path = '/data/wg-data/action/'
@@ -197,7 +199,8 @@ class KikusuiAgent:
                 ]
             )
 
-        writelog(logfile, 'ON', 0, start_position, 'stepwise')
+        if self.debug:
+            writelog(logfile, 'ON', 0, start_position, 'stepwise')
 
         self._rotate_alittle(feedback_time[-1]+0.1)
         time.sleep(self.agent_interval)
@@ -222,10 +225,11 @@ class KikusuiAgent:
                 break
             self._rotate_alittle(operation_time)
 
-        writelog(logfile, 'OFF', 0,
-                 self._get_position(
-                    self.position_path, self.open_trial, self.Deg),
-                 'stepwise')
+        if self.debug:
+            writelog(logfile, 'OFF', 0,
+                     self._get_position(
+                        self.position_path, self.open_trial, self.Deg),
+                     'stepwise')
 
     ##################
     # Main functions #
@@ -245,10 +249,11 @@ class KikusuiAgent:
                 return False, 'Could not acquire lock'
 
             logfile = openlog(self.action_path)
-            writelog(logfile, 'ON', 0,
-                     self._get_position(
-                        self.position_path, self.open_trial, self.Deg),
-                     'continuous')
+            if self.debug:
+                writelog(logfile, 'ON', 0,
+                         self._get_position(
+                            self.position_path, self.open_trial, self.Deg),
+                         'continuous')
 
             self.cmd.user_input('on')
             logfile.close()
@@ -268,10 +273,11 @@ class KikusuiAgent:
                 return False, 'Could not acquire lock'
 
             logfile = openlog(self.action_path)
-            writelog(logfile, 'OFF', 0,
-                     self._get_position(
-                        self.position_path, self.open_trial, self.Deg),
-                     'continuous')
+            if self.debug:
+                writelog(logfile, 'OFF', 0,
+                         self._get_position(
+                            self.position_path, self.open_trial, self.Deg),
+                         'continuous')
 
             self.cmd.user_input('off')
             logfile.close()
@@ -591,6 +597,10 @@ def make_parser(parser=None):
     pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--kikusui-ip')
     pgroup.add_argument('--kikusui-port')
+    pgroup.add_argument('--debug')
+    pgroup.add_argument('--debug', dest='debug',
+                        action='store_true', default=False,
+                        help='Write a log file for debug')
     return parser
 
 
@@ -603,7 +613,8 @@ if __name__ == '__main__':
     site_config.reparse_args(args, 'WGKikusuiAgent')
     agent, runner = ocs_agent.init_site_agent(args)
     kikusui_agent = KikusuiAgent(agent, kikusui_ip=args.kikusui_ip,
-                                 kikusui_port=args.kikusui_port)
+                                 kikusui_port=args.kikusui_port,
+                                 debug = args.debug)
     agent.register_process('IV_acq', kikusui_agent.start_IV_acq,
                            kikusui_agent.stop_IV_acq, startup=True)
     agent.register_task('set_on', kikusui_agent.set_on)
