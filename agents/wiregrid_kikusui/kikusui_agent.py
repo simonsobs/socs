@@ -143,7 +143,7 @@ class KikusuiAgent:
             return True, 'Successfully rotate a little!'
         return True, 'No rotation!'
 
-    def _get_position(self, position_path, open_trial, Deg):
+    def _get_position(self, position_path, open_trial):
         try:
             for i in range(open_trial):
                 with open(position_path) as f:
@@ -160,7 +160,7 @@ class KikusuiAgent:
                 '{}'.format(e)
                 )
 
-        return int(position)*Deg
+        return int(position)*self.Deg
 
     def _get_exectime(self, position_difference, feedback_cut, feedback_time):
         if position_difference >= feedback_cut[4]:
@@ -187,7 +187,7 @@ class KikusuiAgent:
         absolute_position = np.arange(0, 360, wanted_angle)
 
         start_position = self._get_position(
-            self.position_path, self.open_trial, self.Deg)
+            self.position_path, self.open_trial)
         if (360 < start_position + uncertaity_cancel):
             goal_position = wanted_angle
         elif absolute_position[-1] < start_position + uncertaity_cancel:
@@ -207,7 +207,7 @@ class KikusuiAgent:
 
         for step in range(feedback_steps):
             mid_position = self._get_position(
-                self.position_path, self.open_trial, self.Deg)
+                self.position_path, self.open_trial)
             if goal_position + wanted_angle < mid_position:
                 operation_time =\
                     self._get_exectime(
@@ -228,7 +228,7 @@ class KikusuiAgent:
         if self.debug:
             writelog(logfile, 'OFF', 0,
                      self._get_position(
-                        self.position_path, self.open_trial, self.Deg),
+                        self.position_path, self.open_trial),
                      'stepwise')
 
     ##################
@@ -252,7 +252,7 @@ class KikusuiAgent:
             if self.debug:
                 writelog(logfile, 'ON', 0,
                          self._get_position(
-                            self.position_path, self.open_trial, self.Deg),
+                            self.position_path, self.open_trial),
                          'continuous')
 
             self.cmd.user_input('on')
@@ -276,7 +276,7 @@ class KikusuiAgent:
             if self.debug:
                 writelog(logfile, 'OFF', 0,
                          self._get_position(
-                            self.position_path, self.open_trial, self.Deg),
+                            self.position_path, self.open_trial),
                          'continuous')
 
             self.cmd.user_input('off')
@@ -404,23 +404,23 @@ class KikusuiAgent:
 
                     writelog(logfile, 'ON', tperiod,
                              self._get_position(
-                                self.position_path, self.open_trial, self.Deg),
+                                self.position_path, self.open_trial),
                              'calibration')
                     self._rotate_alittle(tperiod)
                     time.sleep(self.agent_interval+1.)
                     writelog(logfile, 'OFF', 0.,
                              self._get_position(
-                                self.position_path, self.open_trial, self.Deg),
+                                self.position_path, self.open_trial),
                              'calibration')
                     writelog(logfile, 'ON', 0.70,
                              self._get_position(
-                                self.position_path, self.open_trial, self.Deg),
+                                self.position_path, self.open_trial),
                              'calibration')
                     self._rotate_alittle(0.70)
                     time.sleep(self.agent_interval+1.)
                     writelog(logfile, 'OFF', 0.,
                              self._get_position(
-                                self.position_path, self.open_trial, self.Deg),
+                                self.position_path, self.open_trial),
                              'calibration')
                     cycle += 1
 
