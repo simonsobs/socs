@@ -136,9 +136,9 @@ class KikusuiAgent:
 
     def _rotate_alittle(self, operation_time):
         if operation_time != 0.:
-            self.cmd.user_input('on')
+            self.cmd.user_input('ON')
             time.sleep(operation_time)
-            self.cmd.user_input('off')
+            self.cmd.user_input('OFF')
             time.sleep(self.agent_interval)
             return True, 'Successfully rotate a little!'
         return True, 'No rotation!'
@@ -255,7 +255,7 @@ class KikusuiAgent:
                             self.position_path, self.open_trial),
                          'continuous')
 
-            self.cmd.user_input('on')
+            self.cmd.user_input('ON')
             logfile.close()
             return True, 'Set Kikusui on'
 
@@ -279,7 +279,7 @@ class KikusuiAgent:
                             self.position_path, self.open_trial),
                          'continuous')
 
-            self.cmd.user_input('off')
+            self.cmd.user_input('OFF')
             logfile.close()
             return True, 'Set Kikusui off'
 
