@@ -698,7 +698,7 @@ class WiregridActuatorAgent:
             }
 
         Parameters:
-           Nothing
+           interval-time: interval time for data acquisition
         """
         if params is None:
             params = {}
