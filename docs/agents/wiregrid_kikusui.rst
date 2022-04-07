@@ -18,14 +18,6 @@ The agent communicates with the converter via eternet.
    :func: make_parser
    :prog: python3 kikusui_agent.py
 
-Dependencies
-------------
-
-This agent depends on src/command.py, moxaSerial.py, and pmx.py.
-These scripts are also used in hwp_rotation agent.
-Therefore, they should be shared.
-
-
 Configuration File Examples
 ---------------------------
 
