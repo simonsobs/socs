@@ -20,6 +20,21 @@ from common import openlog, writelog
 
 
 class KikusuiAgent:
+    """Agent to control the wire-grid rotation
+    The KIKUSUI is a power supply and
+    it is controlled via serial-to-ethernet converter.
+    The converter is linked to the KIKUSUI
+    via RS-232 (D-sub 9pin cable).
+    The agent communicates with the converter via eternet.
+
+    Args:
+        kikusui-ip (str): IP address of the serial-to-ethernet converter
+        kikusui-port (int or str): Asigned port for the KIKUSUI power supply
+            The converter has four D-sub ports to control
+            multiple devices connected via serial communication.
+            Communicating device is determined
+            by the ethernet port number of the converter.
+    """
     def __init__(self, agent, kikusui_ip, kikusui_port):
         self.agent = agent
         self.log = agent.log
