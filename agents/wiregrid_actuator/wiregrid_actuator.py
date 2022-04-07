@@ -1,15 +1,9 @@
-import os
-import sys
 import argparse
 import time
 
 from ocs import ocs_agent
 from ocs import site_config
 from ocs.ocs_twisted import TimeoutLock
-
-# add PATH to ./src directory
-#this_dir = os.path.dirname(os.path.abspath(__file__))
-#sys.path.append(os.path.join(this_dir, 'src'))
 
 # import classes / configs
 from src.Actuator import Actuator
@@ -18,9 +12,21 @@ import stopper_config
 
 
 class WiregridActuatorAgent:
+    """ Agent to control the linear actuator
+    to insert or eject the wire-grid via a GALIL motor controller.
+    It communicates with the controller via an ethernet.
+    It also reads ON/OFF of the limit-switches on the ends of the actuators
+    and lock/unlock the stoppers to lock/unlock the actuators.
+
+    Args:
+        ip_address      (str): IP address for the GALIL motor controller
+        interval_time (float): Interval time for dat acquisition
+        sleep         (float): sleep time for every commands
+        the motor controller
+    """
 
     def __init__(self, agent, ip_address='192.168.1.100',
-                 interval_time=1, sleep=0.05, verbose=0):
+                 interval_time=1., sleep=0.05, verbose=0):
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
