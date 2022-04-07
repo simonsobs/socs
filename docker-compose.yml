@@ -206,6 +206,8 @@ services:
   ocs-wgkikusui-agent:
     image: "ocs-wgkikusui-agent"
     build: ./agents/wiregrid_kikusui/
+    depends_on:
+      - "socs"
 
   # --------------------------------------------------------------------------
   # Wiregrid encoder agent
@@ -213,6 +215,8 @@ services:
   ocs-wgencoder-agent:
     image: "ocs-wgencoder-agent"
     build: ./agents/wiregrid_encoder/
+    depends_on:
+      - "socs"
 
   # --------------------------------------------------------------------------
   # Wiregrid actuator agent
@@ -220,6 +224,8 @@ services:
   ocs-wgactuator-agent:
     image: "ocs-wgactuator-agent"
     build: ./agents/wiregrid_actuator/
+    depends_on:
+      - "socs"
 
   # --------------------------------------------------------------------------
   # SOCS Simulators
