@@ -2,7 +2,7 @@
 # socs Agent container for interacting with a Lakeshore 240.
 
 # Use socs base image
-FROM simonsobs/socs:latest
+FROM socs:latest
 
 # Set the working directory to registry directory
 WORKDIR /app/socs/agents/lakeshore240/
