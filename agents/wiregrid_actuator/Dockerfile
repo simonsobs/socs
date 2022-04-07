@@ -1,4 +1,4 @@
-FROM simonsobs/socs:latest
+FROM socs:latest
 
 WORKDIR /app/socs/agents/wiregrid_actuator
 
