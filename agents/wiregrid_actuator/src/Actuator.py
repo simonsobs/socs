@@ -50,7 +50,6 @@ class Actuator:
         self._cleanG()
         print('Actuator:__del__(): '
               'Successfully close the actuator controller.')
-        return True
 
     ######################
     # Internal functions #
