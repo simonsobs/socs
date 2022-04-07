@@ -9,7 +9,9 @@ RUN apt-get update \
  && apt-key add GALIL-GPG-KEY-E29D0E4B.asc \
  && wget http://www.galil.com/sw/pub/ubuntu/20.04/galil.list \
  && cp galil.list /etc/apt/sources.list.d \
- && apt-get update
+ && apt-get update \
+ && apt-get install gclib \
+ && python3 setup.py install
 
 COPY . .
 

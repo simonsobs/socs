@@ -3,7 +3,7 @@
 # converts.
 
 # Use socs base image
-FROM simonsobs/socs:latest
+FROM socs:latest
 
 # Set the working directory to registry directory
 WORKDIR /app/socs/agents/wiregrid_kikusui/
