@@ -53,8 +53,6 @@ An example docker-compose configuration::
         image: simonsobs/ocs-wgactuator-agent:latest
         hostname: ocs-docker
         network_mode: "host"
-        depends_on:
-          - "crossbar"
         volumes:
           - ${OCS_CONFIG_DIR}:/config:ro
           - /usr/sbin:/usr/sbin
@@ -72,7 +70,7 @@ Description
 Functions
 `````````
 
-The agent have many functions, however most of them are for a test.
+The agent has many functions, however most of them are for testing.
 The main functions are ``insert()`` and ``eject()``.
 
 **Main Functions**
@@ -126,14 +124,11 @@ Example Clients
 
 Below is an example client to insert and eject the actuator::
 
-    from ocs import matched_client
-    wgactuator = matched_client.MatchedClient('wgactuator', args=[])
+    from ocs.ocs_client import OCSClient
+    wgactuator = OCSClient('wgactuator')
 
     # Insert the actuator
-    wgactuator.insert.start()
-    wgactuator.insert.wait()
+    wgactuator.insert()
 
     # Eject the actuator
-    wgactuator.eject.start()
-    wgactuator.eject.wait()
-
+    wgactuator.eject()

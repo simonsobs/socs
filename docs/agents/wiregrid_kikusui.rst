@@ -11,7 +11,7 @@ The KIKUSUI is a power supply and
 it is controlled via serial-to-ethernet converter.
 The converter is linked to the KIKUSUI 
 via RS-232 (D-sub 9pin cable).
-The agent communicates with the converter via eternet.
+The agent communicates with the converter via Ethernet.
 
 .. argparse::
    :filename: ../agents/wiregrid_kikusui/kikusui_agent.py
@@ -38,7 +38,7 @@ An example site-config-file block::
  - kikusui-port is an asigned port for the KIKUSUI power supply.
    (The converter has four D-sub ports to control 
    multiple devices connected via serial communication. 
-   Communicating device is determined by the ethernet port number of the converter.)
+   Communicating device is determined by the Ethernet port number of the converter.)
 
 Docker Compose
 ``````````````
@@ -70,14 +70,14 @@ Description
 Functions
 `````````
 
-The agent have many functions, however most of them are for a test.
+The agent has many functions, however most of them are for testing.
 The main function is ``stepwise_rotation()``.
 ``calibrate_wg()``.
 
 **Main Function (Stepwise Rotation)**
  - stepwise_rotation(): 
    Run step-wise rotation for wire-grid calibration.
-   In each step, seveal small-rotations are occurred to rotate 22.5-deg. 
+   In each step, several small-rotations are made to rotate 22.5-deg. 
    - Parameters:
        - feedback_steps: number of small rotations for each 22.5-deg step
        - num_laps: number of laps (revolutions)
@@ -120,8 +120,8 @@ Example Clients
 
 Below is an example client to insert and eject the kikusui::
 
-    from ocs import matched_client
-    wgkikusui = matched_client.MatchedClient('wgkikusui', args=[])
+    from ocs.ocs_client import OCSClient
+    wgkikusui = OCSClient('wgkikusui')
 
     # Set Voltage
     wgkikusui.set_v.start(volt=12.)
