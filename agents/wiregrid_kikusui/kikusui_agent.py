@@ -291,7 +291,8 @@ class KikusuiAgent:
             current: set current [A] (should be [0.0, 3.0])
         """
         if params is None:
-            params = {'current': 0}
+            params = {}
+        current = params.get('current', 0.)
 
         with self.lock.acquire_timeout(timeout=5, job='set_c') as acquired:
             if not acquired:
@@ -300,9 +301,8 @@ class KikusuiAgent:
                     .format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            if params['current'] <= 3. and 0. <= params['current']:
-                current = params['current']
-                self.cmd.user_input('C {}'.format(params['current']))
+            if current <= 3. and 0. <= current:
+                self.cmd.user_input('C {}'.format(current))
             else:
                 current = 3.0
                 self.log.warn(
@@ -320,7 +320,8 @@ class KikusuiAgent:
             volt: set voltage [V] (should be ONLY 12)
         """
         if params is None:
-            params = {'volt': 0}
+            params = {}
+        volt = params.get('volt', 0)
 
         with self.lock.acquire_timeout(timeout=5, job='set_v') as acquired:
             if not acquired:
@@ -329,8 +330,8 @@ class KikusuiAgent:
                     .format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            if params['volt'] == 12.:
-                self.cmd.user_input('V {}'.format(params['volt']))
+            if volt == 12.:
+                self.cmd.user_input('V {}'.format(volt))
             else:
                 self.log.warn(
                     'Value Error: Rated Voltage of the motor is 12 V. '
@@ -381,7 +382,8 @@ class KikusuiAgent:
             storepath: path for log file
         """
         if params is None:
-            params = {'storepath': self.action_path}
+            params = {}
+        storepath = params.get('storepath', self.action_path)
 
         with self.lock.acquire_timeout(timeout=5, job='calibrate_wg')\
                 as acquired:
@@ -391,7 +393,7 @@ class KikusuiAgent:
                               .format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            logfile = openlog(params['storepath'])
+            logfile = openlog(storepath)
 
             cycle = 1
             for i in range(11):
@@ -441,8 +443,7 @@ class KikusuiAgent:
             feedback_time: calibration constants for the 22.5-deg rotation
         """
         if params is None:
-            params = {'feedback_steps': 8, 'num_laps': 1, 'stopped_time': 10,
-                      'feedback_time': [0.181, 0.221, 0.251, 0.281, 0.301]}
+            params = {}
 
         with self.lock.acquire_timeout(timeout=5, job='stepwise_rotation')\
                 as acquired:
@@ -452,10 +453,11 @@ class KikusuiAgent:
                               .format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            self.feedback_steps = params['feedback_steps']
-            self.num_laps = params['num_laps']
-            self.stopped_time = params['stopped_time']
-            self.feedback_time = params['feedback_time']
+            self.feedback_steps = params.get('feedback_steps', 8)
+            self.num_laps = params.get('num_laps', 1)
+            self.stopped_time = params.get('stopped_time', 10)
+            self.feedback_time = params.get(
+                'feedback_time', [0.181, 0.221, 0.251, 0.281, 0.301])
 
             logfile = openlog(self.action_path)
 
@@ -614,7 +616,7 @@ if __name__ == '__main__':
     agent, runner = ocs_agent.init_site_agent(args)
     kikusui_agent = KikusuiAgent(agent, kikusui_ip=args.kikusui_ip,
                                  kikusui_port=args.kikusui_port,
-                                 debug = args.debug)
+                                 debug=args.debug)
     agent.register_process('IV_acq', kikusui_agent.start_IV_acq,
                            kikusui_agent.stop_IV_acq, startup=True)
     agent.register_task('set_on', kikusui_agent.set_on)
