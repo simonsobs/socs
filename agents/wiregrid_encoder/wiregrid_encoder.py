@@ -4,13 +4,13 @@ import numpy as np
 import argparse
 import traceback
 
-from signal_parser import EncoderParser
+from ocs import ocs_agent, site_config
+from ocs.ocs_twisted import TimeoutLock
 
 # Required by OCS
 ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 if not ON_RTD:
-    from ocs import ocs_agent, site_config
-    from ocs.ocs_twisted import TimeoutLock
+    from signal_parser import EncoderParser
 
 NUM_ENCODER_TO_PUBLISH = 1000
 SEC_ENCODER_TO_PUBLISH = 1
