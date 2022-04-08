@@ -27,7 +27,16 @@ def count2time(counts, t_offset=0.):
     return t_array.tolist()
 
 
-class WGEncoderAgent:
+class WiregridEncoderAgent:
+    """ Agent to record the wiregrid rotary-encoder data.
+    The encoder signal and IRIG timing signal is read
+    by a BeagleBoneBlack (BBB).
+    The BBB sends the data to this PC via Ethernet.
+
+    Args:
+        bbport(int): Port number of the PC
+                     determined in the script running in the BBB.
+    """
 
     def __init__(self, agent_obj, bbport=50007):
 
@@ -45,51 +54,52 @@ class WGEncoderAgent:
 
         agg_params = {'frame_length': 60}
         self.agent.register_feed(
-            'WGEncoder_rough', record=True,
+            'wgencoder_rough', record=True,
             agg_params=agg_params, buffer_time=0.5)
 
         agg_params = {'frame_length': 60, 'exclude_influx': True}
         self.agent.register_feed(
-            'WGEncoder_full', record=True, agg_params=agg_params)
+            'wgencoder_full', record=True, agg_params=agg_params)
 
         self.parser = EncoderParser(beaglebone_port=self.bbport)
 
-    def start_acq(self, session, params=None):
-        """
-        Method to start data acquisition process.
+    def acq(self, session, params=None):
+        """acq()
 
-        The most recent data collected is stored in session.data in the
-        structure::
+        **Process** - Run data acquisition.
 
-        IRIG data case:
-            >>> session.data
-            {'fields':
-                {
-                 'irig_time': computure unix time in receiving the IRIG packet,
-                 'rising_edge_count': PRU clock (Beaglebone clock) count,
-                 'edge_diff': Difference of PRU clock
-                              from the previous IRIG data,
-                 'irig_sec': IRIG second,
-                 'irig_min': IRIG minuite,
-                 'irig_hour': IRIG hour,
-                 'irig_day': IRIG Day,
-                 'irig_year': IRIG Year
-                }
-            }
+        Notes:
+            The most recent data collected is stored in session.data in the
+            structure::
 
-        Encoder data case:
-            >>> session.data
-            {'fields':
-                {
-                 'quadrature': [Array] quadrature encoder signals,
-                 'pru_clock': [Array] PRU clock (Beaglebone clock) ,
-                 'reference_degree': [Array] Encoder rotation position [deg.],
-                 'error': [Array] Encoder error flags
-                }
-            }
+                IRIG data case:
+                    >>> response.session['data']
+                    {'fields':
+                        {
+                         'irig_time': computure unix time
+                                      in receiving the IRIG packet,
+                         'rising_edge_count': PRU clock (BBB clock) count,
+                         'edge_diff': Difference of PRU clock
+                                      from the previous IRIG data,
+                         'irig_sec': IRIG second,
+                         'irig_min': IRIG minuite,
+                         'irig_hour': IRIG hour,
+                         'irig_day': IRIG Day,
+                         'irig_year': IRIG Year
+                        }
+                    }
 
-        Parameters:
-           Nothing
+                Encoder data case:
+                    >>> response.session['data']
+                    {'fields':
+                        {
+                         'quadrature' (list):  quadrature encoder signals,
+                         'pru_clock' (list): PRU clock (Beaglebone clock) ,
+                         'reference_degree' (list): Encoder rotation position
+                                                    [deg.],
+                         'error' (list): Encoder error flags
+                        }
+                    }
         """
 
         time_encoder_published = 0
@@ -137,7 +147,7 @@ class WGEncoderAgent:
                     sys_time = irig_data[4]
 
                     irg_rdata = {'timestamp': sys_time,
-                                 'block_name': 'WGEncoder_irig',
+                                 'block_name': 'wgencoder_irig',
                                  'data': {}}
 
                     irg_rdata['data']['irig_time'] = irig_time
@@ -165,7 +175,7 @@ class WGEncoderAgent:
                         bbb_clock_freq = 0.
                     irg_rdata['data']['bbb_clock_freq'] = bbb_clock_freq
 
-                    self.agent.publish_to_feed('WGEncoder_rough', irg_rdata)
+                    self.agent.publish_to_feed('wgencoder_rough', irg_rdata)
                     # store session.data
                     field_dict = {
                         'irig_time': irig_time,
@@ -186,7 +196,7 @@ class WGEncoderAgent:
                     # saving clock counts for every refernce edge
                     # and every irig bit info
                     irg_fdata = {'timestamps': [],
-                                 'block_name': 'WGEncoder_irig_raw',
+                                 'block_name': 'wgencoder_irig_raw',
                                  'data': {}}
                     # 0.09: time difference in seconds b/w reference marker and
                     #       the first index marker
@@ -197,7 +207,7 @@ class WGEncoderAgent:
                     irg_fdata['data']['irig_synch_pulse_clock_counts'] =\
                         synch_pulse_clock_counts
                     irg_fdata['data']['irig_info'] = list(irig_info)
-                    self.agent.publish_to_feed('WGEncoder_full', irg_fdata)
+                    self.agent.publish_to_feed('wgencoder_full', irg_fdata)
 
                 if len(self.parser.encoder_queue):
                     encoder_data = self.parser.encoder_queue.popleft()
@@ -233,13 +243,13 @@ class WGEncoderAgent:
 
                     enc_rdata = {
                         'timestamps': [],
-                        'block_name': 'WGEncoder_rough',
+                        'block_name': 'wgencoder_rough',
                         'data': {}
                     }
 
                     enc_fdata = {
                         'timestamps': [],
-                        'block_name': 'WGEncoder_full',
+                        'block_name': 'wgencoder_full',
                         'data': {}
                     }
 
@@ -260,7 +270,7 @@ class WGEncoderAgent:
 
                         enc_rdata['data']['rotation_speed'] = rot_speed  # Hz
                         self.agent.publish_to_feed(
-                            'WGEncoder_rough', enc_rdata)
+                            'wgencoder_rough', enc_rdata)
                         # store session.data
                         field_dict = {
                             'quadrature': enc_rdata['data']['quadrature'],
@@ -278,7 +288,7 @@ class WGEncoderAgent:
                         enc_fdata['data']['pru_clock'] = pru_clock
                         enc_fdata['data']['reference_count'] = ref_count
                         enc_fdata['data']['error'] = error_flag
-                        self.agent.publish_to_feed('WGEncoder_full', enc_fdata)
+                        self.agent.publish_to_feed('wgencoder_full', enc_fdata)
 
                         quad_data = []
                         pru_clock = []
@@ -302,9 +312,9 @@ class WGEncoderAgent:
                     pass
                 pass
 
-        self.agent.feeds['WGEncoder_rough'].flush_buffer()
+        self.agent.feeds['wgencoder_rough'].flush_buffer()
         # This buffer (full data) has huge data size.
-        # self.agent.feeds['WGEncoder_full'].flush_buffer()
+        # self.agent.feeds['wgencoder_full'].flush_buffer()
 
         return True, 'Acquisition exited cleanly.'
 
@@ -316,22 +326,30 @@ class WGEncoderAgent:
             return False, 'acq is not currently running.'
 
 
-if __name__ == '__main__':
-    parser = site_config.add_arguments()
+def make_parser(parser=None):
     if parser is None:
         parser = argparse.ArgumentParser()
+
     pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--port', dest='port',
                         type=int, default=50007,
                         help='Port of the beaglebone '
                              'running wiregrid encoder DAQ')
-    args = parser.parse_args()
+    return parser
 
-    site_config.reparse_args(args, 'WGEncoderAgent')
+
+if __name__ == '__main__':
+
+    parser = make_parser()
+    args = site_config.parse_args(
+        agent_class='WiregridEncoderAgent', parser=parser)
+
     agent, runner = ocs_agent.init_site_agent(args)
-    wg_encoder_agent = WGEncoderAgent(agent, bbport=args.port)
+
+    wg_encoder_agent = WiregridEncoderAgent(agent, bbport=args.port)
+
     agent.register_process('acq',
-                           wg_encoder_agent.start_acq,
+                           wg_encoder_agent.acq,
                            wg_encoder_agent.stop_acq,
                            startup=True)
 
