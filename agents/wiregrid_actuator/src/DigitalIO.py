@@ -65,7 +65,7 @@ class DigitalIO:
         Args:
             io_name is a string of a IO name or list of IO names
         Return value:
-            list of True/False or one True/Falsel
+            list of True/False or one True/False
                 True  : ON
                 False : OFF
         """
@@ -135,7 +135,6 @@ class DigitalIO:
         else:
             cmd = 'CB {}'.format(io_num)
         self.g.GCommand(cmd)
-        return True
 
     def set_onoff(self, onoff=0, io_name=None):
         """
@@ -148,7 +147,7 @@ class DigitalIO:
             onoff: 0 (OFF) or 1 (ON)
             io_name: a string of a IO name or list of IO names
         Return value:
-            True
+            Nothing
         """
         set_io_names = []
         if io_name is None:
@@ -181,14 +180,13 @@ class DigitalIO:
               '{}'.format(self.name, 'ON' if onoff else 'OFF', set_io_names))
         for name in set_io_names:
             self._set_onoff(onoff, name)
-        return True
 
     def set_allon(self):
         print('DigitalIO[{}]:set_allon(): '
               'Set ON for all of the digital IOs'.format(self.name))
-        return self.set_onoff(1, None)
+        self.set_onoff(1, None)
 
     def set_alloff(self):
         print('DigitalIO[{}]:set_allon(): '
               'Set OFF for all of the digital IOs'.format(self.name))
-        return self.set_onoff(0, None)
+        self.set_onoff(0, None)

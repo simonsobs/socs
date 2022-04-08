@@ -145,7 +145,7 @@ class WiregridActuatorAgent:
             self.log.error(msg)
             return False, msg
 
-        # Release stopper twice (Powering ON the stoppers)
+        # Release stopper (Powering ON the stoppers)
         # 1st trial
         try:
             self.actuator.st.set_allon()
@@ -155,15 +155,27 @@ class WiregridActuatorAgent:
                   '--> Stop moving! | Exception = "{}"'.format(flabel, e)
             self.log.error(msg)
             return False, msg
-        # 2nd trial (double check)
-        try:
-            self.actuator.st.set_allon()
-        except Exception as e:
-            msg = '_insert_eject()[{}]: '\
-                  'ERROR!: Failed to run the stopper set_allon() '\
-                  '--> Stop moving! | Exception = "{}"'.format(flabel, e)
-            self.log.error(msg)
-            return False, msg
+        # Check the stopper
+        onoff_st = self.actuator.st.get_onoff()
+        if not all(onoff_st):
+            # 2nd trial (double check)
+            try:
+                self.actuator.st.set_allon()
+            except Exception as e:
+                msg = '_insert_eject()[{}]: '\
+                      'ERROR!: Failed to run the stopper set_allon() '\
+                      '--> Stop moving! | Exception = "{}"'.format(flabel, e)
+                self.log.error(msg)
+                return False, msg
+            onoff_st = self.actuator.st.get_onoff()
+            # Error in powering ON stopper
+            if not all(onoff_st):
+                msg = '_insert_eject()[{}]: '\
+                      'ERROR!: Could not confirm all the stopper released '\
+                      'after twice stopper set_allon()! '\
+                      '--> Stop moving!'.format(flabel)
+                self.log.error(msg)
+                return False, msg
 
         # Initial slow & small moving
         ret, msg, LSonoff = move_func(5, speedrate=0.2)
