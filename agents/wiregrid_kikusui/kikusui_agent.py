@@ -278,7 +278,9 @@ class KikusuiAgent:
             logfile.close()
             return True, 'Set Kikusui off'
 
-    def set_c(self, session, params=None):
+    @ocs_agent.param('current', default=0., type=float, check=lambda: x: 0.0 <= x <= 3.0)
+    @inlineCallbacks
+    def set_c(self, session, params):
         """set_c(current=0)
 
         **Task** - Set current [A]
@@ -286,9 +288,7 @@ class KikusuiAgent:
         Parameters:
             current (float): set current [A] (should be [0.0, 3.0])
         """
-        if params is None:
-            params = {}
-        current = params.get('current', 0.)
+        current = params.get('current')
 
         with self.lock.acquire_timeout(timeout=5, job='set_c') as acquired:
             if not acquired:
@@ -297,28 +297,20 @@ class KikusuiAgent:
                     .format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            if current <= 3. and 0. <= current:
-                self.cmd.user_input('C {}'.format(current))
-            else:
-                current = 3.0
-                self.log.warn(
-                    'Value Error: set current 3.0 A or less. '
-                    'Now set to {} A'.format(current))
-                self.cmd.user_input('C {}'.format(current))
-
+            self.cmd.user_input('C {}'.format(current))
             return True, 'Set Kikusui current to {} A'.format(current)
 
-    def set_v(self, session, params=None):
-        """set_v(volt=12)
+    @ocs_agent.param('volt', default=12., type=float, check=lambda: x: 0.0 < x < 12.0)
+    @inlineCallbacks
+    def set_v(self, session, params):
+        """set_v*volt=12.)
 
         **Task** - Set voltage [V].
 
         Parameters:
-            volt: set voltage [V] (Usually 12V)
+            volt: set voltage [V] (Usually 12V / Should be [0.0, 12.0])
         """
-        if params is None:
-            params = {}
-        volt = params.get('volt', 12)
+        volt = params.get('volt')
 
         with self.lock.acquire_timeout(timeout=5, job='set_v') as acquired:
             if not acquired:
@@ -327,14 +319,7 @@ class KikusuiAgent:
                     .format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            if 0. <= volt and volt <= 12.:
-                self.cmd.user_input('V {}'.format(volt))
-            else:
-                volt = 12.
-                self.log.warn(
-                    'Value Error: Rated Voltage of the motor is 12 V. '
-                    'Now set to 12 V')
-                self.cmd.user_input('V {}'.format(12.))
+            self.cmd.user_input('V {}'.format(volt))
 
             return True, 'Set Kikusui voltage to {} V'.format(volt)
 
@@ -371,7 +356,9 @@ class KikusuiAgent:
                 'Get Kikusui voltage / current: {} V / {} A [status={}]'\
                 .format(v_val, c_val, s_val)
 
-    def calibrate_wg(self, session, params=None):
+    @ocs_agent.param('storepath', default=self.action_path, type=str)
+    @inlineCallbacks
+    def calibrate_wg(self, session, params):
         """calibrate_wg(storepath='/data/wg-data/action/')
 
         **Task** - Run rotation-motor calibration for wire-grid.
@@ -379,9 +366,7 @@ class KikusuiAgent:
         Parameters:
             storepath (str): Path for log file.
         """
-        if params is None:
-            params = {}
-        storepath = params.get('storepath', self.action_path)
+        storepath = params.get('storepath')
 
         with self.lock.acquire_timeout(timeout=5, job='calibrate_wg')\
                 as acquired:
