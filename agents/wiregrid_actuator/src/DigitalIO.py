@@ -88,7 +88,7 @@ class DigitalIO:
             if not (io_name in self.io_names):
                 msg = \
                     'DigitalIO[{}]:get_onoff(): ERROR!: '\
-                a   'There is no IO name of {}.\n'\
+                    'There is no IO name of {}.\n'\
                     .format(self.name, io_name) \
                     + 'DigitalIO[{}]:get_onoff():         '\
                       'Assigned IO names = {}'.format(self.name, self.io_names)
