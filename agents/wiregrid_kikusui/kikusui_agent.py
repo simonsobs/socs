@@ -317,11 +317,11 @@ class KikusuiAgent:
         Set voltage [V]
 
         Parameters:
-            volt: set voltage [V] (should be ONLY 12)
+            volt: set voltage [V] (Usually 12V)
         """
         if params is None:
             params = {}
-        volt = params.get('volt', 0)
+        volt = params.get('volt', 12)
 
         with self.lock.acquire_timeout(timeout=5, job='set_v') as acquired:
             if not acquired:
@@ -330,15 +330,16 @@ class KikusuiAgent:
                     .format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            if volt == 12.:
+            if 0. <= volt and volt <= 12.:
                 self.cmd.user_input('V {}'.format(volt))
             else:
+                volt = 12.
                 self.log.warn(
                     'Value Error: Rated Voltage of the motor is 12 V. '
                     'Now set to 12 V')
                 self.cmd.user_input('V {}'.format(12.))
 
-            return True, 'Set Kikusui voltage to 12 V'
+            return True, 'Set Kikusui voltage to {} V'.format(volt)
 
     def get_vc(self, session, params=None):
         """
