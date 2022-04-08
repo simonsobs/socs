@@ -458,13 +458,13 @@ class WiregridActuatorAgent:
 
         Parameters:
             distance:  Actuator moving distance [mm] (default: 10)
-            speedrate: Actuator speed rate [0.0, 1.0] (default: 0.1)
+            speedrate: Actuator speed rate [0.0, 1.0] (default: 0.2)
         """
         # Get parameters
         if params is None:
             params = {}
         distance = params.get('distance', 10)
-        speedrate = params.get('speedrate', 10)
+        speedrate = params.get('speedrate', 0.2)
         self.log.info('insert_test(): set distance   = {} mm'
                       .format(distance))
         self.log.info('insert_test(): set speed rate = {}'
@@ -507,13 +507,13 @@ class WiregridActuatorAgent:
 
         Parameters:
             distance:  Actuator moving distance [mm] (default: 10)
-            speedrate: Actuator speed rate [0.0, 1.0] (default: 0.1)
+            speedrate: Actuator speed rate [0.0, 1.0] (default: 0.2)
         """
         # Get parameters
         if params is None:
             params = {}
         distance = params.get('distance', 10)
-        speedrate = params.get('speedrate', 10)
+        speedrate = params.get('speedrate', 0.2)
         self.log.info('eject_test(): set distance   = {} mm'
                       .format(distance))
         self.log.info('eject_test(): set speed rate = {}'
