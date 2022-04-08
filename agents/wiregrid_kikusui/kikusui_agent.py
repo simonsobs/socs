@@ -16,7 +16,7 @@ if not ON_RTD:
     from src.common import openlog, writelog
 
 
-class KikusuiAgent:
+class WiregridKikusuiAgent:
     """Agent to control the wire-grid rotation
     The KIKUSUI is a power supply and
     it is controlled via serial-to-ethernet converter.
@@ -596,10 +596,10 @@ def make_parser(parser=None):
 
 if __name__ == '__main__':
     parser = make_parser()
-    args = site_config.parse_args(agent_class='WGKikusuiAgent', parser=parser)
+    args = site_config.parse_args(agent_class='WiregridKikusuiAgent', parser=parser)
 
     agent, runner = ocs_agent.init_site_agent(args)
-    kikusui_agent = KikusuiAgent(agent, kikusui_ip=args.kikusui_ip,
+    kikusui_agent = WiregridKikusuiAgent(agent, kikusui_ip=args.kikusui_ip,
                                  kikusui_port=args.kikusui_port,
                                  debug=args.debug)
     agent.register_process('IV_acq', kikusui_agent.IV_acq,
