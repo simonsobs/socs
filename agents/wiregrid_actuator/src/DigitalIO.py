@@ -6,9 +6,14 @@ class DigitalIO:
     via the Galil actuator controller.
 
     Args:
-        name(string)    : Name of this instance
-        io_list(list)   : IO configurations
-        g(gclib.py())   : Actuator controller library
+        name(string)            : Name of this instance
+        io_list(list)           : IO configurations
+        g(gclib.py())           : Actuator controller library
+        get_onoff_reverse(bool) : Return 1/0 in _get_onoff()
+                                  if IO input is 0/1
+        set_onoff_reverse(bool) : Send SB(1)/CB(0) to the controller
+                                  in _set_onoff()
+                                  if "onoff" argument is False/True
         verbose(int)    : Verbosity level
     """
 
