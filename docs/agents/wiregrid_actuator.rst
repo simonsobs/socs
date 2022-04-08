@@ -51,7 +51,7 @@ OCS Site Config
 
 An example site-config-file block::
 
-    {'agent-class': 'WGActuatorAgent',
+    {'agent-class': 'WiregridActuatorAgent',
      'instance-id': 'wgactuator',
      'arguments': [['--ip-address', '10.10.10.73']]},
 

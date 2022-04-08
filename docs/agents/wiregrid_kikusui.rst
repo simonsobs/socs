@@ -48,7 +48,7 @@ An example docker-compose configuration::
     ocs-wgkikusui-agent:
       image: simonsobs/ocs-wgkikusui-agent:latest
       restart: always
-      hostname: kyoto-docker
+      hostname: ocs-docker
       network_mode: "host"
       depends_on:
         - "crossbar"
