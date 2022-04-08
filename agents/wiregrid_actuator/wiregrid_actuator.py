@@ -734,7 +734,7 @@ class WiregridActuatorAgent:
                          'STR2': 0 or 1, (0: OFF, 1:ON)
                          .
                          .
-                         ]
+                         }
                     }
                 }
         """
@@ -803,10 +803,10 @@ class WiregridActuatorAgent:
                     onoff_ls = self.actuator.ls.get_onoff()
                     onoff_st = self.actuator.st.get_onoff()
                 except Exception as e:
-                    msg = 'start_acq(): '\
+                    msg = 'acq(): '\
                           'ERROR!: Failed to get status '\
                           'from the actuator controller!'\
-                          '--> Stop start_acq()! | Exception = "{}"'.format(e)
+                          '--> Stop acq()! | Exception = "{}"'.format(e)
                     self.log.error(msg)
                     return False, msg
 
