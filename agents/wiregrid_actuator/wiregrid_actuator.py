@@ -47,7 +47,7 @@ class WiregridActuatorAgent:
 
         agg_params = {'frame_length': 60}
         self.agent.register_feed(
-                'wg_actuator', record=True, agg_params=agg_params)
+                'wgactuator', record=True, agg_params=agg_params)
 
         try:
             self.actuator = Actuator(
@@ -823,7 +823,7 @@ class WiregridActuatorAgent:
                     data['data']['stopper_{}'.format(name)] = onoff
                     onoff_dict_st[name] = onoff
                 # publish data
-                self.agent.publish_to_feed('wg_actuator', data)
+                self.agent.publish_to_feed('wgactuator', data)
                 # store session.data
                 field_dict = {'motor': onoff_mt,
                               'limitswitch': onoff_dict_ls,
@@ -835,7 +835,7 @@ class WiregridActuatorAgent:
                 time.sleep(interval_time)
         # End of lock acquire
 
-        self.agent.feeds['wg_actuator'].flush_buffer()
+        self.agent.feeds['wgactuator'].flush_buffer()
         return True, 'acq(): Acquisition exited cleanly'
 
     def stop_acq(self, session, params=None):
@@ -871,7 +871,7 @@ if __name__ == '__main__':
 
     parser = make_parser()
     args = site_config.parse_args(
-        agent_class='WGActuatorAgent', parser=parser)
+        agent_class='WiregridActuatorAgent', parser=parser)
 
     agent, runner = ocs_agent.init_site_agent(args)
 
