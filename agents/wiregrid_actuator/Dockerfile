@@ -1,4 +1,4 @@
-FROM simonsobs/socs:latest
+FROM socs:latest
 
 WORKDIR /app/socs/agents/wiregrid_actuator
 
@@ -9,7 +9,11 @@ RUN apt-get update \
  && apt-key add GALIL-GPG-KEY-E29D0E4B.asc \
  && wget http://www.galil.com/sw/pub/ubuntu/20.04/galil.list \
  && cp galil.list /etc/apt/sources.list.d \
- && apt-get update
+ && apt-get update \
+ && apt-get install -y gclib \
+ && ls /usr/share/doc/gclib/src \
+ && python3 setup.py install
+# && tar -xvf /usr/share/doc/gclib/src/gclib_python.tar.gz \
 
 COPY . .
 

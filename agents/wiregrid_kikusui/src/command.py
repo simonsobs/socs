@@ -1,5 +1,5 @@
 # Built-in python modules
-import sys as sy
+import sys
 
 # KIKUSUI-power-suuply control modules
 import src.pmx as pmx
@@ -132,7 +132,7 @@ class Command:
                 print(ret)
             # Exit the program
             elif cmd == self._cmds["stop"]:
-                sy.exit("\nExiting...")
+                sys.exit("\nExiting...")
             # Set the RTU port
             elif cmd == self._cmds["set_port"]:
                 if self._PMX.using_tcp:

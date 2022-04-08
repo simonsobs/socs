@@ -17,7 +17,23 @@ if not ON_RTD:
 
 
 class KikusuiAgent:
-    def __init__(self, agent, kikusui_ip, kikusui_port):
+    """Agent to control the wire-grid rotation
+    The KIKUSUI is a power supply and
+    it is controlled via serial-to-ethernet converter.
+    The converter is linked to the KIKUSUI
+    via RS-232 (D-sub 9pin cable).
+    The agent communicates with the converter via eternet.
+
+    Args:
+        kikusui-ip (str): IP address of the serial-to-ethernet converter
+        kikusui-port (int or str): Asigned port for the KIKUSUI power supply
+            The converter has four D-sub ports to control
+            multiple devices connected via serial communication.
+            Communicating device is determined
+            by the ethernet port number of the converter.
+        debug (bool): ON/OFF of writing a log file
+    """
+    def __init__(self, agent, kikusui_ip, kikusui_port, debug=False):
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
@@ -25,6 +41,7 @@ class KikusuiAgent:
         self.take_data = False
         self.kikusui_ip = kikusui_ip
         self.kikusui_port = int(kikusui_port)
+        self.debug = debug
 
         self.position_path = '/data/wg-data/position.log'
         self.action_path = '/data/wg-data/action/'
@@ -116,14 +133,14 @@ class KikusuiAgent:
 
     def _rotate_alittle(self, operation_time):
         if operation_time != 0.:
-            self.cmd.user_input('on')
+            self.cmd.user_input('ON')
             time.sleep(operation_time)
-            self.cmd.user_input('off')
+            self.cmd.user_input('OFF')
             time.sleep(self.agent_interval)
             return True, 'Successfully rotate a little!'
         return True, 'No rotation!'
 
-    def _get_position(self, position_path, open_trial, Deg):
+    def _get_position(self, position_path, open_trial):
         try:
             for i in range(open_trial):
                 with open(position_path) as f:
@@ -140,7 +157,7 @@ class KikusuiAgent:
                 '{}'.format(e)
                 )
 
-        return int(position)*Deg
+        return int(position)*self.Deg
 
     def _get_exectime(self, position_difference, feedback_cut, feedback_time):
         if position_difference >= feedback_cut[4]:
@@ -167,7 +184,7 @@ class KikusuiAgent:
         absolute_position = np.arange(0, 360, wanted_angle)
 
         start_position = self._get_position(
-            self.position_path, self.open_trial, self.Deg)
+            self.position_path, self.open_trial)
         if (360 < start_position + uncertaity_cancel):
             goal_position = wanted_angle
         elif absolute_position[-1] < start_position + uncertaity_cancel:
@@ -179,14 +196,15 @@ class KikusuiAgent:
                 ]
             )
 
-        writelog(logfile, 'ON', 0, start_position, 'stepwise')
+        if self.debug:
+            writelog(logfile, 'ON', 0, start_position, 'stepwise')
 
         self._rotate_alittle(feedback_time[-1]+0.1)
         time.sleep(self.agent_interval)
 
         for step in range(feedback_steps):
             mid_position = self._get_position(
-                self.position_path, self.open_trial, self.Deg)
+                self.position_path, self.open_trial)
             if goal_position + wanted_angle < mid_position:
                 operation_time =\
                     self._get_exectime(
@@ -204,10 +222,11 @@ class KikusuiAgent:
                 break
             self._rotate_alittle(operation_time)
 
-        writelog(logfile, 'OFF', 0,
-                 self._get_position(
-                    self.position_path, self.open_trial, self.Deg),
-                 'stepwise')
+        if self.debug:
+            writelog(logfile, 'OFF', 0,
+                     self._get_position(
+                        self.position_path, self.open_trial),
+                     'stepwise')
 
     ##################
     # Main functions #
@@ -226,12 +245,13 @@ class KikusuiAgent:
                 return False, 'Could not acquire lock'
 
             logfile = openlog(self.action_path)
-            writelog(logfile, 'ON', 0,
-                     self._get_position(
-                        self.position_path, self.open_trial, self.Deg),
-                     'continuous')
+            if self.debug:
+                writelog(logfile, 'ON', 0,
+                         self._get_position(
+                            self.position_path, self.open_trial),
+                         'continuous')
 
-            self.cmd.user_input('on')
+            self.cmd.user_input('ON')
             logfile.close()
             return True, 'Set Kikusui on'
 
@@ -248,12 +268,13 @@ class KikusuiAgent:
                 return False, 'Could not acquire lock'
 
             logfile = openlog(self.action_path)
-            writelog(logfile, 'OFF', 0,
-                     self._get_position(
-                        self.position_path, self.open_trial, self.Deg),
-                     'continuous')
+            if self.debug:
+                writelog(logfile, 'OFF', 0,
+                         self._get_position(
+                            self.position_path, self.open_trial),
+                         'continuous')
 
-            self.cmd.user_input('off')
+            self.cmd.user_input('OFF')
             logfile.close()
             return True, 'Set Kikusui off'
 
@@ -266,7 +287,8 @@ class KikusuiAgent:
             current (float): set current [A] (should be [0.0, 3.0])
         """
         if params is None:
-            params = {'current': 0}
+            params = {}
+        current = params.get('current', 0.)
 
         with self.lock.acquire_timeout(timeout=5, job='set_c') as acquired:
             if not acquired:
@@ -275,9 +297,8 @@ class KikusuiAgent:
                     .format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            if params['current'] <= 3. and 0. <= params['current']:
-                current = params['current']
-                self.cmd.user_input('C {}'.format(params['current']))
+            if current <= 3. and 0. <= current:
+                self.cmd.user_input('C {}'.format(current))
             else:
                 current = 3.0
                 self.log.warn(
@@ -293,10 +314,11 @@ class KikusuiAgent:
         **Task** - Set voltage [V].
 
         Parameters:
-            volt: set voltage [V] (should be ONLY 12)
+            volt: set voltage [V] (Usually 12V)
         """
         if params is None:
-            params = {'volt': 0}
+            params = {}
+        volt = params.get('volt', 12)
 
         with self.lock.acquire_timeout(timeout=5, job='set_v') as acquired:
             if not acquired:
@@ -305,15 +327,16 @@ class KikusuiAgent:
                     .format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            if params['volt'] == 12.:
-                self.cmd.user_input('V {}'.format(params['volt']))
+            if 0. <= volt and volt <= 12.:
+                self.cmd.user_input('V {}'.format(volt))
             else:
+                volt = 12.
                 self.log.warn(
                     'Value Error: Rated Voltage of the motor is 12 V. '
                     'Now set to 12 V')
                 self.cmd.user_input('V {}'.format(12.))
 
-            return True, 'Set Kikusui voltage to 12 V'
+            return True, 'Set Kikusui voltage to {} V'.format(volt)
 
     def get_vc(self, session, params=None):
         """get_vc()
@@ -357,7 +380,8 @@ class KikusuiAgent:
             storepath (str): Path for log file.
         """
         if params is None:
-            params = {'storepath': self.action_path}
+            params = {}
+        storepath = params.get('storepath', self.action_path)
 
         with self.lock.acquire_timeout(timeout=5, job='calibrate_wg')\
                 as acquired:
@@ -367,7 +391,7 @@ class KikusuiAgent:
                               .format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            logfile = openlog(params['storepath'])
+            logfile = openlog(storepath)
 
             cycle = 1
             for i in range(11):
@@ -378,23 +402,23 @@ class KikusuiAgent:
 
                     writelog(logfile, 'ON', tperiod,
                              self._get_position(
-                                self.position_path, self.open_trial, self.Deg),
+                                self.position_path, self.open_trial),
                              'calibration')
                     self._rotate_alittle(tperiod)
                     time.sleep(self.agent_interval+1.)
                     writelog(logfile, 'OFF', 0.,
                              self._get_position(
-                                self.position_path, self.open_trial, self.Deg),
+                                self.position_path, self.open_trial),
                              'calibration')
                     writelog(logfile, 'ON', 0.70,
                              self._get_position(
-                                self.position_path, self.open_trial, self.Deg),
+                                self.position_path, self.open_trial),
                              'calibration')
                     self._rotate_alittle(0.70)
                     time.sleep(self.agent_interval+1.)
                     writelog(logfile, 'OFF', 0.,
                              self._get_position(
-                                self.position_path, self.open_trial, self.Deg),
+                                self.position_path, self.open_trial),
                              'calibration')
                     cycle += 1
 
@@ -418,8 +442,7 @@ class KikusuiAgent:
             feedback_time (list): Calibration constants for the 22.5-deg rotation.
         """
         if params is None:
-            params = {'feedback_steps': 8, 'num_laps': 1, 'stopped_time': 10,
-                      'feedback_time': [0.181, 0.221, 0.251, 0.281, 0.301]}
+            params = {}
 
         with self.lock.acquire_timeout(timeout=5, job='stepwise_rotation')\
                 as acquired:
@@ -429,10 +452,11 @@ class KikusuiAgent:
                               .format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            self.feedback_steps = params['feedback_steps']
-            self.num_laps = params['num_laps']
-            self.stopped_time = params['stopped_time']
-            self.feedback_time = params['feedback_time']
+            self.feedback_steps = params.get('feedback_steps', 8)
+            self.num_laps = params.get('num_laps', 1)
+            self.stopped_time = params.get('stopped_time', 10)
+            self.feedback_time = params.get(
+                'feedback_time', [0.181, 0.221, 0.251, 0.281, 0.301])
 
             logfile = openlog(self.action_path)
 
@@ -574,19 +598,21 @@ def make_parser(parser=None):
     pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--kikusui-ip')
     pgroup.add_argument('--kikusui-port')
+    pgroup.add_argument('--debug')
+    pgroup.add_argument('--debug', dest='debug',
+                        action='store_true', default=False,
+                        help='Write a log file for debug')
     return parser
 
 
 if __name__ == '__main__':
-    site_parser = site_config.add_arguments()
-    parser = make_parser(site_parser)
+    parser = make_parser()
+    args = site_config.parse_args(agent_class='WGKikusuiAgent', parser=parser)
 
-    args = parser.parse_args()
-
-    site_config.reparse_args(args, 'WGKikusuiAgent')
     agent, runner = ocs_agent.init_site_agent(args)
     kikusui_agent = KikusuiAgent(agent, kikusui_ip=args.kikusui_ip,
-                                 kikusui_port=args.kikusui_port)
+                                 kikusui_port=args.kikusui_port,
+                                 debug=args.debug)
     agent.register_process('IV_acq', kikusui_agent.IV_acq,
                            kikusui_agent.stop_IV_acq, startup=True)
     agent.register_task('set_on', kikusui_agent.set_on)

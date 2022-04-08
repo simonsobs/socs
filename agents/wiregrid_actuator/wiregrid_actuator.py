@@ -1,5 +1,3 @@
-import os
-import sys
 import argparse
 import time
 
@@ -20,9 +18,21 @@ if not on_rtd:
 
 
 class WiregridActuatorAgent:
+    """ Agent to control the linear actuator
+    to insert or eject the wire-grid via a GALIL motor controller.
+    It communicates with the controller via an ethernet.
+    It also reads ON/OFF of the limit-switches on the ends of the actuators
+    and lock/unlock the stoppers to lock/unlock the actuators.
+
+    Args:
+        ip_address      (str): IP address for the GALIL motor controller
+        interval_time (float): Interval time for dat acquisition
+        sleep         (float): sleep time for every commands
+        the motor controller
+    """
 
     def __init__(self, agent, ip_address='192.168.1.100',
-                 interval_time=1, sleep=0.05, verbose=0):
+                 interval_time=1., sleep=0.05, verbose=0):
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
@@ -141,7 +151,7 @@ class WiregridActuatorAgent:
             self.log.error(msg)
             return False, msg
 
-        # Release stopper twice (Powering ON the stoppers)
+        # Release stopper (Powering ON the stoppers)
         # 1st trial
         try:
             self.actuator.st.set_allon()
@@ -151,15 +161,27 @@ class WiregridActuatorAgent:
                   '--> Stop moving! | Exception = "{}"'.format(flabel, e)
             self.log.error(msg)
             return False, msg
-        # 2nd trial (double check)
-        try:
-            self.actuator.st.set_allon()
-        except Exception as e:
-            msg = '_insert_eject()[{}]: '\
-                  'ERROR!: Failed to run the stopper set_allon() '\
-                  '--> Stop moving! | Exception = "{}"'.format(flabel, e)
-            self.log.error(msg)
-            return False, msg
+        # Check the stopper
+        onoff_st = self.actuator.st.get_onoff()
+        if not all(onoff_st):
+            # 2nd trial (double check)
+            try:
+                self.actuator.st.set_allon()
+            except Exception as e:
+                msg = '_insert_eject()[{}]: '\
+                      'ERROR!: Failed to run the stopper set_allon() '\
+                      '--> Stop moving! | Exception = "{}"'.format(flabel, e)
+                self.log.error(msg)
+                return False, msg
+            onoff_st = self.actuator.st.get_onoff()
+            # Error in powering ON stopper
+            if not all(onoff_st):
+                msg = '_insert_eject()[{}]: '\
+                      'ERROR!: Could not confirm all the stopper released '\
+                      'after twice stopper set_allon()! '\
+                      '--> Stop moving!'.format(flabel)
+                self.log.error(msg)
+                return False, msg
 
         # Initial slow & small moving
         ret, msg, LSonoff = move_func(5, speedrate=0.2)
@@ -443,13 +465,18 @@ class WiregridActuatorAgent:
 
         Parameters:
             distance (float): Actuator moving distance [mm] (default: 10)
-            speedrate (float): Actuator speed rate [0.0, 1.0] (default: 0.1)
+            speedrate (float): Actuator speed rate [0.0, 1.0] (default: 0.2)
         """
         # Get parameters
         if params is None:
             params = {}
         distance = params.get('distance', 10)
-        speedrate = params.get('speedrate', 10)
+        speedrate = params.get('speedrate', 0.2)
+        if speedrate < 0. or speedrate < 1.0:
+            self.log.warn('insert_test(): speedrate is out of range ({}).'
+                          'It should be in 0.0--1.0.'
+                          '--> Set to 0.2')
+            speedrate = 0.2
         self.log.info('insert_test(): set distance   = {} mm'
                       .format(distance))
         self.log.info('insert_test(): set speed rate = {}'
@@ -493,13 +520,18 @@ class WiregridActuatorAgent:
 
         Parameters:
             distance:  Actuator moving distance [mm] (default: 10)
-            speedrate: Actuator speed rate [0.0, 1.0] (default: 0.1)
+            speedrate: Actuator speed rate [0.0, 1.0] (default: 0.2)
         """
         # Get parameters
         if params is None:
             params = {}
         distance = params.get('distance', 10)
-        speedrate = params.get('speedrate', 10)
+        speedrate = params.get('speedrate', 0.2)
+        if speedrate < 0. or speedrate < 1.0:
+            self.log.warn('eject_test(): speedrate is out of range ({}).'
+                          'It should be in 0.0--1.0.'
+                          '--> Set to 0.2')
+            speedrate = 0.2
         self.log.info('eject_test(): set distance   = {} mm'
                       .format(distance))
         self.log.info('eject_test(): set speed rate = {}'
@@ -673,6 +705,9 @@ class WiregridActuatorAgent:
 
         **Process** - Run data acquisition.
 
+        Parameters:
+           interval-time: interval time for data acquisition
+
         Notes:
             The most recent data collected is stored in session.data in the
             structure::
@@ -696,7 +731,6 @@ class WiregridActuatorAgent:
                          ]
                     }
                 }
-
         """
         if params is None:
             params = {}
@@ -758,9 +792,18 @@ class WiregridActuatorAgent:
                 onoff_dict_ls = {}
                 onoff_dict_st = {}
                 # Get onoff
-                onoff_mt = self.actuator.get_motor_onoff()
-                onoff_ls = self.actuator.ls.get_onoff()
-                onoff_st = self.actuator.st.get_onoff()
+                try:
+                    onoff_mt = self.actuator.get_motor_onoff()
+                    onoff_ls = self.actuator.ls.get_onoff()
+                    onoff_st = self.actuator.st.get_onoff()
+                except Exception as e:
+                    msg = 'start_acq(): '\
+                          'ERROR!: Failed to get status '\
+                          'from the actuator controller!'\
+                          '--> Stop start_acq()! | Exception = "{}"'.format(e)
+                    self.log.error(msg)
+                    return False, msg
+
                 # Data for motor
                 data['data']['motor'] = onoff_mt
                 # Data for limitswitch

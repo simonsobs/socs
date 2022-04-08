@@ -11,20 +11,12 @@ The KIKUSUI is a power supply and
 it is controlled via serial-to-ethernet converter.
 The converter is linked to the KIKUSUI 
 via RS-232 (D-sub 9pin cable).
-The agent communicates with the converter via eternet.
+The agent communicates with the converter via Ethernet.
 
 .. argparse::
    :filename: ../agents/wiregrid_kikusui/kikusui_agent.py
    :func: make_parser
    :prog: python3 kikusui_agent.py
-
-Dependencies
-------------
-
-This agent depends on src/command.py, moxaSerial.py, and pmx.py.
-These scripts are also used in hwp_rotation agent.
-Therefore, they should be shared.
-
 
 Configuration File Examples
 ---------------------------
@@ -78,7 +70,7 @@ Description
 Functions
 `````````
 
-The agent have many functions, however most of them are for a test.
+The agent has many functions, however most of them are for testing.
 The main function is ``stepwise_rotation()``.
 ``calibrate_wg()``.
 
@@ -117,8 +109,8 @@ Example Clients
 
 Below is an example client to insert and eject the kikusui::
 
-    from ocs import matched_client
-    wgkikusui = matched_client.MatchedClient('wgkikusui', args=[])
+    from ocs.ocs_client import OCSClient
+    wgkikusui = OCSClient('wgkikusui')
 
     # Set Voltage
     wgkikusui.set_v.start(volt=12.)

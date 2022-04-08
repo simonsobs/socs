@@ -6,9 +6,14 @@ class DigitalIO:
     via the Galil actuator controller.
 
     Args:
-        name(string)    : Name of this instance
-        io_list(list)   : IO configurations
-        g(gclib.py())   : Actuator controller library
+        name(string)            : Name of this instance
+        io_list(list)           : IO configurations
+        g(gclib.py())           : Actuator controller library
+        get_onoff_reverse(bool) : Return 1/0 in _get_onoff()
+                                  if IO input is 0/1
+        set_onoff_reverse(bool) : Send SB(1)/CB(0) to the controller
+                                  in _set_onoff()
+                                  if "onoff" argument is False/True
         verbose(int)    : Verbosity level
     """
 
@@ -43,7 +48,6 @@ class DigitalIO:
                 + 'DigitalIO[{}]:_get_onoff(): '\
                   ' message = "{}" | Exception = "{}"'\
                   .format(self.name, onoff, e)
-            print(msg)
             raise ValueError(e)
         if self.get_reverse:
             onoff = not onoff
@@ -78,18 +82,16 @@ class DigitalIO:
                       .format(self.io_names)\
                     + 'DigitalIO[{}]:get_onoff():       '\
                       'Asked IO names = {}'.format(self.name, io_name)
-                print(msg)
                 raise ValueError(msg)
             onoff = [self._get_onoff(name) for name in io_name]
         else:
             if not (io_name in self.io_names):
                 msg = \
                     'DigitalIO[{}]:get_onoff(): ERROR!: '\
-                    'There is no IO name of {}.\n'\
+                a   'There is no IO name of {}.\n'\
                     .format(self.name, io_name) \
                     + 'DigitalIO[{}]:get_onoff():         '\
                       'Assigned IO names = {}'.format(self.name, self.io_names)
-                print(msg)
                 raise ValueError(msg)
             onoff = self._get_onoff(io_name)
         return onoff
@@ -108,7 +110,6 @@ class DigitalIO:
                       .format(self.name, self.io_names)\
                     + 'DigitalIO[{}]:get_label():     '\
                       'Asked IO names    = {}'.format(self.name, io_name)
-                print(msg)
                 raise ValueError(msg)
             label = [self.io_indices[name] for name in io_name]
         else:
@@ -119,7 +120,6 @@ class DigitalIO:
                     .format(self.name, io_name) \
                     + 'DigitalIO[{}]:get_label():     '\
                       'Assigned IO names = {}'.format(self.name, self.io_names)
-                print(msg)
                 raise ValueError(msg)
             label = self.io_label(io_name)
         return label
@@ -134,7 +134,6 @@ class DigitalIO:
         else:
             cmd = 'CB {}'.format(io_num)
         self.g.GCommand(cmd)
-        return True
 
     def set_onoff(self, onoff=0, io_name=None):
         """Set True/False (ON/OFF) for the digital IOs.
@@ -145,9 +144,6 @@ class DigitalIO:
                 If None, set all possible IOs ON/OFF. If a list, set all
                 specified IOs ON/OFF. If a string (one IO), set the given IO
                 ON/OFF.
-
-        Returns:
-            bool: Always True.
         """
         set_io_names = []
         if io_name is None:
@@ -164,7 +160,6 @@ class DigitalIO:
                     + 'DigitalIO[{}]:set_onoff():     '\
                       'Asked IO names    = {}'\
                       .format(self.name, io_name)
-                print(msg)
                 raise ValueError(msg)
             set_io_names = io_name
         else:
@@ -175,21 +170,19 @@ class DigitalIO:
                     .format(self.name, io_name)\
                     + 'DigitalIO[{}]:set_onoff():     '\
                       'Assigned IO names = {}'.format(self.name, self.io_names)
-                print(msg)
                 raise ValueError(msg)
             set_io_names = [io_name]
         print('DigitalIO[{}]:set_onoff(): Set {} for the IOs: '
               '{}'.format(self.name, 'ON' if onoff else 'OFF', set_io_names))
         for name in set_io_names:
             self._set_onoff(onoff, name)
-        return True
 
     def set_allon(self):
         print('DigitalIO[{}]:set_allon(): '
               'Set ON for all of the digital IOs'.format(self.name))
-        return self.set_onoff(1, None)
+        self.set_onoff(1, None)
 
     def set_alloff(self):
         print('DigitalIO[{}]:set_allon(): '
               'Set OFF for all of the digital IOs'.format(self.name))
-        return self.set_onoff(0, None)
+        self.set_onoff(0, None)
