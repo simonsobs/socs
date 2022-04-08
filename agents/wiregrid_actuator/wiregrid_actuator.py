@@ -458,7 +458,10 @@ class WiregridActuatorAgent:
                 return False, msg
             return True, 'eject_homing(): Successfully finish!'
 
-    def insert_test(self, session, params=None):
+    @ocs_agent.param('distance', default=10., type=float)
+    @ocs_agent.param('speedrate', default=0.2, type=float, check=lambda x: 0.0 < x <= 1.0)
+    @inlineCallbacks
+    def insert_test(self, session, params):
         """insert_test(distance=10, speedrate=0.1)
 
         **Task** - Insert slowly the wire-grid into the forebaffle interface
@@ -469,10 +472,8 @@ class WiregridActuatorAgent:
             speedrate (float): Actuator speed rate [0.0, 1.0] (default: 0.2)
         """
         # Get parameters
-        if params is None:
-            params = {}
-        distance = params.get('distance', 10)
-        speedrate = params.get('speedrate', 0.2)
+        distance = params.get('distance')
+        speedrate = params.get('speedrate')
         if speedrate < 0. or speedrate < 1.0:
             self.log.warn('insert_test(): speedrate is out of range ({}).'
                           'It should be in 0.0--1.0.'
@@ -513,7 +514,10 @@ class WiregridActuatorAgent:
             self.actuator.st.set_alloff()
             return True, 'insert_test(): Successfully finish!'
 
-    def eject_test(self, session, params=None):
+    @ocs_agent.param('distance', default=10., type=float)
+    @ocs_agent.param('speedrate', default=0.2, type=float, check=lambda x: 0.0 < x <= 1.0)
+    @inlineCallbacks
+    def eject_test(self, session, params):
         """eject_test(distance=10, speedrate=0.1)
 
         **Task** - Eject slowly the wire-grid from the forebaffle interface
@@ -524,8 +528,6 @@ class WiregridActuatorAgent:
             speedrate: Actuator speed rate [0.0, 1.0] (default: 0.2)
         """
         # Get parameters
-        if params is None:
-            params = {}
         distance = params.get('distance', 10)
         speedrate = params.get('speedrate', 0.2)
         if speedrate < 0. or speedrate < 1.0:
