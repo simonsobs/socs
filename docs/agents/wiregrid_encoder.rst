@@ -16,15 +16,15 @@ This agent parses the received data to a readable data and records it.
 
 .. argparse::
    :filename: ../agents/wiregrid_encoder/wiregrid_encoder.py
+   :func: make_parser
    :prog: python3 wiregrid_encoder.py
-
 
 Dependencies
 ------------
 
 This agent recieves the data from BeagleBoneBlack. 
-Therefore, a script reading the encoder data should be running in the BeagleBoneBlack.
-
+Therefore, a script reading the encoder data 
+should be running in the BeagleBoneBlack.
 
 Configuration File Examples
 ---------------------------
@@ -37,13 +37,12 @@ OCS Site Config
 
 An example site-config-file block::
 
-    {'agent-class': 'WGEncoderAgent',
+    {'agent-class': 'WiregridEncoderAgent',
      'instance-id': 'wgencoder',
      'arguments': [['--port', 50007]]},
 
 The port is used to receive the data from the BeagleBoneBlack.
 The port number is determined in the script running in the BeagleBoneBlack.
-
 
 Docker Compose
 ``````````````
@@ -55,8 +54,6 @@ An example docker-compose configuration::
       restart: always
       hostname: ocs-docker
       network_mode: "host"
-      depends_on:
-        - "crossbar"
       volumes:
         - ${OCS_CONFIG_DIR}:/config:ro
         - "/data/wg-data:/data/wg-data"
@@ -72,18 +69,17 @@ An example docker-compose configuration::
   which is used in ``Wiregrid Kikusui Agent`` for feedback control of the rotation.
 - ``ports`` is defined to receive the data from BeagleBoneBlack via UDP connection.
 
-
 Description
 -----------
 
 Functions
 `````````
 
-The agent has only a ``start_acq()`` function.
+The agent has only a ``acq()`` function.
 
 
-Configuration
-`````````````
+Hardware Configurations
+```````````````````````
 
 The hardware-related variables are defined in ``wiregrid_encoder.py``.
     - COUNTER_INFO_LENGTH = 100
@@ -97,5 +93,13 @@ The variables should be consistent with the BeagleBoneBlack script as well.
 Agent API
 ---------
 
-.. autoclass:: agents.wiregrid_encoder.wiregrid_encoder.WGEncoderAgent
-    :members: start_acq
+.. autoclass:: agents.wiregrid_encoder.wiregrid_encoder.WiregridEncoderAgent
+    :members:
+
+Example Clients
+---------------
+
+Below is an example client to insert and eject the actuator::
+
+    from ocs.ocs_client import OCSClient
+    wgencoder = OCSClient('wgencoder')
