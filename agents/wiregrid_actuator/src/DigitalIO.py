@@ -48,7 +48,6 @@ class DigitalIO:
                 + 'DigitalIO[{}]:_get_onoff(): '\
                   ' message = "{}" | Exception = "{}"'\
                   .format(self.name, onoff, e)
-            print(msg)
             raise ValueError(e)
         if self.get_reverse:
             onoff = not onoff
@@ -84,18 +83,16 @@ class DigitalIO:
                       .format(self.io_names)\
                     + 'DigitalIO[{}]:get_onoff():       '\
                       'Asked IO names = {}'.format(self.name, io_name)
-                print(msg)
                 raise ValueError(msg)
             onoff = [self._get_onoff(name) for name in io_name]
         else:
             if not (io_name in self.io_names):
                 msg = \
                     'DigitalIO[{}]:get_onoff(): ERROR!: '\
-                    'There is no IO name of {}.\n'\
+                a   'There is no IO name of {}.\n'\
                     .format(self.name, io_name) \
                     + 'DigitalIO[{}]:get_onoff():         '\
                       'Assigned IO names = {}'.format(self.name, self.io_names)
-                print(msg)
                 raise ValueError(msg)
             onoff = self._get_onoff(io_name)
         return onoff
@@ -114,7 +111,6 @@ class DigitalIO:
                       .format(self.name, self.io_names)\
                     + 'DigitalIO[{}]:get_label():     '\
                       'Asked IO names    = {}'.format(self.name, io_name)
-                print(msg)
                 raise ValueError(msg)
             label = [self.io_indices[name] for name in io_name]
         else:
@@ -125,7 +121,6 @@ class DigitalIO:
                     .format(self.name, io_name) \
                     + 'DigitalIO[{}]:get_label():     '\
                       'Assigned IO names = {}'.format(self.name, self.io_names)
-                print(msg)
                 raise ValueError(msg)
             label = self.io_label(io_name)
         return label
@@ -170,7 +165,6 @@ class DigitalIO:
                     + 'DigitalIO[{}]:set_onoff():     '\
                       'Asked IO names    = {}'\
                       .format(self.name, io_name)
-                print(msg)
                 raise ValueError(msg)
             set_io_names = io_name
         else:
@@ -181,7 +175,6 @@ class DigitalIO:
                     .format(self.name, io_name)\
                     + 'DigitalIO[{}]:set_onoff():     '\
                       'Assigned IO names = {}'.format(self.name, self.io_names)
-                print(msg)
                 raise ValueError(msg)
             set_io_names = [io_name]
         print('DigitalIO[{}]:set_onoff(): Set {} for the IOs: '

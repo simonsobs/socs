@@ -93,7 +93,6 @@ class Actuator:
         if self.g is None:
             msg = 'Actuator:_connect() : ERROR!: Failed to '\
                   'initialize the connection to the actuator controller.'
-            print(msg)
             raise RuntimeError(msg)
         self.g.GOpen('{}'.format(self.ip_address))
         # Connection check
@@ -117,7 +116,6 @@ class Actuator:
         if not status:
             msg = 'Actuator:_connect(): ERROR!: '\
                   'check_connect() is failed.'
-            print(msg)
             raise RuntimeError(msg)
         time.sleep(1)
         print('Actuator:_connect(): Successfully make a connection.')
@@ -142,7 +140,6 @@ class Actuator:
                 'Actuator:_check_motortype(): ERROR!: Failed to check '\
                 'the motor type! | '\
                 'Exception = "{}"'.format(e)
-            print(msg)
             raise RuntimeError(msg)
         if len(mts) != 2:
             print('Actuator:_check_motortype(): '
@@ -335,7 +332,6 @@ class Actuator:
                 'motor A = {} / motor B = {}'.format(
                     'ON' if onoffA else 'OFF',
                     'ON' if onoffB else 'OFF')
-            print(msg)
             raise RuntimeError(msg)
 
     # Set motor ON/OFF
@@ -357,7 +353,6 @@ class Actuator:
                 'Actuator:set_motor_onoff(): ERROR!: '\
                 'Set motor {} but the current ON/OFF ("{}") is different!'\
                 .format('ON' if onoff else 'OFF', onoff_test)
-            print(msg)
             raise RuntimeError(msg)
         print('Actuator:set_motor_onoff(): '
               'Successfully {} the actuator motors!'
