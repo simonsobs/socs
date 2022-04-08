@@ -598,7 +598,6 @@ def make_parser(parser=None):
     pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--kikusui-ip')
     pgroup.add_argument('--kikusui-port')
-    pgroup.add_argument('--debug')
     pgroup.add_argument('--debug', dest='debug',
                         action='store_true', default=False,
                         help='Write a log file for debug')
