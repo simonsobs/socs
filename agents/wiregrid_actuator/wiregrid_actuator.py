@@ -465,6 +465,11 @@ class WiregridActuatorAgent:
             params = {}
         distance = params.get('distance', 10)
         speedrate = params.get('speedrate', 0.2)
+        if speedrate < 0. or speedrate < 1.0:
+            self.log.warn('insert_test(): speedrate is out of range ({}).'
+                          'It should be in 0.0--1.0.'
+                          '--> Set to 0.2')
+            speedrate = 0.2
         self.log.info('insert_test(): set distance   = {} mm'
                       .format(distance))
         self.log.info('insert_test(): set speed rate = {}'
@@ -514,6 +519,11 @@ class WiregridActuatorAgent:
             params = {}
         distance = params.get('distance', 10)
         speedrate = params.get('speedrate', 0.2)
+        if speedrate < 0. or speedrate < 1.0:
+            self.log.warn('eject_test(): speedrate is out of range ({}).'
+                          'It should be in 0.0--1.0.'
+                          '--> Set to 0.2')
+            speedrate = 0.2
         self.log.info('eject_test(): set distance   = {} mm'
                       .format(distance))
         self.log.info('eject_test(): set speed rate = {}'
