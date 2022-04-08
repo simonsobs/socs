@@ -760,9 +760,18 @@ class WiregridActuatorAgent:
                 onoff_dict_ls = {}
                 onoff_dict_st = {}
                 # Get onoff
-                onoff_mt = self.actuator.get_motor_onoff()
-                onoff_ls = self.actuator.ls.get_onoff()
-                onoff_st = self.actuator.st.get_onoff()
+                try:
+                    onoff_mt = self.actuator.get_motor_onoff()
+                    onoff_ls = self.actuator.ls.get_onoff()
+                    onoff_st = self.actuator.st.get_onoff()
+                except Exception as e:
+                    msg = 'start_acq(): '\
+                          'ERROR!: Failed to get status '\
+                          'from the actuator controller!'\
+                          '--> Stop start_acq()! | Exception = "{}"'.format(e)
+                    self.log.error(msg)
+                    return False, msg
+
                 # Data for motor
                 data['data']['motor'] = onoff_mt
                 # Data for limitswitch
