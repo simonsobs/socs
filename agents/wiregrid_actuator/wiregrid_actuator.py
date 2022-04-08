@@ -7,8 +7,8 @@ from ocs import site_config
 from ocs.ocs_twisted import TimeoutLock
 
 # add PATH to ./src directory
-#this_dir = os.path.dirname(os.path.abspath(__file__))
-#sys.path.append(os.path.join(this_dir, 'src'))
+# this_dir = os.path.dirname(os.path.abspath(__file__))
+# sys.path.append(os.path.join(this_dir, 'src'))
 
 on_rtd = os.environ.get('READTHEDOCS') == 'True'
 if not on_rtd:
@@ -459,7 +459,8 @@ class WiregridActuatorAgent:
             return True, 'eject_homing(): Successfully finish!'
 
     @ocs_agent.param('distance', default=10., type=float)
-    @ocs_agent.param('speedrate', default=0.2, type=float, check=lambda x: 0.0 < x <= 1.0)
+    @ocs_agent.param('speedrate', default=0.2, type=float,
+                     check=lambda x: 0.0 < x <= 1.0)
     @inlineCallbacks
     def insert_test(self, session, params):
         """insert_test(distance=10, speedrate=0.1)
@@ -515,7 +516,8 @@ class WiregridActuatorAgent:
             return True, 'insert_test(): Successfully finish!'
 
     @ocs_agent.param('distance', default=10., type=float)
-    @ocs_agent.param('speedrate', default=0.2, type=float, check=lambda x: 0.0 < x <= 1.0)
+    @ocs_agent.param('speedrate', default=0.2, type=float,
+                     check=lambda x: 0.0 < x <= 1.0)
     @inlineCallbacks
     def eject_test(self, session, params):
         """eject_test(distance=10, speedrate=0.1)
