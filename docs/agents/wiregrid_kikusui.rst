@@ -113,30 +113,24 @@ Below is an example client to insert and eject the kikusui::
     wgkikusui = OCSClient('wgkikusui')
 
     # Set Voltage
-    wgkikusui.set_v.start(volt=12.)
-    wgkikusui.set_v.wait()
+    wgkikusui.set_v(volt=12.)
 
     # Set Current
-    wgkikusui.set_c.start(current=3.)
-    wgkikusui.set_c.wait()
+    wgkikusui.set_c(current=3.)
 
     # Get voltage/current/onoff
-    wgkikusui.get_vc.start()
-    status, msg, session = wgkikusui.get_vc.wait()
+    status, msg, session = wgkikusui.get_vc()
     print(session['messages'][1][1])
 
     # Stepwise rotation
-    wgkikusui.stepwise_rotation.start(
+    wgkikusui.stepwise_rotation(
         feedback_steps=8,
         num_laps=1,
         stopped_time=10.,
         )
-    wgkikusui.stepwise_rotation.wait()
 
     # Continuous rotation
     import time
-    wgkikusui.set_on.start()
-    wgkikusui.set_on.wait()
+    wgkikusui.set_on()
     time.sleep(10) #  10 sec rotation
-    wgkikusui.set_off.start()
-    wgkikusui.set_off.wait()
+    wgkikusui.set_off()

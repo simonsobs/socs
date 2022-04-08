@@ -25,12 +25,20 @@ Running the gclib library needs some special treatments.
 gclib requires installation of other libraries and gclib itself
 and starting services(dbus, avahi-daemon, and gcapsd) in the docker.
 These preparations are implemented in Dockerfile and wg-actuator-entrypoint.sh.
-Probably, the host machine requires the installation of gcapsd.
-Please install it via (in Ubuntu):
+The host machine requires the installation of gcapsd.
+The reference links:
+    - Adding repository: https://www.galil.com/sw/pub/all/doc/global/html/ubuntu2004.html
+    - Installation via apt: https://www.galil.com/sw/pub/all/doc/gclib/html/ubuntu.html
+Please install it via (in Ubuntu20.04):
 
 .. code-block:: bash
 
-    $ sudo apt install gcapsd
+    $ wget http://www.galil.com/sw/pub/all/crypto/GALIL-GPG-KEY-E29D0E4B.asc
+    $ sudo apt-key add GALIL-GPG-KEY-E29D0E4B.asc
+    $ wget http://www.galil.com/sw/pub/ubuntu/20.04/galil.list
+    $ sudo cp galil.list /etc/apt/sources.list.d
+    $ sudo apt-get update
+    $ sudo apt install -y gclib gcapsd
 
 Configuration File Examples
 ---------------------------
@@ -103,7 +111,7 @@ However, the motor power is not turned ON or OFF during the both functions.
 In the test mode, you can choose the moving distance [mm] and speed rate.
 The parameter details are here:
 - distance: Actuator moving distance [mm] (default: 10)
-- speedrate: Actuator speed rate [0.0, 1.0] (default: 0.1)
+- speedrate: Actuator speed rate [0.0, 1.0] (default: 0.2)
 
 
 Hardware Configurations
