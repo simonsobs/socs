@@ -1,4 +1,3 @@
-import sys
 import os
 import argparse
 import time
@@ -278,7 +277,8 @@ class KikusuiAgent:
             logfile.close()
             return True, 'Set Kikusui off'
 
-    @ocs_agent.param('current', default=0., type=float, check=lambda: x: 0.0 <= x <= 3.0)
+    @ocs_agent.param('current', default=0., type=float,
+                     check=lambda x: 0.0 <= x <= 3.0)
     @inlineCallbacks
     def set_c(self, session, params):
         """set_c(current=0)
@@ -300,7 +300,8 @@ class KikusuiAgent:
             self.cmd.user_input('C {}'.format(current))
             return True, 'Set Kikusui current to {} A'.format(current)
 
-    @ocs_agent.param('volt', default=12., type=float, check=lambda: x: 0.0 < x < 12.0)
+    @ocs_agent.param('volt', default=12., type=float,
+                     check=lambda x: 0.0 < x < 12.0)
     @inlineCallbacks
     def set_v(self, session, params):
         """set_v*volt=12.)
@@ -350,13 +351,13 @@ class KikusuiAgent:
                 msg, v_val, c_val = self.cmd.user_input('VC?')
                 s_msg, s_val = self.cmd.user_input('O?')
 
-            self.log.info('Get voltage/current message: {}'.format(msg))
-            self.log.info('Get status message: {}'.format(s_msg))
+            # self.log.info('Get voltage/current message: {}'.format(msg))
+            # self.log.info('Get status message: {}'.format(s_msg))
             return True,\
                 'Get Kikusui voltage / current: {} V / {} A [status={}]'\
                 .format(v_val, c_val, s_val)
 
-    @ocs_agent.param('storepath', default=self.action_path, type=str)
+    @ocs_agent.param('storepath', default='/data/wg-data/action/', type=str)
     @inlineCallbacks
     def calibrate_wg(self, session, params):
         """calibrate_wg(storepath='/data/wg-data/action/')
@@ -421,10 +422,13 @@ class KikusuiAgent:
         step, seveal small-rotations are performed to rotate 22.5-deg.
 
         Parameters:
-            feedback_steps (int): Number of small rotations for each 22.5-deg step.
+            feedback_steps (int): Number of small rotations
+                                  for each 22.5-deg step.
             num_laps (int): Number of laps (revolutions).
-            stopped_time (float): Stopped time [sec] for each 22.5-deg step.
-            feedback_time (list): Calibration constants for the 22.5-deg rotation.
+            stopped_time (float): Stopped time [sec]
+                                  for each 22.5-deg step.
+            feedback_time (list): Calibration constants
+                                  for the 22.5-deg rotation.
         """
         if params is None:
             params = {}
