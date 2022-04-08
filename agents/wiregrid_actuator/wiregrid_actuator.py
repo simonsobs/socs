@@ -5,6 +5,7 @@ import time
 from ocs import ocs_agent
 from ocs import site_config
 from ocs.ocs_twisted import TimeoutLock
+from twisted.internet.defer import inlineCallbacks
 
 # add PATH to ./src directory
 # this_dir = os.path.dirname(os.path.abspath(__file__))

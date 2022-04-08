@@ -6,6 +6,7 @@ import traceback
 
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
+from twisted.internet.defer import inlineCallbacks
 
 ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 if not ON_RTD:
