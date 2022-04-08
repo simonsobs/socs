@@ -29,7 +29,7 @@ OCS Site Config
 
 An example site-config-file block::
 
-    {'agent-class': 'WGKIKUSUIAgent',
+    {'agent-class': 'WiregridKikusuiAgent',
      'instance-id': 'wgkikusui',
      'arguments': [['--kikusui-ip', '10.10.10.71'],
                    ['--kikusui-port', '29']]},
@@ -100,7 +100,7 @@ However, if you want to rotate the wire-grid continuousely, you can use the foll
 Agent API
 ---------
 
-.. autoclass:: agents.wiregrid_kikusui.kikusui_agent.KikusuiAgent
+.. autoclass:: agents.wiregrid_kikusui.kikusui_agent.WiregridKikusuiAgent
     :members:
 
 
