@@ -47,7 +47,7 @@ class WiregridActuatorAgent:
 
         agg_params = {'frame_length': 60}
         self.agent.register_feed(
-                'WGActuator', record=True, agg_params=agg_params)
+                'wg_actuator', record=True, agg_params=agg_params)
 
         try:
             self.actuator = Actuator(
@@ -823,7 +823,7 @@ class WiregridActuatorAgent:
                     data['data']['stopper_{}'.format(name)] = onoff
                     onoff_dict_st[name] = onoff
                 # publish data
-                self.agent.publish_to_feed('WGActuator', data)
+                self.agent.publish_to_feed('wg_actuator', data)
                 # store session.data
                 field_dict = {'motor': onoff_mt,
                               'limitswitch': onoff_dict_ls,
@@ -835,7 +835,7 @@ class WiregridActuatorAgent:
                 time.sleep(interval_time)
         # End of lock acquire
 
-        self.agent.feeds['WGActuator'].flush_buffer()
+        self.agent.feeds['wg_actuator'].flush_buffer()
         return True, 'acq(): Acquisition exited cleanly'
 
     def stop_acq(self, session, params=None):
