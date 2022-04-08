@@ -2,7 +2,7 @@
 
 class DigitalIO:
     """
-    The digitalIO class to read & control the digital IOs
+    The digital IO class to read & control the digital IOs
     via the Galil actuator controller.
 
     Args:
@@ -56,18 +56,17 @@ class DigitalIO:
         return int(onoff)
 
     def get_onoff(self, io_name=None):
-        """
-        Get True/False (ON/OFF) for the digital IOs
-        If io_name=None, return a list of the ON/OFFs for all the IOs
-        If io_name is list, return a list of the ON/OFFs for asked IOs
-        If io_name is string (one IO), return one ON/OFF
+        """Get True/False (ON/OFF) for the digital IOs.
 
         Args:
-            io_name is a string of a IO name or list of IO names
-        Return value:
-            list of True/False or one True/False
-                True  : ON
-                False : OFF
+            io_name (str or list): A string of a IO name or list of IO names.
+
+        Returns:
+            list or str: A list of True/Falses or a single True/False depending
+            on the value of `io_name`. If `io_name` is None, return a list of
+            the ON/OFFs for all the IOs. If `io_name` is a list, return a list
+            of the ON/OFFs for asked IOs.  If `io_name` is a string (one IO),
+            return one ON/OFF. Here True means ON and False means OFF.
         """
         if io_name is None:
             onoff = [self._get_onoff(name) for name in self.io_names]
@@ -89,7 +88,7 @@ class DigitalIO:
             if not (io_name in self.io_names):
                 msg = \
                     'DigitalIO[{}]:get_onoff(): ERROR!: '\
-                a   'There is no IO name of {}.\n'\
+                    'There is no IO name of {}.\n'\
                     .format(self.name, io_name) \
                     + 'DigitalIO[{}]:get_onoff():         '\
                       'Assigned IO names = {}'.format(self.name, self.io_names)
@@ -137,17 +136,14 @@ class DigitalIO:
         self.g.GCommand(cmd)
 
     def set_onoff(self, onoff=0, io_name=None):
-        """
-        Set True/False (ON/OFF) for the digital IOs
-        If io_name=None, return a list of the ON/OFFs for all the IOs
-        If io_name is list, return a list of the ON/OFFs for asked IOs
-        If io_name is string (one IO), return one ON/OFF
+        """Set True/False (ON/OFF) for the digital IOs.
 
         Args:
-            onoff: 0 (OFF) or 1 (ON)
-            io_name: a string of a IO name or list of IO names
-        Return value:
-            Nothing
+            onoff (int): 0 (OFF) or 1 (ON)
+            io_name (str or list): a string of a IO name or list of IO names.
+                If None, set all possible IOs ON/OFF. If a list, set all
+                specified IOs ON/OFF. If a string (one IO), set the given IO
+                ON/OFF.
         """
         set_io_names = []
         if io_name is None:

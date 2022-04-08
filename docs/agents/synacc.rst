@@ -79,4 +79,4 @@ Agent API
 ---------
 
 .. autoclass:: agents.synacc.synacc.SynaccessAgent
-    :members: get_status, reboot, set_outlet, set_all, start_status_acq
+    :members:

@@ -1,3 +1,4 @@
+import os
 import argparse
 import time
 
@@ -5,10 +6,16 @@ from ocs import ocs_agent
 from ocs import site_config
 from ocs.ocs_twisted import TimeoutLock
 
-# import classes / configs
-from src.Actuator import Actuator
-import limitswitch_config
-import stopper_config
+# add PATH to ./src directory
+#this_dir = os.path.dirname(os.path.abspath(__file__))
+#sys.path.append(os.path.join(this_dir, 'src'))
+
+on_rtd = os.environ.get('READTHEDOCS') == 'True'
+if not on_rtd:
+    # import classes / configs
+    from src.Actuator import Actuator
+    import limitswitch_config
+    import stopper_config
 
 
 class WiregridActuatorAgent:
@@ -278,14 +285,66 @@ class WiregridActuatorAgent:
     ##################
     # Return: status(True or False), message
 
-    def check_limitswitch(self, session, params=None):
+    def insert(self, session, params=None):
+        """insert()
+
+        **Task** - Insert the wire-grid into the forebaffle interface above the
+        SAT.
+
         """
-        Print limit-switch ON/OFF
+        with self.lock.acquire_timeout(timeout=3, job='insert') as acquired:
+            if not acquired:
+                self.log.warn(
+                    'insert(): '
+                    'Lock could not be acquired because it is held by {}.'
+                    .format(self.lock.job))
+                return False, 'insert(): Could not acquire lock'
+            # Wait for a second before moving
+            time.sleep(1)
+            # Moving commands
+            ret, msg = self._insert(920, 1.0)
+            if not ret:
+                msg = 'insert(): '\
+                      'ERROR!: Failed insert() in _insert(850,1.0) | {}'\
+                      .format(msg)
+                self.log.error(msg)
+                return False, msg
+            return True, 'insert(): Successfully finish!'
+
+    def eject(self, session, params=None):
+        """eject()
+
+        **Task** - Eject the wire-grid from the forebaffle interface above the
+        SAT.
+
+        """
+        with self.lock.acquire_timeout(timeout=3, job='eject') as acquired:
+            if not acquired:
+                self.log.warn(
+                        'eject(): '
+                        'Lock could not be acquired because it is held by {}.'
+                        .format(self.lock.job))
+                return False, 'eject(): Could not acquire lock'
+            # Wait for a second before moving
+            time.sleep(1)
+            # Moving commands
+            ret, msg = self._eject(920, 1.0)
+            if not ret:
+                msg = 'eject(): ERROR!: Failed in _eject(850,1.0) | {}'\
+                    .format(msg)
+                self.log.error(msg)
+                return False, msg
+            return True, 'eject(): Successfully finish!'
+
+    def check_limitswitch(self, session, params=None):
+        """check_limitswitch(io_name)
+
+        **Task** - Print limit-switch ON/OFF state.
 
         Parameters:
-            io_name (string): An io name to be printed
-                - io_name is determined in limitswitch_config.py
-                - If io_name is None, all limit-switches are printed.
+            io_name (string): The IO name to be printed. Names configured in
+                ``limitswitch_config.py``. If None, all limit-switches are
+                printed.
         """
         if params is None:
             params = {}
@@ -314,13 +373,14 @@ class WiregridActuatorAgent:
             return True, msg
 
     def check_stopper(self, session, params=None):
-        """
-        Print stopper ON/OFF (ON: lock the actuator, OFF: release the actuator)
+        """check_stopper(io_name)
+
+        **Task** - Print stopper ON/OFF (ON: lock the actuator, OFF: release
+        the actuator)
 
         Parameters:
-            io_name (string): An io name to be printed
-                - io_name is determined in stopper_config.py
-                - If io_name is None, all stoppers are printed.
+            io_name (string): The IO name to be printed. Names configured in
+                ``stopper_config.py``. If None, all stoppers are printed.
         """
         if params is None:
             params = {}
@@ -346,64 +406,12 @@ class WiregridActuatorAgent:
             self.log.info(msg)
             return True, msg
 
-    def insert(self, session, params=None):
-        """
-        Insert the wire-grid into the forebaffle interface above the SAT
-
-        Parameters:
-            Nothing
-        """
-        with self.lock.acquire_timeout(timeout=3, job='insert') as acquired:
-            if not acquired:
-                self.log.warn(
-                    'insert(): '
-                    'Lock could not be acquired because it is held by {}.'
-                    .format(self.lock.job))
-                return False, 'insert(): Could not acquire lock'
-            # Wait for a second before moving
-            time.sleep(1)
-            # Moving commands
-            ret, msg = self._insert(920, 1.0)
-            if not ret:
-                msg = 'insert(): '\
-                      'ERROR!: Failed insert() in _insert(920,1.0) | {}'\
-                      .format(msg)
-                self.log.error(msg)
-                return False, msg
-            return True, 'insert(): Successfully finish!'
-
-    def eject(self, session, params=None):
-        """
-        Eject the wire-grid from the forebaffle interface above the SAT
-
-        Parameters:
-            Nothing
-        """
-        with self.lock.acquire_timeout(timeout=3, job='eject') as acquired:
-            if not acquired:
-                self.log.warn(
-                        'eject(): '
-                        'Lock could not be acquired because it is held by {}.'
-                        .format(self.lock.job))
-                return False, 'eject(): Could not acquire lock'
-            # Wait for a second before moving
-            time.sleep(1)
-            # Moving commands
-            ret, msg = self._eject(920, 1.0)
-            if not ret:
-                msg = 'eject(): ERROR!: Failed in _eject(920,1.0) | {}'\
-                    .format(msg)
-                self.log.error(msg)
-                return False, msg
-            return True, 'eject(): Successfully finish!'
-
     def insert_homing(self, session, params=None):
-        """
-        Insert slowly the wire-grid into the forebaffle interface above the SAT
-        until the inside limit-switch becomes ON
+        """insert_homing()
 
-        Parameters:
-            Nothing
+        **Task** - Insert slowly the wire-grid into the forebaffle interface
+        above the SAT until the inside limit-switch becomes ON.
+
         """
         with self.lock.acquire_timeout(timeout=3, job='insert_homing')\
                 as acquired:
@@ -425,12 +433,11 @@ class WiregridActuatorAgent:
             return True, 'insert_homing(): Successfully finish!'
 
     def eject_homing(self, session, params=None):
-        """
-        Eject slowly the wire-grid from the forebaffle interface above the SAT
-        until the outside limit-switch becomes ON
+        """eject_homing()
 
-        Parameters:
-            Nothing
+        **Task** - Eject slowly the wire-grid from the forebaffle interface
+        above the SAT until the outside limit-switch becomes ON.
+
         """
         with self.lock.acquire_timeout(timeout=3, job='eject_homing')\
                 as acquired:
@@ -452,13 +459,14 @@ class WiregridActuatorAgent:
             return True, 'eject_homing(): Successfully finish!'
 
     def insert_test(self, session, params=None):
-        """
-        Insert slowly the wire-grid into the forebaffle interface above the SAT
-        with a small distance
+        """insert_test(distance=10, speedrate=0.1)
+
+        **Task** - Insert slowly the wire-grid into the forebaffle interface
+        above the SAT with a small distance.
 
         Parameters:
-            distance:  Actuator moving distance [mm] (default: 10)
-            speedrate: Actuator speed rate [0.0, 1.0] (default: 0.2)
+            distance (float): Actuator moving distance [mm] (default: 10)
+            speedrate (float): Actuator speed rate [0.0, 1.0] (default: 0.2)
         """
         # Get parameters
         if params is None:
@@ -506,9 +514,10 @@ class WiregridActuatorAgent:
             return True, 'insert_test(): Successfully finish!'
 
     def eject_test(self, session, params=None):
-        """
-        Eject slowly the wire-grid from the forebaffle interface above the SAT
-        with a small distance
+        """eject_test(distance=10, speedrate=0.1)
+
+        **Task** - Eject slowly the wire-grid from the forebaffle interface
+        above the SAT with a small distance.
 
         Parameters:
             distance:  Actuator moving distance [mm] (default: 10)
@@ -560,11 +569,10 @@ class WiregridActuatorAgent:
             return True, 'eject_test(): Successfully finish!'
 
     def motor_on(self, session, params=None):
-        """
-        Powering ON the motors of the actuators
+        """motor_on()
 
-        Parameters:
-            Nothing
+        **Task** - Power ON the motors of the actuators.
+
         """
         with self.lock.acquire_timeout(timeout=3, job='motor_on')\
                 as acquired:
@@ -586,11 +594,10 @@ class WiregridActuatorAgent:
             return True, 'motor_on(): Successfully finish!'
 
     def motor_off(self, session, params=None):
-        """
-        Powering OFF the motors of the actuators
+        """motor_off()
 
-        Parameters:
-            Nothing
+        **Task** - Power OFF the motors of the actuators.
+
         """
         with self.lock.acquire_timeout(timeout=3, job='motor_off')\
                 as acquired:
@@ -612,12 +619,14 @@ class WiregridActuatorAgent:
             return True, 'motor_off(): Successfully finish!'
 
     def stop(self, session, params=None):
-        """
-        Emergency stop of the wire-grid actuator (Disable the actuator moving)
-        - This command can be excuted even if the other command is running.
+        """stop()
 
-        Parameters:
-            Nothing
+        **Task** - Emergency stop of the wire-grid actuator. (Disable the
+        actuator motion.)
+
+        .. note::
+            This command can be excuted even if the other command is running.
+
         """
         self.log.warn('stop(): Try to stop and hold the actuator.')
         # This will disable move() command in Actuator class
@@ -630,11 +639,10 @@ class WiregridActuatorAgent:
         return True, 'stop(): Successfully finish!'
 
     def release(self, session, params=None):
-        """
-        Enable the actuator moving
+        """release()
 
-        Parameters:
-            Nothing
+        **Task** - Enable the actuator moving.
+
         """
         with self.lock.acquire_timeout(timeout=3, job='release')\
                 as acquired:
@@ -657,12 +665,13 @@ class WiregridActuatorAgent:
             return True, 'release(): Successfully finish!'
 
     def reconnect(self, session, params=None):
-        """
-        Reconnect to the actuator controller
-        (This command turn OFF the motor power!)
+        """reconnect()
 
-        Parameters:
-            Nothing
+        **Task** - Reconnect to the actuator controller.
+
+        .. warning::
+            This command turns OFF the motor power!
+
         """
         with self.lock.acquire_timeout(timeout=3, job='reconnect')\
                 as acquired:
@@ -692,35 +701,37 @@ class WiregridActuatorAgent:
                 self.log.error(msg)
                 return False, msg
 
-    def start_acq(self, session, params=None):
-        """
-        Method to start data acquisition process.
+    def acq(self, session, params=None):
+        """acq()
 
-        The most recent data collected is stored in session.data in the
-        structure::
-
-            >>> session.data
-            {'fields':
-                {
-                 'motor':
-                    0 or 1
-                 'limitswitch':
-                 {   'LSR1': 0 or 1, (0: OFF, 1:ON)
-                     'LSR2': 0 or 1, (0: OFF, 1:ON)
-                     .
-                     .
-                     },
-                 'stopper':
-                 {   'STR1': 0 or 1, (0: OFF, 1:ON)
-                     'STR2': 0 or 1, (0: OFF, 1:ON)
-                     .
-                     .
-                     ]
-                }
-            }
+        **Process** - Run data acquisition.
 
         Parameters:
            interval-time: interval time for data acquisition
+
+        Notes:
+            The most recent data collected is stored in session.data in the
+            structure::
+
+                >>> response.session['data']
+                {'fields':
+                    {
+                     'motor':
+                        0 or 1
+                     'limitswitch':
+                     {   'LSR1': 0 or 1, (0: OFF, 1:ON)
+                         'LSR2': 0 or 1, (0: OFF, 1:ON)
+                         .
+                         .
+                         },
+                     'stopper':
+                     {   'STR1': 0 or 1, (0: OFF, 1:ON)
+                         'STR2': 0 or 1, (0: OFF, 1:ON)
+                         .
+                         .
+                         ]
+                    }
+                }
         """
         if params is None:
             params = {}
@@ -729,32 +740,32 @@ class WiregridActuatorAgent:
         # If interval-time is None, use value passed to Agent init
         if interval_time is None:
             self.log.info(
-                'start_acq(): '
-                'Not set by parameter of "interval-time" for start_acq()')
+                'acq(): '
+                'Not set by parameter of "interval-time" for acq()')
             interval_time = self.interval_time
         else:
             try:
                 interval_time = float(interval_time)
             except ValueError as e:
                 self.log.warn(
-                    'start_acq(): '
+                    'acq(): '
                     'Parameter of "interval-time" is incorrect | '
                     'Exception = "{}"'.format(e))
                 interval_time = self.interval_time
         self.log.info(
-            'start_acq(): '
+            'acq(): '
             'interval time for acquisition of limit-switch & stopper = {} sec'
             .format(interval_time))
 
         with self.lock.acquire_timeout(timeout=0, job='acq') as acquired:
-            self.log.info('start_acq(): Start to take data')
+            self.log.info('acq(): Start to take data')
             if not acquired:
                 self.log.warn(
-                    'start_acq(): '
+                    'acq(): '
                     'Lock could not be acquired because it is held by {}.'
                     .format(self.lock.job))
-                return False, 'start_acq(): Could not acquire lock.'
-            self.log.info('start_acq(): Got the lock')
+                return False, 'acq(): Could not acquire lock.'
+            self.log.info('acq(): Got the lock')
 
             session.set_status('running')
 
@@ -766,11 +777,11 @@ class WiregridActuatorAgent:
                     last_release = time.time()
                     if not self.lock.release_and_acquire(timeout=600):
                         self.log.warn(
-                            'start_acq(): '
+                            'acq(): '
                             'Could not re-acquire lock now held by {}.'
                             .format(self.lock.job))
                         return False,\
-                            'start_acq(): Could not re-acquire lock (timeout)'
+                            'acq(): Could not re-acquire lock (timeout)'
 
                 current_time = time.time()
                 data = {'timestamp': current_time,
@@ -820,7 +831,7 @@ class WiregridActuatorAgent:
         # End of lock acquire
 
         self.agent.feeds['WGActuator'].flush_buffer()
-        return True, 'start_acq(): Acquisition exited cleanly'
+        return True, 'acq(): Acquisition exited cleanly'
 
     def stop_acq(self, session, params=None):
         if self.run_acq:
@@ -876,7 +887,7 @@ if __name__ == '__main__':
     agent.register_task('stop', actuator_agent.stop)
     agent.register_task('release', actuator_agent.release)
     agent.register_task('reconnect', actuator_agent.reconnect)
-    agent.register_process('acq', actuator_agent.start_acq,
+    agent.register_process('acq', actuator_agent.acq,
                            actuator_agent.stop_acq, startup=True)
 
     runner.run(agent, auto_reconnect=True)

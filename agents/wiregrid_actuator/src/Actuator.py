@@ -1,8 +1,11 @@
 # Built-in python modules
 import time
+import os
 # Specific module for actuator controller
-import gclib
-from src.DigitalIO import DigitalIO
+on_rtd = os.environ.get('READTHEDOCS') == 'True'
+if not on_rtd:
+    import gclib
+from .DigitalIO import DigitalIO
 
 
 class Actuator:

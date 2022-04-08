@@ -106,29 +106,27 @@ class SynaccessAgent:
             else:
                 return False, "Could not acquire lock"
 
-    def start_status_acq(self, session, params=None):
+    def status_acq(self, session, params=None):
+        """status_acq()
 
-        """acq(params=None)
+        **Process** - Method to start data acquisition process.
 
-         Method to start data acquisition process.
+        Notes:
+            The most recent data collected is stored in session.data in the
+            structure::
 
-         The most recent data collected is stored in session.data in the
-         structure::
+                >>> response.session['data']
+                {"fields":
+                    {synaccess:
+                        {0: 0 or 1, (0: OFF, 1:ON)
+                         1: 0 or 1, (0: OFF, 1:ON)
+                         2: 0 or 1, (0: OFF, 1:ON)
+                         3: 0 or 1, (0: OFF, 1:ON)
+                         4: 0 or 1, (0: OFF, 1:ON)
+                        }
+                    }
+                }
 
-             >>> session.data
-             {"fields":
-                 {synaccess:
-                     {0: 0 or 1, (0: OFF, 1:ON)
-                      1: 0 or 1, (0: OFF, 1:ON)
-                      2: 0 or 1, (0: OFF, 1:ON)
-                      3: 0 or 1, (0: OFF, 1:ON)
-                      4: 0 or 1, (0: OFF, 1:ON)
-                     }
-                 }
-             }
-
-         Parameters:
-            Nothing
         """
 
         with self.lock.acquire_timeout(timeout=0, job='status_acq')\
@@ -212,7 +210,7 @@ if __name__ == '__main__':
                        ip_address=args.ip_address,
                        username=args.username,
                        password=args.password)
-    agent.register_process('status_acq', p.start_status_acq,
+    agent.register_process('status_acq', p.status_acq,
                            p.stop_status_acq, startup=True)
     agent.register_task('get_status', p.get_status, startup={})
     agent.register_task('reboot', p.reboot)

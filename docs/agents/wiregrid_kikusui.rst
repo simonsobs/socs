@@ -34,11 +34,11 @@ An example site-config-file block::
      'arguments': [['--kikusui-ip', '10.10.10.71'],
                    ['--kikusui-port', '29']]},
 
- - kikusui-ip is an IP address of the serial-to-ethernet converter.
- - kikusui-port is an asigned port for the KIKUSUI power supply.
-   (The converter has four D-sub ports to control 
-   multiple devices connected via serial communication. 
-   Communicating device is determined by the Ethernet port number of the converter.)
+- kikusui-ip is an IP address of the serial-to-ethernet converter.
+- kikusui-port is an asigned port for the KIKUSUI power supply.
+  (The converter has four D-sub ports to control
+  multiple devices connected via serial communication.
+  Communicating device is determined by the ethernet port number of the converter.)
 
 Docker Compose
 ``````````````
@@ -77,22 +77,14 @@ The main function is ``stepwise_rotation()``.
 **Main Function (Stepwise Rotation)**
  - stepwise_rotation(): 
    Run step-wise rotation for wire-grid calibration.
-   In each step, several small-rotations are made to rotate 22.5-deg. 
-   - Parameters:
-       - feedback_steps: number of small rotations for each 22.5-deg step
-       - num_laps: number of laps (revolutions)
-       - stopped_time: stopped time [sec] for each 22.5-deg step
-       - feedback_time: calibration constants for the 22.5-deg rotation
-
+   In each step, seveal small-rotations are occurred to rotate 22.5-deg. 
 
 **Continuous Rotation Funciton**
 Nominally, the wire-grid calibration uses the above stepwise rotation.
 However, if you want to rotate the wire-grid continuousely, you can use the following functions.
- - set_c(): Set current [A] 
-    - Parameters:
-      - current: current [A] (should be [0.0, 3.0] / default: 3.0)
- - set_on(): Power ON the KIKUSUI power supply (start the rotation)
- - set_off(): Power OFF the KIKUSUI power supply (stop the rotation)
+- set_c(): Set current [A]
+- set_on(): Power ON the KIKUSUI power supply (start the rotation)
+- set_off(): Power OFF the KIKUSUI power supply (stop the rotation)
 
 **Optional Functions**
  - get_vc(): Show voltage [V], current [A], and ON/OFF
@@ -103,16 +95,13 @@ However, if you want to rotate the wire-grid continuousely, you can use the foll
  - calibrate_wg(): Run rotation-motor calibration for the wire-grid.
    The output of this calibration is used to control the rotation in ``stepwire_rotation()``.
    This function repeats rotations several times and takes too long time (> hours).
-    - Parameters:
-        - storepath: path for log file
 
 
 Agent API
 ---------
 
 .. autoclass:: agents.wiregrid_kikusui.kikusui_agent.KikusuiAgent
-    :members: set_on, set_off, set_v, set_c, get_vc,
-              calibration_wg, stepwise_rotation, IV_acq
+    :members:
 
 
 Example Clients
