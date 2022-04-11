@@ -298,7 +298,8 @@ class PysmurfController:
     @ocs_agent.param('bands', default=None)
     @ocs_agent.param('kwargs', default=None)
     def uxm_setup(self, session, params):
-        """
+        """uxm_setup(bands=[0, 1, 2, 3, 4, 5, 6, 7])
+
         **Task** - Task to run first-time setup procedure for a UXM. This
         will run the following operations:
 
@@ -317,7 +318,7 @@ class PysmurfController:
         Args
         -----
         bands : list, int
-            Bands to set up.
+            Bands to set up. Defaults to all.
         kwargs : dict
             Dict containing additional keyword args to pass to the uxm_setup
             function.
@@ -340,7 +341,8 @@ class PysmurfController:
     @ocs_agent.param('bands', default=None)
     @ocs_agent.param('kwargs', default=None)
     def uxm_relock(self, session, params):
-        """
+        """uxm_relock(bands=[0, 1, 2, 3, 4, 5, 6, 7])
+
         **Task** - Task to relock detectors to existing tune if setup has
         already been run. Runs the following operations:
 
@@ -358,7 +360,7 @@ class PysmurfController:
         Args
         -----
         bands : list, int
-            Bands to set up.
+            Bands to set up. Defaults to all.
         kwargs : dict
             Dict containing additional keyword args to pass to the uxm_relock
             function.
@@ -380,7 +382,8 @@ class PysmurfController:
     @ocs_agent.param('duration', default=30., type=float)
     @ocs_agent.param('kwargs', default=None)
     def take_noise(self, session, params):
-        """
+        """take_noise(duration=30.)
+
         **Task** - Task to take a short timestream and calculate noise
         statistics. Median white noise level for each band will be stored in
         the session data. See the :ref:`sodetlib noise docs 
@@ -390,9 +393,9 @@ class PysmurfController:
         Args
         -----
         duration : float
-            Bands to set up.
+            Duration of timestream to take for noise calculation.
         kwargs : dict
-            Dict containing additional keyword args to pass to the uxm_relock
+            Dict containing additional keyword args to pass to the take_noise
             function.
         """
         if params['kwargs'] is None:
@@ -464,7 +467,7 @@ class PysmurfController:
         if params['kwargs'] is None:
             params['kwargs'] = {}
 
-        with self.lock.acquire_timeout(0, job='uxm_setup') as acquired:
+        with self.lock.acquire_timeout(0, job='take_iv') as acquired:
             if not acquired:
                 return False, f"Operation failed: {self.lock.job} is running."
 
@@ -503,7 +506,7 @@ class PysmurfController:
                 return False, f"Operation failed: {self.lock.job} is running."
 
             session.set_status('starting')
-            S, cfg = self._get_smurf_control()
+            S, cfg = self._get_smurf_control(session=session)
             bsa = bias_steps.take_bias_steps(
                 S, cfg, **params['kwargs']
             )
@@ -516,11 +519,50 @@ class PysmurfController:
     @ocs_agent.param('rfrac')
     @ocs_agent.param('kwargs', default=None)
     def bias_dets(self, session, params):
-        """"""
-        
+        """bias_dets(rfrac=(0.3, 0.6))
 
+        Biases detectors to a target Rfrac value or range. This function uses
+        IV results to determine voltages for each bias-group. If rfrac is set
+        to be a value, the bias voltage will be set such that the median rfrac
+        across all channels is as close as possible to the set value. If a
+        range is specified, the voltage will be chosen to maximize the number
+        of channels in that range.
 
-        
+        See the sodetlib docs page for :ref:`biasing dets into transition
+        <https://simons1.princeton.edu/docs/sodetlib/operations/iv.html#biasing-detectors-into-transition>`_
+        for more information on the functions and additional keyword args that
+        can be passed in.
+
+        Args
+        -------
+        rfrac : float, tuple
+            Target rfrac range to aim for. If this is a float, bias voltages
+            will be chosen to get the median rfrac of each bias group as close
+            as possible to that value. If 
+        kwargs : dict
+            Additional kwargs to pass to the ``bias_dets`` function.
+        """
+        if params['kwargs'] is None:
+            params['kwargs'] = {}
+
+        with self.lock.acquire_timeout(0, job='bias_steps') as acquired:
+            if not acquired:
+                return False, f"Operation failed: {self.lock.job} is running."
+
+            session.set_status('starting')
+            S, cfg = self._get_smurf_control(session=session)
+            if isinstance(rfrac, (int, float)):
+                biases = bias_dets.bias_to_rfrac(
+                    S, cfg, rfrac=params['rfrac'], **params['kwargs']
+                )
+            else:
+                biases = bias_dets.bias_to_rfrac(
+                    S, cfg, rfrac_range=params['rfrac'], **params['kwargs']
+                )
+
+            session.data['biases'] = biases.tolist()
+
+            return True, "Finished taking bias steps"
 
 
 def make_parser(parser=None):
