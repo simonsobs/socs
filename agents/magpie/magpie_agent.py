@@ -444,7 +444,8 @@ class MagpieAgent:
 
     @ocs_agent.param('target_rate', type=float)
     def set_target_rate(self, session, params):
-        """
+        """set_target_rate(target_rate=20.0)
+
         Sets the target downsampled sample-rate of the data sent to lyrebird
 
         Args:
@@ -457,7 +458,8 @@ class MagpieAgent:
 
     @ocs_agent.param('delay', type=float)
     def set_delay(self, session, params):
-        """
+        """set_delay(delay=5.0)
+
         Sets the target downsampled sample-rate of the data sent to lyrebird
 
         Args:
@@ -468,7 +470,7 @@ class MagpieAgent:
         return True, f'Set delay param to {self.delay}'
 
 
-    def process_status(self, frame):
+    def _process_status(self, frame):
         """
         Processes a status frame. This will set or update the channel
         mask whenever the smurf metadata is updated.
@@ -481,7 +483,7 @@ class MagpieAgent:
                 ast.literal_eval(status[self.mask_register])
             )
 
-    def process_data(self, frame):
+    def _process_data(self, frame):
         """
         Processes a Scan frame. If lyrebird is enabled, this will return a seq
         of G3Frames that are formatted for lyrebird to ingest.
@@ -568,21 +570,44 @@ class MagpieAgent:
         else:
             sources = params['src']
 
-        reader = core.G3Reader(sources[src_idx])
+        reader = None
+        source = None
         while self._running:
+
+            if reader is None:
+                try:
+                    source = sources[src_idx]
+                    source_is_file = not source.startswith('tcp://')
+                    reader = core.G3Reader(source, timeout=5)
+                except RuntimeError as e:
+                    if source_is_file:
+                        # Raise error if file cannot be found
+                        raise e
+                    else:
+                        # If not a file, log error and try again
+                        self.log.error("G3Reader could not connect! Retrying in 10 sec.")
+                        time.sleep(10)
+                        continue
+
             frames = reader.Process(None)
             if not frames:
-                src_idx += 1
-                # Rotate files if no more frames
-                reader = core.G3Reader(sources[src_idx])
-                frames = reader.Process(None)
+                # If source is a file, start over with next file or break if
+                # finished all sources. If socket, just reset reader and try to
+                # reconnect
+                if source_is_file:
+                    src_idx += 1
+                    if src_idx >= len(sources):
+                        self.log("Finished reading all sources")
+                        break
+                reader = None
+                continue
 
             frame = frames[0]
             if frame.type == core.G3FrameType.Wiring:
-                self.process_status(frame)
+                self._process_status(frame)
                 continue
             elif frame.type == core.G3FrameType.Scan:
-                out = self.process_data(frame)
+                out = self._process_data(frame)
             else:
                 continue
 
@@ -641,7 +666,8 @@ class MagpieAgent:
 
     @ocs_agent.param('dest', type=int)
     def send(self, session, params=None):
-        """
+        """send(dest=8675)
+
         **Process** - Process for sending outgoing G3Frames. This will query
         the out_queue for frames to be sent to lyrebird. This will try to
         regulate how fast it sends frames such that the delay between when the
@@ -682,36 +708,37 @@ def make_parser(parser=None):
     if parser is None:
         parser = argparse.ArgumentParser()
 
-    parser.add_argument('--src', nargs='+', default='tcp://localhost:4532',
+    pgroup = parser.add_argument_group('Agent Options')
+    pgroup.add_argument('--src', nargs='+', default='tcp://localhost:4532',
                         help="Address of incoming G3Frames.")
-    parser.add_argument('--dest', type=int, default=8675,
-                        help="Port to server lyrebird frames")
-    parser.add_argument('--stream-id', type=str, default='none',
+    pgroup.add_argument('--dest', type=int, default=8675,
+                        help="Port to serve lyrebird frames")
+    pgroup.add_argument('--stream-id', type=str, default='none',
                         help="Stream-id to use to distinguish magpie streams."
                              "This will be prepended to data-val names in lyrebird.")
-    parser.add_argument('--target-rate', '-t', type=float, default=20,
+    pgroup.add_argument('--target-rate', '-t', type=float, default=20,
                         help="Target sample rate for data being sent to Lyrebird. "
                              "Detector data will be downsampled to this rate.")
-    parser.add_argument(
+    pgroup.add_argument(
         '--delay', type=float, default=5,
         help="Delay (sec) between the timestamp of a G3Frame relative to the "
              "initial frame, and when the frame should be sent to lyrebird. "
              "This must be larger than the frame-aggregation time for smooth "
              "update times in lyrebird."
     )
-    parser.add_argument('--layout', '-l', default='grid', choices=['grid', 'wafer'],
+    pgroup.add_argument('--layout', '-l', default='grid', choices=['grid', 'wafer'],
                         help="Focal plane layout style")
-    parser.add_argument('--xdim', type=int, default=64,
+    pgroup.add_argument('--xdim', type=int, default=64,
                         help="Number of pixels in x-dimension for grid layout")
-    parser.add_argument('--ydim', type=int, default=64,
+    pgroup.add_argument('--ydim', type=int, default=64,
                         help="Number of pixels in y-dimension for grid layout")
-    parser.add_argument('--wafer-scale', '--ws', type=float, default=50.,
+    pgroup.add_argument('--wafer-scale', '--ws', type=float, default=50.,
                         help="scale of wafer coordinates")
-    parser.add_argument('--det-map', type=str, help="Path to det-map csv file")
-    parser.add_argument('--fake-data', action='store_true',
+    pgroup.add_argument('--det-map', type=str, help="Path to det-map csv file")
+    pgroup.add_argument('--fake-data', action='store_true',
                         help="If set, will stream fake data instead of listening to "
                              "a G3stream.")
-    parser.add_argument('--offset', nargs=2, default=[0, 0], type=float,
+    pgroup.add_argument('--offset', nargs=2, default=[0, 0], type=float,
                         help="Offset of detector coordinates with respect to "
                              "lyrebird coordinate system")
     return parser

@@ -206,6 +206,8 @@ services:
   ocs-magpie-agent:
     image: "ocs-magpie-agent"
     build: ./agents/magpie
+    depends_on:
+      - "socs"
 
   # --------------------------------------------------------------------------
   # SOCS Simulators

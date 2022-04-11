@@ -25,8 +25,8 @@ Configuration File Examples
 Below are example docker-compose and ocs configuration files for running the
 magpie agent.
 
-Site Config
-````````````
+OCS Site Config
+``````````````````
 Below is the site-config entry for the magpie instance we have running at UCSD
 on K2SO. We are displaying detectors using a wafer layout, determined by
 a detmap csv file, with a target sample rate of 20 Hz::
@@ -48,13 +48,27 @@ a detmap csv file, with a target sample rate of 20 Hz::
          '--offset', 0, 0,
        ]},
 
-Docker
-```````
-Below is an example docker-compose entry for running magpie. If crossbar
-is being run on a different server, you'll have to modify the ``site-hub``
-and ``site-http`` args accordingly::
+It is  possible to tell magpie to stream data from existing G3Files instead of
+directly from the smurf-stream. To do this, simply set the ``src`` argument to
+be the filepath of the file you wish to stream. If you want to stream from
+multiple files in series, you can do this by putting multiple source filepaths,
+as is shown below. In this case, once the first file has finished streaming
+magpie will imediately start streaming from the second file::
 
-    ocs-magpie:
+     '--src', '/path/to/file1.g3', '/path/to/file2.g3',
+
+You can also tell the magpie agent to ignore the src argument all together and generate
+fake data by adding the ``--fake-data`` argument.
+
+
+Docker Compose
+``````````````````
+
+Below is an example docker-compose entry for running a magpie corresponding to
+crate-id 1 and slot 2. If crossbar is being run on a different server, you'll
+have to modify the ``site-hub`` and ``site-http`` args accordingly::
+
+    ocs-magpie-crate1slot2:
         image: simonsobs/ocs-magpie:${SOCS_TAG}
         hostname: ocs-docker
         user: ocs:ocs
@@ -66,6 +80,7 @@ and ``site-http`` args accordingly::
         command:
             - "--site-hub=ws://localhost:8001/ws"
             - "--site-http=http://localhost:8001/call"
+            - "--instance-id=magpie-crate1slot2"
 
 Lyrebird
 ------------
@@ -124,7 +139,7 @@ To get lyrebird running, you must bring software up in the following order:
 
       run_lyrebird --port 8675 8676
 
-   and this will start lyrebird for the two corresponding slotkjs.
+   and this will start lyrebird for the two corresponding slots.
 
 
 Operation
@@ -148,7 +163,7 @@ following fields:
  - ``cname``: Array of len ``nchans`` the base name for each channel. This is something
    like ``<magpie-instance-id>/channel_10``
  - ``rotation``: Array of len ``nchans`` containing how many rads each vis elem should
-   be rotated when drawn.
+   be rotated (counter-clockwise) when drawn.
  - ``templates``: Array of len ``nchans`` containing the det template (defined in the
  - ``values``: Array of len ``n * nchans`` containing data values corresponding
    to a given channel. These must be unique, and are of the form
@@ -310,69 +325,14 @@ to generate a focal-plane layout.
   :width: 400
   :alt: Alternative text
 
-Additional Streaming Modes
-----------------------------
-
-Reading from G3Files
-``````````````````````
-
-It is  possible to tell magpie to stream data from existing G3Files instead of
-directly from the smurf-stream. To do this, simply set the ``src`` argument to
-be the filepath of the file you wish to stream. If you want to stream from
-multiple files in series, you can do this by pu::
-
-      {'agent-class': 'MagpieAgent',
-       'instance-id': 'magpie-crate1slot2',
-       'arguments': [
-         '--stream-id', 'crate1-slot2',
-
-         '--src', '/path/to/file1.g3', '/path/to/file2.g3',
-
-         '--dest', 8675,
-         '--delay', 5,
-         '--target-rate', 20
-         '--layout', 'wafer',
-
-         # Detmap CSV file
-         '--csv-file', '/home/jlashner/lyrebird_demo/detmap.csv',
-         '--offset', 0, 0,
-       ]},
-
-Streaming Fake Data
-``````````````````````
-
-To stream fake data, add the ``--fake-data`` argument. In this case
-you don't need to provide a data-source::
-
-      {'agent-class': 'MagpieAgent',
-       'instance-id': 'magpie-crate1slot2',
-       'arguments': [
-         '--stream-id', 'crate1-slot2',
-
-         '--dest', 8675,
-         '--delay', 5,
-         '--target-rate', 20
-         '--layout', 'wafer',
-
-         # Detmap CSV file
-         '--csv-file', '/home/jlashner/lyrebird_demo/detmap.csv',
-         '--offset', 0, 0,
-         '--fake-data',
-       ]},
-
-
-
-API
------
-
 Agent API
-``````````
+------------------
 
 .. autoclass:: agents.magpie.magpie_agent.MagpieAgent
    :members:
 
 Supporting APIs
-````````````````````
+------------------
 .. autoclass:: agents.magpie.magpie_agent.FIRFilter
   :members:
 
