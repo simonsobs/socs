@@ -223,7 +223,7 @@ class FocalplaneConfig:
         name : str
             Name of the channel
         x : float
-            x -oord of the element
+            x-coord of the element
         y : float
             y-coord of the element
         rot : float
@@ -322,7 +322,7 @@ class FocalplaneConfig:
     @classmethod
     def from_csv(cls, stream_id, detmap_file, wafer_scale=1., offset=(0, 0)):
         """
-        Creatse a FocalplaneConfig object from a detmap csv file.
+        Creates a FocalplaneConfig object from a detmap csv file.
 
         Args
         -----
@@ -367,7 +367,7 @@ class FocalplaneConfig:
                 if row['pol'].strip() == 'B':
                     rot = np.pi / 2
             except ValueError:
-                # Just skip detctors with unknown bandpass
+                # Just skip detectors with unknown bandpass
                 continue
             x, y = row['det_x'] * wafer_scale, row['det_y'] * wafer_scale
             x += offset[0]
@@ -444,7 +444,7 @@ class MagpieAgent:
 
     @ocs_agent.param('target_rate', type=float)
     def set_target_rate(self, session, params):
-        """set_target_rate(target_rate=20.0)
+        """set_target_rate(target_rate)
 
         Sets the target downsampled sample-rate of the data sent to lyrebird
 
@@ -458,7 +458,7 @@ class MagpieAgent:
 
     @ocs_agent.param('delay', type=float)
     def set_delay(self, session, params):
-        """set_delay(delay=5.0)
+        """set_delay(delay)
 
         Sets the target downsampled sample-rate of the data sent to lyrebird
 
@@ -666,7 +666,7 @@ class MagpieAgent:
 
     @ocs_agent.param('dest', type=int)
     def send(self, session, params=None):
-        """send(dest=8675)
+        """send(dest)
 
         **Process** - Process for sending outgoing G3Frames. This will query
         the out_queue for frames to be sent to lyrebird. This will try to

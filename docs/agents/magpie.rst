@@ -53,7 +53,7 @@ directly from the smurf-stream. To do this, simply set the ``src`` argument to
 be the filepath of the file you wish to stream. If you want to stream from
 multiple files in series, you can do this by putting multiple source filepaths,
 as is shown below. In this case, once the first file has finished streaming
-magpie will imediately start streaming from the second file::
+magpie will immediately start streaming from the second file::
 
      '--src', '/path/to/file1.g3', '/path/to/file2.g3',
 
@@ -73,7 +73,6 @@ have to modify the ``site-hub`` and ``site-http`` args accordingly::
         hostname: ocs-docker
         user: ocs:ocs
         network_mode: host
-        container_name: ocs-magpie
         volumes:
             - ${OCS_CONFIG_DIR}:/config
             - /data:/data
