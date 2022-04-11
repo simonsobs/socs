@@ -130,14 +130,15 @@ class PysmurfController:
                     if isinstance(data['payload'], str):
                         self.current_session.add_message(data['payload'])
 
-    def _get_smurf_control(self, session=None):
+    def _get_smurf_control(self, session=None, load_tune=True):
         """
-        Gets pysmurf and detconfig instances for sodetlib functions.
+        Gets pysmurf and det-config instances for sodetlib functions.
         """
         cfg = DetConfig()
         cfg.load_config_files(slot=self.slot)
         S = cfg.get_smurf_control()
-        S.load_tune(cfg.dev.exp['tunefile'])
+        if load_tune:
+            S.load_tune(cfg.dev.exp['tunefile'])
         S._ocs_session = session
         return S, cfg
 
@@ -256,9 +257,33 @@ class PysmurfController:
         self.prot.transport.signalProcess('KILL')
         return True, "Aborting process"
 
+    def check_state(self, session, params=None):
+        """check_state()
+        
+        **Task** - Task to check the current state of the smurf. This will will
+        not modify the smurf state, so this task can be run in conjunction with
+        other smurf operations. This operation will put state variables into
+        the ``session.data`` object.
+        """
+        S, _ = self._get_smurf_control(load_tune=False)
+
+        d = session.data
+        d['channel_mask'] = S.get_channel_mask().tolist()
+        d['downsample_factor'] = S.get_downsample_factor()
+        d['open_datfile'] = S.get_streaming_file_open()
+
+        reg = sdl.Registers(S)
+        d['agg_time'] = reg.agg_time.get()
+        d['open_g3stream'] = reg.open_g3stream.get()
+        d['pysmurf_action'] = reg.pysmurf_action.get()
+        d['pysmurf_action_timestamp'] = reg.pysmurf_action_timestamp.get()
+        d['stream_tag'] = reg.stream_tag.get()
+
+        return True, "Finished checking state"
+
     @ocs_agent.param("duration", default=None, type=float)
     def stream(self, session, params):
-        """stream(duration=30)
+        """stream(duration=None)
 
         **Process** - Process to stream smurf data. If a duration is specified,
         stream will end after that amount of time. If unspecified, the stream
@@ -298,7 +323,7 @@ class PysmurfController:
     @ocs_agent.param('bands', default=None)
     @ocs_agent.param('kwargs', default=None)
     def uxm_setup(self, session, params):
-        """uxm_setup(bands=[0, 1, 2, 3, 4, 5, 6, 7])
+        """uxm_setup(bands=None, kwargs=None)
 
         **Task** - Task to run first-time setup procedure for a UXM. This
         will run the following operations:
@@ -310,8 +335,8 @@ class PysmurfController:
             5. setup tracking params
             6. Measure noise
 
-        See the :ref:`sodetlib setup docs 
-        <https://simons1.princeton.edu/docs/sodetlib/operations/setup.html#first-time-setup'>`_
+        See the `sodetlib setup docs
+        <https://simons1.princeton.edu/docs/sodetlib/operations/setup.html#first-time-setup>`_
         for more information on the sodetlib setup procedure and allowed
         keyword arguments.
 
@@ -341,7 +366,7 @@ class PysmurfController:
     @ocs_agent.param('bands', default=None)
     @ocs_agent.param('kwargs', default=None)
     def uxm_relock(self, session, params):
-        """uxm_relock(bands=[0, 1, 2, 3, 4, 5, 6, 7])
+        """uxm_relock(bands=None, kwargs=None)
 
         **Task** - Task to relock detectors to existing tune if setup has
         already been run. Runs the following operations:
@@ -352,8 +377,8 @@ class PysmurfController:
             3. Tracking setup
             4. Noise check
 
-        See the :ref:`sodetlib relock docs 
-        <https://simons1.princeton.edu/docs/sodetlib/operations/setup.html#relocking'>`_
+        See the `sodetlib relock docs 
+        <https://simons1.princeton.edu/docs/sodetlib/operations/setup.html#relocking>`_
         for more information on the sodetlib relock procedure and allowed
         keyword arguments.
 
@@ -382,11 +407,11 @@ class PysmurfController:
     @ocs_agent.param('duration', default=30., type=float)
     @ocs_agent.param('kwargs', default=None)
     def take_noise(self, session, params):
-        """take_noise(duration=30.)
+        """take_noise(duration=30., kwargs=None)
 
         **Task** - Task to take a short timestream and calculate noise
         statistics. Median white noise level for each band will be stored in
-        the session data. See the :ref:`sodetlib noise docs 
+        the session data. See the `sodetlib noise docs 
         <https://simons1.princeton.edu/docs/sodetlib/noise.html>`_ for more
         information on the noise function and possible keyword arguments.
 
@@ -417,8 +442,7 @@ class PysmurfController:
         **Task** - Takes a bias-group map. This will calculate the number of
         channels assigned to each bias group and put that into the session data
         object along with the filepath to the analyzed bias-step output. See
-        the :ref:`bias steps docs page
-        <https://simons1.princeton.edu/docs/sodetlib/operations/bias_steps.html>`_
+        the `bias steps docs page <https://simons1.princeton.edu/docs/sodetlib/operations/bias_steps.html>`_
         for more information on what additional keyword arguments can be
         passed.
 
@@ -454,7 +478,7 @@ class PysmurfController:
 
         Takes an IV. This will add the normal resistance array and channel info
         to the session data object along with the analyzed IV filepath.
-        See the :ref:`sodetlib IV docs page
+        See the `sodetlib IV docs page
         <https://simons1.princeton.edu/docs/sodetlib/operations/iv.html>`_
         for more information on what additional keyword arguments can be passed
         in.
@@ -488,7 +512,7 @@ class PysmurfController:
         """take_bias_steps(kwargs=None)
 
         Takes bias_steps and saves the output filepath to the session data
-        object. See the :ref:`sodetlib bias step docs page
+        object. See the `sodetlib bias step docs page
         <https://simons1.princeton.edu/docs/sodetlib/operations/bias_steps.html>`_
         for more information on bias steps and what kwargs can be passed in.
 
@@ -516,10 +540,10 @@ class PysmurfController:
 
             return True, "Finished taking bias steps"
 
-    @ocs_agent.param('rfrac')
+    @ocs_agent.param('rfrac', default=(0.3, 0.6))
     @ocs_agent.param('kwargs', default=None)
     def bias_dets(self, session, params):
-        """bias_dets(rfrac=(0.3, 0.6))
+        """bias_dets(rfrac=(0.3, 0.6), kwargs=None)
 
         Biases detectors to a target Rfrac value or range. This function uses
         IV results to determine voltages for each bias-group. If rfrac is set
@@ -528,7 +552,7 @@ class PysmurfController:
         range is specified, the voltage will be chosen to maximize the number
         of channels in that range.
 
-        See the sodetlib docs page for :ref:`biasing dets into transition
+        See the sodetlib docs page for `biasing dets into transition
         <https://simons1.princeton.edu/docs/sodetlib/operations/iv.html#biasing-detectors-into-transition>`_
         for more information on the functions and additional keyword args that
         can be passed in.
@@ -551,7 +575,7 @@ class PysmurfController:
 
             session.set_status('starting')
             S, cfg = self._get_smurf_control(session=session)
-            if isinstance(rfrac, (int, float)):
+            if isinstance(params['rfrac'], (int, float)):
                 biases = bias_dets.bias_to_rfrac(
                     S, cfg, rfrac=params['rfrac'], **params['kwargs']
                 )
@@ -589,6 +613,7 @@ if __name__ == '__main__':
 
     agent.register_task('run', controller.run, blocking=False)
     agent.register_task('abort', controller.abort, blocking=False)
+    agent.register_task('check_state', controller.check_state)
     agent.register_process(
         'stream', controller.stream, controller._stream_stop
     )
