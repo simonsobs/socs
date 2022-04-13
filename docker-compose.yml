@@ -177,6 +177,15 @@ services:
     build: ./agents/tektronix3021c/
     depends_on:
       - "socs"
+    
+  # --------------------------------------------------------------------------
+  # Pfeiffer Turbo Controller
+  # --------------------------------------------------------------------------
+  ocs-pfeiffer-tc400-agent:
+    image: "ocs-pfeiffer-tc400-agent"
+    build: ./agents/pfeiffer_tc400/
+    depends_on:
+      - "socs"
 
   # --------------------------------------------------------------------------
   # CHWP Encoder BBB agent
@@ -197,6 +206,15 @@ services:
   ocs-suprsync-agent:
     image: 'ocs-suprsync-agent'
     build: ./agents/suprsync/
+    depends_on:
+      - "socs"
+
+  # --------------------------------------------------------------------------
+  # Magpie agent
+  # --------------------------------------------------------------------------
+  ocs-magpie-agent:
+    image: "ocs-magpie-agent"
+    build: ./agents/magpie
     depends_on:
       - "socs"
 

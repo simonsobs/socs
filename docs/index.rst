@@ -31,6 +31,7 @@ Simulator Reference  Simulators are used to mock software and hardware
     user/network
     user/new_agents
     user/webserver
+    user/sequencer
 
 .. toctree::
     :caption: Agent Reference
@@ -48,8 +49,10 @@ Simulator Reference  Simulators are used to mock software and hardware
     agents/lakeshore372
     agents/lakeshore425
     agents/latrt_xy_stage
+    agents/magpie
     agents/meinberg_m1000_agent
     agents/pfeiffer
+    agents/pfeiffer_tc400
     agents/pysmurf/index
     agents/scpi_psu
     agents/smurf_crate_monitor
@@ -76,6 +79,12 @@ Simulator Reference  Simulators are used to mock software and hardware
 
     developer/snmp
     developer/testing
+
+.. toctree::
+    :caption: API Reference
+    :maxdepth: 2
+
+    api
 
 Indices and tables
 ==================
