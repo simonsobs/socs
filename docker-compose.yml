@@ -71,15 +71,6 @@ services:
       - "socs"
 
   # --------------------------------------------------------------------------
-  # The Pysmurf Archiver Agent
-  # --------------------------------------------------------------------------
-  ocs-pysmurf-archiver-agent:
-    image: "ocs-pysmurf-archiver-agent"
-    build: ./agents/pysmurf_archiver/
-    depends_on:
-      - "socs"
-
-  # --------------------------------------------------------------------------
   # Smurf stream simulator agent
   # --------------------------------------------------------------------------
   ocs-smurf-stream-sim-agent:

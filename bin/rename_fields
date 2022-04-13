@@ -150,7 +150,7 @@ def _md5sum(path, blocksize=65536):
 def rename_fields(field_name):
     """Rename invalid field names."""
     # Agents requiring no changes.
-    # keithley2230G-psu, pfeiffer_tpg366, pysmurf_archiver,
+    # keithley2230G-psu, pfeiffer_tpg366,
     # pysmurf_controller, pysmurf monitor, smurf stream simulator, chwp Agent
 
     # Agents that hardcode their fields:
