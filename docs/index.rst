@@ -20,6 +20,7 @@ Agent Reference      Agents are the OCS components that interface with other
 Simulator Reference  Simulators are used to mock software and hardware
                      interfaces when access to actual hardware is unavailable.
                      These are useful for testing other code.
+API Reference        Full API documentation for core parts of the SOCS library.
 ===================  ============================================================
 
 .. toctree::
