@@ -56,7 +56,7 @@ class DeviceEmulator:
 
     Attributes:
         responses (dict): Current set of responses the DeviceEmulator would
-            give
+            give. Should all be strings, not bytes-like.
         default_response (str): Default response to send if a command is
             unrecognized. No response is sent and an error message is logged if
             a command is unrecognized and the default response is set to None.
@@ -213,6 +213,10 @@ class DeviceEmulator:
 
                 response = self._get_response(msg)
 
+                # Avoid user providing bytes-like response
+                if isinstance(response, bytes):
+                    response = response.decode()
+
                 if response is None:
                     continue
 
@@ -262,6 +266,10 @@ class DeviceEmulator:
                 >>> responses = {'KRDG? 1': '+1.7E+03'}
                 >>> responses = {'*IDN?': 'LSCI,MODEL425,4250022,1.0',
                                  'RDGFIELD?': ['+1.0E-01', '+1.2E-01', '+1.4E-01']}
+
+        Notes:
+            The responses defined should all be strings, not bytes-like. The
+            DeviceEmulator will handle encoding/decoding.
 
         """
         print(f"responses set to {responses}")
