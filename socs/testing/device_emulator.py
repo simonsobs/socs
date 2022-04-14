@@ -175,14 +175,18 @@ class DeviceEmulator:
         itself.
 
         """
-        #print('shutting down background reading')
+        # print('shutting down background reading')
         self._read = False
         time.sleep(1)
         if self._type == 'serial':
-            #print('shutting down socat relay')
+            # print('shutting down socat relay')
             self.proc.terminate()
             out, err = self.proc.communicate()
-            #print(out, err)
+            # print(out, err)
+        if self._type == 'tcp':
+            # print('shutting down background tcp relay')
+            self._conn.close()
+            self._sock.close()
 
     def _read_socket(self, port):
         """Loop until shutdown, reading any commands sent over the relay.
@@ -195,15 +199,15 @@ class DeviceEmulator:
         self._read = True
 
         # Listen for connections
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.bind(('127.0.0.1', port))
-        sock.listen(1)
+        self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._sock.bind(('127.0.0.1', port))
+        self._sock.listen(1)
         print("Device emulator waiting for tcp client connection")
-        conn, client_address = sock.accept()
+        self._conn, client_address = self._sock.accept()
         print(f"Client connection made from {client_address}")
 
         while self._read:
-            msg = conn.recv(4096).strip().decode('utf-8')
+            msg = self._conn.recv(4096).strip().decode('utf-8')
             if msg:
                 print(f"msg='{msg}'")
 
@@ -213,12 +217,12 @@ class DeviceEmulator:
                     continue
 
                 print(f"response='{response}'")
-                conn.sendall((response).encode('utf-8'))
+                self._conn.sendall((response).encode('utf-8'))
 
             time.sleep(0.01)
 
-        conn.close()
-        sock.close()
+        self._conn.close()
+        self._sock.close()
 
     def create_tcp_relay(self, port):
         """Create the TCP relay, emulating a hardware device connected over
