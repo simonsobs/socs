@@ -57,7 +57,6 @@ API Reference        Full API documentation for core parts of the SOCS library.
     agents/pysmurf-monitor
     agents/scpi_psu
     agents/smurf_crate_monitor
-    agents/smurf_file_emulator
     agents/suprsync
     agents/synacc
     agents/tektronix3021c
@@ -69,6 +68,7 @@ API Reference        Full API documentation for core parts of the SOCS library.
 
     simulators/ls240_simulator
     simulators/ls372_simulator
+    agents/smurf_file_emulator
     simulators/smurf_stream_simulator
 
 .. toctree::
