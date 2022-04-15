@@ -238,27 +238,15 @@ def test_hwp_rotation_ign_ext(wait_for_crossbar, kikusui_emu, pid_emu, run_agent
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 
-# @pytest.mark.integtest
-# def test_ls425_start_acq(wait_for_crossbar, emulator, run_agent, client):
-#     responses = {'*IDN?': 'LSCI,MODEL425,LSA425T,1.3',
-#                  'RDGFIELD?': '+1.0E-01'}
-#     emulator.define_responses(responses)
-#
-#     resp = client.acq.start(sampling_frequency=1.0)
-#     assert resp.status == ocs.OK
-#     assert resp.session['op_code'] == OpCode.STARTING.value
-#
-#     # We stopped the process with run_once=True, but that will leave us in the
-#     # RUNNING state
-#     resp = client.acq.status()
-#     assert resp.session['op_code'] == OpCode.RUNNING.value
-#
-#     # Now we request a formal stop, which should put us in STOPPING
-#     client.acq.stop()
-#     # this is so we get through the acq loop and actually get a stop command in
-#     # TODO: get sleep_time in the acq process to be small for testing
-#     time.sleep(3)
-#     resp = client.acq.status()
-#     print(resp)
-#     print(resp.session)
-#     assert resp.session['op_code'] in [OpCode.STOPPING.value, OpCode.SUCCEEDED.value]
+@pytest.mark.integtest
+def test_hwp_rotation_iv_acq(wait_for_crossbar, kikusui_emu, pid_emu, run_agent, client):
+    responses = {'MEAS:VOLT?': '2',
+                 'MEAS:CURR?': '1'}
+    kikusui_emu.define_responses(responses)
+
+    resp = client.iv_acq.start(test_mode=True)
+    assert resp.status == ocs.OK
+
+    resp = client.iv_acq.wait(timeout=20)
+    assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value

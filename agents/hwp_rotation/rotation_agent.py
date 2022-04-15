@@ -341,10 +341,15 @@ class RotationAgent:
 
         return True, 'Set Kikusui voltage to direct control'
 
+    @ocs_agent.param('test_mode', default=False, type=bool)
     def iv_acq(self, session, params):
-        """iv_acq()
+        """iv_acq(test_mode=False)
 
         **Process** - Start Kikusui data acquisition.
+
+        Parameters:
+            test_mode (bool, optional): Run the Process loop only once.
+                This is meant only for testing. Default is False.
 
         Notes:
             The most recent data collected is stored in the session data in the
@@ -384,6 +389,9 @@ class RotationAgent:
                                     'last_updated': time.time()}
 
                 time.sleep(1)
+
+                if params['test_mode']:
+                    break
 
         self.agent.feeds['hwprotation'].flush_buffer()
         return True, 'Acqusition exited cleanly'
