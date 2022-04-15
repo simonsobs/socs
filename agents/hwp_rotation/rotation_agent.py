@@ -364,26 +364,26 @@ class RotationAgent:
 
             session.set_status('running')
 
-        self.take_data = True
+            self.take_data = True
 
-        while self.take_data:
-            data = {'timestamp': time.time(),
-                    'block_name': 'HWPKikusui_IV', 'data': {}}
+            while self.take_data:
+                data = {'timestamp': time.time(),
+                        'block_name': 'HWPKikusui_IV', 'data': {}}
 
-            if not self.switching:
-                v_msg, v_val = self.cmd.user_input('V?')
-                i_msg, i_val = self.cmd.user_input('C?')
+                if not self.switching:
+                    v_msg, v_val = self.cmd.user_input('V?')
+                    i_msg, i_val = self.cmd.user_input('C?')
 
-                data['data']['kikusui_volt'] = v_val
-                data['data']['kikusui_curr'] = i_val
+                    data['data']['kikusui_volt'] = v_val
+                    data['data']['kikusui_curr'] = i_val
 
-                self.agent.publish_to_feed('hwprotation', data)
+                    self.agent.publish_to_feed('hwprotation', data)
 
-                session.data = {'kikusui_volt': v_val,
-                                'kikusui_curr': i_val,
-                                'last_updated': time.time()}
+                    session.data = {'kikusui_volt': v_val,
+                                    'kikusui_curr': i_val,
+                                    'last_updated': time.time()}
 
-            time.sleep(1)
+                time.sleep(1)
 
         self.agent.feeds['hwprotation'].flush_buffer()
         return True, 'Acqusition exited cleanly'
