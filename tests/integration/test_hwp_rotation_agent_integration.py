@@ -160,6 +160,84 @@ def test_hwp_rotation_tune_freq(wait_for_crossbar, kikusui_emu, pid_emu, run_age
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 
+@pytest.mark.integtest
+def test_hwp_rotation_set_on(wait_for_crossbar, kikusui_emu, pid_emu, run_agent, client):
+    responses = {'OUTP ON': '',
+                 'OUTP?': 'on'}
+    kikusui_emu.define_responses(responses)
+
+    resp = client.set_on()
+    print(resp)
+    assert resp.status == ocs.OK
+    print(resp.session)
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
+
+@pytest.mark.integtest
+def test_hwp_rotation_set_off(wait_for_crossbar, kikusui_emu, pid_emu, run_agent, client):
+    responses = {'OUTP OFF': '',
+                 'OUTP?': 'off'}
+    kikusui_emu.define_responses(responses)
+
+    resp = client.set_off()
+    print(resp)
+    assert resp.status == ocs.OK
+    print(resp.session)
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
+
+@pytest.mark.integtest
+def test_hwp_rotation_set_v(wait_for_crossbar, kikusui_emu, pid_emu, run_agent, client):
+    responses = {'VOLT 1.000000': '',
+                 'VOLT?': '1.000000'}
+    kikusui_emu.define_responses(responses)
+
+    resp = client.set_v(volt=1)
+    print(resp)
+    assert resp.status == ocs.OK
+    print(resp.session)
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
+
+@pytest.mark.integtest
+def test_hwp_rotation_set_v_lim(wait_for_crossbar, kikusui_emu, pid_emu, run_agent, client):
+    responses = {'VOLT:PROT 10.000000': '',
+                 'VOLT:PROT?': '10.000000'}
+    kikusui_emu.define_responses(responses)
+
+    resp = client.set_v_lim(volt=10)
+    print(resp)
+    assert resp.status == ocs.OK
+    print(resp.session)
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
+
+@pytest.mark.integtest
+def test_hwp_rotation_use_ext(wait_for_crossbar, kikusui_emu, pid_emu, run_agent, client):
+    responses = {'VOLT:EXT:SOUR VOLT': '',
+                 'VOLT:EXT:SOUR?': 'source_name'}
+    kikusui_emu.define_responses(responses)
+
+    resp = client.use_ext()
+    print(resp)
+    assert resp.status == ocs.OK
+    print(resp.session)
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
+
+@pytest.mark.integtest
+def test_hwp_rotation_ign_ext(wait_for_crossbar, kikusui_emu, pid_emu, run_agent, client):
+    responses = {'VOLT:EXT:SOUR NONE': '',
+                 'VOLT:EXT:SOUR?': 'False'}
+    kikusui_emu.define_responses(responses)
+
+    resp = client.ign_ext()
+    print(resp)
+    assert resp.status == ocs.OK
+    print(resp.session)
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
+
 # @pytest.mark.integtest
 # def test_ls425_start_acq(wait_for_crossbar, emulator, run_agent, client):
 #     responses = {'*IDN?': 'LSCI,MODEL425,LSA425T,1.3',
