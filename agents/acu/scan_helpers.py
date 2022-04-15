@@ -184,7 +184,7 @@ def generate_linear_turnaround(az_endpoint1, az_endpoint2, az_speed, acc, el_end
     el = el_endpoint1
     if step_time < 0.05:
         raise ValueError('Time step size too small, must be at least 0.05 seconds')
-    daz = round(step_time*az_speed, 4)
+    daz = step_time * az_speed
     el_vel = el_speed
     az_flag = 0
     if az < az_endpoint2:
@@ -195,13 +195,6 @@ def generate_linear_turnaround(az_endpoint1, az_endpoint2, az_speed, acc, el_end
         az_vel = -1*az_speed
     else:
         raise ValueError('Need two different motion endpoints')
-    az_remainder = (az_max - az_min) % daz
-    if az_remainder == 0.0:
-        leftover_az = 0.0
-        leftover_time = 0.0
-    else:
-        leftover_az = round(az_remainder, 4)
-        leftover_time = az_remainder / az_speed
     i = 0
     while i < stop_iter:
         i += 1
@@ -209,46 +202,50 @@ def generate_linear_turnaround(az_endpoint1, az_endpoint2, az_speed, acc, el_end
         for j in range(batch_size):
             t += step_time
             if increasing:
-                if round(az, 4) <= (az_max-(2*daz+leftover_az)):
+                if az <= (az_max - 2*daz):
                     az += daz
                     az_vel = az_speed
                     el_vel = el_speed
                     az_flag = 1
                     el_flag = 0
                     increasing = True
-                elif round(az, 4) == az_max:
+                elif az == az_max:
                     t += turntime
                     az_vel = -1*az_speed
                     el_vel = el_speed
                     az_flag = 1
                     el_flag = 0
                     increasing = False
-                elif round(az, 4) == round((az_max-(daz+leftover_az)), 4):
+                else:
+                    az_remaining = az_max - az
+                    time_remaining = az_remaining / az_speed
                     az = az_max
-                    t += leftover_time
+                    t += (time_remaining - step_time)
                     az_vel = az_speed
                     el_vel = el_speed
                     az_flag = 2
                     el_flag = 0
                     increasing = True
             else:
-                if round(az, 4) >= (az_min + (2*daz+leftover_az)):
+                if az >= (az_min + 2*daz):
                     az -= daz
                     az_vel = -1*az_speed
                     el_vel = el_speed
                     az_flag = 1
                     el_flag = 0
                     increasing = False
-                elif round(az, 4) == az_min:
+                elif az == az_min:
                     t += turntime
                     az_vel = az_speed
                     el_vel = el_speed
                     az_flag = 1
                     el_flag = 0
                     increasing = True
-                elif round(az, 4) == round(az_min+(daz+leftover_az), 4):
+                else:
+                    az_remaining = az - az_min
+                    time_remaining = az_remaining / az_speed
                     az = az_min
-                    t += leftover_time
+                    t += (time_remaining - step_time)
                     az_vel = -1*az_speed
                     el_vel = el_speed
                     az_flag = 2
