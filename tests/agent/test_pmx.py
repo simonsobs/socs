@@ -30,6 +30,12 @@ def test_pmx_create_command(tcp_emulator):
 
 
 @pytest.mark.integtest
+def test_pmx_destructor(tcp_emulator):
+    cmd = create_command()
+    del cmd
+
+
+@pytest.mark.integtest
 def test_pmx_cmd_on(tcp_emulator):
     cmd = create_command()
     tcp_emulator.define_responses({'OUTP ON': '',

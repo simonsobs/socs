@@ -17,6 +17,9 @@ class PMX:
 
     def __init__(self, rtu_port=None, tcp_ip=None, tcp_port=None, timeout=None):
         # Connect to device
+        self.using_tcp = None
+        self._rtu_port = None
+        self.ser = None
         msg = self.__conn(rtu_port, tcp_ip, tcp_port, timeout)
         print(msg)
         self._remote_Mode()
@@ -29,12 +32,12 @@ class PMX:
             print(
                 "Disconnecting from RTU port %s"
                 % (self._rtu_port))
-            self.ser.close()
+            if self.ser:
+                self.ser.close()
         else:
             print(
                 "Disconnecting from TCP IP %s at port %d"
                 % (self._tcp_ip, self._tcp_port))
-            pass
         return
 
     def check_voltage(self):
