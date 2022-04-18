@@ -409,10 +409,18 @@ class RotationAgent:
                 return False, 'Could not acquire lock'
 
             session.set_status('running')
-
+            last_release = time.time()
             self.take_data = True
 
             while self.take_data:
+                # Relinquish sampling lock occasionally.
+                if time.time() - last_release > 1.:
+                    last_release = time.time()
+                    if not self.lock.release_and_acquire(timeout=10):
+                        self.log.warn(f"Failed to re-acquire sampling lock, "
+                                      f"currently held by {self.lock.job}.")
+                        continue
+
                 data = {'timestamp': time.time(),
                         'block_name': 'HWPKikusui_IV', 'data': {}}
 
