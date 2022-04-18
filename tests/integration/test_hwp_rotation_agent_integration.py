@@ -19,6 +19,8 @@ pytest_plugins = ("docker_compose")
 wait_for_crossbar = create_crossbar_fixture()
 run_agent = create_agent_runner_fixture(
     '../agents/hwp_rotation/rotation_agent.py', 'hwp_rotation_agent', args=['--log-dir', './logs/'])
+run_agent_idle = create_agent_runner_fixture(
+    '../agents/hwp_rotation/rotation_agent.py', 'hwp_rotation_agent', args=['--mode', 'idle', '--log-dir', './logs/'])
 client = create_client_fixture('rotator')
 kikusui_emu = create_device_emulator(
     {'SYST:REM': ''}, relay_type='tcp', port=2000)
@@ -32,10 +34,29 @@ def test_testing(wait_for_crossbar):
     assert True
 
 
+# This ends up hanging for some reason that I can't figure out at the moment.
+# @pytest.mark.integtest
+# def test_hwp_rotation_failed_connection_kikusui(wait_for_crossbar, pid_emu, run_agent_idle, client):
+#     resp = client.init_connection.start()
+#     print(resp)
+#     # We can't really check anything here, the agent's going to exit during the
+#     # init_conneciton task because it cannot connect to the Kikusui.
+
+
+@pytest.mark.integtest
+def test_hwp_rotation_failed_connection_pid(wait_for_crossbar, kikusui_emu, run_agent_idle, client):
+    resp = client.init_connection.start()
+    print(resp)
+    # We can't really check anything here, the agent's going to exit during the
+    # init_conneciton task because it cannot connect to the PID controller.
+
+
 @pytest.mark.integtest
 def test_hwp_rotation_get_direction(wait_for_crossbar, kikusui_emu, pid_emu, run_agent, client):
     responses = {'*R02': 'R02400000\r'}
     pid_emu.define_responses(responses)
+
+    client.init_connection.wait()  # wait for connection to be made
     resp = client.get_direction()
     print(resp)
     assert resp.status == ocs.OK
@@ -59,8 +80,9 @@ def test_hwp_rotation_get_direction(wait_for_crossbar, kikusui_emu, pid_emu, run
 def test_hwp_rotation_set_direction(wait_for_crossbar, kikusui_emu, pid_emu, run_agent, client):
     responses = {'*W02400000': 'W02\r',
                  '*W02401388': 'W02\r'}
-
     pid_emu.define_responses(responses)
+
+    client.init_connection.wait()  # wait for connection to be made
     resp = client.set_direction(direction='0')
     print(resp)
     assert resp.status == ocs.OK
@@ -80,8 +102,9 @@ def test_hwp_rotation_set_pid(wait_for_crossbar, kikusui_emu, pid_emu, run_agent
                  '*W18003F': 'W18\r',
                  '*W190000': 'W19\r',
                  '*Z02': 'Z02\r'}
-
     pid_emu.define_responses(responses)
+
+    client.init_connection.wait()  # wait for connection to be made
     resp = client.set_pid(p_param=0.2, i_param=63, d_param=0)
     print(resp)
     assert resp.status == ocs.OK
@@ -98,8 +121,9 @@ def test_hwp_rotation_tune_stop(wait_for_crossbar, kikusui_emu, pid_emu, run_age
                  '*W1700C8': 'W17\r',
                  '*W180000': 'W18\r',
                  '*W190000': 'W19\r'}
-
     pid_emu.define_responses(responses)
+
+    client.init_connection.wait()  # wait for connection to be made
     resp = client.tune_stop()
     print(resp)
     assert resp.status == ocs.OK
@@ -112,6 +136,7 @@ def test_hwp_rotation_get_freq(wait_for_crossbar, kikusui_emu, pid_emu, run_agen
     responses = {'*X01': 'X010.000\r'}
     pid_emu.define_responses(responses)
 
+    client.init_connection.wait()  # wait for connection to be made
     resp = client.get_freq()
     print(resp)
     assert resp.status == ocs.OK
@@ -126,6 +151,7 @@ def test_hwp_rotation_set_scale(wait_for_crossbar, kikusui_emu, pid_emu, run_age
                  '*Z02': 'Z02\r'}
     pid_emu.define_responses(responses)
 
+    client.init_connection.wait()  # wait for connection to be made
     resp = client.set_scale()
     print(resp)
     assert resp.status == ocs.OK
@@ -135,6 +161,7 @@ def test_hwp_rotation_set_scale(wait_for_crossbar, kikusui_emu, pid_emu, run_age
 
 @pytest.mark.integtest
 def test_hwp_rotation_declare_freq(wait_for_crossbar, kikusui_emu, pid_emu, run_agent, client):
+    client.init_connection.wait()  # wait for connection to be made
     resp = client.declare_freq(freq=0)
     print(resp)
     assert resp.status == ocs.OK
@@ -153,6 +180,7 @@ def test_hwp_rotation_tune_freq(wait_for_crossbar, kikusui_emu, pid_emu, run_age
                  '*W190000': 'W19\r'}
     pid_emu.define_responses(responses)
 
+    client.init_connection.wait()  # wait for connection to be made
     resp = client.tune_freq()
     print(resp)
     assert resp.status == ocs.OK
@@ -166,6 +194,7 @@ def test_hwp_rotation_set_on(wait_for_crossbar, kikusui_emu, pid_emu, run_agent,
                  'OUTP?': 'on'}
     kikusui_emu.define_responses(responses)
 
+    client.init_connection.wait()  # wait for connection to be made
     resp = client.set_on()
     print(resp)
     assert resp.status == ocs.OK
@@ -179,6 +208,7 @@ def test_hwp_rotation_set_off(wait_for_crossbar, kikusui_emu, pid_emu, run_agent
                  'OUTP?': 'off'}
     kikusui_emu.define_responses(responses)
 
+    client.init_connection.wait()  # wait for connection to be made
     resp = client.set_off()
     print(resp)
     assert resp.status == ocs.OK
@@ -192,6 +222,7 @@ def test_hwp_rotation_set_v(wait_for_crossbar, kikusui_emu, pid_emu, run_agent, 
                  'VOLT?': '1.000000'}
     kikusui_emu.define_responses(responses)
 
+    client.init_connection.wait()  # wait for connection to be made
     resp = client.set_v(volt=1)
     print(resp)
     assert resp.status == ocs.OK
@@ -205,6 +236,7 @@ def test_hwp_rotation_set_v_lim(wait_for_crossbar, kikusui_emu, pid_emu, run_age
                  'VOLT:PROT?': '10.000000'}
     kikusui_emu.define_responses(responses)
 
+    client.init_connection.wait()  # wait for connection to be made
     resp = client.set_v_lim(volt=10)
     print(resp)
     assert resp.status == ocs.OK
@@ -218,6 +250,7 @@ def test_hwp_rotation_use_ext(wait_for_crossbar, kikusui_emu, pid_emu, run_agent
                  'VOLT:EXT:SOUR?': 'source_name'}
     kikusui_emu.define_responses(responses)
 
+    client.init_connection.wait()  # wait for connection to be made
     resp = client.use_ext()
     print(resp)
     assert resp.status == ocs.OK
@@ -231,6 +264,7 @@ def test_hwp_rotation_ign_ext(wait_for_crossbar, kikusui_emu, pid_emu, run_agent
                  'VOLT:EXT:SOUR?': 'False'}
     kikusui_emu.define_responses(responses)
 
+    client.init_connection.wait()  # wait for connection to be made
     resp = client.ign_ext()
     print(resp)
     assert resp.status == ocs.OK
@@ -244,6 +278,7 @@ def test_hwp_rotation_iv_acq(wait_for_crossbar, kikusui_emu, pid_emu, run_agent,
                  'MEAS:CURR?': '1'}
     kikusui_emu.define_responses(responses)
 
+    client.init_connection.wait()  # wait for connection to be made
     resp = client.iv_acq.start(test_mode=True)
     assert resp.status == ocs.OK
 

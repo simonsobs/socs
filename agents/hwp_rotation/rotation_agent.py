@@ -1,7 +1,7 @@
-import sys
 import os
 import argparse
 import time
+from twisted.internet import reactor
 
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
@@ -29,6 +29,7 @@ class RotationAgent:
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
+        self._initialized = False
         self.take_data = False
         self.switching = False
         self.kikusui_ip = kikusui_ip
@@ -36,27 +37,64 @@ class RotationAgent:
         self.pid_ip = pid_ip
         self.pid_port = pid_port
         self._pid_verbosity = pid_verbosity > 0
+        self.cmd = None  # Command object for PSU commanding
+        self.pid = None  # PID object for pid controller commanding
 
         agg_params = {'frame_length': 60}
         self.agent.register_feed(
             'hwprotation', record=True, agg_params=agg_params)
 
-        try:
-            self.pmx = PMX(tcp_ip=self.kikusui_ip,
-                           tcp_port=self.kikusui_port, timeout=0.5)
-            self.cmd = Command(self.pmx)
-            self.log.info('Connected to Kikusui power supply')
-        except ConnectionRefusedError:
-            self.log.error('Could not establish connection to Kikusui power supply')
-            sys.exit(1)
+    @ocs_agent.param('auto_acquire', default=False, type=bool)
+    @ocs_agent.param('force', default=False, type=bool)
+    def init_connection(self, session, params):
+        """init_connection(auto_acquire=False, force=False)
 
-        try:
-            self.pid = pd.PID(pid_ip=self.pid_ip, pid_port=self.pid_port,
-                              verb=self._pid_verbosity)
-            self.log.info('Connected to PID controller')
-        except BrokenPipeError:
-            self.log.error('Could not establish connection to PID controller')
-            sys.exit(1)
+        **Task** - Initialize connection to Kikusui Power Supply and PID
+        Controller.
+
+        Parameters:
+            auto_acquire (bool, optional): Default is False. Starts data
+                acquisition after initialization if True.
+            force (bool, optional): Force initialization, even if already
+                initialized. Defaults to False.
+
+        """
+        if self._initialized and not params['force']:
+            self.log.info("Connection already initialized. Returning...")
+            return True, "Connection already initialized"
+
+        with self.lock.acquire_timeout(0, job='init_connection') as acquired:
+            if not acquired:
+                self.log.warn(
+                    'Could not run init_connection because {} is already running'.format(self.lock.job))
+                return False, 'Could not acquire lock'
+
+            try:
+                pmx = PMX(tcp_ip=self.kikusui_ip,
+                          tcp_port=self.kikusui_port, timeout=0.5)
+                self.cmd = Command(pmx)
+                self.log.info('Connected to Kikusui power supply')
+            except ConnectionRefusedError:
+                self.log.error('Could not establish connection to Kikusui power supply')
+                reactor.callFromThread(reactor.stop)
+                return False, 'Unable to connect to Kikusui PSU'
+
+            try:
+                self.pid = pd.PID(pid_ip=self.pid_ip, pid_port=self.pid_port,
+                                  verb=self._pid_verbosity)
+                self.log.info('Connected to PID controller')
+            except BrokenPipeError:
+                self.log.error('Could not establish connection to PID controller')
+                reactor.callFromThread(reactor.stop)
+                return False, 'Unable to connect to PID controller'
+
+        self._initialized = True
+
+        # Start 'iv_acq' Process if requested
+        if params['auto_acquire']:
+            self.agent.start('iv_acq')
+
+        return True, 'Connection to PSU and PID controller established'
 
     def tune_stop(self, session, params):
         """tune_stop()
@@ -427,7 +465,7 @@ def make_parser(parser=None):
     pgroup.add_argument('--verbose', '-v', action='count', default=0,
                         help='PID Controller verbosity level.')
     pgroup.add_argument('--mode', type=str, default='iv_acq',
-                        choices=['idle', 'iv_acq'],
+                        choices=['idle', 'init', 'iv_acq'],
                         help="Starting operation for the Agent.")
     return parser
 
@@ -436,9 +474,11 @@ if __name__ == '__main__':
     parser = make_parser()
     args = site_config.parse_args(agent_class='RotationAgent', parser=parser)
 
-    acq_startup = False
-    if args.mode == 'iv_acq':
-        acq_startup = True
+    init_params = False
+    if args.mode == 'init':
+        init_params = {'auto_acquire': False}
+    elif args.mode == 'iv_acq':
+        init_params = {'auto_acquire': True}
 
     agent, runner = ocs_agent.init_site_agent(args)
     rotation_agent = RotationAgent(agent, kikusui_ip=args.kikusui_ip,
@@ -447,7 +487,9 @@ if __name__ == '__main__':
                                    pid_port=args.pid_port,
                                    pid_verbosity=args.verbose)
     agent.register_process('iv_acq', rotation_agent.iv_acq,
-                           rotation_agent._stop_iv_acq, startup=acq_startup)
+                           rotation_agent._stop_iv_acq)
+    agent.register_task('init_connection', rotation_agent.init_connection,
+                        startup=init_params)
     agent.register_task('tune_stop', rotation_agent.tune_stop)
     agent.register_task('tune_freq', rotation_agent.tune_freq)
     agent.register_task('declare_freq', rotation_agent.declare_freq)
