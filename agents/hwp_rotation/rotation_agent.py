@@ -46,7 +46,7 @@ class RotationAgent:
                            tcp_port=self.kikusui_port, timeout=0.5)
             self.cmd = Command(self.pmx)
             self.log.info('Connected to Kikusui power supply')
-        except:
+        except ConnectionRefusedError:
             self.log.error('Could not establish connection to Kikusui power supply')
             sys.exit(1)
 
@@ -54,7 +54,7 @@ class RotationAgent:
             self.pid = pd.PID(pid_ip=self.pid_ip, pid_port=self.pid_port,
                               verb=self._pid_verbosity)
             self.log.info('Connected to PID controller')
-        except:
+        except BrokenPipeError:
             self.log.error('Could not establish connection to PID controller')
             sys.exit(1)
 
