@@ -3,7 +3,7 @@ import os
 import argparse
 import time
 
-from ocs import ocs_agent, site_config, client_t
+from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
 from socs.agent.pmx import PMX, Command
