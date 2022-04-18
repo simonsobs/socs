@@ -21,10 +21,11 @@ class RotationAgent:
         kikusui_port (str): Port for the Kikusui power supply
         pid_ip (str): IP address for the PID controller
         pid_port (str): Port for the PID controller
+        pid_verbosity (str): Verbosity of PID controller output
 
     """
 
-    def __init__(self, agent, kikusui_ip, kikusui_port, pid_ip, pid_port):
+    def __init__(self, agent, kikusui_ip, kikusui_port, pid_ip, pid_port, pid_verbosity):
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
@@ -34,6 +35,7 @@ class RotationAgent:
         self.kikusui_port = int(kikusui_port)
         self.pid_ip = pid_ip
         self.pid_port = pid_port
+        self._pid_verbosity = pid_verbosity > 0
 
         agg_params = {'frame_length': 60}
         self.agent.register_feed(
@@ -49,7 +51,8 @@ class RotationAgent:
             sys.exit(1)
 
         try:
-            self.pid = pd.PID(pid_ip=self.pid_ip, pid_port=self.pid_port)
+            self.pid = pd.PID(pid_ip=self.pid_ip, pid_port=self.pid_port,
+                              verb=self._pid_verbosity)
             self.log.info('Connected to PID controller')
         except:
             self.log.error('Could not establish connection to PID controller')
@@ -421,6 +424,8 @@ def make_parser(parser=None):
     pgroup.add_argument('--kikusui-port')
     pgroup.add_argument('--pid-ip')
     pgroup.add_argument('--pid-port')
+    pgroup.add_argument('--verbose', '-v', action='count', default=0,
+                        help='PID Controller verbosity level.')
     return parser
 
 
@@ -432,7 +437,8 @@ if __name__ == '__main__':
     rotation_agent = RotationAgent(agent, kikusui_ip=args.kikusui_ip,
                                    kikusui_port=args.kikusui_port,
                                    pid_ip=args.pid_ip,
-                                   pid_port=args.pid_port)
+                                   pid_port=args.pid_port,
+                                   pid_verbosity=args.verbose)
     agent.register_process('iv_acq', rotation_agent.iv_acq,
                            rotation_agent._stop_iv_acq, startup=True)
     agent.register_task('tune_stop', rotation_agent.tune_stop)
