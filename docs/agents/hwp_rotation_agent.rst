@@ -27,7 +27,8 @@ An example site-config-file block::
        'arguments': [['--kikusui-ip', '10.10.10.100'],
                      ['--kikusui-port', '2000'],
                      ['--pid-ip', '10.10.10.101'],
-                     ['--pid-port', '2001']]},
+                     ['--pid-port', '2001'],
+                     ['--mode', 'iv_acq']]},
 
 Docker Compose
 ``````````````

@@ -426,12 +426,19 @@ def make_parser(parser=None):
     pgroup.add_argument('--pid-port')
     pgroup.add_argument('--verbose', '-v', action='count', default=0,
                         help='PID Controller verbosity level.')
+    pgroup.add_argument('--mode', type=str, default='iv_acq',
+                        choices=['idle', 'iv_acq'],
+                        help="Starting operation for the Agent.")
     return parser
 
 
 if __name__ == '__main__':
     parser = make_parser()
     args = site_config.parse_args(agent_class='RotationAgent', parser=parser)
+
+    acq_startup = False
+    if args.mode == 'iv_acq':
+        acq_startup = True
 
     agent, runner = ocs_agent.init_site_agent(args)
     rotation_agent = RotationAgent(agent, kikusui_ip=args.kikusui_ip,
@@ -440,7 +447,7 @@ if __name__ == '__main__':
                                    pid_port=args.pid_port,
                                    pid_verbosity=args.verbose)
     agent.register_process('iv_acq', rotation_agent.iv_acq,
-                           rotation_agent._stop_iv_acq, startup=True)
+                           rotation_agent._stop_iv_acq, startup=acq_startup)
     agent.register_task('tune_stop', rotation_agent.tune_stop)
     agent.register_task('tune_freq', rotation_agent.tune_freq)
     agent.register_task('declare_freq', rotation_agent.declare_freq)
