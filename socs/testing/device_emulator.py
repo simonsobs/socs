@@ -64,6 +64,7 @@ class DeviceEmulator:
         _type (str): Relay type, either 'serial' or 'tcp'.
         _read (bool): Used to stop the background reading of data recieved on
             the relay.
+        _conn (socket.socket): TCP connection for use in 'tcp' relay.
 
     """
     def __init__(self, responses):
@@ -71,6 +72,7 @@ class DeviceEmulator:
         self.default_response = None
         self._type = None
         self._read = True
+        self._conn = None
 
     @staticmethod
     def _setup_socat():
@@ -185,8 +187,9 @@ class DeviceEmulator:
             # print(out, err)
         if self._type == 'tcp':
             # print('shutting down background tcp relay')
-            self._conn.close()
-            self._sock.close()
+            if self._conn:
+                self._conn.close()
+                self._sock.close()
 
     def _read_socket(self, port):
         """Loop until shutdown, reading any commands sent over the relay.
