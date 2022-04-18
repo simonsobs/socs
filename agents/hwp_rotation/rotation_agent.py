@@ -151,20 +151,20 @@ class RotationAgent:
 
         return True, 'Setpoint at {} Hz'.format(params['freq'])
 
-    @ocs_agent.param('p_param', default=0.2, type=float, check=lambda x: 0. < x <= 8.)
-    @ocs_agent.param('i_param', default=63, type=int, check=lambda x: 0 <= x <= 200)
-    @ocs_agent.param('d_param', default=0., type=float, check=lambda x: 0. <= x < 10.)
+    @ocs_agent.param('p', default=0.2, type=float, check=lambda x: 0. < x <= 8.)
+    @ocs_agent.param('i', default=63, type=int, check=lambda x: 0 <= x <= 200)
+    @ocs_agent.param('d', default=0., type=float, check=lambda x: 0. <= x < 10.)
     def set_pid(self, session, params):
-        """set_pid(p_param=0.2, i_param=63, d_param=0.)
+        """set_pid(p=0.2, i=63, d=0.)
 
         **Task** - Set the PID parameters. Note these changes are for the
         current session only and will change whenever the agent container is
         reloaded.
 
         Parameters:
-            p_param (float): Proportional PID value
-            i_param (int): Integral PID value
-            d_param (float): Derivative PID value
+            p (float): Proportional PID value
+            i (int): Integral PID value
+            d (float): Derivative PID value
 
         """
         with self.lock.acquire_timeout(0, job='set_pid') as acquired:
@@ -174,9 +174,9 @@ class RotationAgent:
                 return False, 'Could not acquire lock'
 
             self.pid.set_pid(
-                [params['p_param'], params['i_param'], params['d_param']])
+                [params['p'], params['i'], params['d']])
 
-        return True, f"Set PID params to p: {params['p_param']}, i: {params['i_param']}, d: {params['d_param']}"
+        return True, f"Set PID params to p: {params['p']}, i: {params['i']}, d: {params['d']}"
 
     def get_freq(self, session, params):
         """get_freq()

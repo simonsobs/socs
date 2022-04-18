@@ -105,7 +105,7 @@ def test_hwp_rotation_set_pid(wait_for_crossbar, kikusui_emu, pid_emu, run_agent
     pid_emu.define_responses(responses)
 
     client.init_connection.wait()  # wait for connection to be made
-    resp = client.set_pid(p_param=0.2, i_param=63, d_param=0)
+    resp = client.set_pid(p=0.2, i=63, d=0)
     print(resp)
     assert resp.status == ocs.OK
     print(resp.session)
