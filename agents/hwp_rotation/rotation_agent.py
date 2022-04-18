@@ -31,7 +31,6 @@ class RotationAgent:
         self.lock = TimeoutLock()
         self._initialized = False
         self.take_data = False
-        self.switching = False
         self.kikusui_ip = kikusui_ip
         self.kikusui_port = int(kikusui_port)
         self.pid_ip = pid_ip
@@ -269,10 +268,8 @@ class RotationAgent:
                     'Could not set on because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            self.switching = True
             time.sleep(1)
             self.cmd.user_input('on')
-            self.switching = False
 
         return True, 'Set Kikusui on'
 
@@ -288,10 +285,8 @@ class RotationAgent:
                     'Could not set off because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            self.switching = True
             time.sleep(1)
             self.cmd.user_input('off')
-            self.switching = False
 
         return True, 'Set Kikusui off'
 
@@ -311,10 +306,8 @@ class RotationAgent:
                     'Could not set v because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            self.switching = True
             time.sleep(1)
             self.cmd.user_input('V {}'.format(params['volt']))
-            self.switching = False
 
         return True, 'Set Kikusui voltage to {} V'.format(params['volt'])
 
@@ -334,11 +327,9 @@ class RotationAgent:
                     'Could not set v lim because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            self.switching = True
             time.sleep(1)
             print(params['volt'])
             self.cmd.user_input('VL {}'.format(params['volt']))
-            self.switching = False
 
         return True, 'Set Kikusui voltage limit to {} V'.format(params['volt'])
 
@@ -355,10 +346,8 @@ class RotationAgent:
                     'Could not use external voltage because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            self.switching = True
             time.sleep(1)
             self.cmd.user_input('U')
-            self.switching = False
 
         return True, 'Set Kikusui voltage to PID control'
 
@@ -375,10 +364,8 @@ class RotationAgent:
                     'Could not ignore external voltage because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            self.switching = True
             time.sleep(1)
             self.cmd.user_input('I')
-            self.switching = False
 
         return True, 'Set Kikusui voltage to direct control'
 
@@ -424,18 +411,17 @@ class RotationAgent:
                 data = {'timestamp': time.time(),
                         'block_name': 'HWPKikusui_IV', 'data': {}}
 
-                if not self.switching:
-                    v_msg, v_val = self.cmd.user_input('V?')
-                    i_msg, i_val = self.cmd.user_input('C?')
+                v_msg, v_val = self.cmd.user_input('V?')
+                i_msg, i_val = self.cmd.user_input('C?')
 
-                    data['data']['kikusui_volt'] = v_val
-                    data['data']['kikusui_curr'] = i_val
+                data['data']['kikusui_volt'] = v_val
+                data['data']['kikusui_curr'] = i_val
 
-                    self.agent.publish_to_feed('hwprotation', data)
+                self.agent.publish_to_feed('hwprotation', data)
 
-                    session.data = {'kikusui_volt': v_val,
-                                    'kikusui_curr': i_val,
-                                    'last_updated': time.time()}
+                session.data = {'kikusui_volt': v_val,
+                                'kikusui_curr': i_val,
+                                'last_updated': time.time()}
 
                 time.sleep(1)
 
