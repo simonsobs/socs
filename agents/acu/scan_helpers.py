@@ -240,16 +240,19 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
         stop_iter = float('inf')
     else:
         stop_iter = num_batches
-        leftover_in_leg = (az_max - az_min) % daz
-        if leftover_in_leg == 0:
-            batch_size = (az_max - az_min) / daz
-        else:
-            batch_size = (az_max - az_min) / daz + 1
+        batch_size = int(np.floor((az_max - az_min) / daz)) + 1
     i = 0
     while i < stop_iter:
         i += 1
         point_block = [[],[],[],[],[],[],[]]
         for j in range(batch_size):
+            point_block[0].append(t + t0)
+            point_block[1].append(az)
+            point_block[2].append(el)
+            point_block[3].append(az_vel)
+            point_block[4].append(el_vel)
+            point_block[5].append(az_flag)
+            point_block[6].append(el_flag)
             t += step_time
             if increasing:
                 if az <= (az_max - 2 * daz):
@@ -301,13 +304,6 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                     az_flag = 2
                     el_flag = 0
                     increasing = False
-            point_block[0].append(t + t0)
-            point_block[1].append(az)
-            point_block[2].append(el)
-            point_block[3].append(az_vel)
-            point_block[4].append(el_vel)
-            point_block[5].append(az_flag)
-            point_block[6].append(el_flag)
         if ptstack_fmt:
             yield ptstack_format(point_block[0], point_block[1],
                                  point_block[2], point_block[3],
