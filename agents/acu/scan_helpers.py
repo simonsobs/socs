@@ -228,6 +228,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
     daz = step_time * az_speed
     el_vel = el_speed
     az_flag = 0
+    el_flag = 0
     if az < az_endpoint2:
         increasing = True
         az_vel = az_speed
