@@ -241,8 +241,8 @@ class ACUAgent:
                                  agg_params=basic_agg_params,
                                  buffer_time=1)
         agent.register_task('go_to', self.go_to, blocking=False)
-        agent.register_task('linear_turnaround_scan',
-                            self.linear_turnaround_scan,
+        agent.register_task('constant_velocity_scan',
+                            self.constant_velocity_scan,
                             blocking=False)
         agent.register_task('fromfile_scan',
                             self.fromfile_scan,
@@ -775,7 +775,7 @@ class ACUAgent:
         yield True, 'Track completed'
 
     @inlineCallbacks
-    def linear_turnaround_scan(self, session, params=None):
+    def constant_velocity_scan(self, session, params=None):
         azpts = params.get('azpts')
         el = params.get('el')
         azvel = params.get('azvel')
@@ -788,7 +788,7 @@ class ACUAgent:
             return False, 'Azimuth location out of range!'
         if el <= self.motion_limits['elevation']['lower'] or el >= self.motion_limits['elevation']['upper']:
             return False, 'Elevation location out of range!'
-        times, azs, els, vas, ves, azflags, elflags = sh.linear_turnaround_scanpoints(azpts, el, azvel, acc, ntimes)
+        times, azs, els, vas, ves, azflags, elflags = sh.constant_velocity_scanpoints(azpts, el, azvel, acc, ntimes)
         yield self.run_specified_scan(session, times, azs, els, vas, ves, azflags, elflags, azonly)
         return True, 'Track completed.'
 
@@ -802,8 +802,7 @@ class ACUAgent:
 
         Params:
             scantype (str): the type of scan information you are uploading.
-                            Options are 'from_file', 'linear_1dir', or
-                            'linear_turnaround'.
+                            Options are 'from_file' or 'constant_velocity'.
         """
         ok, msg = self.try_set_job('control')
         if not ok:
