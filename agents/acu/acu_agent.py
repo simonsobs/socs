@@ -951,7 +951,7 @@ class ACUAgent:
         el_speed = params.get('el_speed')
 
         yield self.acu_control.stop()
-        g = sh.generate_linear_turnaround(az_endpoint1, az_endpoint2,
+        g = sh.generate_constant_velocity_scan(az_endpoint1, az_endpoint2,
                         az_speed, acc, el_endpoint1, el_endpoint2, el_speed)
         self.acu_control.mode('ProgramTrack')
         while True:

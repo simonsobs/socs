@@ -148,7 +148,7 @@ def ptstack_format(conctimes, concaz, concel, concva, concve, az_flags, el_flags
 
     return all_lines
 
-def generate_linear_turnaround(az_endpoint1, az_endpoint2, az_speed, acc, el_endpoint1, el_endpoint2, el_speed, stop_iter=float('inf'), wait_to_start=10., step_time=0.1, batch_size=500, ptstack_fmt=True):
+def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed, acc, el_endpoint1, el_endpoint2, el_speed, num_batches=None, start_time=None, wait_to_start=3., step_time=0.1, batch_size=500, ptstack_fmt=True):
     """
     Python generator to produce times, azimuth and elevation positions, azimuth and elevation 
     velocities, azimuth and elevation flags for arbitrarily long constant-velocity azimuth 
@@ -161,23 +161,28 @@ def generate_linear_turnaround(az_endpoint1, az_endpoint2, az_speed, acc, el_end
         acc (float): turnaround acceleration for the azimuth motion at the endpoints
         el_endpoint1 (float): elevation endpoint at which to start the motion
         el_endpoint2 (float): second elevation endpoint of the scan. For development, this 
-                              must be equal to el_endpoint1.
+            must be equal to el_endpoint1.
         el_speed (float): speed of the elevation motion. For development, set to 0.0
-        stop_iter (float or int): sets the number of iterations for the generator.
-                                  Default value is infinity.
+        num_batches (int or None): sets the number of batches for the generator to create.
+            Default value is None (interpreted as infinity).
+        start_time (float or None): a ctime at which to start the scan. Default is None,
+            which is interpreted as time.time(). 
         wait_to_start (float): number of seconds to wait between time.time() and the real 
-                               start time. Default is 10 seconds.
+            start time. Default is 10 seconds.
         step_time (float): time between points on the constant-velocity parts of the motion.
-                           Default value is 0,1 seconds. Minimum value is 0.05 seconds.
+            Default value is 0.1 seconds. Minimum value is 0.05 seconds.
         batch_size (int): number of values to produce in each iteration. Default is 500.
         ptstack_fmt (bool): determine whether values are produced with the necessary format
-                            to upload to the ACU. If False, this function will produce 
-                            lists of time, azimuth, elevation, azimuth velocity, elevation
-                            velocity, azimuth flags, and elevation flags. Default is True.
+            to upload to the ACU. If False, this function will produce lists of time, azimuth, 
+            elevation, azimuth velocity, elevation velocity, azimuth flags, and elevation
+            flags. Default is True.
     """
     az_min = min(az_endpoint1, az_endpoint2)
     az_max = max(az_endpoint1, az_endpoint2)
-    t0 = time.time() + wait_to_start
+    if start_time == None:
+        t0 = time.time() + wait_to_start
+    else:
+        t0 = start_time
     t = 0
     turntime = 2.0 * az_speed / acc
     az = az_endpoint1
@@ -195,6 +200,15 @@ def generate_linear_turnaround(az_endpoint1, az_endpoint2, az_speed, acc, el_end
         az_vel = -1*az_speed
     else:
         raise ValueError('Need two different motion endpoints')
+    if num_batches == None:
+        stop_iter = float('inf')
+    else:
+        stop_iter = num_batches
+        leftover_in_leg = (az_max - az_min) % daz
+        if leftover_in_leg == 0:
+            batch_size = (az_max - az_min) / daz
+        else:
+            batch_size = (az_max - az_min) / daz + 1
     i = 0
     while i < stop_iter:
         i += 1
