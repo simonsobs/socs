@@ -11,8 +11,7 @@ from twisted.internet.defer import inlineCallbacks
 ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 if not ON_RTD:
     # import classes
-    from src import pmx
-    from src import command
+    from socs.agent import pmx
     from src.common import openlog, writelog
 
 
@@ -71,7 +70,7 @@ class WiregridKikusuiAgent:
             self.PMX = None
 
         if self.PMX is not None:
-            self.cmd = command.Command(self.PMX)
+            self.cmd = pmx.Command(self.PMX)
         else:
             self.cmd = None
 
@@ -114,7 +113,7 @@ class WiregridKikusuiAgent:
             self.cmd = None
             return False, msg
         # reinitialize cmd
-        self.cmd = command.Command(self.PMX)
+        self.cmd = pmx.Command(self.PMX)
         ret, msg = self._check_connect()
         if ret:
             msg = 'Successfully reconnected to the KIKUSUI power supply!'
