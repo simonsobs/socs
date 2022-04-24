@@ -6,7 +6,6 @@ import traceback
 
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
-from twisted.internet.defer import inlineCallbacks
 
 ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 if not ON_RTD:
@@ -279,7 +278,6 @@ class WiregridKikusuiAgent:
 
     @ocs_agent.param('current', default=0., type=float,
                      check=lambda x: 0.0 <= x <= 3.0)
-    @inlineCallbacks
     def set_c(self, session, params):
         """set_c(current=0)
 
@@ -301,8 +299,7 @@ class WiregridKikusuiAgent:
             return True, 'Set Kikusui current to {} A'.format(current)
 
     @ocs_agent.param('volt', default=12., type=float,
-                     check=lambda x: 0.0 < x < 12.0)
-    @inlineCallbacks
+                     check=lambda x: 0.0 <= x <= 12.0)
     def set_v(self, session, params):
         """set_v*volt=12.)
 
@@ -358,7 +355,6 @@ class WiregridKikusuiAgent:
                 .format(v_val, c_val, s_val)
 
     @ocs_agent.param('storepath', default='/data/wg-data/action/', type=str)
-    @inlineCallbacks
     def calibrate_wg(self, session, params):
         """calibrate_wg(storepath='/data/wg-data/action/')
 
