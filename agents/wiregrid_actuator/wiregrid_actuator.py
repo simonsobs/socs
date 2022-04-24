@@ -5,7 +5,6 @@ import time
 from ocs import ocs_agent
 from ocs import site_config
 from ocs.ocs_twisted import TimeoutLock
-from twisted.internet.defer import inlineCallbacks
 
 # add PATH to ./src directory
 # this_dir = os.path.dirname(os.path.abspath(__file__))
@@ -462,7 +461,6 @@ class WiregridActuatorAgent:
     @ocs_agent.param('distance', default=10., type=float)
     @ocs_agent.param('speedrate', default=0.2, type=float,
                      check=lambda x: 0.0 < x <= 1.0)
-    @inlineCallbacks
     def insert_test(self, session, params):
         """insert_test(distance=10, speedrate=0.1)
 
@@ -514,7 +512,6 @@ class WiregridActuatorAgent:
     @ocs_agent.param('distance', default=10., type=float)
     @ocs_agent.param('speedrate', default=0.2, type=float,
                      check=lambda x: 0.0 < x <= 1.0)
-    @inlineCallbacks
     def eject_test(self, session, params):
         """eject_test(distance=10, speedrate=0.1)
 
