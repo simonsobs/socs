@@ -44,7 +44,6 @@ class WiregridEncoderAgent:
         self.log = agent_obj.log
         self.lock = TimeoutLock()
 
-        self.initialized = False
         self.take_data = False
 
         self.bbport = bbport
@@ -86,7 +85,8 @@ class WiregridEncoderAgent:
                          'irig_hour': IRIG hour,
                          'irig_day': IRIG Day,
                          'irig_year': IRIG Year
-                        }
+                        },
+                     'timestamp':1601925677.6914878
                     }
 
                 Encoder data case:
@@ -98,7 +98,8 @@ class WiregridEncoderAgent:
                          'reference_degree' (list): Encoder rotation position
                                                     [deg.],
                          'error' (list): Encoder error flags
-                        }
+                        },
+                     'timestamp':1601925677.6914878
                     }
         """
 
@@ -133,8 +134,6 @@ class WiregridEncoderAgent:
                                   .format(e))
                     with open('parse_error.log', 'a') as f:
                         traceback.print_exc(file=f)
-                        pass
-                    pass
 
                 # IRIG part mainly takes over CHWP scripts by H.Nishino
                 if len(self.parser.irig_queue):
@@ -303,14 +302,12 @@ class WiregridEncoderAgent:
                         time_encoder_published = current_time
 
                         time.sleep(SLEEP)
-                        pass
-                    pass
 
+                ''' Should be removed
                 with open('/data/wg-data/position.log', 'w') as f:
                     f.write(str(shared_time)+' '+str(shared_position)+'\n')
                     f.flush()
-                    pass
-                pass
+                '''
 
         self.agent.feeds['wgencoder_rough'].flush_buffer()
         # This buffer (full data) has huge data size.

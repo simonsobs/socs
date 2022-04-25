@@ -57,31 +57,30 @@ class EncoderParser:
             if enc_oncetime and irig_oncetime:
                 print('---finished taking each data---')
                 break
+            if header == 0x1eaf and not enc_oncetime:  # Encoder data
+                if not self.check_data_length(0, COUNTER_PACKET_SIZE):
+                    self.log.error(
+                        'Failed to catch the Encoder data')
+                self.parse_counter_info(self.data[4: COUNTER_PACKET_SIZE])
+                res_bb = self.encoder_queue.popleft()
+                print('---Encoder Response---')
+                print(res_bb)
+                enc_oncetime = True
+            elif header == 0xcafe and not irig_oncetime:
+                if not self.check_data_length(0, IRIG_PACKET_SIZE):
+                    self.log.error(
+                        'Failed to catch the IRIG data')
+                self.parse_irig_info(self.data[4:IRIG_PACKET_SIZE])
+                res_irig = self.irig_queue.popleft()
+                print('---IRIG Response---')
+                print(res_irig)
+                irig_oncetime = True
             else:
-                if header == 0x1eaf and not enc_oncetime:  # Encoder data
-                    if not self.check_data_length(0, COUNTER_PACKET_SIZE):
-                        self.log.error(
-                            'Failed to catch the Encoder data')
-                    self.parse_counter_info(self.data[4: COUNTER_PACKET_SIZE])
-                    res_bb = self.encoder_queue.popleft()
-                    print('---Encoder Response---')
-                    print(res_bb)
-                    enc_oncetime = True
-                elif header == 0xcafe and not irig_oncetime:
-                    if not self.check_data_length(0, IRIG_PACKET_SIZE):
-                        self.log.error(
-                            'Failed to catch the IRIG data')
-                    self.parse_irig_info(self.data[4:IRIG_PACKET_SIZE])
-                    res_irig = self.irig_queue.popleft()
-                    print('---IRIG Response---')
-                    print(res_irig)
-                    irig_oncetime = True
-                else:
-                    pass
+                pass
 
-                if time.time() - checking_start > sampling_timeout:
-                    print('Checking time out')
-                    break
+            if time.time() - checking_start > sampling_timeout:
+                print('time out')
+                break
         # End of check_once()
 
     def check_data_length(self, start_index, size_of_read):
