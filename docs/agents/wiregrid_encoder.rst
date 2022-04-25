@@ -24,7 +24,8 @@ Dependencies
 
 This agent recieves the data from BeagleBoneBlack. 
 Therefore, a script reading the encoder data 
-should be running in the BeagleBoneBlack.
+should be running in the BeagleBoneBlack: 
+https://github.com/simonsobs/wire_grid_loader/tree/master/Encoder/Beaglebone.
 
 Configuration File Examples
 ---------------------------
@@ -72,22 +73,18 @@ An example docker-compose configuration::
 Description
 -----------
 
-Functions
-`````````
-
-The agent has only a ``acq()`` function.
-
-
 Hardware Configurations
 ```````````````````````
 
 The hardware-related variables are defined in ``wiregrid_encoder.py``.
     - COUNTER_INFO_LENGTH = 100
     - COUNTS_ON_BELT = 52000
-These should be consistent with the script running in the BeagleBoneBlack.
+These should be consistent with the script running in the BeagleBoneBlack,
+and these numbers will rarely be changed because they depend on the hardware.
 
-And there are variables related to the data format in ``signal_parser.py``.
+There are variables related to the data format in ``signal_parser.py``.
 The variables should be consistent with the BeagleBoneBlack script as well.
+They also will rarely be changed.
 
 
 Agent API
@@ -95,11 +92,3 @@ Agent API
 
 .. autoclass:: agents.wiregrid_encoder.wiregrid_encoder.WiregridEncoderAgent
     :members:
-
-Example Clients
----------------
-
-Below is an example client to insert and eject the actuator::
-
-    from ocs.ocs_client import OCSClient
-    wgencoder = OCSClient('wgencoder')
