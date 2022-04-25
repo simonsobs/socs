@@ -96,10 +96,8 @@ class EncoderParser:
                 data = self.sock.recv(self.read_chunk_size)
                 if len(self.data) > 0:
                     self.data += data
-                    pass
                 else:
                     self.data = data
-                    pass
 
                 while True:
                     if not self.check_data_length(0, 4):
@@ -160,7 +158,6 @@ class EncoderParser:
 
                     if len(self.data) == 0:
                         break
-                    pass
                 break
 
     def parse_counter_info(self, data):
@@ -253,4 +250,3 @@ if __name__ == '__main__':
     test = EncoderParser()
     test.check_once()
     del test
-    pass
