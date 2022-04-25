@@ -723,7 +723,7 @@ class WiregridActuatorAgent:
                          .
                          }
                     },
-                'timestamp':1601925677.6914878
+                 'timestamp':1601925677.6914878
                 }
         """
         if params is None:

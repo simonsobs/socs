@@ -552,7 +552,7 @@ class WiregridKikusuiAgent:
                          'status': output power status 1(on) or 0(off)
                          }
                     },
-                'timestamp':1601925677.6914878
+                 'timestamp':1601925677.6914878
                 }
 
         """
