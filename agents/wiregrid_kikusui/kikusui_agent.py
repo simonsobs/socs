@@ -6,6 +6,7 @@ import traceback
 
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
+from ocs.ocs_client import OCSClient
 
 ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 if not ON_RTD:
@@ -23,15 +24,16 @@ class WiregridKikusuiAgent:
     The agent communicates with the converter via eternet.
 
     Args:
-        kikusui-ip (str): IP address of the serial-to-ethernet converter
-        kikusui-port (int or str): Asigned port for the KIKUSUI power supply
+        kikusui_ip (str): IP address of the serial-to-ethernet converter
+        kikusui_port (int or str): Asigned port for the KIKUSUI power supply
             The converter has four D-sub ports to control
             multiple devices connected via serial communication.
             Communicating device is determined
             by the ethernet port number of the converter.
+        encoder_agent (str): Instance ID of the wiregrid encoder agent
         debug (bool): ON/OFF of writing a log file
     """
-    def __init__(self, agent, kikusui_ip, kikusui_port, debug=False):
+    def __init__(self, agent, kikusui_ip, kikusui_port, encoder_agent='wgencoder', debug=False):
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
@@ -39,6 +41,7 @@ class WiregridKikusuiAgent:
         self.take_data = False
         self.kikusui_ip = kikusui_ip
         self.kikusui_port = int(kikusui_port)
+        self.encoder_agent = encoder_agent
         self.debug = debug
 
         self.position_path = '/data/wg-data/position.log'
@@ -72,6 +75,10 @@ class WiregridKikusuiAgent:
             self.cmd = pmx.Command(self.PMX)
         else:
             self.cmd = None
+
+        # Connect to the encoder agent
+        self.encoder_clident = None
+        self._connect_encoder()
 
     ######################
     # Internal functions #
@@ -129,6 +136,9 @@ class WiregridKikusuiAgent:
             self.cmd = None
             return False, msg
 
+    def _connect_encoder(self):
+        self.encoder_client = OCSClient(self.encoder_agent)
+
     def _rotate_alittle(self, operation_time):
         if operation_time != 0.:
             self.cmd.user_input('ON')
@@ -138,6 +148,7 @@ class WiregridKikusuiAgent:
             return True, 'Successfully rotate a little!'
         return True, 'No rotation!'
 
+    '''
     def _get_position(self, position_path, open_trial):
         try:
             for i in range(open_trial):
@@ -156,6 +167,39 @@ class WiregridKikusuiAgent:
                 )
 
         return int(position)*self.Deg
+    '''
+    def _get_position(self):
+        position = -1.
+        try:
+            response = self.encoder_client.acq.status()
+        except Exception as e:
+            self.log.warn(
+                'Failed to get ENCODER POSITION | '
+                '{}'.format(e)
+                )
+            self.log.warn(
+                '    --> Retry to connect to the encoder agent'
+                )
+            self._connect_encoder()
+            try:
+                response = self.encoder_client.acq.status()
+            except Exception as e:
+                self.log.error(
+                    'Failed to get encoder position | '
+                    '{}'.format(e)
+                    )
+                return -1.
+
+        try:
+            position = (int)(response.session['data']['fields']['reference_degree'][-1])
+        except Exception as e:
+            self.log.warn(
+                'Failed to get encoder position | '
+                '{}'.format(e)
+                )
+
+        return int(position)*self.Deg
+
 
     def _get_exectime(self, position_difference, feedback_cut, feedback_time):
         if position_difference >= feedback_cut[4]:
@@ -583,6 +627,9 @@ def make_parser(parser=None):
     pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--kikusui-ip')
     pgroup.add_argument('--kikusui-port')
+    pgroup.add_argument('--encoder-agent', dest='encoder_agent',
+                        default='wgencoder',
+                        help='Instance id of the wiregrid encoder agent')
     pgroup.add_argument('--debug', dest='debug',
                         action='store_true', default=False,
                         help='Write a log file for debug')
@@ -596,6 +643,7 @@ if __name__ == '__main__':
     agent, runner = ocs_agent.init_site_agent(args)
     kikusui_agent = WiregridKikusuiAgent(agent, kikusui_ip=args.kikusui_ip,
                                  kikusui_port=args.kikusui_port,
+                                 encoder_agent=args.encoder_agent,
                                  debug=args.debug)
     agent.register_process('IV_acq', kikusui_agent.IV_acq,
                            kikusui_agent.stop_IV_acq, startup=True)

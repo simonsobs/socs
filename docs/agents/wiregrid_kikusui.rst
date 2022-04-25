@@ -32,13 +32,16 @@ An example site-config-file block::
     {'agent-class': 'WiregridKikusuiAgent',
      'instance-id': 'wgkikusui',
      'arguments': [['--kikusui-ip', '10.10.10.71'],
-                   ['--kikusui-port', '29']]},
+                   ['--kikusui-port', '29'],
+                   ['--encoder-agent', 'wgencoder']]},
 
 - kikusui-ip is an IP address of the serial-to-ethernet converter.
 - kikusui-port is an asigned port for the KIKUSUI power supply.
   (The converter has four D-sub ports to control
   multiple devices connected via serial communication.
   Communicating device is determined by the ethernet port number of the converter.)
+- encoder-agent is an instance ID of the wiregrid encoder agent (wiregrid-encoder).
+  This is necessary to get the position recorded by the encoder for controlling the rotation.
 
 Docker Compose
 ``````````````
