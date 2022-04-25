@@ -241,7 +241,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
         stop_iter = float('inf')
     else:
         stop_iter = num_batches
-        batch_size = int(np.floor((az_max - az_min) / daz)) + 1
+        batch_size = int(np.ceil((az_max - az_min) / daz))
     i = 0
     while i < stop_iter:
         i += 1
