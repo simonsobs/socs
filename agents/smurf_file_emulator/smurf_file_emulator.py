@@ -11,10 +11,12 @@ import so3g
 from spt3g import core
 
 
-# Load sample status frame from file
-status_file = os.path.join(os.path.split(__file__)[0], 'status_sample.yaml')
-with open(status_file, 'r') as f:
-    status_sample = yaml.safe_load(f)
+def get_smurf_status():
+    """Loads a sample status dict from file"""
+    status_file = os.path.join(os.path.split(__file__)[0], 'status_sample.yaml')
+    with open(status_file, 'r') as f:
+        return yaml.safe_load(f)
+
 
 SOSTREAM_VERSION = 2
 NBIASLINES = 16
@@ -45,7 +47,7 @@ class G3FrameGenerator:
 
     def get_status_frame(self):
         fr = core.G3Frame(core.G3FrameType.Wiring)
-        fr['status'] = yaml.dump(status_sample)
+        fr['status'] = yaml.dump(get_smurf_status())
         self.tag_frame(fr)
         return fr
 
