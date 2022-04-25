@@ -2,7 +2,6 @@ import os
 import argparse
 import time
 import numpy as np
-import traceback
 
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
@@ -33,7 +32,8 @@ class WiregridKikusuiAgent:
         encoder_agent (str): Instance ID of the wiregrid encoder agent
         debug (bool): ON/OFF of writing a log file
     """
-    def __init__(self, agent, kikusui_ip, kikusui_port, encoder_agent='wgencoder', debug=False):
+    def __init__(self, agent, kikusui_ip, kikusui_port,
+                 encoder_agent='wgencoder', debug=False):
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
@@ -45,7 +45,9 @@ class WiregridKikusuiAgent:
         self.debug = debug
 
         self.position_path = '/data/wg-data/position.log'
+        ''' Should be removed
         self.action_path = '/data/wg-data/action/'
+        '''
 
         self.open_trial = 10
         self.Deg = 360/52000
@@ -148,7 +150,7 @@ class WiregridKikusuiAgent:
             return True, 'Successfully rotate a little!'
         return True, 'No rotation!'
 
-    '''
+    ''' Should be removed
     def _get_position(self, position_path, open_trial):
         try:
             for i in range(open_trial):
@@ -191,7 +193,8 @@ class WiregridKikusuiAgent:
                 return -1.
 
         try:
-            position = (int)(response.session['data']['fields']['reference_degree'][-1])
+            position = (int)(
+                response.session['data']['fields']['reference_degree'][-1])
         except Exception as e:
             self.log.warn(
                 'Failed to get encoder position | '
@@ -199,7 +202,6 @@ class WiregridKikusuiAgent:
                 )
 
         return int(position)*self.Deg
-
 
     def _get_exectime(self, position_difference, feedback_cut, feedback_time):
         if position_difference >= feedback_cut[4]:
@@ -225,8 +227,11 @@ class WiregridKikusuiAgent:
         uncertaity_cancel = 3
         absolute_position = np.arange(0, 360, wanted_angle)
 
+        start_position = self._get_position()
+        ''' Should be removed
         start_position = self._get_position(
             self.position_path, self.open_trial)
+        '''
         if (360 < start_position + uncertaity_cancel):
             goal_position = wanted_angle
         elif absolute_position[-1] < start_position + uncertaity_cancel:
@@ -245,8 +250,11 @@ class WiregridKikusuiAgent:
         time.sleep(self.agent_interval)
 
         for step in range(feedback_steps):
+            mid_position = self._get_position()
+            ''' Should be removed
             mid_position = self._get_position(
                 self.position_path, self.open_trial)
+            '''
             if goal_position + wanted_angle < mid_position:
                 operation_time =\
                     self._get_exectime(
@@ -266,9 +274,13 @@ class WiregridKikusuiAgent:
 
         if self.debug:
             writelog(logfile, 'OFF', 0,
+                     self._get_position(), 'stepwise')
+            ''' Should be removed
+            writelog(logfile, 'OFF', 0,
                      self._get_position(
                         self.position_path, self.open_trial),
                      'stepwise')
+            '''
 
     ##################
     # Main functions #
@@ -289,9 +301,13 @@ class WiregridKikusuiAgent:
             logfile = openlog(self.action_path)
             if self.debug:
                 writelog(logfile, 'ON', 0,
+                         self._get_position(), 'continuous')
+                ''' Should be removed
+                writelog(logfile, 'ON', 0,
                          self._get_position(
                             self.position_path, self.open_trial),
                          'continuous')
+                '''
 
             self.cmd.user_input('ON')
             logfile.close()
@@ -312,9 +328,13 @@ class WiregridKikusuiAgent:
             logfile = openlog(self.action_path)
             if self.debug:
                 writelog(logfile, 'OFF', 0,
+                         self._get_position(), 'continuous')
+                ''' Should be removed
+                writelog(logfile, 'OFF', 0,
                          self._get_position(
                             self.position_path, self.open_trial),
                          'continuous')
+                '''
 
             self.cmd.user_input('OFF')
             logfile.close()
@@ -427,6 +447,19 @@ class WiregridKikusuiAgent:
                         self.log.warn(f'this is {cycle}th time action')
 
                     writelog(logfile, 'ON', tperiod,
+                             self._get_position(), 'calibration')
+                    self._rotate_alittle(tperiod)
+                    time.sleep(self.agent_interval+1.)
+                    writelog(logfile, 'OFF', 0.,
+                             self._get_position(), 'calibration')
+                    writelog(logfile, 'ON', 0.70,
+                             self._get_position(), 'calibration')
+                    self._rotate_alittle(0.70)
+                    time.sleep(self.agent_interval+1.)
+                    writelog(logfile, 'OFF', 0.,
+                             self._get_position(), 'calibration')
+                    ''' Should be removed
+                    writelog(logfile, 'ON', tperiod,
                              self._get_position(
                                 self.position_path, self.open_trial),
                              'calibration')
@@ -446,6 +479,7 @@ class WiregridKikusuiAgent:
                              self._get_position(
                                 self.position_path, self.open_trial),
                              'calibration')
+                    '''
                     cycle += 1
 
             logfile.close()
@@ -638,13 +672,14 @@ def make_parser(parser=None):
 
 if __name__ == '__main__':
     parser = make_parser()
-    args = site_config.parse_args(agent_class='WiregridKikusuiAgent', parser=parser)
+    args = site_config.parse_args(
+            agent_class='WiregridKikusuiAgent', parser=parser)
 
     agent, runner = ocs_agent.init_site_agent(args)
     kikusui_agent = WiregridKikusuiAgent(agent, kikusui_ip=args.kikusui_ip,
-                                 kikusui_port=args.kikusui_port,
-                                 encoder_agent=args.encoder_agent,
-                                 debug=args.debug)
+                                         kikusui_port=args.kikusui_port,
+                                         encoder_agent=args.encoder_agent,
+                                         debug=args.debug)
     agent.register_process('IV_acq', kikusui_agent.IV_acq,
                            kikusui_agent.stop_IV_acq, startup=True)
     agent.register_task('set_on', kikusui_agent.set_on)
