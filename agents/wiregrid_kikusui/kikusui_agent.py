@@ -551,7 +551,8 @@ class WiregridKikusuiAgent:
                          'currset': current setting [A],
                          'status': output power status 1(on) or 0(off)
                          }
-                    }
+                    },
+                'timestamp':1601925677.6914878
                 }
 
         """
@@ -636,8 +637,8 @@ class WiregridKikusuiAgent:
                                'status': s_val
                                }
                               }
-                session.data['timestamp'] = current_time
                 session.data['fields'] = field_dict
+                session.data['timestamp'] = current_time
 
                 time.sleep(1)  # DAQ interval
             # End of while loop for take_data
