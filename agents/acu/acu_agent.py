@@ -224,6 +224,10 @@ class ACUAgent:
                                  record=True,
                                  agg_params=influx_agg_params,
                                  buffer_time=1)
+        self.agent.register_feed('acu_commands_influx',
+                                 record=True,
+                                 agg_params=influx_agg_params,
+                                 buffer_time=1)
         self.agent.register_feed('acu_udp_stream',
                                  record=True,
                                  agg_params=fullstatus_agg_params,
@@ -247,9 +251,6 @@ class ACUAgent:
         agent.register_task('fromfile_scan',
                             self.fromfile_scan,
                             blocking=False)
-#        agent.register_task('run_specified_scan',
-#                            self.run_specified_scan,
-#                            blocking=False)
         agent.register_task('set_boresight',
                             self.set_boresight,
                             blocking=False)
@@ -397,7 +398,7 @@ class ACUAgent:
                         elif type(value) == int or type(value) == float:
                             self.data['status'][category][self.monitor_fields[category][key]] = value
                         elif value == None:
-                            self.data['status'][category][self.monitor_fields[category][key]] = float(0.0)#'None'
+                            self.data['status'][category][self.monitor_fields[category][key]] = float('nan')
                         else:
                             self.data['status'][category][self.monitor_fields[category][key]] = str(value)
             self.data['status']['summary']['ctime'] =\
@@ -407,25 +408,41 @@ class ACUAgent:
             # more keys to any self.data['status'] categories beyond this point
             influx_status = {}
             for category in self.data['status']:
-                for statkey in self.data['status'][category].keys():
-                    if type(self.data['status'][category][statkey]) == float:
-                        if self.data['status'][category][statkey] == float('nan'):
-                            influx_status[statkey + '_influx'] = 0.0
-                        else:
-                            influx_status[statkey + '_influx'] = self.data['status'][category][statkey]
-                    elif type(self.data['status'][category][statkey]) == str:
-                        if self.data['status'][category][statkey] in ['None', 'True', 'False']:
-                            influx_status[statkey + '_influx'] = tfn_key[self.data['status'][category][statkey]]
-                        else:
-                            influx_status[statkey + '_influx'] = mode_key[self.data['status'][category][statkey]]
-                    elif type(self.data['status'][category][statkey]) == int:
-                        if statkey in ['Year', 'Free_upload_positions']:
-                            influx_status[statkey + '_influx'] = float(self.data['status'][category][statkey])
-                        else:
-                            influx_status[statkey + '_influx'] = int(self.data['status'][category][statkey])
-                    else:
-                        print(statkey)
-
+                if category != 'commands':
+                    for statkey, statval in self.data['status'][category].items():
+                        if type(statval) == float:
+                            influx_status[statkey + '_influx'] = statval
+                        elif type(statval) == str:
+                            if statval == 'None':
+                                influx_status[statkey + '_influx'] = float('nan')
+                            elif statval in ['True', 'False']:
+                                influx_status[statkey + '_influx'] = tfn_key[statval]
+                            else:
+                                influx_status[statkey + '_influx'] = mode_key[statval]
+                        elif type(statval) == int:
+                            if statkey in ['Year', 'Free_upload_positions']:
+                                influx_status[statkey + '_influx'] = float(statval)
+                            else:
+                                influx_status[statkey + '_influx'] = int(statval)
+                elif category == 'commands':
+                    if str(self.data['status']['commands']['Azimuth_commanded_position']) != 'nan':
+                        acucommand_az = {'timestamp': self.data['status']['summary']['ctime'],
+                                         'block_name': 'ACU_commanded_positions_az',
+                                         'data': {'Azimuth_commanded_position_influx': self.data['status']['commands']['Azimuth_commanded_position']}
+                                         }
+                        self.agent.publish_to_feed('acu_commands_influx', acucommand_az)
+                    if str(self.data['status']['commands']['Elevation_commanded_position']) != 'nan':
+                        acucommand_el = {'timestamp': self.data['status']['summary']['ctime'],
+                                         'block_name': 'ACU_commanded_positions_el',
+                                         'data': {'Elevation_commanded_position_influx': self.data['status']['commands']['Elevation_commanded_position']}
+                                         }
+                        self.agent.publish_to_feed('acu_commands_influx', acucommand_el)
+                    if str(self.data['status']['commands']['Boresight_commanded_position']) != 'nan':
+                        acucommand_bs = {'timestamp': self.data['status']['summary']['ctime'],
+                                         'block_name': 'ACU_commanded_positions_boresight',
+                                         'data': {'Boresight_commanded_position_influx': self.data['status']['commands']['Boresight_commanded_position']}
+                                         }
+                        self.agent.publish_to_feed('acu_commands_influx', acucommand_bs)
             if self.data['uploads']['PtStack_Time'] == '000, 00:00:00.000000':
                 self.data['uploads']['PtStack_ctime'] = self.data['status']['summary']['ctime']
 
@@ -495,13 +512,7 @@ class ACUAgent:
             self.agent.publish_to_feed('acu_status_general_errs', acustatus_acufails)
             self.agent.publish_to_feed('acu_status_platform', acustatus_platform)
             self.agent.publish_to_feed('acu_status_emergency', acustatus_emergency)
-#            influx_status={'fake_data':1.0}
-            try:
-                self.agent.publish_to_feed('acu_status_influx', acustatus_influx, from_reactor=True)
-            #    print(acustatus_influx)
-            except:
-#                print(acustatus_influx)
-                print('failed')
+            self.agent.publish_to_feed('acu_status_influx', acustatus_influx, from_reactor=True)
 #        self.set_job_stop('monitor')
 #        yield dsleep(1)
 #        self.set_job_done('monitor')
