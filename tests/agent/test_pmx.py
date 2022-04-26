@@ -131,6 +131,17 @@ def test_pmx_cmd_check_voltage_current(tcp_emulator):
 
 
 @pytest.mark.integtest
+def test_pmx_cmd_check_voltage_current_setting(tcp_emulator):
+    cmd = create_command()
+    tcp_emulator.define_responses({'VOLT?': '2',
+                                   'CURR?': '1'})
+
+    _, volt, curr = cmd.user_input('VCS?')
+    assert volt == 2
+    assert curr == 1
+
+
+@pytest.mark.integtest
 def test_pmx_cmd_check_output(tcp_emulator):
     cmd = create_command()
     tcp_emulator.define_responses({'OUTP?': '0'})
