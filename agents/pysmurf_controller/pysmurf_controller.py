@@ -259,7 +259,7 @@ class PysmurfController:
 
     def check_state(self, session, params=None):
         """check_state()
-        
+
         **Task** - Task to check the current state of the smurf. This will will
         not modify the smurf state, so this task can be run in conjunction with
         other smurf operations. This operation will put state variables into
@@ -270,7 +270,7 @@ class PysmurfController:
         d = session.data
         d['channel_mask'] = S.get_channel_mask().tolist()
         d['downsample_factor'] = S.get_downsample_factor()
-        d['open_datfile'] = S.get_streaming_file_open()
+        #d['open_datfile'] = S.get_streaming_file_open()
 
         reg = sdl.Registers(S)
         d['agg_time'] = reg.agg_time.get()
@@ -282,6 +282,8 @@ class PysmurfController:
         return True, "Finished checking state"
 
     @ocs_agent.param("duration", default=None, type=float)
+    @ocs_agent.param('kwargs', default=None)
+    @ocs_agent.param('load_tune', default=True, type=bool)
     def stream(self, session, params):
         """stream(duration=None)
 
@@ -295,17 +297,21 @@ class PysmurfController:
             If set, determines how many seconds to stream data. By default,
             will leave stream open until stop function is called.
         """
+        if params['kwargs'] is None:
+            params['kwargs'] = {}
+
         with self.lock.acquire_timeout(0, job='stream') as acquired:
             if not acquired:
                 return False, f"Operation failed: {self.lock.job} is running."
 
-            S, cfg = self._get_smurf_control(session=session)
+            S, cfg = self._get_smurf_control(session=session,
+                                             load_tune=params['load_tune'])
 
             stop_time = None
             if params['duration'] is not None:
                 stop_time = time.time() + params['duration']
 
-            session.data['sid'] = sdl.stream_g3_on(S)
+            session.data['sid'] = sdl.stream_g3_on(S, **params['kwargs'])
             session.set_status('running')
             while session.status in ['starting', 'running']:
                 if stop_time is not None:
@@ -377,7 +383,7 @@ class PysmurfController:
             3. Tracking setup
             4. Noise check
 
-        See the `sodetlib relock docs 
+        See the `sodetlib relock docs
         <https://simons1.princeton.edu/docs/sodetlib/operations/setup.html#relocking>`_
         for more information on the sodetlib relock procedure and allowed
         keyword arguments.
