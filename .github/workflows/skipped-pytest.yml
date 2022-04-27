@@ -1,0 +1,17 @@
+name: Run Tests
+
+on:
+  push:
+    branches-ignore: [ develop ]
+    paths:
+      - 'docs/**'
+      - '*.rst'
+      - '*.md'
+
+jobs:
+  test:
+    name: pytest with coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - run: 'echo "No build required" '
