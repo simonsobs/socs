@@ -3,6 +3,10 @@ name: Build Develop Images
 on:
   push:
     branches: [ develop ]
+    paths-ignore:
+      - 'docs/**'
+      - '*.rst'
+      - '*.md'
 
 jobs:
   test:

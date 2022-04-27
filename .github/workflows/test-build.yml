@@ -2,6 +2,10 @@ name: Test Docker Build
 
 on:
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '*.rst'
+      - '*.md'
 
 jobs:
   build:
