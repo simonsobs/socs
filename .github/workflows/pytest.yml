@@ -49,10 +49,6 @@ jobs:
         docker-compose build socs
 
     # Integration Tests
-    - name: Build images for integration tests
-      run: |
-        docker-compose build ocs-lakeshore372-simulator
-
     - name: Run integration tests
       working-directory: ./tests
       run: |
