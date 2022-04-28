@@ -266,7 +266,7 @@ class PysmurfController:
     def check_state(self, session, params=None):
         """check_state(poll_interval=10)
 
-        **Process** - Process to check the current state of the smurf. This
+        **Process** - Continuously checks the current state of the smurf. This
         will not modify the smurf state, so this task can be run in conjunction
         with other smurf operations. This will continuously poll smurf metadata
         and update the ``session.data`` object. 
@@ -328,9 +328,9 @@ class PysmurfController:
     def stream(self, session, params):
         """stream(duration=None)
 
-        **Process** - Process to stream smurf data. If a duration is specified,
-        stream will end after that amount of time. If unspecified, the stream
-        will run until the stop function is called.
+        **Process** - Stream smurf data. If a duration is specified, stream
+        will end after that amount of time. If unspecified, the stream will run
+        until the stop function is called.
 
         Args
         -----
@@ -383,8 +383,8 @@ class PysmurfController:
     def uxm_setup(self, session, params):
         """uxm_setup(bands=None, kwargs=None)
 
-        **Task** - Task to run first-time setup procedure for a UXM. This
-        will run the following operations:
+        **Task** - Runs first-time setup procedure for a UXM. This will run the
+        following operations:
 
             1. Setup Amps (~1 min)
             2. Estimate attens if attens are not already set in the device cfg
@@ -458,8 +458,8 @@ class PysmurfController:
     def uxm_relock(self, session, params):
         """uxm_relock(bands=None, kwargs=None)
 
-        **Task** - Task to relock detectors to existing tune if setup has
-        already been run. Runs the following operations:
+        **Task** - Relocks detectors to existing tune if setup has already been
+        run. Runs the following operations:
 
             1. Setup Amps (~1 min)
             2. Relocks detectors, setup notches (if requested), and serial
@@ -520,9 +520,9 @@ class PysmurfController:
     def take_noise(self, session, params):
         """take_noise(duration=30., kwargs=None)
 
-        **Task** - Task to take a short timestream and calculate noise
-        statistics. Median white noise level for each band will be stored in
-        the session data. See the `sodetlib noise docs 
+        **Task** - Takes a short timestream and calculates noise statistics.
+        Median white noise level for each band will be stored in the session
+        data. See the `sodetlib noise docs 
         <https://simons1.princeton.edu/docs/sodetlib/noise.html>`_ for more
         information on the noise function and possible keyword arguments.
 
@@ -612,9 +612,9 @@ class PysmurfController:
     def take_iv(self, session, params):
         """take_iv(kwargs=None)
 
-        Takes an IV. This will add the normal resistance array and channel info
-        to the session data object along with the analyzed IV filepath.
-        See the `sodetlib IV docs page
+        **Task** - Takes an IV. This will add the normal resistance array and
+        channel info to the session data object along with the analyzed IV
+        filepath. See the `sodetlib IV docs page
         <https://simons1.princeton.edu/docs/sodetlib/operations/iv.html>`_
         for more information on what additional keyword arguments can be passed
         in.
@@ -660,8 +660,8 @@ class PysmurfController:
     def take_bias_steps(self, session, params):
         """take_bias_steps(kwargs=None)
 
-        Takes bias_steps and saves the output filepath to the session data
-        object. See the `sodetlib bias step docs page
+        **Task** - Takes bias_steps and saves the output filepath to the
+        session data object. See the `sodetlib bias step docs page
         <https://simons1.princeton.edu/docs/sodetlib/operations/bias_steps.html>`_
         for more information on bias steps and what kwargs can be passed in.
 
@@ -703,12 +703,12 @@ class PysmurfController:
     def bias_dets(self, session, params):
         """bias_dets(rfrac=(0.3, 0.6), kwargs=None)
 
-        Biases detectors to a target Rfrac value or range. This function uses
-        IV results to determine voltages for each bias-group. If rfrac is set
-        to be a value, the bias voltage will be set such that the median rfrac
-        across all channels is as close as possible to the set value. If a
-        range is specified, the voltage will be chosen to maximize the number
-        of channels in that range.
+        **Task** - Biases detectors to a target Rfrac value or range. This
+        function uses IV results to determine voltages for each bias-group. If
+        rfrac is set to be a value, the bias voltage will be set such that the
+        median rfrac across all channels is as close as possible to the set
+        value. If a range is specified, the voltage will be chosen to maximize
+        the number of channels in that range.
 
         See the sodetlib docs page for `biasing dets into transition
         <https://simons1.princeton.edu/docs/sodetlib/operations/iv.html#biasing-detectors-into-transition>`_
