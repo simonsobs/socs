@@ -658,8 +658,23 @@ class ACUAgent:
         # Wait for telescope to start moving
         self.log.info('Moving to commanded position')
         yield dsleep(5)
+        elapsed_wait_for_motion = 0.0
         while mdata['Azimuth_current_velocity'] == 0.0 and\
                 mdata['Elevation_current_velocity'] == 0.0:
+            if elapsed_wait_for_motion < 30.:
+                yield dsleep(wait_for_motion)
+                elapsed_wait_for_motion = time.time() - wait_for_motion_start
+                mdata = self.data['status']['summary']
+            else:
+                if round(mdata['Azimuth_current_position'], 1) == az and \
+                round(mdata['Elevation_current_position'], 1) == el:
+                    yield self.acu_control.stop()
+                    self.set_job_done('control')
+                    return True, 'Pointing completed'
+                else:
+                    yield self.acu_control.stop()
+                    self.set_job_done('control')
+                    return False, 'Motion never occurred!'
             yield dsleep(wait_for_motion)
             mdata = self.data['status']['summary']
         moving = True
@@ -777,6 +792,7 @@ class ACUAgent:
     @inlineCallbacks
     def fromfile_scan(self, session, params=None):
         filename = params.get('filename')
+        simulator = params.get('simulator')
         times, azs, els, vas, ves, azflags, elflags = sh.from_file(filename)
         if min(azs) <= self.motion_limits['azimuth']['lower'] or max(azs) >= self.motion_limits['azimith']['upper']:
             return False, 'Azimuth location out of range!'
@@ -793,6 +809,7 @@ class ACUAgent:
         acc = params.get('acc')
         ntimes = params.get('ntimes')
         azonly = params.get('azonly')
+        simulator = params.get('simulator')
         if abs(acc) > self.motion_limits['acc']:
             return False, 'Acceleration too great!'
         if min(azpts) <= self.motion_limits['azimuth']['lower'] or max(azpts) >= self.motion_limits['azimuth']['upper']:
@@ -800,11 +817,11 @@ class ACUAgent:
         if el <= self.motion_limits['elevation']['lower'] or el >= self.motion_limits['elevation']['upper']:
             return False, 'Elevation location out of range!'
         times, azs, els, vas, ves, azflags, elflags = sh.constant_velocity_scanpoints(azpts, el, azvel, acc, ntimes)
-        yield self.run_specified_scan(session, times, azs, els, vas, ves, azflags, elflags, azonly)
+        yield self.run_specified_scan(session, times, azs, els, vas, ves, azflags, elflags, azonly, simulator)
         return True, 'Track completed.'
 
     @inlineCallbacks
-    def run_specified_scan(self, session, times, azs, els, vas, ves, azflags, elflags, azonly):
+    def run_specified_scan(self, session, times, azs, els, vas, ves, azflags, elflags, azonly, simulator):
         """TASK run_specified_scan
 
         Upload and execute a scan pattern. The pattern may be specified by a
@@ -846,7 +863,10 @@ class ACUAgent:
         m = yield self.acu_control.mode()
         print(m)
         self.log.info('mode is now ProgramTrack')
-        group_size = 120
+        if simulator == True:
+            group_size = len(all_lines)
+        else:
+            group_size = 120
         spec = {'times': times,
                 'azs': azs,
                 'els': els,
