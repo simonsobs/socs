@@ -6,6 +6,8 @@ on:
       - 'docs/**'
       - '*.rst'
       - '*.md'
+      - '.flake8'
+      - '.pre-commit-config.yaml'
 
 jobs:
   test:
