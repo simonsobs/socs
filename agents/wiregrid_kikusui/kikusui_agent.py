@@ -408,15 +408,35 @@ class WiregridKikusuiAgent:
             ret, msg = self._check_connect()
             if not ret:
                 msg = 'Could not get c,v because of failure of connection.'
+                self.log.warn(msg)
             else:
                 v_val, c_val = self.cmd.user_input('VC?')
                 s_msg, s_val = self.cmd.user_input('O?')
 
-            # self.log.info('Get voltage/current message: {}'.format(msg))
-            # self.log.info('Get status message: {}'.format(s_msg))
             return True,\
                 'Get Kikusui voltage / current: {} V / {} A [status={}]'\
                 .format(v_val, c_val, s_val)
+
+    def get_angle(self, session, params=None):
+        """get_angle()
+
+        **Task** - Show wire-grid rotaiton angle [deg].
+
+        """
+        with self.lock.acquire_timeout(timeout=5, job='get_angle') as acquired:
+            if not acquired:
+                self.log.warn(
+                    'Could not run get_angle() because {} is already running'
+                    .format(self.lock.job))
+                return False, 'Could not acquire lock'
+
+            angle = self._get_position()
+            if angle < 0.:
+                return False,\
+                    'Could not get the angle of the wire-grid rotation.'
+
+            return True,\
+                'Get wire-grid rotation angle = {} deg'.format(angle)
 
     @ocs_agent.param('storepath', default='/data/wg-data/action/', type=str)
     def calibrate_wg(self, session, params):
@@ -688,6 +708,7 @@ if __name__ == '__main__':
     agent.register_task('set_c', kikusui_agent.set_c)
     agent.register_task('set_v', kikusui_agent.set_v)
     agent.register_task('get_vc', kikusui_agent.get_vc)
+    agent.register_task('get_angle', kikusui_agent.get_angle)
     agent.register_task('calibrate_wg', kikusui_agent.calibrate_wg)
     agent.register_task('stepwise_rotation',
                         kikusui_agent.stepwise_rotation)
