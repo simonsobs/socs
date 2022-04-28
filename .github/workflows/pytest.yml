@@ -3,7 +3,11 @@ name: Run Tests
 on:
   push:
     branches-ignore: [ develop ]
-  pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '*.rst'
+      - '*.md'
+  workflow_call:
 
 jobs:
   test:
