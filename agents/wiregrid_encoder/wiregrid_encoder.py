@@ -48,6 +48,7 @@ class WiregridEncoderAgent:
 
         self.bbport = bbport
 
+        # Stored previous rising_edge_count and irig_time
         self.rising_edge_count = 0
         self.irig_time = 0
 
@@ -71,36 +72,33 @@ class WiregridEncoderAgent:
             The most recent data collected is stored in session.data in the
             structure::
 
-                IRIG data case:
-                    >>> response.session['data']
-                    {'fields':
-                        {
-                         'irig_time': computure unix time
-                                      in receiving the IRIG packet,
-                         'rising_edge_count': PRU clock (BBB clock) count,
-                         'edge_diff': Difference of PRU clock
-                                      from the previous IRIG data,
-                         'irig_sec': IRIG second,
-                         'irig_min': IRIG minuite,
-                         'irig_hour': IRIG hour,
-                         'irig_day': IRIG Day,
-                         'irig_year': IRIG Year
+                >>> response.session['data']
+                {'fields': {
+                    'irig_data':{
+                        'last_updated':timestamp,
+                        'irig_time': computure unix time
+                                     in receiving the IRIG packet,
+                        'rising_edge_count': PRU clock (BBB clock) count,
+                        'edge_diff': Difference of PRU clock
+                                     from the previous IRIG data,
+                        'irig_sec': IRIG second,
+                        'irig_min': IRIG minuite,
+                        'irig_hour': IRIG hour,
+                        'irig_day': IRIG Day,
+                        'irig_year': IRIG Year
                         },
-                     'timestamp':1601925677.6914878
-                    }
-
-                Encoder data case:
-                    >>> response.session['data']
-                    {'fields':
-                        {
-                         'quadrature' (list):  quadrature encoder signals,
-                         'pru_clock' (list): PRU clock (Beaglebone clock) ,
-                         'reference_degree' (list): Encoder rotation position
-                                                    [deg.],
-                         'error' (list): Encoder error flags
+                    'encoder_data':{
+                        'last_updated':timestamp,
+                        'quadrature' (list):  quadrature encoder signals,
+                        'pru_clock' (list): PRU clock (Beaglebone clock) ,
+                        'reference_degree' (list):
+                            Encoder rotation position [deg.],
+                        'error' (list): Encoder error flags
                         },
-                     'timestamp':1601925677.6914878
-                    }
+                    },
+                'timestamp':
+                    timestamp when it updates the irig or encoder data
+                }
         """
 
         time_encoder_published = 0
@@ -124,7 +122,45 @@ class WiregridEncoderAgent:
             session.set_status('running')
 
             self.take_data = True
-            session.data = {'fields': {}}
+            # Initialize data containers
+            session.data = {'fields': {'irig_data': {}, 'encoder_data': {},
+                            'timestamp': 0}}
+            irig_rdata = {'timestamp': 0,
+                          'block_name': 'wgencoder_irig',
+                          'data': {
+                              'irig_time':0, 
+                              'rising_edge_count':0, 
+                              'edge_diff':0,
+                              'irig_sec':0,
+                              'irig_min':0,
+                              'irig_hour':0,
+                              'irig_day':0,
+                              'irig_year':0,
+                              }
+                          }
+            irig_last_updated = 0
+            irig_fdata = {'timestamps': [],
+                          'block_name': 'wgencoder_irig_raw',
+                          'data': {
+                              'quadrature':[],
+                              'pru_clock':[],
+                              'reference_degree':[],
+                              'error':[]
+                              }
+                          }
+            enc_rdata = {
+                'timestamps': [],
+                'block_name': 'wgencoder_rough',
+                'data': {}
+            }
+            enc_last_updated = 0
+            enc_fdata = {
+                'timestamps': [],
+                'block_name': 'wgencoder_full',
+                'data': {}
+            }
+
+            # Loop
             while self.take_data:
 
                 try:
@@ -135,8 +171,12 @@ class WiregridEncoderAgent:
                     with open('parse_error.log', 'a') as f:
                         traceback.print_exc(file=f)
 
+                # Check current time
+                current_time = time.time()
+
                 # IRIG part mainly takes over CHWP scripts by H.Nishino
                 if len(self.parser.irig_queue):
+                    irig_last_updated = current_time
                     irig_data = self.parser.irig_queue.popleft()
 
                     rising_edge_count = irig_data[0]
@@ -145,24 +185,20 @@ class WiregridEncoderAgent:
                     synch_pulse_clock_counts = irig_data[3]
                     sys_time = irig_data[4]
 
-                    irg_rdata = {'timestamp': sys_time,
-                                 'block_name': 'wgencoder_irig',
-                                 'data': {}}
-
-                    irg_rdata['data']['irig_time'] = irig_time
-                    irg_rdata['data']['rising_edge_count'] = rising_edge_count
-                    irg_rdata['data']['edge_diff']\
+                    irig_rdata['data']['irig_time'] = irig_time
+                    irig_rdata['data']['rising_edge_count'] = rising_edge_count
+                    irig_rdata['data']['edge_diff']\
                         = rising_edge_count - self.rising_edge_count
-                    irg_rdata['data']['irig_sec']\
+                    irig_rdata['data']['irig_sec']\
                         = self.parser.de_irig(irig_info[0], 1)
-                    irg_rdata['data']['irig_min']\
+                    irig_rdata['data']['irig_min']\
                         = self.parser.de_irig(irig_info[1], 0)
-                    irg_rdata['data']['irig_hour']\
+                    irig_rdata['data']['irig_hour']\
                         = self.parser.de_irig(irig_info[2], 0)
-                    irg_rdata['data']['irig_day']\
+                    irig_rdata['data']['irig_day']\
                         = self.parser.de_irig(irig_info[3], 0)\
                         + self.parser.de_irig(irig_info[4], 0) * 100
-                    irg_rdata['data']['irig_year']\
+                    irig_rdata['data']['irig_year']\
                         = self.parser.de_irig(irig_info[5], 0)
 
                     # Beagleboneblack clock frequency measured by IRIG
@@ -172,43 +208,29 @@ class WiregridEncoderAgent:
                             / (irig_time - self.irig_time)
                     else:
                         bbb_clock_freq = 0.
-                    irg_rdata['data']['bbb_clock_freq'] = bbb_clock_freq
+                    irig_rdata['data']['bbb_clock_freq'] = bbb_clock_freq
 
-                    self.agent.publish_to_feed('wgencoder_rough', irg_rdata)
-                    # store session.data
-                    field_dict = {
-                        'irig_time': irig_time,
-                        'rising_edge_count': rising_edge_count,
-                        'edge_diff': irg_rdata['data']['edge_diff'],
-                        'irig_sec': irg_rdata['data']['irig_sec'],
-                        'irig_min': irg_rdata['data']['irig_min'],
-                        'irig_hour': irg_rdata['data']['irig_hour'],
-                        'irig_day': irg_rdata['data']['irig_day'],
-                        'irig_year': irg_rdata['data']['irig_year']
-                        }
-                    session.data['timestamp'] = sys_time
-                    session.data['fields'] = field_dict
+                    self.agent.publish_to_feed('wgencoder_rough', irig_rdata)
 
                     self.rising_edge_count = rising_edge_count
                     self.irig_time = irig_time
 
                     # saving clock counts for every refernce edge
                     # and every irig bit info
-                    irg_fdata = {'timestamps': [],
-                                 'block_name': 'wgencoder_irig_raw',
-                                 'data': {}}
                     # 0.09: time difference in seconds b/w reference marker and
                     #       the first index marker
-                    irg_fdata['timestamps'] =\
+                    irig_fdata['timestamps'] =\
                         sys_time + 0.09 + np.arange(10) * 0.1
-                    irg_fdata['data']['irig_synch_pulse_clock_time'] =\
+                    irig_fdata['data']['irig_synch_pulse_clock_time'] =\
                         list(irig_time + 0.09 + np.arange(10) * 0.1)
-                    irg_fdata['data']['irig_synch_pulse_clock_counts'] =\
+                    irig_fdata['data']['irig_synch_pulse_clock_counts'] =\
                         synch_pulse_clock_counts
-                    irg_fdata['data']['irig_info'] = list(irig_info)
-                    self.agent.publish_to_feed('wgencoder_full', irg_fdata)
+                    irig_fdata['data']['irig_info'] = list(irig_info)
+                    self.agent.publish_to_feed('wgencoder_full', irig_fdata)
+                    # End of IRIG case
 
                 if len(self.parser.encoder_queue):
+                    enc_last_updated = current_time
                     encoder_data = self.parser.encoder_queue.popleft()
 
                     quad_data += encoder_data[0].tolist()
@@ -235,23 +257,6 @@ class WiregridEncoderAgent:
 
                     rot_speed.append(dcount[-1]/dclock[-1])
 
-                    current_time = time.time()
-
-                    shared_time = received_time_list[-1]
-                    shared_position = ref_count[-1]
-
-                    enc_rdata = {
-                        'timestamps': [],
-                        'block_name': 'wgencoder_rough',
-                        'data': {}
-                    }
-
-                    enc_fdata = {
-                        'timestamps': [],
-                        'block_name': 'wgencoder_full',
-                        'data': {}
-                    }
-
                     if len(pru_clock) > NUM_ENCODER_TO_PUBLISH \
                         or (len(pru_clock)
                             and (current_time - time_encoder_published)
@@ -270,17 +275,6 @@ class WiregridEncoderAgent:
                         enc_rdata['data']['rotation_speed'] = rot_speed  # Hz
                         self.agent.publish_to_feed(
                             'wgencoder_rough', enc_rdata)
-                        # store session.data
-                        field_dict = {
-                            'quadrature': enc_rdata['data']['quadrature'],
-                            'pru_clock': enc_rdata['data']['pru_clock'],
-                            'reference_degree':
-                                enc_rdata['data']['reference_degree'],
-                            'error': enc_rdata['data']['error'],
-                            }
-                        session.data['timestamps'] = received_time_list
-                        session.data['fields'] = field_dict
-
                         enc_fdata['timestamps'] =\
                             count2time(pru_clock, received_time_list[0])
                         enc_fdata['data']['quadrature'] = quad_data
@@ -302,16 +296,45 @@ class WiregridEncoderAgent:
                         time_encoder_published = current_time
 
                         time.sleep(SLEEP)
+                        # End of filling encoder data
+                    # End of encoder case
+
+                # store session.data
+                irig_field_dict = {
+                    'last_updated': irig_last_updated,
+                    'irig_time': irig_rdata['data']['irig_time'],
+                    'rising_edge_count':
+                        irig_rdata['data']['rising_edge_count'],
+                    'edge_diff': irig_rdata['data']['edge_diff'],
+                    'irig_sec': irig_rdata['data']['irig_sec'],
+                    'irig_min': irig_rdata['data']['irig_min'],
+                    'irig_hour': irig_rdata['data']['irig_hour'],
+                    'irig_day': irig_rdata['data']['irig_day'],
+                    'irig_year': irig_rdata['data']['irig_year']
+                    }
+                enc_field_dict = {
+                    'last_updated': enc_last_updated,
+                    'quadrature': enc_rdata['data']['quadrature'],
+                    'pru_clock': enc_rdata['data']['pru_clock'],
+                    'reference_degree':
+                        enc_rdata['data']['reference_degree'],
+                    'error': enc_rdata['data']['error']
+                    }
+                session.data['timestamp'] = current_time
+                session.data['fields']['irig_data'] = irig_field_dict
+                session.data['fields']['enc_data'] = enc_field_dict
 
                 ''' Should be removed
                 with open('/data/wg-data/position.log', 'w') as f:
                     f.write(str(shared_time)+' '+str(shared_position)+'\n')
                     f.flush()
                 '''
+                # End of loop
+            # End of lock acquiring
 
         self.agent.feeds['wgencoder_rough'].flush_buffer()
         # This buffer (full data) has huge data size.
-        # self.agent.feeds['wgencoder_full'].flush_buffer()
+        self.agent.feeds['wgencoder_full'].flush_buffer()
 
         return True, 'Acquisition exited cleanly.'
 
