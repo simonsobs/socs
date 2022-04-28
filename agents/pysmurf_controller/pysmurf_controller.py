@@ -296,23 +296,30 @@ class PysmurfController:
         reg = sdl.Registers(S)
 
         session.set_status('running')
+        kw = {'retry_on_fail': False}
         while session.status in ['starting', 'running']:
-            d = dict(
-                channel_mask = S.get_channel_mask(),
-                downsample_factor = S.get_downsample_factor(),
-                agg_time = reg.agg_time.get(),
-                open_g3stream = reg.open_g3stream.get(),
-                pysmurf_action = reg.pysmurf_action.get(),
-                pysmurf_action_timestamp = reg.pysmurf_action_timestamp.get(),
-                stream_tag = reg.stream_tag.get(),
-                last_update = time.time()
-            )
-            session.data.update(d)
+            try:
+                d = dict(
+                    channel_mask = S.get_channel_mask(**kw),
+                    downsample_factor = S.get_downsample_factor(**kw),
+                    agg_time = reg.agg_time.get(**kw),
+                    open_g3stream = reg.open_g3stream.get(**kw),
+                    pysmurf_action = reg.pysmurf_action.get(**kw),
+                    pysmurf_action_timestamp = reg.pysmurf_action_timestamp.get(**kw),
+                    stream_tag = reg.stream_tag.get(**kw),
+                    last_update = time.time()
+                )
+                session.data.update(d)
+            except RuntimeError:
+                self.log.warn("Could not connect to epics server! Waiting and "
+                              "then trying again")
+
             time.sleep(params['poll_interval'])
 
         return True, "Finished checking state"
 
     def _stop_check_state(self, session, params):
+        """Stopper for check state process"""
         session.set_status('stopping')
 
     @ocs_agent.param("duration", default=None, type=float)
