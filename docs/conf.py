@@ -98,6 +98,8 @@ autodoc_mock_imports = ['spt3g',
                         'pfeiffer_vacuum_protocol.pfeiffer_vacuum_protocol',
                         'pfeiffer_tc400_driver',
                         'sodetlib',
+                        'sodetlib.operations',
+                        'sodetlib.det_config',
                         ]
 from unittest import mock
 for m in autodoc_mock_imports:
