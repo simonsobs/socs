@@ -57,6 +57,7 @@ named ``ocs-pysmurf-monitor`` might look something like::
             OCS_CONFIG_DIR: /config
             EPICS_CA_ADDR_LIST: 127.255.255.255
             EPICS_CA_MAX_ARRAY_BYTES: 80000000
+            SLOT: 2
         volumes:
             - ${OCS_CONFIG_DIR}:/config
             - /data:/data

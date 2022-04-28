@@ -1,6 +1,5 @@
 from twisted.internet import reactor, protocol, threads
 from twisted.python.failure import Failure
-from twisted.internet.error import ProcessDone, ProcessTerminated
 from twisted.internet.defer import inlineCallbacks, Deferred
 from autobahn.twisted.util import sleep as dsleep
 from twisted.logger import Logger, FileLogObserver
@@ -9,7 +8,7 @@ import matplotlib
 matplotlib.use('Agg')
 import sodetlib as sdl
 from sodetlib.operations import (
-    uxm_setup, uxm_relock, bias_steps, iv, tracking, bias_dets
+    uxm_setup, uxm_relock, bias_steps, iv, bias_dets
 )
 from sodetlib.det_config import DetConfig
 import numpy as np
@@ -23,6 +22,9 @@ import argparse
 from ocs import ocs_agent, site_config
 from ocs.ocs_agent import log_formatter
 from ocs.ocs_twisted import TimeoutLock
+
+
+NBIASLINES = 12
 
 
 class PysmurfScriptProtocol(protocol.ProcessProtocol):
@@ -95,6 +97,8 @@ class PysmurfController:
             protocol used to call and monitor external pysmurf scripts
         lock (ocs.ocs_twisted.TimeoutLock):
             lock to protect multiple pysmurf scripts from running simultaneously.
+        slot (int):
+            ATCA Slot of the smurf-card this agent is commanding.
     """
     def __init__(self, agent, args):
         self.agent: ocs_agent.OCSAgent = agent
@@ -130,13 +134,13 @@ class PysmurfController:
                     if isinstance(data['payload'], str):
                         self.current_session.add_message(data['payload'])
 
-    def _get_smurf_control(self, session=None, load_tune=True):
+    def _get_smurf_control(self, session=None, load_tune=True, **kwargs):
         """
         Gets pysmurf and det-config instances for sodetlib functions.
         """
         cfg = DetConfig()
         cfg.load_config_files(slot=self.slot)
-        S = cfg.get_smurf_control()
+        S = cfg.get_smurf_control(**kwargs)
         if load_tune:
             S.load_tune(cfg.dev.exp['tunefile'])
         S._ocs_session = session
@@ -233,7 +237,8 @@ class PysmurfController:
 
             This would result in the following session.data object::
 
-                >>> {
+                >>> response.session['data']
+                {
                     'datafile': '/data/smurf_data/20200316/1584401673/outputs/1584402020.dat',
                     'active_channels': [0,1,2,3,4]
                 }
@@ -257,29 +262,58 @@ class PysmurfController:
         self.prot.transport.signalProcess('KILL')
         return True, "Aborting process"
 
+    @ocs_agent.param('poll_interval', type=float, default=10)
     def check_state(self, session, params=None):
-        """check_state()
+        """check_state(poll_interval=10)
 
-        **Task** - Task to check the current state of the smurf. This will will
-        not modify the smurf state, so this task can be run in conjunction with
-        other smurf operations. This operation will put state variables into
-        the ``session.data`` object.
+        **Process** - Process to check the current state of the smurf. This
+        will not modify the smurf state, so this task can be run in conjunction
+        with other smurf operations. This will continuously poll smurf metadata
+        and update the ``session.data`` object. 
+
+        Args
+        -----
+        poll_interval : float
+            Time (sec) between updates.
+
+        Notes
+        -------
+        The following data will be written to the session.data object::
+
+            >> response.session['data']
+            {
+                'channel_mask': Array of channels that are streaming data,
+                'downsample_factor': downsample_factor,
+                'agg_time': Buffer time per G3Frame (sec),
+                'open_g3stream': True if data is currently streaming to G3,
+                'pysmurf_action': Current pysmurf action,
+                'pysmurf_action_timestamp': Current pysmurf-action timestamp,
+                'stream_tag': stream-tag for the current g3 stream,
+                'last_update':  Time that session-data was last updated,
+            }
         """
-        S, _ = self._get_smurf_control(load_tune=False)
-
-        d = session.data
-        d['channel_mask'] = S.get_channel_mask().tolist()
-        d['downsample_factor'] = S.get_downsample_factor()
-        #d['open_datfile'] = S.get_streaming_file_open()
-
+        S, _ = self._get_smurf_control(load_tune=False, no_dir=True)
         reg = sdl.Registers(S)
-        d['agg_time'] = reg.agg_time.get()
-        d['open_g3stream'] = reg.open_g3stream.get()
-        d['pysmurf_action'] = reg.pysmurf_action.get()
-        d['pysmurf_action_timestamp'] = reg.pysmurf_action_timestamp.get()
-        d['stream_tag'] = reg.stream_tag.get()
+
+        session.set_status('running')
+        while session.status in ['starting', 'running']:
+            d = dict(
+                channel_mask = S.get_channel_mask(),
+                downsample_factor = S.get_downsample_factor(),
+                agg_time = reg.agg_time.get(),
+                open_g3stream = reg.open_g3stream.get(),
+                pysmurf_action = reg.pysmurf_action.get(),
+                pysmurf_action_timestamp = reg.pysmurf_action_timestamp.get(),
+                stream_tag = reg.stream_tag.get(),
+                last_update = time.time()
+            )
+            session.data.update(d)
+            time.sleep(params['poll_interval'])
 
         return True, "Finished checking state"
+
+    def _stop_check_state(self, session, params):
+        session.set_status('stopping')
 
     @ocs_agent.param("duration", default=None, type=float)
     @ocs_agent.param('kwargs', default=None)
@@ -296,6 +330,16 @@ class PysmurfController:
         duration : float, optional
             If set, determines how many seconds to stream data. By default,
             will leave stream open until stop function is called.
+
+        Notes
+        ------
+        The following data will be written to the session.data object::
+
+            >> response.session['data']
+            {
+                'stream_id': Stream-id for the slot,
+                'sid': Session-id for the streaming session,
+            }
         """
         if params['kwargs'] is None:
             params['kwargs'] = {}
@@ -311,6 +355,7 @@ class PysmurfController:
             if params['duration'] is not None:
                 stop_time = time.time() + params['duration']
 
+            session.data['stream_id']
             session.data['sid'] = sdl.stream_g3_on(S, **params['kwargs'])
             session.set_status('running')
             while session.status in ['starting', 'running']:
@@ -334,12 +379,13 @@ class PysmurfController:
         **Task** - Task to run first-time setup procedure for a UXM. This
         will run the following operations:
 
-            1. Setup Amps
-            2. Estimate attens
-            3. Estimate phase delay
-            4. Setup tune
-            5. setup tracking params
-            6. Measure noise
+            1. Setup Amps (~1 min)
+            2. Estimate attens if attens are not already set in the device cfg
+               (~1 min / band)
+            3. Estimate phase delay (~1 min / band)
+            4. Setup tune (~7 min / band)
+            5. Setup tracking param (~30s / band)
+            6. Measure noise (~45s)
 
         See the `sodetlib setup docs
         <https://simons1.princeton.edu/docs/sodetlib/operations/setup.html#first-time-setup>`_
@@ -353,6 +399,32 @@ class PysmurfController:
         kwargs : dict
             Dict containing additional keyword args to pass to the uxm_setup
             function.
+
+        Notes
+        -------
+        SODETLIB functions such as ``uxm_setup`` and any other functions called
+        by ``uxm_setup`` will add relevant data to the ``session.data`` object
+        to  a unique key. For example, if all is successful ``session.data``
+        may look like::
+
+            >> response.session['data']
+            {
+                'timestamps': [('setup_amps', 1651162263.0204525), ...],
+                'setup_amps_summary': {
+                   'success': True,
+                   'amp_50k_Id': 15.0,
+                   'amp_hemt_Id': 8.0,
+                   'amp_50k_Vg': -0.52,
+                   'amp_hemt_Vg': -0.829,
+                },
+                'setup_phase_delay': {
+                    'bands': [0, 1, ...]
+                    'band_delay_us': List of band delays
+                },
+                'noise': {
+                   'band_medians': List of median white noise for each band
+                }
+            }
         """
         if params['kwargs'] is None:
             params['kwargs'] = {}
@@ -367,7 +439,12 @@ class PysmurfController:
             success, summary = uxm_setup.uxm_setup(
                 S, cfg, bands=params['bands'], **params['kwargs']
             )
-            return success, "Finished UXM-setup procedure"
+
+            if not success:
+                final_step = session.data['timestamps'][-1][0]
+                return False, f"Failed on step {final_step}"
+            else:
+                return True, "Completed full UXM-Setup procedure"
 
     @ocs_agent.param('bands', default=None)
     @ocs_agent.param('kwargs', default=None)
@@ -377,11 +454,11 @@ class PysmurfController:
         **Task** - Task to relock detectors to existing tune if setup has
         already been run. Runs the following operations:
 
-            1. Setup Amps
+            1. Setup Amps (~1 min)
             2. Relocks detectors, setup notches (if requested), and serial
-               gradient descent / eta scan
-            3. Tracking setup
-            4. Noise check
+               gradient descent / eta scan (~5 min / band)
+            3. Tracking setup (~20s / band)
+            4. Noise check (~45s)
 
         See the `sodetlib relock docs
         <https://simons1.princeton.edu/docs/sodetlib/operations/setup.html#relocking>`_
@@ -395,6 +472,27 @@ class PysmurfController:
         kwargs : dict
             Dict containing additional keyword args to pass to the uxm_relock
             function.
+
+        Notes
+        -------
+        SODETLIB functions such as ``uxm_relock`` and any other functions called
+        will add relevant data to the ``session.data`` object to  a unique key.
+        For example, if all is successful ``session.data`` may look like::
+
+            >> response.session['data']
+            {
+                'timestamps': [('setup_amps', 1651162263.0204525), ...],
+                'setup_amps_summary': {
+                   'success': True,
+                   'amp_50k_Id': 15.0,
+                   'amp_hemt_Id': 8.0,
+                   'amp_50k_Vg': -0.52,
+                   'amp_hemt_Vg': -0.829,
+                },
+                'noise': {
+                   'band_medians': List of median white noise for each band
+                }
+            }
         """
         if params['kwargs'] is None:
             params['kwargs'] = {}
@@ -428,6 +526,18 @@ class PysmurfController:
         kwargs : dict
             Dict containing additional keyword args to pass to the take_noise
             function.
+
+        Notes
+        -------
+        Median white noise levels for each band will be stored in the
+        session.data object, for example::
+
+            >> response.session['data']
+            {
+                'noise': {
+                   'band_medians': List of median white noise for each band
+                }
+            }
         """
         if params['kwargs'] is None:
             params['kwargs'] = {}
@@ -456,6 +566,19 @@ class PysmurfController:
         ----
         kwargs : dict
             Additional kwargs to pass to take_bgmap function.
+
+        Notes
+        ------
+        The filepath of the BiasStepAnalysis object and the number of channels
+        assigned to each bias group will be written to the session.data
+        object::
+
+            >> response.session['data']
+            {
+                'nchans_per_bg': [123, 183, 0, 87, ...],
+                'filepath': /path/to/bias_step_file/on/smurf_server.npy,
+            }
+
         """
         if params['kwargs'] is None:
             params['kwargs'] = {}
@@ -467,8 +590,8 @@ class PysmurfController:
             session.set_status('running')
             S, cfg = self._get_smurf_control(session=session)
             bsa = bias_steps.take_bgmap(S, cfg, **params['kwargs'])
-            nchans_per_bg = [0 for _ in range(13)]
-            for bg in range(12):
+            nchans_per_bg = [0 for _ in range(NBIASLINES + 1)]
+            for bg in range(NBIASLINES):
                 nchans_per_bg[bg] = int(np.sum(bsa.bgmap == bg))
             nchans_per_bg[-1] = int(np.sum(bsa.bgmap == -1))
 
@@ -493,6 +616,19 @@ class PysmurfController:
         ----
         kwargs : dict
             Additional kwargs to pass to the ``take_iv`` function.
+
+        Notes
+        ------
+        The following data will be written to the session.data object::
+
+            >> response.session['data']
+            {
+                'bands': Bands number of each resonator
+                'channels': Channel number of each resonator
+                'bgmap': BGMap assignment for each resonator
+                'R_n': Normal resistance for each resonator
+                'filepath': Filepath of saved IVAnalysis object
+            }
         """
         if params['kwargs'] is None:
             params['kwargs'] = {}
@@ -526,6 +662,15 @@ class PysmurfController:
         ----
         kwargs : dict
             Additional kwargs to pass to ``take_bais_steps`` function.
+
+        Notes
+        ------
+        The following data will be written to the session.data object::
+
+            >> response.session['data']
+            {
+                'filepath': Filepath of saved BiasStepAnalysis object
+            }
         """
 
         if params['kwargs'] is None:
@@ -571,6 +716,15 @@ class PysmurfController:
             as possible to that value. If 
         kwargs : dict
             Additional kwargs to pass to the ``bias_dets`` function.
+
+        Notes
+        ------
+        The following data will be written to the session.data object::
+
+            >> response.session['data']
+            {
+                'biases': List of voltage bias values for each bias-group 
+            }
         """
         if params['kwargs'] is None:
             params['kwargs'] = {}
@@ -579,7 +733,7 @@ class PysmurfController:
             if not acquired:
                 return False, f"Operation failed: {self.lock.job} is running."
 
-            session.set_status('starting')
+            session.set_status('running')
             S, cfg = self._get_smurf_control(session=session)
             if isinstance(params['rfrac'], (int, float)):
                 biases = bias_dets.bias_to_rfrac(
@@ -608,6 +762,8 @@ def make_parser(parser=None):
                              "this pysmurf instance.")
     pgroup.add_argument('--slot', type=int,
                         help="Smurf slot that this agent will be controlling")
+    pgroup.add_argument('--poll-interval', type=float,
+                        help="Time between check-state polls")
     return parser
 
 if __name__ == '__main__':
@@ -619,7 +775,14 @@ if __name__ == '__main__':
 
     agent.register_task('run', controller.run, blocking=False)
     agent.register_task('abort', controller.abort, blocking=False)
-    agent.register_task('check_state', controller.check_state)
+
+    startup_pars = {}
+    if args.poll_interval is not None:
+        startup_pars['poll_interval'] = args.poll_interval
+    agent.register_process(
+        'check_state', controller.check_state, controller._stop_check_state,
+        startup=startup_pars
+    )
     agent.register_process(
         'stream', controller.stream, controller._stream_stop
     )
