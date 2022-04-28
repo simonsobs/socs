@@ -409,7 +409,7 @@ class WiregridKikusuiAgent:
             if not ret:
                 msg = 'Could not get c,v because of failure of connection.'
             else:
-                msg, v_val, c_val = self.cmd.user_input('VC?')
+                v_val, c_val = self.cmd.user_input('VC?')
                 s_msg, s_val = self.cmd.user_input('O?')
 
             # self.log.info('Get voltage/current message: {}'.format(msg))
