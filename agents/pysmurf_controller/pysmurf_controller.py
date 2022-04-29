@@ -292,7 +292,7 @@ class PysmurfController:
                 'last_update':  Time that session-data was last updated,
             }
         """
-        S, _ = self._get_smurf_control(load_tune=False, no_dir=True)
+        S, cfg = self._get_smurf_control(load_tune=False, no_dir=True)
         reg = sdl.Registers(S)
 
         session.set_status('running')
@@ -307,7 +307,8 @@ class PysmurfController:
                     pysmurf_action = reg.pysmurf_action.get(**kw),
                     pysmurf_action_timestamp = reg.pysmurf_action_timestamp.get(**kw),
                     stream_tag = reg.stream_tag.get(**kw),
-                    last_update = time.time()
+                    last_update = time.time(),
+                    stream_id = cfg.stream_id,
                 )
                 session.data.update(d)
             except RuntimeError:
@@ -337,6 +338,12 @@ class PysmurfController:
         duration : float, optional
             If set, determines how many seconds to stream data. By default,
             will leave stream open until stop function is called.
+        kwargs : dict
+            A dictionary containing additional keyword arguments to pass
+            to sodetlib's ``stream_g3_on`` function
+        load_tune : bool
+            If true, will load a tune-file to the pysmurf object on
+            instantiation.
 
         Notes
         ------
@@ -362,7 +369,7 @@ class PysmurfController:
             if params['duration'] is not None:
                 stop_time = time.time() + params['duration']
 
-            session.data['stream_id']
+            session.data['stream_id'] = cfg.stream_id
             session.data['sid'] = sdl.stream_g3_on(S, **params['kwargs'])
             session.set_status('running')
             while session.status in ['starting', 'running']:
