@@ -1,7 +1,6 @@
 import sys
 sys.path.insert(0, '../agents/smurf_file_emulator/')
 import os
-from argparse import Namespace
 from smurf_file_emulator import SmurfFileEmulator, make_parser
 
 

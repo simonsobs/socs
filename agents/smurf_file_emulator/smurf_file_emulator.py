@@ -180,7 +180,7 @@ class SmurfFileEmulator:
 
         Args
         ----
-        test_mod : bool
+        test_mode : bool
             If True, will skip any wait times associated with writing
             g3 files. 
         """
