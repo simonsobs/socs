@@ -34,7 +34,7 @@ class G3FrameGenerator:
     def tag_frame(self, fr):
         fr['frame_num'] = self.frame_num
         fr['session_id'] = self.session_id
-        fr['stream_id'] = self.stream_id
+        fr['sostream_id'] = self.stream_id
         fr['sostream_version'] = SOSTREAM_VERSION
         fr['time'] = core.G3Time(time.time() * core.G3Units.s)
         self.frame_num += 1
@@ -58,7 +58,7 @@ class G3FrameGenerator:
         chans = np.arange(self.nchans)
         names = [f'r{ch:0>4}' for ch in chans]
 
-        count_per_phi0 = 2**15 
+        count_per_phi0 = 2**16
         data = np.zeros((self.nchans, nsamps), dtype=np.int32)
         data += count_per_phi0 * chans[:, None]
         data += (count_per_phi0 * 0.2 * np.sin(2 * np.pi * 8 * times)).astype(int)
