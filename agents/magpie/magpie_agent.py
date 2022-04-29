@@ -519,7 +519,6 @@ class MagpieAgent:
             be less than 20 Hz to limit how much detector data is saved to hk.
 
         """
-        print("HERE")
         monitored_chans = []
         for ch_info in params['chan_info']:
             if isinstance(ch_info, int):
@@ -564,8 +563,6 @@ class MagpieAgent:
         else:
             input_rate = 1./np.median(np.diff(times))
             ds_factor = max(int(input_rate // target_rate), 1)
-        if np.isnan(ds_factor):
-            print(len(times))
 
         sl = slice(None, None, ds_factor)
 
