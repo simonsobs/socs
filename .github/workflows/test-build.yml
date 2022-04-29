@@ -2,6 +2,10 @@ name: Test Docker Build
 
 on:
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '*.rst'
+      - '*.md'
 
 jobs:
   build:
@@ -11,7 +15,7 @@ jobs:
     steps:
     # Fetch all history for all tags and branches
     - name: clone socs
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         fetch-depth: 0
 
