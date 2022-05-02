@@ -131,3 +131,5 @@ agents/aggregator/data/*
 agents/aggregator/data2/*
 key.*
 node.pid
+
+.DS_Store

@@ -181,17 +181,18 @@ Agent API
 Supporting APIs
 ---------------
 
-
 .. _SupRsyncFiles:
 
 SupRsyncFiles Table
-````````````````````````````````
+```````````````````
+
 .. autoclass:: socs.db.suprsync.SupRsyncFile
-   :members:
+    :members:
 
 .. _SupRsyncFilesManager:
 
 SupRsyncFiles Manager
-``````````````````````````````
+`````````````````````
+
 .. autoclass:: socs.db.suprsync.SupRsyncFilesManager
-   :members:
+    :members:

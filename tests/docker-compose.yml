@@ -8,8 +8,3 @@ services:
       - ./config.json:/app/crossbar/config.json
     environment:
          - PYTHONUNBUFFERED=1
-
-  ocs-LS372:
-    image: ocs-lakeshore372-simulator
-    ports:
-      - "7777:7777"
