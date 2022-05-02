@@ -43,6 +43,13 @@ class ManagedSmurfInstance:
 
 
 class MultiSmurfManager:
+    """
+
+    Agent to manage multiple PysmurfController instances. This agent will
+    automatically keep track of what PysmurfControllers are on the network, and
+    allow you to run operations on all of them or a subset.
+
+    """
     def __init__(self):
         self.agent = agent
         self.smurfs = {}
@@ -54,15 +61,17 @@ class MultiSmurfManager:
 
     def _register_heartbeat(self, _data):
         op_codes, feed = _data
-        if feed.get('agent_class') != 'PysmurfController':
-            return
-
-        addr = feed['agent_address']
-
-        s = self.smurfs.setdefault(addr, ManagedSmurfInstance(addr))
-        s.register_heartbeat(op_codes, feed)
+        if feed.get('agent_class') == 'PysmurfController':
+            addr = feed['agent_address']
+            self.smurfs.setdefault(
+                addr, ManagedSmurfInstance(addr)
+            ).register_heartbeat(op_codes, feed)
 
     def monitor(self, session, params):
+        """
+        **Process** - Process used to continuously monitor managed controller
+        states.
+        """
         session.set_status('running')
         while session.status in ['starting', 'running']:
             for s in self.smurfs.values():
@@ -75,6 +84,11 @@ class MultiSmurfManager:
         session.set_status('stopping')
 
     def _get_smurfs_by_streamids(self, stream_ids=None):
+        """
+        Gets ManagedSmurf instances from a list of stream_ids. This will take
+        the stream-ids that are not expired. If stream_ids are None, all
+        non-expired smurf instances will be used.
+        """
         smurfs = {}
         if stream_ids is None:
             for name, smurf in self.smurfs.items():
@@ -89,11 +103,15 @@ class MultiSmurfManager:
                 else:
                     raise ValueError(
                         f"Could not find managed smurf with "
-                        f"stream_id: {stream_id}"
-                    )
+                        f"stream_id: {stream_id}")
         return smurfs
 
     def run_op(self, op_name, session, params):
+        """
+        Function for running an operation on a set of pysmurf-controller instances.
+        This will start the operation on all specified instances, and wait until
+        they have all completed before finishing.
+        """
         stream_ids = params.get('stream_ids')
         smurfs = self._get_smurfs_by_streamids(stream_ids)
 
@@ -102,9 +120,31 @@ class MultiSmurfManager:
             smurf.start_op(op_name, params)
 
         session.set_status('running')
+
+        session.data['sessions'] = {}
         while True:
             time.sleep(10)
-            print("HERE")
+
+            all_finished=True
+            failed_ids = []
+            for stream_id, smurf in smurfs.items():
+                smurf_sess = smurf.status[op_name]
+                session.data['sessions'][stream_id] = smurf_sess
+                if smurf_sess['status'] != 'done':
+                    all_finished = False
+                elif not smurf_sess['success']:
+                    failed_ids.append(stream_id)
+
+            if all_finished:
+                break
+
+        if len(failed_ids) == 0:
+            return True, "All managed instances finished successfully!"
+        else:
+            return False, f"Smurfs with stream-ids {failed_ids} have failed!"
+
+
+            
 
 
 def make_parser(parser=None):
@@ -120,9 +160,11 @@ def make_parser(parser=None):
 
 if __name__ == '__main__':
     parser = make_parser()
-    args = site_config.parse_args(agent_class='MultiSmurfManager', parser=parser)
+    args = site_config.parse_args(agent_class='MultiSmurfManager',
+                                  parser=parser)
+
 
     agent, runner = ocs_agent.init_site_agent(args)
-    controller = PysmurfController(agent, args)
+    msm = MultiSmurfManager(agent, args)
 
     runner.run(agent, auto_reconnect=True)
