@@ -1,10 +1,15 @@
 from ocs.ocs_client import OCSClient
-from ocs import site_config
+from ocs import site_config, ocs_agent
 import time
 import argparse
+from copy import deepcopy
 
 
 class ManagedSmurfInstance:
+    """
+    Class to manage a single pysmurf-controller instance. This will contain an
+    updated dict of the sessions of all operations.
+    """
     def __init__(self, address, expire_time=20):
         self.address = address
         self.instance_id = address.split('.')[-1]
@@ -12,24 +17,28 @@ class ManagedSmurfInstance:
         self.last_refresh = 0
         self.expire_time = expire_time
         self.client = OCSClient(self.instance_id)
-        self.status = {}
+        self.sessions = {}
         self.stream_id = None
 
-    def register_heartbeat(self, op_codes, feed):
+    def register_heartbeat(self):
         self.last_refresh = time.time()
 
     @property
     def expired(self):
+        """
+        Returns True if the last heartbeat was registered more than
+        ``expire_time`` seconds ago.
+        """
         return time.time() - self.last_refresh > self.expire_time
 
-    def update_status(self):
+    def update_sessions(self):
         api = self.client._client.get_api()
-        status = {}
+        sessions = {}
         for (name, session, _) in api['tasks']:
-            status[name] = session
+            sessions[name] = session
         for (name, session, _) in api['processes']:
-            status[name] = session
-        self.status = status
+            sessions[name] = session
+        self.sessions = sessions
 
         state_data = self.status['check_state'].get('data')
         if state_data is not None:
@@ -49,8 +58,13 @@ class MultiSmurfManager:
     automatically keep track of what PysmurfControllers are on the network, and
     allow you to run operations on all of them or a subset.
 
+    Attributes
+    -----------
+    smurfs : dict
+        Dictionary containing a ManagedSmurfInstance for each Pysmurfcontroller
+        agent on the site.
     """
-    def __init__(self):
+    def __init__(self, agent, args):
         self.agent = agent
         self.smurfs = {}
 
@@ -58,6 +72,7 @@ class MultiSmurfManager:
             self._register_heartbeat, 'observatory..feeds.heartbeat',
             options={'match': 'wildcard'}
         )
+
 
     def _register_heartbeat(self, _data):
         op_codes, feed = _data
@@ -70,13 +85,14 @@ class MultiSmurfManager:
     def monitor(self, session, params):
         """
         **Process** - Process used to continuously monitor managed controller
-        states.
+        states. This will update the session-data for each of the
+        ManagedSmurfInstance's operations.
         """
         session.set_status('running')
         while session.status in ['starting', 'running']:
             for s in self.smurfs.values():
                 if not s.expired:
-                    s.update_status()
+                    s.update_sessions()
             time.sleep(10)
         return True, "Stopped monitor process"
 
@@ -111,24 +127,39 @@ class MultiSmurfManager:
         Function for running an operation on a set of pysmurf-controller instances.
         This will start the operation on all specified instances, and wait until
         they have all completed before finishing.
+        
+        Any keyword arguments other than the ones specified here will be passed
+        onto the 
+
+        Args
+        -----
+        stream_ids : list, optional
+            List of smurf stream-ids for which an operation should be run on.
+            If not specified, will run on all non-expired ManagedSmurf
+            instances
         """
         stream_ids = params.get('stream_ids')
         smurfs = self._get_smurfs_by_streamids(stream_ids)
 
+        op_pars = deepcopy(params)
+        del op_pars['stream_ids']
+
+        session.data['op_name'] = op_name
         for smurf in smurfs.values():
             session.data['stream_ids'].append(smurf.stream_id)
-            smurf.start_op(op_name, params)
+            smurf.start_op(op_name, op_pars)
 
         session.set_status('running')
 
         session.data['sessions'] = {}
+
         while True:
             time.sleep(10)
 
             all_finished=True
             failed_ids = []
             for stream_id, smurf in smurfs.items():
-                smurf_sess = smurf.status[op_name]
+                smurf_sess = smurf.sessions[op_name]
                 session.data['sessions'][stream_id] = smurf_sess
                 if smurf_sess['status'] != 'done':
                     all_finished = False
@@ -143,8 +174,11 @@ class MultiSmurfManager:
         else:
             return False, f"Smurfs with stream-ids {failed_ids} have failed!"
 
-
-            
+    def _stop_operation(self, session, params):
+        session.set_status("stopping")
+        smurfs = self._get_smurfs_by_streamids(session.data['stream_ids'])
+        for smurf in smurfs:
+            smurf.stop_op(session.data['op_name'], params)
 
 
 def make_parser(parser=None):
@@ -153,7 +187,6 @@ def make_parser(parser=None):
     """
     if parser is None:
         parser = argparse.ArgumentParser()
-
     pgroup = parser.add_argument_group('Agent Options')
     return parser
 
@@ -163,8 +196,28 @@ if __name__ == '__main__':
     args = site_config.parse_args(agent_class='MultiSmurfManager',
                                   parser=parser)
 
-
     agent, runner = ocs_agent.init_site_agent(args)
     msm = MultiSmurfManager(agent, args)
+
+    tasks = [
+        'uxm_setup', 'uxm_relock', 'take_bgmap', 'take_iv', 
+        'take_bias_steps', 'take_noise', 
+    ]
+    for task in tasks:
+        agent.register_task(
+            task,
+            lambda sess, params: msm.run_op(task, sess, params)
+        )
+
+    processes = ['stream']
+    for process in processes:
+        agent.register_process(
+            process,
+            lambda sess, params: msm.run_op(process, sess, params),
+            msm._stop_operation
+        )
+
+    agent.register_process('monitor', msm.monitor, msm._stop_monitor,
+                           startup=True)
 
     runner.run(agent, auto_reconnect=True)
