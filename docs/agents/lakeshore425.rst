@@ -57,3 +57,11 @@ Agent API
 
 .. autoclass:: agents.lakeshore425.LS425_agent.LS425Agent
     :members:
+
+Supporting APIs
+---------------
+
+.. automodule:: socs.Lakeshore.Lakeshore425
+    :members:
+    :undoc-members:
+

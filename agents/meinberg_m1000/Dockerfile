@@ -14,7 +14,7 @@ COPY meinberg_m1000_agent.py .
 RUN true
 
 # Copy in the MIBS
-COPY mibs/ /usr/local/lib/python3.6/dist-packages/pysnmp/smi/mibs/
+COPY mibs/ /root/.pysnmp/mibs/
 
 # Run agent on container startup
 ENTRYPOINT ["dumb-init", "python3", "-u", "meinberg_m1000_agent.py"]
