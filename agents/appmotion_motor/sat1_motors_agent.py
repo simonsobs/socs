@@ -1,81 +1,92 @@
 import time
 import os
-import socket
 import txaio
 import argparse
-import numpy as np
 
-from sat1_motors_driver import MotControl
+from ocs import ocs_agent, site_config
+from ocs.ocs_twisted import TimeoutLock, Pacemaker
 
-on_rtd = os.environ.get('READTHEDOCS') == 'True'
+on_rtd = os.environ.get('READTHEDOCS') == True
 if not on_rtd:
-    from ocs import ocs_agent, site_config
-    from ocs.ocs_twisted import TimeoutLock, Pacemaker
+    from sat1_motors_driver import MotControl
 
 
 class SAT1MotorsAgent:
     """
-    Agent for connecting to the SAT1 XY Stages. Differs from LATRt agent in that motors/controllers are seen as arguments.
-    Motor1 can be the X axis OR the Y axis, same with Motor2. Depends on setup (ip address + port). 
-    
-    Args: 
-        motor1_Ip (str) -- the IP address associated with Motor1
-        motor1_Port (int) -- the port address associated with Motor1
-        motor1_isLin (bool) -- Boolean that determines if Motor1 is a linear motor.
-        motor2_Ip (str) -- the IP address associated with Motor2
-        motor2_Port (int) -- the port address associated with Motor2
-        motor2_isLin (bool) -- Boolean that determines if Motor2 is a linear motor.
-        mode: 'acq': Start data acquisition on initialize
-        mRes (bool) -- True if manual resolution, False if default (res=8) ???
-        samp: default sampling frequency in Hz
+    Agent for connecting to the SAT1 XY Stages. Differs from LATRt agent in that 
+    motors/controllers are seen as arguments.
+    Motor1 can be the X axis OR the Y axis, same with Motor2. Depends on setup 
+    (ip address + port).
+
+    Args:
+        motor1_ip (str) : the IP address associated with Motor1
+        motor1_port (int) : the port address associated with Motor1
+        motor1_is_lin (bool) : Boolean that determines if Motor1 is a linear motor.
+        motor2_ip (str) : the IP address associated with Motor2
+        motor2_port (int) : the port address associated with Motor2
+        motor2_is_lin (bool) : Boolean that determines if Motor2 is a linear motor.
+        mode: 'acq' : Start data acquisition on initialize
+        m_res (bool) : True if manual resolution, False if default (res=8)
+        samp : default sampling frequency in Hz
     """
-    
-    def __init__(self, agent, motor1_Ip, motor1_Port, motor1_isLin, motor2_Ip, motor2_Port, motor2_isLin, mRes, mode=None, samp=2):
+
+    def __init__(
+            self,
+            agent,
+            motor1_ip,
+            motor1_port,
+            motor1_is_lin,
+            motor2_ip,
+            motor2_port,
+            motor2_is_lin,
+            m_res,
+            mode=None,
+            samp=2):
 
         self.job = None
         # Pass these through site config
-        self.motor1_Ip = motor1_Ip
-        self.motor1_Port = motor1_Port
-        self.motor1_isLin = motor1_isLin
-        self.motor2_Ip = motor2_Ip
-        self.motor2_Port = motor2_Port
-        self.motor2_isLin = motor2_isLin
-        self.mRes = mRes
+        self.motor1_ip = motor1_ip
+        self.motor1_port = motor1_port
+        self.motor1_is_lin = motor1_is_lin
+        self.motor2_ip = motor2_ip
+        self.motor2_port = motor2_port
+        self.motor2_is_lin = motor2_is_lin
+        self.m_res = m_res
         self.sampling_frequency = samp
         self.move_status = False
 
         self.motors = None
         self.initialized = False
         self.take_data = False
-        self.move_status = False
-        
+
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
-        
+
         if mode == 'acq':
             self.auto_acq = True
         else:
             self.auto_acq = False
         self.sampling_frequency = float(samp)
 
-        ### register the position feeds
+        # register the position feeds
         agg_params = {
-            'frame_length' : 10*60, #[sec] 
+            'frame_length': 10 * 60,  # [sec]
         }
 
         self.agent.register_feed('positions',
-                                 record = True,
-                                 agg_params = agg_params,
-                                 buffer_time = 0)
-        
-    def init_motors_task(self, session, params=None):
-        """init_xy_stage_task(params=None)
-        Task to connect to the motors, either one or both
+                                 record=True,
+                                 agg_params=agg_params,
+                                 buffer_time=0)
 
-        Args:
-            params (dict): Parameters dictionary for passing parameters to
-                task.
+    def init_motors_task(self, session, params=None):
+        """init_motors_task(params=None):
+        
+        **Task** - Connect to the motors, either one or both.
+
+        Parameters:
+            params (dict): Parameters dictionary for passing 
+                parameters to task.
         """
 
         if params is None:
@@ -84,557 +95,703 @@ class SAT1MotorsAgent:
         with self.lock.acquire_timeout(timeout=0, job='init') as acquired:
             # Locking mechanism stops code from proceeding if no lock acquired
             if not acquired:
-                self.log.warn("Could not start init because {} is already running".format(self.lock.job))
+                self.log.warn(
+                    "Could not start init because {} is already running".format(
+                        self.lock.job))
                 return False, "Could not acquire lock."
             # Run the function you want to run
             self.log.debug("Lock Acquired Connecting to Stages")
-            self.motors = MotControl(motor1_Ip=self.motor1_Ip, motor1_Port=self.motor1_Port, motor1_isLin=self.motor1_isLin, motor2_Ip=self.motor2_Ip, motor2_Port=self.motor2_Port, motor2_isLin=self.motor2_isLin, mRes = self.mRes)            
-            
+            self.motors = MotControl(
+                motor1_ip=self.motor1_ip,
+                motor1_port=self.motor1_port,
+                motor1_is_lin=self.motor1_is_lin,
+                motor2_ip=self.motor2_ip,
+                motor2_port=self.motor2_port,
+                motor2_is_lin=self.motor2_is_lin,
+                m_res=self.m_res)
+
         # This part is for the record and to allow future calls to proceed,
         # so does not require the lock
         self.initialized = True
         if self.auto_acq:
             self.agent.start('acq')
-        return True, 'Motor(s) Initialized.'    
+        return True, 'Motor(s) Initialized.'
 
-    def moveAxisToPosition(self, session, params=None):
-        """
-        Move the axis to the given absolute position in counts or inches.
-        NOTE: If moving multiple axes, function will assume linStage value for all axes.
+    def move_axis_to_position(self, session, params=None):
+        """move_axis_to_position(motor=1, pos=0, pos_is_inches=False,
+            lin_stage=True):
+        
+        ** Task** - Move the axis to the given absolute position in counts or 
+        inches.
+        
+        .. note:: 
+            If moving multiple axes, function will assume ``lin_stage`` value 
+            for all axes.
+            
         Parameters:
-            params: {'motor': int, 'pos': float, 'posIsInches': bool, 'linStage': bool}
-            motor: 1,2,3. Determines which motor, 3 is for all motors. (default 1)
-            pos: float. The desired position in counts or in inches, positive indicates away from the motor (default 0)
-            posIsInches: bool. True if pos was specified in inches, False if in counts (default False)
-            linStage: bool. True if the specified motor is for the linear stage, False if not (default True)    
+            motor (int): Determines which motor, either 1 or 2, 3 is for all
+                motors. (default 1)
+            pos (float): The desired position in counts or in inches, positive 
+                indicates away from the motor (default 0)
+            pos_is_inches (bool): True if pos was specified in inches, False 
+                if in counts (default False)
+            lin_stage (bool): True if the specified motor is for the linear 
+                stage, False if not (default True)
         """
 
-        linStage = params.get('linStage',True)
+        lin_stage = params.get('lin_stage', True)
         motor = params.get('motor', 1)
-        posIsInches = params.get('posIsInches', False)
+        pos_is_inches = params.get('pos_is_inches', False)
         pos = params.get('pos', 0)
-        self.move_status = self.motors.isMoving(motor)
+        self.move_status = self.motors.is_moving(motor)
         if self.move_status:
             return False, "Motors are already moving."
-        
-        with self.lock.acquire_timeout(1, job=f'moveAxisToPosition_motor{motor}') as acquired:
+
+        with self.lock.acquire_timeout(1, job=f'move_axis_to_position_motor{motor}') as acquired:
             if not acquired:
-                    self.log.warn(f"Could not move motor{motor} because lock held by {self.lock.job}")
-                    return False, "Could not acquire lock"
-            self.motors.moveAxisToPosition(motor, pos, posIsInches, linStage)
+                self.log.warn(
+                    f"Could not move motor{motor} because lock held by {self.lock.job}")
+                return False, "Could not acquire lock"
+            self.motors.move_axis_to_position(motor, pos, pos_is_inches, lin_stage)
 
         return True, "Moved motor {} to {}".format(motor, pos)
 
-    def moveAxisByLength(self, session, params=None):
-        """
-        Move the axis relative to the current position by the specified number of counts or inches.      
-        NOTE: If moving multiple axes, function will assume linStage value for all axes.
+    def move_axis_by_length(self, session, params=None):
+        """move_axis_by_length(motor=1, pos=0, pos_is_inches=False, 
+            lin_stage=True):
+        
+        **Task** - Move the axis relative to the current position by the 
+        specified number of counts or inches.
+            
+        .. note:: 
+            If moving multiple axes, function will assume ``lin_stage`` value 
+                for all axes.
         Parameters:
-            params: {'motor': int, 'pos': float, 'posIsInches': bool, 'linStage': bool}
-            motor: 1,2,3. Determines which motor, 3 is for all motors. (default 1)
-            pos: float. The desired position in counts or in inches, positive indicates away from the motor (default 0)
-            posIsInches: bool. True if pos was specified in inches, False if in counts (default False)
-            linStage: bool. True if the specified motor is for the linear stage, False if not (default True)    
+            motor (int): Determines which motor, either 1 or 2, 3 is for all
+                motors. (default 1)
+            pos (float): The desired position in counts or in inches, positive 
+                indicates away from the motor. (default 0)
+            pos_is_inches (bool): True if pos was specified in inches, False if
+                in counts (default False)
+            lin_stage (bool): True if the specified motor is for the linear 
+                stage, False if not (default True)
         """
 
-        linStage = params.get('linStage',True)
+        lin_stage = params.get('lin_stage', True)
         motor = params.get('motor', 1)
         pos = params.get('pos', 0)
-        posIsInches = params.get('posIsInches', False)
-        self.move_status = self.motors.isMoving(motor)
+        pos_is_inches = params.get('pos_is_inches', False)
+        self.move_status = self.motors.is_moving(motor)
         if self.move_status:
             return False, "Motors are already moving."
-        
-        with self.lock.acquire_timeout(1, job=f'moveAxisByLength_motor{motor}') as acquired:
+
+        with self.lock.acquire_timeout(1, job=f'move_axis_by_length_motor{motor}') as acquired:
             if not acquired:
-                    self.log.warn(f"Could not move motor{motor} because lock held by {self.lock.job}")
-                    return False, "Could not acquire lock"
-            self.motors.moveAxisByLength(motor, pos, posIsInches, linStage)
-                
-        return True, "Moved motor {} by {}".format(motor, pos)
-    
+                self.log.warn(
+                    f"Could not move motor{motor} because lock held by {self.lock.job}")
+                return False, "Could not acquire lock"
+            self.motors.move_axis_by_length(motor, pos, pos_is_inches, lin_stage)
 
-    def setVelocity(self, session, params=None):
-        """
-        Set velocity of motors driving stages
-        params: {'motor': int, 'velocity': float}
-        motor : 1,2,3. Determines which motor, 3 is for all motors. (default 3)
-        velocity: [0.25,50]. Sets velocity of motor in revolutions/second (default 12.0)
-        """
+        return True, "Moved motor {} by {}".format(motor, pos)
+
+    def set_velocity(self, session, params=None):
+        """set_velocity(motor=1, velocity=0.25):
         
-        motor = params.get('motor',3)
+        **Task** - Set velocity of motors driving stages.
+        
+        Parameter:
+            motor (int):Determines which motor, either 1 or 2, 3 is for all
+                motors.(default 3)
+            velocity (float): Sets velocity of motor in revolutions per second
+                within range [0.25,50]. (default 12.0)
+        """
+
+        motor = params.get('motor', 3)
         velocity = params.get('velocity', 12.0)
-        self.move_status = self.motors.isMoving(motor)
+        self.move_status = self.motors.is_moving(motor)
         if self.move_status:
             return False, "Motors are already moving."
 
-        with self.lock.acquire_timeout(timeout=1, job=f'setVelocity{motor}') as acquired:
-            if not acquired: 
-                self.log.warn(f"Could not setVelocity because lock held by {self.lock.job}")
+        with self.lock.acquire_timeout(timeout=1, job=f'set_velocity{motor}') as acquired:
+            if not acquired:
+                self.log.warn(
+                    f"Could not set_velocity because lock held by {self.lock.job}")
                 return False, "Could not acquire lock"
-            self.motors.setVelocity(motor, velocity)
-        
+            self.motors.set_velocity(motor, velocity)
+
         return True, "Set velocity of motor {} to {}".format(motor, velocity)
 
-    def setAcceleration(self, session, params=None):
-        """
-        Set acceleration of motors driving stages
-        params: {'motor': int, 'accel': int}
-        motor : 1,2,3. Determines which motor, 3 is for all motors. (default 3)
-        accel: [1,3000]. Sets acceleration in revolutions/second/second (default 1.0)
-        """
+    def set_acceleration(self, session, params=None):
+        """set_acceleration(motor=1, accel=1):
         
+        **Task** - Set acceleration of motors driving stages.
+        
+        .. note::
+            `accel` parameter will only accept integer values.
+        
+        Parameters:
+            motor (int): Determines which motor, either 1 or 2, 3 is for all
+                motors. (default 3)
+            accel (int): Sets acceleration in revolutions per second per second
+                within range [1,3000]. (default 1)
+        """
+
         motor = params.get('motor', 3)
         accel = params.get('accel', 1.0)
-        self.move_status = self.motors.isMoving(motor)
+        self.move_status = self.motors.is_moving(motor)
         if self.move_status:
             return False, "Motors are already moving."
-        
-        with self.lock.acquire_timeout(timeout=1, job=f'setAcceleration_motor{motor}') as acquired:
-            if not acquired: 
-                self.log.warn(f"Could not setAcceleration because lock held by {self.lock.job}")
-                return False, "Could not acquire lock"
-            self.motors.setAcceleration(motor, accel)
-            
-        return True, "Set acceleration of motor {} to {}".format(motor, accel)
-    
-    def startJogging(self, session, params=None):
-        """
-        Jogs the motor(s) set by params
-        params: {'motor': int}
-        motor : 1,2,3. Determines which motor, 3 is for all motors. (default 1)
-        """
-        
-        motor = params.get('motor', 1)
-        with self.lock.acquire_timeout(1, job=f"startJogging_motor{motor}") as acquired:
+
+        with self.lock.acquire_timeout(timeout=1, job=f'set_acceleration_motor{motor}') as acquired:
             if not acquired:
-                self.log.warn(f'Could not startJogging because lock held by {self.lock.job}')
+                self.log.warn(
+                    f"Could not set_acceleration because lock held by {self.lock.job}")
+                return False, "Could not acquire lock"
+            self.motors.set_acceleration(motor, accel)
+
+        return True, "Set acceleration of motor {} to {}".format(motor, accel)
+
+    def start_jogging(self, session, params=None):
+        """start_jogging(motor=1):
+        
+        **Task** - Jogs the motor(s) set by params.
+        
+        Parameters:
+            motor (int): Determines which motor, either 1 or 2, 3 is for all
+                motors. (default 1)
+        """
+
+        motor = params.get('motor', 1)
+        with self.lock.acquire_timeout(1, job=f"start_jogging_motor{motor}") as acquired:
+            if not acquired:
+                self.log.warn(
+                    f'Could not start_jogging because lock held by {self.lock.job}')
                 return False, 'Could not acquire lock'
-            self.motors.startJogging(motor)
+            self.motors.start_jogging(motor)
 
         return True, "Started jogging motor {}".format(motor)
 
-    def stopJogging(self, session, params=None):
-        """
-        Stops the jogging of motor(s) set by params
-        params: {'motor': int}
-        motor : 1,2,3. Determines which motor, 3 is for all motors. (default 1)
-        """
+    def stop_jogging(self, session, params=None):
+        """stop_jogging(motor=1):
         
+        **Task** - Stops the jogging of motor(s) set by params.
+        
+        Parameters:
+            motor (int): Determines which motor, either 1 or 2, 3 is for all
+                motors. (default 1)
+        """
+
         motor = params.get('motor', 1)
-        with self.lock.acquire_timeout(1, job=f"stopJogging_motor{motor}") as acquired:
+        with self.lock.acquire_timeout(1, job=f"stop_jogging_motor{motor}") as acquired:
             if not acquired:
-                self.log.warn(f'Could not stopJogging because lock held by {self.lock.job}')
-                return False, 'Could not acquire lock'                
-            self.motors.stopJogging(motor)
+                self.log.warn(
+                    f'Could not stop_jogging because lock held by {self.lock.job}')
+                return False, 'Could not acquire lock'
+            self.motors.stop_jogging(motor)
 
         return True, "Stopped jogging motor {}".format(motor)
 
-    def seekHomeLinearStage(self, session, params=None):
-        """
-        Move the linear stage to its home position (using the home limit switch).
-        Parameters:
-            parms: {'motor': int, 'isLin': bool}
-            motor: 1,2,3. Determines which motor, 3 is for all motors. (default 1)
-        """
+    def seek_home_linear_stage(self, session, params=None):
+        """seek_home_linear_stage(motor=1):
         
-        motor = params.get('motor',1)
-        self.move_status = self.motors.isMoving(motor)
-        if self.move_status:
-            return False, "Motors are already moving."
-        
-        with self.lock.acquire_timeout(timeout=1, job=f'seekHomeLinearStage_motor{motor}') as acquired:
-            if not acquired: 
-                self.log.warn(f"Could not seekHomeLinearStage because lock held by {self.lock.job}")
-                return False, "Could not acquire lock"
-            self.motors.seekHomeLinearStage(motor)
+        **Task** - Move the linear stage to its home position (using the home
+        limit switch).
             
-        return True, "Moving motor {} to home".format(motor)
-    
-    def setZero(self, session, params=None):
-        """
-        Sets the zero position (AKA home) for motor(s) specified in params
-        params: {'motor': int}
-        motor : 1,2,3. Determines which motor, 3 is for all motors. (default 1)
+        Parameters:
+            motor (int): Determines which motor, either 1 or 2, 3 is for all
+                motors. (default 1)
         """
 
-        motor = params.get('motor',1)
-        self.move_status = self.motors.isMoving(motor)
+        motor = params.get('motor', 1)
+        self.move_status = self.motors.is_moving(motor)
         if self.move_status:
             return False, "Motors are already moving."
 
-        with self.lock.acquire_timeout(1, job=f"setZero_motor{motor}") as acquired:
+        with self.lock.acquire_timeout(timeout=1, job=f'seek_home_linear_stage_motor{motor}') as acquired:
             if not acquired:
-                self.log.warn(f'Could not setZero because lock held by {self.lock.job}')
-                return False, 'Could not acquire lock'                
-            self.motors.setZero(motor)
+                self.log.warn(
+                    f"Could not seek_home_linear_stage because lock held by {self.lock.job}")
+                return False, "Could not acquire lock"
+            self.motors.seek_home_linear_stage(motor)
+
+        return True, "Moving motor {} to home".format(motor)
+
+    def set_zero(self, session, params=None):
+        """set_zero(motor=1):
+        
+        **Task** - Sets the zero position (AKA home) for motor(s) specified in
+        params.
+        
+        Parameters:
+            motor (int): Determines which motor, either 1 or 2, 3 is for all
+                motors. (default 1)
+        """
+
+        motor = params.get('motor', 1)
+        self.move_status = self.motors.is_moving(motor)
+        if self.move_status:
+            return False, "Motors are already moving."
+
+        with self.lock.acquire_timeout(1, job=f"set_zero_motor{motor}") as acquired:
+            if not acquired:
+                self.log.warn(
+                    f'Could not set_zero because lock held by {self.lock.job}')
+                return False, 'Could not acquire lock'
+            self.motors.set_zero(motor)
 
         return True, "Zeroing motor {} position".format(motor)
 
-    def runPositions(self, session, params=None):
-        """
-        Runs a tab-delimited list of entries as positions from a text file.  For motor=3, the first column
-        must be the x-data, and the second column the y-data.  Each position will be attained.
-        xPosition and yPosition will be specified as in the file.        
-        params: {'motor': int, 'posData': list of positions from .tsv file - elements should be TUPlE if motors=3, 'posIsInches': bool}
-        motor: 1,2,3. Determines which motor, 3 is for all motors. (default 1)
-        posData: tab-delimited list of entries. first column is x-data, second column is y-data.
-        posIsInches: Boolean. (default True)
-        """
+    def run_positions(self, session, params=None):
+        """run_positions(motor=1, pos_data=file.tsv, pos_is_inches=False):
         
+        **Task** - Runs a tab-delimited list of entries as positions from a 
+        text file.  For motor=3, the first column must be the x-data, and
+        the second column the y-data.  Each position will be attained. 
+        xPosition and yPosition will be specified as in the file.
+            
+        Parameters:
+            motor (int): Determines which motor, either 1 or 2, 3 is for all
+                motors. (default 1)
+            pos_data (.tsv file): Tab-delimited list of entries. First column
+                is x-data, second column is y-data.
+            pos_is_inches (bool): True if pos was specified in inches, False if
+                in counts (default False)
+        """
+
         motor = params.get('motor', 1)
-        posIsInches = params.get('posIsInches', True)
-        self.move_status = self.motors.isMoving(motor)
+        pos_is_inches = params.get('pos_is_inches', True)
+        self.move_status = self.motors.is_moving(motor)
         if self.move_status:
             return False, "Motors are already moving."
-        
-        with self.lock.acquire_timeout(1, job=f"runPositions_motor{motor}") as acquired:
-            if not acquired:
-                self.log.warn(f'Could not runPositions because lock held by {self.lock.job}')
-                return False, 'Could not acquire lock'                                    
-            self.motors.runPositions(params['posData'], motor, posIsInches)
-            
-        return True, "Moving stage to {}".format(params['posData'])
 
-    def startRotation(self, session, params=None):
-        """
-        Start rotating motor of polarizer. NOTE: Give acceleration and velocity values as arguments here.
-        params: {'motor': int, 'velocity': float, 'accel': float}
-        motor : 1,2,3. Determines which motor, 3 is for all motors. (default 1)
-        velocity: float. [0.25,50] The rotation velocity in revolutions/second (default 12.0)
-        accel: float. [1,3000] -- The acceleration in revolutions/second/second (default 1.0)
-        """
+        with self.lock.acquire_timeout(1, job=f"run_positions_motor{motor}") as acquired:
+            if not acquired:
+                self.log.warn(
+                    f'Could not run_positions because lock held by {self.lock.job}')
+                return False, 'Could not acquire lock'
+            self.motors.run_positions(params['pos_data'], motor, pos_is_inches)
+
+        return True, "Moving stage to {}".format(params['pos_data'])
+
+    def start_rotation(self, session, params=None):
+        """start_rotation(motor=1, velocity=0.25, accel=1):
         
+        **Task** - Start rotating motor of polarizer. 
+        
+        .. note:: 
+            Give acceleration and velocity values as arguments here.
+        
+        Parameters:
+            motor (int): Determines which motor, either 1 or 2, 3 is for all
+                motors. (default 1)
+            velocity (float): The rotation velocity in revolutions per second
+                within range [0.25,50]. (default 12.0)
+            accel (float): The acceleration in revolutions per second per
+                second within range [1,3000]. (default 1.0)
+        """
+
         motor = params.get('motor', 1)
         velocity = params.get('velocity', 12.0)
         accel = params.get('accel', 1.0)
-        with self.lock.acquire_timeout(1, job=f"startRotation_motor{motor}") as acquired:
+        with self.lock.acquire_timeout(1, job=f"start_rotation_motor{motor}") as acquired:
             if not acquired:
-                self.log.warn(f"Could not startRotation because lock held by {self.lock.job}")
+                self.log.warn(
+                    f"Could not start_rotation because lock held by {self.lock.job}")
                 return False, "Could not acquire lock"
-            self.motors.startRotation(motor, velocity, accel)
-            
-        return True, "Started rotating motor at velocity {} and acceleration {}".format(velocity, accel)
+            self.motors.start_rotation(motor, velocity, accel)
 
-    def stopRotation(self, session, params=None):
-        """
-        Stop rotating motor of polarizer.
-        params: {'motor': int}
-        motor : 1,2,3. Determines which motor, 3 is for all motors. (default 1)
-        """
+        return True, "Started rotating motor at velocity {} and acceleration {}".format(
+            velocity, accel)
+
+    def stop_rotation(self, session, params=None):
+        """stop_rotation(motor=1):
         
+        **Task** - Stop rotating motor of polarizer.
+        
+        Parameters:
+            motor (int): Determines which motor, either 1 or 2, 3 is for all
+                motors. (default 1)
+        """
+
         motor = params.get('motor', 1)
-        with self.lock.acquire_timeout(1, job=f"stopRotation_motor{motor}") as acquired:
+        with self.lock.acquire_timeout(1, job=f"stop_rotation_motor{motor}") as acquired:
             if not acquired:
-                self.log.warn(f"Could not stopRotation because lock held by {self.lock.job}")
+                self.log.warn(
+                    f"Could not stop_rotation because lock held by {self.lock.job}")
                 return False, "Could not acquire lock"
-            self.motors.stopRotation(motor)
+            self.motors.stop_rotation(motor)
 
         return True, "Stopped rotating motor"
-   
-    def closeConnection(self, session, params=None):
+
+    def close_connection(self, session, params=None):
+        """close_connection(motor=1):
+        
+        **Task** - Close connection to specific motor.
+        
+        Parameters:
+            motor (int): Determines which motor, either 1 or 2, 3 is for all
+                motors. (default 3)
         """
-        Close connection to specific motor
-        
-        ########################################
-        still need to think about this!
-        ########################################
-        
-        params: {'motor': int}
-        motor : 1,2,3. Determines which motor, 3 is for all motors. (default 3)
-        """
-        
-        motor = params.get('motor', 3) 
-        with self.lock.acquire_timeout(1, job=f"closeConnection_motor{motor}") as acquired:
+
+        motor = params.get('motor', 3)
+        with self.lock.acquire_timeout(1, job=f"close_connection_motor{motor}") as acquired:
             if not acquired:
-                self.log.warn(f'Could not close connection because lock held by {self.lock.job}')
-                return False, "Could not acquire lock"                
-            self.motors.closeConnection(motor)
+                self.log.warn(
+                    f'Could not close connection because lock held by {self.lock.job}')
+                return False, "Could not acquire lock"
+            self.motors.close_connection(motor)
 
         return True, "Closed connection to motor {}".format(motor)
-    
-    def reconnectMotor(self, session, params=None):
-        """
-        Reestablish a connection to a motor if connection is lost.
-        params: {'motor': int}
-        motor : 1,2,3. Determines which motor, 3 for all motors. (default 1)
-        """
+
+    def reconnect_motor(self, session, params=None):
+        """reconnect_motor(motor=1):
         
+        **Task** - Reestablish a connection to a motor if connection is lost.
+        
+        Parameters:
+            motor (int): Determines which motor, either 1 or 2, 3 is for all
+                motors. (default 1)
+        """
+
         motor = params.get('motor', 1)
-        with self.lock.acquire_timeout(1, job=f"reconnectMotor_motor{motor}") as acquired:
+        with self.lock.acquire_timeout(1, job=f"reconnect_motor_motor{motor}") as acquired:
             if not acquired:
-                self.log.warn(f'Could not reestablish connection because lock held by {self.lock.job}')
+                self.log.warn(
+                    f'Could not reestablish connection because lock held by {self.lock.job}')
                 return False, "Could not acquire lock"
-            self.motors.reconnectMotor(motor)            
+            self.motors.reconnect_motor(motor)
         return True, "Reestablished connection with motor{}".format(motor)
 
-    def blockWhileMoving(self, session, params=None):
-        """
-        Block until the specified axes/motor have stop moving.  Checks each axis every updatePeriod seconds.
-        params: {'motor': int, 'updatePeriod': float, 'verbose': bool}
-        motor: 1,2,3. Determines which motor, 3 is for all motors. (default 1)
-        updatePeriod: float. Time after which to check each motor in seconds (default .1)
-        verbose: bool. Prints output from motor requests if True (default False)
+    def block_while_moving(self, session, params=None):
+        """block_while_moving(motor=1, update_period=.1, verbose=False):
+        
+        **Task** - Block until the specified axes/motor have stop moving. 
+        Checks each axis every update_period seconds.
+            
+        Parameters:
+            motor (int): Determines which motor, either 1 or 2, 3 is for all
+                motors. (default 1)
+            updatePeriod (float): Time after which to check each motor in 
+                seconds. (default .1)
+            verbose (bool): Prints output from motor requests if True. 
+                (default False)
         """
 
         motor = params.get('motors', 1)
-        updatePeriod = params.get('updatePeriod', .1)
-        verbose = params.get('verbose',False)
-        with self.lock.acquire_timeout(1, job=f"blockWhileMoving_motor{motor}") as acquired:
+        update_period = params.get('update_period', .1)
+        verbose = params.get('verbose', False)
+        with self.lock.acquire_timeout(1, job=f"block_while_moving_motor{motor}") as acquired:
             if not acquired:
-                self.log.warn(f'Could not blockWhileMoving because lock held by {self.lock.job}')
-                return False, "Could not acquire lock"                                
-            self.motors.blockWhileMoving(motor, updatePeriod, verbose)
+                self.log.warn(
+                    f'Could not block_while_moving because lock held by {self.lock.job}')
+                return False, "Could not acquire lock"
+            self.motors.block_while_moving(motor, update_period, verbose)
 
         return True, "Motor {} stopped moving".format(motor)
 
-    def killAllCommands(self, session, params=None):
-        """
-        Stops all active commands on the device. Does not interact with lock file...
-        params: {'motor': int}
-        motor: 1,2,3. Determines which motor, 3 is for all motors. (default 3)
-        """
+    def kill_all_commands(self, session, params=None):
+        """kill_all_commands(motor=1):
         
-        motor = params.get('motor', 3)
-        with self.lock.acquire_timeout(1, job=f"killAllCommands_motor{motor}") as acquired:
-            if not acquired:
-                self.log.warn(f'Could not killAllCommands because lock held by {self.lock.job}')
-                return False, "Could not acquire lock"                                
-            self.motors.killAllCommands(motor)
-    
-        return True, "Killing all active commands on motor {}".format(motor)
-    
-    def setEncoderValue(self, session, params=None):
-        """
-        Set the encoder values in order to keep track of absolute position
+        **Task** Stops all active commands on the device. Does not interact
+        with lock file...
+            
         Parameters:
-            params: {'motor': int, 'value': float}
-            motor: 1,2,3. Determines which motor, 3 is for all motors. (default 1)
-            value: Sets encoder value. (default 0)
+            motor (int): Determines which motor, either 1 or 2, 3 is for all
+                motors. (default 3)
+        """
+
+        motor = params.get('motor', 3)
+        with self.lock.acquire_timeout(1, job=f"kill_all_commands_motor{motor}") as acquired:
+            if not acquired:
+                self.log.warn(
+                    f'Could not kill_all_commands because lock held by {self.lock.job}')
+                return False, "Could not acquire lock"
+            self.motors.kill_all_commands(motor)
+
+        return True, "Killing all active commands on motor {}".format(motor)
+
+    def set_encoder_value(self, session, params=None):
+        """set_encoder_value(motor=1, value=0):
+        
+        **Task** - Set the encoder values in order to keep track of absolute
+            position.
+            
+        Parameters:
+            motor (int): Determines which motor, either 1 or 2, 3 is for all
+                motors. (default 1)
+            value (float): Sets encoder value. (default 0)
         """
 
         motor = params.get('motor', 1)
         value = params.get('value', 0)
-        self.move_status = self.motors.isMoving(motor)
+        self.move_status = self.motors.is_moving(motor)
         if self.move_status:
             return False, "Motors are already moving."
-        
-        with self.lock.acquire_timeout(1, job=f"setEncoderValue_motor{motor}") as acquired:
+
+        with self.lock.acquire_timeout(1, job=f"set_encoder_value_motor{motor}") as acquired:
             if not acquired:
-                self.log.warn(f'Could not setEncoderValue because lock held by {self.lock.job}')
-                return False, 'Could not acquire lock'                                    
-            ePositions = self.motors.setEncoderValue(motor, value)
+                self.log.warn(
+                    f'Could not set_encoder_value because lock held by {self.lock.job}')
+                return False, 'Could not acquire lock'
+            ePositions = self.motors.set_encoder_value(motor, value)
 
         return True, "Setting encoder position to {}".format(ePositions)
 
-    def getEncoderValue(self, session, params = None):
-        """
-        Retrieve all motor step counts to verify movement.
-        Parameters:
-            params: {'motor': int}
-            motor: 1,2,3. Determines which motor, 3 is for all motors. (default 3)
-        """
+    def get_encoder_value(self, session, params=None):
+        """get_encoder_value(motor=1):
         
-        motor = params.get('motor', 3)
-        with self.lock.acquire_timeout(1, job=f"getEncoderInfo_motor{motor}") as acquired:
-            if not acquired:
-                self.log.warn(f'Could not getEncoderInfo because lock held by {self.lock.job}')
-                return False, 'Could not acquire lock'                                    
-            ePositions = self.motors.retrieveEncoderInfo(motor)
+        **Task** - Retrieve all motor step counts to verify movement.
+        
+        Parameters:
+            motor (int): Determines which motor, either 1 or 2, 3 is for all
+                motors. (default 3)
+        """
 
-        return True, ("Current encoder positions: {}".format(ePositions),ePositions)    
-    
-    def getPositions(self, session, params = None):
-        """
-        Get the position of the motor in counts, relative to the set zero point (or starting point/home).
+        motor = params.get('motor', 3)
+        with self.lock.acquire_timeout(1, job=f"get_encoder_info_motor{motor}") as acquired:
+            if not acquired:
+                self.log.warn(
+                    f'Could not get_encoder_info because lock held by {self.lock.job}')
+                return False, 'Could not acquire lock'
+            ePositions = self.motors.retrieve_encoder_info(motor)
+
+        return True, ("Current encoder positions: {}".format(
+            ePositions), ePositions)
+
+    def get_positions(self, session, params=None):
+        """get_positions(motor=1, inches=True):
         
+        **Task** - Get the position of the motor in counts, relative to the
+        set zero point (or starting point/home).
+
         Parameters:
-            params: {'motor': int, 'inches': bool}
-            motor: 1,2,3. Determines which motor, 3 is for all motors. (default 1)
-            inches: bool. Whether to return positions in inches or not. (default True)
+            motor (int): Determines which motor, either 1 or 2, 3 is for all
+                motors. (default 1)
+            inches (bool): Whether to return positions in inches or not.
+                (default True)
+                
         Returns:
-            positions (list) -- the positions of the specified motors
+            positions (list): The positions of the specified motors.
         """
-        
+
         motor = params.get('motor', 1)
         inches = params.get('inches', True)
-        with self.lock.acquire_timeout(1, job=f"getPositions_motor{motor}") as acquired:
+        with self.lock.acquire_timeout(1, job=f"get_positions_motor{motor}") as acquired:
             if not acquired:
-                self.log.warn(f'Could not getPositions because lock held by {self.lock.job}')
-                return False, "Could not acquire lock"                                
+                self.log.warn(
+                    f'Could not get_positions because lock held by {self.lock.job}')
+                return False, "Could not acquire lock"
             if inches:
-                positions = self.motors.getPositionInInches(motor)
+                positions = self.motors.get_position_in_inches(motor)
             elif not inches:
-                positions = self.motors.getPosition(motor)
-            else: 
+                positions = self.motors.get_position(motor)
+            else:
                 return False, "Invalid choice for inches parameter, must be boolean"
 
         return True, "Current motor positions: {}".format(positions)
 
-    def posWhileMoving(self, session, params = None):
+    def pos_while_moving(self, session, params=None):
+        """pos_while_moving(motor=1, inches=True):
+        
+        **Task** - Get the position of the motor while it is currently in 
+        motion. An estimate based on the calculated trajectory of the movement,
+        relative to the zero point.
+
+        Parameters:
+            motor (int): Determines which motor, either 1 or 2, 3 is for all
+                motors. (default 1)
+            inches (bool): Whether to return positions in inches or not.
+                (default True)
+                
+        Returns:
+            positions (list): The positions of the specified motors.
         """
-        Get the position of the motor while it is currently in motion. An estimate based on the 
-        calculated trajectory of the movement, relative to the zero point.
+
+        inches = params.get('inches', True)
+        motor = params.get('motor', 1)
+        with self.lock.acquire_timeout(1, job=f"pos_while_moving_motor{motor}") as acquired:
+            if not acquired:
+                self.log.warn(
+                    f'Could not pos_while_moving because lock held by {self.lock.job}')
+                return False, "Could not acquire lock"
+            i_positions = self.motors.get_immediate_position(motor, inches)
+
+        return True, "Current motor positions: {}".format(i_positions)
+
+    def is_moving(self, session, params=None):
+        """is_moving(motor=1, verbose=True):
+        
+        **Tasks** - Checks if motors are moving OR if limit switches are 
+        tripped.
         
         Parameters:
-            params: {'motor': int, 'inches': bool}
-            motor: 1,2,3. Determines which motor, 3 is for all motors. (default 1)
-            inches: bool. Whether to return positions in inches or not. (default True)
-        Returns:
-            positions (list) -- the positions of the specified motors
+            motor (int): Determines which motor, either 1 or 2, 3 is for all
+                motors. (default 1)
+            verbose (bool): Prints output from motor requests if True.
+                (default True)
         """
-        
-        inches = params.get('inches',True)
+        verbose = params.get('verbose', True)
         motor = params.get('motor', 1)
-        with self.lock.acquire_timeout(1, job=f"posWhileMoving_motor{motor}") as acquired:
+        with self.lock.acquire_timeout(1, job=f"is_moving_motor{motor}") as acquired:
             if not acquired:
-                self.log.warn(f'Could not posWhileMoving because lock held by {self.lock.job}')
-                return False, "Could not acquire lock"                                
-            iPositions = self.motors.getImmediatePosition(motor,inches)
-
-        return True, "Current motor positions: {}".format(iPositions)
-
-    def isMoving(self, session, params = None):
-        """
-        Checks if motors are moving OR if limit switches are tripped.
-        
-        ########################################
-        still need to think about this!
-        ########################################
-        
-        params{'motor' : int, 'verbose' : bool}
-        motor : 1,2,3. Determines which motor, 3 is for all motors. (default 1)
-        """
-        verbose = params.get('verbose',True)
-        motor = params.get('motor', 1)
-        with self.lock.acquire_timeout(1, job=f"isMoving_motor{motor}") as acquired:
-            if not acquired:
-                self.log.warn(f"Could not check because lock held by {self.lock.job}")
+                self.log.warn(
+                    f"Could not check because lock held by {self.lock.job}")
                 return False
-            self.move_status = self.motors.isMoving(motor,verbose)
+            self.move_status = self.motors.is_moving(motor, verbose)
 
         if self.move_status:
-            return True, ("Motors are moving.",self.move_status)
+            return True, ("Motors are moving.", self.move_status)
         else:
-            return True, ("Motors are not moving.",self.move_status)
-    
-    def moveOffLimit(self, session, params = None):
-        """
-        Moves motor off limit switch if unexpectedly hit, resetting alarms.
+            return True, ("Motors are not moving.", self.move_status)
+
+    def move_off_limit(self, session, params=None):
+        """move_off_limit(motor=1):
         
-        params: {'motor':int}
-        motor : 1,2,3. Determines which motor, 3 is for all motors. (default 3)
-        """
+        **Task** - Moves motor off limit switch if unexpectedly hit, resetting
+        alarms.
         
+        Parameters:
+            motor (int): 1,2,3. Determines which motor, either 1 or 2, 3 is for all
+                motors. (default 3)
+        """
+
         motor = params.get('motor', 3)
-        with self.lock.acquire_timeout(1, job=f"moveOffLimit{motor}") as acquired:
+        with self.lock.acquire_timeout(1, job=f"move_off_limit{motor}") as acquired:
             if not acquired:
-                self.log.warn(f"Could not moveOffLimit because lock held by {self.lock.job}")
+                self.log.warn(
+                    f"Could not move_off_limit because lock held by {self.lock.job}")
                 return False
-            self.motors.moveOffLimit(motor)
-            
+            self.motors.move_off_limit(motor)
+
         return True, "Motor {} moved off limit switch".format(motor)
+
+    def reset_alarms(self, session, params=None):
+        """reset_alarms(motor=1):
         
+        **Task** - Resets alarm codes present. Only advised if you have checked
+        what the alarm is first!
         
-    def resetAlarms(self, session, params = None):
+        Parameters:
+            motor (int): Determines which motor, either 1 or 2, 3 is for all
+                motors. (default 1)
         """
-        Resets alarm codes present. Only advised if you have checked what the alarm is first!
-        params: {'motor': int}
-        motor : 1,2,3. Determines which motor, 3 is for all motors. (default 1)
-        """
-        
+
         motor = params.get('motor', 1)
-        with self.lock.acquire_timeout(1, job=f"resetAlarms_motor{motor}") as acquired:
+        with self.lock.acquire_timeout(1, job=f"reset_alarms_motor{motor}") as acquired:
             if not acquired:
-                self.log.warn(f"Could not resetAlarms because lock held by {self.lock.job}")
+                self.log.warn(
+                    f"Could not reset_alarms because lock held by {self.lock.job}")
                 return False
-            self.motors.resetAlarms(motor)
+            self.motors.reset_alarms(motor)
 
         return True, "Alarms reset for motor {}".format(motor)
 
-    def homeWithLimits(self, session, params = None):
-        """
-        Moves stages to home based on location from limits. One inch from the limit switch.
-        params: {'motor': int}
-        motor : 1,2,3. Determines which motor, 3 is for all motors. (default 1)
-        """
+    def home_with_limits(self, session, params=None):
+        """home_with_limits(motor=1):
         
+        **Task** - Moves stages to home based on location from limits. One inch
+        from the limit switch.
+        
+        Parameters:
+            motor (int): Determines which motor, either 1 or 2, 3 is for all
+                motors. (default 1)
+        """
+
         motor = params.get('motor', 1)
-        with self.lock.acquire_timeout(30, job=f"homeWithLimits_motor{motor}") as acquired:
+        with self.lock.acquire_timeout(30, job=f"home_with_limits_motor{motor}") as acquired:
             if not acquired:
-                self.log.warn(f"Could not move motor{motor} to home because lock held by {self.lock.job}")
+                self.log.warn(
+                    f"Could not move motor{motor} to home because lock held by {self.lock.job}")
                 return False
-            self.motors.homeWithLimits(motor)
+            self.motors.home_with_limits(motor)
 
         return True, "Zeroed stages using limit switches"
 
     def start_acq(self, session, params=None):
-        """
-        Start acquisition of data.
-        params: {'motor': int, 'verbose': bool, sampling_frequency': float}
-        motor: 1,2,3. Determines which motor, 3 is for all motors. (default 3)
-        verbose: bool. Prints output from motor requests if True (default False)
-        sampling_frequency: float, sampling rate in Hz (default 2)
+        """start_acq(motor=1, verbose=False, sampling_freqency=2):
+        
+        **Process** - Start acquisition of data.
+        
+        Parameter:
+        motor (int): Determines which motor, either 1 or 2, 3 is for all
+                motors. (default 3)
+        verbose (bool): Prints output from motor requests if True. 
+            (default False)
+        sampling_frequency (float): Sampling rate in Hz. (default 2)
         """
         if params is None:
             params = {}
 
-        motor = params.get('motor',3)
-        verbose = params.get('verbose',False)
+        motor = params.get('motor', 3)
+        verbose = params.get('verbose', False)
         f_sample = params.get('sampling_frequency', self.sampling_frequency)
         pm = Pacemaker(f_sample, quantize=True)
-        
+
         if not self.initialized or self.motors is None:
             raise Exception("Connection to motors is not initialized")
 
         with self.lock.acquire_timeout(timeout=0, job='acq') as acquired:
             if not acquired:
-                self.log.warn("Could not start acq because {} is already running".format(self.lock.job))
+                self.log.warn(
+                    "Could not start acq because {} is already running".format(
+                        self.lock.job))
                 return False, "Could not acquire lock."
-            self.log.info(f"Starting data acquisition for stages at {f_sample} Hz")
+            self.log.info(
+                f"Starting data acquisition for stages at {f_sample} Hz")
             session.set_status('running')
             self.take_data = True
             last_release = time.time()
 
-            mList = self.motors.genMotorList(motor)
+            mList = self.motors.gen_motor_list(motor)
             while self.take_data:
-                if time.time()-last_release > 1.:
+                if time.time() - last_release > 1.:
                     if not self.lock.release_and_acquire(timeout=10):
-                        self.log.warn(f"Could not re-acquire lock now held by {self.lock.job}.")
+                        self.log.warn(
+                            f"Could not re-acquire lock now held by {self.lock.job}.")
                         return False, "could not re-acquire lock"
                     last_release = time.time()
                 pm.sleep()
-                data = {'timestamp':time.time(), 'block_name':'positions','data':{}}
+                data = {
+                    'timestamp': time.time(),
+                    'block_name': 'positions',
+                    'data': {}}
 
                 for mot in mList:
                     mot_id = mot.propDict['motor']
                     try:
-                        self.log.debug(f"getting position/move status of motor{mot_id}")
-                        self.move_status = self.motors.isMoving(mot_id,verbose)
-                        pos = self.motors.getPositionInInches(motor=mot_id)
+                        self.log.debug(
+                            f"getting position/move status of motor{mot_id}")
+                        self.move_status = self.motors.is_moving(
+                            mot_id, verbose)
+                        pos = self.motors.get_position_in_inches(motor=mot_id)
                         if self.move_status:
                             data['data'][f'motor{mot_id}_encoder'] = -1
                         else:
-                            ePos = self.motors.retrieveEncoderInfo(motor=mot_id)
+                            ePos = self.motors.retrieve_encoder_info(
+                                motor=mot_id)
                             data['data'][f'motor{mot_id}_encoder'] = ePos[0]
                         data['data'][f'motor{mot_id}_stepper'] = pos[0]
                         data['data'][f'motor{mot_id}_connection'] = 1
 
                     except Exception as e:
                         self.log.debug(f'error: {e}')
-                        self.log.debug(f"could not get position/move status of motor{mot_id}")
+                        self.log.debug(
+                            f"could not get position/move status of motor{mot_id}")
                         data['data'][f'motor{mot_id}_encoder'] = 0
                         data['data'][f'motor{mot_id}_stepper'] = 0.0
                         data['data'][f'motor{mot_id}_connection'] = 0
 
-                self.agent.publish_to_feed('positions',data)
+                self.agent.publish_to_feed('positions', data)
 
         return True, 'Acquisition exited cleanly.'
 
     def stop_acq(self, session, params=None):
-        """
-        Stop data acquisition.
-        params: {}
+        """stop_acq(params=None):
+        
+        **Task** - Stop data acquisition.
+        
+        Parameters:
+            None
         """
 
         if self.take_data:
@@ -642,8 +799,8 @@ class SAT1MotorsAgent:
             return True, 'Requested to stop taking data.'
         else:
             return False, 'acq is not currently running.'
-   
-    
+
+
 def make_parser(parser=None):
     """
     Build the argument parser for the Agent. Allows sphinx to automatically
@@ -654,21 +811,40 @@ def make_parser(parser=None):
         parser = argparse.ArgumentParser()
 
     pgroup = parser.add_argument_group('Agent Options')
-    pgroup.add_argument('--motor1_Ip', help="MOXA IP address",type=str)
-    pgroup.add_argument('--motor1_Port', help="MOXA port number for motor 1",type=int)
-    pgroup.add_argument('--motor1_isLin', action='store_true',
-                        help="Whether or not motor 1 is connected to a linear stage")
-    pgroup.add_argument('--motor2_Ip', help="MOXA IP address",type=str)
-    pgroup.add_argument('--motor2_Port', help="MOXA port number for motor 1",type=int)
-    pgroup.add_argument('--motor2_isLin', action='store_true',
-                        help="Whether or not motor 2 is connected to a linear stage")
-    pgroup.add_argument('--mRes', help="Manually enter microstep resolution",action='store_true')
-    pgroup.add_argument('--sampling_frequency', help="Frequency to sample at for data acq",type=float)
-    pgroup.add_argument('--mode',help="puts mode into auto acquisition or not...",type=str)
+    pgroup.add_argument('--motor1-ip', help="MOXA IP address", type=str)
+    pgroup.add_argument(
+        '--motor1-port',
+        help="MOXA port number for motor 1",
+        type=int)
+    pgroup.add_argument(
+        '--motor1-is-lin',
+        action='store_true',
+        help="Whether or not motor 1 is connected to a linear stage")
+    pgroup.add_argument('--motor2-ip', help="MOXA IP address", type=str)
+    pgroup.add_argument(
+        '--motor2-port',
+        help="MOXA port number for motor 1",
+        type=int)
+    pgroup.add_argument(
+        '--motor2-is-lin',
+        action='store_true',
+        help="Whether or not motor 2 is connected to a linear stage")
+    pgroup.add_argument(
+        '--m-res',
+        help="Manually enter microstep resolution",
+        action='store_true')
+    pgroup.add_argument(
+        '--sampling-frequency',
+        help="Frequency to sample at for data acq",
+        type=float)
+    pgroup.add_argument(
+        '--mode',
+        help="puts mode into auto acquisition or not...",
+        type=str)
 
-    
-    return parser 
-    
+    return parser
+
+
 if __name__ == '__main__':
     # For logging
     txaio.use_twisted()
@@ -679,39 +855,48 @@ if __name__ == '__main__':
 
     # Parse comand line.
     parser = make_parser()
-    args = site_config.parse_args(agent_class='SAT1MotorsAgent',parser=parser)
+    args = site_config.parse_args(agent_class='SAT1MotorsAgent', parser=parser)
 
     agent, runner = ocs_agent.init_site_agent(args)
 
-    m = SAT1MotorsAgent(agent, args.motor1_Ip, args.motor1_Port, args.motor1_isLin, args.motor2_Ip, args.motor2_Port, args.motor2_isLin, args.mRes, args.mode, args.sampling_frequency)
+    m = SAT1MotorsAgent(
+        agent,
+        args.motor1_ip,
+        args.motor1_port,
+        args.motor1_is_lin,
+        args.motor2_ip,
+        args.motor2_port,
+        args.motor2_is_lin,
+        args.m_res,
+        args.mode,
+        args.sampling_frequency)
 
     agent.register_task('init_motors', m.init_motors_task)
-    agent.register_task('move_to_position', m.moveAxisToPosition)
-    agent.register_task('move_by_length', m.moveAxisByLength)
+    agent.register_task('move_to_position', m.move_axis_to_position)
+    agent.register_task('move_by_length', m.move_axis_by_length)
     agent.register_task('move_motors', m.move_motors)
-    agent.register_task('set_velocity', m.setVelocity)
-    agent.register_task('set_accel', m.setAcceleration)
-    agent.register_task('start_jog', m.startJogging)
-    agent.register_task('stop_jog', m.stopJogging)
-    agent.register_task('seek_home', m.seekHomeLinearStage)
-    agent.register_task('set_zero', m.setZero)
-    agent.register_task('run_positions', m.runPositions)
-    agent.register_task('start_rotation', m.startRotation)
-    agent.register_task('stop_rotation', m.stopRotation)
-    agent.register_task('close_connect', m.closeConnection)
-    agent.register_task('reconnect_motor', m.reconnectMotor)
-    agent.register_task('block_while_moving', m.blockWhileMoving)
-    agent.register_task('kill_all', m.killAllCommands)
-    agent.register_task('set_encoder', m.setEncoderValue)
-    agent.register_task('get_encoder', m.getEncoderValue)
-    agent.register_task('get_position', m.getPositions)
-    agent.register_task('is_moving', m.isMoving)
-    agent.register_task('get_imm_position', m.posWhileMoving)
-    agent.register_task('move_off_limit', m.moveOffLimit)
-    agent.register_task('reset_alarm', m.resetAlarms)
-    agent.register_task('home_with_limits', m.homeWithLimits)
+    agent.register_task('set_velocity', m.set_velocity)
+    agent.register_task('set_accel', m.set_acceleration)
+    agent.register_task('start_jog', m.start_jogging)
+    agent.register_task('stop_jog', m.stop_jogging)
+    agent.register_task('seek_home', m.seek_home_linear_stage)
+    agent.register_task('set_zero', m.set_zero)
+    agent.register_task('run_positions', m.run_positions)
+    agent.register_task('start_rotation', m.start_rotation)
+    agent.register_task('stop_rotation', m.stop_rotation)
+    agent.register_task('close_connect', m.close_connection)
+    agent.register_task('reconnect_motor', m.reconnect_motor)
+    agent.register_task('block_while_moving', m.block_while_moving)
+    agent.register_task('kill_all', m.kill_all_commands)
+    agent.register_task('set_encoder', m.set_encoder_value)
+    agent.register_task('get_encoder', m.get_encoder_value)
+    agent.register_task('get_position', m.get_positions)
+    agent.register_task('is_moving', m.is_moving)
+    agent.register_task('get_imm_position', m.pos_while_moving)
+    agent.register_task('move_off_limit', m.move_off_limit)
+    agent.register_task('reset_alarm', m.reset_alarms)
+    agent.register_task('home_with_limits', m.home_with_limits)
 
     agent.register_process('acq', m.start_acq, m.stop_acq)
-
 
     runner.run(agent, auto_reconnect=True)
