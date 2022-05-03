@@ -1,5 +1,4 @@
-from ocs.ocs_client import OCSClient
-from ocs import site_config, ocs_agent
+from ocs import site_config, ocs_agent, ocs_client
 import time
 import argparse
 from copy import deepcopy
@@ -16,13 +15,22 @@ class ManagedSmurfInstance:
         self.agent_session_id = None
         self.last_refresh = 0
         self.expire_time = expire_time
-        self.client = OCSClient(self.instance_id)
+        self.client = ocs_client.OCSClient(self.instance_id)
         self.sessions = {}
         self.stream_id = None
 
     def register_heartbeat(self):
         self.last_refresh = time.time()
 
+    def encoded(self):
+        return {
+            'expired': self.expired,
+            'last_refresh': self.last_refresh,
+            'stream_id': self.stream_id,
+            'address': self.address,
+            'sessions': self.sessions
+        }
+        
     @property
     def expired(self):
         """
@@ -60,6 +68,8 @@ class MultiSmurfManager:
 
     Attributes
     -----------
+    agent : OCSAgent
+        OCSAgent object
     smurfs : dict
         Dictionary containing a ManagedSmurfInstance for each Pysmurfcontroller
         agent on the site.
@@ -90,7 +100,9 @@ class MultiSmurfManager:
         """
         session.set_status('running')
         while session.status in ['starting', 'running']:
-            for s in self.smurfs.values():
+            session.data['smurfs'] = {}
+            for addr, s in self.smurfs.items():
+                session.data['smurfs'][addr] = s.encoded()
                 if not s.expired:
                     s.update_sessions()
             time.sleep(10)

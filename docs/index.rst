@@ -51,6 +51,7 @@ API Reference        Full API documentation for core parts of the SOCS library.
     agents/latrt_xy_stage
     agents/magpie
     agents/meinberg_m1000_agent
+    agents/multismurf_manager
     agents/pfeiffer
     agents/pfeiffer_tc400
     agents/pysmurf-controller
