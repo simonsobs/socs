@@ -169,7 +169,7 @@ class LS372_Agent:
         if self.initialized and not params.get('force', False):
             self.log.info("Lakeshore already initialized. Returning...")
             return True, "Already initialized"
-
+        
         with self._lock.acquire_timeout(job='init') as acquired1, \
              self._acq_proc_lock.acquire_timeout(timeout=0., job='init') \
              as acquired2:
@@ -205,12 +205,12 @@ class LS372_Agent:
 
                 self.thermometers = [channel.name for channel in self.module.channels]
 
-                if param['configfile'] not None:
-                    configfile = params['configfile']
-                    self.input_configfile(configfile)
-                    session.add_message("Lakeshore initial configurations uploaded using: %s"%configfile)
-
             self.initialized = True
+
+        if params['configfile'] is not None:
+            configfile = params['configfile']
+            self.input_configfile(session, params)
+            session.add_message("Lakeshore initial configurations uploaded using: %s"%params['configfile'])
 
         # Start data acquisition if requested
         if params.get('auto_acquire', False):
@@ -986,8 +986,8 @@ class LS372_Agent:
 
         return True, "Current still output is {}".format(still_output)
 
-    @ocs_agent_param('configfile', type=str)
-    def input_configfile(self, session, configfile, filepath='/ls372configs/'):
+    @ocs_agent.param('configfile', type=str)
+    def input_configfile(self, session, params=None):
         """input_configfile(configfile=None)
 
         **Task** - Upload 372 configuration file to initialize channel/device
@@ -997,75 +997,71 @@ class LS372_Agent:
             configfile (str): name of .yaml config file
 
         """
-        with self._lock.acquire_timeout(job='get_still_output') as acquired:
+        with self._lock.acquire_timeout(job='input_configfile') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
             
-            # include /ls372configs/ dir where configfiles are in docker container
-            ls372config = os.path.join(filepath, configfile)
-            with open(ls372config) as f:
+            configfile = params['configfile']
+            with open(configfile) as f:
                 config = yaml.safe_load(f)
 
-            ls_serial = self.module.id.split(',')[2]
-
+            ls = self.module
+            ls_serial = ls.id.split(',')[2]
 
             device_config = config[ls_serial]['device_settings']
             ls_chann_settings = config[ls_serial]['channel']
-
+            
+            session.set_status('running')
+            
             # enable/disable autoscan
             if device_config['autoscan'] == 'on':
                 ls.enable_autoscan()
-                print('Autoscan enabled')
+                self.log.info("autoscan enabled")
             elif device_config['autoscan'] == 'off':
                 ls.disable_autoscan()
-                print('Autoscan disabled')
+                self.log.info("autoscan disabled")
 
             for i in ls_chann_settings:
-                lschann = Channel(self.module, i)
-
                 # enable/disable channel
                 if ls_chann_settings[i]['enable'] == 'on':
-                    lschann.enable_channel()
-                    print("CH.{channel} enabled".format(channel=i))
+                    ls.channels[i].enable_channel()
+                    self.log.info("CH.{channel} enabled".format(channel=i))
                 elif ls_chann_settings[i]['enable'] == 'off':
-                    lschann.disable_channel()
-                    print("CH.{channel} disabled".format(channel=i))
+                    ls.channels[i].disable_channel()
+                    self.log.info("CH.{channel} disabled".format(channel=i))
 
                 # autorange
                 if ls_chann_settings[i]['autorange'] == 'on':
-                    lschann.enable_autorange()
-                    print("Turning autorange on")
+                    ls.channels[i].enable_autorange()
+                    self.log.info("autorange on")
                 elif ls_chann_settings[i]['autorange'] == 'off':
-                    lschann.disable_autorange()
-                    print("Turning autorange off")
+                    ls.channels[i].disable_autorange()
+                    self.log.info("autorange off")
 
                 excitation_mode = ls_chann_settings[i]['excitation_mode']
-                lschann.set_excitation_mode(excitation_mode)
-                print("Excitation mode for CH.{channel} set to {exc_mode}".format(channel=i, exc_mode=excitation_mode))
+                ls.channels[i].set_excitation_mode(excitation_mode)
+                self.log.info("excitation mode for CH.{channel} set to {exc_mode}".format(channel=i, exc_mode=excitation_mode))
 
                 excitation_value = ls_chann_settings[i]['excitation_value']
-                lschann.set_excitation(excitation_value)
-                print("Excitation for CH.{channel} set to {exc}".format(channel=i, exc=excitation_value))
+                ls.channels[i].set_excitation(excitation_value)
+                self.log.info("excitation for CH.{channel} set to {exc}".format(channel=i, exc=excitation_value))
 
                 dwell = ls_chann_settings[i]['dwell']
-                lschann.set_dwell(dwell)
-                print("Dwell for CH.{channel} is set to {dwell}".format(channel=i, dwell=dwell))
+                ls.channels[i].set_dwell(dwell)
+                self.log.info("dwell for CH.{channel} is set to {dwell}".format(channel=i, dwell=dwell))
 
                 pause = ls_chann_settings[i]['pause']
-                lschann.set_pause(pause)
-                print("Pause for CH.{channel} is set to {pause}".format(channel=i, pause=pause))
+                ls.channels[i].set_pause(pause)
+                self.log.info("pause for CH.{channel} is set to {pause}".format(channel=i, pause=pause))
 
                 calibration_curvenum = ls_chann_settings[i]['calibration_curve_num']
-                lschann.set_calibration_curve(calibration_curvenum)
-                print("Calibration curve for CH.{channel} set to {cal_curve}".format(channel=i, cal_curve=calibration_curvenum))
+                ls.channels[i].set_calibration_curve(calibration_curvenum)
+                self.log.info("calibration curve for CH.{channel} set to {cal_curve}".format(channel=i, cal_curve=calibration_curvenum))
                 tempco = ls_chann_settings[i]['temperature_coeff']
-                lschann.set_temperature_coefficient(tempco)
-                print("Temperature coefficient for CH.{channel} set to {tempco}".format(channel=i, tempco=tempco))
-
-            session.set_status('running')
-            session.data = {"still_heater_still_out": still_output} # TODO: what does this change into?; maybe a session.message? and then take that message out of init_lakeshore?
+                ls.channels[i].set_temperature_coefficient(tempco)
+                self.log.info("temperature coeff. for CH.{channel} set to {tempco}".format(channel=i, tempco=tempco))
 
         return True, "Uploaded ".format(configfile)
 
