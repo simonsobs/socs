@@ -301,13 +301,13 @@ class PysmurfController:
         while session.status in ['starting', 'running']:
             try:
                 d = dict(
-                    channel_mask = S.get_channel_mask(**kw),
+                    channel_mask = S.get_channel_mask(**kw).tolist(),
                     downsample_factor = S.get_downsample_factor(**kw),
                     agg_time = reg.agg_time.get(**kw),
                     open_g3stream = reg.open_g3stream.get(**kw),
-                    pysmurf_action = reg.pysmurf_action.get(**kw),
+                    pysmurf_action = reg.pysmurf_action.get(**kw, as_string=True),
                     pysmurf_action_timestamp = reg.pysmurf_action_timestamp.get(**kw),
-                    stream_tag = reg.stream_tag.get(**kw),
+                    stream_tag = reg.stream_tag.get(**kw, as_string=True),
                     last_update = time.time(),
                     stream_id = cfg.stream_id,
                 )
