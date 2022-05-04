@@ -45,9 +45,7 @@ class WiregridKikusuiAgent:
         self.debug = debug
 
         self.position_path = '/data/wg-data/position.log'
-        ''' Should be removed
-        self.action_path = '/data/wg-data/action/'
-        '''
+        self.debug_log_path = '/data/wg-data/action/'
 
         self.open_trial = 10
         self.Deg = 360/52000
@@ -298,8 +296,8 @@ class WiregridKikusuiAgent:
                               .format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            logfile = openlog(self.action_path)
             if self.debug:
+                logfile = openlog(self.debug_log_path)
                 writelog(logfile, 'ON', 0,
                          self._get_position(), 'continuous')
                 ''' Should be removed
@@ -308,9 +306,9 @@ class WiregridKikusuiAgent:
                             self.position_path, self.open_trial),
                          'continuous')
                 '''
+                logfile.close()
 
             self.cmd.user_input('ON')
-            logfile.close()
             return True, 'Set Kikusui on'
 
     def set_off(self, session, params=None):
@@ -325,8 +323,8 @@ class WiregridKikusuiAgent:
                               .format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            logfile = openlog(self.action_path)
             if self.debug:
+                logfile = openlog(self.debug_log_path)
                 writelog(logfile, 'OFF', 0,
                          self._get_position(), 'continuous')
                 ''' Should be removed
@@ -335,9 +333,9 @@ class WiregridKikusuiAgent:
                             self.position_path, self.open_trial),
                          'continuous')
                 '''
+                logfile.close()
 
             self.cmd.user_input('OFF')
-            logfile.close()
             return True, 'Set Kikusui off'
 
     @ocs_agent.param('current', default=0., type=float,
@@ -541,7 +539,7 @@ class WiregridKikusuiAgent:
             self.feedback_time = params.get(
                 'feedback_time', [0.181, 0.221, 0.251, 0.281, 0.301])
 
-            logfile = openlog(self.action_path)
+            logfile = openlog(self.debug_log_path)
 
             for i in range(int(self.num_laps*16.)):
                 self._move_next(
