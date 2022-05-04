@@ -27,8 +27,10 @@ and starting services(dbus, avahi-daemon, and gcapsd) in the docker.
 These preparations are implemented in Dockerfile and wg-actuator-entrypoint.sh.
 The host machine requires the installation of gcapsd.
 The reference links:
-    - Adding repository: https://www.galil.com/sw/pub/all/doc/global/html/ubuntu2004.html
-    - Installation via apt: https://www.galil.com/sw/pub/all/doc/gclib/html/ubuntu.html
+
+- Adding repository: https://www.galil.com/sw/pub/all/doc/global/html/ubuntu2004.html
+- Installation via apt: https://www.galil.com/sw/pub/all/doc/gclib/html/ubuntu.html
+
 Please install it via (in Ubuntu20.04):
 
 .. code-block:: bash
