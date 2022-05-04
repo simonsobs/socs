@@ -193,15 +193,15 @@ class WiregridKikusuiAgent:
                 return -1.
 
         try:
-            position = (int)(
-                response.session['data']['fields']['reference_degree'][-1])
+            position = (float)(
+                response.session['data']['fields']['enc_data']['reference_degree'][-1])
         except Exception as e:
             self.log.warn(
                 'Failed to get encoder position | '
                 '{}'.format(e)
                 )
 
-        return int(position)*self.Deg
+        return position
 
     def _get_exectime(self, position_difference, feedback_cut, feedback_time):
         if position_difference >= feedback_cut[4]:
