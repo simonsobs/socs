@@ -131,7 +131,7 @@ class WiregridActuatorAgent:
             LSonoff
 
     def _insert_eject(
-            self, main_distance=800, main_speedrate=1.0, is_insert=True):
+            self, main_distance=920, main_speedrate=1.0, is_insert=True):
         # Function label
         flabel = 'insert' if is_insert else 'eject'
         initial_ls_names = ['LSL2', 'LSR2'] if is_insert else ['LSL1', 'LSR1']
@@ -266,13 +266,13 @@ class WiregridActuatorAgent:
 
         return True, '_insert_eject()[{}]: Successfully moving!'.format(flabel)
 
-    def _insert(self, main_distance=800, main_speedrate=1.0):
+    def _insert(self, main_distance=920, main_speedrate=1.0):
         ret, msg = self._insert_eject(
             main_distance=main_distance, main_speedrate=main_speedrate,
             is_insert=True)
         return ret, msg
 
-    def _eject(self, main_distance=800, main_speedrate=1.0):
+    def _eject(self, main_distance=920, main_speedrate=1.0):
         if main_distance > 0.:
             main_distance = -1. * abs(main_distance)
         ret, msg = self._insert_eject(

@@ -298,6 +298,9 @@ class Actuator:
                 print(msg)
                 time.sleep(1)
                 continue
+            # Set g on DigitalIOs
+            self.ls.g = self.g
+            self.st.g = self.g
             print('Actuator:reconnect(): '
                   'Successfully reconnect to the actuator controller!')
             return True
