@@ -768,7 +768,7 @@ class WiregridActuatorAgent:
             while self.run_acq:
                 if time.time() - last_release > 1.:
                     last_release = time.time()
-                    if not self.lock.release_and_acquire(timeout=600):
+                    if not self.lock.release_and_acquire(timeout=180):
                         self.log.warn(
                             'acq(): '
                             'Could not re-acquire lock now held by {}.'
