@@ -55,8 +55,8 @@ An example docker-compose configuration::
       network_mode: "host"
       depends_on:
         - "crossbar"
-      volumes_from:
-        - ocs-wgencoder-agent
+      volumes:
+        - "<local directory to record log file>:/data/wg-data"
       command:
         - "--instance-id=wgkikusui"
 
