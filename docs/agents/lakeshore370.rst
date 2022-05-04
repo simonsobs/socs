@@ -83,8 +83,8 @@ Agent API
 .. autoclass:: agents.lakeshore370.LS370_agent.LS370_Agent
     :members: init_lakeshore_task, start_acq
 
-Driver API
-----------
+Supporting APIs
+---------------
 
 For the API all methods should start with one of the following:
 

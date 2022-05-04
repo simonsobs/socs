@@ -14,12 +14,14 @@ Contents
 Section              Description
 ===================  ============================================================
 User Guide           Start here for information about the design and use of SOCS.
-Agent Reference      Agents are the OCS components that interface with other
-                     systems. These run at all times, awaiting commands from
-                     OCS Clients. These are the Agents specifc to SO hardware.
+Agent Reference      Details on configuration and use of the OCS Agents
+                     provided by SOCS.
 Simulator Reference  Simulators are used to mock software and hardware
                      interfaces when access to actual hardware is unavailable.
                      These are useful for testing other code.
+Developer Guide      Information relevant to developers who are contributing to
+                     SOCS.
+API Reference        Full API documentation for core parts of the SOCS library.
 ===================  ============================================================
 
 .. toctree::
@@ -28,8 +30,6 @@ Simulator Reference  Simulators are used to mock software and hardware
 
     user/intro
     user/installation
-    user/network
-    user/new_agents
     user/webserver
     user/sequencer
 
@@ -53,10 +53,10 @@ Simulator Reference  Simulators are used to mock software and hardware
     agents/meinberg_m1000_agent
     agents/pfeiffer
     agents/pfeiffer_tc400
-    agents/pysmurf/index
+    agents/pysmurf-controller
+    agents/pysmurf-monitor
     agents/scpi_psu
     agents/smurf_crate_monitor
-    agents/smurf_recorder
     agents/suprsync
     agents/synacc
     agents/tektronix3021c
@@ -71,6 +71,7 @@ Simulator Reference  Simulators are used to mock software and hardware
 
     simulators/ls240_simulator
     simulators/ls372_simulator
+    agents/smurf_file_emulator
     simulators/smurf_stream_simulator
 
 .. toctree::
