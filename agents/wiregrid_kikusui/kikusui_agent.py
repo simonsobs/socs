@@ -148,26 +148,6 @@ class WiregridKikusuiAgent:
             return True, 'Successfully rotate a little!'
         return True, 'No rotation!'
 
-    ''' Should be removed
-    def _get_position(self, position_path, open_trial):
-        try:
-            for i in range(open_trial):
-                with open(position_path) as f:
-                    position_data = f.readlines()
-                    position =\
-                        position_data[-1].split(' ')[1].replace('\n', '')
-                    if len(position) != 0:
-                        break
-        except Exception as e:
-            with open('file_open_error.log', 'a') as f:
-                traceback.print_exc(file=f)
-            self.log.warn(
-                'Failed to open ENCODER POSITION FILE | '
-                '{}'.format(e)
-                )
-
-        return int(position)*self.Deg
-    '''
     def _get_position(self):
         position = -1.
         try:
@@ -226,10 +206,6 @@ class WiregridKikusuiAgent:
         absolute_position = np.arange(0, 360, wanted_angle)
 
         start_position = self._get_position()
-        ''' Should be removed
-        start_position = self._get_position(
-            self.position_path, self.open_trial)
-        '''
         if (360 < start_position + uncertaity_cancel):
             goal_position = wanted_angle
         elif absolute_position[-1] < start_position + uncertaity_cancel:
@@ -249,10 +225,6 @@ class WiregridKikusuiAgent:
 
         for step in range(feedback_steps):
             mid_position = self._get_position()
-            ''' Should be removed
-            mid_position = self._get_position(
-                self.position_path, self.open_trial)
-            '''
             if goal_position + wanted_angle < mid_position:
                 operation_time =\
                     self._get_exectime(
@@ -273,12 +245,6 @@ class WiregridKikusuiAgent:
         if self.debug:
             writelog(logfile, 'OFF', 0,
                      self._get_position(), 'stepwise')
-            ''' Should be removed
-            writelog(logfile, 'OFF', 0,
-                     self._get_position(
-                        self.position_path, self.open_trial),
-                     'stepwise')
-            '''
 
     ##################
     # Main functions #
@@ -300,12 +266,6 @@ class WiregridKikusuiAgent:
                 logfile = openlog(self.debug_log_path)
                 writelog(logfile, 'ON', 0,
                          self._get_position(), 'continuous')
-                ''' Should be removed
-                writelog(logfile, 'ON', 0,
-                         self._get_position(
-                            self.position_path, self.open_trial),
-                         'continuous')
-                '''
                 logfile.close()
 
             self.cmd.user_input('ON')
@@ -327,12 +287,6 @@ class WiregridKikusuiAgent:
                 logfile = openlog(self.debug_log_path)
                 writelog(logfile, 'OFF', 0,
                          self._get_position(), 'continuous')
-                ''' Should be removed
-                writelog(logfile, 'OFF', 0,
-                         self._get_position(
-                            self.position_path, self.open_trial),
-                         'continuous')
-                '''
                 logfile.close()
 
             self.cmd.user_input('OFF')
@@ -476,28 +430,6 @@ class WiregridKikusuiAgent:
                     time.sleep(self.agent_interval+1.)
                     writelog(logfile, 'OFF', 0.,
                              self._get_position(), 'calibration')
-                    ''' Should be removed
-                    writelog(logfile, 'ON', tperiod,
-                             self._get_position(
-                                self.position_path, self.open_trial),
-                             'calibration')
-                    self._rotate_alittle(tperiod)
-                    time.sleep(self.agent_interval+1.)
-                    writelog(logfile, 'OFF', 0.,
-                             self._get_position(
-                                self.position_path, self.open_trial),
-                             'calibration')
-                    writelog(logfile, 'ON', 0.70,
-                             self._get_position(
-                                self.position_path, self.open_trial),
-                             'calibration')
-                    self._rotate_alittle(0.70)
-                    time.sleep(self.agent_interval+1.)
-                    writelog(logfile, 'OFF', 0.,
-                             self._get_position(
-                                self.position_path, self.open_trial),
-                             'calibration')
-                    '''
                     cycle += 1
 
             logfile.close()
