@@ -1,6 +1,6 @@
 .. highlight:: rst
 
-.. _appmotion_motors:
+.. _appmotion_motor:
 
 ==============
 Applied Motion Motors Agent
@@ -14,11 +14,6 @@ mapper motors.
    :func: make_parser
    :prog: python3 appmotion_motors_agent.py
 
-Dependencies
-------------
-
-# Any external dependencies for agent. Omit if there are none, or they are
-# included in the main requirements.txt file.
 
 Configuration File Examples
 ---------------------------
@@ -62,8 +57,7 @@ An example docker-compose configuration::
 Description
 -----------
 
-# Detailed description of the Agent. Include any details the users or developers
-# might find valuable.
+
 
 Subsection
 ``````````
@@ -245,10 +239,7 @@ Supporting APIs
 # when working on the Agent. :noindex: should be used here if code is also
 # indexed in the main API page.
 
-.. autoclass:: ocs.agent.template.Template1
+.. autoclass:: agents.appmotion_motor.appmotion_motors_driver.MotControl
     :members:
-    :noindex:
+    
 
-.. autoclass:: ocs.agent.template.Template2
-    :members:
-    :noindex:
