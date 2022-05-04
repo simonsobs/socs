@@ -1,0 +1,254 @@
+.. highlight:: rst
+
+.. _appmotion_motors:
+
+==============
+Applied Motion Motors Agent
+==============
+
+This agent is used to communicate with NEMA motors, particularly the beam-
+mapper motors.
+
+.. argparse::
+   :module: ../agents/appmotion_motor/appmotion_motors_agent.py
+   :func: make_parser
+   :prog: python3 appmotion_motors_agent.py
+
+Dependencies
+------------
+
+# Any external dependencies for agent. Omit if there are none, or they are
+# included in the main requirements.txt file.
+
+Configuration File Examples
+---------------------------
+
+Below are configuration examples for the ocs config file and for running the
+Agent in a docker container.
+
+OCS Site Config
+````````````````
+
+An example site-config-file block::
+
+    {'agent-class': 'SAT1MotorsAgent',
+         'instance-id': 'beammap-motors',
+         'manage': 'docker',
+         'arguments':[
+           ['--motor1_Ip', '192.168.0.188'],
+           ['--motor1_Port', '4001'],
+           ['--motor1_isLin'],
+           ['--motor2_Ip', '192.168.0.188'],
+           ['--motor2_Port', '4002'],
+           #['--motor2_isLin'],
+           ['--sampling_frequency','2'],
+           ['--mode', 'acq'],
+         ]},
+
+Docker Compose
+``````````````
+
+An example docker-compose configuration::
+
+    ocs-beam-mapper:
+    <<: *ocs-base
+    image: motor_test_image
+    network_mode: "host"
+    environment:
+      LOGLEVEL: debug
+    command:
+      - "--instance-id=beammap-motors"
+
+Description
+-----------
+
+# Detailed description of the Agent. Include any details the users or developers
+# might find valuable.
+
+Subsection
+``````````
+
+# Use subsections where appropriate.
+
+Agent API
+---------
+
+# Autoclass the Agent, this is for users to reference when writing clients.
+
+.. autoclass:: agents.appmotion_motor.appmotion_motors_agent.appMotionMotorsAgent
+    :members: init_motors_task, move_axis_to_position, move_axis_by_length,
+    set_velocity, set_acceleration, start_jogging, stop_jogging,
+    seek_home_linear_stage, set_zero, run_positions, start_rotation,
+    stop_rotation, close_connection, reconnect_motor, block_while_moving, 
+    kill_all_commands, set_encoder_value, get_encoder_value, get_positions,
+    is_moving, pos_while_moving, move_off_limit, reset_alarms, 
+    home_with_limits, start_acq, stop_acq
+    
+Example Clients
+---------------
+
+Below is a script for a beam-mapper scan using the appmotion_motor_agent.::
+
+    import numpy as np
+    import time
+    import os
+    import sys
+
+    # Importing OCS for motor control
+    from ocs import matched_client
+    import ocs
+
+    # Make list of points to map
+    def gen_points(Xstart,Xstop,Xstep,Ystart,Ystop,Ystep):
+
+        if ( (Xstop-Xstart)%Xstep !=0 ) or ((Ystop-Ystart)%Ystep !=0):
+            print('steplength is invalid')
+            sys.exit("Error message...... program is aborting...") 
+        else:
+            mappointX = abs(int((Xstop-Xstart)/Xstep))+1
+            mappointY = abs(int((Ystop-Ystart)/Ystep))+1
+            print('generate beammappoint %d x %d' %(mappointX, mappointY))
+            mappoint = []
+            xposition = Xstart
+            for x in range(mappointX):
+                yposition = Ystart
+                for y in range(mappointY):
+                    position = [xposition,yposition]
+                    mappoint.append(position)
+                    yposition += Ystep
+                xposition +=Xstep
+
+        return mappoint
+
+    # Map points
+    def scan_2d(mappoint,int_time,velocity):
+        print('Initializing motors')
+        motors = matched_client.MatchedClient('beammap-motors', args=[])
+        motors.init_motors.start()
+        motors.init_motors.wait()
+
+        print(f'Setting velocity to {velocity} rev/s')
+        motors.set_velocity.start(motor=3,velocity=velocity)
+        motors.set_velocity.wait()
+
+        print('Homing stages with limit switches')
+
+        motors.home_with_limits.start(motor=3)
+        motors.home_with_limits.wait()
+
+        print(f'Taking data with integration time: {int_time} sec')
+
+        time_dict = {}
+
+        file_time = str(int(np.floor(time.time())))
+        file_name = os.path.join('/home/gir/repos/ocs-site-configs/ucsd/k2so/gir/client_scripts/beam_maps/time_dicts',
+                                    file_time+'_time_dict.txt')
+
+        for point in mappoint:
+            time_dict[str(point)] = []
+            print(f'Moving stages to ({point[0]},{point[1]})')
+
+            motors.acq.stop()
+            motors.acq.wait()
+
+            motors.run_positions.start(posData=point,posIsInches=True,motor=3)
+            motors.run_positions.wait()
+
+            status, msg, session = motors.is_moving.start(motor=3)
+            status, msg, session = motors.is_moving.wait()
+            move_status = session['messages'][1][1][1]
+
+            motors.acq.start()
+
+            time.sleep(1)
+
+            while move_status:
+                print('Motors are still moving. Sleeping 5 seconds.')
+                time.sleep(5)
+
+                motors.acq.stop()
+                motors.acq.wait()
+
+                status, msg, session = motors.is_moving.start(motor=3)
+                status, msg, session = motors.is_moving.wait()
+                move_status = session['messages'][1][1][1]
+
+                motors.acq.start()
+
+
+            motors.acq.stop()
+            motors.acq.wait()
+
+            status, msg, session = motors.get_encoder.start(motor=3)
+            status, msg, session = motors.get_encoder.wait()
+
+            ePositions = session['messages'][1][1][1]
+
+            motors.acq.start()
+
+            start_time = time.time()
+            time_dict[str(point)].append(start_time)
+
+            print(f'Taking data for {int_time} sec')
+            time.sleep(int_time)
+
+            stop_time = time.time()
+
+            time_dict[str(point)].append(stop_time)
+
+            with open(file_name, 'a') as fname:
+                fname.write(f'start: {start_time}, stop : {stop_time}, ePositions: {ePositions}\n')
+
+        time_dict_fp = os.path.join('/home/gir/repos/ocs-site-configs/ucsd/k2so/gir/client_scripts/beam_maps/time_dicts',
+                                    file_time+'_time_dict.npy')
+        print(f'Saving timestamps to {time_dict_fp}')
+        np.save(time_dict_fp,time_dict)
+
+        print('Done taking data. Moving stages back to home.')
+        motors.run_positions.start(posData=(0.,0.),posIsInches=True,motor=3)
+        motors.run_positions.wait()
+
+        status, msg, session = motors.is_moving.start(motor=3)
+        status, msg, session = motors.is_moving.wait()
+        move_status = session['messages'][1][1][1]
+
+        motors.acq.start()
+
+        time.sleep(1)
+
+        while move_status:
+            print('Motors are still moving. Sleeping 5 seconds.')
+            time.sleep(5)
+
+            motors.acq.stop()
+            motors.acq.wait()
+
+            status, msg, session = motors.is_moving.start(motor=3)
+            status, msg, session = motors.is_moving.wait()
+            move_status = session['messages'][1][1][1]
+
+            motors.acq.start()
+
+        motors.acq.stop()
+        motors.acq.wait()
+
+        print('Closing motor connection')
+        motors.close_connect.start(motor=3)
+        motors.close_connect.wait()
+
+        return time_dict_fp
+
+Supporting APIs
+---------------
+
+# Autodoc any code supporting the Agent. This is for developers to reference
+# when working on the Agent. :noindex: should be used here if code is also
+# indexed in the main API page.
+
+.. autoclass:: ocs.agent.template.Template1
+    :members:
+    :noindex:
+
+.. autoclass:: ocs.agent.template.Template2
+    :members:
+    :noindex:
