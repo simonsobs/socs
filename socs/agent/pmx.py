@@ -97,7 +97,7 @@ class PMX:
         # print(msg)
         return voltage, current
 
-    def check_voltagesetting(self):
+    def check_voltage_setting(self):
         """ Check the voltage setting """
         self.clean_serial()
         for i in range(10):
@@ -116,7 +116,7 @@ class PMX:
             print(msg)
         return msg, val
 
-    def check_currentsetting(self):
+    def check_current_setting(self):
         """ Check the current setting """
         self.clean_serial()
         for i in range(10):
@@ -138,8 +138,8 @@ class PMX:
     def check_voltage_current_setting(self):
         """ Check both the voltage and current setting """
         self.clean_serial()
-        voltage = self.check_voltagesetting()[1]
-        current = self.check_currentsetting()[1]
+        voltage = self.check_voltage_setting()[1]
+        current = self.check_current_setting()[1]
         msg = (
             "Voltage setting = %.3f V\n"
             "Current setting = %.3f A\n"
@@ -437,10 +437,10 @@ class Command:
                 return self._PMX.check_voltage_current()
             # Check voltage setting
             elif cmd == self._cmds["check_vs"]:
-                return self._PMX.check_voltagesetting()
+                return self._PMX.check_voltage_setting()
             # Check current setting
             elif cmd == self._cmds["check_cs"]:
-                return self._PMX.check_currentsetting()
+                return self._PMX.check_current_setting()
             # Check voltage and current
             elif cmd == self._cmds["check_vcs"]:
                 return self._PMX.check_voltage_current_setting()
