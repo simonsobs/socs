@@ -56,6 +56,7 @@ An example docker-compose configuration::
       depends_on:
         - "crossbar"
       volumes:
+        - ${OCS_CONFIG_DIR}:/config:ro
         - "<local directory to record log file>:/data/wg-data"
       command:
         - "--instance-id=wgkikusui"
@@ -65,6 +66,9 @@ An example docker-compose configuration::
 - To control the wire-grid rotation accurately, 
   the agent uses the output of the ``Wiregrid Encoder Agent``.
   Therefore, mounting the volume of the ``ocs-wgencoder-agent`` is necessary. 
+- For the ``calibration_wg()`` function and debug mode (assigned by ``--debug`` option), 
+  a directory path to log files should be assigned in the ``volumes`` section 
+  (``/data/wg-data`` is the default path in the docker).
 
 
 Description
@@ -75,7 +79,6 @@ Functions
 
 The agent has many functions, however most of them are for testing.
 The main function is ``stepwise_rotation()``.
-``calibrate_wg()``.
 
 **Main Function (Stepwise Rotation)**
  - stepwise_rotation(): 
