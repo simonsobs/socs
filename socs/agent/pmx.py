@@ -66,7 +66,7 @@ class PMX:
             # print(msg)
         except  ValueError:
             msg = 'WARNING! Could not get correct voltage value! | Response = "%s"' % (val)
-            val = -999
+            val = -999.
             print(msg)
         return msg, val
 
@@ -81,7 +81,7 @@ class PMX:
             # print(msg)
         except  ValueError:
             msg = 'WARNING! Could not get correct current value! | Response = "%s"' % (val)
-            val = -999
+            val = -999.
             print(msg)
         return msg, val
 
@@ -112,7 +112,7 @@ class PMX:
             #print(msg)
         except  ValueError:
             msg = 'WARNING! Could not get correct voltage-setting value! | Response = "%s"' % (val)
-            val = -999
+            val = -999.
             print(msg)
         return msg, val
 
@@ -131,7 +131,7 @@ class PMX:
             #print(msg)
         except  ValueError:
             msg = 'WARNING! Could not get correct current-setting value! | Response = "%s"' % (val)
-            val = -999
+            val = -999.
             print(msg)
         return msg, val
 
