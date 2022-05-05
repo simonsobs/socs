@@ -207,7 +207,7 @@ class LS372_Agent:
 
             self.initialized = True
 
-        if params['configfile'] is not None:
+        if params.get('configfile') is not None:
             self.input_configfile(session, params)
             session.add_message("Lakeshore initial configurations uploaded using: %s"%params['configfile'])
 
