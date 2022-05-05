@@ -1,397 +1,448 @@
-import sys
 import os
 import argparse
 import time
+from twisted.internet import reactor
 
-this_dir = os.path.dirname(__file__)
-sys.path.append(
-        os.path.join(this_dir, 'src'))
+from ocs import ocs_agent, site_config
+from ocs.ocs_twisted import TimeoutLock
 
-import pid_controller as pd
 from socs.agent.pmx import PMX, Command
 
-from ocs import ocs_agent, site_config, client_t
-from ocs.ocs_twisted import TimeoutLock
+on_rtd = os.environ.get('READTHEDOCS') == 'True'
+if not on_rtd:
+    import src.pid_controller as pd
+
 
 class RotationAgent:
     """Agent to control the rotation speed of the CHWP
 
     Args:
-        kikusui_ip (str): IP address for the Kikusui power supply 
+        kikusui_ip (str): IP address for the Kikusui power supply
         kikusui_port (str): Port for the Kikusui power supply
         pid_ip (str): IP address for the PID controller
         pid_port (str): Port for the PID controller
+        pid_verbosity (str): Verbosity of PID controller output
 
     """
-    def __init__(self, agent, kikusui_ip, kikusui_port, pid_ip, pid_port):
+
+    def __init__(self, agent, kikusui_ip, kikusui_port, pid_ip, pid_port, pid_verbosity):
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
+        self._initialized = False
         self.take_data = False
-        self.switching = False
         self.kikusui_ip = kikusui_ip
         self.kikusui_port = int(kikusui_port)
         self.pid_ip = pid_ip
         self.pid_port = pid_port
+        self._pid_verbosity = pid_verbosity > 0
+        self.cmd = None  # Command object for PSU commanding
+        self.pid = None  # PID object for pid controller commanding
 
         agg_params = {'frame_length': 60}
-        self.agent.register_feed('hwprotation', record = True, agg_params = agg_params)
+        self.agent.register_feed(
+            'hwprotation', record=True, agg_params=agg_params)
 
-        try:
-            self.pmx = PMX(tcp_ip = self.kikusui_ip, tcp_port = self.kikusui_port, timeout = 0.5)
-            self.cmd = Command(self.pmx)
-            print('Connected to Kikusui power supply')
-        except:
-            print('Could not establish connection to Kikusui power supply')
-            sys.exit(0)
+    @ocs_agent.param('auto_acquire', default=False, type=bool)
+    @ocs_agent.param('force', default=False, type=bool)
+    def init_connection(self, session, params):
+        """init_connection(auto_acquire=False, force=False)
 
-        try:
-            self.pid = pd.PID(pid_ip = self.pid_ip, pid_port = self.pid_port)
-            print('Connected to PID controller')
-        except:
-            print('Could not establish connection to PID controller')
-            sys.exit(0)
+        **Task** - Initialize connection to Kikusui Power Supply and PID
+        Controller.
 
-    def tune_stop(self, session, params = None):
-        """tune_stop(params = None)
-        
-        Reverses the drive direction of the PID controller and optimizes the PID parameters for deceleration
+        Parameters:
+            auto_acquire (bool, optional): Default is False. Starts data
+                acquisition after initialization if True.
+            force (bool, optional): Force initialization, even if already
+                initialized. Defaults to False.
 
         """
-        with self.lock.acquire_timeout(0, job = 'tune_stop') as acquired:
+        if self._initialized and not params['force']:
+            self.log.info("Connection already initialized. Returning...")
+            return True, "Connection already initialized"
+
+        with self.lock.acquire_timeout(0, job='init_connection') as acquired:
             if not acquired:
-                self.log.warn('Could not tune stop because {} is already running'.format(self.lock.job))
+                self.log.warn(
+                    'Could not run init_connection because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
-            
-            print('tune_stop() called')
+
+            try:
+                pmx = PMX(tcp_ip=self.kikusui_ip,
+                          tcp_port=self.kikusui_port, timeout=0.5)
+                self.cmd = Command(pmx)
+                self.log.info('Connected to Kikusui power supply')
+            except ConnectionRefusedError:
+                self.log.error('Could not establish connection to Kikusui power supply')
+                reactor.callFromThread(reactor.stop)
+                return False, 'Unable to connect to Kikusui PSU'
+
+            try:
+                self.pid = pd.PID(pid_ip=self.pid_ip, pid_port=self.pid_port,
+                                  verb=self._pid_verbosity)
+                self.log.info('Connected to PID controller')
+            except BrokenPipeError:
+                self.log.error('Could not establish connection to PID controller')
+                reactor.callFromThread(reactor.stop)
+                return False, 'Unable to connect to PID controller'
+
+        self._initialized = True
+
+        # Start 'iv_acq' Process if requested
+        if params['auto_acquire']:
+            self.agent.start('iv_acq')
+
+        return True, 'Connection to PSU and PID controller established'
+
+    def tune_stop(self, session, params):
+        """tune_stop()
+
+        **Task** - Reverse the drive direction of the PID controller and
+        optimize the PID parameters for deceleration.
+
+        """
+        with self.lock.acquire_timeout(3, job='tune_stop') as acquired:
+            if not acquired:
+                self.log.warn(
+                    'Could not tune stop because {} is already running'.format(self.lock.job))
+                return False, 'Could not acquire lock'
+
             self.pid.tune_stop()
-        
+
         return True, 'Reversing Direction'
 
-    def tune_freq(self, session, params = None):
-        """tune_freq(params = None)
-        
-        Tunes the PID controller setpoint to the rotation frequency and optimizes the PID parameters for rotation
+    def tune_freq(self, session, params):
+        """tune_freq()
+
+        **Task** - Tune the PID controller setpoint to the rotation frequency
+        and optimize the PID parameters for rotation.
 
         """
-        with self.lock.acquire_timeout(0, job = 'tune_freq') as acquired:
+        with self.lock.acquire_timeout(3, job='tune_freq') as acquired:
             if not acquired:
-                self.log.warn('Could not tune freq because {} is already running'.format(self.lock.job))
+                self.log.warn(
+                    'Could not tune freq because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            print('tune_freq() called')
             self.pid.tune_freq()
 
         return True, 'Tuning to setpoint'
 
-    @ocs_agent.param('freq', default = 0., check = lambda x: 0. <= x <= 3.0)
-    def declare_freq(self, session, params = None):
-        """declare_freq(params = None)
-        
-        Stores the entered frequency as the PID setpoint when tune_freq is next called
+    @ocs_agent.param('freq', default=0., check=lambda x: 0. <= x <= 3.0)
+    def declare_freq(self, session, params):
+        """declare_freq(freq=0)
 
-        Args:
-            params (dict): Parameters dictionary for passing parameters to task
+        **Task** - Store the entered frequency as the PID setpoint when
+        ``tune_freq()`` is next called.
 
         Parameters:
-            freq (float): Desired HWP rotation frequency 
+            freq (float): Desired HWP rotation frequency
 
         """
-        with self.lock.acquire_timeout(0, job = 'declare_freq') as acquired:
+        with self.lock.acquire_timeout(3, job='declare_freq') as acquired:
             if not acquired:
-                self.log.warn('Could not declare freq because {} is already running'.format(self.lock.job))
+                self.log.warn(
+                    'Could not declare freq because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            print('declare_freq() called')
             self.pid.declare_freq(params['freq'])
 
         return True, 'Setpoint at {} Hz'.format(params['freq'])
 
-    @ocs_agent.param('p_param', default = 0.2, check = lambda x: 0. < x <= 8.)
-    @ocs_agent.param('i_param', default = 63, type = int, check = lambda x: 0 <= x <= 200)
-    @ocs_agent.param('d_param', default = 0., type = float, check = lambda x: 0. <= x < 10.)
-    def set_pid(self, session, params = None):
-        """set_pid(params = None)
-        
-        Sets the PID parameters. Note these changes are for the current session only and will change 
-        whenever the agent container is reloaded
+    @ocs_agent.param('p', default=0.2, type=float, check=lambda x: 0. < x <= 8.)
+    @ocs_agent.param('i', default=63, type=int, check=lambda x: 0 <= x <= 200)
+    @ocs_agent.param('d', default=0., type=float, check=lambda x: 0. <= x < 10.)
+    def set_pid(self, session, params):
+        """set_pid(p=0.2, i=63, d=0.)
 
-        Args:
-            params (dict): Parameters dictionary for passing parameters to task
+        **Task** - Set the PID parameters. Note these changes are for the
+        current session only and will change whenever the agent container is
+        reloaded.
 
         Parameters:
-            p_param (float): Proportional PID value
-            i_param (float): Integral PID value
-            d_param (float): Derivative PID value
+            p (float): Proportional PID value
+            i (int): Integral PID value
+            d (float): Derivative PID value
 
         """
-        with self.lock.acquire_timeout(0, job = 'set_pid') as acquired:
+        with self.lock.acquire_timeout(3, job='set_pid') as acquired:
             if not acquired:
-                self.log.warn('Could not set pid because {} is already running'.format(self.lock.job))
+                self.log.warn(
+                    'Could not set pid because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            print('set_pid() called')
-            self.pid.set_pid([p_param, i_param, d_param])
+            self.pid.set_pid(
+                [params['p'], params['i'], params['d']])
 
-        return True, 'Set PID params to p: {}, i: {}, d: {}'.format(p_param, i_param, d_param)
+        return True, f"Set PID params to p: {params['p']}, i: {params['i']}, d: {params['d']}"
 
-    def get_freq(self, session, params = None):
-        """get_freq(params = None)
-        
-        Returns the current HWP frequency as seen by the PID controller
+    def get_freq(self, session, params):
+        """get_freq()
+
+        **Task** - Return the current HWP frequency as seen by the PID
+        controller.
 
         """
-        with self.lock.acquire_timeout(0, job = 'get_freq') as acquired:
+        with self.lock.acquire_timeout(3, job='get_freq') as acquired:
             if not acquired:
-                self.log.warn('Could not get freq because {} is already running'.format(self.lock.job))
+                self.log.warn(
+                    'Could not get freq because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            print('get_freq() called')
-            self.pid.get_freq()
+            freq = self.pid.get_freq()
 
-        return self.pid.cur_freq, 'Current frequency = {}'.format(self.pid.cur_freq)
+        return True, 'Current frequency = {}'.format(freq)
 
-    def get_direction(self, session, params = None):
-        """get_direction(params = None
+    def get_direction(self, session, params):
+        """get_direction()
 
-        Returns the current HWP tune direction as seen by the PID controller 
+        **Task** - Return the current HWP tune direction as seen by the PID
+        controller.
 
         """
-        with self.lock.acquire_timeout(0, job = 'get_direction') as acquired:
+        with self.lock.acquire_timeout(3, job='get_direction') as acquired:
             if not acquired:
-                self.log.warn('Could not get freq because {} is already running'.format(self.lock.job))
+                self.log.warn(
+                    'Could not get freq because {} is already running'.format(self.lock.job))
+                return False, 'Could not acquire lock'
 
-            print('get_direction() called')
-            self.pid.get_direction()
+            direction = self.pid.get_direction()
 
-        return self.pid.direction, 'Current Direction = {}'.format(['Forward', 'Reverse'][self.pid.direction])
+        return True, 'Current Direction = {}'.format(['Forward', 'Reverse'][direction])
 
-    @ocs_agent.param('direction', default = '0', choices = ['0', '1'])
-    def set_direction(self, session, params = None):
-        """set_direction(params = None)
-        
-        Sets the HWP rotation direction
+    @ocs_agent.param('direction', type=str, default='0', choices=['0', '1'])
+    def set_direction(self, session, params):
+        """set_direction(direction='0')
 
-        Args:
-            params (dict): Parameters dictionary for passing parameters to task
+        **Task** - Set the HWP rotation direction.
 
         Parameters:
-            direction (str, optional): '0' for forward and '1' for reverse. Default is '0'
+            direction (str): '0' for forward and '1' for reverse.
 
         """
-        with self.lock.acquire_timeout(0, job = 'set_direction') as acquired:
+        with self.lock.acquire_timeout(3, job='set_direction') as acquired:
             if not acquired:
-                self.log.warn('Could not set direction because {} is already running'.format(self.lock.job))
+                self.log.warn(
+                    'Could not set direction because {} is already running'.format(self.lock.job))
+                return False, 'Could not acquire lock'
 
-            print('set_direction() called')
             self.pid.set_direction(params['direction'])
 
         return True, 'Set direction'
 
-    @ocs_agent.param('slope', default = 1., check = lambda x: -10. < x < 10.)
-    @ocs_agent.param('offset', default = 0., check = lambda x: -10. < x < 10.)
-    def set_scale(self, session, params = None):
-        """set_scale(params = None)
-        
-        Sets the PID's internal conversion from input voltage to rotation frequency
+    @ocs_agent.param('slope', default=1., type=float, check=lambda x: -10. < x < 10.)
+    @ocs_agent.param('offset', default=0.1, type=float, check=lambda x: -10. < x < 10.)
+    def set_scale(self, session, params):
+        """set_scale(slope=1, offset=0.1)
 
-        Args:
-            params (dict): Parameters dictionary for passing parameters to task
+        **Task** - Set the PID's internal conversion from input voltage to
+        rotation frequency.
 
         Parameters:
-            slope (float): Slope of the "rotation frequency vs input voltage" relationship
-            offset (float): y-intercept of the "rotation frequency vs input voltage" relationship
+            slope (float): Slope of the "rotation frequency vs input voltage"
+                relationship
+            offset (float): y-intercept of the "rotation frequency vs input
+                voltage" relationship
 
         """
-        with self.lock.acquire_timeout(0, job = 'set_scale') as acquired:
+        with self.lock.acquire_timeout(3, job='set_scale') as acquired:
             if not acquired:
-                self.log.warn('Could not set scale because {} is already running'.format(self.lock.job))
-            
-            print('set_scale() called')
+                self.log.warn(
+                    'Could not set scale because {} is already running'.format(self.lock.job))
+                return False, 'Could not acquire lock'
+
             self.pid.set_scale(params['slope'], params['offset'])
 
         return True, 'Set scale'
 
-    def set_on(self, session, params = None):
-        """set_on(params = None)
-        
-        Turns on the Kikusui drive voltage
+    def set_on(self, session, params):
+        """set_on()
+
+        **Task** - Turn on the Kikusui drive voltage.
 
         """
-        with self.lock.acquire_timeout(0, job = 'set_on') as acquired:
+        with self.lock.acquire_timeout(3, job='set_on') as acquired:
             if not acquired:
-                self.log.warn('Could not set on because {} is already running'.format(self.lock.job))
+                self.log.warn(
+                    'Could not set on because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            self.switching = True
             time.sleep(1)
-            print('set_on() called')
             self.cmd.user_input('on')
-            self.switching = False
 
         return True, 'Set Kikusui on'
 
-    def set_off(self, session, params = None):
-        """set_off(params = None)
-        
-        Turns off the Kikusui drive voltage
+    def set_off(self, session, params):
+        """set_off()
+
+        **Task** - Turn off the Kikusui drive voltage.
 
         """
-        with self.lock.acquire_timeout(0, job = 'set_off') as acquired:
+        with self.lock.acquire_timeout(3, job='set_off') as acquired:
             if not acquired:
-                self.log.warn('Could not set off because {} is already running'.format(self.lock.job))
+                self.log.warn(
+                    'Could not set off because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            self.switching = True
             time.sleep(1)
-            print('set_off() called')
             self.cmd.user_input('off')
-            self.switching = False
 
         return True, 'Set Kikusui off'
 
-    @ocs_agent.param('volt', default = 0, check = lambda x: 0 <= x <= 35)
-    def set_v(self, session, params = None):
-        """set_v(params = None)
-        
-        Sets the Kikusui drive voltage
+    @ocs_agent.param('volt', default=0, type=float, check=lambda x: 0 <= x <= 35)
+    def set_v(self, session, params):
+        """set_v(volt=0)
 
-        Args:
-            params (dict): Parameters dictionary for passing parameters to task
+        **Task** - Set the Kikusui drive voltage.
 
         Parameters:
             volt (float): Kikusui set voltage
 
         """
-        with self.lock.acquire_timeout(0, job = 'set_v') as acquired:
+        with self.lock.acquire_timeout(3, job='set_v') as acquired:
             if not acquired:
-                self.log.warn('Could not set v because {} is already running'.format(self.lock.job))
+                self.log.warn(
+                    'Could not set v because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            self.switching = True
             time.sleep(1)
-            print('set_v() called')
             self.cmd.user_input('V {}'.format(params['volt']))
-            self.switching = False
 
         return True, 'Set Kikusui voltage to {} V'.format(params['volt'])
 
-    @ocs_agent.param('volt', default = 32., check = lambda x: 0. <= x <= 35.)
-    def set_v_lim(self, session, params = None):
-        """set_v_lim(params = None)
-        
-        Sets the Kikusui drive voltage limit
+    @ocs_agent.param('volt', default=32., type=float, check=lambda x: 0. <= x <= 35.)
+    def set_v_lim(self, session, params):
+        """set_v_lim(volt=32)
 
-        Args:
-            params (dict): Parameters dictionary for passing parameters to task
+        **Task** - Set the Kikusui drive voltage limit.
 
         Parameters:
             volt (float): Kikusui limit voltage
 
         """
-        with self.lock.acquire_timeout(0, job = 'set_v_lim') as acquired:
+        with self.lock.acquire_timeout(3, job='set_v_lim') as acquired:
             if not acquired:
-                self.log.warn('Could not set v lim because {} is already running'.format(self.lock.job))
+                self.log.warn(
+                    'Could not set v lim because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            self.switching = True
             time.sleep(1)
-            print('set_v_lim() called')
             print(params['volt'])
             self.cmd.user_input('VL {}'.format(params['volt']))
-            self.switching = False
 
         return True, 'Set Kikusui voltage limit to {} V'.format(params['volt'])
 
-    def use_ext(self, session, params = None): 
-        """use_ext(params = None)
-        
-        Set's the Kikusui to use an external voltage control. Doing so enables PID control
+    def use_ext(self, session, params):
+        """use_ext()
+
+        **Task** - Set the Kikusui to use an external voltage control. Doing so
+        enables PID control.
 
         """
-        with self.lock.acquire_timeout(0, job = 'use_ext') as acquired:
+        with self.lock.acquire_timeout(3, job='use_ext') as acquired:
             if not acquired:
-                self.log.warn('Could not use external voltage because {} is already running'.format(self.lock.job))
+                self.log.warn(
+                    'Could not use external voltage because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            self.switching = True
             time.sleep(1)
-            print('use_ext() called')
             self.cmd.user_input('U')
-            self.switching = False
 
         return True, 'Set Kikusui voltage to PID control'
 
-    def ign_ext(self, session, params = None):
-        """ign_ext(params = None)
-        
-        Set's the Kiksui to ignore external voltage control. Doing so disables the PID and switches to direct control
+    def ign_ext(self, session, params):
+        """ign_ext()
+
+        **Task** - Set the Kiksui to ignore external voltage control. Doing so
+        disables the PID and switches to direct control.
 
         """
-        with self.lock.acquire_timeout(0, job = 'ign_ext') as acquired:
+        with self.lock.acquire_timeout(3, job='ign_ext') as acquired:
             if not acquired:
-                self.log.warn('Could not ignore external voltage because {} is already running'.format(self.lock.job))
+                self.log.warn(
+                    'Could not ignore external voltage because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            self.switching = True
             time.sleep(1)
-            print('ign_ext() called')
             self.cmd.user_input('I')
-            self.switching = False
 
         return True, 'Set Kikusui voltage to direct control'
 
-    def start_iv_acq(self, session, params = None):
-        """start_iv_acq(params = None)
+    @ocs_agent.param('test_mode', default=False, type=bool)
+    def iv_acq(self, session, params):
+        """iv_acq(test_mode=False)
 
-        Method to start Kikusui data acquisition process
+        **Process** - Start Kikusui data acquisition.
 
-        The most recent data collected is stored in the structure:
-            >>> data
-            {'kikusui_volt': 0, 'kikusui_curr': 0}
+        Parameters:
+            test_mode (bool, optional): Run the Process loop only once.
+                This is meant only for testing. Default is False.
+
+        Notes:
+            The most recent data collected is stored in the session data in the
+            structure::
+
+                >>> response.session['data']
+                {'kikusui_volt': 0,
+                 'kikusui_curr': 0,
+                 'last_updated': 1649085992.719602}
 
         """
-        with self.lock.acquire_timeout(timeout = 0, job = 'iv_acq') as acquired:
+        with self.lock.acquire_timeout(timeout=0, job='iv_acq') as acquired:
             if not acquired:
                 self.log.warn('Could not start iv acq because {} is already running'
                               .format(self.lock.job))
                 return False, 'Could not acquire lock'
 
             session.set_status('running')
-        
-        self.take_data = True
+            last_release = time.time()
+            self.take_data = True
 
-        print('Starting IV acq')
-        while self.take_data:
-            data = {'timestamp': time.time(), 'block_name': 'HWPKikusui_IV', 'data': {}}
-           
-            if not self.switching:
+            while self.take_data:
+                # Relinquish sampling lock occasionally.
+                if time.time() - last_release > 1.:
+                    last_release = time.time()
+                    if not self.lock.release_and_acquire(timeout=10):
+                        self.log.warn(f"Failed to re-acquire sampling lock, "
+                                      f"currently held by {self.lock.job}.")
+                        continue
+
+                data = {'timestamp': time.time(),
+                        'block_name': 'HWPKikusui_IV', 'data': {}}
+
                 v_msg, v_val = self.cmd.user_input('V?')
                 i_msg, i_val = self.cmd.user_input('C?')
 
                 data['data']['kikusui_volt'] = v_val
                 data['data']['kikusui_curr'] = i_val
 
-                if type(data['data']['kikusui_curr'])  == float and type(data['data']['kikusui_volt']) == float:
-                    self.agent.publish_to_feed('hwprotation', data)
-            
-            time.sleep(1)
+                self.agent.publish_to_feed('hwprotation', data)
+
+                session.data = {'kikusui_volt': v_val,
+                                'kikusui_curr': i_val,
+                                'last_updated': time.time()}
+
+                time.sleep(1)
+
+                if params['test_mode']:
+                    break
 
         self.agent.feeds['hwprotation'].flush_buffer()
         return True, 'Acqusition exited cleanly'
 
-    def stop_iv_acq(self, session, params = None):
+    def _stop_iv_acq(self, session, params):
         """
-        Stops acq process
+        Stop iv_acq process.
         """
         if self.take_data:
-            print('Stopping IV acq')
             self.take_data = False
             return True, 'requested to stop taking data'
 
         return False, 'acq is not currently running'
 
-def make_parser(parser = None):
+
+def make_parser(parser=None):
     """
     Build the argument parser for the Agent. Allows sphinx to automatically build documentation
     baised on this function
@@ -405,32 +456,41 @@ def make_parser(parser = None):
     pgroup.add_argument('--kikusui-port')
     pgroup.add_argument('--pid-ip')
     pgroup.add_argument('--pid-port')
+    pgroup.add_argument('--verbose', '-v', action='count', default=0,
+                        help='PID Controller verbosity level.')
+    pgroup.add_argument('--mode', type=str, default='iv_acq',
+                        choices=['idle', 'init', 'iv_acq'],
+                        help="Starting operation for the Agent.")
     return parser
 
+
 if __name__ == '__main__':
-    # Get the default ocs argument parser
-    site_parser = site_config.add_arguments()
-    parser = make_parser(site_parser)
+    parser = make_parser()
+    args = site_config.parse_args(agent_class='RotationAgent', parser=parser)
 
-    # Parse the command line
-    args = parser.parse_args()
+    init_params = False
+    if args.mode == 'init':
+        init_params = {'auto_acquire': False}
+    elif args.mode == 'iv_acq':
+        init_params = {'auto_acquire': True}
 
-    # Interpret options in the context of site_config
-    site_config.reparse_args(args, 'RotationAgent')
     agent, runner = ocs_agent.init_site_agent(args)
-    rotation_agent = RotationAgent(agent, kikusui_ip = args.kikusui_ip, 
-                                          kikusui_port = args.kikusui_port,
-                                          pid_ip = args.pid_ip,
-                                          pid_port = args.pid_port)
-    agent.register_process('iv_acq', rotation_agent.start_iv_acq,
-                           rotation_agent.stop_iv_acq, startup = True)
+    rotation_agent = RotationAgent(agent, kikusui_ip=args.kikusui_ip,
+                                   kikusui_port=args.kikusui_port,
+                                   pid_ip=args.pid_ip,
+                                   pid_port=args.pid_port,
+                                   pid_verbosity=args.verbose)
+    agent.register_process('iv_acq', rotation_agent.iv_acq,
+                           rotation_agent._stop_iv_acq)
+    agent.register_task('init_connection', rotation_agent.init_connection,
+                        startup=init_params)
     agent.register_task('tune_stop', rotation_agent.tune_stop)
     agent.register_task('tune_freq', rotation_agent.tune_freq)
     agent.register_task('declare_freq', rotation_agent.declare_freq)
-    agent.register_task('set_pid', rotation_agent.set_pid) 
-    agent.register_task('get_freq', rotation_agent.get_freq)  
+    agent.register_task('set_pid', rotation_agent.set_pid)
+    agent.register_task('get_freq', rotation_agent.get_freq)
     agent.register_task('get_direction', rotation_agent.get_direction)
-    agent.register_task('set_direction', rotation_agent.set_direction) 
+    agent.register_task('set_direction', rotation_agent.set_direction)
     agent.register_task('set_scale', rotation_agent.set_scale)
     agent.register_task('set_on', rotation_agent.set_on)
     agent.register_task('set_off', rotation_agent.set_off)
@@ -439,5 +499,4 @@ if __name__ == '__main__':
     agent.register_task('use_ext', rotation_agent.use_ext)
     agent.register_task('ign_ext', rotation_agent.ign_ext)
 
-    runner.run(agent, auto_reconnect = True)
-
+    runner.run(agent, auto_reconnect=True)

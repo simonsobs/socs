@@ -1,183 +1,280 @@
-
-########################################################################################################################
-# Imports
-########################################################################################################################
-
-import subprocess
-import os
-import fcntl
 import time
-this_dir = os.path.dirname(__file__)
+import socket
 
-########################################################################################################################
-# Primary Class
-########################################################################################################################
 
 class PID:
-    # Information and variables used for PID connection
-    def __init__(self, pid_ip, pid_port, verb = False):
+    """Class to communicate with the Omega CNi16D54-EIT PID controller.
+
+    Args:
+        pid_ip (str): IP address for the controller.
+        pid_port (int): Port number for the socket connection.
+        verb (bool): Verbose output setting. Defaults to False.
+
+    Attributes:
+        verb (bool): Verbose output setting.
+        hex_freq (str): Currently declared rotation frequency in hexadecimal.
+        direction (int): Current direction of the HWP. 0 for forward and 1 for
+            backwards.
+        conn (socket.socket): Socket object with open connection to the PID
+            controller.
+
+    """
+    def __init__(self, pid_ip, pid_port, verb=False):
         self.verb = verb
-        self.script_dir = os.path.dirname(os.path.abspath(__file__))
-        self.return_list = []
-        self.PID_INFO = [pid_ip, pid_port]
         self.hex_freq = '00000'
-        self.cur_freq = 0
-        self.cur_direction = 0
-        self.stop_params = [0.2, 0, 0]
-        self.tune_params = [0.2, 63, 0]
+        self.direction = None
+        # Need to setup connection before setting direction
+        self.conn = self._establish_connection(pid_ip, int(pid_port))
         self.set_direction('0')
 
-########################################################################################################################
-# Subprocesses
-########################################################################################################################
+    @staticmethod
+    def _establish_connection(ip, port, timeout=5):
+        """Connect to PID controller.
 
-    # Converts the user input into a format the PID controller can read
-    def convert_to_hex(self, value, decimal):
-        temp_value = hex(int(10**decimal*float(value)))
+        Args:
+            ip (str): IP address for controller.
+            port (int): Port number for socket connection.
+            timeout (float): Time in seconds to wait for comms until timeout
+                occurs.
+
+        Returns:
+            socket.socket: Socket object with open connection to the PID
+                controller.
+
+        """
+        conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            conn.connect((ip, port))
+        except ConnectionRefusedError:
+            print(f"Failed to connect to device at {ip}:{port}")
+        conn.settimeout(timeout)
+
+        return conn
+
+    @staticmethod
+    def _convert_to_hex(value, decimal):
+        """Converts the user input into a format the PID controller can
+        read.
+
+        """
+        temp_value = hex(int(10**decimal * float(value)))
         return ('0000' + str(temp_value)[2:].upper())[-4:]
 
-    # Opens the connection with the PID controller and makes sure that nothing else is using the connection
-    def open_line(self):
-        while True:
-            try:
-                self.lock_file = open(os.path.join(this_dir, '.pid_port_busy'))
-                fcntl.flock(self.lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                break
-            except BlockingIOError:
-                time.sleep(2)
+    @staticmethod
+    def _get_scale_hex(num, corr):
+        """Gets the exponent in scientific notation."""
+        expo = int(str(num * 10**40 + 0.01).split('+')[1]) - 40
+        digits = round(num * 10**(-expo + 4))
 
-    # Closes the connection with the PID controller
-    def close_line(self):
-        fcntl.flock(self.lock_file, fcntl.LOCK_UN)
-        self.lock_file.close()
-
-    # Gets the exponent in scientific notation
-    def get_scale_hex(self, num, corr):
-        expo = int(str(num*10**40 + 0.01).split('+')[1])-40
-        digits = round(num*10**(-expo+4))
-
-        expo_hex = str(hex(corr-expo))[2:]
-        digits_hex = ('00000'+str(hex(digits))[2:])[-5:]
+        expo_hex = str(hex(corr - expo))[2:]
+        digits_hex = ('00000' + str(hex(digits))[2:])[-5:]
 
         return expo_hex + digits_hex
 
-########################################################################################################################
-# Main Processes
-########################################################################################################################
+    ######################################################################
+    # Main Processes
+    ######################################################################
 
-    # Sets the direction if the CHWP; 0 for forward and 1 for backwards
     def set_direction(self, direction):
-        self.open_line()   
-        subprocess.call([os.path.join(self.script_dir, 'tune_direction'), self.PID_INFO[0], self.PID_INFO[1],
-                         direction], stderr = subprocess.DEVNULL)
+        """Sets the direction if the CHWP.
+
+        Modifies the ``direction`` attribute.
+
+        Args:
+            direction (int): 0 for forward and 1 for backwards
+
+        """
         if direction == '0':
-            print('Forward')
+            if self.verb:
+                print('Forward')
+            resp = self.send_message("*W02400000")
             self.direction = 0
         elif direction == '1':
-            print('Reverse')
+            if self.verb:
+                print('Reverse')
+            resp = self.send_message("*W02401388")
             self.direction = 1
 
-        self.return_messages()
-        self.close_line()
+        if self.verb:
+            print(self.return_messages([resp])[0])
 
-    # Declare to memory what the CHWP frequency should be (does not actually change the frequency)
     def declare_freq(self, freq):
+        """Declare to memory what the CHWP frequency should be.
+
+        **Note:** Does not actually change the frequency.
+
+        Args:
+            freq (float): Set freqency in Hz. Must be less than 3.5.
+
+        """
         if float(freq) <= 3.5:
-            self.hex_freq = '0' + self.convert_to_hex(freq, 3)
+            self.hex_freq = '0' + self._convert_to_hex(freq, 3)
             if self.verb:
                 print('Frequency Setpoint = ' + str(freq) + ' Hz')
         else:
             if self.verb:
                 print('Invalid Frequency')
 
-    # Method which sets the setpoint to 0 Hz and stops the CHWP
     def tune_stop(self):
-        self.open_line()
+        """Set the setpoint to 0 Hz and stop the CHWP."""
         if self.verb:
             print('Starting Stop')
-        subprocess.call([os.path.join(self.script_dir, 'tune_stop'), self.PID_INFO[0], self.PID_INFO[1]], 
-                         stderr = subprocess.DEVNULL)
-        self.set_pid(self.stop_params)
-        self.close_line()
 
-    # Meathod which sets the setpoint to what is currently defined in memory
-    def tune_freq(self):
-        self.open_line()
+        responses = []
+        responses.append(self.send_message("*W0C83"))
+        responses.append(self.send_message("*W01400000"))
+        responses.append(self.send_message("*R01"))
+        responses.append(self.send_message("*Z02"))
         if self.verb:
-            print('Staring Tune')
-        subprocess.call([os.path.join(self.script_dir, 'tune_freq'), self.PID_INFO[0], self.PID_INFO[1],
-                         self.hex_freq], stderr = subprocess.DEVNULL)
-        self.set_pid(self.tune_params)
-        self.close_line()
+            print(responses)
+            print(self.return_messages(responses))
 
-    # Returns the current frequency of the CHWP
+        stop_params = [0.2, 0, 0]
+        self.set_pid(stop_params)
+
+    def tune_freq(self):
+        """Set the setpoint to currently declared frequency.
+
+        To declare the frequency, use ``PID.declare_freq()``.
+
+        """
+        if self.verb:
+            print('Starting Tune')
+
+        responses = []
+        responses.append(self.send_message("*W0C81"))
+        responses.append(self.send_message(f"*W014{self.hex_freq}"))
+        responses.append(self.send_message("*R01"))
+        responses.append(self.send_message("*Z02"))
+        if self.verb:
+            print(responses)
+            print(self.return_messages(responses))
+
+        tune_params = [0.2, 63, 0]
+        self.set_pid(tune_params)
+
     def get_freq(self):
-        self.open_line()
+        """Returns the current frequency of the CHWP."""
         if self.verb:
             print('Finding CHWP Frequency')
-        subprocess.call([os.path.join(self.script_dir, './get_freq'), self.PID_INFO[0], self.PID_INFO[1]],
-                         stderr = subprocess.DEVNULL)
-        self.return_messages()
-        self.close_line()
-        return self.cur_freq
 
-    # Returns the current rotation direction
+        responses = []
+        responses.append(self.send_message("*X01"))
+        if self.verb:
+            print(responses)
+
+        freq = self.return_messages(responses)[0]
+        return freq
+
     def get_direction(self):
-        self.open_line()
+        """Get the current rotation direction.
+
+        Returns:
+            int: 0 for forward and 1 for backwards
+
+        """
         if self.verb:
             print('Finding CHWP Direction')
-        subprocess.call([os.path.join(self.script_dir, './get_direction'), self.PID_INFO[0], self.PID_INFO[1]],
-                         stderr = subprocess.DEVNULL)
-        self.return_messages()
-        self.close_line()
 
-    # Sets the PID parameters of the controller
+        responses = []
+        responses.append(self.send_message("*R02"))
+
+        direction = self.return_messages(responses)[0]
+        if direction == 1:
+            print('Direction = Reverse')
+        elif direction == 0:
+            print('Direction = Forward')
+        self.direction = direction
+
+        return direction
+
     def set_pid(self, params):
+        """Sets the PID parameters of the controller."""
         if self.verb:
             print('Setting PID Params')
-        p_value = self.convert_to_hex(params[0], 3)
-        i_value = self.convert_to_hex(params[1], 0)
-        d_value = self.convert_to_hex(params[2], 1)
-        subprocess.call([os.path.join(self.script_dir, './set_pid'), self.PID_INFO[0], self.PID_INFO[1], p_value,
-                        i_value, d_value], stderr = subprocess.DEVNULL)
-        self.return_messages()
 
-    # Sets the conversion between feedback voltage and approximate frequency
+        p_value = self._convert_to_hex(params[0], 3)
+        i_value = self._convert_to_hex(params[1], 0)
+        d_value = self._convert_to_hex(params[2], 1)
+
+        responses = []
+        responses.append(self.send_message(f"*W17{p_value}"))
+        responses.append(self.send_message(f"*W18{i_value}"))
+        responses.append(self.send_message(f"*W19{d_value}"))
+        responses.append(self.send_message("*Z02"))
+        if self.verb:
+            print(responses)
+            print(self.return_messages(responses))
+
     def set_scale(self, slope, offset):
-        self.open_line()
-        slope_hex = get_scale_hex(slope, 1)
-        offset_hex = get_scale_hex(offset, 2)
-        subprocess.call([os.path.join(self.script_dir, './set_scale'), self.PID_INFO[0], self.PID_INFO[1],
-                         slope_hex, offset_hex], stderr = subprocess.DEVNULL)
-        self.close_line()
+        """Set the conversion between feedback voltage and approximate
+        frequency.
 
-########################################################################################################################
-# Messaging
-########################################################################################################################
+        """
+        slope_hex = self._get_scale_hex(slope, 1)
+        offset_hex = self._get_scale_hex(offset, 2)
 
-    def return_messages(self):
-        temp_return = self.read_log()
-        self.return_list = self.decode_array(temp_return)
-        self.remove_log()
+        responses = []
+        responses.append(self.send_message(f"*W14{slope_hex}"))
+        responses.append(self.send_message(f"*W03{offset_hex}"))
+        responses.append(self.send_message("*Z02"))
+        if self.verb:
+            print(responses)
+            print(self.return_messages(responses))
 
-    def read_log(self):
-        with open('output.txt', 'rb') as log_file:
-            return_string = log_file.read().split(b'\n')[-1]
-            return return_string.decode('ascii').split('\r')[:-1]
+    ######################################################################
+    # Messaging
+    ######################################################################
 
-    def remove_log(self):
-        subprocess.call(['rm', 'output.txt'])
+    def send_message(self, msg):
+        """Send message over TCP to the PID controller.
 
-    def decode_array(self, input_array):
+        Args:
+            msg (str): Command to send to the controller.
+
+        Returns:
+            str: Respnose from the controller.
+
+        """
+        self.conn.sendall((msg + '\r\n').encode())
+        time.sleep(0.5)  # Don't send messages too quickly
+        for attempt in range(2):
+            try:
+                data = self.conn.recv(4096).decode().strip()
+                break
+            except socket.timeout:
+                print("Caught timeout waiting for response from PID controller. " +
+                      "Trying again...")
+                time.sleep(1)
+                if attempt == 1:
+                    raise RuntimeError(
+                        'Response from PID controller timed out.')
+        return data
+
+    def return_messages(self, msg):
+        """Decode list of responses from PID controller and return useful
+        values.
+
+        Args:
+            msg (list): List of messages to decode.
+
+        Returns:
+            list: Decoded responses.
+
+        """
+        return self._decode_array(msg)
+
+    @staticmethod
+    def _decode_array(input_array):
         output_array = list(input_array)
-        
+
         for index, string in enumerate(list(input_array)):
             header = string[0]
-            
+
             if header == 'R':
-                output_array[index] = self.decode_read(string)
+                output_array[index] = PID._decode_read(string)
             elif header == 'W':
-                output_array[index] = self.decode_write(string)
+                output_array[index] = PID._decode_write(string)
             elif header == 'E':
                 output_array[index] = 'PID Enabled'
             elif header == 'D':
@@ -187,40 +284,44 @@ class PID:
             elif header == 'G':
                 pass
             elif header == 'X':
-                output_array[index] = self.decode_measure(string)
+                output_array[index] = PID._decode_measure(string)
             else:
                 pass
 
         return output_array
 
-    def decode_read(self, string):
+    @staticmethod
+    def _decode_read(string):
         read_type = string[1:3]
         if read_type == '01':
-            return 'Setpoint = ' + str(int(string[4:], 16)/1000.)
-        elif read_type == '02':
-            if int(string[4:], 16)/1000. > 2.5:
+            return 'Setpoint = ' + str(int(string[4:], 16) / 1000.)
+        # Decode direction
+        if read_type == '02':
+            if int(string[4:], 16) / 1000. > 2.5:
                 print('Direction = Reverse')
-                self.direction = 1
+                return 1
             else:
                 print('Direction = Forward')
-                self.direction = 0
+                return 0
         else:
             return 'Unrecognized Read'
 
-    def decode_write(self, string):
+    @staticmethod
+    def _decode_write(string):
         write_type = string[1:]
         if write_type == '01':
             return 'Changed Setpoint'
-        elif write_type == '0C':
+        if write_type == '02':
+            return 'Changed Direction'
+        if write_type == '0C':
             return 'Changed Action Type'
         else:
             return 'Unrecognized Write'
 
-    def decode_measure(self, string):
+    @staticmethod
+    def _decode_measure(string):
         measure_type = string[1:3]
         if measure_type == '01':
-            self.cur_freq = float(string[3:])
             return float(string[3:])
         else:
             return 9.999
-

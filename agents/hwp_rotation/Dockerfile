@@ -3,9 +3,6 @@
 # Use socs base image
 FROM socs:latest
 
-# Install telnet for PID communication
-RUN apt-get install telnet
-
 # Set the working directory to registry directory
 WORKDIR /app/socs/agents/hwp_rotation/
 
