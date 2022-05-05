@@ -9,7 +9,7 @@ import yaml
 from contextlib import contextmanager
 from twisted.internet import reactor
 
-from socs.Lakeshore.Lakeshore372 import LS372, Channel
+from socs.Lakeshore.Lakeshore372 import LS372
 
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock, Pacemaker
@@ -116,7 +116,7 @@ class LS372_Agent:
         self.agent = agent
         # Registers temperature feeds
         agg_params = {
-            'frame_length': 10*60 #[sec]
+            'frame_length': 10*60 # [sec]
         }
         self.agent.register_feed('temperatures',
                                  record=True,
@@ -169,7 +169,7 @@ class LS372_Agent:
         if self.initialized and not params.get('force', False):
             self.log.info("Lakeshore already initialized. Returning...")
             return True, "Already initialized"
-        
+
         with self._lock.acquire_timeout(job='init') as acquired1, \
              self._acq_proc_lock.acquire_timeout(timeout=0., job='init') \
              as acquired2:
@@ -208,7 +208,6 @@ class LS372_Agent:
             self.initialized = True
 
         if params['configfile'] is not None:
-            configfile = params['configfile']
             self.input_configfile(session, params)
             session.add_message("Lakeshore initial configurations uploaded using: %s"%params['configfile'])
 
@@ -782,7 +781,7 @@ class LS372_Agent:
 
             # Make sure we aren't servoing too high in temperature.
             if params["temperature"] > 1:
-                return False, f'Servo temperature is set above 1K. Aborting.'
+                return False, 'Servo temperature is set above 1K. Aborting.'
 
             self.module.sample_heater.set_setpoint(params["temperature"])
 
@@ -921,7 +920,7 @@ class LS372_Agent:
             session.app.publish_to_feed('temperatures', data)
 
         return True, "Set {} display to {}, output to {}".format(heater, display, output)
-                                    
+
     @ocs_agent.param('output', type=float, check=lambda x: 0 <= x <= 100)
     def set_still_output(self, session, params=None):
         """set_still_output(output=None)
@@ -1002,9 +1001,13 @@ class LS372_Agent:
                 self.log.warn(f"Could not start Task because "
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
-            
+
+            # path to configfile in docker container
+            configpath = os.environ.get("OCS_CONFIG_DIR", "/config/")
             configfile = params['configfile']
-            with open(configfile) as f:
+
+            ls372configs = os.path.join(configpath, configfile)
+            with open(ls372configs) as f:
                 config = yaml.safe_load(f)
 
             ls = self.module
@@ -1012,9 +1015,9 @@ class LS372_Agent:
 
             device_config = config[ls_serial]['device_settings']
             ls_chann_settings = config[ls_serial]['channel']
-            
+
             session.set_status('running')
-            
+
             # enable/disable autoscan
             if device_config['autoscan'] == 'on':
                 ls.enable_autoscan()
@@ -1063,7 +1066,7 @@ class LS372_Agent:
                 ls.channels[i].set_temperature_coefficient(tempco)
                 self.log.info("temperature coeff. for CH.{channel} set to {tempco}".format(channel=i, tempco=tempco))
 
-        return True, "Uploaded ".format(configfile)
+        return True, "Uploaded {}".format(configfile)
 
 
 def make_parser(parser=None):
@@ -1100,6 +1103,7 @@ def make_parser(parser=None):
 
     return parser
 
+
 if __name__ == '__main__':
     # For logging
     txaio.use_twisted()
@@ -1115,18 +1119,18 @@ if __name__ == '__main__':
     init_params = False
     if args.mode == 'init':
         init_params = {'auto_acquire': False,
-                'acq_params': {'sample_heater': args.sample_heater},
-                'configfile': args.configfile}
+                       'acq_params': {'sample_heater': args.sample_heater},
+                       'configfile': args.configfile}
     elif args.mode == 'acq':
         init_params = {'auto_acquire': True,
-                'acq_params': {'sample_heater': args.sample_heater}}
+                       'acq_params': {'sample_heater': args.sample_heater}}
 
     # Interpret options in the context of site_config.
     print('I am in charge of device with serial number: %s' % args.serial_number)
 
     agent, runner = ocs_agent.init_site_agent(args)
 
-    lake_agent = LS372_Agent(agent, args.serial_number, args.ip_address, 
+    lake_agent = LS372_Agent(agent, args.serial_number, args.ip_address,
                              fake_data=args.fake_data,
                              dwell_time_delay=args.dwell_time_delay,
                              enable_control_chan=args.enable_control_chan)
