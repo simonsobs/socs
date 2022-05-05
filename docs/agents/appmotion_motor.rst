@@ -26,17 +26,17 @@ OCS Site Config
 
 An example site-config-file block::
 
-    {'agent-class': 'SAT1MotorsAgent',
+    {'agent-class': 'appMotionMotorsAgent',
          'instance-id': 'beammap-motors',
          'manage': 'docker',
          'arguments':[
-           ['--motor1_Ip', '192.168.0.188'],
-           ['--motor1_Port', '4001'],
-           ['--motor1_isLin'],
-           ['--motor2_Ip', '192.168.0.188'],
-           ['--motor2_Port', '4002'],
-           #['--motor2_isLin'],
-           ['--sampling_frequency','2'],
+           ['--motor1-ip', '192.168.0.188'],
+           ['--motor1-port', '4001'],
+           ['--motor1-is-lin'],
+           ['--motor2-ip', '192.168.0.188'],
+           ['--motor2-port', '4002'],
+           #['--motor2-is-lin'],
+           ['--sampling-frequency','2'],
            ['--mode', 'acq'],
          ]},
 
@@ -54,15 +54,6 @@ An example docker-compose configuration::
     command:
       - "--instance-id=beammap-motors"
 
-Description
------------
-
-
-
-Subsection
-``````````
-
-# Use subsections where appropriate.
 
 Agent API
 ---------
@@ -234,10 +225,6 @@ Below is a script for a beam-mapper scan using the appmotion_motor_agent.::
 
 Supporting APIs
 ---------------
-
-# Autodoc any code supporting the Agent. This is for developers to reference
-# when working on the Agent. :noindex: should be used here if code is also
-# indexed in the main API page.
 
 .. autoclass:: agents.appmotion_motor.appmotion_motors_driver.MotControl
     :members:

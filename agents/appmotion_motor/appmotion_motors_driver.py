@@ -109,28 +109,17 @@ class MotControl(object):
             print('establishing serial server with motor1!')
             self.motor1 = Serial_TCPServer((motor1_ip, motor1_port))
             if m_res:
-                self.motor1.prop_dict = {
-                    'name': 'motor1',
-                    'motor': MOTOR1,
-                    'res': 'manual',
-                    # Position in counts (should always be an integer)
-                    'pos': 0,
-                    'realPos': 0.0,  # Position in inches
-                    'sPRev': 8000.0,  # Steps per revolution (thread)
-                    'isLin': motor1_is_lin
-                }
+                self.motor1.res = 'manual'
+                self.motor1.s_p_rev = 8000.0 # Steps per revolution (thread)
             else:
-                self.motor1.prop_dict = {
-                    'name': 'motor1',
-                    'motor': MOTOR1,
-                    'res': '8',  # Corresponds to mapping above
-                    # Position in counts (should always be an integer)
-                    'pos': 0,
-                    'realPos': 0.0,  # Position in inches
-                    'sPRev': 20000.0,  # Steps per revolution (thread)
-                    'isLin': motor1_is_lin
-                }
-
+                self.motor1.res = '8' # Corresponds to mapping above
+                self.motor1.s_p_rev = 20000.0 # Steps per revolution (thread)
+            self.motor1.name = 'motor1'
+            self.motor1.motor = MOTOR1
+            self.motor1.pos = 0 # Position in counts (should always be an integer)
+            self.motor1.real_pos = 0.0 # Position in inches
+            self.motor1.is_lin = motor1_is_lin
+                
         # Set up the connection to the second motor
         # Initialized so that the startup position is set to zero
         if not (motor2_ip and motor2_port):
@@ -140,25 +129,16 @@ class MotControl(object):
             print('establishing serial server with motor2!')
             self.motor2 = Serial_TCPServer((motor2_ip, motor2_port))
             if m_res:
-                self.motor2.propDict = {
-                    'name': 'motor2',
-                    'motor': MOTOR2,
-                    'res': 'manual',
-                    'pos': 0,  # Position in counts
-                    'realPos': 0,  # Position in inches
-                    'sPRev': 8000.0,  # Steps per revolution (thread)
-                    'isLin': motor2_is_lin
-                }
+                self.motor2.res = 'manual'
+                self.motor2.s_p_rev = 8000.0 # Steps per revolution (thread)
             else:
-                self.motor2.propDict = {
-                    'name': 'motor2',
-                    'motor': MOTOR2,
-                    'res': '8',  # Corresponds to mapping above
-                    'pos': 0,  # Position in counts
-                    'realPos': 0.0,  # Position in inches
-                    'sPRev': 20000.0,  # Steps per revolution (thread)
-                    'isLin': motor2_is_lin
-                }
+                self.motor2.res = '8' # Corresponds to mapping above
+                self.motor2.s_p_rev = 20000.0 # Steps per revolution (thread)
+            self.motor2.name = 'motor2'
+            self.motor2.motor = MOTOR2
+            self.motor2.pos = 0 # Position in counts
+            self.motor2.real_pos = 0.0  Position in inches
+            self.motor2.is_lin = motor2_is_lin
 
         for motor in ([self.motor1, self.motor2]):
             if motor:
@@ -168,13 +148,13 @@ class MotControl(object):
                 motor.flushInput()
                 print(msg)
                 if (msg == 'RS=R'):
-                    print("%s in receive mode." % (motor.propDict['name']))
+                    print("%s in receive mode." % (motor.name))
                 elif (msg != 'RS=R'):
                     print(
                         "%s not in receive mode.  Resetting." %
-                        (motor.propDict['name']))
+                        (motor.name))
                     print("Message was: ", msg)
-                    self.kill_all_commands(motor.propDict['motor'])
+                    self.kill_all_commands(motor.motor)
                     if (msg == 'RS=AR'):
                         amsg = motor.writeread('AL\r')  # AL = Alarm Code
                         print('is message is: ', amsg)
@@ -196,24 +176,24 @@ class MotControl(object):
                     if (len(msg) <= 4):    # Need at least MR=X + \r, which is 5 characters
                         print(
                             "Couldn't get microstep resolution for %s.  Assuming 8." %
-                            (motor.propDict['name']))
+                            (motor.name))
                     else:
                         print(msg)
-#                        msInfo = msg.rstrip('\r')[3:]
-                        motor.propDict['sPRev'] = float(msInfo)
+                        ms_info = msg[3:]
+                        motor.s_p_rev = float(ms_info)
                 else:
                     msg = motor.writeread('EG\r')
                     motor.flushInput()
                     if (len(msg) <= 4):
                         print(
                             "Couldn't get microstep resolution for %s. Disconnect and retry." %
-                            (motor.propDict['name']))
+                            (motor.name))
                     else:
                         print(msg)
                         ms_info = msg[3:]
-                        motor.propDict['sPRev'] = float(ms_info)
-                        ms_info = float(ms_iInfo)
-            if (motor is not None) and (motor.propDict['isLin']):
+                        motor.s_p_rev = float(ms_info)
+                        ms_info = float(ms_info)
+            if (motor is not None) and (motor.is_lin):
                 # DL1 = Define Limits for closed input (definition unclear in
                 # manual, however)
                 msg = motor.writeread('DL\r')
@@ -234,7 +214,7 @@ class MotControl(object):
                     motor.write('JE\r')  # JE = Jog Enable
 
     def gen_motor_list(self, motor):
-        """gen_motor_list(motor=MOTOR1):
+        """gen_motor_list(motor=ALL):
         
         **Task** - Generate a list of the motors in a MotControl object.
 
@@ -252,7 +232,7 @@ class MotControl(object):
         return m_list
 
     def is_moving(self, motor=ALL, verbose=False):
-        """is_moving(motor=MOTOR1, verbose=False):
+        """is_moving(motor=ALL, verbose=False):
         
         **Task** - Returns True if either motor is moving, False if both motors
         are not moving. Also returns True if the motor provides an irregular
@@ -269,7 +249,7 @@ class MotControl(object):
             motor.flushInput()
             # Get the status of the motor and print if verbose = True
             msg = motor.writeread('RS\r')  # RS = Request Status
-            name = motor.propDict['name']
+            name = motor.name
             motor.flushInput()
             if verbose:
                 print(msg)
@@ -302,7 +282,7 @@ class MotControl(object):
         return False
 
     def move_off_limit(self, motor=ALL):
-        """move_off_limit(motor=MOTOR1):
+        """move_off_limit(motor=ALL):
         
         **Task** -Ignores alarm to be able to move off the limit switch if 
         unexpectedly hit, and resets alarm. Function should be used when not
@@ -315,7 +295,7 @@ class MotControl(object):
         m_list = self.gen_motor_list(motor)
 
         for motor in (m_list):
-            mot_id = motor.propDict['motor']
+            mot_id = motor.motor
             msg = motor.writeread('AL\r')
             if (msg == 'AL=0002'):
                 print(
@@ -333,7 +313,7 @@ class MotControl(object):
                 print(f'Motor{motor} not on either switch')
 
     def home_with_limits(self, motor=ALL):
-        """home_with_limits(motor=MOTOR1):
+        """home_with_limits(motor=ALL):
         
         **Task** - Uses the limit switches to zero all motor positions.
         This function should only be used if the linear stages do not have
@@ -350,7 +330,7 @@ class MotControl(object):
             if motor is None:
                 print('Specified motor is invalid -- exiting function')
                 return
-            mot_id = motor.propDict['motor']
+            mot_id = motor.motor
             # Basically, move motors until it hits the limit switch. This will
             # trigger an alarm
             self.move_axis_by_length(motor=mot_id, pos=-30, pos_is_inches=True)
@@ -372,7 +352,7 @@ class MotControl(object):
                     pos = int(
                         1.0 *
                         AXIS_THREADS_PER_INCH_STAGE *
-                        motor.propDict['sPRev'] /
+                        motor.s_p_rev /
                         2.0)
                     motor.write('DI%i\r' % (pos))  # DI = Distance/Position
                     motor.write('FL\r')  # FL = Feed to Length
@@ -394,7 +374,7 @@ class MotControl(object):
             print('Stage zeroed using limit switch')
 
     def start_jogging(self, motor=ALL):
-        """start_jogging(motor=MOTOR1):
+        """start_jogging(motor=ALL):
         
         **Task** - Starts jogging control for specified motors.
         
@@ -412,7 +392,7 @@ class MotControl(object):
             motor.flushInput()
 
     def stop_jogging(self, motor=ALL):
-        """stop_jogging(motor=MOTOR1):
+        """stop_jogging(motor=ALL):
         
         **Task** - Stop jogging control to all motors.
         
@@ -422,7 +402,7 @@ class MotControl(object):
         self.kill_all_commands(motor)
 
     def seek_home_linear_stage(self, motor=ALL):
-        """seek_home_linear_stage(motor=MOTOR1):
+        """seek_home_linear_stage(motor=ALL):
         
         **Task** - Move the linear stage to its home position using the home 
         limit switch.
@@ -443,7 +423,7 @@ class MotControl(object):
                 print("Specified motor is invalid - no motion.")
                 continue
 
-            elif not motor.propDict['isLin']:
+            elif not motor.is_lin:
                 print("Motor isn't connected to a linear stage.")
                 continue
             motor.write('VE2.0\r')  # VE = Velocity
@@ -453,12 +433,12 @@ class MotControl(object):
             motor.write('SHX3L\r')  # SH = Seek Home
             motor.flushInput()
             print("Linear stage homing...")
-            self.block_while_moving(motor.propDict['motor'], verbose=True)
+            self.block_while_moving(motor.motor, verbose=True)
 
         print("Linear stage home found.")
 
     def set_zero(self, motor=ALL):
-        """set_zero(motor=MOTOR1):
+        """set_zero(motor=ALL):
         
         **Task** - Tell the motor to set the current position as the zero 
         point.
@@ -478,13 +458,13 @@ class MotControl(object):
             if not motor:
                 print("Specified motor is invalid.")
                 continue
-            motor.propDict['pos'] = 0
-            motor.propDict['realPos'] = 0.0
+            motor.pos = 0
+            motor.real_pos = 0.0
             motor.write('SP0\r')  # SP = Set Position
             motor.flushInput()
 
     def get_position(self, motor=ALL):
-        """get_position(motor=MOTOR1):
+        """get_position(motor=ALL):
         
         **Task** - Get the position of the motor in counts, relative to the set
         zero point (or starting point).
@@ -502,11 +482,11 @@ class MotControl(object):
                 print("Specified motor is invalid - no position info.")
                 positions.append(None)
             else:
-                positions.append(motor.propDict['pos'])
+                positions.append(motor.pos)
         return positions
 
     def get_position_in_inches(self, motor=ALL):
-        """get_position_in_inches(motor=MOTOR1):
+        """get_position_in_inches(motor=ALL):
         
         **Task** - Get the position of the motor in inches, relative to the set
         zero point (or starting point).
@@ -525,11 +505,11 @@ class MotControl(object):
                 print("Specified motor is invalid - no position info.")
                 real_positions.append(None)
             else:
-                real_positions.append(motor.propDict['realPos'])
+                real_positions.append(motor.real_pos)
         return real_positions
 
     def get_immediate_position(self, motor=ALL, inches=True):
-        """get_immediate_positions(motor=MOTOR1, inches=True):
+        """get_immediate_positions(motor=ALL, inches=True):
         
         **Task** - Get the position of the motor while it is currently in 
         motion. An estimate based on the calculated trajectory of the movement,
@@ -587,9 +567,9 @@ class MotControl(object):
             motor (int): MOTOR1, MOTOR2, or ALL. (default MOTOR1)
             pos (float): The desired position in counts or in inches, positive
                 indicates away from the motor. (default 0)
-            posIsInches (bool): True if pos was specified in inches, False if
+            pos_is_inches (bool): True if pos was specified in inches, False if
                 in counts. (default False)
-            linStage (bool): True if the specified motor is for the linear
+            lin_stage (bool): True if the specified motor is for the linear
                 stage, False if not. (default True)
         """
 
@@ -610,14 +590,14 @@ class MotControl(object):
                 # 2.0 is because threads go twice the distance for one
                 # revolution
                 unit_pos = int(pos * AXIS_THREADS_PER_INCH *
-                              motor.propDict['sPRev'] / 2.0)
+                              motor.s_p_rev / 2.0)
             else:
                 unit_pos = int(pos)
 
-            # Set the new pos and realPos parameters of the motor object
-            motor.propDict['pos'] = unit_pos
-            motor.propDict['realPos'] = 2.0 * unit_pos / \
-                (AXIS_THREADS_PER_INCH * motor.propDict['sPRev'])  # See 2.0 note above
+            # Set the new pos and real_pos parameters of the motor object
+            motor.pos = unit_pos
+            motor.real_pos = 2.0 * unit_pos / \
+                (AXIS_THREADS_PER_INCH * motor.s_p_rev)  # See 2.0 note above
 
             # Move the motor
             motor.write('DI%i\r' % (unit_pos))  # DI = Distance/Position
@@ -641,9 +621,9 @@ class MotControl(object):
             pos (float): the desired number of counts or inches to move from 
                 current position, positive indicates away from the motor. 
                 (default 0)
-            posIsInches (bool): True if pos was specified in inches, False if
+            pos_is_inches (bool): True if pos was specified in inches, False if
                 in counts. (default False)
-            linStage (bool): True if the specified motor is for the linear 
+            lin_stage (bool): True if the specified motor is for the linear 
                 stage, False if not. (default True)
         """
 
@@ -664,15 +644,15 @@ class MotControl(object):
                 unit_pos = int(
                     pos *
                     AXIS_THREADS_PER_INCH *
-                    motor.propDict['sPRev'] /
+                    motor.s_p_rev /
                     2.0)  # See 2.0 note above
             else:
                 unit_pos = int(pos)
 
-            # Set the new pos and realPos parameters of the motor object
-            motor.propDict['pos'] += unit_pos
-            motor.propDict['realPos'] += 2.0 * unit_pos / \
-                (AXIS_THREADS_PER_INCH * motor.propDict['sPRev'])  # See 2.0 note above
+            # Set the new pos and real_pos parameters of the motor object
+            motor.pos += unit_pos
+            motor.real_pos += 2.0 * unit_pos / \
+                (AXIS_THREADS_PER_INCH * motor.s_p_rev)  # See 2.0 note above
 
             # Move the motor
             motor.write('DI%i\r' % (unit_pos))  # DI = Distance/Position
@@ -681,7 +661,7 @@ class MotControl(object):
             print("Final position: ", pos)
 
     def set_velocity(self, motor=ALL, velocity=1.0):
-        """set_velocity(motor=MOTOR1, velocity=1.0):
+        """set_velocity(motor=ALL, velocity=1.0):
         
         **Task** - Set velocity in revolutions/second.  Range is 0.25 - 50. 
         Accepts floating point values.
@@ -707,7 +687,7 @@ class MotControl(object):
             motor.flushInput()
 
     def set_acceleration(self, motor=ALL, accel=5):
-        """set_acceleration(motor=MOTOR1, accel=5):
+        """set_acceleration(motor=ALL, accel=5):
         
         **Task** - Set acceleration of motors driving stages. (default 5)
         
@@ -750,11 +730,11 @@ class MotControl(object):
         """block_while_moving(motor=ALL, update_period=.1, verbose=False):
         
         **Task** - Block until the specified axes have stop moving. Checks each
-        axis every updatePeriod seconds.
+        axis every update_period seconds.
 
         Parameters:
             motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
-            updatePeriod (float): Time after which to check each motor in
+            update_period (float): Time after which to check each motor in
                 seconds. (default .1)
             verbose (bool): Prints output from motor requests if True.
                 (default False)
@@ -788,15 +768,14 @@ class MotControl(object):
         print('')
 
     def run_positions(self, pos_data, motor=ALL, pos_is_inches=False):
-        """run_positions(pos_data=file, motor=ALL, pos_is_inches=False):
+        """run_positions(pos_data=[1,1], motor=ALL, pos_is_inches=False):
         
-        **Task** - Runs a tab-delimited list of entries as positions from a 
-        text file. For motor=ALL, the first column must be the x-data, and the
-        second column the y-data. Each position will be attained. xPosition and
-        yPosition will be specified as in the file.
+        **Task** - Runs a tab-delimited list of entries as positions. For 
+        motor=ALL, the first column must be the x-data, and the second column
+        the y-data. Each position will be attained. 
         
         Parameters:
-            pos_data (file): Tab-delimited list of entries. First column
+            pos_data (list): Tab-delimited list of entries. First column
                 is x-data, second column is y-data.
             motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
             pos_is_inches (bool): True if pos was specified in inches, False if
@@ -810,7 +789,7 @@ class MotControl(object):
             return
 
         if (len(pos_data) > 0):
-            # This is for the 2-axis case.  In the 1-axis case, posData[0] will
+            # This is for the 2-axis case.  In the 1-axis case, pos_data[0] will
             # just be a floating point value
             if motor == ALL and len(pos_data) < 2:
                 raise Exception(
@@ -917,8 +896,8 @@ class MotControl(object):
             e_positions.append(e_pos)
         return e_positions
 
-    def start_rotation(self, motor=MOTOR2, velocity=12.0, accel=1.0):
-        """start_rotation(motor=MOTOR2, velocity=12.0, accel=1.0):
+    def start_rotation(self, motor=MOTOR2, velocity=12.0, rot_accel=1.0):
+        """start_rotation(motor=MOTOR2, velocity=12.0, rot_accel=1.0):
         
         **Task** - Starts jogging specifically for the rotation of the output
         polarizer in the FTS.
@@ -926,7 +905,7 @@ class MotControl(object):
         Parameters:
             motor (int): MOTOR1, MOTOR2, or ALL (default MOTOR2)
             velocity (float): The rotation velocity in revolutions per second (default 12.0)
-            accel (float): The acceleration in revolutions per second per
+            rot_accel (float): The acceleration in revolutions per second per
                 second within range [1,3000].  (default 1.0)
         """
         m_list = self.gen_motor_list(motor)
@@ -937,8 +916,8 @@ class MotControl(object):
 
             # Set the jog parameters
             motor.write('JS%1.3f\r' % (velocity))  # JS = Jog Speed
-            motor.write('JA%i\r' % (accel))  # JA = Jog Acceleration
-            motor.write('JL%i\r' % (accel))  # JL = Jog Decel
+            motor.write('JA%i\r' % (rot_accel))  # JA = Jog Acceleration
+            motor.write('JL%i\r' % (rot_accel))  # JL = Jog Decel
 
             # Start rotation
             motor.write('CJ\r')  # CJ = Commence Jogging
