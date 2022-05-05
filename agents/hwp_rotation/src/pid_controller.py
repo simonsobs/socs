@@ -236,7 +236,7 @@ class PID:
             str: Respnose from the controller.
 
         """
-        self.conn.sendall(msg.encode())
+        self.conn.sendall((msg + '\r\n').encode())
         time.sleep(0.5)  # Don't send messages too quickly
         for attempt in range(2):
             try:
