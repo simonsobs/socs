@@ -21,26 +21,12 @@ Dependencies
 ------------
 
 This agent depends on GALIL controller libraries: gclib.
-Running the gclib library needs some special treatments.
 gclib requires installation of other libraries and gclib itself
 and starting services(dbus, avahi-daemon, and gcapsd) in the docker.
-These preparations are implemented in Dockerfile and wg-actuator-entrypoint.sh.
-The host machine requires the installation of gcapsd.
-The reference links:
-
+These preparations are automatically made in Dockerfile and wg-actuator-entrypoint.sh.
+Reference links for gclib:
 - Adding repository: https://www.galil.com/sw/pub/all/doc/global/html/ubuntu2004.html
 - Installation via apt: https://www.galil.com/sw/pub/all/doc/gclib/html/ubuntu.html
-
-Please install it via (in Ubuntu20.04):
-
-.. code-block:: bash
-
-    $ wget http://www.galil.com/sw/pub/all/crypto/GALIL-GPG-KEY-E29D0E4B.asc
-    $ sudo apt-key add GALIL-GPG-KEY-E29D0E4B.asc
-    $ wget http://www.galil.com/sw/pub/ubuntu/20.04/galil.list
-    $ sudo cp galil.list /etc/apt/sources.list.d
-    $ sudo apt-get update
-    $ sudo apt install -y gclib gcapsd
 
 Configuration File Examples
 ---------------------------
@@ -68,14 +54,11 @@ An example docker-compose configuration::
         network_mode: "host"
         volumes:
           - ${OCS_CONFIG_DIR}:/config:ro
-          - /usr/sbin:/usr/sbin
         command:
           - "--instance-id=wgactuator"
 
 - Since the agent within the container needs to communicate with hardware on the
   host network you must use ``network_mode: "host"`` in your compose file.
-- To communicate the actuator controller, it uses the /usr/sbin/gcapsd. 
-  Therefore, it requires volume of /usr/sbin in the docker.
 
 Description
 -----------
