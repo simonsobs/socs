@@ -6,67 +6,7 @@ on:
 
 jobs:
   test:
-    name: pytest with coverage
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Install system packages
-      run: |
-        sudo apt-get install -y socat
-
-    - name: Set up Python 3.8 
-      uses: actions/setup-python@v2
-      with:
-        python-version: 3.8 
-
-    # (start steps from pytest workflow)
-    # Install
-    - name: Install so3g
-      run: |
-        pip3 install so3g
-
-    # Fetch all history for all tags and branches
-    - name: clone socs
-      uses: actions/checkout@v2
-      with:
-        fetch-depth: 0
-
-    - name: Install socs
-      run: |
-        pip3 install -r requirements.txt
-        pip3 install -e .
-
-    # Unit Tests
-    - name: Run unit tests
-      working-directory: ./tests
-      run: |
-        COVERAGE_FILE=.coverage.unit python3 -m pytest --cov -m 'not integtest'
-
-    - name: Build docker test images
-      run: |
-        docker-compose build socs
-
-    # Integration Tests
-    - name: Build images for integration tests
-      run: |
-        docker-compose build ocs-lakeshore372-simulator
-
-    - name: Run integration tests
-      working-directory: ./tests
-      run: |
-        COVERAGE_FILE=.coverage.int python3 -m pytest --cov -m 'integtest'
-
-    # Coverage
-    - name: Report test coverage
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        mv ./tests/.coverage.* ./
-        pip install coveralls
-        coverage combine
-        coverage report
-        coveralls --service=github
-    # (end steps from pytest workflow)
+    uses: ./.github/workflows/pytest.yml
 
   docker:
     name: build and deploy docker images
@@ -76,7 +16,7 @@ jobs:
     steps:
     # Fetch all history for all tags and branches
     - name: clone socs
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         fetch-depth: 0
 
@@ -85,14 +25,17 @@ jobs:
       run: |
         docker-compose build
 
+    - name: Login to Docker Hub
+      uses: docker/login-action@v1
+      with:
+        username: ${{ secrets.REGISTRY_USER }}
+        password: ${{ secrets.REGISTRY_PASSWORD }}
+
     - name: Build and push official docker image
       env:
-        REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
-        REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
         DOCKERHUB_ORG: "simonsobs"
       run: |
         export DOCKER_TAG=`git describe --tags --always`
-        echo "${REGISTRY_PASSWORD}" | docker login -u "${REGISTRY_USER}" --password-stdin;
 
         # Tag all images for upload to the registry
         docker-compose config | grep 'image: ' | awk -F ': ' '{ print $2 }' | xargs -I {} docker tag {}:latest ${DOCKERHUB_ORG}/{}:latest
@@ -113,12 +56,12 @@ jobs:
 
     steps:
     - name: Set up Python 3.8
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v3
       with:
         python-version: 3.8
 
     - name: clone socs
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
 
     - name: install build dependencies
       run: |

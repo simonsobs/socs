@@ -43,9 +43,7 @@ crc_table = arr.array('H', [
 
 
 def calc_crc(data):
-    """
-        Calculates CRC
-    """
+    """Calculates CRC."""
 
     crc = 0
     for i in data:
@@ -55,16 +53,13 @@ def calc_crc(data):
 
 
 class VantagePro2:
-    """
-        Allows communication to Vantage Pro 2 Weather Monitor Module.
-        Contains commands to be issued and member variables that store
-        collected data.
+    """Allows communication to Vantage Pro 2 Weather Monitor Module.
+    Contains commands to be issued and member variables that store
+    collected data.
     """
 
     def __init__(self, path, baud=19200, timeout=1):
-        """
-            Establish serial connection and initialize member variables
-        """
+        """Establish serial connection and initialize member variables."""
 
         if not path:
             path = '/dev/ttyUSB0'
@@ -72,9 +67,7 @@ class VantagePro2:
         self.startup()
 
     def startup(self):
-        """
-            Wakeup vantage pro 2 console
-        """
+        """Wakeup vantage pro 2 console."""
         self.com.write(b"\n")
         for i in range(0, 3):
             response = self.com.read(2)
@@ -85,9 +78,9 @@ class VantagePro2:
             raise TimeoutError("Vantage Pro 2 console not woke")
 
     def crc_check(self, data):
-        """
-        Checks received data. If received data has a CRC value of 0,
-        then correct message received!
+        """Checks received data. If received data has a CRC value of 0, then
+        correct message received!
+
         """
 
         crc = calc_crc(data)
@@ -103,9 +96,9 @@ class VantagePro2:
         self.com.close()
 
     def conditions_screen(self):
-        """
-            Move console to conditions screen
-            (where loop command can succesfully be sent)
+        """Move console to conditions screen (where loop command can
+        succesfully be sent.)
+
         """
 
         self.startup()
@@ -121,10 +114,9 @@ class VantagePro2:
             raise TimeoutError("Command not acknowledged")
 
     def msg(self, msg):
-        """
-            Send general command or query to module.
-            If command received and acknowledged, continue
-            else retry 2 more times.
+        """Send general command or query to module. If command received and
+        acknowledged, continue else retry 2 more times.
+
         """
 
         attempt = 0
@@ -142,9 +134,7 @@ class VantagePro2:
             return False
 
     def interrupt_daq(self):
-        """
-            Interrupts loop command...if sent before loop command finishes
-        """
+        """Interrupts loop command...if sent before loop command finishes."""
 
         self.startup()
         self.com.write(b'\n')
@@ -158,71 +148,78 @@ class VantagePro2:
             raise TimeoutError('Data Acquisition not interrupted')
 
     def receive_data(self):
-        """
-            Reads weather data from console and returns loop_data{}
-            User should read Vantage Pro Serial Communication Reference Manual
-            for the format of the loop data packet.
-            Specifically for units of data!
+        """Reads weather data from console and returns loop_data{}.
+        User should read Vantage Pro Serial Communication Reference Manual
+        for the format of the loop data packet.
+        Specifically for units of data! Available fields:
 
-            -Barometer trend: the current 3 hour barometer trend.
-                    -60 = Falling rapidly
-                    -20 = Falling slowly
-                    0 = Steady
-                    20 = Rising slowly
-                    60 = Rising rapidly
-                    80 = No trend available
-                    Any other value = The VantagePro2 does not have the 3 hours
-                    of data needed to determine the barometer trend.
-            -Barometer: Current barometer reading (Hg/1000)
-            -Inside Temperature: Temperatue in Fahrenheit (10th of a degree)
-            -Inside Humidity: Relative humidity in percent
-            -Outside Temperature: Temperature in Fahrenheit (10th of a degree)
-            -Wind Speed: Wind speed in miles per hour
-            -10 min average wind speed: 10 minute average wind speed in mph
-            -Wind Direction: From 1-360 degrees
-                    0 = No wind direction data
-                    90 = East
-                    180 = South
-                    270 = West
-                    360 = North
-            Extra Temperatures: Temperature from up to 7 extra temperature
-                stations.
-            Soil Temperatures: Four soil temperature sensors, in the same
-                format as the extra temperatures format listed above.
-            Leaf Temperatures: Four leaf temperature sensors, in the same
-                format as the extra temperatures format listed above.
-            Outside Humidity: Relativie humidity in percent
-            Extra Humidities: Realtive humidity in percent for 7 humidity
-                 stations
-            Rain Rate: Number of rain clicks (0.1in or 0.2mm) per hour
-            UV: "Unit is in UV index"
-            Solar Radiation: Units in watt/meter^2
-            Storm Rain: Stored in 100th of an inch
-            Start Date of Current storm: Gives month, date,
-                and year (offset by 2000)
-            Day Rain: Number of rain clicks (0.1in or 0.2mm)/hour
-                in the past day
-            Month Rain: Number of rain clicks (0.1in or 0.2mm)/hour
-                in the past month
-            Year Rain: Number of rain clicks (0.1in or 0.2mm)/hour
-                in the past year
-            Day ET: 1000th of an inch
-            Month ET: 1000th of an inch
-            Year ET: 1000th of an inch
-            Soil Moistures: In centibar, supports 4 soil sensors
-            Leaf Wetnesses: Scale from 0-15. Supports 4 leaf sensors
-                    0 = Very dry
-                    15 = Very wet
-            Inside Alarms: Currently active inside alarms
-            Rain Alarms: Currently active rain alarms
-            Outside Alarms: Currently active outside alarms
-            Outside Humidity Alarms: Currently active humidity alarms
-            Extra Temp/Hum Alarms: Currently active extra
-                temperature/humidity alarms
-            Soil & Leaf Alarms: Currently active soil/leaf alarms
-            Console Battery Voltage: Voltage
-            Time of Sunrise: Time is stored as hour x 100 + min
-            Time of Sunset: Time is stored as hour x 100 + min
+        * Barometer trend: the current 3 hour barometer trend. Possible values::
+
+                -60 = Falling rapidly
+                -20 = Falling slowly
+                  0 = Steady
+                 20 = Rising slowly
+                 60 = Rising rapidly
+                 80 = No trend available
+
+                Any other value = The VantagePro2 does not have the 3 hours
+                of data needed to determine the barometer trend.
+
+        * Barometer: Current barometer reading (Hg/1000)
+        * Inside Temperature: Temperatue in Fahrenheit (10th of a degree)
+        * Inside Humidity: Relative humidity in percent
+        * Outside Temperature: Temperature in Fahrenheit (10th of a degree)
+        * Wind Speed: Wind speed in miles per hour
+        * 10 min average wind speed: 10 minute average wind speed in mph
+        * Wind Direction: From 1-360 degrees. Possible values::
+
+                  0 = No wind direction data
+                 90 = East
+                180 = South
+                270 = West
+                360 = North
+
+        * Extra Temperatures: Temperature from up to 7 extra temperature
+          stations.
+        * Soil Temperatures: Four soil temperature sensors, in the same
+          format as the extra temperatures format listed above.
+        * Leaf Temperatures: Four leaf temperature sensors, in the same
+          format as the extra temperatures format listed above.
+        * Outside Humidity: Relativie humidity in percent
+        * Extra Humidities: Realtive humidity in percent for 7 humidity
+          stations
+        * Rain Rate: Number of rain clicks (0.1in or 0.2mm) per hour
+        * UV: "Unit is in UV index"
+        * Solar Radiation: Units in watt/meter^2
+        * Storm Rain: Stored in 100th of an inch
+        * Start Date of Current storm: Gives month, date,
+          and year (offset by 2000)
+        * Day Rain: Number of rain clicks (0.1in or 0.2mm)/hour
+          in the past day
+        * Month Rain: Number of rain clicks (0.1in or 0.2mm)/hour
+          in the past month
+        * Year Rain: Number of rain clicks (0.1in or 0.2mm)/hour
+          in the past year
+        * Day ET: 1000th of an inch
+        * Month ET: 1000th of an inch
+        * Year ET: 1000th of an inch
+        * Soil Moistures: In centibar, supports 4 soil sensors
+        * Leaf Wetnesses: Scale from 0-15. Supports 4 leaf sensors. Possible
+          values::
+
+                 0 = Very dry
+                15 = Very wet
+
+        * Inside Alarms: Currently active inside alarms
+        * Rain Alarms: Currently active rain alarms
+        * Outside Alarms: Currently active outside alarms
+        * Outside Humidity Alarms: Currently active humidity alarms
+        * Extra Temp/Hum Alarms: Currently active extra
+          temperature/humidity alarms
+        * Soil & Leaf Alarms: Currently active soil/leaf alarms
+        * Console Battery Voltage: Voltage
+        * Time of Sunrise: Time is stored as hour x 100 + min
+        * Time of Sunset: Time is stored as hour x 100 + min
 
         """
 
@@ -322,9 +319,9 @@ class VantagePro2:
         return loop_data
 
     def weather_daq(self):
-        """
-            Issues "LOOP 1"(which samples weather data) command
-            to weather station, and unpacks the data.
+        """Issues "LOOP 1"(which samples weather data) command to weather
+        station, and unpacks the data.
+
         """
 
         # Startup and issue loop command
@@ -337,10 +334,9 @@ class VantagePro2:
         return self.receive_data()
 
     def print_data(self, data):
-        """
-            Prints contents of data collected from LOOP <loops> command.
-            Loop: loop#
-            Field : Value format.
+        """Prints contents of data collected from LOOP <loops> command.
+        Loop: loop#
+        Field : Value format.
         """
 
         print("**************")

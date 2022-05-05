@@ -56,3 +56,4 @@ API
 ---
 .. automodule:: socs.testing.device_emulator
     :members:
+    :noindex:

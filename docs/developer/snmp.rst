@@ -97,3 +97,4 @@ interface is available for use and detailed here:
 
 .. autoclass:: socs.snmp.SNMPTwister
     :members:
+    :noindex:
