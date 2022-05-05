@@ -452,7 +452,12 @@ class BlueforsAgent:
         with self.lock:
             self.job = None
 
-    def start_acq(self, session, params=None):
+    def acq(self, session, params=None):
+        """acq()
+
+        **Process** - Monitor and publish data from the Bluefors log files.
+
+        """
 
         ok, msg = self.try_set_job('acq')
         if not ok:
@@ -493,7 +498,7 @@ class BlueforsAgent:
         self.set_job_done()
         return True, 'Acquisition exited cleanly.'
 
-    def stop_acq(self, session, params=None):
+    def _stop_acq(self, session, params=None):
         ok = False
         with self.lock:
             if self.job == 'acq':
@@ -531,7 +536,7 @@ if __name__ == '__main__':
 
     bluefors_agent = BlueforsAgent(agent, args.log_directory)
 
-    agent.register_process('acq', bluefors_agent.start_acq, 
-                           bluefors_agent.stop_acq, startup=True)
+    agent.register_process('acq', bluefors_agent.acq,
+                           bluefors_agent._stop_acq, startup=True)
 
     runner.run(agent, auto_reconnect=True)

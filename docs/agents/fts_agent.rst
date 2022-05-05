@@ -61,4 +61,4 @@ Agent API
 ---------
 
 .. autoclass:: agents.fts_aerotech_stage.fts_aerotech_agent.FTSAerotechAgent
-    :members: init_stage_task, home, move_to, start_acq, stop_acq 
+    :members: init_stage_task, home_task, move_to, start_acq, stop_acq 

@@ -1,0 +1,40 @@
+# Site configuration for a fake observatory.
+hub:
+
+  wamp_server: ws://127.0.0.1:18001/ws
+  wamp_http: http://127.0.0.1:18001/call
+  wamp_realm: test_realm
+  address_root: observatory
+  registry_address: observatory.registry
+
+hosts:
+  localhost: {
+    'agent-instances': [
+      {'agent-class': 'Lakeshore372Agent',
+       'instance-id': 'LSASIM',
+       'arguments': [['--serial-number', 'LSASIM'],
+                     ['--ip-address', '127.0.0.1'],
+                     ['--dwell-time-delay', 0],
+                     ['--sample-heater', False],
+                     ['--mode', 'idle']]},
+      {'agent-class': 'Lakeshore425Agent',
+      'instance-id': 'LS425',
+      'arguments': [
+        ['--port', './responder'],
+        ['--mode', 'init'],
+        ['--sampling-frequency', 1.],
+      ]},
+      {'agent-class': 'Lakeshore240Agent',
+       'instance-id': 'LSA240S',
+       'arguments': [['--serial-number', 'LSA240S'],
+                     ['--mode', 'idle'],
+                     ['--port', './responder'],
+                    ]
+      },
+      {'agent-class': 'PfeifferTC400Agent',
+       'instance-id': 'pfeifferturboA',
+       'arguments': [['--ip-address', '127.0.0.1'],
+                       ['--port-number', '9001'],
+                       ['--turbo-address', '1']]},
+    ]
+  }

@@ -93,7 +93,10 @@ autodoc_mock_imports = ['spt3g',
                         'soaculib',
                         'scan_helpers',
                         'soaculib.twisted_backend',
-                        'soaculib.status_keys']
+                        'soaculib.status_keys',
+                        'pfeiffer_vacuum_protocol',
+                        'pfeiffer_vacuum_protocol.pfeiffer_vacuum_protocol',
+                        ]
 from unittest import mock
 for m in autodoc_mock_imports:
     sys.modules[m] = mock.Mock()
@@ -123,12 +126,9 @@ html_theme = 'sphinx_rtd_theme'
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 
-html_context = {
-    'css_files': [
-        '_static/theme_overrides.css',  # override wide tables in RTD theme
-        ],
-     }
-
+html_css_files = [
+    'theme_overrides.css',  # override wide tables in RTD theme
+]
 
 # Custom sidebar templates, must be a dictionary that maps document names
 # to template names.
