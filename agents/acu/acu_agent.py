@@ -666,8 +666,8 @@ class ACUAgent:
                 elapsed_wait_for_motion = time.time() - wait_for_motion_start
                 mdata = self.data['status']['summary']
             else:
-                if round(mdata['Azimuth_current_position'], 1) == az and \
-                round(mdata['Elevation_current_position'], 1) == el:
+                if round(mdata['Azimuth_current_position'] - az, 1) == 0. and \
+                round(mdata['Elevation_current_position'] - el, 1) == 0.:
                     yield self.acu_control.stop()
                     self.set_job_done('control')
                     return True, 'Pointing completed'
