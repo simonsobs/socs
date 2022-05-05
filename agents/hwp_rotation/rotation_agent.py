@@ -102,7 +102,7 @@ class RotationAgent:
         optimize the PID parameters for deceleration.
 
         """
-        with self.lock.acquire_timeout(0, job='tune_stop') as acquired:
+        with self.lock.acquire_timeout(3, job='tune_stop') as acquired:
             if not acquired:
                 self.log.warn(
                     'Could not tune stop because {} is already running'.format(self.lock.job))
@@ -119,7 +119,7 @@ class RotationAgent:
         and optimize the PID parameters for rotation.
 
         """
-        with self.lock.acquire_timeout(0, job='tune_freq') as acquired:
+        with self.lock.acquire_timeout(3, job='tune_freq') as acquired:
             if not acquired:
                 self.log.warn(
                     'Could not tune freq because {} is already running'.format(self.lock.job))
@@ -140,7 +140,7 @@ class RotationAgent:
             freq (float): Desired HWP rotation frequency
 
         """
-        with self.lock.acquire_timeout(0, job='declare_freq') as acquired:
+        with self.lock.acquire_timeout(3, job='declare_freq') as acquired:
             if not acquired:
                 self.log.warn(
                     'Could not declare freq because {} is already running'.format(self.lock.job))
@@ -166,7 +166,7 @@ class RotationAgent:
             d (float): Derivative PID value
 
         """
-        with self.lock.acquire_timeout(0, job='set_pid') as acquired:
+        with self.lock.acquire_timeout(3, job='set_pid') as acquired:
             if not acquired:
                 self.log.warn(
                     'Could not set pid because {} is already running'.format(self.lock.job))
@@ -184,7 +184,7 @@ class RotationAgent:
         controller.
 
         """
-        with self.lock.acquire_timeout(0, job='get_freq') as acquired:
+        with self.lock.acquire_timeout(3, job='get_freq') as acquired:
             if not acquired:
                 self.log.warn(
                     'Could not get freq because {} is already running'.format(self.lock.job))
@@ -201,7 +201,7 @@ class RotationAgent:
         controller.
 
         """
-        with self.lock.acquire_timeout(0, job='get_direction') as acquired:
+        with self.lock.acquire_timeout(3, job='get_direction') as acquired:
             if not acquired:
                 self.log.warn(
                     'Could not get freq because {} is already running'.format(self.lock.job))
@@ -221,7 +221,7 @@ class RotationAgent:
             direction (str): '0' for forward and '1' for reverse.
 
         """
-        with self.lock.acquire_timeout(0, job='set_direction') as acquired:
+        with self.lock.acquire_timeout(3, job='set_direction') as acquired:
             if not acquired:
                 self.log.warn(
                     'Could not set direction because {} is already running'.format(self.lock.job))
@@ -246,7 +246,7 @@ class RotationAgent:
                 voltage" relationship
 
         """
-        with self.lock.acquire_timeout(0, job='set_scale') as acquired:
+        with self.lock.acquire_timeout(3, job='set_scale') as acquired:
             if not acquired:
                 self.log.warn(
                     'Could not set scale because {} is already running'.format(self.lock.job))
@@ -262,7 +262,7 @@ class RotationAgent:
         **Task** - Turn on the Kikusui drive voltage.
 
         """
-        with self.lock.acquire_timeout(0, job='set_on') as acquired:
+        with self.lock.acquire_timeout(3, job='set_on') as acquired:
             if not acquired:
                 self.log.warn(
                     'Could not set on because {} is already running'.format(self.lock.job))
@@ -279,7 +279,7 @@ class RotationAgent:
         **Task** - Turn off the Kikusui drive voltage.
 
         """
-        with self.lock.acquire_timeout(0, job='set_off') as acquired:
+        with self.lock.acquire_timeout(3, job='set_off') as acquired:
             if not acquired:
                 self.log.warn(
                     'Could not set off because {} is already running'.format(self.lock.job))
@@ -300,7 +300,7 @@ class RotationAgent:
             volt (float): Kikusui set voltage
 
         """
-        with self.lock.acquire_timeout(0, job='set_v') as acquired:
+        with self.lock.acquire_timeout(3, job='set_v') as acquired:
             if not acquired:
                 self.log.warn(
                     'Could not set v because {} is already running'.format(self.lock.job))
@@ -321,7 +321,7 @@ class RotationAgent:
             volt (float): Kikusui limit voltage
 
         """
-        with self.lock.acquire_timeout(0, job='set_v_lim') as acquired:
+        with self.lock.acquire_timeout(3, job='set_v_lim') as acquired:
             if not acquired:
                 self.log.warn(
                     'Could not set v lim because {} is already running'.format(self.lock.job))
@@ -340,7 +340,7 @@ class RotationAgent:
         enables PID control.
 
         """
-        with self.lock.acquire_timeout(0, job='use_ext') as acquired:
+        with self.lock.acquire_timeout(3, job='use_ext') as acquired:
             if not acquired:
                 self.log.warn(
                     'Could not use external voltage because {} is already running'.format(self.lock.job))
@@ -358,7 +358,7 @@ class RotationAgent:
         disables the PID and switches to direct control.
 
         """
-        with self.lock.acquire_timeout(0, job='ign_ext') as acquired:
+        with self.lock.acquire_timeout(3, job='ign_ext') as acquired:
             if not acquired:
                 self.log.warn(
                     'Could not ignore external voltage because {} is already running'.format(self.lock.job))
