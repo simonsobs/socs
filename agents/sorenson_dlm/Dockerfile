@@ -1,6 +1,6 @@
-# SOCS PTC Agent
+# SOCS DLM Agent
 
-# SOCS Agent container for interacting with PTC over ethernet
+# SOCS Agent container for interacting with DLM over ethernet
 # Use socs base image
 
 FROM socs:latest

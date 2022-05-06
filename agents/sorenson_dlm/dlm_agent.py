@@ -1,36 +1,34 @@
-#script to log and control the Sorenson DLM power supply, for heaters
-#asdf
-import sys, os
-import binascii
+# Script to log and control the Sorenson DLM power supply, for heaters
+# Tanay Bhandarkar, Jack Orlowski-Scherer
 import time
-import struct
 import socket
-import signal
-import errno
+import numpy as np
 from contextlib import contextmanager
 from ocs import site_config, ocs_agent
 from ocs.ocs_twisted import TimeoutLock
 
+
 class DLM:
-    def __init__(self, ip_address = '10.10.10.21', port = 9221, timeout = 10):
+    def __init__(self, ip_address='10.10.10.21', port=9221, timeout=10):
         self.ip_address = ip_address
         self.port = port
         self.comm = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.comm.connect((self.ip_address, self.port))
         self.comm.settimeout(timeout)
         self.volt_prot = None
-    
-    
+
     def send_msg(self, cmd):
         """
-        Sends a message to the DLM. OPC? causes the DLM to wait for the previous command to complete to being the next
+        Sends a message to the DLM. 'OPC?' causes the DLM to wait for the
+        previous command to complete to being the next
         """
         msg = str(cmd) + ';OPC?\r\n'
         self.comm.send(msg.encode('ASCII'))
 
     def rec_msg(self):
         """
-        Waits for a message from the DLM, typically as a result of a querry, and returns it
+        Waits for a message from the DLM, typically as a result of a query,
+        and returns it
         """
         dataStr = self.comm.recv(1024).decode('ASCII')
         return dataStr.strip()
@@ -41,26 +39,23 @@ class DLM:
         """
         self.send_msg('*CLS')
         self.send_msg('*RST')
-        #TODO Figure out voltage formating: i.e. all voltage variables of the form 1.0? Also, check how DLM returns values and make sure check works
         self.send_msg('SOUR:VOLT:PROT {}'.format(voltage))
-        
+
         self.send_msg('SOUR:VOLT:PROT?')
         ovp = self.rec_msg()
         if ovp != voltage:
             print("Error: Over voltage protection not set to requested value")
             return
-        
+
         self.send_msg('STAT:PROT:ENABLE 8')
         self.send_msg('STAT:PROT:ENABLE?')
         enb = self.rec_msg()
-        #TODO check that message returns string
         if enb != '8':
             print('Error: Over voltage protection failed to enable')
-            return    
+            return
 
         self.send_msg('STAT:PROT:EVENT?')
         event = self.rec_msg()
-        #TODO check that message returns string
         if event != '0':
             print('Error: Over voltage already tripped')
             return
@@ -71,7 +66,6 @@ class DLM:
         """
         self.send_msg('SOUR:VOLT?')
         msg = self.rec_msg()
-        #print(msg)
         return msg
 
     def read_current(self):
@@ -94,36 +88,37 @@ class DLM:
 class DLMAgent:
     '''
     TO DO:
-    start_acq function
-    set_voltage function
-    set_voltage_protection function
-    set_current_fuction
-    set_current_and_voltage??? (simulatneously set current and voltage, not sure if needed)
-    
-    ???
+    set_current_and_voltage (simulatneously set current and voltage,
+    not sure if needed)
+
     '''
 
-
-    def __init__(self,agent,ip_address , port, f_sample=2.5):
+    def __init__(self, agent, ip_address , port, f_sample=2.5):
         self.active = True
-        self.agent= agent
+        self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
         self.f_sample = f_sample
         self.take_data = False
         self.over_volt = 0
         self.dlm = DLM(ip_address, int(port))
-        agg_params = {'frame length':60, }
+        agg_params = {'frame length': 60, }
         self.agent.register_feed('voltages',
                                  record=True,
                                  agg_params=agg_params,
                                  buffer_time=1)
 
     def start_acq(self, session, params=None):
-        
+        '''
+        Get voltage and current values from the sorenson, publishes them to
+        the feed
+
+        Args:
+            sampling_frequency: defaults to 2.5Hz
+        '''
         if params is None:
             params = {}
-        
+
         f_sample = params.get('sampling_frequency')
         if f_sample is None:
             f_sample = self.f_sample
@@ -146,9 +141,11 @@ class DLMAgent:
                     'data': {}
                 }
                 voltage_reading = self.dlm.read_voltage()
+                current_reading = self.dlm.read_current()
                 print('Voltage: {}'.format(voltage_reading))
-                # Loop through all the channels on the device
-                data['data']["voltage"] = voltage_reading
+                print('Current: {}'.format(current_reading))
+                data['data']["voltage"] = np.float(voltage_reading)
+                data['data']["current"] = np.float(current_reading)
 
                 self.agent.publish_to_feed('voltages', data)
                 time.sleep(sleep_time)
@@ -156,18 +153,18 @@ class DLMAgent:
             self.agent.feeds['voltages'].flush_buffer()
         return True, 'Acquistion exited cleanly'
 
-    def set_voltage(self, session, params = None):
+    def set_voltage(self, session, params=None):
         """
         Sets voltage of power supply:
         Args:
-            volts (int): Voltage to set. 
+            voltage (int): Voltage to set.
         """
 
-        with self.lock.acquire_timeout(timeout = 0, job = 'init') as acquired:
+        with self.lock.acquire_timeout(timeout=0, job='init') as acquired:
             if acquired:
                 if self.over_volt == 0:
                     return False, 'Over voltage protection not set'
-                elif float(params['voltage'])>float(self.over_volt):
+                elif float(params['voltage']) > float(self.over_volt):
                     return False, 'Voltage greater then over voltage protection'
                 else:
                     self.dlm.send_msg('SOUR:VOLT {}'.format(params['voltage']))
@@ -183,13 +180,34 @@ class DLMAgent:
             over_volt (int): Over voltage protection to set
         """
 
-        with self.lock.acquire_timeout(timeout = 0, job = 'init') as acquired:
+        with self.lock.acquire_timeout(timeout=0, job='init') as acquired:
             if acquired:
+                print("ACQUIRED", params)
                 self.dlm.set_overv_prot(params['over_volt'])
-                self.over_volt = float(params['over_volt']) 
+                self.over_volt = float(params['over_volt'])
             else:
                 return False, 'Could not acquire lock'
         return True, 'Set over voltage protection to {}'.format(params['over_volt'])
+
+    def set_current(self, session, params=None):
+        """
+        Sets current of power supply:
+        Args:
+            current (int): Current to set.
+        """
+
+        with self.lock.acquire_timeout(timeout=0, job='init') as acquired:
+            if acquired:
+                if self.over_volt == 0:
+                    return False, 'Over voltage protection not set'
+                elif float(params['voltage']) > float(self.over_volt):
+                    return False, 'Voltage greater then over voltage protection'
+                else:
+                    self.dlm.send_msg('SOUR:CURR {}'.format(params['current']))
+            else:
+                return False, "Could not acquire lock"
+
+        return True, 'Set current to {}'.format(params['current'])
 
     def stop_acq(self, session, params=None):
         '''
@@ -197,11 +215,9 @@ class DLMAgent:
         '''
         if self.take_data:
             self.take_data = False
-            #self.power_supply.close()
             return True, 'requested to stop taking data.'
         else:
             return False, 'acq is not currently running'
-
 
 
 if __name__ == '__main__':
@@ -218,59 +234,8 @@ if __name__ == '__main__':
     agent, runner = ocs_agent.init_site_agent(args)
     DLM_agent = DLMAgent(agent, args.ip_address, args.port)
     agent.register_process('acq', DLM_agent.start_acq,
-                           DLM_agent.stop_acq, startup=True)   
+                           DLM_agent.stop_acq, startup=True)
     agent.register_task('set_voltage', DLM_agent.set_voltage)
     agent.register_task('close', DLM_agent.stop_acq)
     agent.register_task('set_over_volt', DLM_agent.set_over_volt)
     runner.run(agent, auto_reconnect=True)
-
-
-
-#The following would be good for a client script
-                  
-
-"""
-def sendmsg(s, cmd):
-    msg = str(cmd) + '; OPC?\r\n'
-    s.send(msg.encode('ASCII'))
-
-def recmsg(s):
-    dataStr = s.recv(1024).decode('ASCII')    
-    return dataStr.strip()    
-
-comm = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-comm.connect(('10.10.10.21', 9221))
-comm.settimeout(10)
-
-sendmsg(comm, '*CLS')
-sendmsg(comm, '*RST')
-sendmsg(comm, 'SOUR:VOLT:PROT 100.0')    
-sendmsg(comm, 'SOUR:CURR 1.0')
-sendmsg(comm, 'SOUR:VOLT 2.0')
-#sendmsg(comm, 'DISP:VIEW METER1')
-#sendmsg(comm, 'SOUR:CURR?')
-sendmsg(comm, 'SOUR:VOLT?')
-
-msg = recmsg(comm)
-print("msg",msg)
-
-sendmsg(comm, 'SOUR:CURR 0.0')
-sendmsg(comm, 'SOUR:VOLT 0.0')
-sendmsg(comm, 'SOUR:VOLT?')
-
-msg = recmsg(comm)
-print(msg)
-
-
-comm.close()
-
-msg = '*CLS\n'
-#comm.send(msg.encode())
-comm.sendall(msg.encode('ASCII'))
-msg = 'SYST:ERR?\n'
-#comm.send(msg.encode())
-comm.sendall(msg.encode('ASCII'))
-status = comm.recv(4096).decode('ASCII')
-
-print(status)
-"""
