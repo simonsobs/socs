@@ -66,8 +66,7 @@ Agent API
 ---------
 
 .. autoclass:: agents.acu.acu_agent.ACUAgent
-    :members: monitor, broadcast, generate_scan, go_to,
-        run_specified_scan, set_boresight, stop_and_clear
+    :members:
 
 Example Clients
 ---------------
