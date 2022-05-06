@@ -90,7 +90,7 @@ def from_file(filename):
     must be formatted as an array of arrays in the order [times, azimuths,
     elevations, azimuth velocities, elevation velocities]
 
-    Params:
+    Parameters:
         filename (str): Full path to the numpy file containing scan
             parameter array
 
@@ -130,7 +130,7 @@ def ptstack_format(conctimes, concaz, concel, concva, concve, az_flags,
     to complete a scan. Params are the outputs of from_file, 
     constant_velocity_scanpoints, or generate_constant_velocity_scan.
 
-    Params:
+    Parameters:
         conctimes (list): List of times starting at 0 for the ACU to reach
             associated positions
         concaz (list): List of azimuth positions associated with times
@@ -178,7 +178,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
     azimuth and elevation velocities, azimuth and elevation flags for
     arbitrarily long constant-velocity azimuth scans.
 
-    Params:
+    Parameters:
         az_endpoint1 (float): the azimuth endpoint at which to start the
             scan
         az_endpoint2 (float): the second azimuth endpoint of the scan
