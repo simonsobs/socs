@@ -789,11 +789,21 @@ class ACUAgent:
                                     'Clear Stack')
         yield dsleep(0.1)
         self.log.info('Cleared stack.')
-        self.set_job_done('control')
+        self._set_job_done('control')
         return True, 'Job completed'
 
     @inlineCallbacks
     def fromfile_scan(self, session, params=None):
+        """fromfile_scan(filename=None, simulator=None)
+
+        **Task** - Upload and execute a scan pattern from numpy file.
+
+        Parameters:
+            filename (str): full path to desired numpy file. File contains an
+                array of three lists ([list(times), list(azimuths),
+                list(elevations)]). Times begin from 0.0. Applies to scantype
+                'from_file'. Required if scantype is 'from_file'.
+        """
         filename = params.get('filename')
         simulator = params.get('simulator')
         times, azs, els, vas, ves, azflags, elflags = sh.from_file(filename)
@@ -806,36 +816,12 @@ class ACUAgent:
 
     @inlineCallbacks
     def constant_velocity_scan(self, session, params=None):
-        azpts = params.get('azpts')
-        el = params.get('el')
-        azvel = params.get('azvel')
-        acc = params.get('acc')
-        ntimes = params.get('ntimes')
-        azonly = params.get('azonly')
-        simulator = params.get('simulator')
-        if abs(acc) > self.motion_limits['acc']:
-            return False, 'Acceleration too great!'
-        if min(azpts) <= self.motion_limits['azimuth']['lower'] or max(azpts) >= self.motion_limits['azimuth']['upper']:
-            return False, 'Azimuth location out of range!'
-        if el <= self.motion_limits['elevation']['lower'] or el >= self.motion_limits['elevation']['upper']:
-            return False, 'Elevation location out of range!'
-        times, azs, els, vas, ves, azflags, elflags = sh.constant_velocity_scanpoints(azpts, el, azvel, acc, ntimes)
-        yield self.run_specified_scan(session, times, azs, els, vas, ves, azflags, elflags, azonly, simulator)
-        return True, 'Track completed.'
+        """constant_velocity_scan(azpts=None, el=None, azvel=None, acc=None, \
+                                  ntimes=None, azonly=None, simulator=None)
 
-    @inlineCallbacks
-    def run_specified_scan(self, session, times, azs, els, vas, ves, azflags, elflags, azonly, simulator):
-        """TASK run_specified_scan
-
-        **Task** - Upload and execute a scan pattern. The pattern may be
-        specified by a numpy file, parameters for a linear scan in one
-        direction, or a linear scan with a turnaround.
+        **Task** - Run a constant velocity scan.
 
         Parameters:
-            filename (str, optional): full path to desired numpy file. File
-                contains an array of three lists ([list(times), list(azimuths),
-                list(elevations)]). Times begin from 0.0. Applies to scantype
-                'from_file'. Required if scantype is 'from_file'.
             azpts (tuple, optional): spatial endpoints of the azimuth scan.
                 Applies to scantype 'linear_1dir' (2 values) and
                 'linear_turnaround_sameends' (3 values). Required if scantype
@@ -855,8 +841,29 @@ class ACUAgent:
             ntimes (int, optional): number of times the platform traverses
                 between azimuth endpoints for a 'linear_turnaround_sameends'
                 scan. Required if scantype is 'linear_turnaround_sameends'.
+            azonly:
+            simulator:
 
         """
+        azpts = params.get('azpts')
+        el = params.get('el')
+        azvel = params.get('azvel')
+        acc = params.get('acc')
+        ntimes = params.get('ntimes')
+        azonly = params.get('azonly')
+        simulator = params.get('simulator')
+        if abs(acc) > self.motion_limits['acc']:
+            return False, 'Acceleration too great!'
+        if min(azpts) <= self.motion_limits['azimuth']['lower'] or max(azpts) >= self.motion_limits['azimuth']['upper']:
+            return False, 'Azimuth location out of range!'
+        if el <= self.motion_limits['elevation']['lower'] or el >= self.motion_limits['elevation']['upper']:
+            return False, 'Elevation location out of range!'
+        times, azs, els, vas, ves, azflags, elflags = sh.constant_velocity_scanpoints(azpts, el, azvel, acc, ntimes)
+        yield self.run_specified_scan(session, times, azs, els, vas, ves, azflags, elflags, azonly, simulator)
+        return True, 'Track completed.'
+
+    @inlineCallbacks
+    def run_specified_scan(self, session, times, azs, els, vas, ves, azflags, elflags, azonly, simulator):
         ok, msg = self.try_set_job('control')
         if not ok:
             return ok, msg
@@ -977,9 +984,9 @@ class ACUAgent:
 
     @inlineCallbacks
     def generate_scan(self, session, params):
-        """generate_scan(scantype='linear', stop_iter=None, az_endpoint1=None, \
-                         az_endpoint2=None, az_speed=None, acc=None, \
-                         el_endpoint1=None, el_endpoint2=None, el_speed=None)
+        """generate_scan(az_endpoint1=None, az_endpoint2=None, az_speed=None, \
+                         acc=None, el_endpoint1=None, el_endpoint2=None, \
+                         el_speed=None)
 
         **Process** - Scan generator, currently only works for
         constant-velocity az scans with fixed elevation.
