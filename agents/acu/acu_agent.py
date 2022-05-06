@@ -328,9 +328,8 @@ class ACUAgent:
     def monitor(self, session, params):
         """monitor()
 
-        **Process** - This process refreshes the cache of SATP ACU status
-        information, and reports it on HK feeds 'acu_status_summary' and
-        'acu_status_full'.
+        **Process** - Refresh the cache of SATP ACU status information and
+        report it on the 'acu_status_summary' and 'acu_status_full' HK feeds.
 
         Summary parameters are ACU-provided time code, Azimuth mode,
         Azimuth position, Azimuth velocity, Elevation mode, Elevation position,
@@ -523,8 +522,8 @@ class ACUAgent:
     def broadcast(self, session, params):
         """broadcast()
 
-        **Process** - This process reads UDP data from the port specified by
-        self.acu_config, decodes it, and publishes to an HK feed.
+        **Process** - Read UDP data from the port specified by self.acu_config,
+        decode it, and publish to an HK feed.
 
         """
         ok, msg = self._try_set_job('broadcast')
@@ -607,7 +606,7 @@ class ACUAgent:
     def go_to(self, session, params):
         """go_to(az=None, el=None, wait=1)
 
-        **Task** - Moves the telescope to a particular point (azimuth,
+        **Task** - Move the telescope to a particular point (azimuth,
         elevation) in Preset mode. When motion has ended and the telescope
         reaches the preset point, it returns to Stop mode and ends.
 
@@ -723,7 +722,7 @@ class ACUAgent:
     def set_boresight(self, session, params):
         """set_boresight(b=None)
 
-        **Task** - Moves the telescope to a particular third-axis angle.
+        **Task** - Move the telescope to a particular third-axis angle.
 
         Parameters:
             b (float): destination angle for boresight rotation
@@ -771,7 +770,7 @@ class ACUAgent:
     def stop_and_clear(self, session, params):
         """stop_and_clear()
 
-        **Task** - Changes the azimuth and elevation modes to Stop and clears
+        **Task** - Change the azimuth and elevation modes to Stop and clear
         points uploaded to the stack.
 
         """
