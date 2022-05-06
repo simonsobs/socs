@@ -157,7 +157,13 @@ class DLMAgent:
         """
         Sets voltage of power supply:
         Args:
-            voltage (int): Voltage to set.
+            voltage (float): Voltage to set.
+        
+        Examples:
+            Example of a client, setting the current to 1V:
+
+                client.set_voltage(voltage = 1.)
+
         """
 
         with self.lock.acquire_timeout(timeout=0, job='init') as acquired:
@@ -178,6 +184,12 @@ class DLMAgent:
         Sets over voltage protection of power supply:
         Args:
             over_volt (int): Over voltage protection to set
+
+        Examples:
+            Example of a client, setting the overvoltage protection to 10V:
+
+                client.set_over_volt(over_volt = 10.)
+
         """
 
         with self.lock.acquire_timeout(timeout=0, job='init') as acquired:
@@ -193,7 +205,13 @@ class DLMAgent:
         """
         Sets current of power supply:
         Args:
-            current (int): Current to set.
+            current (float): Current to set.
+
+        Examples:
+            Example of a client, setting the current to 1A:
+
+                client.set_current(current = 1.)
+
         """
 
         with self.lock.acquire_timeout(timeout=0, job='init') as acquired:
