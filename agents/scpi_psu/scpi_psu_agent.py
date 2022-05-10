@@ -57,11 +57,14 @@ class ScpiPsuAgent:
             Args:
                 wait (float, optional):
                     time to wait between measurements [seconds].
+                channels (list[int], optional):
+                    channels to monitor. [1, 2, 3] by default.
         """
         if params is None:
             params = {}
 
         wait_time = params.get('wait', 1)
+        channels = params.get('channels', [1, 2, 3])
 
         self.monitor = True
 
@@ -74,7 +77,7 @@ class ScpiPsuAgent:
                         'data': {}
                     }
 
-                    for chan in [1, 2, 3]:
+                    for chan in channels:
                         data['data']["Voltage_{}".format(chan)] = self.psu.get_volt(chan)
                         data['data']["Current_{}".format(chan)] = self.psu.get_curr(chan)
 

@@ -1,0 +1,10 @@
+[flake8]
+max_line_length = 80
+ignore = E501
+in-place = true
+recursive = true
+aggressive = 2
+exclude =
+    agents/meinberg_m1000/mibs/MBG-SNMP-LTNG-MIB.py
+    agents/meinberg_m1000/mibs/SNMPv2-MIB.py
+    agents/meinberg_m1000/mibs/MBG-SNMP-ROOT-MIB.py

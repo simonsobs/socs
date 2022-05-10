@@ -71,29 +71,11 @@ services:
       - "socs"
 
   # --------------------------------------------------------------------------
-  # The Pysmurf Archiver Agent
-  # --------------------------------------------------------------------------
-  ocs-pysmurf-archiver-agent:
-    image: "ocs-pysmurf-archiver-agent"
-    build: ./agents/pysmurf_archiver/
-    depends_on:
-      - "socs"
-
-  # --------------------------------------------------------------------------
   # Smurf stream simulator agent
   # --------------------------------------------------------------------------
   ocs-smurf-stream-sim-agent:
     image: "ocs-smurf-stream-sim"
     build: ./agents/smurf_stream_simulator/
-    depends_on:
-      - "socs"
-
-  # --------------------------------------------------------------------------
-  # SMuRF timestream aggregator
-  # --------------------------------------------------------------------------
-  ocs-smurf-recorder:
-    image: "ocs-smurf-recorder"
-    build: ./agents/smurf_recorder/
     depends_on:
       - "socs"
 
@@ -177,6 +159,15 @@ services:
     build: ./agents/tektronix3021c/
     depends_on:
       - "socs"
+    
+  # --------------------------------------------------------------------------
+  # Pfeiffer Turbo Controller
+  # --------------------------------------------------------------------------
+  ocs-pfeiffer-tc400-agent:
+    image: "ocs-pfeiffer-tc400-agent"
+    build: ./agents/pfeiffer_tc400/
+    depends_on:
+      - "socs"
 
   # --------------------------------------------------------------------------
   # CHWP Encoder BBB agent
@@ -184,6 +175,15 @@ services:
   ocs-hwpbbb-agent:
     image: "ocs-hwpbbb-agent"
     build: ./agents/chwp/
+    depends_on:
+      - "socs"
+
+  # --------------------------------------------------------------------------
+  # HWP Rotation Agent
+  # --------------------------------------------------------------------------
+  ocs-hwp-rotation-agent:
+    image: "ocs-hwp-rotation-agent"
+    build: ./agents/hwp_rotation/
     depends_on:
       - "socs"
 
@@ -197,6 +197,15 @@ services:
   ocs-suprsync-agent:
     image: 'ocs-suprsync-agent'
     build: ./agents/suprsync/
+    depends_on:
+      - "socs"
+
+  # --------------------------------------------------------------------------
+  # Magpie agent
+  # --------------------------------------------------------------------------
+  ocs-magpie-agent:
+    image: "ocs-magpie-agent"
+    build: ./agents/magpie
     depends_on:
       - "socs"
 

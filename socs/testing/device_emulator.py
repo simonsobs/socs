@@ -56,7 +56,7 @@ class DeviceEmulator:
 
     Attributes:
         responses (dict): Current set of responses the DeviceEmulator would
-            give
+            give. Should all be strings, not bytes-like.
         default_response (str): Default response to send if a command is
             unrecognized. No response is sent and an error message is logged if
             a command is unrecognized and the default response is set to None.
@@ -64,6 +64,7 @@ class DeviceEmulator:
         _type (str): Relay type, either 'serial' or 'tcp'.
         _read (bool): Used to stop the background reading of data recieved on
             the relay.
+        _conn (socket.socket): TCP connection for use in 'tcp' relay.
 
     """
     def __init__(self, responses):
@@ -71,6 +72,7 @@ class DeviceEmulator:
         self.default_response = None
         self._type = None
         self._read = True
+        self._conn = None
 
     @staticmethod
     def _setup_socat():
@@ -175,14 +177,19 @@ class DeviceEmulator:
         itself.
 
         """
-        #print('shutting down background reading')
+        # print('shutting down background reading')
         self._read = False
         time.sleep(1)
         if self._type == 'serial':
-            #print('shutting down socat relay')
+            # print('shutting down socat relay')
             self.proc.terminate()
             out, err = self.proc.communicate()
-            #print(out, err)
+            # print(out, err)
+        if self._type == 'tcp':
+            # print('shutting down background tcp relay')
+            if self._conn:
+                self._conn.close()
+                self._sock.close()
 
     def _read_socket(self, port):
         """Loop until shutdown, reading any commands sent over the relay.
@@ -195,30 +202,34 @@ class DeviceEmulator:
         self._read = True
 
         # Listen for connections
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.bind(('127.0.0.1', port))
-        sock.listen(1)
+        self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._sock.bind(('127.0.0.1', port))
+        self._sock.listen(1)
         print("Device emulator waiting for tcp client connection")
-        conn, client_address = sock.accept()
+        self._conn, client_address = self._sock.accept()
         print(f"Client connection made from {client_address}")
 
         while self._read:
-            msg = conn.recv(4096).strip().decode('utf-8')
+            msg = self._conn.recv(4096).strip().decode('utf-8')
             if msg:
                 print(f"msg='{msg}'")
 
                 response = self._get_response(msg)
 
+                # Avoid user providing bytes-like response
+                if isinstance(response, bytes):
+                    response = response.decode()
+
                 if response is None:
                     continue
 
                 print(f"response='{response}'")
-                conn.sendall((response).encode('utf-8'))
+                self._conn.sendall((response).encode('utf-8'))
 
             time.sleep(0.01)
 
-        conn.close()
-        sock.close()
+        self._conn.close()
+        self._sock.close()
 
     def create_tcp_relay(self, port):
         """Create the TCP relay, emulating a hardware device connected over
@@ -258,6 +269,10 @@ class DeviceEmulator:
                 >>> responses = {'KRDG? 1': '+1.7E+03'}
                 >>> responses = {'*IDN?': 'LSCI,MODEL425,4250022,1.0',
                                  'RDGFIELD?': ['+1.0E-01', '+1.2E-01', '+1.4E-01']}
+
+        Notes:
+            The responses defined should all be strings, not bytes-like. The
+            DeviceEmulator will handle encoding/decoding.
 
         """
         print(f"responses set to {responses}")

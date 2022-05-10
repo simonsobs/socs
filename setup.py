@@ -35,4 +35,7 @@ setup(name = 'socs',
           'sqlalchemy',
           'pysnmp',
       ],
+      extras_require={
+          "so3g": ["so3g"],
+      },
 )
