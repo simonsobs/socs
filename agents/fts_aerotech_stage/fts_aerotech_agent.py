@@ -10,6 +10,7 @@ if not ON_RTD:
     from ocs import ocs_agent, site_config
     from ocs.ocs_twisted import TimeoutLock, Pacemaker
 
+
 class FTSAerotechStage:
     """
     Class for connecting to the FTS mirror controller
@@ -21,8 +22,8 @@ class FTSAerotechStage:
         speed: speed in mm/s, defaults to 25 mm/s if None
     """
     TRANSLATE = 1, 74.87
-    LIMS = (-74.8,74.8)
-    SPEED = 25 #mm/s
+    LIMS = (-74.8, 74.8)
+    SPEED = 25  # mm/s
     INFLATION = 1.10
     SETTLE_T = 0.2
     MIN_WAIT = 0.1
@@ -35,8 +36,8 @@ class FTSAerotechStage:
         self.comm.connect((self.ip_address, self.port))
         self.comm.settimeout(timeout)
 
-        self.send('ENABLE X\n') #Send enable command
-        data = self.comm.recv(1024) #Collect and print response
+        self.send('ENABLE X\n')  # Send enable command
+        data = self.comm.recv(1024)  # Collect and print response
 
         if data == b'%\n':
             self.initialized = True
@@ -48,9 +49,8 @@ class FTSAerotechStage:
             self.SPEED = speed
         self.speed_code = 'F%i' % self.SPEED
 
-
     def send(self, msg):
-        self.comm.sendall( bytes(msg, 'utf-8'))
+        self.comm.sendall(bytes(msg, 'utf-8'))
 
     def read(self):
         # Controller blocks reply until motion is complete; so if
@@ -61,7 +61,7 @@ class FTSAerotechStage:
     def home(self):
         self.send('HOME X\n')
         time.sleep(0.1)
-        ## block until homing is complete
+        # block until homing is complete
         return self.read()
 
     def get_position(self):
@@ -70,9 +70,9 @@ class FTSAerotechStage:
         out = self.read()
         try:
             M, B = self.TRANSLATE
-            self.pos = (float(out[1:])-B)/M
+            self.pos = (float(out[1:]) - B) / M
             return True, self.pos
-        except:
+        except BaseException:
             return False, None
 
     def move_to(self, position):
@@ -80,7 +80,7 @@ class FTSAerotechStage:
         if position < lims[0] or position > lims[1]:
             return False, 'Move out of bounds!'
         M, B = self.TRANSLATE
-        stage_pos = position*M + B
+        stage_pos = position * M + B
         cmd = ('MOVEABS X%.2f %s\n' % (stage_pos, self.speed_code))
         self.send(cmd)
         out = None
@@ -95,7 +95,6 @@ class FTSAerotechStage:
 
     def close(self):
         self.comm.close()
-
 
 
 class FTSAerotechAgent:
@@ -129,15 +128,15 @@ class FTSAerotechAgent:
             self.auto_acq = False
         self.sampling_frequency = float(samp)
 
-        ### register the position feeds
+        # register the position feeds
         agg_params = {
-            'frame_length' : 10*60, #[sec]
+            'frame_length': 10 * 60,  # [sec]
         }
 
         self.agent.register_feed('position',
-                                 record = True,
-                                 agg_params = agg_params,
-                                 buffer_time = 0)
+                                 record=True,
+                                 agg_params=agg_params,
+                                 buffer_time=0)
 
     def init_stage_task(self, session, params=None):
         """init_stage_task(params=None)
@@ -158,8 +157,8 @@ class FTSAerotechAgent:
         with self.lock.acquire_timeout(timeout=0, job='init') as acquired:
             # Locking mechanism stops code from proceeding if no lock acquired
             if not acquired:
-                self.log.warn("Could not start init because {} is already" \
-                                "running".format(self.lock.job))
+                self.log.warn("Could not start init because {} is already"
+                              "running".format(self.lock.job))
                 return False, "Could not acquire lock."
             # Run the function you want to run
             self.log.debug("Lock Acquired Connecting to Stages")
@@ -182,8 +181,8 @@ class FTSAerotechAgent:
 
         with self.lock.acquire_timeout(timeout=3, job='home') as acquired:
             if not acquired:
-                self.log.warn("Could not start home because lock held by" \
-                               f"{self.lock.job}")
+                self.log.warn("Could not start home because lock held by"
+                              f"{self.lock.job}")
                 return False, "Could not get lock"
             try:
                 self.stage.home()
@@ -204,10 +203,10 @@ class FTSAerotechAgent:
 
         with self.lock.acquire_timeout(timeout=3, job='move') as acquired:
             if not acquired:
-                self.log.warn("Could not start move because lock held by" \
-                               f"{self.lock.job}")
+                self.log.warn("Could not start move because lock held by"
+                              f"{self.lock.job}")
                 return False, "Could not get lock"
-            return self.stage.move_to( params.get('position') )
+            return self.stage.move_to(params.get('position'))
 
         return False, "Move did not complete correctly?"
 
@@ -222,7 +221,6 @@ class FTSAerotechAgent:
         if params is None:
             params = {}
 
-
         f_sample = params.get('sampling_frequency', self.sampling_frequency)
         pm = Pacemaker(f_sample, quantize=True)
 
@@ -231,35 +229,35 @@ class FTSAerotechAgent:
 
         with self.lock.acquire_timeout(timeout=0, job='acq') as acquired:
             if not acquired:
-                self.log.warn(f"Could not start acq because {self.lock.job} " \
-                            "is already running")
+                self.log.warn(f"Could not start acq because {self.lock.job} "
+                              "is already running")
                 return False, "Could not acquire lock."
 
-            self.log.info("Starting Data Acquisition for FTS Mirror at" \
-                           f"{f_sample} Hz")
+            self.log.info("Starting Data Acquisition for FTS Mirror at"
+                          f"{f_sample} Hz")
             session.set_status('running')
             self.take_data = True
             last_release = time.time()
 
             while self.take_data:
-                if time.time()-last_release > 1.:
+                if time.time() - last_release > 1.:
                     if not self.lock.release_and_acquire(timeout=20):
-                        self.log.warn("Could not re-acquire lock now held by" \
+                        self.log.warn("Could not re-acquire lock now held by"
                                       f"{self.lock.job}.")
                         return False, "could not re-acquire lock"
                     last_release = time.time()
                 pm.sleep()
 
                 data = {
-                    'timestamp':time.time(),
-                    'block_name':'position',
-                    'data':{}}
+                    'timestamp': time.time(),
+                    'block_name': 'position',
+                    'data': {}}
                 success, pos = self.stage.get_position()
                 if not success:
                     self.log.info("stage.get_position call failed")
                 else:
                     data['data']['pos'] = pos
-                    self.agent.publish_to_feed('position',data)
+                    self.agent.publish_to_feed('position', data)
 
         return True, 'Acquisition exited cleanly.'
 
@@ -303,13 +301,13 @@ if __name__ == '__main__':
     parser = make_parser()
 
     # Interpret options in the context of site_config.
-    args = site_config.parse_args(agent_class = 'FTSAerotechAgent',
-            parser=parser)
+    args = site_config.parse_args(agent_class='FTSAerotechAgent',
+                                  parser=parser)
 
     agent, runner = ocs_agent.init_site_agent(args)
 
     fts_agent = FTSAerotechAgent(agent, args.ip_address, args.port,
-                                args.mode, args.sampling_frequency)
+                                 args.mode, args.sampling_frequency)
 
     agent.register_task('init_stage', fts_agent.init_stage_task)
     agent.register_task('move_to', fts_agent.move_to)

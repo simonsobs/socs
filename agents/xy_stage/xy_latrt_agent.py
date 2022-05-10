@@ -9,8 +9,9 @@ if not ON_RTD:
     from ocs import ocs_agent, site_config
     from ocs.ocs_twisted import TimeoutLock, Pacemaker
 
-    ## yes I shouldn't have named that module agent
+    # yes I shouldn't have named that module agent
     from xy_agent.xy_connect import XY_Stage
+
 
 class LATRtXYStageAgent:
     """
@@ -43,15 +44,15 @@ class LATRtXYStageAgent:
             self.auto_acq = False
         self.sampling_frequency = float(samp)
 
-        ### register the position feeds
+        # register the position feeds
         agg_params = {
-            'frame_length' : 10*60, #[sec]
+            'frame_length': 10 * 60,  # [sec]
         }
 
         self.agent.register_feed('positions',
-                                 record = True,
-                                 agg_params = agg_params,
-                                 buffer_time = 0)
+                                 record=True,
+                                 agg_params=agg_params,
+                                 buffer_time=0)
 
     def init_xy_stage_task(self, session, params=None):
         """init_xy_stage_task(params=None)
@@ -95,11 +96,11 @@ class LATRtXYStageAgent:
             if not acquired:
                 self.log.warn(f"Could not start x move because lock held by {self.lock.job}")
                 return False
-            self.xy_stage.move_x_cm( params.get('distance',0), params.get('velocity',1))
+            self.xy_stage.move_x_cm(params.get('distance', 0), params.get('velocity', 1))
 
         time.sleep(1)
         while True:
-            ## data acquisition updates the moving field if it is running
+            # data acquisition updates the moving field if it is running
             if not self.take_data:
                 with self.lock.acquire_timeout(timeout=3, job='move_x_cm') as acquired:
                     if not acquired:
@@ -121,11 +122,11 @@ class LATRtXYStageAgent:
             if not acquired:
                 self.log.warn(f"Could not start y move because lock held by {self.lock.job}")
                 return False, "could not acquire lock"
-            self.xy_stage.move_y_cm( params.get('distance',0), params.get('velocity',1))
+            self.xy_stage.move_y_cm(params.get('distance', 0), params.get('velocity', 1))
 
         time.sleep(1)
         while True:
-            ## data acquisition updates the moving field if it is running
+            # data acquisition updates the moving field if it is running
             if not self.take_data:
                 with self.lock.acquire_timeout(timeout=3, job='move_y_cm') as acquired:
                     if not acquired:
@@ -135,7 +136,6 @@ class LATRtXYStageAgent:
             if not self.is_moving:
                 break
         return True, "Y Move Complete"
-
 
     def set_position(self, session, params):
         """
@@ -167,7 +167,6 @@ class LATRtXYStageAgent:
         if params is None:
             params = {}
 
-
         f_sample = params.get('sampling_frequency', self.sampling_frequency)
         pm = Pacemaker(f_sample, quantize=True)
 
@@ -185,22 +184,22 @@ class LATRtXYStageAgent:
             last_release = time.time()
 
             while self.take_data:
-                if time.time()-last_release > 1.:
+                if time.time() - last_release > 1.:
                     if not self.lock.release_and_acquire(timeout=10):
                         self.log.warn(f"Could not re-acquire lock now held by {self.lock.job}.")
                         return False, "could not re-acquire lock"
                     last_release = time.time()
                 pm.sleep()
 
-                data = {'timestamp':time.time(), 'block_name':'positions','data':{}}
+                data = {'timestamp': time.time(), 'block_name': 'positions', 'data': {}}
                 pos = self.xy_stage.position
                 self.is_moving = self.xy_stage.moving
 
                 data['data']['x'] = pos[0]
                 data['data']['y'] = pos[1]
 
-                self.agent.publish_to_feed('positions',data)
-                session.data.update( data['data'] )
+                self.agent.publish_to_feed('positions', data)
+                session.data.update(data['data'])
         return True, 'Acquisition exited cleanly.'
 
     def stop_acq(self, session, params=None):
@@ -213,6 +212,7 @@ class LATRtXYStageAgent:
             return True, 'requested to stop taking data.'
         else:
             return False, 'acq is not currently running.'
+
 
 def make_parser(parser=None):
     """Build the argument parser for the Agent. Allows sphinx to automatically
@@ -241,8 +241,7 @@ if __name__ == '__main__':
     parser = make_parser()
 
     # Interpret options in the context of site_config.
-    args = site_config.parse_args(agent_class = 'LATRtXYStageAgent', parser=parser)
-
+    args = site_config.parse_args(agent_class='LATRtXYStageAgent', parser=parser)
 
     agent, runner = ocs_agent.init_site_agent(args)
 

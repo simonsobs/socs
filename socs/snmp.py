@@ -1,7 +1,7 @@
 import txaio
 
 from pysnmp.hlapi.twisted import getCmd, SnmpEngine, CommunityData, UdpTransportTarget,\
-                                 ContextData, ObjectType, ObjectIdentity, UsmUserData
+    ContextData, ObjectType, ObjectIdentity, UsmUserData
 
 # For logging
 txaio.use_twisted()

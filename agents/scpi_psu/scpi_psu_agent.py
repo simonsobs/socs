@@ -25,7 +25,7 @@ class ScpiPsuAgent:
 
         # Registers Temperature and Voltage feeds
         agg_params = {
-            'frame_length': 10*60,
+            'frame_length': 10 * 60,
         }
         self.agent.register_feed('psu_output',
                                  record=True,

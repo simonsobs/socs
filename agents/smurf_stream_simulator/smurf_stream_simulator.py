@@ -44,6 +44,7 @@ class StreamChannel:
         Standard deviation of Gaussian to simulate data
 
     """
+
     def __init__(self, mean, stdev):
         self.mean = mean
         self.stdev = stdev
@@ -98,6 +99,7 @@ class SmurfStreamSimulator:
         List of simulated channels to stream
 
     """
+
     def __init__(self, agent, target_host="*", port=4536, num_chans=528,
                  stream_id='stream_sim'):
         self.agent = agent

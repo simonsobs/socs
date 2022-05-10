@@ -65,13 +65,14 @@ class LS336_Agent:
         The final setpoint value to avoid issues when the setpoint is
         ramping to a new value. Used in checking temperature stability
     """
+
     def __init__(self, agent, sn, ip, f_sample=0.1,
                  threshold=0.1, window=900):
         self.agent = agent
         self.sn = sn
         self.ip = ip
         self.f_sample = f_sample
-        self.t_sample = 1/self.f_sample - 0.01
+        self.t_sample = 1 / self.f_sample - 0.01
         assert self.t_sample < 7200, \
             "acq sampling freq must be such that t_sample is less than 2 hours"
 
@@ -88,7 +89,7 @@ class LS336_Agent:
         self._recent_temps = None
         self._static_setpoint = None
 
-        agg_params = {'frame_length': 10*60}  # sec
+        agg_params = {'frame_length': 10 * 60}  # sec
 
         # combined feed for thermometry and control data
         self.agent.register_feed(
@@ -177,7 +178,7 @@ class LS336_Agent:
         if f_sample is None:
             t_sample = self.t_sample
         else:
-            t_sample = 1/f_sample - 0.01
+            t_sample = 1 / f_sample - 0.01
             self.t_sample = t_sample
 
         # acquire lock and start Process
@@ -946,7 +947,7 @@ class LS336_Agent:
             current_temp = np.round(self.module.get_kelvin(channel), 4)
 
             # check if recent temps and current temps are within threshold
-            _recent_temps = self._recent_temps[:num_idxs, channel_num-1]
+            _recent_temps = self._recent_temps[:num_idxs, channel_num - 1]
             _recent_temps = np.concatenate(
                 (np.array([current_temp]), _recent_temps))
 
@@ -979,7 +980,7 @@ class LS336_Agent:
         **Task** - Gets an arbitrary channel attribute and stores it in the
         session.data dict. Attribute must be the name of a method
         in the namespace of the Lakeshore336 Channel class,
-        with a leading "get\_" removed (see example).
+        with a leading "get\\_" removed (see example).
 
         Parameters:
             attribute (str): The name of the channel attribute to get. See the
@@ -1028,7 +1029,7 @@ class LS336_Agent:
         **Task** - Gets an arbitrary heater attribute and stores it
         in the session.data dict. Attribute must be the name of a method
         in the namespace of the Lakeshore336 Heater class, with a leading
-        "get\_" removed (see example).
+        "get\\_" removed (see example).
 
         Parameters:
             attribute (str): The name of the channel attribute to get. See the

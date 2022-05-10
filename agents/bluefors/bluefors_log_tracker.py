@@ -58,6 +58,7 @@ class LogTracker:
             }
 
     """
+
     def __init__(self, log_dir):
         self.log_dir = log_dir
         self.date = datetime.date.fromtimestamp(time.time())
@@ -170,6 +171,7 @@ class LogParser:
         collected and publish "stale" data to the OCS live HK system.
 
     """
+
     def __init__(self, tracker, mode="follow", stale_time=2):
         self.log_tracker = tracker
         self.patterns = {'channels': ['v11', 'v2', 'v1', 'turbo1', 'v12', 'v3', 'v10',
@@ -402,7 +404,7 @@ class LogParser:
                 LOG.debug("Data: {d}", d=data)
                 # If the file was reopened due to an inode change we don't know
                 # if the last line is recent enough to be worth publishing. Check
-                if (time.time() - data['timestamp']) < int(self.stale_time)*60:
+                if (time.time() - data['timestamp']) < int(self.stale_time) * 60:
                     app_session.app.publish_to_feed('bluefors', data)
                 else:
                     LOG.warn("Not publishing stale data. Make sure your log " +
@@ -419,6 +421,7 @@ class BlueforsAgent:
         Top level log directory for the Bluefors logs
 
     """
+
     def __init__(self, agent, log_directory):
         self.lock = threading.Semaphore()
         self.job = None
@@ -430,7 +433,7 @@ class BlueforsAgent:
 
         # Registers bluefors feed
         agg_params = {
-            'frame_length': float(os.environ.get("FRAME_LENGTH", 10*60))  # [sec]
+            'frame_length': float(os.environ.get("FRAME_LENGTH", 10 * 60))  # [sec]
         }
         self.log.debug("frame_length set to {length}",
                        length=agg_params['frame_length'])

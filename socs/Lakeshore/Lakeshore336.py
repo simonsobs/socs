@@ -292,6 +292,7 @@ class Channel:
         Lakeshore 3062 scanner is installed on the LS336.
         D and D1 refer to the same channel!
     """
+
     def __init__(self, ls, inp):
         assert inp in ['A', 'B', 'C', 'D', 'D1', 'D2', 'D3', 'D4', 'D5']
 
@@ -757,7 +758,7 @@ class Curve:
                 f.write('No.\tUnits\tTemperature (K)\r\n')
                 f.write('\r\n')
                 for idx, point in enumerate(self.breakpoints):
-                    f.write('%s\t%s %s\r\n' % (idx+1, '%0.5f' %
+                    f.write('%s\t%s %s\r\n' % (idx + 1, '%0.5f' %
                                                point['units'],
                                                '%0.4f' % point['temperature']))
 
@@ -829,10 +830,10 @@ class Curve:
             # data points that should have been uploaded
             values.append(content[i].strip().split())
 
-        for j in range(1, len(values)+1):
+        for j in range(1, len(values) + 1):
             try:
                 resp = self.get_data_point(j)  # response from the 336
-                point = values[j-1]
+                point = values[j - 1]
                 units = float(resp[0])
                 temperature = float(resp[1])
                 assert units == float(
@@ -907,6 +908,7 @@ class Heater:
         the heater output we want to control, 1 = 100W, 2 = 50W
 
     """
+
     def __init__(self, ls, output):
         assert int(output) in [1, 2]
 
@@ -1148,7 +1150,7 @@ class Heater:
     def set_max_current(self, current):
         assert current <= 2, f'Current {current} is too high (>2 A)'
         # round down to 3 decimal places
-        current = math.floor(1000*current)/1000
+        current = math.floor(1000 * current) / 1000
 
         resp = self.get_heater_setup()
         if current in max_current_lock:
@@ -1212,8 +1214,8 @@ class Heater:
         """
         assert 100 * \
             percent == int(
-                100*percent), ("Percent value cannot have more than 2 "
-                               "decimal places")
+                100 * percent), ("Percent value cannot have more than 2 "
+                                 "decimal places")
 
         resp = self.ls.msg(f'MOUT {self.output},{percent}')
         return resp

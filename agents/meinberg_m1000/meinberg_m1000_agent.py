@@ -51,6 +51,7 @@ class MeinbergSNMP:
         passed directly to session.data.
 
     """
+
     def __init__(self, address, port=161, version=3):
         self.log = txaio.make_logger()
         self.address = address
@@ -72,7 +73,7 @@ class MeinbergSNMP:
                              "interval": 60,
                              "lastGet": None},
                             {"oid": ('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockLeapSecondDate', 1),
-                             "interval": 60*60,
+                             "interval": 60 * 60,
                              "lastGet": None},
                             {"oid": ('MBG-SNMP-LTNG-MIB', 'mbgLtNgNtpCurrentState', 0),
                              "interval": 64,
@@ -338,6 +339,7 @@ class MeinbergM1000Agent:
         txaio logger object, created by the OCSAgent
 
     """
+
     def __init__(self, agent, address, port=161, version=3):
         self.agent = agent
         self.is_streaming = False
@@ -347,7 +349,7 @@ class MeinbergM1000Agent:
         self.meinberg = MeinbergSNMP(address, port, version)
 
         agg_params = {
-            'frame_length': 10*60  # [sec]
+            'frame_length': 10 * 60  # [sec]
         }
         self.agent.register_feed('m1000',
                                  record=True,

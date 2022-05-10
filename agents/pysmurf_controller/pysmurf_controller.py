@@ -48,6 +48,7 @@ class PysmurfScriptProtocol(protocol.ProcessProtocol):
     end_status : twisted.python.failure.Failure
         Reason that the process ended.
     """
+
     def __init__(self, path, log=None):
         self.path = path
         self.log = log
@@ -100,6 +101,7 @@ class PysmurfController:
         slot (int):
             ATCA Slot of the smurf-card this agent is commanding.
     """
+
     def __init__(self, agent, args):
         self.agent: ocs_agent.OCSAgent = agent
         self.log = agent.log
@@ -145,7 +147,6 @@ class PysmurfController:
             S.load_tune(cfg.dev.exp['tunefile'])
         S._ocs_session = session
         return S, cfg
-
 
     @inlineCallbacks
     def _run_script(self, script, args, log, session):
@@ -301,15 +302,15 @@ class PysmurfController:
         while session.status in ['starting', 'running']:
             try:
                 d = dict(
-                    channel_mask = S.get_channel_mask(**kw).tolist(),
-                    downsample_factor = S.get_downsample_factor(**kw),
-                    agg_time = reg.agg_time.get(**kw),
-                    open_g3stream = reg.open_g3stream.get(**kw),
-                    pysmurf_action = reg.pysmurf_action.get(**kw, as_string=True),
-                    pysmurf_action_timestamp = reg.pysmurf_action_timestamp.get(**kw),
-                    stream_tag = reg.stream_tag.get(**kw, as_string=True),
-                    last_update = time.time(),
-                    stream_id = cfg.stream_id,
+                    channel_mask=S.get_channel_mask(**kw).tolist(),
+                    downsample_factor=S.get_downsample_factor(**kw),
+                    agg_time=reg.agg_time.get(**kw),
+                    open_g3stream=reg.open_g3stream.get(**kw),
+                    pysmurf_action=reg.pysmurf_action.get(**kw, as_string=True),
+                    pysmurf_action_timestamp=reg.pysmurf_action_timestamp.get(**kw),
+                    stream_tag=reg.stream_tag.get(**kw, as_string=True),
+                    last_update=time.time(),
+                    stream_id=cfg.stream_id,
                 )
                 session.data.update(d)
             except RuntimeError:
@@ -780,6 +781,7 @@ def make_parser(parser=None):
     pgroup.add_argument('--poll-interval', type=float,
                         help="Time between check-state polls")
     return parser
+
 
 if __name__ == '__main__':
     parser = make_parser()

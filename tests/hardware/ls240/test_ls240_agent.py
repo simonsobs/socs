@@ -1,5 +1,6 @@
 import os
 
+
 def assert_session_success(session, success=True):
     print("\n{} messages:".format(session['op_name']))
     for m in session['messages']:

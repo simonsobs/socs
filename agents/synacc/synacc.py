@@ -29,7 +29,7 @@ class SynaccessAgent:
         with self.lock.acquire_timeout(1) as acquired:
             if acquired:
                 req = "http://" + self.user + ":" + self.passw + "@" +\
-                    self.ip_address+"/cmd.cgi?$A5"
+                    self.ip_address + "/cmd.cgi?$A5"
                 r = requests.get(req)
                 resp = str(r.content)[6:11][::-1]
                 ret_str = []
@@ -45,7 +45,7 @@ class SynaccessAgent:
     def reboot(self, session, params=None):
         with self.lock.acquire_timeout(1) as acquired:
             if acquired:
-                req = "http://"+self.user + ":" + \
+                req = "http://" + self.user + ":" + \
                     self.passw + "@" + self.ip_address + \
                     "/cmd.cgi?$A4" + " " + str(params['outlet'])
                 requests.get(req)
@@ -68,7 +68,7 @@ class SynaccessAgent:
                 else:
                     on = "0"
                 req = "http://" + self.user + ":" + self.passw + "@" + \
-                    self.ip_address+"/cmd.cgi?$A3" + " " + \
+                    self.ip_address + "/cmd.cgi?$A3" + " " + \
                     str(params['outlet']) + " " + on
                 requests.get(req)
                 return True, 'Set outlet {} to {}'.\

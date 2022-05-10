@@ -16,10 +16,11 @@ os.environ['OCS_CONFIG_DIR'] = os.getcwd()
 
 
 run_agent = create_agent_runner_fixture(
-                '../agents/lakeshore372/LS372_agent.py',
-                'ls372')
+    '../agents/lakeshore372/LS372_agent.py',
+    'ls372')
 client = create_client_fixture('LSASIM')
 wait_for_crossbar = create_crossbar_fixture()
+
 
 def build_init_responses():
     values = {'*IDN?': 'LSCI,MODEL372,LSASIM,1.3',
@@ -52,6 +53,7 @@ def build_init_responses():
                    'SRDG? A': '+000.000E+09'})
 
     return values
+
 
 emulator = create_device_emulator(build_init_responses(), relay_type='tcp', port=7777)
 

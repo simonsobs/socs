@@ -19,6 +19,7 @@ class PID:
             controller.
 
     """
+
     def __init__(self, pid_ip, pid_port, verb=False):
         self.verb = verb
         self.hex_freq = '00000'

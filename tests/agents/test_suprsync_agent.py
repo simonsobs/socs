@@ -46,13 +46,13 @@ def test_suprsync_handle_files(tmp_path):
     archive_name = 'test'
     for i in range(nfiles):
         fname = f"{i}.npy"
-        path = str(data_dir/fname)
+        path = str(data_dir / fname)
         np.save(path, file_data)
         srfm.add_file(path, f'test_remote/{fname}', archive_name,
                       deletable=True)
 
     fname = f"dont_delete.npy"
-    path = str(data_dir/fname)
+    path = str(data_dir / fname)
     np.save(path, file_data)
     srfm.add_file(path, f'test_remote/{fname}', archive_name,
                   deletable=False)
