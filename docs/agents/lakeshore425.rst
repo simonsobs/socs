@@ -64,4 +64,3 @@ Supporting APIs
 .. automodule:: socs.Lakeshore.Lakeshore425
     :members:
     :undoc-members:
-

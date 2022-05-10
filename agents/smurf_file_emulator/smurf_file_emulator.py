@@ -379,4 +379,3 @@ if __name__ == '__main__':
     agent.register_process('stream', file_em.stream, file_em._stop_stream)
 
     runner.run(agent, auto_reconnect=True)
-

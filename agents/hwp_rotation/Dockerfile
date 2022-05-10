@@ -14,4 +14,3 @@ ENTRYPOINT ["dumb-init", "python3", "-u", "rotation_agent.py"]
 
 CMD ["--site-hub=ws://crossbar:8001/ws", \
      "--site-http=http://crossbar:8001/call"]
-

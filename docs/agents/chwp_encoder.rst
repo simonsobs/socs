@@ -73,5 +73,3 @@ This again is an example to run multiple agents::
       - "--instance-id=HBA1"
       - "--site-hub=ws://crossbar:8001/ws"
       - "--site-http=http://crossbar:8001/call"
-
-

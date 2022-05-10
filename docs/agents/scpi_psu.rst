@@ -94,4 +94,3 @@ Agent API
 
 .. autoclass:: agents.scpi_psu.scpi_psu_agent.ScpiPsuAgent
     :members: monitor_output, set_voltage, set_current, set_output
-

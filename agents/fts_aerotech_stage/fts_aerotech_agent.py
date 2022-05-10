@@ -318,4 +318,3 @@ if __name__ == '__main__':
     agent.register_process('acq', fts_agent.start_acq, fts_agent.stop_acq)
 
     runner.run(agent, auto_reconnect=True)
-
