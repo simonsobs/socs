@@ -313,12 +313,12 @@ class LS372_Agent:
 
                             # Check user set dwell time isn't too long
                             if self.dwell_time_delay > dwell_time:
-                                self.log.warn("WARNING: User set dwell_time_delay of " +
-                                              "{delay} s is larger than channel " +
-                                              "dwell time of {chan_time} s. If " +
-                                              "you are autoscanning this will " +
-                                              "cause no data to be collected. " +
-                                              "Reducing dwell time delay to {s} s.",
+                                self.log.warn("WARNING: User set dwell_time_delay of "
+                                              + "{delay} s is larger than channel "
+                                              + "dwell time of {chan_time} s. If "
+                                              + "you are autoscanning this will "
+                                              + "cause no data to be collected. "
+                                              + "Reducing dwell time delay to {s} s.",
                                               delay=self.dwell_time_delay,
                                               chan_time=dwell_time,
                                               s=dwell_time - 1)
@@ -629,7 +629,7 @@ class LS372_Agent:
 
             session.set_status('running')
 
-            current_dwell = self.module.channels[params["channel"]].set_dwell(params["dwell"])
+            self.module.channels[params["channel"]].set_dwell(params["dwell"])
             session.add_message(f'Set dwell to {params["dwell"]}')
 
         return True, f'Set channel {params["channel"]} dwell time to {params["dwell"]}'
@@ -761,22 +761,22 @@ class LS372_Agent:
 
             # Check we're in correct control mode for servo.
             if self.module.sample_heater.mode != 'Closed Loop':
-                session.add_message(f'Changing control to Closed Loop mode for servo.')
+                session.add_message('Changing control to Closed Loop mode for servo.')
                 self.module.sample_heater.set_mode("Closed Loop")
 
             # Check we aren't autoscanning.
             if self.module.get_autoscan() is True:
-                session.add_message(f'Autoscan is enabled, disabling for PID control on dedicated channel.')
+                session.add_message('Autoscan is enabled, disabling for PID control on dedicated channel.')
                 self.module.disable_autoscan()
 
             # Check we're scanning same channel expected by heater for control.
             if self.module.get_active_channel().channel_num != int(self.module.sample_heater.input):
-                session.add_message(f'Changing active channel to expected heater control input')
+                session.add_message('Changing active channel to expected heater control input')
                 self.module.set_active_channel(int(self.module.sample_heater.input))
 
             # Check we're setup to take correct units.
             if self.module.get_active_channel().units != 'kelvin':
-                session.add_message(f'Setting preferred units to Kelvin on heater control input.')
+                session.add_message('Setting preferred units to Kelvin on heater control input.')
                 self.module.get_active_channel().set_units('kelvin')
 
             # Make sure we aren't servoing too high in temperature.
@@ -826,7 +826,7 @@ class LS372_Agent:
 
             if np.abs(mean - setpoint) < params['threshold']:
                 print("passed threshold")
-                session.add_message(f'Setpoint Difference: ' + str(mean - setpoint))
+                session.add_message('Setpoint Difference: ' + str(mean - setpoint))
                 session.add_message(f'Average is within {params["threshold"]} K threshold. Proceeding with calibration.')
 
                 return True, f"Servo temperature is stable within {params['threshold']} K"

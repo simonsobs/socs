@@ -234,8 +234,8 @@ class Lakeshore372_Simulator:
                     cmds = data.decode().split(';')
 
                     if int(self.scanner) == 1:  # useful only if all channels have the same dwell and pause settings
-                        channel_change = int(elapsed_time // (self.channels[int(self.active_channel)].dwell +
-                                                              self.channels[int(self.active_channel)].pause))
+                        channel_change = int(elapsed_time // (self.channels[int(self.active_channel)].dwell
+                                                              + self.channels[int(self.active_channel)].pause))
                         # print(channel_change)
                         if 0 < channel_change < 16:
                             self.active_channel = 1 + channel_change
@@ -501,19 +501,19 @@ class Lakeshore372_Simulator:
             return
 
         if 0.0 <= float(p) <= 1000:
-            self.heaters[int(heater_output)].P = float(p)
+            self.heaters[int(heater_output)].p = float(p)
         else:
             self.log.warning("P value must be between 0.0 and 1000")
             return
 
         if 0 <= float(i) <= 10000:
-            self.heaters[int(heater_output)].I = float(i)
+            self.heaters[int(heater_output)].i = float(i)
         else:
             self.log.warning("I value must be between 0 and 10000")
             return
 
         if 0 <= float(d) <= 2500:
-            self.heaters[int(heater_output)].D = float(d)
+            self.heaters[int(heater_output)].d = float(d)
         else:
             self.log.warning("D value must be between 0 and 2500")
             return
@@ -521,7 +521,7 @@ class Lakeshore372_Simulator:
     def get_curve_header(self, curve):
         curve_index = int(curve)
         if not 1 <= curve_index <= 59:
-            self.log.warning(f"curve num must be between 1 and 59")
+            self.log.warning("curve num must be between 1 and 59")
             return
 
         return self.curves[curve_index].get_header()
@@ -529,7 +529,7 @@ class Lakeshore372_Simulator:
     def set_curve_header(self, curve, *args):
         curve_index = int(curve)
         if not 21 <= curve_index <= 59:
-            self.log.warning(f"curve num must be between 21 and 59")
+            self.log.warning("curve num must be between 21 and 59")
             return
 
         args = map(str, args)
@@ -538,7 +538,7 @@ class Lakeshore372_Simulator:
     def get_curve_data(self, curve, index):
         curve_index = int(curve)
         if not 1 <= curve_index <= 59:
-            self.log.warning(f"curve num must be between 1 and 59")
+            self.log.warning("curve num must be between 1 and 59")
             return
 
         return '{},{},{}'.format(str(self.curves[curve_index].data[int(index)][0]),
@@ -548,7 +548,7 @@ class Lakeshore372_Simulator:
     def set_curve_data(self, curve, index, units, kelvin, curvature=0):
         curve_index = int(curve)
         if not 21 <= curve_index <= 59:
-            self.log.warning(f"curve num must be between 21 and 59")
+            self.log.warning("curve num must be between 21 and 59")
             return
 
         self.curves[curve_index].data[int(index)][0] = float(units)
@@ -558,7 +558,7 @@ class Lakeshore372_Simulator:
     def delete_curve(self, curve):
         curve_index = int(curve)
         if not 21 <= curve_index <= 59:
-            self.log.warning(f"curve num must be between 21 and 59")
+            self.log.warning("curve num must be between 21 and 59")
             return
 
         for i in range(1, 201):
@@ -697,9 +697,9 @@ class Heater:
 
         self.setpoint = 0
 
-        self.P = 0
-        self.I = 0
-        self.D = 0
+        self.p = 0
+        self.i = 0
+        self.d = 0
 
     def get_output_mode(self):
         return ','.join([

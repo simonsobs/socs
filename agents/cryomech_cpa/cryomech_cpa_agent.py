@@ -206,7 +206,7 @@ class PTCAgent:
         self.fake_errors = fake_errors
 
         self.port = port
-        self.module: Optional[Module] = None
+        self.module = None
         self.f_sample = f_sample
 
         self.initialized = False

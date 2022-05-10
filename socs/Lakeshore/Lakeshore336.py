@@ -745,8 +745,8 @@ class Curve:
             with open(_file, 'w') as f:
                 f.write('Curve Name:\t' + self.name + '\r\n')
                 f.write('Serial Number:\t' + self.serial_number + '\r\n')
-                f.write('Data Format:\t' +
-                        format_lock[self.format] + f'\t({self.format})\r\n')
+                f.write('Data Format:\t'
+                        + format_lock[self.format] + f'\t({self.format})\r\n')
                 f.write('SetPoint Limit:\t%s\t(Kelvin)\r\n' % '%0.4f' %
                         np.max(self.breakpoints['temperature']))
                 f.write('Temperature coefficient:\t'
@@ -1273,25 +1273,25 @@ class Heater:
         Returns
         -------
         tuple
-            (P, I, D)
+            (p, i, d)
 
         """
         resp = self.ls.msg(f"PID? {self.output}").split(',')
-        self.P = float(resp[0])
-        self.I = float(resp[1])
-        self.D = float(resp[2])
-        return self.P, self.I, self.D
+        self.p = float(resp[0])
+        self.i = float(resp[1])
+        self.d = float(resp[2])
+        return self.p, self.i, self.d
 
-    def set_pid(self, P, I, D):
+    def set_pid(self, p, i, d):
         """Set PID parameters for closed loop control.
 
         Parameters
         ----------
-        P : float
+        p : float
             proportional term in PID loop
-        I : float
+        i : float
             integral term in PID loop
-        D : float
+        d : float
             derivative term in PID loop
 
         Returns
@@ -1300,15 +1300,15 @@ class Heater:
             response from PID command
 
         """
-        assert float(P) <= 1000 and float(P) >= 0.1
-        assert float(I) <= 1000 and float(I) >= 0.1
-        assert float(D) <= 200 and float(D) >= 0
+        assert float(p) <= 1000 and float(p) >= 0.1
+        assert float(i) <= 1000 and float(i) >= 0.1
+        assert float(d) <= 200 and float(d) >= 0
 
-        self.P = P
-        self.I = I
-        self.D = D
+        self.p = p
+        self.i = i
+        self.d = d
 
-        resp = self.ls.msg(f"PID {self.output},{P},{I},{D}")
+        resp = self.ls.msg(f"PID {self.output},{p},{i},{d}")
         return resp
 
     def get_ramp(self):

@@ -6,8 +6,6 @@ import serial
 import time
 import numpy as np
 
-import traceback
-
 # Lookup keys for command parameters.
 autorange_key = {'0': 'off',
                  '1': 'on'}
@@ -208,7 +206,7 @@ class LS370:
             self.channels.append(c)
 
         self.sample_heater = Heater(self)
-        #self.still_heater = Heater(self, 2)
+        # self.still_heater = Heater(self, 2)
 
     def msg(self, message):
         """Send message to the Lakeshore 370 over RS-232.
@@ -391,7 +389,7 @@ class Channel:
         self._get_input_channel_parameter()
         self._get_input_setup()
         self.name = f'Channel {channel_num}'
-        #self.tlimit = self.get_temperature_limit()
+        # self.tlimit = self.get_temperature_limit()
 
     def _get_input_channel_parameter(self):
         """Run Input Channel Parameter Query
@@ -488,7 +486,7 @@ class Channel:
         _range = resp[2]
         _autorange = resp[3]
         _csshunt = resp[4]
-        #_units = resp[5]
+        # _units = resp[5]
 
         self.mode = mode_key[_mode]
 
@@ -507,7 +505,7 @@ class Channel:
 
         self.csshunt = csshunt_key[_csshunt]
 
-        #self.units = units_key[_units]
+        # self.units = units_key[_units]
 
         return resp
 
@@ -1392,7 +1390,7 @@ class Heater:
 
         self.resistance = None  # only for output = 0
         # self.max_current = None   in 370, there is only htrrng limit and curve limit
-        #self.max_user_current = None  not in 370
+        # self.max_user_current = None  not in 370
         self.rng_limit = None
         self.display = None
 
@@ -1451,8 +1449,8 @@ class Heater:
         self.display = heater_display_key[resp[4]]
         self.rng_limit = heater_range_key[resp[5]]
         self.resistance = float(resp[6])
-        #self.max_current = int(resp[1])
-        #self.max_user_current = float(resp[2].strip('E+'))
+        # self.max_current = int(resp[1])
+        # self.max_user_current = float(resp[2].strip('E+'))
 
         return [self.display, self.rng_limit, self.resistance]
 
@@ -1700,7 +1698,7 @@ class Heater:
         if str(_range).lower() == 'on':
             _range = "On"
 
-        resp = self.ls.msg(f"HTRRNG {heater_range_lock[_range]}").strip()
+        self.ls.msg(f"HTRRNG {heater_range_lock[_range]}").strip()
 
         # refresh self.heater value with RANGE? query
         self.get_heater_range()
@@ -1711,7 +1709,7 @@ class Heater:
         :returns: heater range in amps
         :rtype: float
         """
-        resp = self.ls.msg(f"HTRRNG?").strip()
+        resp = self.ls.msg("HTRRNG?").strip()
 
         self.range = heater_range_key[resp]
 
@@ -1723,7 +1721,7 @@ class Heater:
 
     # SETP? - heater class, uses self.units to interpret value
     def get_setpoint(self):
-        resp = self.ls.msg(f"SETP?")
+        resp = self.ls.msg("SETP?")
         return resp
 
     # STILL - heater class?
@@ -1732,7 +1730,7 @@ class Heater:
 
     # STILL? - heater_class?
     def get_still_output(self):
-        resp = self.ls.msg(f"STILL?")
+        resp = self.ls.msg("STILL?")
         return resp
 
     # ANALOG, ANALOG?, AOUT?
@@ -1744,31 +1742,31 @@ class Heater:
         pass
 
     # PID
-    def set_pid(self, P, I, D):
+    def set_pid(self, p, i, d):
         """Set PID parameters for closed loop control.
 
-        :params P: proportional term in PID loop
-        :type P: float
-        :params I: integral term in PID loop
-        :type I: float
-        :params D: derivative term in PID loop
-        :type D: float
+        :params p: proportional term in PID loop
+        :type p: float
+        :params i: integral term in PID loop
+        :type i: float
+        :params d: derivative term in PID loop
+        :type d: float
 
         :returns: response from PID command
         :rtype: str
         """
-        assert float(P) <= 1000 and float(P) >= 0
-        assert float(I) <= 10000 and float(I) >= 0
-        assert float(D) <= 2500 and float(D) >= 0
+        assert float(p) <= 1000 and float(p) >= 0
+        assert float(i) <= 10000 and float(i) >= 0
+        assert float(d) <= 2500 and float(d) >= 0
 
-        resp = self.ls.msg(f"PID {P},{I},{D}")
+        resp = self.ls.msg(f"PID {p},{i},{d}")
         return resp
 
     # PID?
     def get_pid(self):
         """Get PID parameters with PID? command.
 
-        :returns: P, I, D
+        :returns: p, i, d
         :rtype: float, float, float
         """
         resp = self.ls.msg("PID?").split(',')

@@ -244,8 +244,8 @@ class PID:
                 data = self.conn.recv(4096).decode().strip()
                 break
             except socket.timeout:
-                print("Caught timeout waiting for response from PID controller. " +
-                      "Trying again...")
+                print("Caught timeout waiting for response from PID controller. "
+                      + "Trying again...")
                 time.sleep(1)
                 if attempt == 1:
                     raise RuntimeError(

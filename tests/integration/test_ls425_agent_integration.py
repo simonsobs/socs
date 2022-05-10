@@ -1,14 +1,5 @@
-import os
 import time
 import pytest
-import signal
-import subprocess
-import coverage.data
-import urllib.request
-
-from urllib.error import URLError
-
-from ocs.matched_client import MatchedClient
 
 import ocs
 from ocs.base import OpCode

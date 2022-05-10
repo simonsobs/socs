@@ -1,5 +1,5 @@
 import argparse
-import so3g
+import so3g  # noqa: F401
 from spt3g import core
 import txaio
 import os
@@ -804,7 +804,7 @@ class MagpieAgent:
                 stream_start_time = now
 
             this_frame_time = stream_start_time + (t - first_frame_time) + self.delay
-            res = sleep_while_running(this_frame_time - now, session)
+            sleep_while_running(this_frame_time - now, session)
             sender.Process(f)
 
         return True, "Stopped send process"

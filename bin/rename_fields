@@ -247,10 +247,10 @@ class HKRenamer:
                 try:
                     Feed.verify_data_field_string(new_field)
                 except ValueError:
-                    raise ValueError("An unexpected invalid field name, " +
-                                     f"'{new_field}', was encountered. Please " +
-                                     "report this field name as an issue to " +
-                                     "the socs repository.")
+                    raise ValueError("An unexpected invalid field name, "
+                                     + f"'{new_field}', was encountered. Please "
+                                     + "report this field name as an issue to "
+                                     + "the socs repository.")
 
                 # print(k, new_field)
                 new_block[new_field] = core.G3VectorDouble(v)

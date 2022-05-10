@@ -87,8 +87,6 @@ SEC_ENCODER_TO_PUBLISH = 10
 # Subsampling facot for the encoder counter data to influxdb
 NUM_SUBSAMPLE = 500
 
-### Definitions of utility functions ###
-
 
 def de_irig(val, base_shift=0):
     """Converts the IRIG signal into sec/min/hours/day/year depending on the parameters
@@ -258,7 +256,7 @@ class EncoderParser:
                   'Clock Count', edge)
 
         # Set the current time in seconds (changed to seconds from unix epoch)
-        #self.current_time = secs + mins*60 + hours*3600
+        # self.current_time = secs + mins*60 + hours*3600
         try:
             st_time = time.strptime("%d %d %d:%d:%d" % (year, day, hours, mins, secs),
                                     "%y %j %H:%M:%S")
@@ -331,7 +329,7 @@ class EncoderParser:
                     header = self.data[0:4]
                     # Convert a structure value from the beaglebone (header) to an int
                     header = struct.unpack('<I', header)[0]
-                    #print('header ', '0x%x'%header)
+                    # print('header ', '0x%x'%header)
 
                     # 0x1EAF = Encoder Packet
                     # 0xCAFE = IRIG Packet
@@ -570,8 +568,8 @@ class HWPBBBAgent:
                     # 0.09: time difference in seconds b/w reference marker and
                     #       the first index marker
                     data['timestamps'] = sys_time + 0.09 + np.arange(10) * 0.1
-                    data['data']['irig_synch_pulse_clock_time'] = list(irig_time + 0.09 +
-                                                                       np.arange(10) * 0.1)
+                    data['data']['irig_synch_pulse_clock_time'] = list(irig_time + 0.09
+                                                                       + np.arange(10) * 0.1)
                     data['data']['irig_synch_pulse_clock_counts'] = synch_pulse_clock_counts
                     data['data']['irig_info'] = list(irig_info)
                     self.agent.publish_to_feed('HWPEncoder', data)

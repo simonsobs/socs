@@ -27,8 +27,8 @@ def create_device_emulator(responses, relay_type, port=9001):
 
     """
     if relay_type not in ['serial', 'tcp']:
-        raise NotImplementedError(f"relay_type '{relay_type}' is not" +
-                                  "implemented or is an invalid type")
+        raise NotImplementedError(f"relay_type '{relay_type}' is not"
+                                  + "implemented or is an invalid type")
 
     @pytest.fixture()
     def create_device():

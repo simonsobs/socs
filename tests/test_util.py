@@ -1,1 +1,1 @@
-from socs import util
+from socs import util  # noqa: F401

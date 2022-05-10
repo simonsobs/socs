@@ -138,7 +138,7 @@ class PysmurfMonitor(DatagramProtocol):
 
             path = data['payload']['path']
             val = data['payload']['value']
-            val_type = data['payload']['type']
+            data['payload']['type']
 
             field_name = ocs_feed.Feed.enforce_field_name_rules(path)
             feed_name = f'{stream_id}_meta'

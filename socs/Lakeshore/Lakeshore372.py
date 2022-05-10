@@ -2,7 +2,6 @@
 
 import sys
 import socket
-import time
 import numpy as np
 
 # Lookup keys for command parameters.
@@ -1728,11 +1727,11 @@ class Heater:
             _range = "On"
 
         if self.output == 0:
-            resp = self.ls.msg(f"RANGE {self.output} {heater_range_lock[_range]}").strip()
+            self.ls.msg(f"RANGE {self.output} {heater_range_lock[_range]}").strip()
         else:
             on_off_key = {"0": "Off", "1": "On"}
             on_off_lock = {v: k for k, v in on_off_key.items()}
-            resp = self.ls.msg(f"RANGE {self.output} {on_off_lock[_range]}").strip()
+            self.ls.msg(f"RANGE {self.output} {on_off_lock[_range]}").strip()
 
         # refresh self.heater value with RANGE? query
         self.get_heater_range()
@@ -1768,7 +1767,7 @@ class Heater:
 
     # STILL? - heater_class?
     def get_still_output(self):
-        resp = self.ls.msg(f"STILL?")
+        resp = self.ls.msg("STILL?")
         return resp
 
     # ANALOG, ANALOG?, AOUT?
@@ -1780,31 +1779,31 @@ class Heater:
         pass
 
     # PID
-    def set_pid(self, P, I, D):
+    def set_pid(self, p, i, d):
         """Set PID parameters for closed loop control.
 
-        :params P: proportional term in PID loop
-        :type P: float
-        :params I: integral term in PID loop
-        :type I: float
-        :params D: derivative term in PID loop
-        :type D: float
+        :params p: proportional term in PID loop
+        :type p: float
+        :params i: integral term in PID loop
+        :type i: float
+        :params d: derivative term in PID loop
+        :type d: float
 
         :returns: response from PID command
         :rtype: str
         """
-        assert float(P) <= 1000 and float(P) >= 0
-        assert float(I) <= 10000 and float(I) >= 0
-        assert float(D) <= 2500 and float(D) >= 0
+        assert float(p) <= 1000 and float(p) >= 0
+        assert float(i) <= 10000 and float(i) >= 0
+        assert float(d) <= 2500 and float(d) >= 0
 
-        resp = self.ls.msg(f"PID {self.output},{P},{I},{D}")
+        resp = self.ls.msg(f"PID {self.output},{p},{i},{d}")
         return resp
 
     # PID?
     def get_pid(self):
         """Get PID parameters with PID? command.
 
-        :returns: P, I, D
+        :returns: p, i, d
         :rtype: float, float, float
         """
         resp = self.ls.msg("PID?").split(',')

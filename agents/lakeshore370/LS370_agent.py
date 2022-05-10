@@ -245,12 +245,12 @@ class LS370_Agent:
 
                             # Check user set dwell time isn't too long
                             if self.dwell_time_delay > dwell_time:
-                                self.log.warn("WARNING: User set dwell_time_delay of " +
-                                              "{delay} s is larger than channel " +
-                                              "dwell time of {chan_time} s. If " +
-                                              "you are autoscanning this will " +
-                                              "cause no data to be collected. " +
-                                              "Reducing dwell time delay to {s} s.",
+                                self.log.warn("WARNING: User set dwell_time_delay of "
+                                              + "{delay} s is larger than channel "
+                                              + "dwell time of {chan_time} s. If "
+                                              + "you are autoscanning this will "
+                                              + "cause no data to be collected. "
+                                              + "Reducing dwell time delay to {s} s.",
                                               delay=self.dwell_time_delay,
                                               chan_time=dwell_time,
                                               s=dwell_time - 1)
