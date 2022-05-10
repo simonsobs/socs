@@ -6,10 +6,10 @@
 Vantage Pro2 Agent
 ==================
 
-The Davis Instruments Vantage Pro2 is a weather system + monitor used to 
+The Davis Instruments Vantage Pro2 is a weather system + monitor used to
 acquire and readout weather data. The Vantage Pro2 monitor is connected to
 the laboratory computer via usb cable and data is sent though that connection.
-Here is the `VantagePro2 Operations manual`_. 
+Here is the `VantagePro2 Operations manual`_.
 
 .. argparse::
     :filename: ../agents/vantagePro2_agent/vantage_pro2_agent.py
@@ -20,13 +20,13 @@ Here is the `VantagePro2 Operations manual`_.
 
 Description
 -----------
-Out of the box, one just needs to connect the weather station to the 
+Out of the box, one just needs to connect the weather station to the
 Vantage Pro2 monitor, and the monitor to the lab computer via usb.
 
 The Vantage Pro2 monitor and weather station records many different
 types of weather data:
 
-- Barometer trend, the current 3 hour barometer trend. 
+- Barometer trend, the current 3 hour barometer trend.
 
   - -60 = Falling rapidly
   - -20 = Falling slowly
@@ -34,7 +34,7 @@ types of weather data:
   - 20 = Rising slowly
   - 60 = Rising rapidly
   - 80 = No trend available
-  - Any other value = The VantagePro2 does not have the 3 hours of data needed 
+  - Any other value = The VantagePro2 does not have the 3 hours of data needed
     to determine the barometer trend.
 
 - Barometer: Current barometer reading (Hg/1000)
@@ -51,12 +51,12 @@ types of weather data:
   - 270 = West
   - 360 = North
 
-- Extra Temperatures: VantagePro2 can read temperature from up to 7 extra 
-  temperature stations. However, they are offset by negative 90 degrees fahrenheit. 
+- Extra Temperatures: VantagePro2 can read temperature from up to 7 extra
+  temperature stations. However, they are offset by negative 90 degrees fahrenheit.
   So, a value of 100 is: ``100 - 90 = 10`` degrees fahrenheit.
-- Soil Temperatures: Four soil temperature sensors, in the same format as the 
+- Soil Temperatures: Four soil temperature sensors, in the same format as the
   extra temperatures format listed above.
-- Leaf Temperatures: Four leaf temperature sensors, in the same format as the 
+- Leaf Temperatures: Four leaf temperature sensors, in the same format as the
   extra temperatures format listed above.
 - Outside Humidity: Relativie humidity in percent
 - Extra Humidities: Realtive humidity in percent for 7 humidity stations
@@ -84,7 +84,7 @@ types of weather data:
 - Extra Temp/Hum Alarms: Currently active extra temperature/humidity alarms
 - Soil & Leaf Alarms: Currently active soil/leaf alarms
 - Console Battery Voltage: Voltage = ``((Data x 300)/512)/100.0``
-- Time of Sunrise: Time is stored as hour x 100 + min 
+- Time of Sunrise: Time is stored as hour x 100 + min
 - Time of Sunset: Time is stored as hour x 100 + min
 
 Configuration File Examples
@@ -98,9 +98,9 @@ To configure the Vantage Pro2 Agent we need to add a VantagePro2Agent block to
 our ocs configuration file. Here is an example configuration block,
 where we do not specify the port.
 Note: One should first add the serial number of the VantagePro 2 device
-to the udev file and create SYMLINK. 
-The Vendor ID is "10c4" and the Prodcut ID is "ea60" for the Vantage Pro2. 
-Here, we associate the vendor and product ID's with the SYMLINK 'VP2'. 
+to the udev file and create SYMLINK.
+The Vendor ID is "10c4" and the Prodcut ID is "ea60" for the Vantage Pro2.
+Here, we associate the vendor and product ID's with the SYMLINK 'VP2'.
 So, we're setting the serial number argument as 'VP2'::
 
      {'agent-class': 'VantagePro2Agent',
@@ -108,10 +108,10 @@ So, we're setting the serial number argument as 'VP2'::
        'arguments': [['--mode', 'acq'],
                      ['--serial-number', 'VP2'],
                      ['--sample-freq', '0.5']]},
-   
+
 An example block of the udev rules file for the VantagePro 2 follows::
 
-        SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", 
+        SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60",
                 SYMLINK="VP2"
 
 

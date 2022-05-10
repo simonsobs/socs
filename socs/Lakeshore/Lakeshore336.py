@@ -129,7 +129,7 @@ class LS336:
             inps = ['A', 'B', 'C', 'D']
             self.channels = {inp: Channel(self, inp) for inp in inps}
         else:
-            raise ValueError("Can't determine number of channels. " 
+            raise ValueError("Can't determine number of channels. "
                              "Please debug.")
 
         # Get Heaters
@@ -203,7 +203,7 @@ class LS336:
         Returns
         -------
         array or float
-            array of four (or eight) floats if input is '0', 
+            array of four (or eight) floats if input is '0',
             float otherwise of temperature reading
 
         Raises
@@ -1103,7 +1103,7 @@ class Heater:
         25 or 50 Ohms
         """
         self.get_heater_setup()
-        if self.resistance is None:        
+        if self.resistance is None:
             if self.resistance_setting == 1:
                 self.resistance = 25
             elif self.resistance_setting == 2:

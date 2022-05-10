@@ -18,7 +18,7 @@ feeds.
 
 Configuration File Examples
 ---------------------------
-Below are useful configurations examples for the relevant OCS files and for 
+Below are useful configurations examples for the relevant OCS files and for
 running the agent in a docker container.
 
 ocs-config
@@ -46,7 +46,7 @@ the setting on the BBB side.
 
 Docker
 ``````
-The CHWP BBB agent can be run via a Docker container. The following is an 
+The CHWP BBB agent can be run via a Docker container. The following is an
 example of what to insert into your institution's docker-compose file.
 This again is an example to run multiple agents::
 

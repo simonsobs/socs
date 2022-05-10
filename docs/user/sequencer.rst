@@ -51,7 +51,7 @@ the backend database:
     default:
       external:
         name: ocs-net
-  
+
   services:
     frontend:
       image: ghcr.io/simonsobs/nextline-web:latest
@@ -59,7 +59,7 @@ the backend database:
       environment:
         - API_HTTP=http://localhost/nextline/api/
         - PUBLIC_PATH=/nextline/
-  
+
     backend:
       image: ghcr.io/simonsobs/so-daq-sequencer:latest
       container_name: nextline-backend

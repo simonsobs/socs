@@ -199,10 +199,10 @@ class LS370:
 
         self.id = self.get_id()
         self.autoscan = self.get_autoscan()
-        
+
         self.channels = []
 
-        #unlike 372, 370 does not have dedicated control input channel; rather, only numbered channels 
+        #unlike 372, 370 does not have dedicated control input channel; rather, only numbered channels
         for i in range(1, num_channels + 1):
             c = Channel(self, i)
             self.channels.append(c)
@@ -240,7 +240,7 @@ class LS370:
             while resp == '':
                 if try_count == 0:
                     break
-                
+
                 print(f"Warning: Caught timeout waiting for response to {message}, waiting 1s and " \
                           "trying again {try_count} more time(s) before giving up")
                 time.sleep(1)
@@ -605,10 +605,10 @@ class Channel:
         """Enable auto range for channel via RDGRNG command."""
         resp = self._get_input_setup()
         #order of resp args switch for range, autorange in LS370
-        resp[3] = '1'     
+        resp[3] = '1'
 
         #all LS370 channels respond to this command
-        for c in self.ls.channels: 
+        for c in self.ls.channels:
             c.autorange = autorange_key[resp[3]]
 
         #TODO: move method to LS370 class, fix references in agent
@@ -622,7 +622,7 @@ class Channel:
         #all LS370 channels respond to this command
         for c in self.ls.channels:
             c.autorange = autorange_key[resp[3]]
-       
+
         #TODO: move method to LS370 class, fix references in agent
         return self._set_input_setup(resp)
 
@@ -679,7 +679,7 @@ class Channel:
         #all LS370 channels respond to this command
         for c in self.ls.channels:
             c.csshunt = csshunt_key[resp[4]]
-        
+
         #TODO: move method to LS370 class, fix references in agent
         return self._set_input_setup(resp)
 
@@ -695,7 +695,7 @@ class Channel:
         #all LS370 channels respond to this command
         for c in self.ls.channels:
             c.csshunt = csshunt_key[resp[4]]
-        
+
         #TODO: move method to LS370 class, fix references in agent
         return self._set_input_setup(resp)
 
@@ -1219,7 +1219,7 @@ class Curve:
         """Get a calibration curve from the LS370.
 
         If _file is not None, save to file location.
-        
+
         :param _file: the file to load the calibration curve from
         :type _file: str
         """
@@ -1307,7 +1307,7 @@ class Curve:
         values = []
         for i in range(9, len(content)):
             values.append(content[i].strip().split()) #data points that should have been uploaded
-        
+
         #TODO: shouldn't this be capped at len(values) + 1?
         #above is done ZA 20200330
         for j in range(1, len(values) + 1):
@@ -1325,8 +1325,8 @@ class Curve:
             #above is done ZA 20200330
             except AssertionError:
                 if units != float(point[1]) or temperature != float(point[2]):
-         
-                    #TODO: fix, could enter infinite loop if always fails 
+
+                    #TODO: fix, could enter infinite loop if always fails
                     self.set_curve(_file)
 
         #check that remainining points are zeros
@@ -1386,7 +1386,7 @@ class Heater:
         self.range = None
 
         self.resistance = None     #only for output = 0
-        #self.max_current = None   in 370, there is only htrrng limit and curve limit 
+        #self.max_current = None   in 370, there is only htrrng limit and curve limit
         #self.max_user_current = None  not in 370
         self.rng_limit = None
         self.display = None
@@ -1398,7 +1398,7 @@ class Heater:
     def _get_output_mode(self):
         """Query the heater mode using the CMODE?, CPOL?, CSET? commands.
 
-        :returns: 6-tuple with output mode, polarity, input channel, 
+        :returns: 6-tuple with output mode, polarity, input channel,
             unfiltered/filtered, heater units (kelvin, ohms), and autoscanning delay time.
         :rtype: tuple
         """
@@ -1429,7 +1429,7 @@ class Heater:
 
         self.ls.msg(f'CMODE {params.pop(0)}')
         self.ls.msg(f'CPOL {params.pop(0)}')
-        
+
         reply = params + [heater_display_lock[self.display], heater_range_lock[self.rng_limit],
                 str(self.resistance)]
 
@@ -1444,7 +1444,7 @@ class Heater:
         resp = self.ls.msg("CSET?").split(',')
 
         self.display = heater_display_key[resp[4]]
-        self.rng_limit = heater_range_key[resp[5]] 
+        self.rng_limit = heater_range_key[resp[5]]
         self.resistance = float(resp[6])
         #self.max_current = int(resp[1])
         #self.max_user_current = float(resp[2].strip('E+'))
@@ -1696,7 +1696,7 @@ class Heater:
             _range = "On"
 
         resp = self.ls.msg(f"HTRRNG {heater_range_lock[_range]}").strip()
-        
+
         # refresh self.heater value with RANGE? query
         self.get_heater_range()
 

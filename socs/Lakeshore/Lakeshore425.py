@@ -1,7 +1,7 @@
 import serial
 import time
 
-operational_status_key = [ 
+operational_status_key = [
     'No probe',
     'Field overload',
     'New field reading',

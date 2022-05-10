@@ -75,7 +75,7 @@ Below is an example client to start data acquisition::
 
     status, msg, session = ptc1.acq.start()
 
-.. note:: 
+.. note::
     If ``['--mode', 'acq']`` is specified in the ocs configuration file,
     acquisition will begin automatically upon agent startup, so there may be no
     need to run this client.

@@ -211,7 +211,7 @@ class FocalplaneConfig:
         frame['eq_labels'] = core.G3VectorString(self.eq_labels)
         frame['cmaps'] = core.G3VectorString(self.cmaps)
         return frame
-        
+
     def add_vis_elem(self, name, x, y, rot, value_names, eqs, eq_labels, cmaps,
                      template, abs_smurf_chan, eq_color_is_dynamic):
         """
@@ -413,7 +413,7 @@ class MagpieAgent:
         Two Rolling Averagers which are used to calculate the rolling RMS data.
     monitored_channels : list
         List of monitored channels whose data should be sent to grafana.
-        This list will contain entries which look like 
+        This list will contain entries which look like
         ``(readout_chan_number, field_name)``.
     monitored_chan_sample_rate : float
         Sample rate (Hz) to target when downsampling monitored channel data for
@@ -484,7 +484,7 @@ class MagpieAgent:
 
 
     @ocs_agent.param('chan_info', type=list, check=lambda x: len(x) <= 6)
-    @ocs_agent.param('sample_rate', type=float, default=10, 
+    @ocs_agent.param('sample_rate', type=float, default=10,
                      check=lambda x: 0 < x <= 20)
     def set_monitored_channels(self, session, params):
         """set_monitored_channels(chan_info, sample_rate=10)
@@ -668,7 +668,7 @@ class MagpieAgent:
         self._running = True
         session.set_status('running')
 
-        src_idx = 0 
+        src_idx = 0
         if isinstance(params['src'], str):
             sources = [params['src']]
         else:
@@ -879,15 +879,15 @@ if __name__ == '__main__':
 
     agent.register_process('read', magpie.read, magpie._stop_read,
                            startup=read_startup)
-    agent.register_process('stream_fake_data', magpie.stream_fake_data, 
+    agent.register_process('stream_fake_data', magpie.stream_fake_data,
                            magpie._stop_stream_fake_data, startup=args.fake_data)
     agent.register_process('send', magpie.send, magpie._send_stop,
                            startup={'dest': args.dest})
     agent.register_task('set_target_rate', magpie.set_target_rate)
     agent.register_task('set_delay', magpie.set_delay)
     agent.register_task(
-        'set_monitored_channels', magpie.set_monitored_channels, 
-        startup={'chan_info': args.monitored_channels, 
+        'set_monitored_channels', magpie.set_monitored_channels,
+        startup={'chan_info': args.monitored_channels,
                 'sample_rate': args.monitored_channel_rate}
     )
 

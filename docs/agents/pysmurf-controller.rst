@@ -68,7 +68,7 @@ named ``ocs-pysmurf-monitor`` might look something like::
             - "--site-http=ws://${CB_HOST}:8001/call"
             - "--instance-id=pysmurf-controller-s2"
 
-where ``CB_HOST`` and ``SOCS_TAG`` are set as environment variables or in the 
+where ``CB_HOST`` and ``SOCS_TAG`` are set as environment variables or in the
 ``.env`` file.
 
 Pysmurf Publisher Options
@@ -116,7 +116,7 @@ Session Data`_ section for more info).
 In order for the Pysmurf instance to accurately represent the smurf state,
 we must be careful about not using a second pysmurf instance to modify any
 variables while a persistant instance exists. For that reason, the ``run``
-function and most tasks are protected by a single lock, preventing you 
+function and most tasks are protected by a single lock, preventing you
 from running multiple tasks at a time.
 
 
@@ -134,7 +134,7 @@ The run function takes params
 - **log**: True if using agent logger, path to log file, or False if you don't
   want to log the script's stdout and stderr messages.
 
-For instance, to run a script ``sodetlib/scripts/tune.py``, the client script 
+For instance, to run a script ``sodetlib/scripts/tune.py``, the client script
 would look like::
 
     from ocs.matched_client import MatchedClient

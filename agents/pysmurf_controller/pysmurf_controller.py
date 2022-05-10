@@ -269,7 +269,7 @@ class PysmurfController:
         **Process** - Continuously checks the current state of the smurf. This
         will not modify the smurf state, so this task can be run in conjunction
         with other smurf operations. This will continuously poll smurf metadata
-        and update the ``session.data`` object. 
+        and update the ``session.data`` object.
 
         Args
         -----
@@ -530,7 +530,7 @@ class PysmurfController:
 
         **Task** - Takes a short timestream and calculates noise statistics.
         Median white noise level for each band will be stored in the session
-        data. See the `sodetlib noise docs 
+        data. See the `sodetlib noise docs
         <https://simons1.princeton.edu/docs/sodetlib/noise.html>`_ for more
         information on the noise function and possible keyword arguments.
 
@@ -728,7 +728,7 @@ class PysmurfController:
         rfrac : float, tuple
             Target rfrac range to aim for. If this is a float, bias voltages
             will be chosen to get the median rfrac of each bias group as close
-            as possible to that value. If 
+            as possible to that value. If
         kwargs : dict
             Additional kwargs to pass to the ``bias_dets`` function.
 
@@ -738,7 +738,7 @@ class PysmurfController:
 
             >> response.session['data']
             {
-                'biases': List of voltage bias values for each bias-group 
+                'biases': List of voltage bias values for each bias-group
             }
         """
         if params['kwargs'] is None:

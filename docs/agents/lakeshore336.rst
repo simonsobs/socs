@@ -9,7 +9,7 @@ Lakeshore 336
 The Lakeshore 336 Agent interfaces with the Lakeshore 336 (LS336) hardware to
 perform temperature monitoring and servoing on the LS336's four channels.
 This setup is currently primarily being used for controlling a cold load.
-Basic functionality to interface with and control an LS336 is provided by 
+Basic functionality to interface with and control an LS336 is provided by
 the :ref:`336_driver`.
 
 .. argparse::
@@ -74,7 +74,7 @@ Description
 Like the Lakeshore 372, direct communication via ethernet is possible
 with the Lakeshore 336. Please see the Lakeshore 372 Agent documentation
 for more information about direct communication and the following APIs
-to see which methods are available in the agent and the underlying 
+to see which methods are available in the agent and the underlying
 Lakeshore336.py script.
 
 Agent API

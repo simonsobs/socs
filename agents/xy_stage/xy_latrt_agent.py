@@ -15,8 +15,8 @@ if not ON_RTD:
 class LATRtXYStageAgent:
     """
     Agent for connecting to the LATRt XY Stages
-    
-    Args: 
+
+    Args:
         ip_addr: IP address where RPi server is running
         port: Port the RPi Server is listening on
         mode: 'acq': Start data acquisition on initialize
@@ -24,10 +24,10 @@ class LATRtXYStageAgent:
     """
 
     def __init__(self, agent, ip_addr, port, mode=None, samp=2):
-        
+
         self.ip_addr = ip_addr
         self.port = int(port)
-        
+
         self.xy_stage = None
         self.initialized = False
         self.take_data = False
@@ -36,7 +36,7 @@ class LATRtXYStageAgent:
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
-         
+
         if mode == 'acq':
             self.auto_acq = True
         else:
@@ -45,14 +45,14 @@ class LATRtXYStageAgent:
 
         ### register the position feeds
         agg_params = {
-            'frame_length' : 10*60, #[sec] 
+            'frame_length' : 10*60, #[sec]
         }
 
         self.agent.register_feed('positions',
                                  record = True,
                                  agg_params = agg_params,
                                  buffer_time = 0)
-    
+
     def init_xy_stage_task(self, session, params=None):
         """init_xy_stage_task(params=None)
         Perform first time setup for communivation with XY stages.
@@ -73,11 +73,11 @@ class LATRtXYStageAgent:
                 return False, "Could not acquire lock."
             # Run the function you want to run
             self.log.debug("Lock Acquired Connecting to Stages")
-            
+
             self.xy_stage = XY_Stage(self.ip_addr, self.port)
             self.xy_stage.init_stages()
             print("XY Stages Initialized")
-            
+
         # This part is for the record and to allow future calls to proceed,
         # so does not require the lock
         self.initialized = True
@@ -87,7 +87,7 @@ class LATRtXYStageAgent:
 
     def move_x_cm(self, session, params):
         """
-        params: 
+        params:
             dict: { 'distance': float, 'velocity':float < 1.2}
         """
 
@@ -96,7 +96,7 @@ class LATRtXYStageAgent:
                 self.log.warn(f"Could not start x move because lock held by {self.lock.job}")
                 return False
             self.xy_stage.move_x_cm( params.get('distance',0), params.get('velocity',1))
-        
+
         time.sleep(1)
         while True:
             ## data acquisition updates the moving field if it is running
@@ -106,14 +106,14 @@ class LATRtXYStageAgent:
                         self.log.warn(f"Could not check because lock held by {self.lock.job}")
                         return False, "Could not acquire lock"
                     self.is_moving = self.xy_stage.moving
-            
+
             if not self.is_moving:
                 break
         return True, "X Move Complete"
 
     def move_y_cm(self, session, params):
         """
-        params: 
+        params:
             dict: { 'distance': float, 'velocity':float < 1.2}
         """
 
@@ -122,7 +122,7 @@ class LATRtXYStageAgent:
                 self.log.warn(f"Could not start y move because lock held by {self.lock.job}")
                 return False, "could not acquire lock"
             self.xy_stage.move_y_cm( params.get('distance',0), params.get('velocity',1))
-        
+
         time.sleep(1)
         while True:
             ## data acquisition updates the moving field if it is running
@@ -136,23 +136,23 @@ class LATRtXYStageAgent:
                 break
         return True, "Y Move Complete"
 
- 
+
     def set_position(self, session, params):
         """
-        params: 
+        params:
             dict: {'position': (float, float)}
         """
         with self.lock.acquire_timeout(timeout=3, job='set_position') as acquired:
             if not acquired:
                 self.log.warn(f"Could not set position because lock held by {self.lock.job}")
                 return False, "Could not acquire lock"
-                        
+
             self.xy_stage.position = params['position']
         return True, "Position Updated"
 
     def start_acq(self, session, params=None):
         """
-        params: 
+        params:
             dict: {'sampling_frequency': float, sampling rate in Hz}
 
         The most recent positions are stored in the session.data object in the
@@ -167,13 +167,13 @@ class LATRtXYStageAgent:
         if params is None:
             params = {}
 
-        
+
         f_sample = params.get('sampling_frequency', self.sampling_frequency)
         pm = Pacemaker(f_sample, quantize=True)
 
         if not self.initialized or self.xy_stage is None:
             raise Exception("Connection to XY Stages not initialized")
-        
+
         with self.lock.acquire_timeout(timeout=0, job='acq') as acquired:
             if not acquired:
                 self.log.warn("Could not start acq because {} is already running".format(self.lock.job))
@@ -197,15 +197,15 @@ class LATRtXYStageAgent:
                 self.is_moving = self.xy_stage.moving
 
                 data['data']['x'] = pos[0]
-                data['data']['y'] = pos[1] 
+                data['data']['y'] = pos[1]
 
                 self.agent.publish_to_feed('positions',data)
                 session.data.update( data['data'] )
         return True, 'Acquisition exited cleanly.'
-    
+
     def stop_acq(self, session, params=None):
         """
-        params: 
+        params:
             dict: {}
         """
         if self.take_data:
@@ -213,7 +213,7 @@ class LATRtXYStageAgent:
             return True, 'requested to stop taking data.'
         else:
             return False, 'acq is not currently running.'
-    
+
 def make_parser(parser=None):
     """Build the argument parser for the Agent. Allows sphinx to automatically
     build documentation based on this function.
@@ -242,7 +242,7 @@ if __name__ == '__main__':
 
     # Interpret options in the context of site_config.
     args = site_config.parse_args(agent_class = 'LATRtXYStageAgent', parser=parser)
-    
+
 
     agent, runner = ocs_agent.init_site_agent(args)
 
@@ -252,7 +252,7 @@ if __name__ == '__main__':
     agent.register_task('move_x_cm', xy_agent.move_x_cm)
     agent.register_task('move_y_cm', xy_agent.move_y_cm)
     agent.register_task('set_position', xy_agent.set_position)
-    
+
     agent.register_process('acq', xy_agent.start_acq, xy_agent.stop_acq)
 
     runner.run(agent, auto_reconnect=True)

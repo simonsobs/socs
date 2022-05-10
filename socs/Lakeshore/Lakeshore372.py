@@ -1336,7 +1336,7 @@ class Curve:
         values = []
         for i in range(9, len(content)):
             values.append(content[i].strip().split()) #data points that should have been uploaded
-    
+
         for j in range(1, len(values)+1):
             try:
                 resp = self.get_data_point(j) #response from the 372
