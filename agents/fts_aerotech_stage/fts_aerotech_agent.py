@@ -37,33 +37,33 @@ class FTSAerotechStage:
 
         self.send('ENABLE X\n') #Send enable command
         data = self.comm.recv(1024) #Collect and print response
- 
+
         if data == b'%\n':
             self.initialized = True
         else:
             self.initialized = False
-        
+
         self.pos = None
         if speed is not None:
             self.SPEED = speed
         self.speed_code = 'F%i' % self.SPEED
-        
- 
+
+
     def send(self, msg):
         self.comm.sendall( bytes(msg, 'utf-8'))
-    
+
     def read(self):
         # Controller blocks reply until motion is complete; so if
         # you're putting a timeout in here make sure it's smart/long
         # enough.
         return self.comm.recv(1024)
-    
+
     def home(self):
         self.send('HOME X\n')
         time.sleep(0.1)
         ## block until homing is complete
         return self.read()
-    
+
     def get_position(self):
         self.send('CMDPOS X\n')
         time.sleep(0.1)
@@ -90,13 +90,13 @@ class FTSAerotechStage:
                 time.sleep(0.1)
                 out = self.read()
             except TimeoutError:
-                continue         
+                continue
         return True, 'Move Complete'
 
     def close(self):
         self.comm.close()
 
-    
+
 
 class FTSAerotechAgent:
     """
@@ -107,7 +107,7 @@ class FTSAerotechAgent:
         port: Port of Motion Controller
         mode: 'acq': Start data acquisition on initialize
         samp: default sampling frequency in Hz
- 
+
     """
 
     def __init__(self, agent, ip_addr, port, mode=None, samp=2):
@@ -150,10 +150,10 @@ class FTSAerotechAgent:
 
         if params is None:
             params = {}
-        
+
         if self.stage is not None and self.initialized:
             return True, 'Stages already Initialized'
-           
+
         self.log.debug("Trying to acquire lock")
         with self.lock.acquire_timeout(timeout=0, job='init') as acquired:
             # Locking mechanism stops code from proceeding if no lock acquired
@@ -191,7 +191,7 @@ class FTSAerotechAgent:
                 self.log.error(f"Homing Failed: {e}")
                 return False, "Homing Failed"
         return True, "Homing Complete"
-    
+
     def move_to(self, session, params=None):
         """Move to absolute position relative to stage center (in mm)
 
@@ -210,7 +210,7 @@ class FTSAerotechAgent:
             return self.stage.move_to( params.get('position') )
 
         return False, "Move did not complete correctly?"
-    
+
     def start_acq(self, session, params=None):
         """
         params:
@@ -308,7 +308,7 @@ if __name__ == '__main__':
 
     agent, runner = ocs_agent.init_site_agent(args)
 
-    fts_agent = FTSAerotechAgent(agent, args.ip_address, args.port, 
+    fts_agent = FTSAerotechAgent(agent, args.ip_address, args.port,
                                 args.mode, args.sampling_frequency)
 
     agent.register_task('init_stage', fts_agent.init_stage_task)
@@ -318,4 +318,3 @@ if __name__ == '__main__':
     agent.register_process('acq', fts_agent.start_acq, fts_agent.stop_acq)
 
     runner.run(agent, auto_reconnect=True)
-

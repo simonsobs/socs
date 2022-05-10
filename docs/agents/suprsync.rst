@@ -36,7 +36,7 @@ transferred files after 7 days, or 604800 seconds::
            '--db-path', '/data/so/dbs/suprsync.db',
            '--ssh-host', '<user>@<hostname>',
            '--ssh-key', '<path_to_ssh_key>',
-           '--delete-local-after', '604800', 
+           '--delete-local-after', '604800',
            '--max-copy-attempts', '10',
            '--copy-timeout', '60',
            '--cmd-timeout', '5'
@@ -51,7 +51,7 @@ transferred files after 7 days, or 604800 seconds::
            '--db-path', '/data/so/dbs/suprsync.db',
            '--ssh-host', '<user>@<hostname>',
            '--ssh-key', '<path_to_ssh_key>',
-           '--delete-local-after', '604800', 
+           '--delete-local-after', '604800',
            '--max-copy-attempts', '10',
            '--copy-timeout', '20',
            '--cmd-timeout', '5'
@@ -71,7 +71,7 @@ transferred files after 7 days, or 604800 seconds::
 Docker Compose
 ``````````````
 
-Below is a sample docker-compose entry for the SupRsync agents. 
+Below is a sample docker-compose entry for the SupRsync agents.
 Because the data we'll be transfering is owned by the ``cryo:smurf`` user, we
 set that as the user of the agent so it has the correct permissions. This is
 only possible because the ``cryo:smurf`` user is already built into the
@@ -79,7 +79,7 @@ SuprSync docker::
 
   ocs-timestream-sync:
        image: simonsobs/ocs-suprsync-agent:latest
-       hostname: ocs-docker 
+       hostname: ocs-docker
        user: cryo:smurf
        network_mode: host
        container_name: ocs-timestream-sync
@@ -131,7 +131,7 @@ determine which SupRsync agent should manage each file. This makes it possible
 for  multiple SupRsync agents to monitor the same db, but write their archives
 to different base-directories or remote computers.
 
-.. note:: 
+.. note::
 
    This agent does not remove empty directories, since I can't think of a
    foolproof way to determine whether or not more files will be written to a
@@ -156,7 +156,7 @@ To add a file to the SupRsync database, you can use the
     srfm = SupRsyncFilesManager('/path/to/suprsync.db')
     srfm.add_file(local_abspath, remote_relpath, archive)
 
-The SupRsync agent will then copy the file ``/path/to/local/file.g3`` to 
+The SupRsync agent will then copy the file ``/path/to/local/file.g3`` to
 the ``<remote_basedir>/remote/path/file.g3`` on the remote server (or locally
 if none is specified). If the ``--delete-local-after`` option is used, the original
 file will be deleted after the specified amount of time.

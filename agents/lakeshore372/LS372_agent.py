@@ -522,7 +522,7 @@ class LS372_Agent:
     def get_excitation(self, session, params):
         """get_excitation(channel=None)
 
-        **Task** - Get the excitation voltage/current value of a specified 
+        **Task** - Get the excitation voltage/current value of a specified
         channel.
 
         Parameters:
@@ -614,7 +614,7 @@ class LS372_Agent:
         **Task** - Set the autoscanning dwell time for a particular channel.
 
         Parameters:
-            channel (int): Channel to set the dwell time for. Valid values 
+            channel (int): Channel to set the dwell time for. Valid values
                 are 1-16.
             dwell (int): Dwell time in seconds, type is int and must be in the
                 range 1-200 inclusive.

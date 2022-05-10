@@ -87,7 +87,7 @@ class G3FrameGenerator:
 
         self.tag_frame(fr)
         return fr
-        
+
 
 class SmurfFileEmulator:
     """
@@ -182,7 +182,7 @@ class SmurfFileEmulator:
         ----
         test_mode : bool
             If True, will skip any wait times associated with writing
-            g3 files. 
+            g3 files.
         """
         # Find Freq
         action_time = time.time()
@@ -379,4 +379,3 @@ if __name__ == '__main__':
     agent.register_process('stream', file_em.stream, file_em._stop_stream)
 
     runner.run(agent, auto_reconnect=True)
-

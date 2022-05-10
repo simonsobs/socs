@@ -12,7 +12,7 @@ if not ON_RTD:
 
 
 def get_sensors(shm_addr):
-    """ 
+    """
     Runs a command on the shelf manager that returns a list of all
     of the avialable sensors to stdout. Uses subprocess module to
     read stdout and identify the ipmb address and sensor id for all

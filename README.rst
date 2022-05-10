@@ -121,7 +121,7 @@ For guidelines on how to contribute to OCS see `CONTRIBUTING.rst`_.
 
 License
 --------
-This project is licensed under the BSD 2-Clause License - see the 
+This project is licensed under the BSD 2-Clause License - see the
 `LICENSE.txt`_ file for details.
 
 .. _LICENSE.txt: https://github.com/simonsobs/socs/blob/master/LICENSE.txt

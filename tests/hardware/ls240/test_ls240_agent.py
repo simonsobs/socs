@@ -21,7 +21,7 @@ def test_set_values(client):
 
 
 def test_upload_cal_curve(client):
-    
+
     cal_file = os.path.join(os.getcwd(), 'dt-670_standard_curve.txt')
     client.upload_cal_curve.start(channel=1, filename=cal_file)
     ok, msg, session = client.upload_cal_curve.wait()

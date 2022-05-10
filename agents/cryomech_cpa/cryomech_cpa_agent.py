@@ -178,7 +178,7 @@ class PTC:
 
     def __del__(self):
         """
-        If the PTC class instance is destroyed, close the connection to the 
+        If the PTC class instance is destroyed, close the connection to the
         ptc.
         """
         self.comm.close()
@@ -280,7 +280,7 @@ class PTCAgent:
 
             # Publish data, waiting 1/f_sample seconds in between calls.
             while self.take_data:
-                pub_data = {'timestamp': time.time(), 
+                pub_data = {'timestamp': time.time(),
                             'block_name': 'ptc_status'}
                 data_flag, data = self.ptc.get_data()
                 pub_data['data'] = data
