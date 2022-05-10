@@ -20,6 +20,10 @@ SOCS - Simons Observatory Control System
    :target: https://pypi.org/project/socs/
    :alt: PyPI Package
 
+.. image:: https://results.pre-commit.ci/badge/github/simonsobs/socs/develop.svg
+   :target: https://results.pre-commit.ci/latest/github/simonsobs/socs/develop
+   :alt: pre-commit.ci status
+
 Overview
 --------
 
