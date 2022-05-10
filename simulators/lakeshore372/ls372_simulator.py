@@ -54,8 +54,9 @@ current_excitation_key = {1: 1.0e-12,
                           18: 316.0e-6,
                           19: 1.0e-3,
                           20: 3.16e-3,
-                          21: 10.0-3,
-                          22: 31.6-3}
+                          21: 10.0e-3,
+                          22: 31.6e-3}
+
 
 class Lakeshore372_Simulator:
     def __init__(self, port, num_channels=16, sn="LSASIM"):
