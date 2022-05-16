@@ -17,7 +17,6 @@ SEC_ENCODER_TO_PUBLISH = 1
 COUNTER_INFO_LENGTH = 100
 COUNTS_ON_BELT = 52000
 REFERENCE_COUNT_MAX = 2 << 15  # > that of belt on wiregrid (=nominal 52000)
-SLEEP = 0.1
 
 
 def count2time(counts, t_offset=0.):
@@ -295,7 +294,6 @@ class WiregridEncoderAgent:
 
                         time_encoder_published = current_time
 
-                        time.sleep(SLEEP)
                         # End of filling encoder data
                     # End of encoder case
 
