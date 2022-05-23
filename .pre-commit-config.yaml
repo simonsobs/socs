@@ -10,8 +10,7 @@ repos:
     rev: v1.6.0
     hooks:
     -   id: autopep8
-# comment out while we process all files
-#-   repo: https://github.com/pycqa/flake8
-#    rev: 4.0.1
-#    hooks:
-#    -   id: flake8
+-   repo: https://github.com/pycqa/flake8
+    rev: 4.0.1
+    hooks:
+    -   id: flake8
