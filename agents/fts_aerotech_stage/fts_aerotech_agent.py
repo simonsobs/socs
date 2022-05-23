@@ -21,6 +21,12 @@ class FTSAerotechStage:
         port: Port the controller is listening on
         timeout: communication timeout
         speed: speed in mm/s, defaults to 25 mm/s if None
+        translate: Argument which translates the aerotech stage readout into
+                   a standardized value.
+        limits: 2-tuple of the max and min FTS central mirror positions to
+                prevent the stage from moving out of bounds via software
+                limits.
+
     """
 
     def __init__(self, ip_address, port, translate=None, limits=None,
@@ -68,7 +74,7 @@ class FTSAerotechStage:
         out = self.read()
         try:
             M, B = self.translate
-            self.pos = (float(out[1:])-B)/M
+            self.pos = (float(out[1:]) - B) / M
             return True, self.pos
         except BaseException:
             return False, None
@@ -78,7 +84,7 @@ class FTSAerotechStage:
         if position < limits[0] or position > limits[1]:
             return False, 'Move out of bounds!'
         M, B = self.translate
-        stage_pos = position*M + B
+        stage_pos = position * M + B
         cmd = ('MOVEABS X%.2f %s\n' % (stage_pos, self.speed_code))
         self.send(cmd)
         out = None
@@ -104,6 +110,8 @@ class FTSAerotechAgent:
         port: Port of Motion Controller
         mode: 'acq': Start data acquisition on initialize
         samp: default sampling frequency in Hz
+        config_file: File which contains FTS-specific translate, limits, and
+                     speed arguments.
 
     """
 
@@ -140,7 +148,7 @@ class FTSAerotechAgent:
         # like limits and translate vary over different FTSes This is loaded
         # from a yaml file, which is assumed to be in the $OCS_CONFIG_DIR
         # directory.
-        if config_file == 'None':
+        if config_file is None:
             raise Exception(
                 "No config file specified for the FTS mirror config")
         else:
@@ -308,7 +316,7 @@ def make_parser(parser=None):
     pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--ip-address')
     pgroup.add_argument('--port')
-    pgroup.add_argument('--config_file')
+    pgroup.add_argument('--config-file')
     pgroup.add_argument('--mode')
     pgroup.add_argument('--sampling_frequency')
     return parser
