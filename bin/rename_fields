@@ -216,6 +216,7 @@ class HKRenamer:
     changes.
 
     """
+
     def __init__(self):
         pass
 

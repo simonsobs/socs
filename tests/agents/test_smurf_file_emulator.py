@@ -12,6 +12,7 @@ from unittest import mock
 import txaio
 txaio.use_twisted()
 
+
 def create_agent(base_dir, file_duration=10, frame_len=2,
                  nchans=1024):
     """Test fixture to setup a mocked OCSAgent."""
@@ -28,21 +29,25 @@ def create_agent(base_dir, file_duration=10, frame_len=2,
     agent = SmurfFileEmulator(mock_agent, args)
     return agent
 
+
 def test_tune_up(tmp_path):
     emulator = create_agent(str(tmp_path))
     session = mock.MagicMock()
     session.data = {}
     emulator.tune_dets(session, {'test_mode': True})
 
+
 def test_take_iv(tmp_path):
     emulator = create_agent(str(tmp_path))
     session = mock.MagicMock()
     emulator.take_iv(session)
 
+
 def test_take_bias_steps(tmp_path):
     emulator = create_agent(str(tmp_path))
     session = mock.MagicMock()
     emulator.take_bias_steps(session)
+
 
 def test_bias_dets(tmp_path):
     emulator = create_agent(str(tmp_path))
@@ -53,5 +58,5 @@ def test_bias_dets(tmp_path):
 def test_stream(tmp_path):
     emulator = create_agent(str(tmp_path), file_duration=0.2, frame_len=0.05)
     session = mock.MagicMock()
-    session.data ={}
+    session.data = {}
     emulator.stream(session, params={'duration': 1})

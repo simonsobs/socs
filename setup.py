@@ -5,14 +5,14 @@ import versioneer
 with open("README.rst", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
-setup(name = 'socs',
+setup(name='socs',
       long_description=long_description,
       long_description_content_type="text/x-rst",
-      version = versioneer.get_version(),
+      version=versioneer.get_version(),
       cmdclass=versioneer.get_cmdclass(),
-      description = 'Simons Observatory Control System',
-      package_dir = {'socs': 'socs'},
-      packages = find_packages(),
+      description='Simons Observatory Control System',
+      package_dir={'socs': 'socs'},
+      packages=find_packages(),
       url="https://github.com/simonsobs/socs",
       project_urls={
           "Source Code": "https://github.com/simonsobs/ocs",
@@ -38,4 +38,4 @@ setup(name = 'socs',
       extras_require={
           "so3g": ["so3g"],
       },
-)
+      )

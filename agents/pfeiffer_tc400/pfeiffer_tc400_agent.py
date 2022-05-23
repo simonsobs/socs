@@ -27,6 +27,7 @@ class PfeifferTC400Agent:
         An internal address used to communicate between the power supplies and
         the tc400. Found on the front screen of the power supplies.
     """
+
     def __init__(self, agent, ip_address, port_number, turbo_address):
         self.agent = agent
         self.log = agent.log
@@ -42,7 +43,7 @@ class PfeifferTC400Agent:
 
         # Registers Temperature and Voltage feeds
         agg_params = {
-            'frame_length': 10*60,
+            'frame_length': 10 * 60,
         }
         self.agent.register_feed('pfeiffer_turbo',
                                  record=True,

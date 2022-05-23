@@ -27,6 +27,7 @@ class Pfeiffer:
        read_pressure_all reads pressures from the six channels
        close closes the socket
     """
+
     def __init__(self, ip_address, port, timeout=10,
                  f_sample=2.5):
         self.ip_address = ip_address
@@ -119,7 +120,7 @@ class PfeifferAgent:
         if f_sample is None:
             f_sample = self.f_sample
 
-        sleep_time = 1./f_sample - 0.01
+        sleep_time = 1. / f_sample - 0.01
 
         with self.lock.acquire_timeout(timeout=0, job='init') as acquired:
             # Locking mechanism stops code from proceeding if no lock acquired
@@ -140,7 +141,7 @@ class PfeifferAgent:
                 pressure_array = self.gauge.read_pressure_all()
                 # Loop through all the channels on the device
                 for channel in range(len(pressure_array)):
-                    data['data']["pressure_ch"+str(channel+1)] = pressure_array[channel]
+                    data['data']["pressure_ch" + str(channel + 1)] = pressure_array[channel]
 
                 self.agent.publish_to_feed('pressures', data)
                 time.sleep(sleep_time)

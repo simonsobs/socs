@@ -67,6 +67,7 @@ class DeviceEmulator:
         _conn (socket.socket): TCP connection for use in 'tcp' relay.
 
     """
+
     def __init__(self, responses):
         self.responses = responses
         self.default_response = None

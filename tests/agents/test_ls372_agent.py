@@ -525,9 +525,9 @@ def test_ls372_set_autoscan_off(agent):
 
 
 # servo_to_temperature
-## this task should really get reworked, mostly into a client
+# this task should really get reworked, mostly into a client
 # check_temperature_stability
-## this task should become a client function really
+# this task should become a client function really
 
 
 # set_output_mode

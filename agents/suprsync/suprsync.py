@@ -45,6 +45,7 @@ class SupRsync:
     copy_timeout : float
         Time (sec) after which a copy command will timeout
     """
+
     def __init__(self, agent, args):
         self.agent = agent
         self.log = txaio.make_logger()

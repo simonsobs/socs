@@ -37,6 +37,7 @@ class PfeifferTC400:
         turbo_address: int
             The serial Address of the Turbo Controller.
     """
+
     def __init__(self, moxa_ip_address, moxa_port, turbo_address):
         self.ser = serial.serial_for_url('socket://{}:{}'.format(moxa_ip_address, moxa_port),
                                          baudrate=9600,

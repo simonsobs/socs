@@ -26,6 +26,7 @@ class YieldingLock:
     method release_and_acquire() is provided to make this a one-liner.
 
     """
+
     def __init__(self, default_timeout=None):
         self.job = None
         self._next = threading.Lock()
@@ -86,6 +87,7 @@ class LS372_Agent:
             If True, will read data from the control channel each iteration of
             the acq loop. Defaults to False.
     """
+
     def __init__(self, agent, name, ip, fake_data=False, dwell_time_delay=0,
                  enable_control_chan=False):
 
@@ -116,7 +118,7 @@ class LS372_Agent:
         self.agent = agent
         # Registers temperature feeds
         agg_params = {
-            'frame_length': 10*60 # [sec]
+            'frame_length': 10 * 60  # [sec]
         }
         self.agent.register_feed('temperatures',
                                  record=True,
@@ -171,8 +173,8 @@ class LS372_Agent:
             return True, "Already initialized"
 
         with self._lock.acquire_timeout(job='init') as acquired1, \
-             self._acq_proc_lock.acquire_timeout(timeout=0., job='init') \
-             as acquired2:
+                self._acq_proc_lock.acquire_timeout(timeout=0., job='init') \
+                as acquired2:
             if not acquired1:
                 self.log.warn(f"Could not start init because "
                               f"{self._lock.job} is already running")
@@ -201,7 +203,7 @@ class LS372_Agent:
                     return False, 'Lakeshore initialization failed'
 
                 print("Initialized Lakeshore module: {!s}".format(self.module))
-                session.add_message("Lakeshore initilized with ID: %s"%self.module.id)
+                session.add_message("Lakeshore initilized with ID: %s" % self.module.id)
 
                 self.thermometers = [channel.name for channel in self.module.channels]
 
@@ -209,7 +211,7 @@ class LS372_Agent:
 
         if params.get('configfile') is not None:
             self.input_configfile(session, params)
-            session.add_message("Lakeshore initial configurations uploaded using: %s"%params['configfile'])
+            session.add_message("Lakeshore initial configurations uploaded using: %s" % params['configfile'])
 
         # Start data acquisition if requested
         if params.get('auto_acquire', False):
@@ -248,8 +250,8 @@ class LS372_Agent:
         pm = Pacemaker(10, quantize=True)
 
         with self._acq_proc_lock.acquire_timeout(timeout=0, job='acq') \
-             as acq_acquired, \
-             self._lock.acquire_timeout(job='acq') as acquired:
+                as acq_acquired, \
+                self._lock.acquire_timeout(job='acq') as acquired:
             if not acq_acquired:
                 self.log.warn(f"Could not start Process because "
                               f"{self._acq_proc_lock.job} is already running")
@@ -311,11 +313,11 @@ class LS372_Agent:
 
                             # Check user set dwell time isn't too long
                             if self.dwell_time_delay > dwell_time:
-                                self.log.warn("WARNING: User set dwell_time_delay of " + \
-                                              "{delay} s is larger than channel " + \
-                                              "dwell time of {chan_time} s. If " + \
-                                              "you are autoscanning this will " + \
-                                              "cause no data to be collected. " + \
+                                self.log.warn("WARNING: User set dwell_time_delay of " +
+                                              "{delay} s is larger than channel " +
+                                              "dwell time of {chan_time} s. If " +
+                                              "you are autoscanning this will " +
+                                              "cause no data to be collected. " +
                                               "Reducing dwell time delay to {s} s.",
                                               delay=self.dwell_time_delay,
                                               chan_time=dwell_time,
@@ -326,7 +328,7 @@ class LS372_Agent:
 
                             for i in range(total_time):
                                 self.log.debug("Sleeping for {t} more seconds...",
-                                               t=total_time-i)
+                                               t=total_time - i)
                                 time.sleep(1)
 
                         # Track the last channel we measured
@@ -454,7 +456,7 @@ class LS372_Agent:
 
         return True, f'Set {heater_string} heater range to {params["range"]}'
 
-    @ocs_agent.param('channel', type=int, check=lambda x: 1<=x<=16)
+    @ocs_agent.param('channel', type=int, check=lambda x: 1 <= x <= 16)
     @ocs_agent.param('mode', type=str, choices=['current', 'voltage'])
     def set_excitation_mode(self, session, params):
         """set_excitation_mode(channel=None, mode=None)
@@ -482,7 +484,7 @@ class LS372_Agent:
 
         return True, f'return text for Set channel {params["channel"]} excitation mode to {params["mode"]}'
 
-    @ocs_agent.param('channel', type=int, check=lambda x: 1<=x<=16)
+    @ocs_agent.param('channel', type=int, check=lambda x: 1 <= x <= 16)
     @ocs_agent.param('value', type=float)
     def set_excitation(self, session, params):
         """set_excitation(channel=None, value=None)
@@ -518,7 +520,7 @@ class LS372_Agent:
 
         return True, f'Set channel {params["channel"]} excitation to {params["value"]} {units}'
 
-    @ocs_agent.param('channel', type=int, check=lambda x: 1<=x<=16)
+    @ocs_agent.param('channel', type=int, check=lambda x: 1 <= x <= 16)
     def get_excitation(self, session, params):
         """get_excitation(channel=None)
 
@@ -545,7 +547,7 @@ class LS372_Agent:
 
         return True, f'Channel {params["channel"]} excitation {mode} is {current_excitation} {units}'
 
-    @ocs_agent.param('channel', type=int, check=lambda x: 1<=x<=16)
+    @ocs_agent.param('channel', type=int, check=lambda x: 1 <= x <= 16)
     @ocs_agent.param('resistance_range', type=float)
     def set_resistance_range(self, session, params):
         """set_resistance_range(channel=None,resistance_range=None)
@@ -582,7 +584,7 @@ class LS372_Agent:
 
         return True, f'Set channel {params["channel"]} resistance range to {params["resistance_range"]}'
 
-    @ocs_agent.param('channel', type=int, check=lambda x: 1<=x<=16)
+    @ocs_agent.param('channel', type=int, check=lambda x: 1 <= x <= 16)
     def get_resistance_range(self, session, params):
         """get_resistance_range(channel=None)
 
@@ -606,8 +608,8 @@ class LS372_Agent:
 
         return True, f'Channel {params["channel"]} resistance range is {current_resistance_range}'
 
-    @ocs_agent.param('channel', type=int, check=lambda x: 1<=x<=16)
-    @ocs_agent.param('dwell', type=int, check=lambda x: 1<=x<=200)
+    @ocs_agent.param('channel', type=int, check=lambda x: 1 <= x <= 16)
+    @ocs_agent.param('dwell', type=int, check=lambda x: 1 <= x <= 200)
     def set_dwell(self, session, params):
         """set_dwell(channel=None, dwell=None)
 
@@ -630,10 +632,9 @@ class LS372_Agent:
             current_dwell = self.module.channels[params["channel"]].set_dwell(params["dwell"])
             session.add_message(f'Set dwell to {params["dwell"]}')
 
-
         return True, f'Set channel {params["channel"]} dwell time to {params["dwell"]}'
 
-    @ocs_agent.param('channel', type=int, check=lambda x: 1<=x<=16)
+    @ocs_agent.param('channel', type=int, check=lambda x: 1 <= x <= 16)
     def get_dwell(self, session, params):
         """get_dwell(channel=None, dwell=None)
 
@@ -654,7 +655,6 @@ class LS372_Agent:
             current_dwell = self.module.channels[params["channel"]].get_dwell()
             session.add_message(f'Dwell time for channel {params["channel"]} is {current_dwell}')
             session.data = {"dwell_time": current_dwell}
-
 
         return True, f'Channel {params["channel"]} dwell time is {current_dwell}'
 
@@ -833,7 +833,7 @@ class LS372_Agent:
 
             else:
                 print("we're in the else")
-                #adjust_heater(t,rest)
+                # adjust_heater(t,rest)
 
         return False, f"Temperature not stable within {params['threshold']}."
 

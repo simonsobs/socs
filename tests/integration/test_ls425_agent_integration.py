@@ -54,16 +54,16 @@ def test_ls425_init_lakeshore(wait_for_crossbar, emulator, run_agent, client):
 @pytest.mark.integtest
 def test_ls425_auto_start_acq(wait_for_crossbar, emulator, run_agent_acq, client):
     resp = client.init_lakeshore.status()
-    #print(resp)
+    # print(resp)
     assert resp.status == ocs.OK
-    #print(resp.session)
+    # print(resp.session)
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
     time.sleep(3)
     resp = client.acq.status()
-    #print(resp)
+    # print(resp)
     assert resp.status == ocs.OK
-    #print(resp.session)
+    # print(resp.session)
     assert resp.session['op_code'] == OpCode.RUNNING.value
 
 

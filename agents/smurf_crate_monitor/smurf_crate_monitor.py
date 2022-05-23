@@ -87,7 +87,7 @@ def get_channel_names(ipmbs):
         if ipmb == 'fe':
             chan_names[i] = 'pwr_mgmt'
             continue
-        slot = int('0x'+ipmb, 16)//2-64
+        slot = int('0x' + ipmb, 16) // 2 - 64
         if slot < 1:
             # Not exactly sure what this corresponds to...
             chan_names[i] = f"ipmb{ipmb}"
@@ -168,7 +168,7 @@ class SmurfCrateMonitor:
         self.crate_id = crate_id
         # Register feed
         agg_params = {
-            'frame_length': 10*60
+            'frame_length': 10 * 60
         }
         self.log.info('registering')
         self.agent.register_feed('smurf_sensors',
@@ -242,10 +242,10 @@ class SmurfCrateMonitor:
                                      chan_names=chan_names,
                                      crate_id=self.crate_id)
             data = {
-                    'timestamp': time.time(),
-                    'block_name': f'smurf_{self.crate_id}',
-                    'data': datadict
-                    }
+                'timestamp': time.time(),
+                'block_name': f'smurf_{self.crate_id}',
+                'data': datadict
+            }
             self.agent.publish_to_feed('smurf_sensors', data)
         return True, 'Acquisition exited cleanly'
 
@@ -272,7 +272,7 @@ def make_parser(parser=None):
     pgroup.add_argument('--shm-addr',
                         help='Shelf manager addres i.e. root@192.168.1.2')
     pgroup.add_argument('--crate-id',
-                       help='Crate id used for block_name')
+                        help='Crate id used for block_name')
     return parser
 
 
