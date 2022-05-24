@@ -31,9 +31,21 @@ the available arguments::
         'arguments': [
           ['--ip-address', '192.168.10.13'],
           ['--port', 8000],
+          ['--config_file', 'fts_config.yaml'],
           ['--mode', 'acq'],
           ['--sampling_freqency', 1'],
           ]},
+
+
+fts-config
+``````````
+The FTS takes a separate YAML config file to specify some inner paramters. Here
+is an example using all the available arguments.::
+
+    translate: [1, 74.87]
+    limits: [-74.8, 74.8]
+    speed: 10
+    timeout: 10
 
 Example Client
 --------------
