@@ -15,7 +15,7 @@ txaio.use_twisted()
 ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 if not ON_RTD:
     from ocs import ocs_agent, site_config
-    import so3g
+    import so3g  # noqa: F401
     from spt3g import core
 
 
@@ -341,8 +341,8 @@ def make_parser(parser=None):
     # Add options specific to this agent.
     pgroup = parser.add_argument_group("Agent Options")
     pgroup.add_argument("--auto-start", default=False, type=bool,
-                        help="Automatically start streaming at " +
-                        "Agent startup.")
+                        help="Automatically start streaming at "
+                        + "Agent startup.")
     pgroup.add_argument("--target-host", default="*",
                         help="Target remote host.")
     pgroup.add_argument("--port", default=50000,

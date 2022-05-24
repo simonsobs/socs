@@ -230,5 +230,5 @@ class Serial_TCPServer(object):
         return self.__timeout
 
     timeout = property(gettimeout, settimeout,
-                       doc='Communication timeout. Only use timeout mode ' +
-                           'with ``timeout > 0.0``.')
+                       doc='Communication timeout. Only use timeout mode '
+                           + 'with ``timeout > 0.0``.')

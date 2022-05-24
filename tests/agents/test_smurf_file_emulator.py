@@ -1,12 +1,7 @@
 import sys
 sys.path.insert(0, '../agents/smurf_file_emulator/')
-import os
 from smurf_file_emulator import SmurfFileEmulator, make_parser
 
-
-from ocs.ocs_agent import OpSession
-
-import pytest
 from unittest import mock
 
 import txaio

@@ -62,8 +62,8 @@ class SNMPTwister:
         if error_status:
             self.log.error('%s: %s at %s' % (self.address,
                                              error_status.prettyPrint(),
-                                             error_index and
-                                             var_binds[int(error_index) - 1][0] or '?'))
+                                             error_index
+                                             and var_binds[int(error_index) - 1][0] or '?'))
         else:
             for var in var_binds:
                 self.log.debug(' = '.join([x.prettyPrint() for x in var]))

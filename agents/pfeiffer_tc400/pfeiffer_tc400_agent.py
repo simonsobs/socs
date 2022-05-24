@@ -72,8 +72,8 @@ class PfeifferTC400Agent:
                                            self.port_number,
                                            self.turbo_address)
             except socket.timeout as e:
-                self.log.error("Turbo Controller timed out" +
-                               f"during connect with error {e}")
+                self.log.error("Turbo Controller timed out"
+                               + f"during connect with error {e}")
                 return False, "Timeout"
             self.log.info("Connected to turbo controller")
 
@@ -222,14 +222,14 @@ def make_parser(parser=None):
 
     # Add options specific to this agent.
     pgroup = parser.add_argument_group('Agent Options')
-    pgroup.add_argument('--ip-address', type=str, help="Serial-to-ethernet " +
-                        "converter ip address")
-    pgroup.add_argument('--port-number', type=int, help="Serial-to-ethernet " +
-                        "converter port")
-    pgroup.add_argument('--turbo-address', type=int, help="Internal address " +
-                        "used by power supplies")
-    pgroup.add_argument('--mode', type=str, help="Set to acq to run acq on " +
-                        "startup")
+    pgroup.add_argument('--ip-address', type=str, help="Serial-to-ethernet "
+                        + "converter ip address")
+    pgroup.add_argument('--port-number', type=int, help="Serial-to-ethernet "
+                        + "converter port")
+    pgroup.add_argument('--turbo-address', type=int, help="Internal address "
+                        + "used by power supplies")
+    pgroup.add_argument('--mode', type=str, help="Set to acq to run acq on "
+                        + "startup")
 
     return parser
 

@@ -391,12 +391,12 @@ class LogParser:
             elif log_type in ['channels', 'status', 'heater']:
                 data = self._parse_multi_value_log(new, log_type, log_name)
             elif log_type == 'errors':
-                LOG.info("The Bluefors Agent cannot process error logs. " +
-                         "Not publishing.")
+                LOG.info("The Bluefors Agent cannot process error logs. "
+                         + "Not publishing.")
                 data = None
             else:
-                LOG.warn("Warning: Unknown log type. Skipping publish step. " +
-                         "This probably shouldn't happen.")
+                LOG.warn("Warning: Unknown log type. Skipping publish step. "
+                         + "This probably shouldn't happen.")
                 LOG.warn("Filename: {}".format(k))
                 data = None
 
@@ -407,9 +407,9 @@ class LogParser:
                 if (time.time() - data['timestamp']) < int(self.stale_time) * 60:
                     app_session.app.publish_to_feed('bluefors', data)
                 else:
-                    LOG.warn("Not publishing stale data. Make sure your log " +
-                             "file sync is done at a rate faster than once ever " +
-                             "{x} minutes.", x=self.stale_time)
+                    LOG.warn("Not publishing stale data. Make sure your log "
+                             + "file sync is done at a rate faster than once ever "
+                             + "{x} minutes.", x=self.stale_time)
 
 
 class BlueforsAgent:

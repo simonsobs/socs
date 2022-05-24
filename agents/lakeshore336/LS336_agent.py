@@ -218,8 +218,8 @@ class LS336_Agent:
                 for i, channel in enumerate(self.module.channels.values()):
                     channel_str = channel.input_name.replace(' ', '_')
                     temperatures_message['data'][channel_str + '_T'] = temps[i]
-                    temperatures_message['data'][channel_str +
-                                                 '_V'] = voltages[i]
+                    temperatures_message['data'][channel_str
+                                                 + '_V'] = voltages[i]
 
                 # append to recent temps array for temp stability check
                 self._recent_temps = np.roll(self._recent_temps, 1, axis=0)

@@ -7,21 +7,14 @@ Created on Fri Feb 23 14:15:51 2018
 """
 
 from serial import Serial
-from serial.serialutil import SerialException
 import time
 import sys
-import numpy as np
 from collections import OrderedDict
 import socket
 from typing import List
 
 
 BUFF_SIZE = 1024
-
-try:
-    from tqdm import *
-except ModuleNotFoundError:
-    def tqdm(x): return x
 
 
 class Module:

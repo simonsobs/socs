@@ -325,7 +325,7 @@ def test_ls372_set_heater_range_identical_range(agent):
     agent.init_lakeshore(session, None)
 
     # Mock the heater interface
-    #agent.module.sample_heater.get_heater_range = mock.Mock(return_value="Off")
+    # agent.module.sample_heater.get_heater_range = mock.Mock(return_value="Off")
     agent.module.sample_heater.set_heater_range = mock.Mock()
 
     params = {'range': 'Off', 'heater': 'sample', 'wait': 0}
