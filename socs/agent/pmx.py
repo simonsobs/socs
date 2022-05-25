@@ -67,8 +67,8 @@ class PMX:
             msg = "Measured voltage = %.3f V" % (val)
             # print(msg)
         except ValueError:
-            msg = 'WARNING! Could not get correct voltage value! | Response = "%s"' % (val)
             val = -999.
+            msg = 'WARNING! Could not get correct voltage value! | Response = "%s"' % (val)
             print(msg)
         return msg, val
 
@@ -82,8 +82,8 @@ class PMX:
             msg = "Measured current = %.3f A" % (val)
             # print(msg)
         except ValueError:
-            msg = 'WARNING! Could not get correct current value! | Response = "%s"' % (val)
             val = -999.
+            msg = 'WARNING! Could not get correct current value! | Response = "%s"' % (val)
             print(msg)
         return msg, val
 
@@ -113,8 +113,8 @@ class PMX:
             msg = "Voltage setting = %.3f V" % (val)
             # print(msg)
         except ValueError:
-            msg = 'WARNING! Could not get correct voltage-setting value! | Response = "%s"' % (val)
             val = -999.
+            msg = 'WARNING! Could not get correct voltage-setting value! | Response = "%s"' % (val)
             print(msg)
         return msg, val
 
@@ -132,8 +132,8 @@ class PMX:
             msg = "Current setting = %.3f A" % (val)
             # print(msg)
         except ValueError:
-            msg = 'WARNING! Could not get correct current-setting value! | Response = "%s"' % (val)
             val = -999.
+            msg = 'WARNING! Could not get correct current-setting value! | Response = "%s"' % (val)
             print(msg)
         return msg, val
 
@@ -157,8 +157,8 @@ class PMX:
         try:
             val = int(self.ser.readline())
         except ValueError:
-            msg = 'WARNING! Could not get correct output value! | Response = "%s"' % (val)
             val = -999
+            msg = 'WARNING! Could not get correct output value! | Response = "%s"' % (val)
             print(msg)
             return msg, val
         if val == 0:
