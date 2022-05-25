@@ -40,7 +40,7 @@ class PsuInterface(PrologixInterface):
         self.set_chan(ch)
         self.enable(ch)
         if isinstance(out, str):
-            self.write('CHAN:OUTP '+out)
+            self.write('CHAN:OUTP ' + out)
         elif out:
             self.write('CHAN:OUTP ON')
         else:

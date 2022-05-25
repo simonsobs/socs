@@ -7,7 +7,7 @@ FROM socs:latest
 # Set the working directory to proper agent directory
 WORKDIR /app/socs/agents/labjack/
 
-# Install ljm module from labjack, copied from the labjack ljm dockerfile 
+# Install ljm module from labjack, copied from the labjack ljm dockerfile
 # located at https://hub.docker.com/r/labjack/ljm/dockerfile
 RUN apt-get update
 RUN apt-get install -y wget python3-pip libusb-1.0-0-dev udev

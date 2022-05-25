@@ -1,6 +1,4 @@
-# SOCS AWG Agent
-# socs Agent container for interacting with AWG over GPIB to Ethernet
-# converts.
+# SOCS Agent container for controlling the HWP rotation speed and direction
 
 # Use socs base image
 FROM socs:latest

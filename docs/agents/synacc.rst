@@ -5,8 +5,8 @@
 ==================
 Synaccess Agent
 ==================
-The Synaccess Agent interfaces with the power strip over ethernet to control 
-different outlets as well as get their status. 
+The Synaccess Agent interfaces with the power strip over ethernet to control
+different outlets as well as get their status.
 
 .. argparse::
     :filename: ../agents/synacc/synacc.py
@@ -21,8 +21,8 @@ Agent in a docker container.
 
 ocs-config
 ``````````
-To configure the Synaccess Agent we need to add a Synaccess Agent block to our ocs 
-configuration file. Here is an example configuration block using all of the 
+To configure the Synaccess Agent we need to add a Synaccess Agent block to our ocs
+configuration file. Here is an example configuration block using all of the
 available arguments::
 
        {'agent-class': 'SynaccessAgent',
@@ -60,17 +60,17 @@ Below is an example client to control outlets::
     #Get status of the strip
     synaccess.get_status.start()
     status, msg, session = synaccess.get_status.wait()
-    session['messages'] 
-        
-    #Reboot outlet 
+    session['messages']
+
+    #Reboot outlet
     synaccess.reboot.start(outlet=1)
     synaccess.reboot.wait()
-    
+
     #Turn on/off outlet
     synaccess.set_outlet.start(outlet=1, on=True)
     synaccess.set_outlet.wait()
-    
-    #Turn on/off all outlets 
+
+    #Turn on/off all outlets
     synaccess.set_all.start(on=True)
     synaccess.set_all.wait()
 

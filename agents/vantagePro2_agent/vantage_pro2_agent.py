@@ -27,6 +27,7 @@ class VantagePro2Agent:
              will communicate via this port.
     """
     # change port argument when I figure out how to generalize it!
+
     def __init__(self, agent, port="/dev/ttyUSB0", sample_freq=0.5):
         self.active = True
         self.agent: ocs_agent.OCSAgent = agent
@@ -109,7 +110,7 @@ class VantagePro2Agent:
         # If loops is None, use value passed to Agent init
         if sample_freq is None:
             sample_freq = self.sample_freq
-        wait_time = 1/sample_freq
+        wait_time = 1 / sample_freq
 
         with self.lock.acquire_timeout(0, job='acq') as acquired:
             if not acquired:

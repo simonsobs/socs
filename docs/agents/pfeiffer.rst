@@ -7,8 +7,8 @@
 Pfeiffer TPG 366 Agent
 ======================
 
-The Pfeiffer TPG 366 Controller is a six channel pressure gauge monitor. The 
-Pfeiffer agent communicates with the Controller module, and reads out 
+The Pfeiffer TPG 366 Controller is a six channel pressure gauge monitor. The
+Pfeiffer agent communicates with the Controller module, and reads out
 pressure readingss from the six different channels.
 
 .. argparse::
@@ -18,7 +18,7 @@ pressure readingss from the six different channels.
 
 Configuration File Examples
 ---------------------------
-Below are useful configurations examples for the relevent OCS files and for 
+Below are useful configurations examples for the relevent OCS files and for
 running the agent in a docker container.
 
 ocs-config
@@ -35,14 +35,14 @@ using all of the available arguments::
           ['--mode', 'acq'],
           ]}
 
-You should assign a static IP address to Pfeiffer device, and record it here. 
+You should assign a static IP address to Pfeiffer device, and record it here.
 In general, the Pfeiffer device will assign port 8000 by default. This should
 not need to be changed unless you you specificy the port otherwise.
 
 
 Docker
 ``````
-The Pfeiffer Agent can be run via a Docker container. The following is an 
+The Pfeiffer Agent can be run via a Docker container. The following is an
 example of what to insest into your institution's docker-compose file. ::
 
 
@@ -71,9 +71,7 @@ Below is an example client to start data acquisition
     time.sleep(0.05)
 
 
-.. note:: 
+.. note::
     If ``['--mode', 'acq']`` is specified in the ocs configuration file,
     acquisition will begin automatically upon agent startup, so there may be no
     need to run this client.
-
-

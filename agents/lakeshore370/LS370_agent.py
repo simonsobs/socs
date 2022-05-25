@@ -26,6 +26,7 @@ class YieldingLock:
     method release_and_acquire() is provided to make this a one-liner.
 
     """
+
     def __init__(self, default_timeout=None):
         self.job = None
         self._next = threading.Lock()
@@ -84,6 +85,7 @@ class LS370_Agent:
             ensures at least one second of data collection at the end of a scan.
 
     """
+
     def __init__(self, agent, name, port, fake_data=False, dwell_time_delay=0):
 
         # self._acq_proc_lock is held for the duration of the acq Process.
@@ -112,7 +114,7 @@ class LS370_Agent:
         self.agent = agent
         # Registers temperature feeds
         agg_params = {
-            'frame_length': 10*60  # [sec]
+            'frame_length': 10 * 60  # [sec]
         }
         self.agent.register_feed('temperatures',
                                  record=True,
@@ -143,8 +145,8 @@ class LS370_Agent:
             return True, "Already initialized"
 
         with self._lock.acquire_timeout(job='init') as acquired1, \
-        self._acq_proc_lock.acquire_timeout(timeout=0., job='init') \
-        as acquired2:
+                self._acq_proc_lock.acquire_timeout(timeout=0., job='init') \
+                as acquired2:
             if not acquired1:
                 self.log.warn(f"Could not start init because "
                               f"{self._lock.job} is already running")
@@ -183,8 +185,8 @@ class LS370_Agent:
         """
 
         with self._acq_proc_lock.acquire_timeout(timeout=0, job='acq') \
-             as acq_acquired, \
-             self._lock.acquire_timeout(job='acq') as acquired:
+                as acq_acquired, \
+                self._lock.acquire_timeout(job='acq') as acquired:
             if not acq_acquired:
                 self.log.warn(f"Could not start Process because "
                               f"{self._acq_proc_lock.job} is already running")
@@ -243,12 +245,12 @@ class LS370_Agent:
 
                             # Check user set dwell time isn't too long
                             if self.dwell_time_delay > dwell_time:
-                                self.log.warn("WARNING: User set dwell_time_delay of " +
-                                              "{delay} s is larger than channel " +
-                                              "dwell time of {chan_time} s. If " +
-                                              "you are autoscanning this will " +
-                                              "cause no data to be collected. " +
-                                              "Reducing dwell time delay to {s} s.",
+                                self.log.warn("WARNING: User set dwell_time_delay of "
+                                              + "{delay} s is larger than channel "
+                                              + "dwell time of {chan_time} s. If "
+                                              + "you are autoscanning this will "
+                                              + "cause no data to be collected. "
+                                              + "Reducing dwell time delay to {s} s.",
                                               delay=self.dwell_time_delay,
                                               chan_time=dwell_time,
                                               s=dwell_time - 1)
@@ -258,7 +260,7 @@ class LS370_Agent:
 
                             for i in range(total_time):
                                 self.log.debug("Sleeping for {t} more seconds...",
-                                               t=total_time-i)
+                                               t=total_time - i)
                                 time.sleep(1)
 
                         # Track the last channel we measured

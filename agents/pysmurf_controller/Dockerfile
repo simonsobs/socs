@@ -1,4 +1,4 @@
-FROM simonsobs/sodetlib:v0.3.0-101-gccbc921
+FROM simonsobs/sodetlib:v0.4.0
 
 WORKDIR /app
 

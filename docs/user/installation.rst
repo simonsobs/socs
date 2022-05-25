@@ -95,4 +95,3 @@ that ... is a place-holder for other configuration text.
       ]
       ...
     }
-
