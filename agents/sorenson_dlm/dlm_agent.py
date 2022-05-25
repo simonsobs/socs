@@ -93,7 +93,7 @@ class DLMAgent:
 
     '''
 
-    def __init__(self, agent, ip_address , port, f_sample=2.5):
+    def __init__(self, agent, ip_address, port, f_sample=2.5):
         self.active = True
         self.agent = agent
         self.log = agent.log
@@ -123,7 +123,7 @@ class DLMAgent:
         if f_sample is None:
             f_sample = self.f_sample
 
-        sleep_time = 1./f_sample - 0.01
+        sleep_time = 1. / f_sample - 0.01
         with self.lock.acquire_timeout(timeout=0, job='init') as acquired:
             # Locking mechanism stops code from proceeding if no lock acquired
             if not acquired:
@@ -158,7 +158,7 @@ class DLMAgent:
         Sets voltage of power supply:
         Args:
             voltage (float): Voltage to set.
-        
+
         Examples:
             Example of a client, setting the current to 1V:
 
