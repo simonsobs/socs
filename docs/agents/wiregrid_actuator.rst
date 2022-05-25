@@ -6,7 +6,7 @@
 Wiregrid Actuator Agent
 =======================
 
-The Wiregrid Actuator Agent controls the linear actuator 
+The Wiregrid Actuator Agent controls the linear actuator
 to insert or eject the wire-grid via a GALIL motor controller.
 It communicates with the controller via an ethernet.
 It also reads ON/OFF of the limit-switches on the ends of the actuators
@@ -80,13 +80,13 @@ However, the motor power is not turned ON or OFF during the both functions.
  - check_limitswitch(): Check ON/OFF of the limit switches
  - check_stopper(): Check ON/OFF (lock/unlock) of the stoppers
  - insert_homing(): Insert very slowly
- - eject_homing(): Eject very slowly 
+ - eject_homing(): Eject very slowly
  - insert_test(): Insert in a test mode
  - eject_test(): Eject in a test mode
  - motor_on(): Power ON the actuator motors
- - motor_off(): Power OFF the actuator motors 
-   (CAUTION: Take care of using this function 
-   since powering OFF the motor means 
+ - motor_off(): Power OFF the actuator motors
+   (CAUTION: Take care of using this function
+   since powering OFF the motor means
    that the wire-grid can slide down by its gravity if the stoppers do NOT lock the actuators.)
  - stop(): Stop the motion of the actuators (Change a STOP flag in Actuator class to True)
  - release(): Release the agent to receive the functions if it is locked in the software

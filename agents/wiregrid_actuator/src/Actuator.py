@@ -35,7 +35,7 @@ class Actuator:
         self.speed_max = 2000
         self.speed_min = 0
         # scale factor [pulses/mm] mutiplied to distance [mm]
-        self.distance_factor = 1000./5.5
+        self.distance_factor = 1000. / 5.5
 
         # Open communication to the controller
         self.g = None
@@ -217,7 +217,7 @@ class Actuator:
                   'Speedrate is sed to 0.1.')
             speedrate = 0.1
         speed = \
-            int(speedrate * (self.speed_max-self.speed_min) + self.speed_min)
+            int(speedrate * (self.speed_max - self.speed_min) + self.speed_min)
         # distance_count is an absolute value
         distance_count = int(abs(distance) * self.distance_factor)
         # Change the gearing
@@ -261,7 +261,7 @@ class Actuator:
     # Return: success (True) or failure (False)
     def wait_idle(self, max_loop_time=180):
         # Number of loop for max_loop_time [sec]
-        max_loop = int(max_loop_time/self.sleep)
+        max_loop = int(max_loop_time / self.sleep)
         for i in range(max_loop):
             isrun = self.is_run()
             if not isrun:

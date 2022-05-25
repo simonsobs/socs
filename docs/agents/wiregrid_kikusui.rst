@@ -7,9 +7,9 @@ Wiregrid Kikusui Agent
 =======================
 
 The Wiregrid Kikusui Agent controls the wire-grid rotation.
-The KIKUSUI is a power supply and 
+The KIKUSUI is a power supply and
 it is controlled via serial-to-ethernet converter.
-The converter is linked to the KIKUSUI 
+The converter is linked to the KIKUSUI
 via RS-232 (D-sub 9pin cable).
 The agent communicates with the converter via Ethernet.
 
@@ -63,11 +63,11 @@ An example docker-compose configuration::
 
 - Since the agent within the container needs to communicate with hardware on the
   host network you must use ``network_mode: "host"`` in your compose file.
-- To control the wire-grid rotation accurately, 
+- To control the wire-grid rotation accurately,
   the agent uses the output of the ``Wiregrid Encoder Agent``.
-  Therefore, mounting the volume of the ``ocs-wgencoder-agent`` is necessary. 
-- For the ``calibration_wg()`` function and debug mode (assigned by ``--debug`` option), 
-  a directory path to log files should be assigned in the ``volumes`` section 
+  Therefore, mounting the volume of the ``ocs-wgencoder-agent`` is necessary.
+- For the ``calibration_wg()`` function and debug mode (assigned by ``--debug`` option),
+  a directory path to log files should be assigned in the ``volumes`` section
   (``/data/wg-data`` is the default path in the docker).
 
 
@@ -81,9 +81,9 @@ The agent has many functions, however most of them are for testing.
 The main function is ``stepwise_rotation()``.
 
 **Main Function (Stepwise Rotation)**
- - stepwise_rotation(): 
+ - stepwise_rotation():
    Run step-wise rotation for wire-grid calibration.
-   In each step, seveal small-rotations are occurred to rotate 22.5-deg. 
+   In each step, seveal small-rotations are occurred to rotate 22.5-deg.
 
 **Continuous Rotation Funciton**
 Nominally, the wire-grid calibration uses the above stepwise rotation.
@@ -94,10 +94,10 @@ However, if you want to rotate the wire-grid continuousely, you can use the foll
 
 **Optional Functions**
  - get_vc(): Show voltage [V], current [A], and ON/OFF
- - set_v(): Set voltage [V] 
+ - set_v(): Set voltage [V]
    (NOTE: Default motor voltage is 12 V. Thus, only 12 V is acceptable.)
 - get_angle(): Show wire-grid rotation angle obtained from encoder agent
-   
+
 **Calibration Function**
  - calibrate_wg(): Run rotation-motor calibration for the wire-grid.
    The output of this calibration is used to control the rotation in ``stepwire_rotation()``.

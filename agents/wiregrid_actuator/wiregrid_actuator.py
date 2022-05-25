@@ -46,7 +46,7 @@ class WiregridActuatorAgent:
 
         agg_params = {'frame_length': 60}
         self.agent.register_feed(
-                'wgactuator', record=True, agg_params=agg_params)
+            'wgactuator', record=True, agg_params=agg_params)
 
         try:
             self.actuator = Actuator(
@@ -121,7 +121,7 @@ class WiregridActuatorAgent:
     # Return value: True/False, message, limit-switch ON/OFF
     def _backward(self, distance, speedrate=0.2):
         if distance > 0.:
-            distance = -1.*abs(distance)
+            distance = -1. * abs(distance)
         ret, msg, LSonoff = self._move(
             distance, speedrate, 'LSL2', 'LSR2', 'outside')
         return ret, \
@@ -321,8 +321,8 @@ class WiregridActuatorAgent:
         with self.lock.acquire_timeout(timeout=3, job='eject') as acquired:
             if not acquired:
                 self.log.warn(
-                        'eject(): '
-                        'Lock could not be acquired because it is held by {}.'
+                    'eject(): '
+                    'Lock could not be acquired because it is held by {}.'
                         .format(self.lock.job))
                 return False, 'eject(): Could not acquire lock'
             # Wait for a second before moving
@@ -443,8 +443,8 @@ class WiregridActuatorAgent:
                 as acquired:
             if not acquired:
                 self.log.warn(
-                        'eject_homing(): '
-                        'Lock could not be acquired because it is held by {}.'
+                    'eject_homing(): '
+                    'Lock could not be acquired because it is held by {}.'
                         .format(self.lock.job))
                 return False, 'eject_homing(): Could not acquire lock'
             # Wait for a second before moving
@@ -480,7 +480,7 @@ class WiregridActuatorAgent:
                       .format(speedrate))
 
         with self.lock.acquire_timeout(timeout=3, job='insert_test') \
-             as acquired:
+                as acquired:
             if not acquired:
                 self.log.warn(
                     'insert_test(): '
@@ -534,8 +534,8 @@ class WiregridActuatorAgent:
                 as acquired:
             if not acquired:
                 self.log.warn(
-                        'eject_test(): '
-                        'Lock could not be acquired because it is held by {}.'
+                    'eject_test(): '
+                    'Lock could not be acquired because it is held by {}.'
                         .format(self.lock.job))
                 return False, 'eject_test(): Could not acquire lock.'
             # Wait for a second before moving
@@ -570,8 +570,8 @@ class WiregridActuatorAgent:
                 as acquired:
             if not acquired:
                 self.log.warn(
-                        'motor_on(): '
-                        'Lock could not be acquired because it is held by {}.'
+                    'motor_on(): '
+                    'Lock could not be acquired because it is held by {}.'
                         .format(self.lock.job))
                 return False, 'motor_on(): Could not acquire lock.'
             self.log.warn('motor_on(): Try to power ON the actuator motors.')
@@ -595,8 +595,8 @@ class WiregridActuatorAgent:
                 as acquired:
             if not acquired:
                 self.log.warn(
-                        'motor_off(): '
-                        'Lock could not be acquired because it is held by {}.'
+                    'motor_off(): '
+                    'Lock could not be acquired because it is held by {}.'
                         .format(self.lock.job))
                 return False, 'motor_off(): Could not acquire lock.'
             self.log.warn('motor_off(): Try to power OFF the actuator motors.')
@@ -640,8 +640,8 @@ class WiregridActuatorAgent:
                 as acquired:
             if not acquired:
                 self.log.warn(
-                        'release(): '
-                        'Lock could not be acquired because it is held by {}.'
+                    'release(): '
+                    'Lock could not be acquired because it is held by {}.'
                         .format(self.lock.job))
                 return False, 'release(): Could not acquire lock.'
             self.log.warn('release(): Try to release the actuator.')
@@ -669,8 +669,8 @@ class WiregridActuatorAgent:
                 as acquired:
             if not acquired:
                 self.log.warn(
-                        'reconnect(): '
-                        'Lock could not be acquired because it is held by {}.'
+                    'reconnect(): '
+                    'Lock could not be acquired because it is held by {}.'
                         .format(self.lock.job))
                 return False, 'reconnect(): Could not acquire lock.'
             self.log.warn('reconnect(): *** Trying to reconnect... ***')

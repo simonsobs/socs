@@ -32,6 +32,7 @@ class WiregridKikusuiAgent:
         encoder_agent (str): Instance ID of the wiregrid encoder agent
         debug (bool): ON/OFF of writing a log file
     """
+
     def __init__(self, agent, kikusui_ip, kikusui_port,
                  encoder_agent='wgencoder', debug=False):
         self.agent = agent
@@ -48,7 +49,7 @@ class WiregridKikusuiAgent:
         self.debug_log_path = '/data/wg-data/action/'
 
         self.open_trial = 10
-        self.Deg = 360/52000
+        self.Deg = 360 / 52000
         # self.feedback_time = [0.151, 0.241, 0.271, 0.301, 0.331]
         self.feedback_time = [0.151, 0.241, 0.271, 0.361, 0.451]
         self.feedback_cut = [1., 2., 3., 5.0, 8.0]
@@ -156,10 +157,10 @@ class WiregridKikusuiAgent:
             self.log.warn(
                 'Failed to get ENCODER POSITION | '
                 '{}'.format(e)
-                )
+            )
             self.log.warn(
                 '    --> Retry to connect to the encoder agent'
-                )
+            )
             self._connect_encoder()
             try:
                 response = self.encoder_client.acq.status()
@@ -167,7 +168,7 @@ class WiregridKikusuiAgent:
                 self.log.error(
                     'Failed to get encoder position | '
                     '{}'.format(e)
-                    )
+                )
                 return -1.
 
         try:
@@ -177,7 +178,7 @@ class WiregridKikusuiAgent:
             self.log.warn(
                 'Failed to get encoder position | '
                 '{}'.format(e)
-                )
+            )
 
         return position
 
@@ -220,7 +221,7 @@ class WiregridKikusuiAgent:
         if self.debug:
             writelog(logfile, 'ON', 0, start_position, 'stepwise')
 
-        self._rotate_alittle(feedback_time[-1]+0.1)
+        self._rotate_alittle(feedback_time[-1] + 0.1)
         time.sleep(self.agent_interval)
 
         for step in range(feedback_steps):
@@ -413,7 +414,7 @@ class WiregridKikusuiAgent:
 
             cycle = 1
             for i in range(11):
-                tperiod = 0.10 + 0.02*i
+                tperiod = 0.10 + 0.02 * i
                 for j in range(100):
                     if j % 20 == 0:
                         self.log.warn(f'this is {cycle}th time action')
@@ -421,13 +422,13 @@ class WiregridKikusuiAgent:
                     writelog(logfile, 'ON', tperiod,
                              self._get_position(), 'calibration')
                     self._rotate_alittle(tperiod)
-                    time.sleep(self.agent_interval+1.)
+                    time.sleep(self.agent_interval + 1.)
                     writelog(logfile, 'OFF', 0.,
                              self._get_position(), 'calibration')
                     writelog(logfile, 'ON', 0.70,
                              self._get_position(), 'calibration')
                     self._rotate_alittle(0.70)
-                    time.sleep(self.agent_interval+1.)
+                    time.sleep(self.agent_interval + 1.)
                     writelog(logfile, 'OFF', 0.,
                              self._get_position(), 'calibration')
                     cycle += 1
@@ -473,7 +474,7 @@ class WiregridKikusuiAgent:
 
             logfile = openlog(self.debug_log_path)
 
-            for i in range(int(self.num_laps*16.)):
+            for i in range(int(self.num_laps * 16.)):
                 self._move_next(
                     logfile, self.feedback_steps, self.feedback_time)
                 time.sleep(self.stopped_time)
@@ -624,7 +625,7 @@ def make_parser(parser=None):
 if __name__ == '__main__':
     parser = make_parser()
     args = site_config.parse_args(
-            agent_class='WiregridKikusuiAgent', parser=parser)
+        agent_class='WiregridKikusuiAgent', parser=parser)
 
     agent, runner = ocs_agent.init_site_agent(args)
     kikusui_agent = WiregridKikusuiAgent(agent, kikusui_ip=args.kikusui_ip,

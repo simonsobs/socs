@@ -2,7 +2,7 @@ FROM socs:latest
 
 WORKDIR /app/socs/agents/wiregrid_actuator
 
-RUN apt-get update \ 
+RUN apt-get update \
  && apt-get install -y apt-utils \
  && apt-get install -y wget libavahi-common-dev libavahi-client-dev libavahi-core-dev libcap-dev libdaemon-dev avahi-daemon \
  && wget http://www.galil.com/sw/pub/all/crypto/GALIL-GPG-KEY-E29D0E4B.asc \
