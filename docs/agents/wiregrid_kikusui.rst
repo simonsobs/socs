@@ -96,7 +96,7 @@ However, if you want to rotate the wire-grid continuousely, you can use the foll
  - get_vc(): Show voltage [V], current [A], and ON/OFF
  - set_v(): Set voltage [V]
    (NOTE: Default motor voltage is 12 V. Thus, only 12 V is acceptable.)
-- get_angle(): Show wire-grid rotation angle obtained from encoder agent
+ - get_angle(): Show wire-grid rotation angle obtained from encoder agent
 
 **Calibration Function**
  - calibrate_wg(): Run rotation-motor calibration for the wire-grid.
