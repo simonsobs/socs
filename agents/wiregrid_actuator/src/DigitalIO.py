@@ -48,7 +48,7 @@ class DigitalIO:
                 + 'DigitalIO[{}]:_get_onoff(): '\
                   ' message = "{}" | Exception = "{}"'\
                   .format(self.name, onoff, e)
-            raise ValueError(e)
+            raise ValueError(msg)
         if self.get_reverse:
             onoff = not onoff
         # print('DigitalIO[{}]:_get_onoff(): onoff for {}: {}'
