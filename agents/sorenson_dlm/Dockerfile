@@ -7,11 +7,11 @@ FROM socs:latest
 
 # Set the working directory to registry directory
 
-WORKDIR /app/socs/agents/sorenson-dlm/
+WORKDIR /app/socs/agents/sorenson_dlm/
 
 # Copy this agent into the app/socs/agents directory
 
-COPY . /app/socs/agents/sorenson-dlm/
+COPY . /app/socs/agents/sorenson_dlm/
 
 # Run agent on container startup
 
