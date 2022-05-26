@@ -226,7 +226,7 @@ class DLMAgent:
                 return False, 'Could not acquire lock'
         return True, 'Set over voltage protection to {}'.format(params['over_volt'])
 
-    @ocs_agent.param('current', default=0., type=float, check=lambda I: 0 <= I <= 2)
+    @ocs_agent.param('current', default=0., type=float, check=lambda x: 0 <= x <= 2)
     def set_current(self, session, params=None):
         """set_current(current=None)
 
