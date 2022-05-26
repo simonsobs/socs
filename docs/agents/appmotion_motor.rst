@@ -64,11 +64,11 @@ Agent API
     :members: init_motors_task, move_axis_to_position, move_axis_by_length,
     set_velocity, set_acceleration, start_jogging, stop_jogging,
     seek_home_linear_stage, set_zero, run_positions, start_rotation,
-    stop_rotation, close_connection, reconnect_motor, block_while_moving, 
+    stop_rotation, close_connection, reconnect_motor, block_while_moving,
     kill_all_commands, set_encoder_value, get_encoder_value, get_positions,
-    is_moving, pos_while_moving, move_off_limit, reset_alarms, 
+    is_moving, pos_while_moving, move_off_limit, reset_alarms,
     home_with_limits, start_acq, stop_acq
-    
+
 Example Clients
 ---------------
 
@@ -88,7 +88,7 @@ Below is a script for a beam-mapper scan using the appmotion_motor_agent.::
 
         if ( (Xstop-Xstart)%Xstep !=0 ) or ((Ystop-Ystart)%Ystep !=0):
             print('steplength is invalid')
-            sys.exit("Error message...... program is aborting...") 
+            sys.exit("Error message...... program is aborting...")
         else:
             mappointX = abs(int((Xstop-Xstart)/Xstep))+1
             mappointY = abs(int((Ystop-Ystart)/Ystep))+1
@@ -228,5 +228,4 @@ Supporting APIs
 
 .. autoclass:: agents.appmotion_motor.appmotion_motors_driver.MotControl
     :members:
-    
 

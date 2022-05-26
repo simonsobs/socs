@@ -62,19 +62,19 @@ AXIS_THREADS_PER_INCH_XYZ = 10.0
 
 class MotControl(object):
     """
-    Driver for connecting to the SAT1 XY Stages. Differs from LATRt agent in 
+    Driver for connecting to the SAT1 XY Stages. Differs from LATRt agent in
     that motors/controllers are seen as arguments.
-    Motor1 can be the X axis OR the Y axis, same with Motor2. Depends on setup 
+    Motor1 can be the X axis OR the Y axis, same with Motor2. Depends on setup
     (ip address + port).
 
     Args:
         motor1_ip (str) : the IP address associated with Motor1
         motor1_port (int) : the port address associated with Motor1.
-        motor1_is_lin (bool) : Boolean that determines if Motor1 is a linear 
+        motor1_is_lin (bool) : Boolean that determines if Motor1 is a linear
             motor.
         motor2_ip (str) : the IP address associated with Motor2
         motor2_port (int) : the port address associated with Motor2
-        motor2_is_lin (bool) : Boolean that determines if Motor2 is a linear 
+        motor2_is_lin (bool) : Boolean that determines if Motor2 is a linear
             motor.
         mode: 'acq' : Start data acquisition on initialize
         m_res (bool) : True if manual resolution, False if default (res=8)
@@ -97,7 +97,7 @@ class MotControl(object):
             motor1_port (int) : the port address associated with Motor1
             motor2_ip (str) : the IP address associated with Motor2
             motor2_port (int) : the port address associated with Motor2
-            m_res (bool) : True if manual resolution, False if default (res=8) 
+            m_res (bool) : True if manual resolution, False if default (res=8)
         """
 
         # Set up the connection to the first motor
@@ -110,16 +110,16 @@ class MotControl(object):
             self.motor1 = Serial_TCPServer((motor1_ip, motor1_port))
             if m_res:
                 self.motor1.res = 'manual'
-                self.motor1.s_p_rev = 8000.0 # Steps per revolution (thread)
+                self.motor1.s_p_rev = 8000.0  # Steps per revolution (thread)
             else:
-                self.motor1.res = '8' # Corresponds to mapping above
-                self.motor1.s_p_rev = 20000.0 # Steps per revolution (thread)
+                self.motor1.res = '8'  # Corresponds to mapping above
+                self.motor1.s_p_rev = 20000.0  # Steps per revolution (thread)
             self.motor1.name = 'motor1'
             self.motor1.motor = MOTOR1
-            self.motor1.pos = 0 # Position in counts (should always be an integer)
-            self.motor1.real_pos = 0.0 # Position in inches
+            self.motor1.pos = 0  # Position in counts (should always be an integer)
+            self.motor1.real_pos = 0.0  # Position in inches
             self.motor1.is_lin = motor1_is_lin
-                
+
         # Set up the connection to the second motor
         # Initialized so that the startup position is set to zero
         if not (motor2_ip and motor2_port):
@@ -130,13 +130,13 @@ class MotControl(object):
             self.motor2 = Serial_TCPServer((motor2_ip, motor2_port))
             if m_res:
                 self.motor2.res = 'manual'
-                self.motor2.s_p_rev = 8000.0 # Steps per revolution (thread)
+                self.motor2.s_p_rev = 8000.0  # Steps per revolution (thread)
             else:
-                self.motor2.res = '8' # Corresponds to mapping above
-                self.motor2.s_p_rev = 20000.0 # Steps per revolution (thread)
+                self.motor2.res = '8'  # Corresponds to mapping above
+                self.motor2.s_p_rev = 20000.0  # Steps per revolution (thread)
             self.motor2.name = 'motor2'
             self.motor2.motor = MOTOR2
-            self.motor2.pos = 0 # Position in counts
+            self.motor2.pos = 0  # Position in counts
             self.motor2.real_pos = 0.0  Position in inches
             self.motor2.is_lin = motor2_is_lin
 
@@ -215,7 +215,7 @@ class MotControl(object):
 
     def gen_motor_list(self, motor):
         """gen_motor_list(motor=ALL):
-        
+
         **Task** - Generate a list of the motors in a MotControl object.
 
         Parameters:
@@ -233,14 +233,14 @@ class MotControl(object):
 
     def is_moving(self, motor=ALL, verbose=False):
         """is_moving(motor=ALL, verbose=False):
-        
+
         **Task** - Returns True if either motor is moving, False if both motors
         are not moving. Also returns True if the motor provides an irregular
         status message, such as any alarm keys.
 
         Parameters:
             motor (int): MOTOR1, MOTOR2, or ALL. (default ALL)
-            verbose (bool): Prints output from motor requests if True. 
+            verbose (bool): Prints output from motor requests if True.
                 (default False)
         """
         m_list = self.gen_motor_list(motor)
@@ -283,8 +283,8 @@ class MotControl(object):
 
     def move_off_limit(self, motor=ALL):
         """move_off_limit(motor=ALL):
-        
-        **Task** -Ignores alarm to be able to move off the limit switch if 
+
+        **Task** -Ignores alarm to be able to move off the limit switch if
         unexpectedly hit, and resets alarm. Function should be used when not
         able to move off limit switch due to alarm.
 
@@ -314,7 +314,7 @@ class MotControl(object):
 
     def home_with_limits(self, motor=ALL):
         """home_with_limits(motor=ALL):
-        
+
         **Task** - Uses the limit switches to zero all motor positions.
         This function should only be used if the linear stages do not have
         home switches, and should be done carefully. Does one motor at a time
@@ -350,10 +350,10 @@ class MotControl(object):
                     print(
                         'Reached CCW limit switch. Moving 1 inch away from limit switch')
                     pos = int(
-                        1.0 *
-                        AXIS_THREADS_PER_INCH_STAGE *
-                        motor.s_p_rev /
-                        2.0)
+                        1.0
+                        * AXIS_THREADS_PER_INCH_STAGE
+                        * motor.s_p_rev
+                        / 2.0)
                     motor.write('DI%i\r' % (pos))  # DI = Distance/Position
                     motor.write('FL\r')  # FL = Feed to Length
                     motor.flushInput()
@@ -375,9 +375,9 @@ class MotControl(object):
 
     def start_jogging(self, motor=ALL):
         """start_jogging(motor=ALL):
-        
+
         **Task** - Starts jogging control for specified motors.
-        
+
         Parameters:
             motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
         """
@@ -393,9 +393,9 @@ class MotControl(object):
 
     def stop_jogging(self, motor=ALL):
         """stop_jogging(motor=ALL):
-        
+
         **Task** - Stop jogging control to all motors.
-        
+
         Parameters:
             motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
         """
@@ -403,10 +403,10 @@ class MotControl(object):
 
     def seek_home_linear_stage(self, motor=ALL):
         """seek_home_linear_stage(motor=ALL):
-        
-        **Task** - Move the linear stage to its home position using the home 
+
+        **Task** - Move the linear stage to its home position using the home
         limit switch.
-        
+
         Parameters:
             motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
         """
@@ -439,10 +439,10 @@ class MotControl(object):
 
     def set_zero(self, motor=ALL):
         """set_zero(motor=ALL):
-        
-        **Task** - Tell the motor to set the current position as the zero 
+
+        **Task** - Tell the motor to set the current position as the zero
         point.
-        
+
         Parameters:
             motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
         """
@@ -465,7 +465,7 @@ class MotControl(object):
 
     def get_position(self, motor=ALL):
         """get_position(motor=ALL):
-        
+
         **Task** - Get the position of the motor in counts, relative to the set
         zero point (or starting point).
 
@@ -487,7 +487,7 @@ class MotControl(object):
 
     def get_position_in_inches(self, motor=ALL):
         """get_position_in_inches(motor=ALL):
-        
+
         **Task** - Get the position of the motor in inches, relative to the set
         zero point (or starting point).
 
@@ -495,7 +495,7 @@ class MotControl(object):
             motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
 
         Returns:
-            real_positions (list): The positions in inches of the specified 
+            real_positions (list): The positions in inches of the specified
             motors.
         """
         m_list = self.gen_motor_list(motor)
@@ -510,8 +510,8 @@ class MotControl(object):
 
     def get_immediate_position(self, motor=ALL, inches=True):
         """get_immediate_positions(motor=ALL, inches=True):
-        
-        **Task** - Get the position of the motor while it is currently in 
+
+        **Task** - Get the position of the motor while it is currently in
         motion. An estimate based on the calculated trajectory of the movement,
         relative to the zero point.
 
@@ -559,7 +559,7 @@ class MotControl(object):
             lin_stage=True):
         """move_axis_to_position(motor=MOTOR1, pos=0, pos_is_inches=False,
             lin_stage=True):
-        
+
         **Task** - Move the axis to the given absolute position in counts or
         inches.
 
@@ -589,8 +589,8 @@ class MotControl(object):
             if(pos_is_inches):
                 # 2.0 is because threads go twice the distance for one
                 # revolution
-                unit_pos = int(pos * AXIS_THREADS_PER_INCH *
-                              motor.s_p_rev / 2.0)
+                unit_pos = int(pos * AXIS_THREADS_PER_INCH
+                               * motor.s_p_rev / 2.0)
             else:
                 unit_pos = int(pos)
 
@@ -610,20 +610,20 @@ class MotControl(object):
             pos=0,
             pos_is_inches=False,
             lin_stage=True):
-        """move_axis_by_length(motor=MOTOR1, pos=0, pos_is_inches=0, 
+        """move_axis_by_length(motor=MOTOR1, pos=0, pos_is_inches=0,
             lin_stage=0):
-            
-        **Task** - Move the axis relative to the current position by the 
+
+        **Task** - Move the axis relative to the current position by the
         specified number of counts or inches.
 
         Parameters:
             motor (int): MOTOR1, MOTOR2, or ALL (default MOTOR1)
-            pos (float): the desired number of counts or inches to move from 
-                current position, positive indicates away from the motor. 
+            pos (float): the desired number of counts or inches to move from
+                current position, positive indicates away from the motor.
                 (default 0)
             pos_is_inches (bool): True if pos was specified in inches, False if
                 in counts. (default False)
-            lin_stage (bool): True if the specified motor is for the linear 
+            lin_stage (bool): True if the specified motor is for the linear
                 stage, False if not. (default True)
         """
 
@@ -642,10 +642,10 @@ class MotControl(object):
             # Convert from inches if necessary
             if(pos_is_inches):
                 unit_pos = int(
-                    pos *
-                    AXIS_THREADS_PER_INCH *
-                    motor.s_p_rev /
-                    2.0)  # See 2.0 note above
+                    pos
+                    * AXIS_THREADS_PER_INCH
+                    * motor.s_p_rev
+                    / 2.0)  # See 2.0 note above
             else:
                 unit_pos = int(pos)
 
@@ -662,10 +662,10 @@ class MotControl(object):
 
     def set_velocity(self, motor=ALL, velocity=1.0):
         """set_velocity(motor=ALL, velocity=1.0):
-        
-        **Task** - Set velocity in revolutions/second.  Range is 0.25 - 50. 
+
+        **Task** - Set velocity in revolutions/second.  Range is 0.25 - 50.
         Accepts floating point values.
-        
+
         Parameters:
             motor(int): MOTOR1, MOTOR2, or ALL. (default ALL)
             velocity (float): Sets velocity of motor in revolutions per second
@@ -688,12 +688,12 @@ class MotControl(object):
 
     def set_acceleration(self, motor=ALL, accel=5):
         """set_acceleration(motor=ALL, accel=5):
-        
+
         **Task** - Set acceleration of motors driving stages. (default 5)
-        
+
         .. note::
             `accel` parameter will only accept integer values.
-            
+
         Parameters:
             motor (int): MOTOR1, MOTOR2, or ALL. (default ALL)
             accel (int): Sets acceleration in revolutions per second per second
@@ -710,9 +710,9 @@ class MotControl(object):
 
     def kill_all_commands(self, motor=ALL):
         """kill_all_commands(motor=ALL):
-        
+
         **Task** - Stop all active commands on the device.
-        
+
         Parameters:
             motor(int): MOTOR1, MOTOR2, or ALL (default ALL)
         """
@@ -728,7 +728,7 @@ class MotControl(object):
 
     def block_while_moving(self, motor=ALL, update_period=.1, verbose=False):
         """block_while_moving(motor=ALL, update_period=.1, verbose=False):
-        
+
         **Task** - Block until the specified axes have stop moving. Checks each
         axis every update_period seconds.
 
@@ -769,11 +769,11 @@ class MotControl(object):
 
     def run_positions(self, pos_data, motor=ALL, pos_is_inches=False):
         """run_positions(pos_data=[1,1], motor=ALL, pos_is_inches=False):
-        
-        **Task** - Runs a tab-delimited list of entries as positions. For 
+
+        **Task** - Runs a tab-delimited list of entries as positions. For
         motor=ALL, the first column must be the x-data, and the second column
-        the y-data. Each position will be attained. 
-        
+        the y-data. Each position will be attained.
+
         Parameters:
             pos_data (list): Tab-delimited list of entries. First column
                 is x-data, second column is y-data.
@@ -809,10 +809,10 @@ class MotControl(object):
 
     def set_motor_enable(self, motor=ALL, enable=True):
         """set_motor_enable(motor=ALL, enable=True):
-        
+
         **Task** - Set motor enable to true or false for given axis. Should
         disable motor when stopped for lower noise data acquisition.
-        
+
         Parameters:
             motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
             enable (bool): Enables specified motor if True, disables specified
@@ -831,9 +831,9 @@ class MotControl(object):
 
     def retrieve_encoder_info(self, motor=ALL):
         """retrieve_encoder_info(motor=ALL):
-        
+
         **Task** - Retrieve all motor step counts to verify movement.
-        
+
         Parameters:
             motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
         """
@@ -862,10 +862,10 @@ class MotControl(object):
 
     def set_encoder_value(self, motor=ALL, value=0):
         """set_encoder_value(motor=ALL, value=0):
-        
-        **Task** - Set the encoder values in order to keep track of absolute 
+
+        **Task** - Set the encoder values in order to keep track of absolute
         position.
-        
+
         Parameters:
             motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
             value (float): Sets encoder value. (default 0)
@@ -898,7 +898,7 @@ class MotControl(object):
 
     def start_rotation(self, motor=MOTOR2, velocity=12.0, rot_accel=1.0):
         """start_rotation(motor=MOTOR2, velocity=12.0, rot_accel=1.0):
-        
+
         **Task** - Starts jogging specifically for the rotation of the output
         polarizer in the FTS.
 
@@ -925,9 +925,9 @@ class MotControl(object):
 
     def stop_rotation(self, motor=MOTOR2):
         """stop_rotation(motor=MOTOR2):
-        
+
         **Task** - Stops jogging for the rotation of the specified motor.
-        
+
         Parameters:
             motor (int): MOTOR1, MOTOR2, or ALL (default MOTOR2)
         """
@@ -941,7 +941,7 @@ class MotControl(object):
 
     def reset_alarms(self, motor=ALL):
         """reset_alarms(motor=ALL):
-        
+
         **Task** - Resets alarm codes present. Only advised if you have checked
         what the alarm is first!
 
@@ -959,10 +959,10 @@ class MotControl(object):
 
     def close_connection(self, motor=ALL):
         """close_connection(motor=ALL):
-        
+
         **Task** - Close the connection to the serial controller for the
         specified motor.
-        
+
         Parameters:
             motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
         """
@@ -976,9 +976,9 @@ class MotControl(object):
 
     def reconnect_motor(self, motor=ALL):
         """reconnect_motor(motor=ALL):
-        
+
         **Task** - Reestablish connection with specified motor.
-        
+
         Parameters:
             motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
         """
@@ -990,8 +990,6 @@ class MotControl(object):
             print(f"port: {mot.port}")
             try:
                 mot.sock.connect(mot.port)
-            except:
+            except BaseException:
                 print(f"Connection with motor{motor} could not be reestablished.")
         print(f"Connection with motor{motor} has been reestablished.")
-
-
