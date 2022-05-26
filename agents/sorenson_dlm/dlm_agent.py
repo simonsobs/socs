@@ -85,7 +85,7 @@ class DLM:
 
 class DLMAgent:
     """ Agent to connect to a Sorenson DLM power supply via ethernet.
-    
+
     Args:
         ip_address: str
             IP address of the DLM
@@ -107,7 +107,7 @@ class DLMAgent:
             self.dlm = DLM(ip_address, int(port))
         except socket.timeout as e:
             self.log.error("DLM power supply has timed out"
-                    + f"during connect with error {e}")
+                           + f"during connect with error {e}")
             return False, "Timeout"
 
         agg_params = {'frame length': 60, }
@@ -127,8 +127,7 @@ class DLMAgent:
         """
         if params is None:
             params = {}
-        
-        
+
         f_sample = params.get('sampling_frequency')
         if f_sample is None:
             f_sample = self.f_sample
@@ -173,7 +172,7 @@ class DLMAgent:
 
             self.agent.feeds['voltages'].flush_buffer()
         return True, 'Acquistion exited cleanly'
-    
+
     @ocs_agent.param('voltage', default=0., type=float, check=lambda V: 0 <= V <= 300)
     def set_voltage(self, session, params=None):
         """set_voltage(voltage=None)
@@ -224,7 +223,7 @@ class DLMAgent:
             else:
                 return False, 'Could not acquire lock'
         return True, 'Set over voltage protection to {}'.format(params['over_volt'])
-    
+
     @ocs_agent.param('current', default=0., type=float, check=lambda I: 0 <= I <= 2)
     def set_current(self, session, params=None):
         """set_current(current=None)
@@ -263,6 +262,7 @@ class DLMAgent:
         else:
             return False, 'acq is not currently running'
 
+
 def make_parser(parser=None):
     """Build the argument parser for the Agent. Allows sphinx to automatically
     build documentation based on this function.
@@ -279,6 +279,8 @@ def make_parser(parser=None):
                         + "startup")
 
     return parser
+
+
 if __name__ == '__main__':
     parser = site_config.add_arguments()
 
