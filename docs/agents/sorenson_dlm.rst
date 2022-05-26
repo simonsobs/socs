@@ -12,9 +12,9 @@ voltage and current values, and defines tasks used to set voltages and
 currents.
 
 .. argparse::
-   :module: ../agents/sorenson_dlm/dlm_agent.py
+   :filename: ../agents/sorenson_dlm/dlm_agent.py
    :func: make_parser
-   :prog: dlm_agent.py
+   :prog: python3 dlm_agent.py
 
 
 
@@ -28,9 +28,10 @@ OCS Site Config
 ````````````````
 
 An example site-config-file block::
+
       {'agent-class': 'DLMAgent',
         'instance-id': 'dlm',
-        'arguments' :[['--ip-address', '10.10.10.21'],
+        'arguments': [['--ip-address', '10.10.10.21'],
                       ['--mode', 'acq'],
                       ['--port', '9221'],]},
 
@@ -38,6 +39,7 @@ Docker Compose
 ``````````````
 
 An example docker-compose configuration::
+
   ocs-dlm:
     image: simonsobs/ocs-dlm-agent:latest
     hostname: ocs-docker

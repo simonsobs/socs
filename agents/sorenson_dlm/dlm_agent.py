@@ -84,7 +84,7 @@ class DLM:
 
 
 class DLMAgent:
-    """ Agent to connect to a Sorenson DLM power supply via ethernet.
+    """Agent to connect to a Sorenson DLM power supply via ethernet.
 
     Args:
         ip_address: str
@@ -117,9 +117,10 @@ class DLMAgent:
                                  buffer_time=1)
 
     def acq(self, session, params=None):
-        """acq("wait=1, test_mode=False)
-        Get voltage and current values from the sorenson, publishes them to
-        the feed
+        """acq(sampling_frequency=2.5)
+
+        **Process** - Get voltage and current values from the sorenson,
+        publishes them to the feed.
 
         Args:
             sampling_frequency: float
@@ -177,12 +178,13 @@ class DLMAgent:
     def set_voltage(self, session, params=None):
         """set_voltage(voltage=None)
 
-        Sets voltage of power supply:
+        **Task** - Sets voltage of power supply.
+
         Args:
             voltage (float): Voltage to set.
 
-        Examples::
-            Example of a client, setting the current to 1V:
+        Examples:
+            Example of a client, setting the current to 1V::
 
                 client.set_voltage(voltage = 1.)
 
@@ -204,13 +206,13 @@ class DLMAgent:
     def set_over_volt(self, session, params=None):
         """set_over_volt(over_volt=None)
 
-        Sets over voltage protection of power supply.
+        **Task** - Sets over voltage protection of power supply.
 
         Args:
             over_volt (int): Over voltage protection to set
 
-        Examples::
-            Example of a client, setting the overvoltage protection to 10V:
+        Examples:
+            Example of a client, setting the overvoltage protection to 10V::
 
                 client.set_over_volt(over_volt = 10.)
 
@@ -228,12 +230,13 @@ class DLMAgent:
     def set_current(self, session, params=None):
         """set_current(current=None)
 
-        Sets current of power supply:
+        **Task** - Sets current of power supply.
+
         Args:
             current (float): Current to set.
 
-        Examples::
-            Example of a client, setting the current to 1A:
+        Examples:
+            Example of a client, setting the current to 1A::
 
                 client.set_current(current = 1.)
 
