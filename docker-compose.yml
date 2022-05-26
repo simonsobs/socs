@@ -227,3 +227,12 @@ services:
     build: ./simulators/lakeshore372/
     depends_on:
       - "socs"
+
+  # --------------------------------------------------------------------------
+  # Sorenson DLM Power Supply
+  # --------------------------------------------------------------------------
+  ocs-dlm-agent:
+    image: "ocs-dlm-agent"
+    build: ./agents/sorenson_dlm/
+    depends_on:
+      - "socs"

@@ -58,6 +58,7 @@ API Reference        Full API documentation for core parts of the SOCS library.
     agents/pysmurf-monitor
     agents/scpi_psu
     agents/smurf_crate_monitor
+    agents/sorenson_dlm
     agents/suprsync
     agents/synacc
     agents/tektronix3021c

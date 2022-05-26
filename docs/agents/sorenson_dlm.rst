@@ -2,14 +2,13 @@
 
 .. _sorenson_dlm:
 
-==============
+==================
 Sorenson DLM Agent
-==============
+==================
 
-# A brief description of the Agent.
 The Sorenson DLM is a 300V/2A single channel power supply, with over-voltage
 protection. The DLM agent communicates with the power supply, reading out
-voltage and current values, and defining tasks used to set voltages and
+voltage and current values, and defines tasks used to set voltages and
 currents.
 
 .. argparse::
@@ -18,11 +17,6 @@ currents.
    :prog: dlm_agent.py
 
 
-Dependencies
-------------
-
-# Any external dependencies for agent. Omit if there are none, or they are
-# included in the main requirements.txt file.
 
 Configuration File Examples
 ---------------------------
@@ -34,31 +28,25 @@ OCS Site Config
 ````````````````
 
 An example site-config-file block::
-      # DLM Agent
       {'agent-class': 'DLMAgent',
         'instance-id': 'dlm',
-        'arguments':[
-          ['--ip-address', '10.10.10.21'],
-          ['--mode','acq' ],
-          ['--port','9221'],]},
+        'arguments' :[['--ip-address', '10.10.10.21'],
+                      ['--mode', 'acq'],
+                      ['--port', '9221'],]},
 
 Docker Compose
 ``````````````
 
 An example docker-compose configuration::
-  # --------------------------------------------------------------------------
-  # OCS - DLM
-  # --------------------------------------------------------------------------
   ocs-dlm:
-    #<<: *log-options
-    image: simonsobs/cs-dlm-agent:latest
+    image: simonsobs/ocs-dlm-agent:latest
     hostname: ocs-docker
     network_mode: "host"
     volumes:
       - ${OCS_CONFIG_DIR}:/config
-      - /home/ocs:/home/ocs
     command:
       - "--instance-id=dlm"
+
 
 Description
 -----------
@@ -69,36 +57,30 @@ requires both an output voltage value and an output current value. You can also
 set an upper-bound on the voltage output for safety purposees (overvoltage
 setting).
 
-Subsection
-``````````
-
-# Use subsections where appropriate.
 
 Agent API
 ---------
 
-# Autoclass the Agent, this is for users to reference when writing clients.
 
-.. autoclass:: agents.dlm.dlm_agent.DLMAgent
+.. autoclass:: agents.sorenson_dlm.dlm_agent.DLMAgent
     :members:
 
 Example Clients
 ---------------
+The following client sets the output voltage and current to 1V and 1A, respectively::
 
-# The following client sets the output voltage and current to 1V and 1A, respectively::
+        from ocs.ocs_client import OCSClient
 
-        from ocs.matched_client import MatchedClient
-
-        mc = MatchedClient('dlm')
+        client = OCSClient('dlm')
 
         #Stop data acquisition
-        mc.close()
+        client.close()
 
         #Set overvoltage protection
-        mc.set_over_volt(over_volt=1.)
+        client.set_over_volt(over_volt=1.)
         #Set DLM Voltage
-        mc.set_voltage(voltage = 1.)
-        mc.set_current(current = 1.)
+        client.set_voltage(voltage = 1.)
+        client.set_current(current = 1.)
 
         #Re-start data acq
-        mc.acq.start()
+        client.acq.start()
