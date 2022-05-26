@@ -129,7 +129,7 @@ class LS336:
             inps = ['A', 'B', 'C', 'D']
             self.channels = {inp: Channel(self, inp) for inp in inps}
         else:
-            raise ValueError("Can't determine number of channels. " 
+            raise ValueError("Can't determine number of channels. "
                              "Please debug.")
 
         # Get Heaters
@@ -203,7 +203,7 @@ class LS336:
         Returns
         -------
         array or float
-            array of four (or eight) floats if input is '0', 
+            array of four (or eight) floats if input is '0',
             float otherwise of temperature reading
 
         Raises
@@ -292,6 +292,7 @@ class Channel:
         Lakeshore 3062 scanner is installed on the LS336.
         D and D1 refer to the same channel!
     """
+
     def __init__(self, ls, inp):
         assert inp in ['A', 'B', 'C', 'D', 'D1', 'D2', 'D3', 'D4', 'D5']
 
@@ -744,8 +745,8 @@ class Curve:
             with open(_file, 'w') as f:
                 f.write('Curve Name:\t' + self.name + '\r\n')
                 f.write('Serial Number:\t' + self.serial_number + '\r\n')
-                f.write('Data Format:\t' +
-                        format_lock[self.format] + f'\t({self.format})\r\n')
+                f.write('Data Format:\t'
+                        + format_lock[self.format] + f'\t({self.format})\r\n')
                 f.write('SetPoint Limit:\t%s\t(Kelvin)\r\n' % '%0.4f' %
                         np.max(self.breakpoints['temperature']))
                 f.write('Temperature coefficient:\t'
@@ -757,7 +758,7 @@ class Curve:
                 f.write('No.\tUnits\tTemperature (K)\r\n')
                 f.write('\r\n')
                 for idx, point in enumerate(self.breakpoints):
-                    f.write('%s\t%s %s\r\n' % (idx+1, '%0.5f' %
+                    f.write('%s\t%s %s\r\n' % (idx + 1, '%0.5f' %
                                                point['units'],
                                                '%0.4f' % point['temperature']))
 
@@ -829,10 +830,10 @@ class Curve:
             # data points that should have been uploaded
             values.append(content[i].strip().split())
 
-        for j in range(1, len(values)+1):
+        for j in range(1, len(values) + 1):
             try:
                 resp = self.get_data_point(j)  # response from the 336
-                point = values[j-1]
+                point = values[j - 1]
                 units = float(resp[0])
                 temperature = float(resp[1])
                 assert units == float(
@@ -907,6 +908,7 @@ class Heater:
         the heater output we want to control, 1 = 100W, 2 = 50W
 
     """
+
     def __init__(self, ls, output):
         assert int(output) in [1, 2]
 
@@ -1103,7 +1105,7 @@ class Heater:
         25 or 50 Ohms
         """
         self.get_heater_setup()
-        if self.resistance is None:        
+        if self.resistance is None:
             if self.resistance_setting == 1:
                 self.resistance = 25
             elif self.resistance_setting == 2:
@@ -1148,7 +1150,7 @@ class Heater:
     def set_max_current(self, current):
         assert current <= 2, f'Current {current} is too high (>2 A)'
         # round down to 3 decimal places
-        current = math.floor(1000*current)/1000
+        current = math.floor(1000 * current) / 1000
 
         resp = self.get_heater_setup()
         if current in max_current_lock:
@@ -1212,8 +1214,8 @@ class Heater:
         """
         assert 100 * \
             percent == int(
-                100*percent), ("Percent value cannot have more than 2 "
-                               "decimal places")
+                100 * percent), ("Percent value cannot have more than 2 "
+                                 "decimal places")
 
         resp = self.ls.msg(f'MOUT {self.output},{percent}')
         return resp
@@ -1271,25 +1273,25 @@ class Heater:
         Returns
         -------
         tuple
-            (P, I, D)
+            (p, i, d)
 
         """
         resp = self.ls.msg(f"PID? {self.output}").split(',')
-        self.P = float(resp[0])
-        self.I = float(resp[1])
-        self.D = float(resp[2])
-        return self.P, self.I, self.D
+        self.p = float(resp[0])
+        self.i = float(resp[1])
+        self.d = float(resp[2])
+        return self.p, self.i, self.d
 
-    def set_pid(self, P, I, D):
+    def set_pid(self, p, i, d):
         """Set PID parameters for closed loop control.
 
         Parameters
         ----------
-        P : float
+        p : float
             proportional term in PID loop
-        I : float
+        i : float
             integral term in PID loop
-        D : float
+        d : float
             derivative term in PID loop
 
         Returns
@@ -1298,15 +1300,15 @@ class Heater:
             response from PID command
 
         """
-        assert float(P) <= 1000 and float(P) >= 0.1
-        assert float(I) <= 1000 and float(I) >= 0.1
-        assert float(D) <= 200 and float(D) >= 0
+        assert float(p) <= 1000 and float(p) >= 0.1
+        assert float(i) <= 1000 and float(i) >= 0.1
+        assert float(d) <= 200 and float(d) >= 0
 
-        self.P = P
-        self.I = I
-        self.D = D
+        self.p = p
+        self.i = i
+        self.d = d
 
-        resp = self.ls.msg(f"PID {self.output},{P},{I},{D}")
+        resp = self.ls.msg(f"PID {self.output},{p},{i},{d}")
         return resp
 
     def get_ramp(self):

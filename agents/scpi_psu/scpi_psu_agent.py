@@ -25,7 +25,7 @@ class ScpiPsuAgent:
 
         # Registers Temperature and Voltage feeds
         agg_params = {
-            'frame_length': 10*60,
+            'frame_length': 10 * 60,
         }
         self.agent.register_feed('psu_output',
                                  record=True,
@@ -43,7 +43,7 @@ class ScpiPsuAgent:
                 self.psu = PsuInterface(self.ip_address, self.gpib_slot)
                 self.idn = self.psu.identify()
             except socket.timeout as e:
-                self.log.error("PSU timed out during connect")
+                self.log.error(f"PSU timed out during connect: {e}")
                 return False, "Timeout"
             self.log.info("Connected to psu: {}".format(self.idn))
 

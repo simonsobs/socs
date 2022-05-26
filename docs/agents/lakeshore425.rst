@@ -6,7 +6,7 @@
 Lakeshore 425
 ======================
 
-The Lakeshore Model 425 gaussmeter is a device which measure the magnetic field by hall sensor. 
+The Lakeshore Model 425 gaussmeter is a device which measure the magnetic field by hall sensor.
 This agent is used to measure the magnetic field from the superconducting magnetic bearing of the CHWP rotation mechanism and to monitoring the status of floating and rotating CHWP.
 
 .. argparse::
@@ -16,12 +16,12 @@ This agent is used to measure the magnetic field from the superconducting magnet
 
 Configuration File Examples
 ---------------------------
-Below are useful configurations examples for the relevant OCS files and for 
+Below are useful configurations examples for the relevant OCS files and for
 running the agent in a docker container.
 
 OCS Site Config
 ```````````````
-To configure the ocs-lakeshore425-agent we need to add a Lakeshore425Agent 
+To configure the ocs-lakeshore425-agent we need to add a Lakeshore425Agent
 block to our ocs configuration file. Here is an example configuration block
 using all of the available arguments::
 
@@ -37,7 +37,7 @@ If you would like to chanege the setting or check the status of the lakeshore 42
 
 Docker Compose
 ``````````````
-The ocs-lakeshore425-agent can be run via a Docker container. The following is an 
+The ocs-lakeshore425-agent can be run via a Docker container. The following is an
 example of what to insert into your institution's docker-compose file.::
 
   ocs-lakeshore425-agent:
@@ -64,4 +64,3 @@ Supporting APIs
 .. automodule:: socs.Lakeshore.Lakeshore425
     :members:
     :undoc-members:
-

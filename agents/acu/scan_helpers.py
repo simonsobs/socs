@@ -64,10 +64,10 @@ def linear_turnaround_scanpoints(azpts, el, azvel, acc, ntimes):
 
 def from_file(filename):
     """
-    Produces properly formatted lists of times, azimuth and elevation locations, 
-    azimuth and elevation velocities, and azimuth and elevation motion flags for 
-    a finitely long scan from a numpy file. Numpy file must be formatted as an array 
-    of arrays in the order [times, azimuths, elevations, azimuth velocities, elevation 
+    Produces properly formatted lists of times, azimuth and elevation locations,
+    azimuth and elevation velocities, and azimuth and elevation motion flags for
+    a finitely long scan from a numpy file. Numpy file must be formatted as an array
+    of arrays in the order [times, azimuths, elevations, azimuth velocities, elevation
     velocities]
 
     Params:
@@ -85,7 +85,7 @@ def from_file(filename):
 
 def write_lines(conctimes, concaz, concel, concva, concve, az_flags, el_flags):
     """
-    Produces a list of lines in the format necessary to upload to the ACU to complete a scan. 
+    Produces a list of lines in the format necessary to upload to the ACU to complete a scan.
     Params are the outputs of from_file or linear_turnaround_scanpoints.
 
     Params:
@@ -108,11 +108,11 @@ def write_lines(conctimes, concaz, concel, concva, concve, az_flags, el_flags):
 
 def write_generator_lines(conctimes, concaz, concel, concva, concve, az_flags, el_flags):
     """
-    Produces a list of lines in the format necessary to upload to the ACU to complete a 
+    Produces a list of lines in the format necessary to upload to the ACU to complete a
     generated scan. Params are the outputs of generate.
 
     Params:
-        conctimes (list): List of times starting at most recently used time for the ACU 
+        conctimes (list): List of times starting at most recently used time for the ACU
                           to reach associated positions
         concaz (list): List of azimuth positions associated with times
         concel (list): List of elevation positions associated with times
@@ -131,8 +131,8 @@ def write_generator_lines(conctimes, concaz, concel, concva, concve, az_flags, e
 
 def generate(stop_iter, az_endpoint1, az_endpoint2, az_speed, acc, el_endpoint1, el_endpoint2, el_speed):
     """
-    Python generator to produce times, azimuth and elevation positions, azimuth and elevation 
-    velocities, azimuth and elevation flags for arbitrarily long scans. For development, this 
+    Python generator to produce times, azimuth and elevation positions, azimuth and elevation
+    velocities, azimuth and elevation flags for arbitrarily long scans. For development, this
     is limited to constant-velocity azimuth scans.
 
     Params:
@@ -142,7 +142,7 @@ def generate(stop_iter, az_endpoint1, az_endpoint2, az_speed, acc, el_endpoint1,
         az_speed (float): speed of the constant-velocity azimuth motion
         acc (float): turnaround acceleration for the azimuth motion at the endpoints
         el_endpoint1 (float): elevation endpoint at which to start the motion
-        el_endpoint2 (float): second elevation endpoint of the scan. For development, this 
+        el_endpoint2 (float): second elevation endpoint of the scan. For development, this
                               must be equal to el_endpoint1.
         el_speed (float): speed of the elevation motion. For development, set to 0.0
     """

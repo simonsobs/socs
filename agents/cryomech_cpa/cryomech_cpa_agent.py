@@ -27,7 +27,8 @@ ESC_CR = '\x31'
 ESC_ESC = '\x32'
 
 
-class TimeoutException(Exception): pass
+class TimeoutException(Exception):
+    pass
 
 
 @contextmanager
@@ -152,7 +153,7 @@ class PTC:
                 # 2 x 8-bit lookup tables.
                 elif key in ["Model"]:
                     model_major = struct.unpack(
-                        ">B",  bytes([rawdata[locs[0]]]))[0]
+                        ">B", bytes([rawdata[locs[0]]]))[0]
                     model_minor = struct.unpack(
                         ">B", bytes([rawdata[locs[1]]]))[0]
                     # Model is an attribute, not publishable data
@@ -169,7 +170,7 @@ class PTC:
 
             data_flag = False
 
-        except:
+        except BaseException:
             data_flag = True
             print("Compressor output could not be converted to numbers."
                   f"Skipping this data block. Bad output string is {rawdata}")
@@ -178,7 +179,7 @@ class PTC:
 
     def __del__(self):
         """
-        If the PTC class instance is destroyed, close the connection to the 
+        If the PTC class instance is destroyed, close the connection to the
         ptc.
         """
         self.comm.close()
@@ -195,6 +196,7 @@ class PTCAgent:
             output 50% of the time.
 
     """
+
     def __init__(self, agent, port, ip_address, f_sample=2.5,
                  fake_errors=False):
         self.agent = agent
@@ -204,7 +206,7 @@ class PTCAgent:
         self.fake_errors = fake_errors
 
         self.port = port
-        self.module: Optional[Module] = None
+        self.module = None
         self.f_sample = f_sample
 
         self.initialized = False
@@ -280,7 +282,7 @@ class PTCAgent:
 
             # Publish data, waiting 1/f_sample seconds in between calls.
             while self.take_data:
-                pub_data = {'timestamp': time.time(), 
+                pub_data = {'timestamp': time.time(),
                             'block_name': 'ptc_status'}
                 data_flag, data = self.ptc.get_data()
                 pub_data['data'] = data
@@ -288,7 +290,7 @@ class PTCAgent:
                 # do not publish
                 if not data_flag:
                     self.agent.publish_to_feed('ptc_status', pub_data)
-                time.sleep(1./self.f_sample)
+                time.sleep(1. / self.f_sample)
 
             self.agent.feeds["ptc_status"].flush_buffer()
 
@@ -318,7 +320,7 @@ def make_parser(parser=None):
     pgroup.add_argument('--serial-number')
     pgroup.add_argument('--mode', choices=['init', 'acq'])
     pgroup.add_argument('--fake-errors', default=False,
-                        help="If True, randomly output 'FAKE ERROR' instead of "\
+                        help="If True, randomly output 'FAKE ERROR' instead of "
                              "data half of the time.")
 
     return parser
@@ -345,7 +347,7 @@ def main():
     ptc = PTCAgent(agent, args.port, args.ip_address,
                    fake_errors=args.fake_errors)
 
-    agent.register_task('init',  ptc.init, startup=init_params)
+    agent.register_task('init', ptc.init, startup=init_params)
     agent.register_process('acq', ptc.acq, ptc._stop_acq)
 
     runner.run(agent, auto_reconnect=True)

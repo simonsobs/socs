@@ -4,8 +4,7 @@ import numpy as np
 import txaio
 
 sys.path.insert(0, '../agents/suprsync/')
-from suprsync import SupRsync
-from socs.db.suprsync import SupRsyncFilesManager, SupRsyncFile, SupRsyncFileHandler
+from socs.db.suprsync import SupRsyncFilesManager, SupRsyncFileHandler
 
 txaio.use_twisted()
 
@@ -27,7 +26,7 @@ def test_suprsync_handle_files(tmp_path):
     Tests file handling
     """
     txaio.start_logging(level='info')
-    log = txaio.make_logger()
+    txaio.make_logger()
     db_path = str(tmp_path / 'test.db')
     dest = tmp_path / 'dest'
     dest.mkdir()
@@ -46,13 +45,13 @@ def test_suprsync_handle_files(tmp_path):
     archive_name = 'test'
     for i in range(nfiles):
         fname = f"{i}.npy"
-        path = str(data_dir/fname)
+        path = str(data_dir / fname)
         np.save(path, file_data)
         srfm.add_file(path, f'test_remote/{fname}', archive_name,
                       deletable=True)
 
-    fname = f"dont_delete.npy"
-    path = str(data_dir/fname)
+    fname = "dont_delete.npy"
+    path = str(data_dir / fname)
     np.save(path, file_data)
     srfm.add_file(path, f'test_remote/{fname}', archive_name,
                   deletable=False)

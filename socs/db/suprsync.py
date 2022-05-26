@@ -136,6 +136,7 @@ class SupRsyncFilesManager:
         echo : bool
             If true, writes sql statements to stdout
     """
+
     def __init__(self, db_path, create_all=True, echo=False):
         db_path = os.path.abspath(db_path)
         if not os.path.exists(os.path.dirname(db_path)):
@@ -206,7 +207,7 @@ class SupRsyncFilesManager:
             session = self.Session()
 
         query = session.query(SupRsyncFile).filter(
-            SupRsyncFile.removed == None,
+            SupRsyncFile.removed == None,  # noqa: E711
             SupRsyncFile.archive_name == archive_name,
         )
 
@@ -243,7 +244,7 @@ class SupRsyncFilesManager:
             session = self.Session()
 
         query = session.query(SupRsyncFile).filter(
-            SupRsyncFile.removed == None,
+            SupRsyncFile.removed == None,  # noqa: E711
             SupRsyncFile.archive_name == archive_name,
             SupRsyncFile.deletable,
         )
@@ -264,6 +265,7 @@ class SupRsyncFileHandler:
     Helper class to handle files in the suprsync db and copy them to their
     dest / delete them if enough time has passed.
     """
+
     def __init__(self, file_manager, archive_name, remote_basedir,
                  ssh_host=None, ssh_key=None, cmd_timeout=None,
                  copy_timeout=None):
@@ -346,7 +348,7 @@ class SupRsyncFileHandler:
                 cmd = ['rsync', '-Lrt']
                 if self.ssh_key is not None:
                     cmd.extend(['--rsh', f'ssh -i {self.ssh_key}'])
-                cmd.extend([tmp_dir+'/', dest])
+                cmd.extend([tmp_dir + '/', dest])
 
                 subprocess.run(cmd, check=True, timeout=self.copy_timeout)
 

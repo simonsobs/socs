@@ -20,10 +20,13 @@ def get_smurf_status():
 
 SOSTREAM_VERSION = 2
 NBIASLINES = 16
+
+
 class G3FrameGenerator:
     """
     Helper class for generating G3 Streams.
     """
+
     def __init__(self, stream_id, sample_rate, nchans):
         self.frame_num = 0
         self.session_id = int(time.time())
@@ -53,7 +56,7 @@ class G3FrameGenerator:
 
     def get_data_frame(self, start, stop):
 
-        times = np.arange(start, stop, 1./self.sample_rate)
+        times = np.arange(start, stop, 1. / self.sample_rate)
         nsamps = len(times)
         chans = np.arange(self.nchans)
         names = [f'r{ch:0>4}' for ch in chans]
@@ -87,12 +90,13 @@ class G3FrameGenerator:
 
         self.tag_frame(fr)
         return fr
-        
+
 
 class SmurfFileEmulator:
     """
     OCS Agent for emulating file creation for the smurf system.
     """
+
     def __init__(self, agent, args):
         self.log = agent.log
         self.file_duration = args.file_duration
@@ -182,7 +186,7 @@ class SmurfFileEmulator:
         ----
         test_mode : bool
             If True, will skip any wait times associated with writing
-            g3 files. 
+            g3 files.
         """
         # Find Freq
         action_time = time.time()
@@ -288,7 +292,6 @@ class SmurfFileEmulator:
         if params.get('duration') is not None:
             end_time = time.time() + params['duration']
 
-
         session.set_status('running')
         frame_gen = G3FrameGenerator(
             self.stream_id, self.sample_rate, self.nchans
@@ -349,7 +352,7 @@ def make_parser(parser=None):
                         help='Stream ID for fake smurf stream')
     pgroup.add_argument('--base-dir', required=True,
                         help="Base directory where data should be written")
-    pgroup.add_argument('--file-duration', default=10*60, type=float,
+    pgroup.add_argument('--file-duration', default=10 * 60, type=float,
                         help="Time in sec before rotating g3 files")
     pgroup.add_argument('--nchans', default=1024, type=int,
                         help="Number of channels to stream from")
@@ -357,7 +360,6 @@ def make_parser(parser=None):
                         help="Sample rate for streaming data")
     pgroup.add_argument('--frame-len', default=2, type=float,
                         help="Time per G3 data frame (seconds)")
-
 
     return parser
 
@@ -379,4 +381,3 @@ if __name__ == '__main__':
     agent.register_process('stream', file_em.stream, file_em._stop_stream)
 
     runner.run(agent, auto_reconnect=True)
-

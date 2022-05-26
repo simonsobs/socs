@@ -6,8 +6,6 @@ import serial
 import time
 import numpy as np
 
-import traceback
-
 # Lookup keys for command parameters.
 autorange_key = {'0': 'off',
                  '1': 'on'}
@@ -51,8 +49,8 @@ current_excitation_key = {1: 1.0e-12,
                           18: 316.0e-6,
                           19: 1.0e-3,
                           20: 3.16e-3,
-                          21: 10.0-3,
-                          22: 31.6-3}
+                          21: 10.0e-3,
+                          22: 31.6e-3}
 
 voltage_excitation_lock = {2.0e-6: 1,
                            6.32e-6: 2,
@@ -87,8 +85,8 @@ current_excitation_lock = {1.0e-12: 1,
                            316.0e-6: 18,
                            1.0e-3: 19,
                            3.16e-3: 20,
-                           10.0-3: 21,
-                           31.6-3: 22}
+                           10.0e-3: 21,
+                           31.6e-3: 22}
 
 range_key = {1: 2.0e-3,
              2: 6.32e-3,
@@ -160,18 +158,18 @@ format_lock = {"Ohm/K (linear)": '3',
 heater_range_key = {"0": "Off", "1": 31.6e-6, "2": 100e-6, "3": 316e-6,
                     "4": 1e-3, "5": 3.16e-3, "6": 10e-3, "7": 31.6e-3,
                     "8": 100e-3}
-heater_range_lock = {v:k for k, v in heater_range_key.items()}
+heater_range_lock = {v: k for k, v in heater_range_key.items()}
 heater_range_lock["On"] = "1"
 
 output_modes = {'1': 'Closed Loop', '2': 'Zone', '3': 'Open Loop', '4': 'Off'}
-output_modes_lock = {v.lower():k for k, v in output_modes.items()}
+output_modes_lock = {v.lower(): k for k, v in output_modes.items()}
 
 analog_modes = {'0': 'Off', '1': 'Channel', '2': 'Manual', '3': 'Zone', '4': 'Still'}
-analog_modes_lock = {v.lower():k for k, v in analog_modes.items()}
+analog_modes_lock = {v.lower(): k for k, v in analog_modes.items()}
 
-heater_display_key = { '1': 'current',
-                '2': 'power'}
-heater_display_lock = {v: k for k,v in heater_display_key.items()}
+heater_display_key = {'1': 'current',
+                      '2': 'power'}
+heater_display_lock = {v: k for k, v in heater_display_key.items()}
 
 
 class LS370:
@@ -199,16 +197,16 @@ class LS370:
 
         self.id = self.get_id()
         self.autoscan = self.get_autoscan()
-        
+
         self.channels = []
 
-        #unlike 372, 370 does not have dedicated control input channel; rather, only numbered channels 
+        # unlike 372, 370 does not have dedicated control input channel; rather, only numbered channels
         for i in range(1, num_channels + 1):
             c = Channel(self, i)
             self.channels.append(c)
 
         self.sample_heater = Heater(self)
-        #self.still_heater = Heater(self, 2)
+        # self.still_heater = Heater(self, 2)
 
     def msg(self, message):
         """Send message to the Lakeshore 370 over RS-232.
@@ -240,9 +238,9 @@ class LS370:
             while resp == '':
                 if try_count == 0:
                     break
-                
-                print(f"Warning: Caught timeout waiting for response to {message}, waiting 1s and " \
-                          "trying again {try_count} more time(s) before giving up")
+
+                print(f"Warning: Caught timeout waiting for response to {message}, waiting 1s and "
+                      "trying again {try_count} more time(s) before giving up")
                 time.sleep(1)
 
                 # retry comms
@@ -383,6 +381,7 @@ class Channel:
                         type)
     :type channel_num: int
     """
+
     def __init__(self, ls, channel_num):
         self.ls = ls
         self.channel_num = channel_num
@@ -390,7 +389,7 @@ class Channel:
         self._get_input_channel_parameter()
         self._get_input_setup()
         self.name = f'Channel {channel_num}'
-        #self.tlimit = self.get_temperature_limit()
+        # self.tlimit = self.get_temperature_limit()
 
     def _get_input_channel_parameter(self):
         """Run Input Channel Parameter Query
@@ -487,12 +486,12 @@ class Channel:
         _range = resp[2]
         _autorange = resp[3]
         _csshunt = resp[4]
-        #_units = resp[5]
+        # _units = resp[5]
 
         self.mode = mode_key[_mode]
 
         excitation_key = {'0': voltage_excitation_key,
-                            '1': current_excitation_key}
+                          '1': current_excitation_key}
 
         excitation_units_key = {'0': 'volts',
                                 '1': 'amps'}
@@ -506,7 +505,7 @@ class Channel:
 
         self.csshunt = csshunt_key[_csshunt]
 
-        #self.units = units_key[_units]
+        # self.units = units_key[_units]
 
         return resp
 
@@ -572,7 +571,7 @@ class Channel:
         _excitation = resp[1]
 
         excitation_key = {'0': voltage_excitation_key,
-                            '1': current_excitation_key}
+                          '1': current_excitation_key}
 
         self.excitation = excitation_key[_mode][int(_excitation)]
 
@@ -594,7 +593,7 @@ class Channel:
         elif _mode == 'current':
             excitation_lock = current_excitation_lock
 
-        closest_value = min(excitation_lock, key=lambda x: abs(x-excitation_value))
+        closest_value = min(excitation_lock, key=lambda x: abs(x - excitation_value))
 
         resp = self._get_input_setup()
         resp[1] = str(excitation_lock[closest_value])
@@ -604,14 +603,14 @@ class Channel:
     def enable_autorange(self):
         """Enable auto range for channel via RDGRNG command."""
         resp = self._get_input_setup()
-        #order of resp args switch for range, autorange in LS370
-        resp[3] = '1'     
+        # order of resp args switch for range, autorange in LS370
+        resp[3] = '1'
 
-        #all LS370 channels respond to this command
-        for c in self.ls.channels: 
+        # all LS370 channels respond to this command
+        for c in self.ls.channels:
             c.autorange = autorange_key[resp[3]]
 
-        #TODO: move method to LS370 class, fix references in agent
+        # TODO: move method to LS370 class, fix references in agent
         return self._set_input_setup(resp)
 
     def disable_autorange(self):
@@ -619,11 +618,11 @@ class Channel:
         resp = self._get_input_setup()
         resp[3] = '0'
 
-        #all LS370 channels respond to this command
+        # all LS370 channels respond to this command
         for c in self.ls.channels:
             c.autorange = autorange_key[resp[3]]
-       
-        #TODO: move method to LS370 class, fix references in agent
+
+        # TODO: move method to LS370 class, fix references in agent
         return self._set_input_setup(resp)
 
     def set_resistance_range(self, resistance_range):
@@ -645,13 +644,13 @@ class Channel:
                       6.32, 20.0, 63.2, 200, 632, 2e3, 6.32e3, 20.0e3, 63.2e3,
                       200e3, 632e3, 2e6, 6.32e6, 20.0e6, 63.2e6]
 
-            return min(ranges, key=lambda x: abs(x-num))
+            return min(ranges, key=lambda x: abs(x - num))
 
         _range = get_closest_resistance_range(resistance_range)
 
         resp = self._get_input_setup()
 
-        #order of range, autorange switched in LS370
+        # order of range, autorange switched in LS370
         resp[2] = str(range_lock[_range])
         self.range = _range
         return self._set_input_setup(resp)
@@ -676,11 +675,11 @@ class Channel:
         resp = self._get_input_setup()
         resp[4] = '0'
 
-        #all LS370 channels respond to this command
+        # all LS370 channels respond to this command
         for c in self.ls.channels:
             c.csshunt = csshunt_key[resp[4]]
-        
-        #TODO: move method to LS370 class, fix references in agent
+
+        # TODO: move method to LS370 class, fix references in agent
         return self._set_input_setup(resp)
 
     def disable_excitation(self):
@@ -692,11 +691,11 @@ class Channel:
         resp = self._get_input_setup()
         resp[4] = '1'
 
-        #all LS370 channels respond to this command
+        # all LS370 channels respond to this command
         for c in self.ls.channels:
             c.csshunt = csshunt_key[resp[4]]
-        
-        #TODO: move method to LS370 class, fix references in agent
+
+        # TODO: move method to LS370 class, fix references in agent
         return self._set_input_setup(resp)
 
     def get_excitation_power(self):
@@ -991,6 +990,7 @@ class Channel:
 
 class Curve:
     """Calibration Curve class for the LS370."""
+
     def __init__(self, ls, curve_num):
         self.ls = ls
         self.curve_num = curve_num
@@ -1219,7 +1219,7 @@ class Curve:
         """Get a calibration curve from the LS370.
 
         If _file is not None, save to file location.
-        
+
         :param _file: the file to load the calibration curve from
         :type _file: str
         """
@@ -1241,8 +1241,8 @@ class Curve:
                 f.write('Serial Number:\t' + self.serial_number + '\r\n')
                 f.write('Data Format:\t' + format_lock[self.format] + f'\t({self.format})\r\n')
 
-                #TODO: shouldn't this be the curve_header limit?
-                #above is done ZA 20200405
+                # TODO: shouldn't this be the curve_header limit?
+                # above is done ZA 20200405
                 f.write('SetPoint Limit:\t%s\t(Kelvin)\r\n' % '%0.4f' % self.limit)
                 f.write('Temperature coefficient:\t' + tempco_lock[self.coefficient] + f' ({self.coefficient})\r\n')
                 f.write('Number of Breakpoints:\t%s\r\n' % len(self.breakpoints))
@@ -1250,7 +1250,7 @@ class Curve:
                 f.write('No.\tUnits\tTemperature (K)\r\n')
                 f.write('\r\n')
                 for idx, point in enumerate(self.breakpoints):
-                    f.write('%s\t%s %s\r\n' % (idx+1, '%0.4f' % point['units'], '%0.4f' % point['temperature']))
+                    f.write('%s\t%s %s\r\n' % (idx + 1, '%0.4f' % point['units'], '%0.4f' % point['temperature']))
 
         return self.breakpoints
 
@@ -1283,7 +1283,7 @@ class Curve:
         self._set_header(header[:-1])  # ignore num of breakpoints
 
         for point in values:
-            print("uploading %s"%point)
+            print("uploading %s" % point)
             self._set_data_point(point[0], point[1], point[2])
 
         # refresh curve attributes
@@ -1303,44 +1303,44 @@ class Curve:
         with open(_file) as f:
             content = f.readlines()
 
-        #skipping header info
+        # skipping header info
         values = []
         for i in range(9, len(content)):
-            values.append(content[i].strip().split()) #data points that should have been uploaded
-        
-        #TODO: shouldn't this be capped at len(values) + 1?
-        #above is done ZA 20200330
+            values.append(content[i].strip().split())  # data points that should have been uploaded
+
+        # TODO: shouldn't this be capped at len(values) + 1?
+        # above is done ZA 20200330
         for j in range(1, len(values) + 1):
             try:
-                resp = self.get_data_point(j) #response from the 370
-                point = values[j-1]
+                resp = self.get_data_point(j)  # response from the 370
+                point = values[j - 1]
                 units = float(resp[0])
                 temperature = float(resp[1])
-                assert units == float(point[1]), "Point number %s not uploaded"%point[0]
-                assert temperature == float(point[2]), "Point number %s not uploaded"%point[0]
-                print("Successfully uploaded %s, %s" %(units,temperature))
-            #if AssertionError, tell 370 to re-upload points
+                assert units == float(point[1]), "Point number %s not uploaded" % point[0]
+                assert temperature == float(point[2]), "Point number %s not uploaded" % point[0]
+                print("Successfully uploaded %s, %s" % (units, temperature))
+            # if AssertionError, tell 370 to re-upload points
 
-            #TODO: shouldn't this condition on either units or temperature, not just units?
-            #above is done ZA 20200330
+            # TODO: shouldn't this condition on either units or temperature, not just units?
+            # above is done ZA 20200330
             except AssertionError:
                 if units != float(point[1]) or temperature != float(point[2]):
-         
-                    #TODO: fix, could enter infinite loop if always fails 
+
+                    # TODO: fix, could enter infinite loop if always fails
                     self.set_curve(_file)
 
-        #check that remainining points are zeros
+        # check that remainining points are zeros
         for j in range(len(values) + 1, 201):
             try:
-                resp = self.get_data_point(j) #response from the 370
+                resp = self.get_data_point(j)  # response from the 370
                 units = float(resp[0])
                 temperature = float(resp[1])
-                assert units == 0, "Point number %s contains nonzero data"%j
-                assert temperature == 0, "Point number %s contains nonzero data"%j
+                assert units == 0, "Point number %s contains nonzero data" % j
+                assert temperature == 0, "Point number %s contains nonzero data" % j
             except AssertionError:
                 if units != 0 or temperature != 0:
 
-                    #TODO: fix, could enter infinite loop if always fails
+                    # TODO: fix, could enter infinite loop if always fails
                     self.set_curve(_file)
 
     def delete_curve(self):
@@ -1364,20 +1364,23 @@ class Curve:
 
         return string
 
-#TODO: make new Analog class. Too many firmware distictions to group both Heater and Analog outputs
-#into same class of objects
+# TODO: make new Analog class. Too many firmware distictions to group both Heater and Analog outputs
+# into same class of objects
+
+
 class Heater:
     """Heater class for LS370 control
 
     :param ls: the lakeshore object we're controlling
     :type ls: Lakeshore370.LS370
     """
+
     def __init__(self, ls):
         self.ls = ls
 
         self.mode = None
         self.input = None
-        #self.powerup = None in 370, powerup is always disabled
+        # self.powerup = None in 370, powerup is always disabled
         self.polarity = None
         self.filter = None
         self.delay = None
@@ -1385,9 +1388,9 @@ class Heater:
 
         self.range = None
 
-        self.resistance = None     #only for output = 0
-        #self.max_current = None   in 370, there is only htrrng limit and curve limit 
-        #self.max_user_current = None  not in 370
+        self.resistance = None  # only for output = 0
+        # self.max_current = None   in 370, there is only htrrng limit and curve limit
+        # self.max_user_current = None  not in 370
         self.rng_limit = None
         self.display = None
 
@@ -1398,7 +1401,7 @@ class Heater:
     def _get_output_mode(self):
         """Query the heater mode using the CMODE?, CPOL?, CSET? commands.
 
-        :returns: 6-tuple with output mode, polarity, input channel, 
+        :returns: 6-tuple with output mode, polarity, input channel,
             unfiltered/filtered, heater units (kelvin, ohms), and autoscanning delay time.
         :rtype: tuple
         """
@@ -1429,9 +1432,9 @@ class Heater:
 
         self.ls.msg(f'CMODE {params.pop(0)}')
         self.ls.msg(f'CPOL {params.pop(0)}')
-        
+
         reply = params + [heater_display_lock[self.display], heater_range_lock[self.rng_limit],
-                str(self.resistance)]
+                          str(self.resistance)]
 
         param_str = ','.join(reply)
         return self.ls.msg(f"CSET {param_str}")
@@ -1444,10 +1447,10 @@ class Heater:
         resp = self.ls.msg("CSET?").split(',')
 
         self.display = heater_display_key[resp[4]]
-        self.rng_limit = heater_range_key[resp[5]] 
+        self.rng_limit = heater_range_key[resp[5]]
         self.resistance = float(resp[6])
-        #self.max_current = int(resp[1])
-        #self.max_user_current = float(resp[2].strip('E+'))
+        # self.max_current = int(resp[1])
+        # self.max_user_current = float(resp[2].strip('E+'))
 
         return [self.display, self.rng_limit, self.resistance]
 
@@ -1515,7 +1518,7 @@ class Heater:
         :param _input: specifies which input or channel to control from
         :type _input: str or int
         """
-        #ZA fixed to range(1, 17) from range(17). deleted 'A'
+        # ZA fixed to range(1, 17) from range(17). deleted 'A'
         assert int(_input) in range(1, 17), f"{_input} not a valid input/channel"
 
         resp = self._get_output_mode()
@@ -1695,8 +1698,8 @@ class Heater:
         if str(_range).lower() == 'on':
             _range = "On"
 
-        resp = self.ls.msg(f"HTRRNG {heater_range_lock[_range]}").strip()
-        
+        self.ls.msg(f"HTRRNG {heater_range_lock[_range]}").strip()
+
         # refresh self.heater value with RANGE? query
         self.get_heater_range()
 
@@ -1706,7 +1709,7 @@ class Heater:
         :returns: heater range in amps
         :rtype: float
         """
-        resp = self.ls.msg(f"HTRRNG?").strip()
+        resp = self.ls.msg("HTRRNG?").strip()
 
         self.range = heater_range_key[resp]
 
@@ -1718,7 +1721,7 @@ class Heater:
 
     # SETP? - heater class, uses self.units to interpret value
     def get_setpoint(self):
-        resp = self.ls.msg(f"SETP?")
+        resp = self.ls.msg("SETP?")
         return resp
 
     # STILL - heater class?
@@ -1727,7 +1730,7 @@ class Heater:
 
     # STILL? - heater_class?
     def get_still_output(self):
-        resp = self.ls.msg(f"STILL?")
+        resp = self.ls.msg("STILL?")
         return resp
 
     # ANALOG, ANALOG?, AOUT?
@@ -1739,31 +1742,31 @@ class Heater:
         pass
 
     # PID
-    def set_pid(self, P, I, D):
+    def set_pid(self, p, i, d):
         """Set PID parameters for closed loop control.
 
-        :params P: proportional term in PID loop
-        :type P: float
-        :params I: integral term in PID loop
-        :type I: float
-        :params D: derivative term in PID loop
-        :type D: float
+        :params p: proportional term in PID loop
+        :type p: float
+        :params i: integral term in PID loop
+        :type i: float
+        :params d: derivative term in PID loop
+        :type d: float
 
         :returns: response from PID command
         :rtype: str
         """
-        assert float(P) <= 1000 and float(P) >= 0
-        assert float(I) <= 10000 and float(I) >= 0
-        assert float(D) <= 2500 and float(D) >= 0
+        assert float(p) <= 1000 and float(p) >= 0
+        assert float(i) <= 10000 and float(i) >= 0
+        assert float(d) <= 2500 and float(d) >= 0
 
-        resp = self.ls.msg(f"PID {P},{I},{D}")
+        resp = self.ls.msg(f"PID {p},{i},{d}")
         return resp
 
     # PID?
     def get_pid(self):
         """Get PID parameters with PID? command.
 
-        :returns: P, I, D
+        :returns: p, i, d
         :rtype: float, float, float
         """
         resp = self.ls.msg("PID?").split(',')

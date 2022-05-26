@@ -6,9 +6,9 @@
 Pfeiffer TC400
 ==============
 
-The Pfeiffer TC400 agent is an OCS Agent which controls the 
-Pfeiffer TC400 electronic drive unit, which control the turbos used 
-for the bluefors DR. The communcation is done over serial, and should be 
+The Pfeiffer TC400 agent is an OCS Agent which controls the
+Pfeiffer TC400 electronic drive unit, which control the turbos used
+for the bluefors DR. The communcation is done over serial, and should be
 integrated into OCS using a serial-to-ethernet converter.
 
 .. argparse::
@@ -39,9 +39,9 @@ Agent in a docker container.
 OCS Site Config
 ```````````````
 To configure the Pfeiffer TC400 Agent we need to add a PfeifferTC400Agent
-block to our ocs configuration file. The IP address and port 
-number are from the serial-to-ethernet converter. The turbo address is 
-visible on the power supply front panel. Here is an example configuration 
+block to our ocs configuration file. The IP address and port
+number are from the serial-to-ethernet converter. The turbo address is
+visible on the power supply front panel. Here is an example configuration
 block using all of the available arguments::
 
  {'agent-class': 'PfeifferTC400Agent',
@@ -83,11 +83,11 @@ example client shows all of this functionality::
 
     from ocs.ocs_client import OCSClient
     client = OCSClient("pfeifferturboA)
-    
+
     # Start data acq
     status, message, session = client.acq.start()
     print(session)
-    
+
     # Stop data acq
     client.acq.stop()
     client.acq.wait()
@@ -97,7 +97,7 @@ example client shows all of this functionality::
 
     # Stop the turbo
     client.turn_turbo_off()
-    
+
     # Acknowledge errors
     client.acknowledge_turbo_errors()
 
