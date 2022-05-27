@@ -73,9 +73,9 @@ class WiregridEncoderAgent:
 
                 >>> response.session['data']
                 {'fields': {
-                    'irig_data':{
-                        'last_updated':timestamp,
-                        'irig_time': computure unix time
+                    'irig_data': {
+                        'last_updated': timestamp,
+                        'irig_time': computer unix time
                                      in receiving the IRIG packet,
                         'rising_edge_count': PRU clock (BBB clock) count,
                         'edge_diff': Difference of PRU clock
@@ -86,9 +86,9 @@ class WiregridEncoderAgent:
                         'irig_day': IRIG Day,
                         'irig_year': IRIG Year
                         },
-                    'encoder_data':{
-                        'last_updated':timestamp,
-                        'quadrature' (list):  quadrature encoder signals,
+                    'encoder_data': {
+                        'last_updated': timestamp,
+                        'quadrature' (list): quadrature encoder signals,
                         'pru_clock' (list): PRU clock (Beaglebone clock) ,
                         'reference_degree' (list):
                             Encoder rotation position [deg.],
