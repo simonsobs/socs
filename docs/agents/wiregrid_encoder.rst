@@ -7,11 +7,11 @@ Wiregrid Encoder Agent
 =======================
 
 The Wiregrid Encoder Agent records the wire-grid encoder outputs
-related to the rotational angle of the wire-grid. 
-The encoder reader data is read by a BeagleBoneBlack 
+related to the rotational angle of the wire-grid.
+The encoder reader data is read by a BeagleBoneBlack
 on the grid-loader electronics plate.
-The BeagleBoneBlack sends the measured data to this agent 
-via ethernet UDP connection. 
+The BeagleBoneBlack sends the measured data to this agent
+via ethernet UDP connection.
 This agent parses the received data to a readable data and records it.
 
 .. argparse::
@@ -22,9 +22,9 @@ This agent parses the received data to a readable data and records it.
 Dependencies
 ------------
 
-This agent recieves the data from BeagleBoneBlack. 
-Therefore, a script reading the encoder data 
-should be running in the BeagleBoneBlack: 
+This agent recieves the data from BeagleBoneBlack.
+Therefore, a script reading the encoder data
+should be running in the BeagleBoneBlack:
 https://github.com/simonsobs/wire_grid_loader/tree/master/Encoder/Beaglebone.
 
 Configuration File Examples
@@ -65,8 +65,8 @@ An example docker-compose configuration::
 
 - Since the agent within the container needs to communicate with hardware on the
   host network you must use ``network_mode: "host"`` in your compose file.
-- ``/data/wg-data`` is a directory to store 
-  the information of the current angle of the wire-grid rotation, 
+- ``/data/wg-data`` is a directory to store
+  the information of the current angle of the wire-grid rotation,
   which is used in ``Wiregrid Kikusui Agent`` for feedback control of the rotation.
 - ``ports`` is defined to receive the data from BeagleBoneBlack via UDP connection.
 

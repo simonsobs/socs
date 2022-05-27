@@ -103,7 +103,7 @@ class EncoderParser:
                     if not self.check_data_length(0, 4):
                         self.log.error(
                             'Header data length error in grab_and_parse_data()'
-                            )
+                        )
                         break
 
                     header = self.data[0:4]
@@ -162,19 +162,19 @@ class EncoderParser:
 
     def parse_counter_info(self, data):
         derter = np.array(
-                    struct.unpack('<' + 'LLLLL' * COUNTER_INFO_LENGTH, data))
+            struct.unpack('<' + 'LLLLL' * COUNTER_INFO_LENGTH, data))
 
         self.encoder_queue.append(
             (derter[0:COUNTER_INFO_LENGTH],
-             derter[COUNTER_INFO_LENGTH:2*COUNTER_INFO_LENGTH]
-             + (derter[2*COUNTER_INFO_LENGTH:3*COUNTER_INFO_LENGTH] << 32),
-             derter[3*COUNTER_INFO_LENGTH:4*COUNTER_INFO_LENGTH],
-             derter[4*COUNTER_INFO_LENGTH:5*COUNTER_INFO_LENGTH],
+             derter[COUNTER_INFO_LENGTH:2 * COUNTER_INFO_LENGTH]
+             + (derter[2 * COUNTER_INFO_LENGTH:3 * COUNTER_INFO_LENGTH] << 32),
+             derter[3 * COUNTER_INFO_LENGTH:4 * COUNTER_INFO_LENGTH],
+             derter[4 * COUNTER_INFO_LENGTH:5 * COUNTER_INFO_LENGTH],
              time.time()))
 
     def parse_irig_info(self, data):
 
-        unpacked_data = struct.unpack('<' + 'LL' + 'LLL'*10, data)
+        unpacked_data = struct.unpack('<' + 'LL' + 'LLL' * 10, data)
         rising_edge_time = unpacked_data[0] + (unpacked_data[1] << 32)
         irig_info = unpacked_data[2:12]
         irig_time = self.pretty_print_irig_info(irig_info, rising_edge_time)
@@ -232,15 +232,15 @@ class EncoderParser:
 
     def de_irig(self, val, base_shift=0):
         return (
-                ((val >> (0+base_shift)) & 1)
-                + ((val >> (1+base_shift)) & 1) * 2
-                + ((val >> (2+base_shift)) & 1) * 4
-                + ((val >> (3+base_shift)) & 1) * 8
-                + ((val >> (5+base_shift)) & 1) * 10
-                + ((val >> (6+base_shift)) & 1) * 20
-                + ((val >> (7+base_shift)) & 1) * 40
-                + ((val >> (8+base_shift)) & 1) * 80
-                )
+            ((val >> (0 + base_shift)) & 1)
+            + ((val >> (1 + base_shift)) & 1) * 2
+            + ((val >> (2 + base_shift)) & 1) * 4
+            + ((val >> (3 + base_shift)) & 1) * 8
+            + ((val >> (5 + base_shift)) & 1) * 10
+            + ((val >> (6 + base_shift)) & 1) * 20
+            + ((val >> (7 + base_shift)) & 1) * 40
+            + ((val >> (8 + base_shift)) & 1) * 80
+        )
 
     def __del__(self):
         self.sock.close()

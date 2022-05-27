@@ -127,26 +127,26 @@ class WiregridEncoderAgent:
             irig_rdata = {'timestamp': 0,
                           'block_name': 'wgencoder_irig',
                           'data': {
-                              'irig_time':0, 
-                              'rising_edge_count':0, 
-                              'edge_diff':0,
-                              'irig_sec':0,
-                              'irig_min':0,
-                              'irig_hour':0,
-                              'irig_day':0,
-                              'irig_year':0,
-                              }
+                              'irig_time': 0,
+                              'rising_edge_count': 0,
+                              'edge_diff': 0,
+                              'irig_sec': 0,
+                              'irig_min': 0,
+                              'irig_hour': 0,
+                              'irig_day': 0,
+                              'irig_year': 0,
+                          }
                           }
             irig_last_updated = 0
             irig_fdata = {'timestamps': [],
                           'block_name': 'wgencoder_irig_raw',
                           'data': {
-                              'quadrature':[],
-                              'pru_clock':[],
-                              'reference_degree':[],
-                              'error':[]
-                              }
-                          }
+                              'quadrature': [],
+                              'pru_clock': [],
+                              'reference_degree': [],
+                              'error': []
+            }
+            }
             enc_rdata = {
                 'timestamps': [],
                 'block_name': 'wgencoder_rough',
@@ -240,7 +240,7 @@ class WiregridEncoderAgent:
                     received_time_list.append(encoder_data[4])
 
                     dclock.append(
-                        (encoder_data[1][-1] - encoder_data[1][0])*5e-9)
+                        (encoder_data[1][-1] - encoder_data[1][0]) * 5e-9)
                     if (dclock[-1] > 0.)\
                        and (ref_count[-COUNTER_INFO_LENGTH] > ref_count[-1]):
                         dcount.append(
@@ -254,7 +254,7 @@ class WiregridEncoderAgent:
                              - ref_count[-COUNTER_INFO_LENGTH])
                             / COUNTS_ON_BELT)
 
-                    rot_speed.append(dcount[-1]/dclock[-1])
+                    rot_speed.append(dcount[-1] / dclock[-1])
 
                     if len(pru_clock) > NUM_ENCODER_TO_PUBLISH \
                         or (len(pru_clock)
@@ -309,7 +309,7 @@ class WiregridEncoderAgent:
                     'irig_hour': irig_rdata['data']['irig_hour'],
                     'irig_day': irig_rdata['data']['irig_day'],
                     'irig_year': irig_rdata['data']['irig_year']
-                    }
+                }
                 enc_field_dict = {
                     'last_updated': enc_last_updated,
                     'quadrature': enc_rdata['data']['quadrature'],
@@ -317,7 +317,7 @@ class WiregridEncoderAgent:
                     'reference_degree':
                         enc_rdata['data']['reference_degree'],
                     'error': enc_rdata['data']['error']
-                    }
+                }
                 session.data['timestamp'] = current_time
                 session.data['fields']['irig_data'] = irig_field_dict
                 session.data['fields']['enc_data'] = enc_field_dict
