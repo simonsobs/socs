@@ -2,6 +2,7 @@
 import os
 import requests
 import argparse
+import time
 
 on_rtd = os.environ.get('READTHEDOCS') == 'True'
 if not on_rtd:
@@ -25,13 +26,21 @@ class SynaccessAgent:
         self.user = username
         self.passw = password
 
+        agg_params = {'frame_length': 60}
+        self.agent.register_feed(
+            'synaccess', record=True, agg_params=agg_params)
+
+    def __get_status(self):
+        req = "http://" + self.user + ":" + self.passw + "@" +\
+            self.ip_address + "/cmd.cgi?$A5"
+        r = requests.get(req)
+        resp = str(r.content)[6:11][::-1]
+        return resp
+
     def get_status(self, session, params=None):
-        with self.lock.acquire_timeout(1) as acquired:
+        with self.lock.acquire_timeout(3, job='get_status') as acquired:
             if acquired:
-                req = "http://" + self.user + ":" + self.passw + "@" +\
-                    self.ip_address + "/cmd.cgi?$A5"
-                r = requests.get(req)
-                resp = str(r.content)[6:11][::-1]
+                resp = self.__get_status()
                 ret_str = []
                 for x in resp:
                     if x == '1':
@@ -43,7 +52,7 @@ class SynaccessAgent:
                 return False, "Could not acquire lock"
 
     def reboot(self, session, params=None):
-        with self.lock.acquire_timeout(1) as acquired:
+        with self.lock.acquire_timeout(3, job='reboot') as acquired:
             if acquired:
                 req = "http://" + self.user + ":" + \
                     self.passw + "@" + self.ip_address + \
@@ -61,7 +70,7 @@ class SynaccessAgent:
             outlet (int): the outlet that we are changing the state of
             on (bool): the new state
         """
-        with self.lock.acquire_timeout(1) as acquired:
+        with self.lock.acquire_timeout(3, job='set_outlet') as acquired:
             if acquired:
                 if params['on']:
                     on = "1"
@@ -85,7 +94,7 @@ class SynaccessAgent:
             on (bool): the new state
 
         """
-        with self.lock.acquire_timeout(1) as acquired:
+        with self.lock.acquire_timeout(3, job='set_all') as acquired:
             if acquired:
                 on = "0"
                 if params['on']:
@@ -96,6 +105,83 @@ class SynaccessAgent:
                 return True, 'Set all outlets to {}'.format(params['on'])
             else:
                 return False, "Could not acquire lock"
+
+    def status_acq(self, session, params=None):
+        """status_acq()
+
+        **Process** - Method to start data acquisition process.
+
+        Notes:
+            The most recent data collected is stored in session.data in the
+            structure::
+
+                >>> response.session['data']
+                {"fields":
+                    {synaccess:
+                        {0: 0 or 1, (0: OFF, 1:ON)
+                         1: 0 or 1, (0: OFF, 1:ON)
+                         2: 0 or 1, (0: OFF, 1:ON)
+                         3: 0 or 1, (0: OFF, 1:ON)
+                         4: 0 or 1, (0: OFF, 1:ON)
+                        }
+                    }
+                }
+
+        """
+
+        with self.lock.acquire_timeout(timeout=0, job='status_acq')\
+                as acquired:
+            if not acquired:
+                self.log.warn(
+                    'Could not start status acq because {} is already running'
+                    .format(self.lock.job))
+                return False, 'Could not acquire lock'
+
+            session.set_status('running')
+
+            self.take_data = True
+            last_release = time.time()
+            session.data = {'fields': {}}
+            while self.take_data:
+                if time.time() - last_release > 1.:
+                    last_release = time.time()
+                    if not self.lock.release_and_acquire(timeout=10):
+                        self.log.warn(
+                            'Could not re-acquire lock now held by {}.'
+                            .format(self.lock.job))
+                        return False, 'Could not re-acquire lock (timeout)'
+
+                current_time = time.time()
+                data = {'timestamp': current_time,
+                        'block_name': 'synaccess_status',
+                        'data': {}}
+
+                status_dict = {}
+                resp = self.__get_status()
+                for i, x in enumerate(resp):
+                    if x == '1':
+                        status = 1
+                    else:
+                        status = 0
+                    data['data']['synaccess_%d' % i] = status
+                    status_dict['%d' % i] = status
+                self.agent.publish_to_feed('synaccess', data)
+                field_dict = {'synaccess': status_dict}
+                session.data['timestamp'] = current_time
+                session.data['fields'] = field_dict
+
+                time.sleep(1)  # DAQ interval
+                # End of while loop
+
+        self.agent.feeds['synaccess'].flush_buffer()
+        return True, 'Acqusition exited cleanly'
+
+    def stop_status_acq(self, session, params=None):
+        if self.take_data:
+            self.take_data = False
+            return True, 'requested to stop taking data'
+
+        return False, 'acq is not currently running'
 
 
 def make_parser(parser=None):
@@ -124,6 +210,8 @@ if __name__ == '__main__':
                        ip_address=args.ip_address,
                        username=args.username,
                        password=args.password)
+    agent.register_process('status_acq', p.status_acq,
+                           p.stop_status_acq, startup=True)
     agent.register_task('get_status', p.get_status, startup={})
     agent.register_task('reboot', p.reboot)
     agent.register_task('set_outlet', p.set_outlet)

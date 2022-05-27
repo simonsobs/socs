@@ -210,6 +210,24 @@ services:
       - "socs"
 
   # --------------------------------------------------------------------------
+  # Wiregrid KIKUSUI power supply agent
+  # --------------------------------------------------------------------------
+  ocs-wgkikusui-agent:
+    image: "ocs-wgkikusui-agent"
+    build: ./agents/wiregrid_kikusui/
+    depends_on:
+      - "socs"
+
+  # --------------------------------------------------------------------------
+  # Wiregrid actuator agent
+  # --------------------------------------------------------------------------
+  ocs-wgactuator-agent:
+    image: "ocs-wgactuator-agent"
+    build: ./agents/wiregrid_actuator/
+    depends_on:
+      - "socs"
+
+  # --------------------------------------------------------------------------
   # SOCS Simulators
   # --------------------------------------------------------------------------
 
