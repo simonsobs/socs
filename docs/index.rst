@@ -62,7 +62,9 @@ API Reference        Full API documentation for core parts of the SOCS library.
     agents/synacc
     agents/tektronix3021c
     agents/vantage_pro2
+    agents/wiregrid_actuator
     agents/wiregrid_encoder
+    agents/wiregrid_kikusui
 
 .. toctree::
     :caption: Simulator Reference
