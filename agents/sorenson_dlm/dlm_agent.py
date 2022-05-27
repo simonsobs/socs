@@ -43,20 +43,20 @@ class DLM:
         ovp = self.rec_msg()
         if ovp != voltage:
             print("Error: Over voltage protection not set to requested value")
-            return
+            return False
 
         self.send_msg('STAT:PROT:ENABLE 8')
         self.send_msg('STAT:PROT:ENABLE?')
         enb = self.rec_msg()
         if enb != '8':
             print('Error: Over voltage protection failed to enable')
-            return
+            return False
 
         self.send_msg('STAT:PROT:EVENT?')
         event = self.rec_msg()
         if event != '0':
             print('Error: Over voltage already tripped')
-            return
+            return False
 
     def read_voltage(self):
         """
@@ -169,7 +169,7 @@ class DLMAgent:
                 data['data']["current"] = float(current_reading)
 
                 self.agent.publish_to_feed('voltages', data)
-                time.sleep(wait_time)
+                pm.sleep()
 
             self.agent.feeds['voltages'].flush_buffer()
         return True, 'Acquistion exited cleanly'
@@ -255,6 +255,49 @@ class DLMAgent:
 
         return True, 'Set current to {}'.format(params['current'])
 
+    @ocs_agent.param('auto_acquire', default=False, type=bool)
+    @ocs_agent.param('acq_params', type=dict, default=None)
+    @ocs_agent.param('force', default=False, type=bool)
+    def init_dlm(self, session, params=None):
+        """init_dlm(auto_acquire=False, acq_params=None, force=False)
+        **Task** - Perform first time setup of the Sorenson DLM communication.
+
+        Parameters:
+            auto_acquire (bool, optional): Default is False. Starts data
+                acquisition after initialization if True.
+            acq_params (dict, optional): Params to pass to acq process if
+                auto_acquire is True.
+            force (bool, optional): Force initialization, even if already
+                initialized. Defaults to False.
+        """
+        if params is None:
+            params = {}
+
+        if self.initialized and not params.get('force', False):
+            self.log.info("DLM already initialized Returning...")
+            return True, "Already initialized"
+
+        
+        with self._lock.acquire_timeout(job='init') as acquired1, \
+                self._acq_proc_lock.acquire_timeout(timeout=0., job='init') \
+                as acquired2:
+            if not acquired1:
+                self.log.warn(f"Could not start init because "
+                              f"{self._lock.job} is already running")
+                return False, "Could not acquire lock"
+            if not acquired2:
+                self.log.warn(f"Could not start init because "
+                              f"{self._acq_proc_lock.job} is already running")
+                return False, "Could not acquire lock"
+        session.set_status('running')
+
+        
+        # Start data acquisition if requested
+        if params.get('auto_acquire', False):
+            self.agent.start('acq', params.get('acq_params', None))
+
+        return True, 'DLM module initialized.'
+
     def _stop_acq(self, session, params=None):
         """
         End voltage data acquisition
@@ -276,25 +319,17 @@ def make_parser(parser=None):
     pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--ip-address', type=str, help="Serial-to-ethernet "
                         + "converter ip address")
-    pgroup.add_argument('--port-number', type=int, help="Serial-to-ethernet "
+    pgroup.add_argument('--port', type=int, help="Serial-to-ethernet "
                         + "converter port")
-    pgroup.add_argument('--mode', type=str, help="Set to acq to run acq on "
-                        + "startup")
 
     return parser
 
 
 if __name__ == '__main__':
-    parser = site_config.add_arguments()
+    parser = make_parser()
+    args = site_config.parse_args(agent_class='DLMAgent',
+                                  parser=parser)  
 
-    pgroup = parser.add_argument_group('Agent Options')
-    pgroup.add_argument('--ip_address')
-    pgroup.add_argument('--port')
-    pgroup.add_argument('--voltage')
-
-    args = parser.parse_args()
-
-    site_config.reparse_args(args, 'DLMAgent')
     agent, runner = ocs_agent.init_site_agent(args)
     DLM_agent = DLMAgent(agent, args.ip_address, args.port)
     agent.register_process('acq', DLM_agent.acq,
@@ -302,4 +337,5 @@ if __name__ == '__main__':
     agent.register_task('set_voltage', DLM_agent.set_voltage)
     agent.register_task('close', DLM_agent._stop_acq)
     agent.register_task('set_over_volt', DLM_agent.set_over_volt)
+    agent.register_task('init_dlm', DLM_agent.init_dlm)
     runner.run(agent, auto_reconnect=True)
