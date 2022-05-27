@@ -277,7 +277,6 @@ class DLMAgent:
             self.log.info("DLM already initialized Returning...")
             return True, "Already initialized"
 
-        
         with self._lock.acquire_timeout(job='init') as acquired1, \
                 self._acq_proc_lock.acquire_timeout(timeout=0., job='init') \
                 as acquired2:
@@ -291,7 +290,6 @@ class DLMAgent:
                 return False, "Could not acquire lock"
         session.set_status('running')
 
-        
         # Start data acquisition if requested
         if params.get('auto_acquire', False):
             self.agent.start('acq', params.get('acq_params', None))
@@ -328,7 +326,7 @@ def make_parser(parser=None):
 if __name__ == '__main__':
     parser = make_parser()
     args = site_config.parse_args(agent_class='DLMAgent',
-                                  parser=parser)  
+                                  parser=parser)
 
     agent, runner = ocs_agent.init_site_agent(args)
     DLM_agent = DLMAgent(agent, args.ip_address, args.port)
