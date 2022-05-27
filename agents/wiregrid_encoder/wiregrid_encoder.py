@@ -323,12 +323,6 @@ class WiregridEncoderAgent:
                 session.data['timestamp'] = current_time
                 session.data['fields']['irig_data'] = irig_field_dict
                 session.data['fields']['enc_data'] = enc_field_dict
-
-                ''' Should be removed
-                with open('/data/wg-data/position.log', 'w') as f:
-                    f.write(str(shared_time)+' '+str(shared_position)+'\n')
-                    f.flush()
-                '''
                 # End of loop
             # End of lock acquiring
 
