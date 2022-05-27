@@ -10,7 +10,7 @@ services:
   # --------------------------------------------------------------------------
   # SOCS Agents
   # --------------------------------------------------------------------------
-  
+
   # --------------------------------------------------------------------------
   # The Lakeshore 372 Agent
   # --------------------------------------------------------------------------
@@ -71,29 +71,11 @@ services:
       - "socs"
 
   # --------------------------------------------------------------------------
-  # The Pysmurf Archiver Agent
-  # --------------------------------------------------------------------------
-  ocs-pysmurf-archiver-agent:
-    image: "ocs-pysmurf-archiver-agent"
-    build: ./agents/pysmurf_archiver/
-    depends_on:
-      - "socs"
-
-  # --------------------------------------------------------------------------
   # Smurf stream simulator agent
   # --------------------------------------------------------------------------
   ocs-smurf-stream-sim-agent:
     image: "ocs-smurf-stream-sim"
     build: ./agents/smurf_stream_simulator/
-    depends_on:
-      - "socs"
-
-  # --------------------------------------------------------------------------
-  # SMuRF timestream aggregator
-  # --------------------------------------------------------------------------
-  ocs-smurf-recorder:
-    image: "ocs-smurf-recorder"
-    build: ./agents/smurf_recorder/
     depends_on:
       - "socs"
 
@@ -132,7 +114,7 @@ services:
     build: ./agents/labjack/
     depends_on:
       - "socs"
-    
+
   # --------------------------------------------------------------------------
   # Pfeiffer tpg366 agent
   # --------------------------------------------------------------------------
@@ -141,7 +123,7 @@ services:
     build: ./agents/pfeiffer_tpg366/
     depends_on:
       - "socs"
-    
+
   # --------------------------------------------------------------------------
   # Synaccess power strip agent
   # --------------------------------------------------------------------------
@@ -177,7 +159,7 @@ services:
     build: ./agents/tektronix3021c/
     depends_on:
       - "socs"
-    
+
   # --------------------------------------------------------------------------
   # Pfeiffer Turbo Controller
   # --------------------------------------------------------------------------
@@ -193,6 +175,15 @@ services:
   ocs-hwpbbb-agent:
     image: "ocs-hwpbbb-agent"
     build: ./agents/chwp/
+    depends_on:
+      - "socs"
+
+  # --------------------------------------------------------------------------
+  # HWP Rotation Agent
+  # --------------------------------------------------------------------------
+  ocs-hwp-rotation-agent:
+    image: "ocs-hwp-rotation-agent"
+    build: ./agents/hwp_rotation/
     depends_on:
       - "socs"
 

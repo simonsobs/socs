@@ -16,7 +16,7 @@ class Lakeshore240_Simulator:
         self.modname = "SIM_MODULE"
 
         self.num_channels = num_channels
-        self.channels = [ChannelSim(i+1, "Channel {}".format(i+1))
+        self.channels = [ChannelSim(i + 1, "Channel {}".format(i + 1))
                          for i in range(self.num_channels)]
 
         self.cmds = {
@@ -70,21 +70,21 @@ class Lakeshore240_Simulator:
             self.log.warning(f"chan num must be between 1 and {self.num_channels}")
             return
 
-        return self.channels[int(chan)-1].name
+        return self.channels[int(chan) - 1].name
 
     def set_channel_name(self, chan, name):
         if not 0 < int(chan) <= self.num_channels:
             self.log.warning(f"chan num must be between 1 and {self.num_channels}")
             return
 
-        self.channels[int(chan)-1].name = name
+        self.channels[int(chan) - 1].name = name
 
     def run(self):
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         # Checks self.port plus the next ten to see if they're open
-        for p in range(self.port, self.port+10):
+        for p in range(self.port, self.port + 10):
             try:
                 self.log.info(f"Trying to listen on port {p}")
                 sock.bind(('', p))
@@ -187,27 +187,27 @@ class ChannelSim:
         ])
 
     def set_intype(self, sensor_type, autorange, rng, current_reversal, units, enabled):
-        if sensor_type in [1,2,3]:
+        if sensor_type in [1, 2, 3]:
             self.log.debug(f"Setting sensor type to {sensor_type}")
             self.sensor_type = sensor_type
 
-        if autorange in [0,1]:
+        if autorange in [0, 1]:
             self.autorange = autorange
 
-        if (self.sensor_type in [1,2] and rng in [0]) or \
-            (self.sensor_type == 3 and rng in range(9)):
+        if (self.sensor_type in [1, 2] and rng in [0]) or \
+                (self.sensor_type == 3 and rng in range(9)):
             self.range = rng
 
-        if self.sensor_type in [2,3] and current_reversal in [0,1]:
+        if self.sensor_type in [2, 3] and current_reversal in [0, 1]:
             self.log.debug(f"Setting chan {self.channel_num} "
                            f"current_reversal to {current_reversal}")
             self.current_reversal = current_reversal
 
-        if units in [1,2,3,4]:
+        if units in [1, 2, 3, 4]:
             self.log.debug(f"Setting chan {self.channel_num} units to {units}")
             self.units = units
 
-        if enabled in [0,1]:
+        if enabled in [0, 1]:
             self.log.debug(f"Setting chan {self.channel_num} enabled to {enabled}")
             self.enabled = enabled
 

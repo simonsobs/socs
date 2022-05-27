@@ -16,7 +16,7 @@ hosts:
                      ['--ip-address', '127.0.0.1'],
                      ['--dwell-time-delay', 0],
                      ['--sample-heater', False],
-                     ['--mode', 'init']]},
+                     ['--mode', 'idle']]},
       {'agent-class': 'Lakeshore425Agent',
       'instance-id': 'LS425',
       'arguments': [
@@ -36,5 +36,15 @@ hosts:
        'arguments': [['--ip-address', '127.0.0.1'],
                        ['--port-number', '9001'],
                        ['--turbo-address', '1']]},
+      {'agent-class': 'RotationAgent',
+       'instance-id': 'rotator',
+       'arguments': [['--kikusui-ip', '127.0.0.1'],
+                     ['--kikusui-port', '2000'],
+                     ['--pid-ip', '127.0.0.1'],
+                     ['--pid-port', '2001'],
+                     ['-v'],
+                     ['--mode', 'init'],
+                    ]
+      },
     ]
   }

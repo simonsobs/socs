@@ -1,9 +1,8 @@
 import time
 import serial
 import sys
-import os
 
-from . import moxaSerial as mx
+from socs.agent import moxaSerial as mx
 
 
 class PMX:
@@ -18,6 +17,9 @@ class PMX:
 
     def __init__(self, rtu_port=None, tcp_ip=None, tcp_port=None, timeout=None):
         # Connect to device
+        self.using_tcp = None
+        self._rtu_port = None
+        self.ser = None
         msg = self.__conn(rtu_port, tcp_ip, tcp_port, timeout)
         print(msg)
         self._remote_Mode()
@@ -30,18 +32,18 @@ class PMX:
             print(
                 "Disconnecting from RTU port %s"
                 % (self._rtu_port))
-            self.ser.close()
+            if self.ser:
+                self.ser.close()
         else:
             print(
                 "Disconnecting from TCP IP %s at port %d"
                 % (self._tcp_ip, self._tcp_port))
-            pass
         return
 
     def check_voltage(self):
         """Check the voltage."""
         self.clean_serial()
-        bts = self.ser.write("MEAS:VOLT?\n\r")
+        self.ser.write("MEAS:VOLT?\n\r")
         self.wait()
         val = float(self.ser.readline())
         msg = "Measured voltage = %.3f V" % (val)
@@ -63,10 +65,10 @@ class PMX:
         self.clean_serial()
         voltage = self.check_voltage()[1]
         current = self.check_current()[1]
-        msg = (
-            "Measured voltage = %.3f V\n"
-            "Measured current = %.3f A\n"
-            % (voltage, current))
+        # msg = (
+        #     "Measured voltage = %.3f V\n"
+        #     "Measured current = %.3f A\n"
+        #     % (voltage, current))
         # print(msg)
         return voltage, current
 
@@ -94,7 +96,7 @@ class PMX:
         self.wait()
         val = self.ser.readline()
         msg = "Voltage set = %.3f V" % (float(val))
-        if (silent != True):
+        if silent is not True:
             print(msg)
 
         return msg
@@ -108,7 +110,7 @@ class PMX:
         self.wait()
         val = self.ser.readline()
         msg = "Current set = %.3f A\n" % (float(val))
-        if (silent != True):
+        if silent is not True:
             print(msg)
 
         return msg
@@ -148,7 +150,7 @@ class PMX:
         self.wait()
         val = self.ser.readline()
         msg = "Voltage limit set = %.3f V" % (float(val))
-        if (silent != True):
+        if silent is not True:
             print(msg)
 
         return msg
@@ -162,7 +164,7 @@ class PMX:
         self.wait()
         val = self.ser.readline()
         msg = "Current limit set = %.3f A\n" % (float(val))
-        if (silent != True):
+        if silent is not True:
             print(msg)
 
         return msg
@@ -207,8 +209,8 @@ class PMX:
             raise Exception(
                 "Aborted PMX._conn() due to no RTU or "
                 "TCP port specified")
-        elif (rtu_port is not None and
-              (tcp_ip is not None or tcp_port is not None)):
+        elif (rtu_port is not None
+              and (tcp_ip is not None or tcp_port is not None)):
             raise Exception(
                 "Aborted PMX._conn() due to RTU and TCP port both being "
                 "specified. Can only have one or the other.")
@@ -327,7 +329,7 @@ class Command:
         """Take user input and execute PMX command."""
         argv = arg.split()
         # if len(args) > 0:
-        #value = float(args[0])
+        # value = float(args[0])
 
         while len(argv):
             cmd = str(argv.pop(0)).upper()
@@ -356,10 +358,10 @@ class Command:
 
             # elif cmd == self._cmds["set_v"]:
                 # print(value)
-                #ret = self._PMX.set_voltage(value)
+                # ret = self._PMX.set_voltage(value)
 
             # elif cmd == self._cmds["set_c"]:
-                #ret = self._PMX.set_current(value)
+                # ret = self._PMX.set_current(value)
 
             elif cmd == self._cmds["use_ext"]:
                 return self._PMX.use_external_voltage()

@@ -2,14 +2,101 @@ import time
 import os
 import argparse
 import txaio
+import numpy as np
 
 from ocs import ocs_agent, site_config
+import yaml
+
+import so3g
+from spt3g import core
+
+
+def get_smurf_status():
+    """Loads a sample status dict from file"""
+    status_file = os.path.join(os.path.split(__file__)[0], 'status_sample.yaml')
+    with open(status_file, 'r') as f:
+        return yaml.safe_load(f)
+
+
+SOSTREAM_VERSION = 2
+NBIASLINES = 16
+
+
+class G3FrameGenerator:
+    """
+    Helper class for generating G3 Streams.
+    """
+
+    def __init__(self, stream_id, sample_rate, nchans):
+        self.frame_num = 0
+        self.session_id = int(time.time())
+        self.nchans = nchans
+        self.sample_rate = sample_rate
+        self.stream_id = stream_id
+
+    def tag_frame(self, fr):
+        fr['frame_num'] = self.frame_num
+        fr['session_id'] = self.session_id
+        fr['sostream_id'] = self.stream_id
+        fr['sostream_version'] = SOSTREAM_VERSION
+        fr['time'] = core.G3Time(time.time() * core.G3Units.s)
+        self.frame_num += 1
+        return fr
+
+    def get_obs_frame(self):
+        fr = core.G3Frame(core.G3FrameType.Observation)
+        self.tag_frame(fr)
+        return fr
+
+    def get_status_frame(self):
+        fr = core.G3Frame(core.G3FrameType.Wiring)
+        fr['status'] = yaml.dump(get_smurf_status())
+        self.tag_frame(fr)
+        return fr
+
+    def get_data_frame(self, start, stop):
+
+        times = np.arange(start, stop, 1. / self.sample_rate)
+        nsamps = len(times)
+        chans = np.arange(self.nchans)
+        names = [f'r{ch:0>4}' for ch in chans]
+
+        count_per_phi0 = 2**16
+        data = np.zeros((self.nchans, nsamps), dtype=np.int32)
+        data += count_per_phi0 * chans[:, None]
+        data += (count_per_phi0 * 0.2 * np.sin(2 * np.pi * 8 * times)).astype(int)
+        data += (count_per_phi0 * np.random.normal(0, 0.03, (self.nchans, nsamps))).astype(int)
+
+        fr = core.G3Frame(core.G3FrameType.Scan)
+
+        g3times = core.G3VectorTime(times * core.G3Units.s)
+        fr['data'] = so3g.G3SuperTimestream(names, g3times, data)
+
+        primary_names = [
+            'UnixTime', 'FluxRampIncrement', 'FluxRampOffset', 'Counter0',
+            'Counter1', 'Counter2', 'AveragingResetBits', 'FrameCounter',
+            'TESRelaySetting'
+        ]
+        primary_data = np.zeros((len(primary_names), nsamps), dtype=np.int64)
+        primary_data[0, :] = (times * 1e9).astype(int)
+        fr['primary'] = so3g.G3SuperTimestream(primary_names, g3times, primary_data)
+
+        tes_bias_names = [f'bias{bg:0>2}' for bg in range(NBIASLINES)]
+        bias_data = np.zeros((NBIASLINES, nsamps), dtype=np.int32)
+        fr['tes_biases'] = so3g.G3SuperTimestream(tes_bias_names, g3times, bias_data)
+
+        fr['timing_paradigm'] = 'Low Precision'
+        fr['num_samples'] = nsamps
+
+        self.tag_frame(fr)
+        return fr
 
 
 class SmurfFileEmulator:
     """
     OCS Agent for emulating file creation for the smurf system.
     """
+
     def __init__(self, agent, args):
         self.log = agent.log
         self.file_duration = args.file_duration
@@ -20,31 +107,21 @@ class SmurfFileEmulator:
 
         self.smurfdir = os.path.join(self.basedir, 'smurf')
         self.timestreamdir = os.path.join(self.basedir, 'timestreams')
+        self.nchans = args.nchans
+        self.sample_rate = args.sample_rate
+        self.frame_len = args.frame_len
 
         self.streaming = False
 
-    def _write_g3_file(self, session_id=None, seq=0, start=None, stop=None):
+    def _get_g3_filename(self, session_id, seq, makedirs=True):
         """
-        Writes fake G3 timestream file.
+        Returns the file path for a g3-file with specified session id and seq
+        idx.
         """
-        if session_id is None:
-            session_id = int(time.time())
-        if start is None:
-            start = time.time()
-        if stop is None:
-            stop = time.time()
-
         timecode = f"{session_id}"[:5]
         subdir = os.path.join(self.timestreamdir, timecode, self.stream_id)
-        os.makedirs(subdir, exist_ok=True)
         filepath = os.path.join(subdir, f"{session_id}_{seq:0>3}.g3")
-        self.log.info(f"Writing file {filepath}")
-        with open(filepath, 'w') as f:
-            f.write(f'start: {start}\n')
-            f.write(f"stop: {stop}\n")
         return filepath
-
-
 
     def _write_smurf_file(self, name, action, action_time=None,
                           prepend_ctime=True, is_plot=False):
@@ -92,7 +169,8 @@ class SmurfFileEmulator:
             f.write(f'start: {time.time()}\n')
         return filepath
 
-    def tune_dets(self, session, params=None):
+    @ocs_agent.param('test_mode', type=bool, default=False)
+    def tune_dets(self, session, params):
         """tune_dets()
 
         **Task** - Emulates files that might come from a general tune dets
@@ -103,6 +181,12 @@ class SmurfFileEmulator:
              2. setup_notches
              3. tracking_setup
              4. short g3 stream
+
+        Args
+        ----
+        test_mode : bool
+            If True, will skip any wait times associated with writing
+            g3 files.
         """
         # Find Freq
         action_time = time.time()
@@ -125,7 +209,26 @@ class SmurfFileEmulator:
         self._write_smurf_file(fname, 'tracking_setup', prepend_ctime=False)
 
         # Short g3 stream
-        self._write_g3_file()
+        frame_gen = G3FrameGenerator(
+            self.stream_id, self.sample_rate, self.nchans
+        )
+        fname = self._get_g3_filename(frame_gen.session_id, 0, makedirs=True)
+        os.makedirs(os.path.dirname(fname), exist_ok=True)
+        session.data['noise_file'] = fname
+        writer = core.G3Writer(fname)
+        writer(frame_gen.get_obs_frame())
+        writer(frame_gen.get_status_frame())
+        start = time.time()
+        stop = start + 30
+        frame_starts = np.arange(start, stop, self.frame_len)
+        frame_stops = frame_starts + self.frame_len
+        for t0, t1 in zip(frame_starts, frame_stops):
+            if not params['test_mode']:
+                now = time.time()
+                if now < t1:
+                    time.sleep(t1 - now)
+            writer(frame_gen.get_data_frame(t0, t1))
+        writer(core.G3Frame(core.G3FrameType.EndProcessing))
 
         return True, "Wrote tune files"
 
@@ -161,7 +264,8 @@ class SmurfFileEmulator:
         """
         return True, 'Wrote det biasing files'
 
-    def stream(self, session, params=None):
+    @ocs_agent.param('duration', default=None)
+    def stream(self, session, params):
         """stream(duration=None)
 
         **Process** - Generates example fake-files organized in the same way as
@@ -176,6 +280,8 @@ class SmurfFileEmulator:
                 If set, will stop stream after specified amount of time (sec).
         """
         session.set_status('starting')
+
+        # Write initial smurf metadata
         action_time = time.time()
         files = ['freq.txt', 'mask.txt']
         for f in files:
@@ -186,41 +292,45 @@ class SmurfFileEmulator:
         if params.get('duration') is not None:
             end_time = time.time() + params['duration']
 
-        self.streaming = True
-
         session.set_status('running')
+        frame_gen = G3FrameGenerator(
+            self.stream_id, self.sample_rate, self.nchans
+        )
+        session.data['session_id'] = frame_gen.session_id
+        session.data['g3_files'] = []
+
         seq = 0
-        sid = int(time.time())
-        g3_file_info = None
+        fname = self._get_g3_filename(frame_gen.session_id, seq, makedirs=True)
+        os.makedirs(os.path.dirname(fname), exist_ok=True)
+        session.data['g3_files'].append(fname)
+        writer = core.G3Writer(fname)
+        file_start = time.time()
 
-        file_start = None
+        writer(frame_gen.get_obs_frame())
+        writer(frame_gen.get_status_frame())
+        self.streaming = True
         while self.streaming:
-            if g3_file_info is None:
-                file_start = time.time()
-                g3_file_info = {
-                    'start': file_start,
-                    'seq': seq,
-                    'session_id': sid
-                }
-
-            time.sleep(1)
+            start = time.time()
+            time.sleep(self.frame_len)
+            stop = time.time()
+            writer(frame_gen.get_data_frame(start, stop))
 
             if end_time is not None:
-                if time.time() > end_time:
-                    g3_file_info['stop'] = time.time()
-                    self._write_g3_file(**g3_file_info)
+                if stop > end_time:
                     break
 
             if time.time() - file_start > self.file_duration:
-                g3_file_info['stop'] = time.time()
-                self._write_g3_file(**g3_file_info)
-                g3_file_info = None
+                writer(core.G3Frame(core.G3FrameType.EndProcessing))
                 seq += 1
+                fname = self._get_g3_filename(
+                    frame_gen.session_id, seq, makedirs=True
+                )
+                os.makedirs(os.path.dirname(fname), exist_ok=True)
+                session.data['g3_files'].append(fname)
+                writer = core.G3Writer(fname)
+                file_start = time.time()
 
-        if g3_file_info is not None:
-            # Write out unwritten file info on stop
-            g3_file_info['stop'] = time.time()
-            self._write_g3_file(**g3_file_info)
+        writer(core.G3Frame(core.G3FrameType.EndProcessing))
 
         return True, "Finished stream"
 
@@ -242,8 +352,14 @@ def make_parser(parser=None):
                         help='Stream ID for fake smurf stream')
     pgroup.add_argument('--base-dir', required=True,
                         help="Base directory where data should be written")
-    pgroup.add_argument('--file-duration', default=10*60, type=int,
+    pgroup.add_argument('--file-duration', default=10 * 60, type=float,
                         help="Time in sec before rotating g3 files")
+    pgroup.add_argument('--nchans', default=1024, type=int,
+                        help="Number of channels to stream from")
+    pgroup.add_argument('--sample-rate', default=200, type=float,
+                        help="Sample rate for streaming data")
+    pgroup.add_argument('--frame-len', default=2, type=float,
+                        help="Time per G3 data frame (seconds)")
 
     return parser
 
@@ -265,4 +381,3 @@ if __name__ == '__main__':
     agent.register_process('stream', file_em.stream, file_em._stop_stream)
 
     runner.run(agent, auto_reconnect=True)
-

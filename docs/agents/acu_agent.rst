@@ -6,7 +6,7 @@
 ACU Agent
 =========
 
-The Antenna Control Unit (ACU) is an industrial PC with VxWorks installed.    
+The Antenna Control Unit (ACU) is an industrial PC with VxWorks installed.
 It is used for readout of encoder measurements and control of telescope
 platforms.
 
@@ -63,7 +63,7 @@ example configuration block is below::
 Example Client
 --------------
 Below is an example client demonstrating a go-to task followed by a scan.
-Note that all tasks and the generate_scan process can be run while the data 
+Note that all tasks and the generate_scan process can be run while the data
 acquisition processes are running::
 
     from ocs.matched_client import MatchedClient

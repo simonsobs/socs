@@ -4,7 +4,6 @@
 
 import argparse
 import socket
-import numpy as np
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 import time
@@ -27,6 +26,7 @@ class Pfeiffer:
        read_pressure_all reads pressures from the six channels
        close closes the socket
     """
+
     def __init__(self, ip_address, port, timeout=10,
                  f_sample=2.5):
         self.ip_address = ip_address
@@ -50,7 +50,7 @@ class Pfeiffer:
         msg = 'PR%d\r\n' % ch_no
         self.comm.send(msg.encode())
         # Can use this to catch exemptions, for troubleshooting
-        status = self.comm.recv(BUFF_SIZE).decode()
+        self.comm.recv(BUFF_SIZE).decode()
         self.comm.send(ENQ.encode())
         read_str = self.comm.recv(BUFF_SIZE).decode()
         pressure_str = read_str.split(',')[-1].split('\r')[0]
@@ -71,12 +71,11 @@ class Pfeiffer:
         msg = 'PRX\r\n'
         self.comm.send(msg.encode())
         # Could use this to catch exemptions, for troubleshooting
-        status = self.comm.recv(BUFF_SIZE).decode()
+        self.comm.recv(BUFF_SIZE).decode()
         self.comm.send(ENQ.encode())
         read_str = self.comm.recv(BUFF_SIZE).decode()
         pressure_str = read_str.split('\r')[0]
-        #gauge_states = pressure_str.split(',')[::2]
-        #gauge_states = np.array(gauge_states, dtype=int)
+        # gauge_states = pressure_str.split(',')[::2]
         pressures = pressure_str.split(',')[1::2]
         pressures = [float(p) for p in pressures]
         return pressures
@@ -119,7 +118,7 @@ class PfeifferAgent:
         if f_sample is None:
             f_sample = self.f_sample
 
-        sleep_time = 1./f_sample - 0.01
+        sleep_time = 1. / f_sample - 0.01
 
         with self.lock.acquire_timeout(timeout=0, job='init') as acquired:
             # Locking mechanism stops code from proceeding if no lock acquired
@@ -140,7 +139,7 @@ class PfeifferAgent:
                 pressure_array = self.gauge.read_pressure_all()
                 # Loop through all the channels on the device
                 for channel in range(len(pressure_array)):
-                    data['data']["pressure_ch"+str(channel+1)] = pressure_array[channel]
+                    data['data']["pressure_ch" + str(channel + 1)] = pressure_array[channel]
 
                 self.agent.publish_to_feed('pressures', data)
                 time.sleep(sleep_time)
