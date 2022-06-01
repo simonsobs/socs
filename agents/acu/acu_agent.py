@@ -21,7 +21,7 @@ def timecode(acutime):
     Takes the time code produced by the ACU status stream and returns
     a ctime.
 
-    Args:
+    Parameters:
         acutime (float): The time recorded by the ACU status stream,
                          corresponding to the fractional day of the year
     """
@@ -60,15 +60,15 @@ def front_group(data_dict, group_size):
     return new_data_dict
 
 class ACUAgent:
-
     """
     Agent to acquire data from an ACU and control telescope pointing with the
     ACU.
 
-    Args:
+    Parameters:
         acu_config (str):
             The configuration for the ACU, as referenced in aculib.configs.
             Default value is 'guess'.
+
     """
     def __init__(self, agent, acu_config='guess'):
         self.lock = TimeoutLock()
@@ -144,18 +144,18 @@ class ACUAgent:
             acu_config, backend=TwistedHttpBackend(persistent=True), readonly=True)
 
         agent.register_process('monitor',
-                               self.start_monitor,
-                               lambda session, params: self.set_job_stop('monitor'),
+                               self.monitor,
+                               lambda session, params: self._set_job_stop('monitor'),
                                blocking=False,
                                startup=True)
         agent.register_process('broadcast',
-                               self.start_udp_monitor,
-                               lambda session, params: self.set_job_stop('broadcast'),
+                               self.broadcast,
+                               lambda session, params: self._set_job_stop('broadcast'),
                                blocking=False,
                                startup=True)
         agent.register_process('generate_scan',
                                self.generate_scan,
-                               lambda session, params: self.set_job_stop('generate_scan'),
+                               lambda session, params: self._set_job_stop('generate_scan'),
                                blocking=False,
                                startup=False)
         basic_agg_params = {'frame_length': 60}
@@ -262,13 +262,13 @@ class ACUAgent:
     # must be able to alone or simultaneously.  The state of each is
     # registered in self.jobs, protected by self.lock (though this is
     # probably not necessary as long as we don't thread).  Any logic
-    # to assess conflicts should probably be in try_set_job.
+    # to assess conflicts should probably be in _try_set_job.
 
-    def try_set_job(self, job_name):
+    def _try_set_job(self, job_name):
         """
         Set a job status to 'run'.
 
-        Args:
+        Parameters:
             job_name (str): Name of the task/process you are trying to start.
         """
         with self.lock.acquire_timeout(timeout=1.0, job=job_name) as acquired:
@@ -280,11 +280,11 @@ class ACUAgent:
             self.jobs[job_name] = 'run'
             return (True, 'ok')
 
-    def set_job_stop(self, job_name):
+    def _set_job_stop(self, job_name):
         """
         Set a job status to 'stop'.
 
-        Args:
+        Parameters:
             job_name (str): Name of the process you are trying to stop.
         """
         print('try to acquire stop')
@@ -306,11 +306,11 @@ class ACUAgent:
             except Exception as e:
                 print(str(e)) 
 
-    def set_job_done(self, job_name):
+    def _set_job_done(self, job_name):
         """
         Set a job status to 'idle'.
 
-        Args:
+        Parameters:
             job_name (str): Name of the task/process you are trying to idle.
         """
         with self.lock.acquire_timeout(timeout=1.0, job=job_name) as acquired:
@@ -325,18 +325,18 @@ class ACUAgent:
     #
 
     @inlineCallbacks
-    def start_monitor(self, session, params=None):
-        """PROCESS "monitor".
+    def monitor(self, session, params):
+        """monitor()
 
-        This process refreshes the cache of SATP ACU status information,
-        and reports it on HK feeds 'acu_status_summary' and 'acu_status_full'.
+        **Process** - Refresh the cache of SATP ACU status information and
+        report it on the 'acu_status_summary' and 'acu_status_full' HK feeds.
 
         Summary parameters are ACU-provided time code, Azimuth mode,
         Azimuth position, Azimuth velocity, Elevation mode, Elevation position,
         Elevation velocity, Boresight mode, and Boresight position.
 
         """
-        ok, msg = self.try_set_job('monitor')
+        ok, msg = self._try_set_job('monitor')
         if not ok:
             return ok, msg
 
@@ -513,20 +513,20 @@ class ACUAgent:
             self.agent.publish_to_feed('acu_status_platform', acustatus_platform)
             self.agent.publish_to_feed('acu_status_emergency', acustatus_emergency)
             self.agent.publish_to_feed('acu_status_influx', acustatus_influx, from_reactor=True)
-#        self.set_job_stop('monitor')
+#        self._set_job_stop('monitor')
 #        yield dsleep(1)
-#        self.set_job_done('monitor')
+#        self._set_job_done('monitor')
         return True, 'Acquisition exited cleanly.'
 
     @inlineCallbacks
-    def start_udp_monitor(self, session, params=None):
-        """PROCESS broadcast
+    def broadcast(self, session, params):
+        """broadcast()
 
-        This process reads UDP data from the port specified by self.acu_config,
-        decodes it, and publishes to an HK feed.
+        **Process** - Read UDP data from the port specified by self.acu_config,
+        decode it, and publish to an HK feed.
 
         """
-        ok, msg = self.try_set_job('broadcast')
+        ok, msg = self._try_set_job('broadcast')
         if not ok:
             return ok, msg
         session.set_status('running')
@@ -599,23 +599,24 @@ class ACUAgent:
             yield dsleep(0.005)
 
         handler.stopListening()
-        self.set_job_done('broadcast')
+        self._set_job_done('broadcast')
         return True, 'Acquisition exited cleanly.'
 
     @inlineCallbacks
-    def go_to(self, session, params=None):
-        """ TASK "go_to"
+    def go_to(self, session, params):
+        """go_to(az=None, el=None, wait=1)
 
-        Moves the telescope to a particular point (azimuth, elevation)
-        in Preset mode. When motion has ended and the telescope reaches
-        the preset point, it returns to Stop mode and ends.
+        **Task** - Move the telescope to a particular point (azimuth,
+        elevation) in Preset mode. When motion has ended and the telescope
+        reaches the preset point, it returns to Stop mode and ends.
 
-        Params:
+        Parameters:
             az (float): destination angle for the azimuthal axis
             el (float): destination angle for the elevation axis
             wait (float): amount of time to wait for motion to end
+
         """
-        ok, msg = self.try_set_job('control')
+        ok, msg = self._try_set_job('control')
         if not ok:
             return ok, msg
         az = params.get('az')
@@ -646,7 +647,7 @@ class ACUAgent:
         if round(current_az, 1) == az and round(current_el, 1) == el:
             self.log.info('Already positioned at %.2f, %.2f'
                           % (current_az, current_el))
-            self.set_job_done('control')
+            self._set_job_done('control')
             return True, 'Pointing completed'
    #     yield self.acu.stop()
         yield self.acu_control.mode('Stop')
@@ -669,11 +670,11 @@ class ACUAgent:
                 if round(mdata['Azimuth_current_position'] - az, 1) == 0. and \
                 round(mdata['Elevation_current_position'] - el, 1) == 0.:
                     yield self.acu_control.stop()
-                    self.set_job_done('control')
+                    self._set_job_done('control')
                     return True, 'Pointing completed'
                 else:
                     yield self.acu_control.stop()
-                    self.set_job_done('control')
+                    self._set_job_done('control')
                     return False, 'Motion never occurred!'
             yield dsleep(wait_for_motion)
             mdata = self.data['status']['summary']
@@ -714,19 +715,20 @@ class ACUAgent:
                       'data': self.data['uploads']
                       }
         self.agent.publish_to_feed('acu_upload', acu_upload, from_reactor=True)
-        self.set_job_done('control')
+        self._set_job_done('control')
         return True, 'Pointing completed'
 
     @inlineCallbacks
-    def set_boresight(self, session, params=None):
-        """TASK set_boresight
+    def set_boresight(self, session, params):
+        """set_boresight(b=None)
 
-        Moves the telescope to a particular third-axis angle.
+        **Task** - Move the telescope to a particular third-axis angle.
 
-        Params:
+        Parameters:
             b (float): destination angle for boresight rotation
+
         """
-        ok, msg = self.try_set_job('control')
+        ok, msg = self._try_set_job('control')
         if not ok:
             return ok, msg
         bs_destination = params.get('b')
@@ -761,23 +763,23 @@ class ACUAgent:
                       'data': self.data['uploads']
                       }
         self.agent.publish_to_feed('acu_upload', acu_upload)
-        self.set_job_done('control')
+        self._set_job_done('control')
         return True, 'Moved to new 3rd axis position'
 
     @inlineCallbacks
-    def stop_and_clear(self, session, params=None):
-        """TASK stop_and_clear
+    def stop_and_clear(self, session, params):
+        """stop_and_clear()
 
-        Changes the azimuth and elevation modes to Stop and clears
+        **Task** - Change the azimuth and elevation modes to Stop and clear
         points uploaded to the stack.
 
         """
-        ok, msg = self.try_set_job('control')
+        ok, msg = self._try_set_job('control')
         if not ok:
-            self.set_job_done('control')
+            self._set_job_done('control')
             yield dsleep(0.1)
-            self.try_set_job('control')
-        self.log.info('try_set_job ok')
+            self._try_set_job('control')
+        self.log.info('_try_set_job ok')
 #        yield self.acu.stop()
         yield self.acu_control.mode('Stop')
         self.log.info('Stop called')
@@ -786,11 +788,21 @@ class ACUAgent:
                                     'Clear Stack')
         yield dsleep(0.1)
         self.log.info('Cleared stack.')
-        self.set_job_done('control')
+        self._set_job_done('control')
         return True, 'Job completed'
 
     @inlineCallbacks
     def fromfile_scan(self, session, params=None):
+        """fromfile_scan(filename=None, simulator=None)
+
+        **Task** - Upload and execute a scan pattern from numpy file.
+
+        Parameters:
+            filename (str): full path to desired numpy file. File contains an
+                array of three lists ([list(times), list(azimuths),
+                list(elevations)]). Times begin from 0.0. Applies to scantype
+                'from_file'. Required if scantype is 'from_file'.
+        """
         filename = params.get('filename')
         simulator = params.get('simulator')
         times, azs, els, vas, ves, azflags, elflags = sh.from_file(filename)
@@ -798,11 +810,40 @@ class ACUAgent:
             return False, 'Azimuth location out of range!'
         if min(els) <= self.motion_limits['elevation']['lower'] or max(els) >= self.motion_limits['elevation']['upper']:
             return False, 'Elevation location out of range!'
-        yield self.run_specified_scan(session, times, azs, els, vas, ves, azflags, elflags, azonly=False)
+        yield self._run_specified_scan(session, times, azs, els, vas, ves, azflags, elflags, azonly=False)
         yield True, 'Track completed'
 
     @inlineCallbacks
     def constant_velocity_scan(self, session, params=None):
+        """constant_velocity_scan(azpts=None, el=None, azvel=None, acc=None, \
+                                  ntimes=None, azonly=None, simulator=None)
+
+        **Task** - Run a constant velocity scan.
+
+        Parameters:
+            azpts (tuple, optional): spatial endpoints of the azimuth scan.
+                Applies to scantype 'linear_1dir' (2 values) and
+                'linear_turnaround_sameends' (3 values). Required if scantype
+                is not 'from_file'.
+            el (float, optional): elevation for a linear velocity azimuth scan.
+                Applies to scantype 'linear_1dir' and
+                'linear_turnaround_sameends'. Required if scantype is not
+                'from_file'.
+            azvel (float, optional): velocity of the azimuth axis in a linear
+                velocity azimuth scan. Applies to scantype 'linear_1dir' and
+                'linear_turnaround_sameends'. Required if scantype is not
+                'from_file'.
+            acc (float, optional): acceleration of the turnaround for a linear
+                velocity scan with a turnaround. Applies to scantype
+                'linear_turnaround_sameends'. Required if scantype is not
+                'from_file'.
+            ntimes (int, optional): number of times the platform traverses
+                between azimuth endpoints for a 'linear_turnaround_sameends'
+                scan. Required if scantype is 'linear_turnaround_sameends'.
+            azonly:
+            simulator:
+
+        """
         azpts = params.get('azpts')
         el = params.get('el')
         azvel = params.get('azvel')
@@ -817,25 +858,15 @@ class ACUAgent:
         if el <= self.motion_limits['elevation']['lower'] or el >= self.motion_limits['elevation']['upper']:
             return False, 'Elevation location out of range!'
         times, azs, els, vas, ves, azflags, elflags = sh.constant_velocity_scanpoints(azpts, el, azvel, acc, ntimes)
-        yield self.run_specified_scan(session, times, azs, els, vas, ves, azflags, elflags, azonly, simulator)
+        yield self._run_specified_scan(session, times, azs, els, vas, ves, azflags, elflags, azonly, simulator)
         return True, 'Track completed.'
 
     @inlineCallbacks
-    def run_specified_scan(self, session, times, azs, els, vas, ves, azflags, elflags, azonly, simulator):
-        """TASK run_specified_scan
-
-        Upload and execute a scan pattern. The pattern may be specified by a
-        numpy file, parameters for a linear scan in one direction, or a linear
-        scan with a turnaround.
-
-        Params:
-            scantype (str): the type of scan information you are uploading.
-                            Options are 'from_file' or 'constant_velocity'.
-        """
-        ok, msg = self.try_set_job('control')
+    def _run_specified_scan(self, session, times, azs, els, vas, ves, azflags, elflags, azonly, simulator):
+        ok, msg = self._try_set_job('control')
         if not ok:
             return ok, msg
-        self.log.info('try_set_job ok')
+        self.log.info('_try_set_job ok')
 
         start_az = azs[0]
         start_el = els[0]
@@ -947,16 +978,19 @@ class ACUAgent:
                       'data': self.data['uploads']
                       }
         self.agent.publish_to_feed('acu_upload', acu_upload)
-        self.set_job_done('control')
+        self._set_job_done('control')
         return True
 
     @inlineCallbacks
-    def generate_scan(self, session, params=None):
-        """
-        Scan generator, currently only works for constant-velocity az scans
-        with fixed elevation.
+    def generate_scan(self, session, params):
+        """generate_scan(az_endpoint1=None, az_endpoint2=None, az_speed=None, \
+                         acc=None, el_endpoint1=None, el_endpoint2=None, \
+                         el_speed=None)
 
-        Args:
+        **Process** - Scan generator, currently only works for
+        constant-velocity az scans with fixed elevation.
+
+        Parameters:
             az_endpoint1 (float): first endpoint of a linear azimuth scan
             az_endpoint2 (float): second endpoint of a linear azimuth scan
             az_speed (float): azimuth speed for constant-velocity scan
@@ -968,10 +1002,10 @@ class ACUAgent:
                 elevation. For dev, currently set to 0.0
 
         """
-        ok, msg = self.try_set_job('control')
+        ok, msg = self._try_set_job('control')
         if not ok:
             return ok, msg
-        self.log.info('try_set_job ok')
+        self.log.info('_try_set_job ok')
         az_endpoint1 = params.get('az_endpoint1')
         az_endpoint2 = params.get('az_endpoint2')
         az_speed = params.get('az_speed')
@@ -1000,7 +1034,7 @@ class ACUAgent:
                         ['Free_upload_positions']
                 yield self.acu_control.http.UploadPtStack(text)
         yield self.acu_control.stop()
-        self.set_job_done('control')
+        self._set_job_done('control')
         return True, 'Track generation ended cleanly'
 
 
