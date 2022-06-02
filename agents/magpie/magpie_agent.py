@@ -13,7 +13,7 @@ from ocs import ocs_agent, site_config
 
 MAX_CHANS = 4096
 CHANS_PER_BAND = 512
-pA_per_rad = 9e6 / (2*np.pi)
+pA_per_rad = 9e6 / (2 * np.pi)
 
 
 # Map from primary key-names to their index in the SuperTimestream
@@ -157,7 +157,7 @@ class FIRFilter:
         width : int
             number of samples to average together
         """
-        b = 1./width * np.ones(width, dtype=float)
+        b = 1. / width * np.ones(width, dtype=float)
         a = np.zeros_like(b)
         a[0] = 1
         return cls(b, a)
@@ -165,7 +165,7 @@ class FIRFilter:
     @classmethod
     def differ(cls, delay=1):
         """
-        FIR filter to calculate a rolling diff of incoming data. 
+        FIR filter to calculate a rolling diff of incoming data.
 
         Args
         ----
@@ -177,6 +177,7 @@ class FIRFilter:
         b[0], b[-1] = 1, -1
         a[0] = 1
         return cls(b, a)
+
 
 class Demodulator:
     """
@@ -191,6 +192,7 @@ class Demodulator:
     fs : float
         Sample rate of incoming data
     """
+
     def __init__(self, f, bw=1, fs=200):
         self.f = f
         self.lp_sin = FIRFilter.butter_lowpass(bw, fs)
@@ -206,14 +208,15 @@ class Demodulator:
             Array of (unnormalized) demodulated data in the same shape as the
             input data
         """
-        sin = np.sin(2*np.pi*self.f*times)
-        cos = np.cos(2*np.pi*self.f*times)
+        sin = np.sin(2 * np.pi * self.f * times)
+        cos = np.cos(2 * np.pi * self.f * times)
 
-        # We don't really care about normalization 
-        demod_sin = self.lp_sin.lfilt(data*sin[None, :], in_place=False)
-        demod_cos = self.lp_cos.lfilt(data*cos[None, :], in_place=False)
+        # We don't really care about normalization
+        demod_sin = self.lp_sin.lfilt(data * sin[None, :], in_place=False)
+        demod_cos = self.lp_cos.lfilt(data * cos[None, :], in_place=False)
 
         return np.sqrt(demod_sin**2 + demod_cos**2)
+
 
 class WhiteNoiseCalculator:
     """
@@ -226,8 +229,9 @@ class WhiteNoiseCalculator:
     navg : int
         Number of samples to average over in the RMS calc
     """
+
     def __init__(self, fs=200, navg=200):
-        # Aiming for 20 Hz 
+        # Aiming for 20 Hz
         delay = fs // 20
         self.differ = FIRFilter.differ(delay=delay)
         self.averager = FIRFilter.moving_avg(navg)
@@ -240,8 +244,9 @@ class WhiteNoiseCalculator:
         return np.sqrt(
             self.averager.lfilt(
                 self.differ.lfilt(data, in_place=False)**2, in_place=False
-            )/self.fsamp
+            ) / self.fsamp
         )
+
 
 class VisElem:
     """
@@ -291,6 +296,7 @@ class VisElem:
         List of booleans that determine if each equation's color-scale is
         dynamic or fixed. This must be the same size as the ``eqs`` array.
     """
+
     def __init__(self, name, x, y, rot, template, abs_smurf_chan, cmap_idx=0):
         self.x = x
         self.y = y
@@ -302,8 +308,8 @@ class VisElem:
         vals = ['{name}/raw', '{name}/demod', '{name}/wl', '{name}/flagged']
         self.vals = [v.format(name=name) for v in vals]
         eq_templates = {
-            'Raw': '{name}/raw', 
-            'Demod': '* {name}/demod rms_scale', 
+            'Raw': '{name}/raw',
+            'Demod': '* {name}/demod rms_scale',
             'White Noise': '* {name}/wl wl_scale',
             'flagged': '{name}/flagged',
             'smurf_band': f'{self.abs_smurf_chan // CHANS_PER_BAND}',
@@ -321,7 +327,7 @@ class VisElem:
             ['red_cmap' for _ in eq_templates],
             ['blue_cmap' for _ in eq_templates]
         ][cmap_idx]
-        
+
 
 class FocalplaneConfig:
     def __init__(self):
@@ -710,7 +716,7 @@ class MagpieAgent:
             'timestamp': time.time(),
             'block_name': 'white_noise',
             'data': {
-                k: np.quantile(wls, q/100)
+                k: np.quantile(wls, q / 100)
                 for k, q in zip(labels, quantiles)
             }
         }
