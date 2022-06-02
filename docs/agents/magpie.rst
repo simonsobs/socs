@@ -46,6 +46,8 @@ a detmap csv file, with a target sample rate of 20 Hz::
          # Detmap CSV file
          '--det-map', '/home/jlashner/lyrebird_demo/detmap.csv',
          '--offset', 0, 0,
+         '--demod-freq', 8,
+         '--demod-bandwidth', 0.5
        ]},
 
 It is  possible to tell magpie to stream data from existing G3Files instead of
@@ -333,9 +335,6 @@ Agent API
 Supporting APIs
 ------------------
 .. autoclass:: agents.magpie.magpie_agent.FIRFilter
-  :members:
-
-.. autoclass:: agents.magpie.magpie_agent.RollingAvg
   :members:
 
 .. autoclass:: agents.magpie.magpie_agent.FocalplaneConfig
