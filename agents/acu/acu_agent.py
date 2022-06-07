@@ -80,8 +80,6 @@ class ACUAgent:
             }
 
         self.acu_config = aculib.guess_config(acu_config)
-        self.base_url = self.acu_config['base_url']
-        self.readonly_url = self.acu_config['readonly_url']
         self.sleeptime = self.acu_config['motion_waittime']
         self.udp = self.acu_config['streams']['main']
         self.udp_schema = aculib.get_stream_schema(self.udp['schema'])
@@ -132,14 +130,11 @@ class ACUAgent:
 
         self.take_data = False
 
-        #pool = tclient.HTTPConnectionPool(reactor)
-        self.web_agent = tclient.Agent(reactor)#, pool=pool)
+    #    self.web_agent = tclient.Agent(reactor)
         tclient._HTTP11ClientFactory.noisy = False
 
         self.acu_control = aculib.AcuControl(
-            acu_config, backend=TwistedHttpBackend(persistent=False))#self.web_agent))
-   #     self.acu_read = aculib.AcuControl(
-   #         acu_config, backend=TwistedHttpBackend(self.web_agent), readonly=True)
+            acu_config, backend=TwistedHttpBackend(persistent=False))
         self.acu_read = aculib.AcuControl(
             acu_config, backend=TwistedHttpBackend(persistent=True), readonly=True)
 
@@ -371,7 +366,7 @@ class ACUAgent:
                 n_ok = 0
 
             if now - query_t < min_query_period:
-                yield dsleep(-(now - query_t-min_query_period))
+                yield dsleep(min_query_period - (now - query_t))
 
             query_t = time.time()
             try:
