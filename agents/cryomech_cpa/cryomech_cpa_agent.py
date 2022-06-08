@@ -1,7 +1,6 @@
 # Script to log and readout PTC data through ethernet connection.
 # Tamar Ervin and Jake Spisak, February 2019
 
-import os
 import argparse
 import time
 import struct
@@ -10,10 +9,8 @@ import signal
 from contextlib import contextmanager
 import random
 
-ON_RTD = os.environ.get('READTHEDOCS') == 'True'
-if not ON_RTD:
-    from ocs import site_config, ocs_agent
-    from ocs.ocs_twisted import TimeoutLock
+from ocs import site_config, ocs_agent
+from ocs.ocs_twisted import TimeoutLock
 
 STX = '\x02'
 ADDR = '\x10'
@@ -264,10 +261,15 @@ class PTCAgent:
 
         return True, "PTC agent initialized"
 
-    def acq(self, session, params=None):
+    @ocs_agent.param('test_mode', default=False, type=bool)
+    def acq(self, session, params):
         """acq()
 
         **Process** - Starts acqusition of data from the PTC.
+
+        Parameters:
+            test_mode (bool, optional): Run the Process loop only once.
+                This is meant only for testing. Default is False.
 
         """
         with self.lock.acquire_timeout(0, job='acq') as acquired:
@@ -292,11 +294,14 @@ class PTCAgent:
                     self.agent.publish_to_feed('ptc_status', pub_data)
                 time.sleep(1. / self.f_sample)
 
+                if params['test_mode']:
+                    break
+
             self.agent.feeds["ptc_status"].flush_buffer()
 
         return True, 'Acquisition exited cleanly.'
 
-    def _stop_acq(self, session, params=None):
+    def _stop_acq(self, session, params):
         """Stops acqusition of data from the PTC."""
         if self.take_data:
             self.take_data = False

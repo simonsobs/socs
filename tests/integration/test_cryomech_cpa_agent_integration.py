@@ -42,18 +42,18 @@ def test_cryomech_cpa_init(wait_for_crossbar, emulator, run_agent,
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 
-# @pytest.mark.integtest
-# def test_pfeiffer_tc400_turn_turbo_on(wait_for_crossbar, emulator, run_agent,
-#                                      client):
-#    client.init()
-#
-#    responses = {'0011001006111111015': format_reply('111111'),  # ready_turbo()
-#                 '0011002306111111019': format_reply('111111'),  # turn_turbo_motor_on()
-#                 }
-#    emulator.define_responses(responses)
-#
-#    resp = client.turn_turbo_on()
-#    print(resp)
-#    assert resp.status == ocs.OK
-#    print(resp.session)
-#    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+@pytest.mark.integtest
+def test_cryomech_cpa_acq(wait_for_crossbar, emulator, run_agent, client):
+    client.init()
+
+    resp = client.acq.start(test_mode=True)
+    resp = client.acq.wait()
+
+    print(resp)
+    assert resp.status == ocs.OK
+    print(resp.session)
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
+    # already stopped, but will set self.take_data = False
+    resp = client.acq.stop()
+    print(resp)
