@@ -5,8 +5,6 @@ import argparse
 import time
 import struct
 import socket
-import signal
-from contextlib import contextmanager
 import random
 
 from ocs import site_config, ocs_agent
@@ -22,22 +20,6 @@ ESC = '\x07'
 ESC_STX = '\x30'
 ESC_CR = '\x31'
 ESC_ESC = '\x32'
-
-
-class TimeoutException(Exception):
-    pass
-
-
-@contextmanager
-def time_limit(seconds):
-    def signal_handler(signum, frame):
-        raise TimeoutException("Timed out!")
-    signal.signal(signal.SIGALRM, signal_handler)
-    signal.alarm(seconds)
-    try:
-        yield
-    finally:
-        signal.alarm(0)
 
 
 class PTC:
