@@ -218,6 +218,7 @@ class PTCAgent:
                                  agg_params=agg_params,
                                  buffer_time=1)
 
+    @ocs_agent.param('auto_acquire', default=False, type=bool)
     def init(self, session, params=None):
         """init(auto_acquire=False)
 
@@ -225,14 +226,9 @@ class PTCAgent:
 
         Parameters:
             auto_acquire (bool): Automatically start acq process after
-                initialization
+                initialization if True. Defaults to False.
 
         """
-        if params is None:
-            params = {}
-
-        auto_acquire = params.get('auto_acquire', False)
-
         if self.initialized:
             return True, "Already Initialized"
 
@@ -256,7 +252,7 @@ class PTCAgent:
         self.initialized = True
 
         # Start data acquisition if requested
-        if auto_acquire:
+        if params['auto_acquire']:
             self.agent.start('acq')
 
         return True, "PTC agent initialized"
