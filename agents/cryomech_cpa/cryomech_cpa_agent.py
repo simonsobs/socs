@@ -46,7 +46,8 @@ class PTC:
 
         return data_flag, brd
 
-    def buildRegistersQuery(self):
+    @staticmethod
+    def buildRegistersQuery():
         query = bytes([0x09, 0x99,  # Message ID
                        0x00, 0x00,  # Unused
                        0x00, 0x06,  # Message size in bytes
