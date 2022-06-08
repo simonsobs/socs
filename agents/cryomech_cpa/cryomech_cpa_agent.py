@@ -58,33 +58,30 @@ class PTC:
                        0x00, 0x35])  # How many to read
         return query
 
-    def power_on(self):
-        """
-        Raw cryomech command for turning ptc on
-        """
-        command = bytes([0x09, 0x99,  # Message ID
-                         0x00, 0x00,  # Unused
-                         0x00, 0x06,  # Message size in bytes
-                         0x01,        # Slave Address
-                         0x06,        # Function Code
-                         0x00, 0x01,   # Register Number
-                         0x00, 0x01])  # The Value
+    def power(self, state):
+        """Turn the PTC on or off.
 
-        self.comm.sendall(command)
+        Parameters
+        ----------
+        state : str
+            Desired power state of the PTC, either 'on', or 'off'.
 
-    def power_off(self):
         """
-        Raw cryomech command for turning ptc off
-        """
-        command = bytes([0x09, 0x99,  # Message ID
-                         0x00, 0x00,  # Unused
-                         0x00, 0x06,  # Message size in bytes
-                         0x01,        # Slave Address
-                         0x06,        # Function Code
-                         0x00, 0x01,   # Register Number
-                         0x00, 0xff])  # The Value
+        command = [0x09, 0x99,  # Message ID
+                   0x00, 0x00,  # Unused
+                   0x00, 0x06,  # Message size in bytes
+                   0x01,        # Slave Address
+                   0x06,        # Function Code
+                   0x00, 0x01]   # Register Number
 
-        self.comm.sendall(command)
+        if state.lower() == 'on':
+            command.extend([0x00, 0x01])
+        elif state.lower() == 'off':
+            command.extend([0x00, 0xff])
+        else:
+            raise ValueError(f"Invalid state: {state}")
+
+        self.comm.sendall(bytes(command))
 
     def breakdownReplyData(self, rawdata):
         """Take in raw ptc data, and return a dictionary.
@@ -278,7 +275,7 @@ class PTCAgent:
         Parameters
         ----------
         state : str
-            Desired powere state of the PTC, either 'on', or 'off'.
+            Desired power state of the PTC, either 'on', or 'off'.
 
         """
         with self.lock.acquire_timeout(0, job='power_ptc') as acquired:
@@ -289,10 +286,7 @@ class PTCAgent:
 
             session.set_status('running')
 
-            if params['state'] == 'off':
-                self.ptc.power_off()
-            if params['state'] == 'on':
-                self.ptc.power_on()
+            self.ptc.power(params['state'])
 
         return True, "PTC powered {}".format(params['state'])
 
