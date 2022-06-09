@@ -231,7 +231,12 @@ class DeviceEmulator:
         print(f"Client connection made from {client_address}")
 
         while self._read:
-            msg = self._conn.recv(4096)
+            try:
+                msg = self._conn.recv(4096)
+            # Was seeing this on tests in the cryomech agent
+            except ConnectionResetError:
+                print('Caught connection reset on Agent clean up')
+                break
             if self.encoding:
                 msg = msg.strip().decode(self.encoding)
             if msg:
