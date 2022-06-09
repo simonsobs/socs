@@ -1,5 +1,6 @@
 # Script to log and readout PTC data through ethernet connection.
 # Tamar Ervin and Jake Spisak, February 2019
+# Sanah Bhimani, May 2022
 
 import argparse
 import time
@@ -56,6 +57,31 @@ class PTC:
                        0x00, 0x01,   # The starting Register Number
                        0x00, 0x35])  # How many to read
         return query
+
+    def power(self, state):
+        """Turn the PTC on or off.
+
+        Parameters
+        ----------
+        state : str
+            Desired power state of the PTC, either 'on', or 'off'.
+
+        """
+        command = [0x09, 0x99,  # Message ID
+                   0x00, 0x00,  # Unused
+                   0x00, 0x06,  # Message size in bytes
+                   0x01,        # Slave Address
+                   0x06,        # Function Code
+                   0x00, 0x01]   # Register Number
+
+        if state.lower() == 'on':
+            command.extend([0x00, 0x01])
+        elif state.lower() == 'off':
+            command.extend([0x00, 0xff])
+        else:
+            raise ValueError(f"Invalid state: {state}")
+
+        self.comm.sendall(bytes(command))
 
     def breakdownReplyData(self, rawdata):
         """Take in raw ptc data, and return a dictionary.
@@ -240,6 +266,30 @@ class PTCAgent:
 
         return True, "PTC agent initialized"
 
+    @ocs_agent.param('state', type=str, choices=['off', 'on'])
+    def power_ptc(self, session, params=None):
+        """power_ptc(state=None)
+
+        **Task** - Remotely turn the PTC on or off.
+
+        Parameters
+        ----------
+        state : str
+            Desired power state of the PTC, either 'on', or 'off'.
+
+        """
+        with self.lock.acquire_timeout(0, job='power_ptc') as acquired:
+            if not acquired:
+                self.log.warn("Could not start task because {} is already "
+                              "running".format(self.lock.job))
+                return False, "Could not acquire lock."
+
+            session.set_status('running')
+
+            self.ptc.power(params['state'])
+
+        return True, "PTC powered {}".format(params['state'])
+
     @ocs_agent.param('test_mode', default=False, type=bool)
     def acq(self, session, params):
         """acq()
@@ -333,6 +383,7 @@ def main():
 
     agent.register_task('init', ptc.init, startup=init_params)
     agent.register_process('acq', ptc.acq, ptc._stop_acq)
+    agent.register_task('power_ptc', ptc.power_ptc)
 
     runner.run(agent, auto_reconnect=True)
 

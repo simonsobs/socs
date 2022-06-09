@@ -43,6 +43,24 @@ def test_cryomech_cpa_init(wait_for_crossbar, emulator, run_agent,
 
 
 @pytest.mark.integtest
+@pytest.mark.parametrize("state,command", [('on', b'\t\x99\x00\x00\x00\x06\x01\x06\x00\x01\x00\x01'),
+                                           ('off', b'\t\x99\x00\x00\x00\x06\x01\x06\x00\x01\x00\xff')])
+def test_cryomech_cpa_power_ptc(wait_for_crossbar, emulator, run_agent,
+                                client, state, command):
+    client.init.wait()
+
+    # response from compressor is an echo of the message
+    responses = {command: command}
+    emulator.define_responses(responses)
+
+    resp = client.power_ptc(state=state)
+    print(resp)
+    assert resp.status == ocs.OK
+    print(resp.session)
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
+
+@pytest.mark.integtest
 def test_cryomech_cpa_acq(wait_for_crossbar, emulator, run_agent, client):
     client.init()
 
