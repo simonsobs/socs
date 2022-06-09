@@ -6,7 +6,7 @@ import argparse
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock, Pacemaker
 
-on_rtd = os.environ.get('READTHEDOCS') == True
+on_rtd = os.environ.get('READTHEDOCS') == 'True'
 if not on_rtd:
     from appmotion_motors_driver import MotControl
 
@@ -80,7 +80,7 @@ class appMotionMotorsAgent:
                                  buffer_time=0)
 
     def init_motors_task(self, session, params=None):
-        """init_motors_task(params=None):
+        """init_motors_task(params=None)
         
         **Task** - Connect to the motors, either one or both.
 
@@ -99,16 +99,23 @@ class appMotionMotorsAgent:
                     "Could not start init because {} is already running".format(
                         self.lock.job))
                 return False, "Could not acquire lock."
-            # Run the function you want to run
+            
             self.log.debug("Lock Acquired Connecting to Stages")
-            self.motors = MotControl(
-                motor1_ip=self.motor1_ip,
-                motor1_port=self.motor1_port,
-                motor1_is_lin=self.motor1_is_lin,
-                motor2_ip=self.motor2_ip,
-                motor2_port=self.motor2_port,
-                motor2_is_lin=self.motor2_is_lin,
-                m_res=self.m_res)
+            # Run the function you want to run
+#            self.motors = MotControl(
+#                motor1_ip=self.motor1_ip,
+#                motor1_port=self.motor1_port,
+#                motor1_is_lin=self.motor1_is_lin,
+#                motor2_ip=self.motor2_ip,
+#                motor2_port=self.motor2_port,
+#                motor2_is_lin=self.motor2_is_lin,
+#                m_res=self.m_res)
+            
+            print('establishing serial server with motor1!')
+            self.motor1 = Motor(motor1_ip, motor1_port, motor1_is_lin, name='motor1', index=MOTOR1, m_res=m_res)
+            
+            print('establishing serial server with motor2!')
+            self.motor2 = Motor(motor2_ip, motor2_port, motor2_is_lin, name='motor2', index=MOTOR2, m_res=m_res)
 
         # This part is for the record and to allow future calls to proceed,
         # so does not require the lock
@@ -116,10 +123,31 @@ class appMotionMotorsAgent:
         if self.auto_acq:
             self.agent.start('acq')
         return True, 'Motor(s) Initialized.'
+    
+    @ocs_agent.param('motor', default=1, type=int)
+    def gen_motor_list(self, session, params=None):
+        """gen_motor_list(motor=1)
+        **Task** - Generate a list of the motors in a MotControl object.
 
+        Parameters:
+            motor (int): Determines which motor, either 1 or 2, 3 is for all
+                motors. (default 1)
+
+        """
+        m_list = []
+        if motor == MOTOR1 or motor == ALL:
+            m_list.append(self.motor1)
+        if motor == MOTOR2 or motor == ALL:
+            m_list.append(self.motor2)
+        return m_list
+    
+    @ocs_agent.param('lin_stage', default=True, type=bool)
+    @ocs_agent.param('motor', default=1, type=int)
+    @ocs_agent.param('pos_is_inches', default=False, type=bool)
+    @ocs_agent.param('pos', default=0, type=float)
     def move_axis_to_position(self, session, params=None):
         """move_axis_to_position(motor=1, pos=0, pos_is_inches=False,
-            lin_stage=True):
+            lin_stage=True)
         
         ** Task** - Move the axis to the given absolute position in counts or 
         inches.
@@ -138,17 +166,11 @@ class appMotionMotorsAgent:
             lin_stage (bool): True if the specified motor is for the linear 
                 stage, False if not (default True)
         """
-
-        @ocs_agent.param('lin_stage', default=True, type=bool)
-        @ocs_agent.param('motor', default=1, type=int)
-        @ocs_agent.param('pos_is_inches', default=False, type=bool)
-        @ocs_agent.param('pos', default=0, type=float)
         
-        self.move_status = self.is_moving(motor)
-        if self.move_status:
-            return False, "Motors are already moving."
-
+        self.move_status = self.is_moving(motor)[1][1]
         with self.lock.acquire_timeout(1, job=f'move_axis_to_position_motor{motor}') as acquired:
+            if self.move_status:
+                return False, "Motors are already moving."
             if not acquired:
                 self.log.warn(
                     f"Could not move motor{motor} because lock held by {self.lock.job}")
@@ -156,10 +178,14 @@ class appMotionMotorsAgent:
             self.motors.move_axis_to_position(motor, pos, pos_is_inches, lin_stage)
 
         return True, "Moved motor {} to {}".format(motor, pos)
-
+    
+    @ocs_agent.param('lin_stage', default=True, type=bool)
+    @ocs_agent.param('motor', default=1, type=int)
+    @ocs_agent.param('pos_is_inches', default=False, type=bool)
+    @ocs_agent.param('pos', default=0, type=float)
     def move_axis_by_length(self, session, params=None):
         """move_axis_by_length(motor=1, pos=0, pos_is_inches=False, 
-            lin_stage=True):
+            lin_stage=True)
         
         **Task** - Move the axis relative to the current position by the 
         specified number of counts or inches.
@@ -177,17 +203,11 @@ class appMotionMotorsAgent:
             lin_stage (bool): True if the specified motor is for the linear 
                 stage, False if not (default True)
         """
-        
-        @ocs_agent.param('lin_stage', default=True, type=bool)
-        @ocs_agent.param('motor', default=1, type=int)
-        @ocs_agent.param('pos_is_inches', default=False, type=bool)
-        @ocs_agent.param('pos', default=0, type=float)
-        
-        self.move_status = self.is_moving(motor)
-        if self.move_status:
-            return False, "Motors are already moving."
 
+        self.move_status = self.is_moving(motor)[1][1]
         with self.lock.acquire_timeout(1, job=f'move_axis_by_length_motor{motor}') as acquired:
+            if self.move_status:
+                return False, "Motors are already moving."
             if not acquired:
                 self.log.warn(
                     f"Could not move motor{motor} because lock held by {self.lock.job}")
@@ -196,8 +216,10 @@ class appMotionMotorsAgent:
 
         return True, "Moved motor {} by {}".format(motor, pos)
 
+    @ocs_agent.param('motor', default=3, type=int)
+    @ocs_agent.param('velocity', default=12.0, type=float, check=lambda x: 0.25 <= x <= 50)
     def set_velocity(self, session, params=None):
-        """set_velocity(motor=1, velocity=0.25):
+        """set_velocity(motor=1, velocity=0.25)
         
         **Task** - Set velocity of motors driving stages.
         
@@ -207,15 +229,11 @@ class appMotionMotorsAgent:
             velocity (float): Sets velocity of motor in revolutions per second
                 within range [0.25,50]. (default 12.0)
         """
-        
-        @ocs_agent.param('motor', default=3, type=int)
-        @ocs_agent.param('velocity', default=12.0, type=float, check=lambda x: 0.25 <= x <= 50)
-        
-        self.move_status = self.is_moving(motor)
-        if self.move_status:
-            return False, "Motors are already moving."
 
+        self.move_status = self.is_moving(motor)[1][1]
         with self.lock.acquire_timeout(timeout=1, job=f'set_velocity{motor}') as acquired:
+            if self.move_status:
+                return False, "Motors are already moving."
             if not acquired:
                 self.log.warn(
                     f"Could not set_velocity because lock held by {self.lock.job}")
@@ -223,9 +241,11 @@ class appMotionMotorsAgent:
             self.motors.set_velocity(motor, velocity)
 
         return True, "Set velocity of motor {} to {}".format(motor, velocity)
-
+    
+    @ocs_agent.param('motor', default=3, type=int)
+    @ocs_agent.param('accel', default=1, type=int, check=lambda x: 1 <= x <= 3000)
     def set_acceleration(self, session, params=None):
-        """set_acceleration(motor=3, accel=1):
+        """set_acceleration(motor=3, accel=1)
         
         **Task** - Set acceleration of motors driving stages.
         
@@ -239,14 +259,10 @@ class appMotionMotorsAgent:
                 within range [1,3000]. (default 1)
         """
         
-        @ocs_agent.param('motor', default=3, type=int)
-        @ocs_agent.param('accel', default=1, type=int, check=lambda x: 1 <= x <= 3000)
-        
-        self.move_status = self.is_moving(motor)
-        if self.move_status:
-            return False, "Motors are already moving."
-
+        self.move_status = self.is_moving(motor)[1][1]
         with self.lock.acquire_timeout(timeout=1, job=f'set_acceleration_motor{motor}') as acquired:
+            if self.move_status:
+                return False, "Motors are already moving."
             if not acquired:
                 self.log.warn(
                     f"Could not set_acceleration because lock held by {self.lock.job}")
@@ -254,9 +270,10 @@ class appMotionMotorsAgent:
             self.motors.set_acceleration(motor, accel)
 
         return True, "Set acceleration of motor {} to {}".format(motor, accel)
-
+    
+    @ocs_agent.param('motor', default=1, type=int)
     def start_jogging(self, session, params=None):
-        """start_jogging(motor=1):
+        """start_jogging(motor=1)
         
         **Task** - Jogs the motor(s) set by params.
         
@@ -264,8 +281,6 @@ class appMotionMotorsAgent:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 1)
         """
-        
-        @ocs_agent.param('motor', default=1, type=int)
         
         with self.lock.acquire_timeout(1, job=f"start_jogging_motor{motor}") as acquired:
             if not acquired:
@@ -276,8 +291,9 @@ class appMotionMotorsAgent:
 
         return True, "Started jogging motor {}".format(motor)
 
+    @ocs_agent.param('motor', default=1, type=int)
     def stop_jogging(self, session, params=None):
-        """stop_jogging(motor=1):
+        """stop_jogging(motor=1)
         
         **Task** - Stops the jogging of motor(s) set by params.
         
@@ -285,8 +301,6 @@ class appMotionMotorsAgent:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 1)
         """
-
-        @ocs_agent.param('motor', default=1, type=int)
         
         with self.lock.acquire_timeout(1, job=f"stop_jogging_motor{motor}") as acquired:
             if not acquired:
@@ -297,8 +311,9 @@ class appMotionMotorsAgent:
 
         return True, "Stopped jogging motor {}".format(motor)
 
+    @ocs_agent.param('motor', default=1, type=int)
     def seek_home_linear_stage(self, session, params=None):
-        """seek_home_linear_stage(motor=1):
+        """seek_home_linear_stage(motor=1)
         
         **Task** - Move the linear stage to its home position (using the home
         limit switch).
@@ -308,13 +323,10 @@ class appMotionMotorsAgent:
                 motors. (default 1)
         """
 
-        @ocs_agent.param('motor', default=1, type=int)
-        
-        self.move_status = self.is_moving(motor)
-        if self.move_status:
-            return False, "Motors are already moving."
-
+        self.move_status = self.is_moving(motor)[1][1]
         with self.lock.acquire_timeout(timeout=1, job=f'seek_home_linear_stage_motor{motor}') as acquired:
+            if self.move_status:
+                return False, "Motors are already moving."
             if not acquired:
                 self.log.warn(
                     f"Could not seek_home_linear_stage because lock held by {self.lock.job}")
@@ -323,8 +335,9 @@ class appMotionMotorsAgent:
 
         return True, "Moving motor {} to home".format(motor)
 
+    @ocs_agent.param('motor', default=1, type=int)
     def set_zero(self, session, params=None):
-        """set_zero(motor=1):
+        """set_zero(motor=1)
         
         **Task** - Sets the zero position (AKA home) for motor(s) specified in
         params.
@@ -334,13 +347,10 @@ class appMotionMotorsAgent:
                 motors. (default 1)
         """
 
-        @ocs_agent.param('motor', default=1, type=int)
-        
-        self.move_status = self.is_moving(motor)
-        if self.move_status:
-            return False, "Motors are already moving."
-
+        self.move_status = self.is_moving(motor)[1][1]
         with self.lock.acquire_timeout(1, job=f"set_zero_motor{motor}") as acquired:
+            if self.move_status:
+                return False, "Motors are already moving."
             if not acquired:
                 self.log.warn(
                     f'Could not set_zero because lock held by {self.lock.job}')
@@ -349,10 +359,13 @@ class appMotionMotorsAgent:
 
         return True, "Zeroing motor {} position".format(motor)
 
+    @ocs_agent.param('motor', default=1, type=int)
+    @ocs_agent.param('pos_is_inches', default=True, type=bool)
+    @ocs_agent.param('pos_data', type=list)
     def run_positions(self, session, params=None):
-        """run_positions(pos_data=[1,1], motor=1, pos_is_inches=False):
+        """run_positions(pos_data=None, motor=1, pos_is_inches=False)
         
-        **Task** - Runs a tab-delimited list of entries as positions. For 
+        **Task** - Runs a list of entries as positions. For 
         motor=ALL, the first column must be the x-data, and the second column
         the y-data. Each position will be attained.
             
@@ -365,14 +378,10 @@ class appMotionMotorsAgent:
                 in counts (default False)
         """
 
-        @ocs_agent.param('motor', default=1, type=int)
-        @ocs_agent.param('pos_is_inches', default=True, type=bool)
-        
-        self.move_status = self.is_moving(motor)
-        if self.move_status:
-            return False, "Motors are already moving."
-
+        self.move_status = self.is_moving(motor)[1][1]
         with self.lock.acquire_timeout(1, job=f"run_positions_motor{motor}") as acquired:
+            if self.move_status:
+                return False, "Motors are already moving."
             if not acquired:
                 self.log.warn(
                     f'Could not run_positions because lock held by {self.lock.job}')
@@ -381,8 +390,11 @@ class appMotionMotorsAgent:
 
         return True, "Moving stage to {}".format(params['pos_data'])
 
+    @ocs_agent.param('motor', default=1, type=int)
+    @ocs_agent.param('velocity', default=12.0, type=float, check=lambda x: 0.25 <= x <= 50)
+    @ocs_agent.param('rot_accel', default=1.0, type=float, check=lambda x: 1.0 <= x <= 3000)
     def start_rotation(self, session, params=None):
-        """start_rotation(motor=1, velocity=12.0, rot_accel=1.0):
+        """start_rotation(motor=1, velocity=12.0, rot_accel=1.0)
         
         **Task** - Start rotating motor of polarizer. 
         
@@ -397,10 +409,6 @@ class appMotionMotorsAgent:
             rot_accel (float): The acceleration in revolutions per second per
                 second within range [1,3000]. (default 1.0)
         """
-
-        @ocs_agent.param('motor', default=1, type=int)
-        @ocs_agent.param('velocity', default=12.0, type=float, check=lambda x: 0.25 <= x <= 50)
-        @ocs_agent.param('rot_accel', default=1.0, type=float, check=lambda x: 1.0 <= x <= 3000)
         
         with self.lock.acquire_timeout(1, job=f"start_rotation_motor{motor}") as acquired:
             if not acquired:
@@ -412,8 +420,9 @@ class appMotionMotorsAgent:
         return True, "Started rotating motor at velocity {} and acceleration {}".format(
             velocity, rot_accel)
 
+    @ocs_agent.param('motor', default=1, type=int)
     def stop_rotation(self, session, params=None):
-        """stop_rotation(motor=1):
+        """stop_rotation(motor=1)
         
         **Task** - Stop rotating motor of polarizer.
         
@@ -421,8 +430,6 @@ class appMotionMotorsAgent:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 1)
         """
-
-        @ocs_agent.param('motor', default=1, type=int)
         
         with self.lock.acquire_timeout(1, job=f"stop_rotation_motor{motor}") as acquired:
             if not acquired:
@@ -433,8 +440,9 @@ class appMotionMotorsAgent:
 
         return True, "Stopped rotating motor"
 
+    @ocs_agent.param('motor', default=3, type=int)
     def close_connection(self, session, params=None):
-        """close_connection(motor=3):
+        """close_connection(motor=3)
         
         **Task** - Close connection to specific motor.
         
@@ -442,8 +450,6 @@ class appMotionMotorsAgent:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 3)
         """
-
-        @ocs_agent.param('motor', default=3, type=int)
         
         with self.lock.acquire_timeout(1, job=f"close_connection_motor{motor}") as acquired:
             if not acquired:
@@ -454,8 +460,9 @@ class appMotionMotorsAgent:
 
         return True, "Closed connection to motor {}".format(motor)
 
+    @ocs_agent.param('motor', default=1, type=int)
     def reconnect_motor(self, session, params=None):
-        """reconnect_motor(motor=1):
+        """reconnect_motor(motor=1)
         
         **Task** - Reestablish a connection to a motor if connection is lost.
         
@@ -463,8 +470,6 @@ class appMotionMotorsAgent:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 1)
         """
-
-        @ocs_agent.param('motor', default=1, type=int)
         
         with self.lock.acquire_timeout(1, job=f"reconnect_motor_motor{motor}") as acquired:
             if not acquired:
@@ -472,10 +477,17 @@ class appMotionMotorsAgent:
                     f'Could not reestablish connection because lock held by {self.lock.job}')
                 return False, "Could not acquire lock"
             self.motors.reconnect_motor(motor)
-        return True, "Reestablished connection with motor{}".format(motor)
+            
+        if self.motors.reconnect_motor.sock_status == 1:
+            return True, "Reestablished connection with motor{}".format(motor)
+        elif self.motors.reconnect_motor.sock_status == 0:
+            return False, "Failed to reestablish connection with motor{}".format()
 
+    @ocs_agent.param('motor', default=1, type=int)
+    @ocs_agent.param('update_period', default=.1, type=float)
+    @ocs_agent.param('verbose', default=False, type=bool)
     def block_while_moving(self, session, params=None):
-        """block_while_moving(motor=1, update_period=.1, verbose=False):
+        """block_while_moving(motor=1, update_period=.1, verbose=False)
         
         **Task** - Block until the specified axes/motor have stop moving. 
         Checks each axis every update_period seconds.
@@ -488,10 +500,6 @@ class appMotionMotorsAgent:
             verbose (bool): Prints output from motor requests if True. 
                 (default False)
         """
-
-        @ocs_agent.param('motor', default=1, type=int)
-        @ocs_agent.param('update_period', default=.1, type=float)
-        @ocs_agent.param('verbose', default=False, type=bool)
         
         with self.lock.acquire_timeout(1, job=f"block_while_moving_motor{motor}") as acquired:
             if not acquired:
@@ -502,8 +510,9 @@ class appMotionMotorsAgent:
 
         return True, "Motor {} stopped moving".format(motor)
 
+    @ocs_agent.param('motor', default=3, type=int)
     def kill_all_commands(self, session, params=None):
-        """kill_all_commands(motor=3):
+        """kill_all_commands(motor=3)
         
         **Task** Stops all active commands on the device. 
             
@@ -511,8 +520,6 @@ class appMotionMotorsAgent:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 3)
         """
-
-        @ocs_agent.param('motor', default=3, type=int)
         
         with self.lock.acquire_timeout(1, job=f"kill_all_commands_motor{motor}") as acquired:
             if not acquired:
@@ -523,8 +530,10 @@ class appMotionMotorsAgent:
 
         return True, "Killing all active commands on motor {}".format(motor)
 
+    @ocs_agent.param('motor', default=1, type=int)
+    @ocs_agent.param('value', default=0, type=float)
     def set_encoder_value(self, session, params=None):
-        """set_encoder_value(motor=1, value=0):
+        """set_encoder_value(motor=1, value=0)
         
         **Task** - Set the encoder values in order to keep track of absolute
             position.
@@ -535,14 +544,10 @@ class appMotionMotorsAgent:
             value (float): Sets encoder value. (default 0)
         """
 
-        @ocs_agent.param('motor', default=1, type=int)
-        @ocs_agent.param('value', default=0, type=float)
-        
-        self.move_status = self.is_moving(motor)
-        if self.move_status:
-            return False, "Motors are already moving."
-
+        self.move_status = self.is_moving(motor)[1][1]
         with self.lock.acquire_timeout(1, job=f"set_encoder_value_motor{motor}") as acquired:
+            if self.move_status:
+                return False, "Motors are already moving."
             if not acquired:
                 self.log.warn(
                     f'Could not set_encoder_value because lock held by {self.lock.job}')
@@ -551,8 +556,9 @@ class appMotionMotorsAgent:
 
         return True, "Setting encoder position to {}".format(e_positions)
 
+    @ocs_agent.param('motor', default=3, type=int)
     def get_encoder_value(self, session, params=None):
-        """get_encoder_value(motor=3):
+        """get_encoder_value(motor=3)
         
         **Task** - Retrieve all motor step counts to verify movement.
         
@@ -560,8 +566,6 @@ class appMotionMotorsAgent:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 3)
         """
-
-        @ocs_agent.param('motor', default=3, type=int)
         
         with self.lock.acquire_timeout(1, job=f"get_encoder_info_motor{motor}") as acquired:
             if not acquired:
@@ -573,8 +577,10 @@ class appMotionMotorsAgent:
         return True, ("Current encoder positions: {}".format(
             e_positions), e_positions)
 
+    @ocs_agent.param('motor', default=1, type=int)
+    @ocs_agent.param('pos_is_inches', default=True, type=bool)
     def get_positions(self, session, params=None):
-        """get_positions(motor=1, inches=True):
+        """get_positions(motor=1, inches=True)
         
         **Task** - Get the position of the motor in counts, relative to the
         set zero point (or starting point/home).
@@ -588,9 +594,6 @@ class appMotionMotorsAgent:
         Returns:
             positions (list): The positions of the specified motors.
         """
-
-        @ocs_agent.param('motor', default=1, type=int)
-        @ocs_agent.param('pos_is_inches', default=True, type=bool)
         
         with self.lock.acquire_timeout(1, job=f"get_positions_motor{motor}") as acquired:
             if not acquired:
@@ -606,8 +609,10 @@ class appMotionMotorsAgent:
 
         return True, "Current motor positions: {}".format(positions)
 
+    @ocs_agent.param('motor', default=1, type=int)
+    @ocs_agent.param('pos_is_inches', default=True, type=bool)
     def pos_while_moving(self, session, params=None):
-        """pos_while_moving(motor=1, inches=True):
+        """pos_while_moving(motor=1, inches=True)
         
         **Task** - Get the position of the motor while it is currently in 
         motion. An estimate based on the calculated trajectory of the movement,
@@ -622,9 +627,6 @@ class appMotionMotorsAgent:
         Returns:
             positions (list): The positions of the specified motors.
         """
-
-        @ocs_agent.param('motor', default=1, type=int)
-        @ocs_agent.param('pos_is_inches', default=True, type=bool)
         
         with self.lock.acquire_timeout(1, job=f"pos_while_moving_motor{motor}") as acquired:
             if not acquired:
@@ -635,8 +637,10 @@ class appMotionMotorsAgent:
 
         return True, "Current motor positions: {}".format(i_positions)
 
+    @ocs_agent.param('motor', default=1, type=int)
+    @ocs_agent.param('verbose', default=True, type=bool)
     def is_moving(self, session, params=None):
-        """is_moving(motor=1, verbose=True):
+        """is_moving(motor=1, verbose=True)
         
         **Tasks** - Checks if motors are moving OR if limit switches are 
         tripped.
@@ -647,8 +651,6 @@ class appMotionMotorsAgent:
             verbose (bool): Prints output from motor requests if True.
                 (default True)
         """
-        @ocs_agent.param('motor', default=1, type=int)
-        @ocs_agent.param('verbose', default=True, type=bool)
         
         with self.lock.acquire_timeout(1, job=f"is_moving_motor{motor}") as acquired:
             if not acquired:
@@ -662,8 +664,9 @@ class appMotionMotorsAgent:
         else:
             return True, ("Motors are not moving.", self.move_status)
 
+    @ocs_agent.param('motor', default=3, type=int)
     def move_off_limit(self, session, params=None):
-        """move_off_limit(motor=3):
+        """move_off_limit(motor=3)
         
         **Task** - Moves motor off limit switch if unexpectedly hit, resetting
         alarms.
@@ -672,8 +675,6 @@ class appMotionMotorsAgent:
             motor (int): 1,2,3. Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 3)
         """
-        
-        @ocs_agent.param('motor', default=3, type=int)
         
         with self.lock.acquire_timeout(1, job=f"move_off_limit{motor}") as acquired:
             if not acquired:
@@ -684,8 +685,9 @@ class appMotionMotorsAgent:
 
         return True, "Motor {} moved off limit switch".format(motor)
 
+    @ocs_agent.param('motor', default=1, type=int)
     def reset_alarms(self, session, params=None):
-        """reset_alarms(motor=1):
+        """reset_alarms(motor=1)
         
         **Task** - Resets alarm codes present. Only advised if you have checked
         what the alarm is first!
@@ -694,8 +696,6 @@ class appMotionMotorsAgent:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 1)
         """
-
-        @ocs_agent.param('motor', default=1, type=int)
         
         with self.lock.acquire_timeout(1, job=f"reset_alarms_motor{motor}") as acquired:
             if not acquired:
@@ -706,8 +706,9 @@ class appMotionMotorsAgent:
 
         return True, "Alarms reset for motor {}".format(motor)
 
+    @ocs_agent.param('motor', default=1, type=int)
     def home_with_limits(self, session, params=None):
-        """home_with_limits(motor=1):
+        """home_with_limits(motor=1)
         
         **Task** - Moves stages to home based on location from limits. One inch
         from the limit switch.
@@ -716,8 +717,6 @@ class appMotionMotorsAgent:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 1)
         """
-
-        @ocs_agent.param('motor', default=1, type=int)
         
         with self.lock.acquire_timeout(30, job=f"home_with_limits_motor{motor}") as acquired:
             if not acquired:
@@ -728,10 +727,27 @@ class appMotionMotorsAgent:
 
         return True, "Zeroed stages using limit switches"
 
+    @ocs_agent.param('motor', default=3, type=int)
+    @ocs_agent.param('verbose', default=True, type=bool)
+    @ocs_agent.param('f_sample', default=self.sampling_frequency, type=float)
     def start_acq(self, session, params=None):
-        """start_acq(motor=3, verbose=False, f_sample=2):
+        """start_acq(motor=3, verbose=False, f_sample=2)
         
         **Process** - Start acquisition of data.
+        
+        The ``session.data`` object stores the most recent published values
+        in a dictionary. For example::
+        
+            session.data = {
+                'timestamp': 1598626144.5365012,
+                'block_name': 'positions',
+                'data': {
+                    "motor1_encoder": 15000,
+                    "motor1_stepper": 12,
+                    "motor1_connection": 1,
+                    "motor1_move_status": False,
+                }
+            }
         
         Parameter:
         motor (int): Determines which motor, either 1 or 2, 3 is for all
@@ -742,10 +758,6 @@ class appMotionMotorsAgent:
         """
         if params is None:
             params = {}
-
-        @ocs_agent.param('motor', default=3, type=int)
-        @ocs_agent.param('verbose', default=True, type=bool)
-        @ocs_agent.param('f_sample', default=self.sampling_frequency, type=float)
         
         pm = Pacemaker(f_sample, quantize=True)
 
@@ -783,7 +795,7 @@ class appMotionMotorsAgent:
                     try:
                         self.log.debug(
                             f"getting position/move status of motor{mot_id}")
-                        self.move_status = self.is_moving(
+                        self.move_status = self.motors.is_moving(
                             mot_id, verbose)
                         pos = self.motors.get_position_in_inches(motor=mot_id)
                         if self.move_status:
@@ -805,11 +817,12 @@ class appMotionMotorsAgent:
                         data['data'][f'motor{mot_id}_connection'] = 0
 
                 self.agent.publish_to_feed('positions', data)
+                session.data = data
 
         return True, 'Acquisition exited cleanly.'
 
     def stop_acq(self, session, params=None):
-        """stop_acq(params=None):
+        """stop_acq(params=None)
         
         **Task** - Stop data acquisition.
         
