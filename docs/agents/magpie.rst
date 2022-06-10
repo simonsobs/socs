@@ -337,5 +337,11 @@ Supporting APIs
 .. autoclass:: agents.magpie.magpie_agent.FIRFilter
   :members:
 
+.. autoclass:: agents.magpie.magpie_agent.Demodulator
+  :members:
+
+.. autoclass:: agents.magpie.magpie_agent.WhiteNoiseCalculator
+  :members:
+
 .. autoclass:: agents.magpie.magpie_agent.FocalplaneConfig
   :members:
