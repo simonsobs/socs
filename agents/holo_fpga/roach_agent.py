@@ -20,16 +20,16 @@ from holog_daq import fpga_daq3, poco3
 ON_RTD = os.environ.get("READTHEDOCS") == "True"
 if not ON_RTD:
     import casperfpga
-    from holog_daq import fpga_daq3, synth3
+    from holog_daq import fpga_daq3, poco3, synth3
     from ocs import ocs_agent, site_config
-    from ocs.ocs_twisted import TimeoutLock
+    from ocs.ocs_twisted import Pacemaker, TimeoutLock
 
 
 class FPGAAgent:
     """
     Agent for connecting to the Synths for holography
     
-    Args: holog_config.yaml (path relative to $OCS_CONFIG_DIR)
+    Args: 
     """
 
     def __init__(self, agent, config_file):
@@ -43,6 +43,14 @@ class FPGAAgent:
         self.lock = TimeoutLock()
 
         """
+        if mode == 'acq':
+            self.auto_acq = True
+        else:
+            self.auto_acq = False
+        self.sampling_frequency = float(samp)
+
+        ### register the position feeds
+
         ### Agent registers data feed, things published to feed go to grafana and .g3 files
         ### pick a good name for feeds, once it's registered it's kinda permanent
         
@@ -56,15 +64,15 @@ class FPGAAgent:
         # like limits and translate vary over different FTSes This is loaded
         # from a yaml file, which is assumed to be in the $OCS_CONFIG_DIR
         # directory.
-        if config_file is None:
-            raise self.log.info()
+        if config_file == "None":
+            raise Exception("No config file specified for the FTS mirror config")
         else:
             config_file_path = os.path.join(os.environ["OCS_CONFIG_DIR"], config_file)
             with open(config_file_path) as stream:
                 self.holog_configs = yaml.safe_load(stream)
                 if self.holog_configs is None:
                     raise Exception("No mirror configs in config file.")
-                self.log.info(f"Loaded holography configs from file {config_file_path}")
+                self.log.info(f"Loaded mirror configs from file {config_file_path}")
                 self.baseline = self.holog_configs.pop("baseline", None)
                 self.roach = self.holog_configs.pop("roach", None)
 
@@ -87,7 +95,71 @@ class FPGAAgent:
         if self.fpga.is_connected():
             print("ok\n")
 
-    
+    # def init_FPGA(self, session, params=None):
+
+    #     if params is None:
+    #         params = {}
+
+    #     self.log.debug("Trying to acquire lock")
+    #     with self.lock.acquire_timeout(timeout=3, job="init") as acquired:
+    #         # Locking mechanism stops code from proceeding if no lock acquired
+    #         if not acquired:
+    #             self.log.warn(
+    #                 "Could not start init because {} is already running".format(
+    #                     self.lock.job
+    #                 )
+    #             )
+    #             return False, "Could not acquire lock."
+    #         # Run the function you want to run
+
+    #         print("Programming FPGA with python2")
+    #         err = os.system(
+    #             "/opt/anaconda2/bin/python2 /home/chesmore/Desktop/holog_daq/scripts/upload_fpga_py2.py"
+    #         )
+    #         assert err == 0
+
+    #         self.fpga = casperfpga.CasperFpga(self.roach)
+
+    #         # is_py3 = int(platform.python_version_tuple()[0]) == 3
+
+    #         # fpga = None
+    #         # roach, opts, baseline = fpga_daq3.roach2_init()
+
+    #         # print("------------------------")
+    #         # print("Programming FPGA with call to a python2 prog...")
+    #         # err = os.system("/opt/anaconda3/bin/python3 /home/chesmore/Desktop/test_package/holog_daq/scripts/poco_init.py3")
+    #         # assert err == 0
+
+    #         # self.fpga = subprocess.Popen("/opt/anaconda3/bin/python3 /home/chesmore/Desktop/test_package/holog_daq/scripts/poco_init.py3",shell=True).stdout
+    #         # self.fpga = subprocess.Popen("/opt/anaconda3/bin/python3 /home/chesmore/Desktop/holog_daq/scripts/poco_init.py3",shell=True).stdout
+            
+    #     # This part is for the record and to allow future calls to proceed,
+    #     # so does not require the lock
+    #     self.initialized = True
+
+    #     return True, "FPGA connected."
+
+    # def init_FPGA(self, session, params=None):
+
+    #     if params is None:
+    #         params = {}
+
+    #     self.log.debug("Trying to acquire lock")
+    #     with self.lock.acquire_timeout(timeout=0, job="init") as acquired:
+    #         # Locking mechanism stops code from proceeding if no lock acquired
+    #         if not acquired:
+    #             self.log.warn(
+    #                 "Could not start init because {} is already running".format(
+    #                     self.lock.job
+    #                 )
+    #             )
+    #             return False, "Could not acquire lock."
+    #         # Run the function you want to run
+
+    #     self.initialized = True
+
+    #     return True, "FPGA connected."
+
     def take_data(self, session, params=None):
 
         with self.lock.acquire_timeout(timeout=3, job="take_data") as acquired:
@@ -129,6 +201,8 @@ class FPGAAgent:
 
             self.agent.publish_to_feed("fpga", data)
             session.data.update(data["data"])
+
+            pass
 
         return True, "Data acquired."
 
