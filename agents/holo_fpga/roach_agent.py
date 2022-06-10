@@ -242,3 +242,4 @@ if __name__ == "__main__":
     agent.register_task("take_data", fpga_agent.take_data)
 
     runner.run(agent, auto_reconnect=True)
+
