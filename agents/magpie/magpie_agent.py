@@ -305,12 +305,15 @@ class VisElem:
         self.abs_smurf_chan = abs_smurf_chan
         self.name = name
 
-        vals = ['{name}/raw', '{name}/demod', '{name}/wl', '{name}/flagged']
+        vals = [
+            '{name}/raw', '{name}/demod', '{name}/wl', '{name}/flagged',
+            '{name}/smurf_band', '{name}/smurf_chan'
+        ]
         self.vals = [v.format(name=name) for v in vals]
         eq_templates = {
-            'Raw': '{name}/raw',
-            'Demod': '* {name}/demod rms_scale',
-            'White Noise': '* {name}/wl wl_scale',
+            'raw': '{name}/raw',
+            'demod': '* {name}/demod rms_scale',
+            'wl': '* {name}/wl wl_scale',
             'flagged': '{name}/flagged',
             'smurf_band': f'{self.abs_smurf_chan // CHANS_PER_BAND}',
             'smurf_chan': f'{self.abs_smurf_chan % 512}',
