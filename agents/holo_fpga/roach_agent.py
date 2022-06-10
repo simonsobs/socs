@@ -28,8 +28,8 @@ if not ON_RTD:
 class FPGAAgent:
     """
     Agent for connecting to the Synths for holography
-    
-    Args: 
+
+    Args:
     """
 
     def __init__(self, agent, config_file):
@@ -53,7 +53,7 @@ class FPGAAgent:
 
         ### Agent registers data feed, things published to feed go to grafana and .g3 files
         ### pick a good name for feeds, once it's registered it's kinda permanent
-        
+
         """
         agg_params = {"frame_length": 10 * 60}  # [sec]
         self.agent.register_feed(
@@ -132,7 +132,7 @@ class FPGAAgent:
 
     #         # self.fpga = subprocess.Popen("/opt/anaconda3/bin/python3 /home/chesmore/Desktop/test_package/holog_daq/scripts/poco_init.py3",shell=True).stdout
     #         # self.fpga = subprocess.Popen("/opt/anaconda3/bin/python3 /home/chesmore/Desktop/holog_daq/scripts/poco_init.py3",shell=True).stdout
-            
+
     #     # This part is for the record and to allow future calls to proceed,
     #     # so does not require the lock
     #     self.initialized = True
@@ -242,4 +242,3 @@ if __name__ == "__main__":
     agent.register_task("take_data", fpga_agent.take_data)
 
     runner.run(agent, auto_reconnect=True)
-

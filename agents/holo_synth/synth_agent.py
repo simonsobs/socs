@@ -76,8 +76,8 @@ class SynthAgent:
             self.log.debug("Lock Acquired Connecting to Stages")
             self.lo_id = synth3.get_LOs()
 
-            synth3.set_RF_output(0, 1, self.lo_id) # LO ID, On=1, USB connection ID
-            synth3.set_RF_output(1, 1, self.lo_id) # LO ID, On=1, USB connection ID
+            synth3.set_RF_output(0, 1, self.lo_id)  # LO ID, On=1, USB connection ID
+            synth3.set_RF_output(1, 1, self.lo_id)  # LO ID, On=1, USB connection ID
 
             # data = {"timestamp": time.time(), "block_name": "synth_LO", "data": {}}
 
@@ -87,7 +87,6 @@ class SynthAgent:
             # self.agent.publish_to_feed("synth_LO", data)
             # session.data.update(data["data"])
 
-
         # This part is for the record and to allow future calls to proceed,
         # so does not require the lock
         self.initialized = True
@@ -96,7 +95,7 @@ class SynthAgent:
 
     def set_frequencies(self, session, params):
         """
-        params: 
+        params:
             dict: {'freq0': float
                    'freq1': float}
         """
@@ -104,9 +103,9 @@ class SynthAgent:
         f1 = params.get("freq1", 0)
         f_offset = params.get("offset", 0)
 
-        F_1 = int(f1 * self.ghz_to_mhz / self.N_MULT) # Convert GHz -> MHz for synthesizers
+        F_1 = int(f1 * self.ghz_to_mhz / self.N_MULT)  # Convert GHz -> MHz for synthesizers
 
-        print(F_1,F_1+f_offset)
+        print(F_1, F_1 + f_offset)
 
         with self.lock.acquire_timeout(timeout=3, job="set_frqeuencies") as acquired:
             if not acquired:
@@ -116,12 +115,12 @@ class SynthAgent:
                 return False, "Could not acquire lock"
 
             synth3.set_f(0, F_1, self.lo_id)
-            synth3.set_f(1, F_1+f_offset, self.lo_id)
+            synth3.set_f(1, F_1 + f_offset, self.lo_id)
 
             data = {"timestamp": time.time(), "block_name": "synth_LO", "data": {}}
 
             data["data"]["F1"] = F_1
-            data["data"]["F2"] = F_1+f_offset
+            data["data"]["F2"] = F_1 + f_offset
 
             self.agent.publish_to_feed("synth_LO", data)
             session.data.update(data["data"])
@@ -142,7 +141,7 @@ class SynthAgent:
 
     def set_synth_status(self, session, params):
         """
-        params: 
+        params:
             dict: {'LO_ID': int
                    'status': int}
         """
@@ -166,8 +165,8 @@ class SynthAgent:
             self.agent.publish_to_feed("synth_LO", data)
             session.data.update(data["data"])
 
-
         return True, "Frequencies Updated"
+
 
 def make_parser(parser=None):
     """Build the argument parser for the Agent. Allows sphinx to automatically

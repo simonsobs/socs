@@ -17,7 +17,7 @@ It will connect the computer to the two Local Oscillators (LO's) via USB port, i
 Dependencies
 ------------
 
-Python Packages: 
+Python Packages:
 - holo_daq
 
 Configuration File Examples
