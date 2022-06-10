@@ -18,14 +18,13 @@ Dependencies
 ------------
 
 Python Packages: 
-- casperfpga
-- holo_daq
+- casperfpga (https://pypi.org/project/casperfpga/)
+- holog_daq (https://github.com/McMahonCosmologyGroup/holog_daq)
 
 Configuration File Examples
 ---------------------------
 
-Below are configuration examples for the ocs config file and for running the
-Agent in a docker container.
+Below are configuration examples for the ocs config file.
 
 OCS Site Config
 ````````````````
@@ -38,17 +37,20 @@ available arguments::
        'instance-id' : 'fpga',
         'arguments': [['--config_file','holog_config.yaml']]},
 
+Example Config File
+---------------
+roach: "192.168.4.20"
+ghz_to_mhz: 1000
+N_MULT: 18
+F_OFFSET: 5
+baseline: 'bd'
+
 Description
 -----------
 
 The FPGAAgent contains functions which control the FPGA for holography measurements.  Before the FPGA can take measuremnts, the user needs to initialize the FPGA using the init_FPGA() function.  This will connect to the FPGA via an ethernet port (user specified in the holog_config.yaml file) and programs the FPGA using a .fpg file.
 
 Once the FPGA is initialized, the user can take data using the take_data() function.  This will record the cross-correlations A, BB, AB, and phase. 
-
-Subsection
-``````````
-
-# Use subsections where appropriate.
 
 Agent API
 ---------
