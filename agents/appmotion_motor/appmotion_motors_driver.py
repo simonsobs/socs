@@ -165,7 +165,7 @@ class Motor:
 
         Parameters:
             motor (int): MOTOR1, MOTOR2, or ALL. (default ALL)
-            verbose (bool): Prints output from motor requests if True. 
+            verbose (bool): Prints output from motor requests if True.
                 (default False)
         """
 
@@ -249,7 +249,6 @@ class Motor:
         # Basically, move motors until it hits the limit switch. This will
         # trigger an alarm
         self.move_axis_by_length(motor=mot_id, pos=-30, pos_is_inches=True)
-
         # Check if either motor is moving, and if yes exit function with an
         # error message
         move_status = self.is_moving(motor)
@@ -291,7 +290,7 @@ class Motor:
     def start_jogging(self, motor=ALL):
         """
         Starts jogging control for specified motors.
-        
+    
         Parameters:
             motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
         """
@@ -307,7 +306,7 @@ class Motor:
     def stop_jogging(self, motor=ALL):
         """
         Stop jogging control to all motors.
-        
+
         Parameters:
             motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
         """
@@ -317,7 +316,7 @@ class Motor:
         """
         Move the linear stage to its home position using the home 
         limit switch.
-        
+
         Parameters:
             motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
         """
@@ -350,7 +349,7 @@ class Motor:
         """
         Tell the motor to set the current position as the zero 
         point.
-        
+
         Parameters:
             motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
         """
@@ -397,7 +396,7 @@ class Motor:
             motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
 
         Returns:
-            real_positions (list): The positions in inches of the specified 
+            real_positions (list): The positions in inches of the specified
             motors.
         """
         real_positions = []
@@ -484,12 +483,10 @@ class Motor:
                           self.s_p_rev / 2.0)
         else:
             unit_pos = int(pos)
-
         # Set the new pos and real_pos parameters of the motor object
         self.pos = unit_pos
         self.real_pos = 2.0 * unit_pos / \
             (AXIS_THREADS_PER_INCH * self.s_p_rev)  # See 2.0 note above
-
         # Move the motor
         self.write('DI%i\r' % (unit_pos))  # DI = Distance/Position
         self.write('FP\r')  # FL = Feed to Position
@@ -507,12 +504,12 @@ class Motor:
 
         Parameters:
             motor (int): MOTOR1, MOTOR2, or ALL (default MOTOR1)
-            pos (float): the desired number of counts or inches to move from 
-                current position, positive indicates away from the motor. 
+            pos (float): the desired number of counts or inches to move from
+                current position, positive indicates away from the motor.
                 (default 0)
             pos_is_inches (bool): True if pos was specified in inches, False if
                 in counts. (default False)
-            lin_stage (bool): True if the specified motor is for the linear 
+            lin_stage (bool): True if the specified motor is for the linear
                 stage, False if not. (default True)
         """
         if not self.motor:
@@ -533,8 +530,6 @@ class Motor:
                 self.s_p_rev /
                 2.0)  # See 2.0 note above
         else:
-
-
             unit_pos = int(pos)
 
         # Set the new pos and real_pos parameters of the motor object
@@ -550,9 +545,9 @@ class Motor:
 
     def set_velocity(self, motor=ALL, velocity=1.0):
         """
-        Set velocity in revolutions/second.  Range is 0.25 - 50. 
+        Set velocity in revolutions/second.  Range is 0.25 - 50.
         Accepts floating point values.
-        
+
         Parameters:
             motor(int): MOTOR1, MOTOR2, or ALL. (default ALL)
             velocity (float): Sets velocity of motor in revolutions per second
@@ -574,10 +569,9 @@ class Motor:
     def set_acceleration(self, motor=ALL, accel=5):
         """
         Set acceleration of motors driving stages. (default 5)
-        
         .. note::
             `accel` parameter will only accept integer values.
-            
+
         Parameters:
             motor (int): MOTOR1, MOTOR2, or ALL. (default ALL)
             accel (int): Sets acceleration in revolutions per second per second
@@ -593,7 +587,6 @@ class Motor:
     def kill_all_commands(self, motor=ALL):
         """
         Stop all active commands on the device.
-        
         Parameters:
             motor(int): MOTOR1, MOTOR2, or ALL (default ALL)
         """
@@ -645,10 +638,10 @@ class Motor:
 
     def run_positions(self, pos_data, motor=ALL, pos_is_inches=False):
         """
-        Runs a list of entries as positions. For 
+        Runs a list of entries as positions. For
         motor=ALL, the first column must be the x-data, and the second column
-        the y-data. Each position will be attained. 
-        
+        the y-data. Each position will be attained.
+
         Parameters:
             pos_data (list): Tab-delimited list of entries. First column
                 is x-data, second column is y-data.
@@ -686,7 +679,7 @@ class Motor:
         """
         Set motor enable to true or false for given axis. Should
         disable motor when stopped for lower noise data acquisition.
-        
+
         Parameters:
             motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
             enable (bool): Enables specified motor if True, disables specified
@@ -704,7 +697,6 @@ class Motor:
     def retrieve_encoder_info(self, motor=ALL):
         """
         Retrieve all motor step counts to verify movement.
-        
         Parameters:
             motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
         """
@@ -730,9 +722,9 @@ class Motor:
 
     def set_encoder_value(self, motor=ALL, value=0):
         """
-        Set the encoder values in order to keep track of absolute 
+        Set the encoder values in order to keep track of absolute
         position.
-        
+
         Parameters:
             motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
             value (float): Sets encoder value. (default 0)
@@ -817,7 +809,7 @@ class Motor:
         """
         Close the connection to the serial controller for the
         specified motor.
-        
+
         Parameters:
             motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
         """
@@ -828,24 +820,22 @@ class Motor:
         print("Connection to serial controller disconnected.")
 
 #NEED TO FIX
-    def reconnect_motor(self, motor=ALL):
-        """
-        Reestablish connection with specified motor.
-        
-        Parameters:
-            motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
-        """
-        if not self.motor:
-            print("Specified motor is invalid - no connection to close.")
-            continue
-        print(f"port: {self.port}")
-        try:
-            self.sock.connect(self.port) #return 1
-            print(f"Connection with motor{motor} has been reestablished.")
-            sock_status = 1
-        except:
-            print(f"Connection with motor{motor} could not be reestablished.") #return 0
-            sock_status = 0
-        
-
+#    def reconnect_motor(self, motor=ALL):
+#        """
+#        Reestablish connection with specified motor.
+#        
+#        Parameters:
+#            motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
+#        """
+#        if not self.motor:
+#            print("Specified motor is invalid - no connection to close.")
+#            continue
+#        print(f"port: {self.port}")
+#        try:
+#            self.sock.connect(self.port) #return 1
+#            print(f"Connection with motor{motor} has been reestablished.")
+#            sock_status = 1
+#        except:
+#            print(f"Connection with motor{motor} could not be reestablished.") #return 0
+#            sock_status = 0        
 

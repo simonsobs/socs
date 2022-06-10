@@ -13,9 +13,9 @@ if not on_rtd:
 
 class appMotionMotorsAgent:
     """
-    Agent for connecting to the SAT1 XY Stages. Differs from LATRt agent in that 
+    Agent for connecting to the SAT1 XY Stages. Differs from LATRt agent in that
     motors/controllers are seen as arguments.
-    Motor1 can be the X axis OR the Y axis, same with Motor2. Depends on setup 
+    Motor1 can be the X axis OR the Y axis, same with Motor2. Depends on setup
     (ip address + port).
 
     Args:
@@ -81,11 +81,11 @@ class appMotionMotorsAgent:
 
     def init_motors_task(self, session, params=None):
         """init_motors_task(params=None)
-        
+
         **Task** - Connect to the motors, either one or both.
 
         Parameters:
-            params (dict): Parameters dictionary for passing 
+            params (dict): Parameters dictionary for passing
                 parameters to task.
         """
 
@@ -151,19 +151,19 @@ class appMotionMotorsAgent:
         
         ** Task** - Move the axis to the given absolute position in counts or 
         inches.
-        
-        .. note:: 
-            If moving multiple axes, function will assume ``lin_stage`` value 
+
+        .. note::
+            If moving multiple axes, function will assume ``lin_stage`` value
             for all axes.
-            
+
         Parameters:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 1)
-            pos (float): The desired position in counts or in inches, positive 
+            pos (float): The desired position in counts or in inches, positive
                 indicates away from the motor (default 0)
-            pos_is_inches (bool): True if pos was specified in inches, False 
+            pos_is_inches (bool): True if pos was specified in inches, False
                 if in counts (default False)
-            lin_stage (bool): True if the specified motor is for the linear 
+            lin_stage (bool): True if the specified motor is for the linear
                 stage, False if not (default True)
         """
         
@@ -189,18 +189,18 @@ class appMotionMotorsAgent:
         
         **Task** - Move the axis relative to the current position by the 
         specified number of counts or inches.
-            
-        .. note:: 
-            If moving multiple axes, function will assume ``lin_stage`` value 
+
+        .. note::
+            If moving multiple axes, function will assume ``lin_stage`` value
                 for all axes.
         Parameters:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 1)
-            pos (float): The desired position in counts or in inches, positive 
+            pos (float): The desired position in counts or in inches, positive
                 indicates away from the motor. (default 0)
             pos_is_inches (bool): True if pos was specified in inches, False if
                 in counts (default False)
-            lin_stage (bool): True if the specified motor is for the linear 
+            lin_stage (bool): True if the specified motor is for the linear
                 stage, False if not (default True)
         """
 
@@ -222,7 +222,7 @@ class appMotionMotorsAgent:
         """set_velocity(motor=1, velocity=0.25)
         
         **Task** - Set velocity of motors driving stages.
-        
+
         Parameter:
             motor (int):Determines which motor, either 1 or 2, 3 is for all
                 motors.(default 3)
@@ -246,12 +246,12 @@ class appMotionMotorsAgent:
     @ocs_agent.param('accel', default=1, type=int, check=lambda x: 1 <= x <= 3000)
     def set_acceleration(self, session, params=None):
         """set_acceleration(motor=3, accel=1)
-        
+
         **Task** - Set acceleration of motors driving stages.
-        
+
         .. note::
             `accel` parameter will only accept integer values.
-        
+
         Parameters:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 3)
@@ -276,7 +276,7 @@ class appMotionMotorsAgent:
         """start_jogging(motor=1)
         
         **Task** - Jogs the motor(s) set by params.
-        
+
         Parameters:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 1)
@@ -294,9 +294,8 @@ class appMotionMotorsAgent:
     @ocs_agent.param('motor', default=1, type=int)
     def stop_jogging(self, session, params=None):
         """stop_jogging(motor=1)
-        
         **Task** - Stops the jogging of motor(s) set by params.
-        
+
         Parameters:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 1)
@@ -314,15 +313,15 @@ class appMotionMotorsAgent:
     @ocs_agent.param('motor', default=1, type=int)
     def seek_home_linear_stage(self, session, params=None):
         """seek_home_linear_stage(motor=1)
-        
+
         **Task** - Move the linear stage to its home position (using the home
         limit switch).
-            
+
         Parameters:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 1)
         """
-
+        
         self.move_status = self.is_moving(motor)[1][1]
         with self.lock.acquire_timeout(timeout=1, job=f'seek_home_linear_stage_motor{motor}') as acquired:
             if self.move_status:
@@ -338,10 +337,10 @@ class appMotionMotorsAgent:
     @ocs_agent.param('motor', default=1, type=int)
     def set_zero(self, session, params=None):
         """set_zero(motor=1)
-        
+
         **Task** - Sets the zero position (AKA home) for motor(s) specified in
         params.
-        
+
         Parameters:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 1)
@@ -368,7 +367,7 @@ class appMotionMotorsAgent:
         **Task** - Runs a list of entries as positions. For 
         motor=ALL, the first column must be the x-data, and the second column
         the y-data. Each position will be attained.
-            
+
         Parameters:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 1)
@@ -400,7 +399,7 @@ class appMotionMotorsAgent:
         
         .. note:: 
             Give acceleration and velocity values as arguments here.
-        
+
         Parameters:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 1)
@@ -409,7 +408,7 @@ class appMotionMotorsAgent:
             rot_accel (float): The acceleration in revolutions per second per
                 second within range [1,3000]. (default 1.0)
         """
-        
+
         with self.lock.acquire_timeout(1, job=f"start_rotation_motor{motor}") as acquired:
             if not acquired:
                 self.log.warn(
@@ -425,12 +424,12 @@ class appMotionMotorsAgent:
         """stop_rotation(motor=1)
         
         **Task** - Stop rotating motor of polarizer.
-        
+
         Parameters:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 1)
         """
-        
+
         with self.lock.acquire_timeout(1, job=f"stop_rotation_motor{motor}") as acquired:
             if not acquired:
                 self.log.warn(
@@ -445,12 +444,12 @@ class appMotionMotorsAgent:
         """close_connection(motor=3)
         
         **Task** - Close connection to specific motor.
-        
+
         Parameters:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 3)
         """
-        
+
         with self.lock.acquire_timeout(1, job=f"close_connection_motor{motor}") as acquired:
             if not acquired:
                 self.log.warn(
@@ -465,7 +464,7 @@ class appMotionMotorsAgent:
         """reconnect_motor(motor=1)
         
         **Task** - Reestablish a connection to a motor if connection is lost.
-        
+
         Parameters:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 1)
@@ -491,16 +490,16 @@ class appMotionMotorsAgent:
         
         **Task** - Block until the specified axes/motor have stop moving. 
         Checks each axis every update_period seconds.
-            
+
         Parameters:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 1)
-            updatePeriod (float): Time after which to check each motor in 
+            updatePeriod (float): Time after which to check each motor in
                 seconds. (default .1)
-            verbose (bool): Prints output from motor requests if True. 
+            verbose (bool): Prints output from motor requests if True.
                 (default False)
         """
-        
+
         with self.lock.acquire_timeout(1, job=f"block_while_moving_motor{motor}") as acquired:
             if not acquired:
                 self.log.warn(
@@ -534,16 +533,16 @@ class appMotionMotorsAgent:
     @ocs_agent.param('value', default=0, type=float)
     def set_encoder_value(self, session, params=None):
         """set_encoder_value(motor=1, value=0)
-        
+
         **Task** - Set the encoder values in order to keep track of absolute
             position.
-            
+
         Parameters:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 1)
             value (float): Sets encoder value. (default 0)
         """
-
+        
         self.move_status = self.is_moving(motor)[1][1]
         with self.lock.acquire_timeout(1, job=f"set_encoder_value_motor{motor}") as acquired:
             if self.move_status:
@@ -561,12 +560,12 @@ class appMotionMotorsAgent:
         """get_encoder_value(motor=3)
         
         **Task** - Retrieve all motor step counts to verify movement.
-        
+
         Parameters:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 3)
         """
-        
+
         with self.lock.acquire_timeout(1, job=f"get_encoder_info_motor{motor}") as acquired:
             if not acquired:
                 self.log.warn(
@@ -590,11 +589,11 @@ class appMotionMotorsAgent:
                 motors. (default 1)
             pos_is_inches (bool): Whether to return positions in inches or not.
                 (default True)
-                
+
         Returns:
             positions (list): The positions of the specified motors.
         """
-        
+
         with self.lock.acquire_timeout(1, job=f"get_positions_motor{motor}") as acquired:
             if not acquired:
                 self.log.warn(
@@ -623,11 +622,11 @@ class appMotionMotorsAgent:
                 motors. (default 1)
             pos_is_inches (bool): Whether to return positions in inches or not.
                 (default True)
-                
+
         Returns:
             positions (list): The positions of the specified motors.
         """
-        
+
         with self.lock.acquire_timeout(1, job=f"pos_while_moving_motor{motor}") as acquired:
             if not acquired:
                 self.log.warn(
@@ -644,14 +643,14 @@ class appMotionMotorsAgent:
         
         **Tasks** - Checks if motors are moving OR if limit switches are 
         tripped.
-        
+
         Parameters:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 1)
             verbose (bool): Prints output from motor requests if True.
                 (default True)
         """
-        
+
         with self.lock.acquire_timeout(1, job=f"is_moving_motor{motor}") as acquired:
             if not acquired:
                 self.log.warn(
@@ -670,12 +669,12 @@ class appMotionMotorsAgent:
         
         **Task** - Moves motor off limit switch if unexpectedly hit, resetting
         alarms.
-        
+
         Parameters:
             motor (int): 1,2,3. Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 3)
         """
-        
+
         with self.lock.acquire_timeout(1, job=f"move_off_limit{motor}") as acquired:
             if not acquired:
                 self.log.warn(
@@ -691,12 +690,12 @@ class appMotionMotorsAgent:
         
         **Task** - Resets alarm codes present. Only advised if you have checked
         what the alarm is first!
-        
+
         Parameters:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 1)
         """
-        
+
         with self.lock.acquire_timeout(1, job=f"reset_alarms_motor{motor}") as acquired:
             if not acquired:
                 self.log.warn(
@@ -712,12 +711,12 @@ class appMotionMotorsAgent:
         
         **Task** - Moves stages to home based on location from limits. One inch
         from the limit switch.
-        
+
         Parameters:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 1)
         """
-        
+
         with self.lock.acquire_timeout(30, job=f"home_with_limits_motor{motor}") as acquired:
             if not acquired:
                 self.log.warn(
@@ -752,13 +751,13 @@ class appMotionMotorsAgent:
         Parameter:
         motor (int): Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 3)
-        verbose (bool): Prints output from motor requests if True. 
+        verbose (bool): Prints output from motor requests if True.
             (default False)
         f_sample (float): Sampling rate in Hz. (default 2)
         """
         if params is None:
             params = {}
-        
+            
         pm = Pacemaker(f_sample, quantize=True)
 
         if not self.initialized or self.motors is None:
@@ -823,9 +822,9 @@ class appMotionMotorsAgent:
 
     def stop_acq(self, session, params=None):
         """stop_acq(params=None)
-        
+
         **Task** - Stop data acquisition.
-        
+
         Parameters:
             None
         """

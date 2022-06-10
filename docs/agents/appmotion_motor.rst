@@ -82,7 +82,7 @@ Below is a script for a beam-mapper scan using the appmotion_motor_agent.::
 
         if ( (Xstop-Xstart)%Xstep !=0 ) or ((Ystop-Ystart)%Ystep !=0):
             print('steplength is invalid')
-            sys.exit("Error message...... program is aborting...") 
+            sys.exit("Error message...... program is aborting...")
         else:
             mappointX = abs(int((Xstop-Xstart)/Xstep))+1
             mappointY = abs(int((Ystop-Ystart)/Ystep))+1
@@ -222,5 +222,4 @@ Supporting APIs
 
 .. autoclass:: agents.appmotion_motor.appmotion_motors_driver.MotControl
     :members:
-    
 
