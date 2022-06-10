@@ -1,6 +1,6 @@
 import txaio
 
-from pysnmp.hlapi.twisted import getCmd, SnmpEngine, CommunityData, UdpTransportTarget,\
+from pysnmp.hlapi.twisted import getCmd, setCmd, SnmpEngine, CommunityData, UdpTransportTarget,\
     ContextData, ObjectType, ObjectIdentity, UsmUserData
 
 # For logging
@@ -140,6 +140,50 @@ class SNMPTwister:
             raise ValueError(f'SNMP version {version} not supported.')
 
         datagram = getCmd(self.snmp_engine,
+                          version_object,
+                          self.udp_transport,
+                          ContextData(),
+                          *oid_list)
+
+        datagram.addCallback(self._success).addErrback(self._failure)
+
+        return datagram
+
+    def set(self, oid_list, version, setvalue):
+        """Issue a setCmd to get SNMP OID states.
+
+        Parameters
+        ----------
+        oid_list : list
+            List of high-level MIB Object OIDs. The list elements should either be
+            ObjectType, or tuples which define the OIDs.
+        version : int
+            SNMP version for communicaton (1, 2, or 3). All versions supported
+            here without auth or privacy. If using v3 the configured username
+            on the SNMP device should be 'ocs'.
+        setvalue : int
+            Integer to set OID. For example, 0 is off and 1 is on for outletControl on the iBootPDU.
+
+        Returns
+        ------
+        twisted.internet.defer.Deferred
+            A Deferred which will callback with the var_binds list from
+            self._success. If successful, this will contain a list of ObjectType class
+            instances representing MIB variables returned in SNMP response.
+
+        """
+        oid_list = [ObjectType(ObjectIdentity(*x), setvalue) if isinstance(x, tuple) else x for x in oid_list]
+
+        if version == 1:
+            version_object = CommunityData('private', mpModel=0)  # SNMPv1
+        elif version == 2:
+            version_object = CommunityData('private')  # SNMPv2c
+        elif version == 3:
+            version_object = UsmUserData('ocs')  # SNMPv3 (no auth, no privacy)
+        else:
+            raise ValueError(f'SNMP version {version} not supported.')
+
+        datagram = setCmd(self.snmp_engine,
                           version_object,
                           self.udp_transport,
                           ContextData(),
