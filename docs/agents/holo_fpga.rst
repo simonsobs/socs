@@ -45,11 +45,6 @@ The FPGAAgent contains functions which control the FPGA for holography measureme
 
 Once the FPGA is initialized, the user can take data using the take_data() function.  This will record the cross-correlations A, BB, AB, and phase. 
 
-Subsection
-``````````
-
-# Use subsections where appropriate.
-
 Agent API
 ---------
 
