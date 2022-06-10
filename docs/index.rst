@@ -62,6 +62,7 @@ API Reference        Full API documentation for core parts of the SOCS library.
     agents/synacc
     agents/tektronix3021c
     agents/vantage_pro2
+    agents/appmotion_motor
 
 .. toctree::
     :caption: Simulator Reference

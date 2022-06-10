@@ -10,7 +10,7 @@ This agent is used to communicate with NEMA motors, particularly the beam-
 mapper motors.
 
 .. argparse::
-   :module: ../agents/appmotion_motor/appmotion_motors_agent.py
+   :filename: ../agents/appmotion_motor/appmotion_motors_agent.py
    :func: make_parser
    :prog: python3 appmotion_motors_agent.py
 
@@ -61,13 +61,7 @@ Agent API
 # Autoclass the Agent, this is for users to reference when writing clients.
 
 .. autoclass:: agents.appmotion_motor.appmotion_motors_agent.appMotionMotorsAgent
-    :members: init_motors_task, move_axis_to_position, move_axis_by_length,
-    set_velocity, set_acceleration, start_jogging, stop_jogging,
-    seek_home_linear_stage, set_zero, run_positions, start_rotation,
-    stop_rotation, close_connection, reconnect_motor, block_while_moving, 
-    kill_all_commands, set_encoder_value, get_encoder_value, get_positions,
-    is_moving, pos_while_moving, move_off_limit, reset_alarms, 
-    home_with_limits, start_acq, stop_acq
+    :members:
     
 Example Clients
 ---------------
