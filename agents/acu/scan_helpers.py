@@ -84,7 +84,6 @@ elevation velocities, azimuth flags, elevation flags)
 
 def from_file(filename):
     """
-<<<<<<< HEAD
     Produces properly formatted lists of times, azimuth and elevation
     locations, azimuth and elevation velocities, and azimuth and elevation
     motion flags for a finitely long scan from a numpy file. Numpy file
