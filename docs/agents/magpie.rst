@@ -343,5 +343,8 @@ Supporting APIs
 .. autoclass:: agents.magpie.magpie_agent.WhiteNoiseCalculator
   :members:
 
+.. autoclass:: agents.magpie.magpie_agent.VisElem
+  :members:
+
 .. autoclass:: agents.magpie.magpie_agent.FocalplaneConfig
   :members:
