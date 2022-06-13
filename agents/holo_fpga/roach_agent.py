@@ -43,12 +43,6 @@ class FPGAAgent:
         self.lock = TimeoutLock()
 
         """
-        if mode == 'acq':
-            self.auto_acq = True
-        else:
-            self.auto_acq = False
-        self.sampling_frequency = float(samp)
-
         ### register the position feeds
 
         ### Agent registers data feed, things published to feed go to grafana and .g3 files
@@ -95,71 +89,6 @@ class FPGAAgent:
         if self.fpga.is_connected():
             print("ok\n")
 
-    # def init_FPGA(self, session, params=None):
-
-    #     if params is None:
-    #         params = {}
-
-    #     self.log.debug("Trying to acquire lock")
-    #     with self.lock.acquire_timeout(timeout=3, job="init") as acquired:
-    #         # Locking mechanism stops code from proceeding if no lock acquired
-    #         if not acquired:
-    #             self.log.warn(
-    #                 "Could not start init because {} is already running".format(
-    #                     self.lock.job
-    #                 )
-    #             )
-    #             return False, "Could not acquire lock."
-    #         # Run the function you want to run
-
-    #         print("Programming FPGA with python2")
-    #         err = os.system(
-    #             "/opt/anaconda2/bin/python2 /home/chesmore/Desktop/holog_daq/scripts/upload_fpga_py2.py"
-    #         )
-    #         assert err == 0
-
-    #         self.fpga = casperfpga.CasperFpga(self.roach)
-
-    #         # is_py3 = int(platform.python_version_tuple()[0]) == 3
-
-    #         # fpga = None
-    #         # roach, opts, baseline = fpga_daq3.roach2_init()
-
-    #         # print("------------------------")
-    #         # print("Programming FPGA with call to a python2 prog...")
-    #         # err = os.system("/opt/anaconda3/bin/python3 /home/chesmore/Desktop/test_package/holog_daq/scripts/poco_init.py3")
-    #         # assert err == 0
-
-    #         # self.fpga = subprocess.Popen("/opt/anaconda3/bin/python3 /home/chesmore/Desktop/test_package/holog_daq/scripts/poco_init.py3",shell=True).stdout
-    #         # self.fpga = subprocess.Popen("/opt/anaconda3/bin/python3 /home/chesmore/Desktop/holog_daq/scripts/poco_init.py3",shell=True).stdout
-
-    #     # This part is for the record and to allow future calls to proceed,
-    #     # so does not require the lock
-    #     self.initialized = True
-
-    #     return True, "FPGA connected."
-
-    # def init_FPGA(self, session, params=None):
-
-    #     if params is None:
-    #         params = {}
-
-    #     self.log.debug("Trying to acquire lock")
-    #     with self.lock.acquire_timeout(timeout=0, job="init") as acquired:
-    #         # Locking mechanism stops code from proceeding if no lock acquired
-    #         if not acquired:
-    #             self.log.warn(
-    #                 "Could not start init because {} is already running".format(
-    #                     self.lock.job
-    #                 )
-    #             )
-    #             return False, "Could not acquire lock."
-    #         # Run the function you want to run
-
-    #     self.initialized = True
-
-    #     return True, "FPGA connected."
-
     def take_data(self, session, params=None):
 
         with self.lock.acquire_timeout(timeout=3, job="take_data") as acquired:
@@ -201,8 +130,6 @@ class FPGAAgent:
 
             self.agent.publish_to_feed("fpga", data)
             session.data.update(data["data"])
-
-            pass
 
         return True, "Data acquired."
 
