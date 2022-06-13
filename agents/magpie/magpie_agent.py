@@ -1,5 +1,5 @@
 import argparse
-import so3g
+import so3g  # noqa: F401
 from spt3g import core
 import txaio
 import os
@@ -43,10 +43,10 @@ def load_frame_data(frame):
         nchans, nsamps = len(d), d.n_samples
         data = np.ndarray((nchans, nsamps), dtype=np.float32)
         for i in range(nchans):
-            data[i] = d[f'r{i:0>4}'] * (2*np.pi) / 2**16
+            data[i] = d[f'r{i:0>4}'] * (2 * np.pi) / 2**16
 
     else:  # G3SuperTimestream probably
-        data = d.data * (2*np.pi) / 2**16
+        data = d.data * (2 * np.pi) / 2**16
 
     return times, data
 
@@ -81,12 +81,13 @@ class FIRFilter:
     Class for Finite Input Response filter. Filter phases are preserved between
     `lfilt` calls so you can filter frame-based data.
     """
+
     def __init__(self, b, a, nchans=None):
         if nchans is None:
             nchans = MAX_CHANS
         self.b = b
         self.a = a
-        self.z = np.zeros((nchans, len(b)-1))
+        self.z = np.zeros((nchans, len(b) - 1))
 
     def lfilt(self, data):
         """Filters data in place"""
@@ -144,6 +145,7 @@ class RollingAvg:
         nchans (int):
             Number of channels this will be operating on.
     """
+
     def __init__(self, N, nchans):
         self.N = N
         self.nchans = nchans
@@ -159,7 +161,7 @@ class RollingAvg:
                 Array of data. Must be of shape (nchans, nsamps)
         """
         nsamps = data.shape[1]
-        summed = 1./self.N * np.cumsum(
+        summed = 1. / self.N * np.cumsum(
             np.concatenate((self.rollover, data), axis=1), axis=1)
         if self.N <= nsamps:
             # Replace entire rollover array
@@ -211,7 +213,7 @@ class FocalplaneConfig:
         frame['eq_labels'] = core.G3VectorString(self.eq_labels)
         frame['cmaps'] = core.G3VectorString(self.cmaps)
         return frame
-        
+
     def add_vis_elem(self, name, x, y, rot, value_names, eqs, eq_labels, cmaps,
                      template, abs_smurf_chan, eq_color_is_dynamic):
         """
@@ -347,7 +349,7 @@ class FocalplaneConfig:
             ['red_cmap', 'blue_cmap'],
             ['blue_cmap', 'red_cmap'],
         ]
-        templates = ["template_c0_p0", "template_c1_p0",]
+        templates = ["template_c0_p0", "template_c1_p0", ]
 
         color_idxs = {}
         ncolors = 0
@@ -413,7 +415,7 @@ class MagpieAgent:
         Two Rolling Averagers which are used to calculate the rolling RMS data.
     monitored_channels : list
         List of monitored channels whose data should be sent to grafana.
-        This list will contain entries which look like 
+        This list will contain entries which look like
         ``(readout_chan_number, field_name)``.
     monitored_chan_sample_rate : float
         Sample rate (Hz) to target when downsampling monitored channel data for
@@ -454,7 +456,6 @@ class MagpieAgent:
             agg_params={'exclude_aggregator': True}
         )
 
-
     @ocs_agent.param('target_rate', type=float)
     def set_target_rate(self, session, params):
         """set_target_rate(target_rate)
@@ -467,7 +468,6 @@ class MagpieAgent:
         """
         self.target_rate = params['target_rate']
         return True, f'Set target rate to {self.target_rate}'
-
 
     @ocs_agent.param('delay', type=float)
     def set_delay(self, session, params):
@@ -482,9 +482,8 @@ class MagpieAgent:
         self.delay = params['delay']
         return True, f'Set delay param to {self.delay}'
 
-
     @ocs_agent.param('chan_info', type=list, check=lambda x: len(x) <= 6)
-    @ocs_agent.param('sample_rate', type=float, default=10, 
+    @ocs_agent.param('sample_rate', type=float, default=10,
                      check=lambda x: 0 < x <= 20)
     def set_monitored_channels(self, session, params):
         """set_monitored_channels(chan_info, sample_rate=10)
@@ -523,7 +522,7 @@ class MagpieAgent:
         for ch_info in params['chan_info']:
             if isinstance(ch_info, int):
                 field_name = f"r{ch_info:0>4}"
-                monitored_chans.append((ch_info,field_name))
+                monitored_chans.append((ch_info, field_name))
             elif isinstance(ch_info, (tuple, list)):
                 monitored_chans.append(ch_info)
             else:
@@ -561,7 +560,7 @@ class MagpieAgent:
         if len(times) <= 1:
             ds_factor = 1
         else:
-            input_rate = 1./np.median(np.diff(times))
+            input_rate = 1. / np.median(np.diff(times))
             ds_factor = max(int(input_rate // target_rate), 1)
 
         sl = slice(None, None, ds_factor)
@@ -572,7 +571,7 @@ class MagpieAgent:
                 self.log.warn(
                     f"Readout channel {rc} is larger than the number of"
                     f"streamed channels ({len(data)})! Data won't be published"
-                     "to grafana."
+                    "to grafana."
                 )
                 continue
             _data = {
@@ -594,8 +593,8 @@ class MagpieAgent:
 
         # Calculate downsample factor
         times_in, data_in = load_frame_data(frame)
-        times_in  = times_in - source_offset
-        sample_rate = 1./np.median(np.diff(times_in))
+        times_in = times_in - source_offset
+        sample_rate = 1. / np.median(np.diff(times_in))
         nsamps = len(times_in)
         nchans = len(data_in)
 
@@ -652,7 +651,6 @@ class MagpieAgent:
             out.append(fr)
         return out
 
-
     def read(self, session, params=None):
         """read(src='tcp://localhost:4532')
 
@@ -668,7 +666,7 @@ class MagpieAgent:
         self._running = True
         session.set_status('running')
 
-        src_idx = 0 
+        src_idx = 0
         if isinstance(params['src'], str):
             sources = [params['src']]
         else:
@@ -714,7 +712,7 @@ class MagpieAgent:
             # timestamps in the file
             if source_is_file and (not source_offset):
                 source_offset = frame['time'].time / core.G3Units.s \
-                                - time.time()
+                    - time.time()
             elif not source_is_file:
                 source_offset = 0
 
@@ -737,7 +735,6 @@ class MagpieAgent:
         self._running = False
         return True, "Stopping read process"
 
-
     def stream_fake_data(self, session, params=None):
         """stream_fake_data()
 
@@ -751,12 +748,12 @@ class MagpieAgent:
         while self._run_fake_stream:
             time.sleep(2)
             frame_stop = time.time()
-            ts = np.arange(frame_start, frame_stop, 1./self.target_rate)
+            ts = np.arange(frame_start, frame_stop, 1. / self.target_rate)
             frame_start = frame_stop
             nframes = len(ts)
 
             data_out = np.random.normal(0, 1, (nframes, ndets))
-            data_out += np.sin(2*np.pi*ts[:, None] + .2 * chans[None, :])
+            data_out += np.sin(2 * np.pi * ts[:, None] + .2 * chans[None, :])
 
             for t, d in zip(ts, data_out):
                 fr = core.G3Frame(core.G3FrameType.Scan)
@@ -773,11 +770,9 @@ class MagpieAgent:
 
         return True, "Stopped fake stream process"
 
-
     def _stop_stream_fake_data(self, session, params=None):
         self._run_fake_stream = False
         return True, "Stopping fake stream process"
-
 
     @ocs_agent.param('dest', type=int)
     def send(self, session, params=None):
@@ -809,7 +804,7 @@ class MagpieAgent:
                 stream_start_time = now
 
             this_frame_time = stream_start_time + (t - first_frame_time) + self.delay
-            res = sleep_while_running(this_frame_time - now, session)
+            sleep_while_running(this_frame_time - now, session)
             sender.Process(f)
 
         return True, "Stopped send process"
@@ -879,16 +874,16 @@ if __name__ == '__main__':
 
     agent.register_process('read', magpie.read, magpie._stop_read,
                            startup=read_startup)
-    agent.register_process('stream_fake_data', magpie.stream_fake_data, 
+    agent.register_process('stream_fake_data', magpie.stream_fake_data,
                            magpie._stop_stream_fake_data, startup=args.fake_data)
     agent.register_process('send', magpie.send, magpie._send_stop,
                            startup={'dest': args.dest})
     agent.register_task('set_target_rate', magpie.set_target_rate)
     agent.register_task('set_delay', magpie.set_delay)
     agent.register_task(
-        'set_monitored_channels', magpie.set_monitored_channels, 
-        startup={'chan_info': args.monitored_channels, 
-                'sample_rate': args.monitored_channel_rate}
+        'set_monitored_channels', magpie.set_monitored_channels,
+        startup={'chan_info': args.monitored_channels,
+                 'sample_rate': args.monitored_channel_rate}
     )
 
     runner.run(agent, auto_reconnect=True)

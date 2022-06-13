@@ -78,13 +78,13 @@ class Serial_TCPServer(object):
         msg = ""
         timeout = self.gettimeout()
         while len(msg) < n:
-            newtimeout = timeout-(time.time()-t0)
+            newtimeout = timeout - (time.time() - t0)
             if newtimeout <= 0.0:
                 break
             self.settimeout(newtimeout)
             try:
                 msg = self.sock.recv(n, socket.MSG_PEEK)
-            except:
+            except BaseException:
                 pass
         # Flush the message out if you got everything
         if len(msg) == n:
@@ -108,7 +108,7 @@ class Serial_TCPServer(object):
         try:
             for i in range(n):
                 msg += self.sock.recv(1)
-        except:
+        except BaseException:
             pass
         self.sock.setblocking(1)  # belt and suspenders
         self.settimeout(self.__timeout)
@@ -126,9 +126,9 @@ class Serial_TCPServer(object):
             return ''
         try:
             msg = self.sock.recv(n)
-        except:
+        except BaseException:
             msg = ''
-        n2 = min(n-len(msg), n/2)
+        n2 = min(n - len(msg), n / 2)
         return msg + self.readbuf(n2)
 
     def readpacket(self, n):
@@ -141,7 +141,7 @@ class Serial_TCPServer(object):
         """
         try:
             msg = self.sock.recv(n)
-        except:
+        except BaseException:
             msg = ''
         return msg
 
@@ -161,7 +161,7 @@ class Serial_TCPServer(object):
 
         """
         msg = self.readexactly(n)
-        n2 = n-len(msg)
+        n2 = n - len(msg)
         if n2 > 0:
             msg += self.readbuf(n2)
         return msg
@@ -176,7 +176,7 @@ class Serial_TCPServer(object):
 
     def readall(self):
         msg = ""
-        while 1:
+        while True:
             c = self.readexactly(1)
             if c == '\r':
                 return msg
@@ -212,7 +212,7 @@ class Serial_TCPServer(object):
         try:
             while len(self.sock.recv(1)) > 0:
                 pass
-        except:
+        except BaseException:
             pass
         self.sock.setblocking(1)
         self.sock.settimeout(self.__timeout)
@@ -230,5 +230,5 @@ class Serial_TCPServer(object):
         return self.__timeout
 
     timeout = property(gettimeout, settimeout,
-                       doc='Communication timeout. Only use timeout mode ' +
-                           'with ``timeout > 0.0``.')
+                       doc='Communication timeout. Only use timeout mode '
+                           + 'with ``timeout > 0.0``.')

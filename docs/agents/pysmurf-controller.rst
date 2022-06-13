@@ -57,6 +57,7 @@ named ``ocs-pysmurf-monitor`` might look something like::
             OCS_CONFIG_DIR: /config
             EPICS_CA_ADDR_LIST: 127.255.255.255
             EPICS_CA_MAX_ARRAY_BYTES: 80000000
+            SLOT: 2
         volumes:
             - ${OCS_CONFIG_DIR}:/config
             - /data:/data
@@ -67,7 +68,7 @@ named ``ocs-pysmurf-monitor`` might look something like::
             - "--site-http=ws://${CB_HOST}:8001/call"
             - "--instance-id=pysmurf-controller-s2"
 
-where ``CB_HOST`` and ``SOCS_TAG`` are set as environment variables or in the 
+where ``CB_HOST`` and ``SOCS_TAG`` are set as environment variables or in the
 ``.env`` file.
 
 Pysmurf Publisher Options
@@ -100,26 +101,24 @@ discarded instead of published.
 Description
 ------------
 
-The pysmurf controller runs pysmurf scripts by beginning an external process
-that initializes a pysmurf object and calls its functions.
-Generally SODETLIB and Pysmurf are mounted into the sodetlib docker as is seen
-in the docker-compose entry above, allowing for fast iteration of control
-scripts.
+The Pysmurf Controller agent exposes many essential pysmurf and sodetlib
+operations so that they can be called using OCS. Tasks and processes will
+generate a new local pysmurf and det-config instance, and load in the tunefile
+specified in the device cfg. The session object will be saved to the pysmurf
+instance as ``S._ocs_session`` so that sodetlib functions can add logs and data
+directly.
 
-The meat of this agent exists in the ``_run_script`` function, which starts the
-script protocol and handles output. This will be called directly by the ``run``
-task, or any other task or process built into the agent. ``_run_script`` is
-protected by a lock so that only one script can be run by the agent at a time.
-The ``abort`` task can be used to interupt the actively running script and
-release the lock.
+Additionally, arbitrary SODETLIB scripts can be run as subprocesses using the
+``run`` task. Data can still be added to the session by passing it using the
+PysmurfPublisher to communicate with pysmurf-monitor agent (see the `Passing
+Session Data`_ section for more info).
 
-The ``run`` task takes in an arbitrary python script and list of command line
-arguments, and is generic enough to run any pysmurf control routine we have a
-script for. However as we start to finalize the sodetlib control scripts we
-wish to use during operation, we will build these into their own tasks or 
-processes which take in parameters specific to that script. The ``tune_squids``
-task is an example of how we can do this, but it just runs a fake script for
-the time being.
+In order for the Pysmurf instance to accurately represent the smurf state,
+we must be careful about not using a second pysmurf instance to modify any
+variables while a persistant instance exists. For that reason, the ``run``
+function and most tasks are protected by a single lock, preventing you
+from running multiple tasks at a time.
+
 
 Example Clients
 ----------------
@@ -135,7 +134,7 @@ The run function takes params
 - **log**: True if using agent logger, path to log file, or False if you don't
   want to log the script's stdout and stderr messages.
 
-For instance, to run a script ``sodetlib/scripts/tune.py``, the client script 
+For instance, to run a script ``sodetlib/scripts/tune.py``, the client script
 would look like::
 
     from ocs.matched_client import MatchedClient
@@ -145,6 +144,8 @@ would look like::
     script_path = '/sodetlib/scripts/tune.py'
     args=['--bands', '0', '1', '2']
     controller.run.start(script=script_path, args=args)
+
+
 
 Passing Session Data
 ``````````````````````

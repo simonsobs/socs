@@ -84,6 +84,7 @@ elevation velocities, azimuth flags, elevation flags)
 
 def from_file(filename):
     """
+<<<<<<< HEAD
     Produces properly formatted lists of times, azimuth and elevation
     locations, azimuth and elevation velocities, and azimuth and elevation
     motion flags for a finitely long scan from a numpy file. Numpy file
@@ -104,9 +105,8 @@ elevation velocities, azimuth flags, elevation flags)
     """
     info = np.load(filename)
     if len(info) < 5:
-        print('Not enough information. Make sure you have specified '\
-              'time, azimuth, elevation, azimuth velocity, and '\
-              'elevation velocity') 
+        raise TypeError('Not enough fields in numpy file! Expected '\
+                        '5 fields.')
     conctimes = info[0]
     concaz = info[1]
     concel = info[2]
@@ -148,6 +148,7 @@ start_offset, otherwise start time is time.time() + start_offset
     Returns:
         all_lines (list): Lines in the correct format to upload to the ACU
     """
+
     fmt = '%j, %H:%M:%S'
     if generator:
         start_time = start_offset

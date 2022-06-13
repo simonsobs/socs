@@ -10,7 +10,7 @@ services:
   # --------------------------------------------------------------------------
   # SOCS Agents
   # --------------------------------------------------------------------------
-  
+
   # --------------------------------------------------------------------------
   # The Lakeshore 372 Agent
   # --------------------------------------------------------------------------
@@ -114,7 +114,7 @@ services:
     build: ./agents/labjack/
     depends_on:
       - "socs"
-    
+
   # --------------------------------------------------------------------------
   # Pfeiffer tpg366 agent
   # --------------------------------------------------------------------------
@@ -123,7 +123,7 @@ services:
     build: ./agents/pfeiffer_tpg366/
     depends_on:
       - "socs"
-    
+
   # --------------------------------------------------------------------------
   # Synaccess power strip agent
   # --------------------------------------------------------------------------
@@ -159,7 +159,7 @@ services:
     build: ./agents/tektronix3021c/
     depends_on:
       - "socs"
-    
+
   # --------------------------------------------------------------------------
   # Pfeiffer Turbo Controller
   # --------------------------------------------------------------------------
@@ -175,6 +175,15 @@ services:
   ocs-hwpbbb-agent:
     image: "ocs-hwpbbb-agent"
     build: ./agents/chwp/
+    depends_on:
+      - "socs"
+
+  # --------------------------------------------------------------------------
+  # HWP Rotation Agent
+  # --------------------------------------------------------------------------
+  ocs-hwp-rotation-agent:
+    image: "ocs-hwp-rotation-agent"
+    build: ./agents/hwp_rotation/
     depends_on:
       - "socs"
 
@@ -197,6 +206,33 @@ services:
   ocs-magpie-agent:
     image: "ocs-magpie-agent"
     build: ./agents/magpie
+    depends_on:
+      - "socs"
+
+  # --------------------------------------------------------------------------
+  # Wiregrid KIKUSUI power supply agent
+  # --------------------------------------------------------------------------
+  ocs-wgkikusui-agent:
+    image: "ocs-wgkikusui-agent"
+    build: ./agents/wiregrid_kikusui/
+    depends_on:
+      - "socs"
+
+  # --------------------------------------------------------------------------
+  # Wiregrid actuator agent
+  # --------------------------------------------------------------------------
+  ocs-wgactuator-agent:
+    image: "ocs-wgactuator-agent"
+    build: ./agents/wiregrid_actuator/
+    depends_on:
+      - "socs"
+
+  # --------------------------------------------------------------------------
+  # Wiregrid encoder agent
+  # --------------------------------------------------------------------------
+  ocs-wgencoder-agent:
+    image: "ocs-wgencoder-agent"
+    build: ./agents/wiregrid_encoder/
     depends_on:
       - "socs"
 

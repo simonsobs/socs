@@ -51,6 +51,7 @@ class MeinbergSNMP:
         passed directly to session.data.
 
     """
+
     def __init__(self, address, port=161, version=3):
         self.log = txaio.make_logger()
         self.address = address
@@ -72,7 +73,7 @@ class MeinbergSNMP:
                              "interval": 60,
                              "lastGet": None},
                             {"oid": ('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockLeapSecondDate', 1),
-                             "interval": 60*60,
+                             "interval": 60 * 60,
                              "lastGet": None},
                             {"oid": ('MBG-SNMP-LTNG-MIB', 'mbgLtNgNtpCurrentState', 0),
                              "interval": 64,
@@ -169,8 +170,8 @@ class MeinbergSNMP:
 
         # I don't expect any other types at the moment, but just in case.
         if not isinstance(oid_value, (int, bytes, str)):
-            self.log.error("{oid} is of unknown and unhandled type " +
-                           "{oid_type}. Returning None.",
+            self.log.error("{oid} is of unknown and unhandled type "
+                           + "{oid_type}. Returning None.",
                            oid=oid, oid_type=type(oid_value))
             oid_value = None
 
@@ -338,6 +339,7 @@ class MeinbergM1000Agent:
         txaio logger object, created by the OCSAgent
 
     """
+
     def __init__(self, agent, address, port=161, version=3):
         self.agent = agent
         self.is_streaming = False
@@ -347,7 +349,7 @@ class MeinbergM1000Agent:
         self.meinberg = MeinbergSNMP(address, port, version)
 
         agg_params = {
-            'frame_length': 10*60  # [sec]
+            'frame_length': 10 * 60  # [sec]
         }
         self.agent.register_feed('m1000',
                                  record=True,
@@ -408,9 +410,9 @@ class MeinbergM1000Agent:
         yield self.meinberg.run_snmp_get(session)
         if not self.meinberg.oid_cache['m1000_connection'].get('connected', False):
             self.log.error('No initial SNMP response.')
-            self.log.error('Either there is a network connection issue, ' +
-                           'or maybe you are using the wrong SNMP ' +
-                           'version. Either way, we are exiting.')
+            self.log.error('Either there is a network connection issue, '
+                           + 'or maybe you are using the wrong SNMP '
+                           + 'version. Either way, we are exiting.')
 
             reactor.callFromThread(reactor.stop)
             return False, 'acq process failed - No connection to M1000'
@@ -445,14 +447,14 @@ def make_parser(parser=None):
     # Add options specific to this agent.
     pgroup = parser.add_argument_group("Agent Options")
     pgroup.add_argument("--auto-start", default=True, type=bool,
-                        help="Automatically start polling for data at " +
-                        "Agent startup.")
+                        help="Automatically start polling for data at "
+                        + "Agent startup.")
     pgroup.add_argument("--address", help="Address to listen to.")
     pgroup.add_argument("--port", default=161,
                         help="Port to listen on.")
     pgroup.add_argument("--snmp-version", default='3', choices=['1', '2', '3'],
-                        help="SNMP version for communication. Must match " +
-                             "configuration on the M1000.")
+                        help="SNMP version for communication. Must match "
+                             + "configuration on the M1000.")
 
     return parser
 

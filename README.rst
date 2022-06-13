@@ -20,6 +20,10 @@ SOCS - Simons Observatory Control System
    :target: https://pypi.org/project/socs/
    :alt: PyPI Package
 
+.. image:: https://results.pre-commit.ci/badge/github/simonsobs/socs/develop.svg
+   :target: https://results.pre-commit.ci/latest/github/simonsobs/socs/develop
+   :alt: pre-commit.ci status
+
 Overview
 --------
 
@@ -121,7 +125,7 @@ For guidelines on how to contribute to OCS see `CONTRIBUTING.rst`_.
 
 License
 --------
-This project is licensed under the BSD 2-Clause License - see the 
+This project is licensed under the BSD 2-Clause License - see the
 `LICENSE.txt`_ file for details.
 
 .. _LICENSE.txt: https://github.com/simonsobs/socs/blob/master/LICENSE.txt

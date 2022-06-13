@@ -1,9 +1,8 @@
 import time
 import serial
 import sys
-import os
 
-from . import moxaSerial as mx
+from socs.agent import moxaSerial as mx
 
 
 class PMX:
@@ -18,6 +17,9 @@ class PMX:
 
     def __init__(self, rtu_port=None, tcp_ip=None, tcp_port=None, timeout=None):
         # Connect to device
+        self.using_tcp = None
+        self._rtu_port = None
+        self.ser = None
         msg = self.__conn(rtu_port, tcp_ip, tcp_port, timeout)
         print(msg)
         self._remote_Mode()
@@ -30,22 +32,44 @@ class PMX:
             print(
                 "Disconnecting from RTU port %s"
                 % (self._rtu_port))
-            self.ser.close()
+            if self.ser:
+                self.ser.close()
         else:
             print(
                 "Disconnecting from TCP IP %s at port %d"
                 % (self._tcp_ip, self._tcp_port))
-            pass
         return
+
+    def check_connect(self):
+        """Check the connection."""
+        try:
+            if not self.using_tcp:
+                self.ser.inWaiting()
+            else:
+                self.clean_serial()
+                self.wait()
+                self.ser.write("OUTP?\n\r")
+                self.wait()
+                val = (self.ser.readline().strip())
+                val = int(val)
+        except Exception as e:
+            msg = 'Could not connect to the PMX serial! | Error: "{}"'.format(e)
+            return msg, False
+        return 'Successfully connect to the PMX serial.', True
 
     def check_voltage(self):
         """Check the voltage."""
         self.clean_serial()
-        bts = self.ser.write("MEAS:VOLT?\n\r")
+        self.ser.write("MEAS:VOLT?\n\r")
         self.wait()
-        val = float(self.ser.readline())
-        msg = "Measured voltage = %.3f V" % (val)
-        # print(msg)
+        try:
+            val = float(self.ser.readline())
+            msg = "Measured voltage = %.3f V" % (val)
+            # print(msg)
+        except ValueError:
+            val = -999.
+            msg = 'WARNING! Could not get correct voltage value! | Response = "%s"' % (val)
+            print(msg)
         return msg, val
 
     def check_current(self):
@@ -53,9 +77,14 @@ class PMX:
         self.clean_serial()
         self.ser.write("MEAS:CURR?\n\r")
         self.wait()
-        val = float(self.ser.readline())
-        msg = "Measured current = %.3f A" % (val)
-        # print(msg)
+        try:
+            val = float(self.ser.readline())
+            msg = "Measured current = %.3f A" % (val)
+            # print(msg)
+        except ValueError:
+            val = -999.
+            msg = 'WARNING! Could not get correct current value! | Response = "%s"' % (val)
+            print(msg)
         return msg, val
 
     def check_voltage_current(self):
@@ -63,26 +92,82 @@ class PMX:
         self.clean_serial()
         voltage = self.check_voltage()[1]
         current = self.check_current()[1]
-        msg = (
-            "Measured voltage = %.3f V\n"
-            "Measured current = %.3f A\n"
-            % (voltage, current))
+        # msg = (
+        #     "Measured voltage = %.3f V\n"
+        #     "Measured current = %.3f A\n"
+        #     % (voltage, current))
         # print(msg)
         return voltage, current
+
+    def check_voltage_setting(self):
+        """ Check the voltage setting """
+        self.clean_serial()
+        for i in range(10):
+            self.ser.write("VOLT?\n\r")
+            self.wait()
+            val = (self.ser.readline().strip())
+            if len(val) > 0:
+                break
+        try:
+            val = float(val)
+            msg = "Voltage setting = %.3f V" % (val)
+            # print(msg)
+        except ValueError:
+            val = -999.
+            msg = 'WARNING! Could not get correct voltage-setting value! | Response = "%s"' % (val)
+            print(msg)
+        return msg, val
+
+    def check_current_setting(self):
+        """ Check the current setting """
+        self.clean_serial()
+        for i in range(10):
+            self.ser.write("CURR?\n\r")
+            self.wait()
+            val = (self.ser.readline().strip())
+            if len(val) > 0:
+                break
+        try:
+            val = float(val)
+            msg = "Current setting = %.3f A" % (val)
+            # print(msg)
+        except ValueError:
+            val = -999.
+            msg = 'WARNING! Could not get correct current-setting value! | Response = "%s"' % (val)
+            print(msg)
+        return msg, val
+
+    def check_voltage_current_setting(self):
+        """ Check both the voltage and current setting """
+        self.clean_serial()
+        voltage = self.check_voltage_setting()[1]
+        current = self.check_current_setting()[1]
+        msg = (
+            "Voltage setting = %.3f V\n"
+            "Current setting = %.3f A\n"
+            % (voltage, current))
+        # print(msg)
+        return msg, voltage, current
 
     def check_output(self):
         """Return the output status."""
         self.clean_serial()
         self.ser.write("OUTP?\n\r")
         self.wait()
-        val = int(self.ser.readline())
+        try:
+            val = int(self.ser.readline())
+        except ValueError:
+            val = -999
+            msg = 'WARNING! Could not get correct output value! | Response = "%s"' % (val)
+            print(msg)
+            return msg, val
         if val == 0:
             msg = "Measured output state = OFF"
         elif val == 1:
             msg = "Measured output state = ON"
         else:
             msg = "Failed to measure output..."
-        print(msg)
+        # print(msg)
         return msg, val
 
     def set_voltage(self, val, silent=False):
@@ -94,7 +179,7 @@ class PMX:
         self.wait()
         val = self.ser.readline()
         msg = "Voltage set = %.3f V" % (float(val))
-        if (silent != True):
+        if silent is not True:
             print(msg)
 
         return msg
@@ -108,7 +193,7 @@ class PMX:
         self.wait()
         val = self.ser.readline()
         msg = "Current set = %.3f A\n" % (float(val))
-        if (silent != True):
+        if silent is not True:
             print(msg)
 
         return msg
@@ -148,7 +233,7 @@ class PMX:
         self.wait()
         val = self.ser.readline()
         msg = "Voltage limit set = %.3f V" % (float(val))
-        if (silent != True):
+        if silent is not True:
             print(msg)
 
         return msg
@@ -162,7 +247,7 @@ class PMX:
         self.wait()
         val = self.ser.readline()
         msg = "Current limit set = %.3f A\n" % (float(val))
-        if (silent != True):
+        if silent is not True:
             print(msg)
 
         return msg
@@ -207,8 +292,8 @@ class PMX:
             raise Exception(
                 "Aborted PMX._conn() due to no RTU or "
                 "TCP port specified")
-        elif (rtu_port is not None and
-              (tcp_ip is not None or tcp_port is not None)):
+        elif (rtu_port is not None
+              and (tcp_ip is not None or tcp_port is not None)):
             raise Exception(
                 "Aborted PMX._conn() due to RTU and TCP port both being "
                 "specified. Can only have one or the other.")
@@ -276,6 +361,9 @@ class Command:
             "check_v": "V?",
             "check_c": "C?",
             "check_vc": "VC?",
+            "check_vs": "VS?",
+            "check_cs": "CS?",
+            "check_vcs": "VCS?",
             "check_out": "O?",
             "set_v": "V",
             "set_c": "C",
@@ -295,6 +383,9 @@ class Command:
             "Check output voltage = '%s'\n"
             "Check output current = '%s'\n"
             "Check output voltage and current = '%s'\n"
+            "Check voltage setting = '%s'\n"
+            "Check current setting = '%s'\n"
+            "Check voltage and current setting = '%s'\n"
             "Check output state = '%s'\n"
             "Set output voltage = '%s' [setting]\n"
             "Set output current = '%s' [setting]\n"
@@ -310,6 +401,9 @@ class Command:
                self._cmds["check_v"],
                self._cmds["check_c"],
                self._cmds["check_vc"],
+               self._cmds["check_vs"],
+               self._cmds["check_cs"],
+               self._cmds["check_vcs"],
                self._cmds["check_out"],
                self._cmds["set_v"],
                self._cmds["set_c"],
@@ -327,7 +421,7 @@ class Command:
         """Take user input and execute PMX command."""
         argv = arg.split()
         # if len(args) > 0:
-        #value = float(args[0])
+        # value = float(args[0])
 
         while len(argv):
             cmd = str(argv.pop(0)).upper()
@@ -343,6 +437,15 @@ class Command:
             # Check voltage and current
             elif cmd == self._cmds["check_vc"]:
                 return self._PMX.check_voltage_current()
+            # Check voltage setting
+            elif cmd == self._cmds["check_vs"]:
+                return self._PMX.check_voltage_setting()
+            # Check current setting
+            elif cmd == self._cmds["check_cs"]:
+                return self._PMX.check_current_setting()
+            # Check voltage and current
+            elif cmd == self._cmds["check_vcs"]:
+                return self._PMX.check_voltage_current_setting()
             # Check output state
             elif cmd == self._cmds["check_out"]:
                 return self._PMX.check_output()
@@ -356,10 +459,10 @@ class Command:
 
             # elif cmd == self._cmds["set_v"]:
                 # print(value)
-                #ret = self._PMX.set_voltage(value)
+                # ret = self._PMX.set_voltage(value)
 
             # elif cmd == self._cmds["set_c"]:
-                #ret = self._PMX.set_current(value)
+                # ret = self._PMX.set_current(value)
 
             elif cmd == self._cmds["use_ext"]:
                 return self._PMX.use_external_voltage()
