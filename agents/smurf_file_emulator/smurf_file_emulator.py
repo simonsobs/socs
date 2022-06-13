@@ -218,6 +218,72 @@ class G3FrameGenerator:
         return fr
 
 
+class DataStreamer:
+    """
+    Helper class for streaming G3 data
+    """
+    def __init__(self, stream_id, sample_rate, tune, timestreamdir,
+                 file_duration, frame_len):
+        self.frame_gen = G3FrameGenerator(stream_id, sample_rate, tune)
+        self.session_id = self.frame_gen.session_id
+        self.stream_id = stream_id
+        self.timestreamdir = timestreamdir
+        self.seq = 0
+        self.file_duration = file_duration
+        self.file_start = 0
+        self.writer = None
+        self.file_list = []
+        self.frame_len = frame_len
+
+    def get_g3_filename(self):
+        """
+        Returns the file path for a g3-file with specified session id and seq
+        idx.
+        """
+        timecode = f"{self.session_id}"[:5]
+        subdir = os.path.join(self.timestreamdir, timecode, self.stream_id)
+        filepath = os.path.join(subdir, f"{self.session_id}_{self.seq:0>3}.g3")
+        return filepath
+
+    def new_file(self):
+        self.end_file()
+        fname = self.get_g3_filename()
+        os.makedirs(os.path.dirname(fname), exist_ok=True)
+        self.writer = core.G3Writer(fname)
+        if self.seq == 0:
+            self.writer(self.frame_gen.get_obs_frame())
+            self.writer(self.frame_gen.get_status_frame())
+        self.file_start = time.time()
+        self.file_list.append(fname)
+        self.seq += 1
+
+    def end_file(self):
+        if self.writer is not None:
+            self.writer(core.G3Frame(core.G3FrameType.EndProcessing))
+
+    def write_next(self, wait=True):
+        start = time.time()
+        if (start - self.file_start > self.file_duration) or (self.writer is None):
+            self.new_file()
+        time.sleep(self.frame_len)
+        stop = time.time()
+        self.writer(self.frame_gen.get_data_frame(start, stop))
+
+    def stream_between(self, start, stop, wait=False):
+        frame_starts = np.arange(start, stop, self.frame_len)
+        frame_stops = frame_starts + self.frame_len
+        self.new_file()
+        for t0, t1 in zip(frame_starts, frame_stops):
+            if wait:
+                now = time.time()
+                if now < t1:
+                    time.sleep(t1 - now)
+            self.writer(self.frame_gen.get_data_frame(start, stop))
+        self.end_file()
+        
+
+
+
 class SmurfFileEmulator:
     """
     OCS Agent for emulating file creation for the smurf system.
@@ -239,6 +305,12 @@ class SmurfFileEmulator:
 
         self.streaming = False
         self.tune = None
+
+    def _new_streamer(self):
+        return DataStreamer(
+            self.stream_id, self.sample_rate, self.tune, self.timestreamdir,
+            self.file_duration, self.frame_len
+        )
 
     def _get_g3_filename(self, session_id, seq, makedirs=True):
         """
@@ -306,7 +378,7 @@ class SmurfFileEmulator:
         return filepath
 
     @ocs_agent.param('test_mode', type=bool, default=False)
-    def tune_dets(self, session, params):
+    def uxm_setup(self, session, params):
         """tune_dets()
 
         **Task** - Emulates files that might come from a general tune dets
@@ -345,28 +417,29 @@ class SmurfFileEmulator:
         self._write_smurf_file(fname, 'tracking_setup', prepend_ctime=False)
 
         # Short g3 stream
-        frame_gen = G3FrameGenerator(
-            self.stream_id, self.sample_rate, self.tune
-        )
-        fname = self._get_g3_filename(frame_gen.session_id, 0, makedirs=True)
-        os.makedirs(os.path.dirname(fname), exist_ok=True)
-        session.data['noise_file'] = fname
-        writer = core.G3Writer(fname)
-        writer(frame_gen.get_obs_frame())
-        writer(frame_gen.get_status_frame())
-        start = time.time()
-        stop = start + 30
-        frame_starts = np.arange(start, stop, self.frame_len)
-        frame_stops = frame_starts + self.frame_len
-        for t0, t1 in zip(frame_starts, frame_stops):
-            if not params['test_mode']:
-                now = time.time()
-                if now < t1:
-                    time.sleep(t1 - now)
-            writer(frame_gen.get_data_frame(t0, t1))
-        writer(core.G3Frame(core.G3FrameType.EndProcessing))
+        streamer = self._new_streamer()
+        now = time.time()
+        streamer.stream_between(now, now + 30, wait=False)
+        session.data['noise_file'] = streamer.file_list[0]
 
         return True, "Wrote tune files"
+
+    def take_noise(self, session, params=None):
+        """
+        Takes a short noise timestream
+        """
+        streamer = self._new_streamer()
+        now = time.time()
+        streamer.stream_between(now, now + 30, wait=False)
+        session.data['noise_file'] = streamer.file_list[0]
+        return True, "Took noise data"
+
+    def uxm_relock(self, session, params=None):
+        """
+        Normally this wouldn't involve a full find-freq, but for emulation
+        purposes it's ok if this is the same as uxm_setup.
+        """
+        return self.uxm_setup(session, params)
 
     def take_iv(self, session, params=None):
         """take_iv()
@@ -392,6 +465,16 @@ class SmurfFileEmulator:
                                    action_time=action_time)
 
         return True, "Wrote Bias Step Files"
+
+    def take_bgmap(self, session, params=None):
+        action_time = time.time()
+        files = ['bg_map.npy', 'bias_step_analysis.npy']
+        for f in files:
+            self._write_smurf_file(f, 'take_bgmap',
+                                   action_time=action_time)
+
+        return True, "Finished taking bgmap"
+
 
     def bias_dets(self, session, params=None):
         """bias_dets()
@@ -432,46 +515,20 @@ class SmurfFileEmulator:
             end_time = time.time() + params['duration']
 
         session.set_status('running')
-        frame_gen = G3FrameGenerator(
-            self.stream_id, self.sample_rate, self.tune
-        )
-        session.data['session_id'] = frame_gen.session_id
-        session.data['g3_files'] = []
+        streamer = self._new_streamer()
+        session.data['session_id'] = streamer.session_id
+        session.data['g3_files'] = streamer.file_list
 
-        seq = 0
-        fname = self._get_g3_filename(frame_gen.session_id, seq, makedirs=True)
-        os.makedirs(os.path.dirname(fname), exist_ok=True)
-        session.data['g3_files'].append(fname)
-        writer = core.G3Writer(fname)
-        file_start = time.time()
-
-        writer(frame_gen.get_obs_frame())
-        writer(frame_gen.get_status_frame())
         self.streaming = True
         while self.streaming:
-            start = time.time()
-            time.sleep(self.frame_len)
-            stop = time.time()
-            writer(frame_gen.get_data_frame(start, stop))
+            streamer.write_next()
 
             if end_time is not None:
-                if stop > end_time:
+                if time.time() > end_time:
                     break
 
-            if time.time() - file_start > self.file_duration:
-                writer(core.G3Frame(core.G3FrameType.EndProcessing))
-                seq += 1
-                fname = self._get_g3_filename(
-                    frame_gen.session_id, seq, makedirs=True
-                )
-                os.makedirs(os.path.dirname(fname), exist_ok=True)
-                session.data['g3_files'].append(fname)
-                writer = core.G3Writer(fname)
-                file_start = time.time()
-
-        writer(core.G3Frame(core.G3FrameType.EndProcessing))
-
-        return True, "Finished stream"
+        streamer.end_file()
+        return True, "Finished Stream"
 
     def _stop_stream(self, session, params=None):
         if self.streaming:
@@ -513,10 +570,13 @@ if __name__ == '__main__':
     agent, runner = ocs_agent.init_site_agent(args)
 
     file_em = SmurfFileEmulator(agent, args)
-    agent.register_task('tune_dets', file_em.tune_dets)
+    agent.register_task('uxm_setup', file_em.uxm_setup)
+    agent.register_task('uxm_relock', file_em.uxm_relock)
     agent.register_task('take_iv', file_em.take_iv)
     agent.register_task('take_bias_steps', file_em.take_bias_steps)
+    agent.register_task('take_bgmap', file_em.take_gmap)
     agent.register_task('bias_dets', file_em.bias_dets)
+    agent.register_task('take_noise', file_em.take_noise)
     agent.register_process('stream', file_em.stream, file_em._stop_stream)
 
     runner.run(agent, auto_reconnect=True)
