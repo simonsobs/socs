@@ -170,54 +170,6 @@ class ACUAgent:
                                  record=True,
                                  agg_params=fullstatus_agg_params,
                                  buffer_time=1)
-#        self.agent.register_feed('acu_status_summary',
-#                                 record=True,
-#                                 agg_params=fullstatus_agg_params,
-#                                 buffer_time=1)
-#        self.agent.register_feed('acu_status_axis_faults',
-#                                  record=True,
-#                                  agg_params=fullstatus_agg_params,
-#                                  buffer_time=1)
-#        self.agent.register_feed('acu_status_position_errs',
-#                                  record=True,
-#                                  agg_params=fullstatus_agg_params,
-#                                  buffer_time=1)
-#        self.agent.register_feed('acu_status_axis_limits',
-#                                  record=True,
-#                                  agg_params=fullstatus_agg_params,
-#                                  buffer_time=1)
-#        self.agent.register_feed('acu_status_axis_warnings',
-#                                  record=True,
-#                                  agg_params=fullstatus_agg_params,
-#                                  buffer_time=1)
-#        self.agent.register_feed('acu_status_axis_failures',
-#                                  record=True,
-#                                  agg_params=fullstatus_agg_params,
-#                                  buffer_time=1)
-#        self.agent.register_feed('acu_status_axis_state',
-#                                  record=True,
-#                                  agg_params=fullstatus_agg_params,
-#                                  buffer_time=1)
-#        self.agent.register_feed('acu_status_osc_alarms',
-#                                  record=True,
-#                                  agg_params=fullstatus_agg_params,
-#                                  buffer_time=1)
-#        self.agent.register_feed('acu_status_commands',
-#                                  record=True,
-#                                  agg_params=fullstatus_agg_params,
-#                                  buffer_time=1)
-#        self.agent.register_feed('acu_status_general_errs',
-#                                  record=True,
-#                                  agg_params=fullstatus_agg_params,
-#                                  buffer_time=1)
-#        self.agent.register_feed('acu_status_platform',
-#                                  record=True,
-#                                  agg_params=fullstatus_agg_params,
-#                                  buffer_time=1)
-#        self.agent.register_feed('acu_status_emergency',
-#                                  record=True,
-#                                  agg_params=fullstatus_agg_params,
-#                                  buffer_time=1)
         self.agent.register_feed('acu_status_influx',
                                  record=True,
                                  agg_params=influx_agg_params,
