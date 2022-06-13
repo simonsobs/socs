@@ -169,7 +169,7 @@ class ACUAgent:
         self.agent.register_feed('acu_status',
                                  record=True,
                                  agg_params=fullstatus_agg_params,
-                                 buffer_time=1) 
+                                 buffer_time=1)
 #        self.agent.register_feed('acu_status_summary',
 #                                 record=True,
 #                                 agg_params=fullstatus_agg_params,
@@ -302,7 +302,7 @@ class ACUAgent:
 #            self.jobs[job_name] = 'stop'
                 return True, 'Requested Process stop.'
             except Exception as e:
-                print(str(e)) 
+                print(str(e))
 
     def _set_job_done(self, job_name):
         """
@@ -517,7 +517,7 @@ class ACUAgent:
 #            self.agent.publish_to_feed('acu_status_platform', acustatus_platform)
 #            self.agent.publish_to_feed('acu_status_emergency', acustatus_emergency)
             self.agent.publish_to_feed('acu_status_influx', acustatus_influx, from_reactor=True)
-            
+
 #        self._set_job_stop('monitor')
 #        yield dsleep(1)
 #        self._set_job_done('monitor')
@@ -927,7 +927,7 @@ elevation in Stop
             all_lines = all_lines[group_size:]
             upload_vals = front_group(spec, group_size)
             spec = pop_first_vals(spec, group_size)
-            
+
             for u in range(len(upload_vals['azs'])):
                 self.data['uploads']['PtStack_Time'] = upload_lines[u].split(';')[0]
                 self.data['uploads']['PtStack_Azimuth'] = upload_vals['azs'][u]
@@ -953,7 +953,7 @@ elevation in Stop
             self.log.info('Uploaded a group')
         self.log.info('No more lines to upload')
         free_positions = self.data['status']['summary']['Free_upload_positions']
-        while free_positions < 9999: 
+        while free_positions < 9999:
             yield dsleep(0.1)
             modes = (self.data['status']['summary']['Azimuth_mode'],
                      self.data['status']['summary']['Elevation_mode'])
