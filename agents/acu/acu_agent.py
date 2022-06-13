@@ -165,56 +165,59 @@ class ACUAgent:
         self.stop_times = {'az': float('nan'),
                            'el': float('nan'),
                            'bs': float('nan'),
-                           } 
-        self.agent.register_feed('acu_status_summary',
+                           }
+        self.agent.register_feed('acu_status',
                                  record=True,
-                              #   agg_params=basic_agg_params,
                                  agg_params=fullstatus_agg_params,
-                                 buffer_time=1)
-        self.agent.register_feed('acu_status_axis_faults',
-                                  record=True,
-                                  agg_params=fullstatus_agg_params,
-                                  buffer_time=1)
-        self.agent.register_feed('acu_status_position_errs',
-                                  record=True,
-                                  agg_params=fullstatus_agg_params,
-                                  buffer_time=1)
-        self.agent.register_feed('acu_status_axis_limits',
-                                  record=True,
-                                  agg_params=fullstatus_agg_params,
-                                  buffer_time=1)
-        self.agent.register_feed('acu_status_axis_warnings',
-                                  record=True,
-                                  agg_params=fullstatus_agg_params,
-                                  buffer_time=1)
-        self.agent.register_feed('acu_status_axis_failures',
-                                  record=True,
-                                  agg_params=fullstatus_agg_params,
-                                  buffer_time=1)
-        self.agent.register_feed('acu_status_axis_state',
-                                  record=True,
-                                  agg_params=fullstatus_agg_params,
-                                  buffer_time=1)
-        self.agent.register_feed('acu_status_osc_alarms',
-                                  record=True,
-                                  agg_params=fullstatus_agg_params,
-                                  buffer_time=1)
-        self.agent.register_feed('acu_status_commands',
-                                  record=True,
-                                  agg_params=fullstatus_agg_params,
-                                  buffer_time=1)
-        self.agent.register_feed('acu_status_general_errs',
-                                  record=True,
-                                  agg_params=fullstatus_agg_params,
-                                  buffer_time=1)
-        self.agent.register_feed('acu_status_platform',
-                                  record=True,
-                                  agg_params=fullstatus_agg_params,
-                                  buffer_time=1)
-        self.agent.register_feed('acu_status_emergency',
-                                  record=True,
-                                  agg_params=fullstatus_agg_params,
-                                  buffer_time=1)
+                                 buffer_time=1) 
+#        self.agent.register_feed('acu_status_summary',
+#                                 record=True,
+#                                 agg_params=fullstatus_agg_params,
+#                                 buffer_time=1)
+#        self.agent.register_feed('acu_status_axis_faults',
+#                                  record=True,
+#                                  agg_params=fullstatus_agg_params,
+#                                  buffer_time=1)
+#        self.agent.register_feed('acu_status_position_errs',
+#                                  record=True,
+#                                  agg_params=fullstatus_agg_params,
+#                                  buffer_time=1)
+#        self.agent.register_feed('acu_status_axis_limits',
+#                                  record=True,
+#                                  agg_params=fullstatus_agg_params,
+#                                  buffer_time=1)
+#        self.agent.register_feed('acu_status_axis_warnings',
+#                                  record=True,
+#                                  agg_params=fullstatus_agg_params,
+#                                  buffer_time=1)
+#        self.agent.register_feed('acu_status_axis_failures',
+#                                  record=True,
+#                                  agg_params=fullstatus_agg_params,
+#                                  buffer_time=1)
+#        self.agent.register_feed('acu_status_axis_state',
+#                                  record=True,
+#                                  agg_params=fullstatus_agg_params,
+#                                  buffer_time=1)
+#        self.agent.register_feed('acu_status_osc_alarms',
+#                                  record=True,
+#                                  agg_params=fullstatus_agg_params,
+#                                  buffer_time=1)
+#        self.agent.register_feed('acu_status_commands',
+#                                  record=True,
+#                                  agg_params=fullstatus_agg_params,
+#                                  buffer_time=1)
+#        self.agent.register_feed('acu_status_general_errs',
+#                                  record=True,
+#                                  agg_params=fullstatus_agg_params,
+#                                  buffer_time=1)
+#        self.agent.register_feed('acu_status_platform',
+#                                  record=True,
+#                                  agg_params=fullstatus_agg_params,
+#                                  buffer_time=1)
+#        self.agent.register_feed('acu_status_emergency',
+#                                  record=True,
+#                                  agg_params=fullstatus_agg_params,
+#                                  buffer_time=1)
         self.agent.register_feed('acu_status_influx',
                                  record=True,
                                  agg_params=influx_agg_params,
@@ -495,19 +498,26 @@ class ACUAgent:
                                 'block_name': 'ACU_status_INFLUX',
                                 'data': influx_status
                                 }
-            self.agent.publish_to_feed('acu_status_summary', acustatus_summary)
-            self.agent.publish_to_feed('acu_status_axis_faults', acustatus_axisfaults)
-            self.agent.publish_to_feed('acu_status_position_errs', acustatus_poserrors)
-            self.agent.publish_to_feed('acu_status_axis_limits', acustatus_axislims)
-            self.agent.publish_to_feed('acu_status_axis_warnings', acustatus_axiswarn)
-            self.agent.publish_to_feed('acu_status_axis_failures', acustatus_axisfail)
-            self.agent.publish_to_feed('acu_status_axis_state', acustatus_axisstate)
-            self.agent.publish_to_feed('acu_status_osc_alarms', acustatus_oscalarm)
-            self.agent.publish_to_feed('acu_status_commands', acustatus_commands)
-            self.agent.publish_to_feed('acu_status_general_errs', acustatus_acufails)
-            self.agent.publish_to_feed('acu_status_platform', acustatus_platform)
-            self.agent.publish_to_feed('acu_status_emergency', acustatus_emergency)
+            status_blocks = [acustatus_summary, acustatus_axisfaults, acustatus_poserrors,
+                             acustatus_axislims, acustatus_axiswarn, acustatus_axisfail,
+                             acustatus_axisstate, acustatus_oscalarm, acustatus_commands,
+                             acustatus_acufails, acustatus_platform, acustatus_emergency]
+            for block in status_blocks:
+                self.agent.publish_to_feed('acu_status', block)
+#            self.agent.publish_to_feed('acu_status_summary', acustatus_summary)
+#            self.agent.publish_to_feed('acu_status_axis_faults', acustatus_axisfaults)
+#            self.agent.publish_to_feed('acu_status_position_errs', acustatus_poserrors)
+#            self.agent.publish_to_feed('acu_status_axis_limits', acustatus_axislims)
+#            self.agent.publish_to_feed('acu_status_axis_warnings', acustatus_axiswarn)
+#            self.agent.publish_to_feed('acu_status_axis_failures', acustatus_axisfail)
+#            self.agent.publish_to_feed('acu_status_axis_state', acustatus_axisstate)
+#            self.agent.publish_to_feed('acu_status_osc_alarms', acustatus_oscalarm)
+#            self.agent.publish_to_feed('acu_status_commands', acustatus_commands)
+#            self.agent.publish_to_feed('acu_status_general_errs', acustatus_acufails)
+#            self.agent.publish_to_feed('acu_status_platform', acustatus_platform)
+#            self.agent.publish_to_feed('acu_status_emergency', acustatus_emergency)
             self.agent.publish_to_feed('acu_status_influx', acustatus_influx, from_reactor=True)
+            
 #        self._set_job_stop('monitor')
 #        yield dsleep(1)
 #        self._set_job_done('monitor')
@@ -597,9 +607,15 @@ class ACUAgent:
         self._set_job_done('broadcast')
         return True, 'Acquisition exited cleanly.'
 
+    @ocs_agent.param('az', default=None, type=float, check=lambda x: \
+                     self.motion_limits['azimuth']['lower'] <= x <= \
+                     self.motion_limits['azimuth']['upper'])
+    @ocs_agent.param('el', default=None, type=float, check=lambda x: \
+                     self.motion_limits['elevation']['lower'] <= x <= \
+                     self.motion_limits['elevation']['upper'])
     @inlineCallbacks
     def go_to(self, session, params):
-        """go_to(az=None, el=None, wait=1)
+        """go_to(az=None, el=None, wait=1, end_stop=False, rounding=1)
 
         **Task** - Move the telescope to a particular point (azimuth,
         elevation) in Preset mode. When motion has ended and the telescope
@@ -609,6 +625,9 @@ class ACUAgent:
             az (float): destination angle for the azimuthal axis
             el (float): destination angle for the elevation axis
             wait (float): amount of time to wait for motion to end
+            end_stop (bool): put the telescope in Stop mode at the end of
+the motion
+            rounding (int): number of decimal places to round to
 
         """
         ok, msg = self._try_set_job('control')
@@ -616,11 +635,13 @@ class ACUAgent:
             return ok, msg
         az = params.get('az')
         el = params.get('el')
-        if az <= self.motion_limits['azimuth']['lower'] or az >= self.motion_limits['azimuth']['upper']:
-            return False, 'Azimuth location out of range!'
-        if el <= self.motion_limits['elevation']['lower'] or el >= self.motion_limits['elevation']['upper']:
-            return False, 'Elevation location out of range!'
-        wait_for_motion = params.get('wait', 1)
+        end_stop = params.get('end_stop', False)
+#        if az <= self.motion_limits['azimuth']['lower'] or az >= self.motion_limits['azimuth']['upper']:
+#            return False, 'Azimuth location out of range!'
+#        if el <= self.motion_limits['elevation']['lower'] or el >= self.motion_limits['elevation']['upper']:
+#            return False, 'Elevation location out of range!'
+        wait_for_motion = params.get('wait', 1.)
+        round_int = params.get('rounding', 1)
         self.log.info('Azimuth commanded position: ' + str(az))
         self.log.info('Elevation commanded position: ' + str(el))
         current_az = round(self.data['broadcast']['Corrected_Azimuth'], 4)
@@ -638,16 +659,18 @@ class ACUAgent:
         self.agent.publish_to_feed('acu_upload', acu_upload)
 
         # Check whether the telescope is already at the point
-        self.log.info('Checking current position')
-        if round(current_az, 1) == az and round(current_el, 1) == el:
-            self.log.info('Already positioned at %.2f, %.2f'
-                          % (current_az, current_el))
+   #     self.log.info('Checking current position')
+        yield self.acu_control.mode('Preset')
+        if round(current_az, round_int) == az and \
+        round(current_el, round_int) == el:
+            yield self.acu_control.go_to(az, el, wait=0.1)
+            self.log.info('Already at commanded position.')
             self._set_job_done('control')
-            return True, 'Pointing completed'
+            return True, 'Preset at commanded position'
    #     yield self.acu.stop()
-        yield self.acu_control.mode('Stop')
-        self.log.info('Stopped')
-        yield dsleep(0.5)
+   #     yield self.acu_control.mode('Stop')
+   #     self.log.info('Stopped')
+   #     yield dsleep(0.5)
         yield self.acu_control.go_to(az, el, wait=0.1)
         yield dsleep(0.3)
         mdata = self.data['status']['summary']
@@ -662,15 +685,17 @@ class ACUAgent:
                 elapsed_wait_for_motion = time.time() - wait_for_motion_start
                 mdata = self.data['status']['summary']
             else:
-                if round(mdata['Azimuth_current_position'] - az, 1) == 0. and \
-                round(mdata['Elevation_current_position'] - el, 1) == 0.:
-                    yield self.acu_control.stop()
+                if round(mdata['Azimuth_current_position'] - az, round_int) == 0. and \
+                round(mdata['Elevation_current_position'] - el, round_int) == 0.:
+                    if end_stop:
+                        yield self.acu_control.stop()
+                        self.log.info('Az and el in Stop mode')
                     self._set_job_done('control')
                     return True, 'Pointing completed'
                 else:
                     yield self.acu_control.stop()
                     self._set_job_done('control')
-                    return False, 'Motion never occurred!'
+                    return False, 'Motion never occurred! Stop activated'
             yield dsleep(wait_for_motion)
             mdata = self.data['status']['summary']
         moving = True
@@ -689,8 +714,8 @@ class ACUAgent:
             else:
                 moving = False
                 mdata = self.data['status']['summary']
-                pe = round(mdata['Elevation_current_position'], 2)
-                pa = round(mdata['Azimuth_current_position'], 2)
+                pe = round(mdata['Elevation_current_position'], round_int)
+                pa = round(mdata['Azimuth_current_position'], round_int)
                 if pe != el or pa != az:
                     yield self.acu_control.stop()
                     self.log.warn('Stopped before reaching commanded point!')
@@ -698,8 +723,9 @@ class ACUAgent:
                 modes = (mdata['Azimuth_mode'], mdata['Elevation_mode'])
                 if modes != ('Preset', 'Preset'):
                     return False, 'Fault triggered!'
-
-        yield self.acu_control.stop()
+        if end_stop:
+            yield self.acu_control.stop()
+            self.log.info('Stop mode activated')
         self.data['uploads']['Start_Azimuth'] = 0.0
         self.data['uploads']['Start_Elevation'] = 0.0
         self.data['uploads']['Command_Type'] = 0
@@ -715,19 +741,20 @@ class ACUAgent:
 
     @inlineCallbacks
     def set_boresight(self, session, params):
-        """set_boresight(b=None)
+        """set_boresight(b=None, end_stop=False)
 
         **Task** - Move the telescope to a particular third-axis angle.
 
         Parameters:
             b (float): destination angle for boresight rotation
+            end_stop (bool): put axes in Stop mode after motion
 
         """
         ok, msg = self._try_set_job('control')
         if not ok:
             return ok, msg
         bs_destination = params.get('b')
-        yield self.acu_control.stop()
+#        yield self.acu_control.stop()
         yield dsleep(5)
         self.data['uploads']['Start_Boresight'] = self.data['status']['summary']['Boresight_current_position']
         self.data['uploads']['Command_Type'] = 1
@@ -749,7 +776,8 @@ class ACUAgent:
             self.agent.publish_to_feed('acu_upload', acu_upload)
             current_position = self.data['status']['summary']\
                 ['Boresight_current_position']
-        yield self.acu_control.stop()
+        if end_stop:
+            yield self.acu_control.stop()
         self.data['uploads']['Start_Boresight'] = 0.0
         self.data['uploads']['Command_Type'] = 0
         self.data['uploads']['Preset_Boresight'] = 0.0
@@ -793,10 +821,10 @@ class ACUAgent:
         **Task** - Upload and execute a scan pattern from numpy file.
 
         Parameters:
-            filename (str): full path to desired numpy file. File contains an
-                array of three lists ([list(times), list(azimuths),
-                list(elevations)]). Times begin from 0.0. Applies to scantype
-                'from_file'. Required if scantype is 'from_file'.
+            filename (str): full path to desired numpy file. File contains
+an array of three lists ([list(times), list(azimuths), list(elevations)]).
+Times begin from 0.0.
+            simulator (bool): toggle for using the ACU simulator.
         """
         filename = params.get('filename')
         simulator = params.get('simulator')
@@ -808,6 +836,11 @@ class ACUAgent:
         yield self._run_specified_scan(session, times, azs, els, vas, ves, azflags, elflags, azonly=False)
         yield True, 'Track completed'
 
+    @ocs_agent.param('acc', default=None, type=float, check=lambda x: \
+                     abs(x) <= self.motion_limits['acc'])
+    @ocs_agent.param('el', default=None, type=float, check=lambda x: \
+                     self.motion_limits['elevation']['lower'] <= x <= \
+                     self.motion_limits['elevation']['upper'])
     @inlineCallbacks
     def constant_velocity_scan(self, session, params=None):
         """constant_velocity_scan(azpts=None, el=None, azvel=None, acc=None, \
@@ -816,27 +849,15 @@ class ACUAgent:
         **Task** - Run a constant velocity scan.
 
         Parameters:
-            azpts (tuple, optional): spatial endpoints of the azimuth scan.
-                Applies to scantype 'linear_1dir' (2 values) and
-                'linear_turnaround_sameends' (3 values). Required if scantype
-                is not 'from_file'.
-            el (float, optional): elevation for a linear velocity azimuth scan.
-                Applies to scantype 'linear_1dir' and
-                'linear_turnaround_sameends'. Required if scantype is not
-                'from_file'.
-            azvel (float, optional): velocity of the azimuth axis in a linear
-                velocity azimuth scan. Applies to scantype 'linear_1dir' and
-                'linear_turnaround_sameends'. Required if scantype is not
-                'from_file'.
-            acc (float, optional): acceleration of the turnaround for a linear
-                velocity scan with a turnaround. Applies to scantype
-                'linear_turnaround_sameends'. Required if scantype is not
-                'from_file'.
-            ntimes (int, optional): number of times the platform traverses
-                between azimuth endpoints for a 'linear_turnaround_sameends'
-                scan. Required if scantype is 'linear_turnaround_sameends'.
-            azonly:
-            simulator:
+            azpts (tuple): spatial endpoints of the azimuth scan
+            el (float): elevation (constant) throughout the scan
+            azvel (float): velocity of the azimuth axis
+            acc (float): acceleration of the turnaround
+            ntimes (int): number of times the platform traverses
+between azimuth endpoints
+            azonly (bool): option for scans with azimuth motion and
+elevation in Stop
+            simulator (bool): toggle option for ACU simulator
 
         """
         azpts = params.get('azpts')
@@ -846,12 +867,12 @@ class ACUAgent:
         ntimes = params.get('ntimes')
         azonly = params.get('azonly')
         simulator = params.get('simulator')
-        if abs(acc) > self.motion_limits['acc']:
-            return False, 'Acceleration too great!'
+#        if abs(acc) > self.motion_limits['acc']:
+#            return False, 'Acceleration too great!'
         if min(azpts) <= self.motion_limits['azimuth']['lower'] or max(azpts) >= self.motion_limits['azimuth']['upper']:
             return False, 'Azimuth location out of range!'
-        if el <= self.motion_limits['elevation']['lower'] or el >= self.motion_limits['elevation']['upper']:
-            return False, 'Elevation location out of range!'
+#        if el <= self.motion_limits['elevation']['lower'] or el >= self.motion_limits['elevation']['upper']:
+#            return False, 'Elevation location out of range!'
         times, azs, els, vas, ves, azflags, elflags = sh.constant_velocity_scanpoints(azpts, el, azvel, acc, ntimes)
         yield self._run_specified_scan(session, times, azs, els, vas, ves, azflags, elflags, azonly, simulator)
         return True, 'Track completed.'
