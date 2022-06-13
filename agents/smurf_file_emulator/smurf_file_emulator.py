@@ -31,6 +31,8 @@ class Tune:
     Helper class for generating tunes
     """
     def __init__(self, nchans=1720):
+        self.log = txaio.make_logger()
+
         self.nchans = nchans
         self.res_freqs = np.linspace(*SMURF_FREQ_RANGE, nchans, endpoint=False)
 
@@ -97,6 +99,7 @@ class Tune:
         path = os.path.join(basedir, f'{timestamp}_tune.npy')
         np.save(path, self.encode_tune(), allow_pickle=True)
         self.tune_path = path
+        self.log.debug(f"Writing tune: {self.tune_path}")
         return path
 
     def write_channel_assignments(self, bands=None, basedir=''):
@@ -114,6 +117,8 @@ class Tune:
         if bands is None:
             bands = np.unique(self.bands)
         bands = np.atleast_1d(bands)
+
+        timestamp = int(time.time())
 
         for b in bands:
             path = os.path.join(
@@ -167,10 +172,11 @@ class G3FrameGenerator:
         m = self.tune.channels != -1
         chmask = self.tune.channels[m] + self.tune.bands[m] * CHANS_PER_BAND
 
-        s['AMCc.SmurfProcessor.ChannelMapper.Mask'] = chmask.tolist()
-        s['AMCc.SmurfProcessor.ChannelMapper.NumChannels'] = self.nchans
+        s['AMCc.SmurfProcessor.ChannelMapper.Mask'] = str(chmask.tolist())
+        s['AMCc.SmurfProcessor.ChannelMapper.NumChannels'] = self.nchans.item()
 
         fr['status'] = yaml.dump(s)
+        fr['dump'] = True
         self.tag_frame(fr)
         return fr
 
