@@ -20,6 +20,114 @@ def get_smurf_status():
 
 SOSTREAM_VERSION = 2
 NBIASLINES = 16
+NBANDS = 8
+# Range of frequencies allowed by smurf
+SMURF_FREQ_RANGE = (4e3, 8e3)
+SUBBANDS_PER_BAND = 512
+CHANS_PER_BAND = 512
+
+class Tune:
+    """
+    Helper class for generating tunes
+    """
+    def __init__(self, nchans=1720):
+        self.nchans = nchans
+        self.res_freqs = np.linspace(*SMURF_FREQ_RANGE, nchans, endpoint=False)
+
+        band_width = (SMURF_FREQ_RANGE[1] - SMURF_FREQ_RANGE[0]) / NBANDS
+        subband_width = band_width / SUBBANDS_PER_BAND
+
+        rs = self.res_freqs - SMURF_FREQ_RANGE[0]
+        self.bands = (rs / band_width).astype(int)
+        self.subbands = ((rs / subband_width) % SUBBANDS_PER_BAND).astype(int) 
+
+        # just assigns channels in order for each band, making sure this
+        # doesn't go above chans_per_band
+        self.channels = np.full(nchans, -1, dtype=int)
+        for b in np.unique(self.bands):
+            m = self.bands == b
+            self.channels[m] = np.arange(np.sum(m))
+        self.channels[self.channels >= CHANS_PER_BAND] = -1
+
+        self.assignment_files = [None for _ in range(NBANDS)]
+
+    def encode_band(self, band):
+        """
+        Encodes band-information in the format of pysmurf tunefiles. This
+        has the same structure as pysmurf tunefiles, but contains just enough
+        information for indexing.
+        """
+        d = {
+            'lock_status': {},
+            'find_freq': {
+                'resonance': self.res_freqs,
+            },
+            'tone_power': 12,
+            'resonances': {}
+        }
+
+        for i, f in enumerate(self.res_freqs[self.bands == band]):
+            d['resonances'][i] = {'freq': f}
+
+        if self.assignment_files[band] is not None:
+            d['channel_assignment'] = self.assignment_files[band]
+
+        return d
+
+    def encode_tune(self):
+        """
+        Encodes a full tune dictionary in the format of pysmurf tunefiles.
+        """
+        return {
+            b: self.encode_band(b)
+            for b in np.unique(self.bands)
+        }
+
+    def write_tune(self, basedir=''):
+        """
+        Writes tune to disk.
+
+        Args
+        ----
+        basedir : str
+            Directory where tune should be written.
+        """
+        timestamp = int(time.time())
+
+        path = os.path.join(basedir, f'{timestamp}_tune.npy')
+        np.save(path, self.encode_tune(), allow_pickle=True)
+        self.tune_path = path
+        return path
+
+    def write_channel_assignments(self, bands=None, basedir=''):
+        """
+        Writes channel assignment files to disk.
+
+        Args
+        -----
+        bands : optional, int, list[int]
+            Bands to write to disk. Defaults to all that are present in the
+            tune.
+        basedir : str
+            Directory where files should be written
+        """
+        if bands is None:
+            bands = np.unique(self.bands)
+        bands = np.atleast_1d(bands)
+
+        for b in bands:
+            path = os.path.join(
+                basedir, f'{timestamp}_channel_assignment_b{b}.txt'
+            )
+            m = self.bands == b
+            d = np.array([
+                self.res_freqs[m],
+                self.subbands[m], 
+                self.channels[m],
+                np.full(np.sum(m), -1)
+            ]).T
+            np.savetxt(path, d, fmt='%.4f,%d,%d,%d')
+            self.assignment_files[b] = path
 
 
 class G3FrameGenerator:
@@ -27,10 +135,11 @@ class G3FrameGenerator:
     Helper class for generating G3 Streams.
     """
 
-    def __init__(self, stream_id, sample_rate, nchans):
+    def __init__(self, stream_id, sample_rate, tune):
         self.frame_num = 0
         self.session_id = int(time.time())
-        self.nchans = nchans
+        self.tune = tune
+        self.nchans = np.sum(tune.channels != -1)
         self.sample_rate = sample_rate
         self.stream_id = stream_id
 
@@ -50,7 +159,18 @@ class G3FrameGenerator:
 
     def get_status_frame(self):
         fr = core.G3Frame(core.G3FrameType.Wiring)
-        fr['status'] = yaml.dump(get_smurf_status())
+        s = get_smurf_status()
+
+        tune_key = 'AMCc.FpgaTopLevel.AppTop.AppCore.SysgenCryo.tuneFilePath'
+        s[tune_key] = self.tune.tune_path
+
+        m = self.tune.channels != -1
+        chmask = self.tune.channels[m] + self.tune.bands[m] * CHANS_PER_BAND
+
+        s['AMCc.SmurfProcessor.ChannelMapper.Mask'] = chmask.tolist()
+        s['AMCc.SmurfProcessor.ChannelMapper.NumChannels'] = self.nchans
+
+        fr['status'] = yaml.dump(s)
         self.tag_frame(fr)
         return fr
 
@@ -112,6 +232,7 @@ class SmurfFileEmulator:
         self.frame_len = args.frame_len
 
         self.streaming = False
+        self.tune = None
 
     def _get_g3_filename(self, session_id, seq, makedirs=True):
         """
@@ -122,6 +243,20 @@ class SmurfFileEmulator:
         subdir = os.path.join(self.timestreamdir, timecode, self.stream_id)
         filepath = os.path.join(subdir, f"{session_id}_{seq:0>3}.g3")
         return filepath
+
+    def _get_action_dir(self, action, action_time=None, is_plot=False):
+        t = int(time.time())
+        if action_time is None:
+            action_time = t
+        action_time = int(action_time)
+        timecode = f"{action_time}"[:5]
+        dir_type = 'plots' if is_plot else 'outputs'
+        subdir = os.path.join(
+            self.smurfdir, timecode, self.stream_id, f'{action_time}_{action}',
+            dir_type
+        )
+        os.makedirs(subdir, exist_ok=True)
+        return subdir
 
     def _write_smurf_file(self, name, action, action_time=None,
                           prepend_ctime=True, is_plot=False):
@@ -152,14 +287,9 @@ class SmurfFileEmulator:
         t = int(time.time())
         if action_time is None:
             action_time = t
-        action_time = int(action_time)
-        timecode = f"{action_time}"[:5]
-        dir_type = 'plots' if is_plot else 'outputs'
-        subdir = os.path.join(
-            self.smurfdir, timecode, self.stream_id, f'{action_time}_{action}',
-            dir_type
+        subdir = self._get_action_dir(
+            action, action_time=action_time, is_plot=is_plot
         )
-        os.makedirs(subdir, exist_ok=True)
         if prepend_ctime:
             filepath = os.path.join(subdir, f'{t}_{name}')
         else:
@@ -188,6 +318,8 @@ class SmurfFileEmulator:
             If True, will skip any wait times associated with writing
             g3 files.
         """
+        self.tune = Tune(nchans=self.nchans)
+
         # Find Freq
         action_time = time.time()
         files = ['amp_sweep_freq.txt', 'amp_sweep_resonance.txt',
@@ -197,11 +329,9 @@ class SmurfFileEmulator:
                                    action_time=action_time)
 
         # Setup Notches
-        action_time = time.time()
-        files = ['channel_assignment_b0.txt', 'tune.npy']
-        for f in files:
-            self._write_smurf_file(f, 'setup_notches',
-                                   action_time=action_time)
+        sdir = self._get_action_dir('setup_notches')
+        self.tune.write_channel_assignments(basedir=sdir)
+        self.tune.write_tune(basedir=sdir)
 
         # tracking setup
         action_time = time.time()
@@ -210,7 +340,7 @@ class SmurfFileEmulator:
 
         # Short g3 stream
         frame_gen = G3FrameGenerator(
-            self.stream_id, self.sample_rate, self.nchans
+            self.stream_id, self.sample_rate, self.tune
         )
         fname = self._get_g3_filename(frame_gen.session_id, 0, makedirs=True)
         os.makedirs(os.path.dirname(fname), exist_ok=True)
@@ -281,6 +411,9 @@ class SmurfFileEmulator:
         """
         session.set_status('starting')
 
+        if self.tune is None:
+            raise ValueError("No tune loaded!")
+
         # Write initial smurf metadata
         action_time = time.time()
         files = ['freq.txt', 'mask.txt']
@@ -294,7 +427,7 @@ class SmurfFileEmulator:
 
         session.set_status('running')
         frame_gen = G3FrameGenerator(
-            self.stream_id, self.sample_rate, self.nchans
+            self.stream_id, self.sample_rate, self.tune
         )
         session.data['session_id'] = frame_gen.session_id
         session.data['g3_files'] = []
