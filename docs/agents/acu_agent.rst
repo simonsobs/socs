@@ -31,8 +31,8 @@ To configure the ACU Agent we need to add a block to the ocs configuration
 file. An example configuration block using all availabile arguments is below::
 
     {'agent-class': 'ACUAgent',
-     'instance-id': 'acu1',
-     'arguments': [['--acu_config', 'guess']],
+     'instance-id': 'acu-satp1',
+     'arguments': [['--acu_config', 'satp1']],
      }
 
 soaculib
@@ -41,26 +41,46 @@ soaculib
 We additionally need to add a block to the soaculib configuration file. An
 example configuration block is below::
 
-    ocs-acu-1: {
-        'base-url': 'http://192.168.1.109:8100',
-        'dev_url': 'http://192.168.1.109:8080',
+    'satp1': {
+        'base_url': 'http://192.168.1.111:8100',
+        'readonly_url': 'http://192.168.1.111:8110',
+        'dev_url': 'http://192.168.1.111:8080',
         'interface_ip': '192.168.1.110',
         'motion_waittime': 5.0,
         'streams': {
             'main': {
                 'acu_name': 'PositionBroadcast',
-                'port': 10001,
-                'schema': 'v1',
-                'active': True
+                'port': 10004,
+                'schema': 'v2'
             },
             'ext': {
                 'acu_name': 'PositionBroadcastExt',
-                'port': 10002,
-                'schema': 'v1'
-                'active': False
-            }
-        }
+                'port': 10005,
+                'active': False,
+            },
+        },
+        'status': {
+            'status_name': 'Datasets.StatusSATPDetailed8100',
+            },
+
+        'platform': 'satp',
+        'motion_limits': {
+            'azimuth': {
+                'lower': -90.0,
+                'upper': 480.0,
+            },
+            'elevation': {
+                'lower': 20.0,
+                'upper': 50.0,
+            },
+            'boresight': {
+                'lower': 0.0,
+                'upper': 360.,
+            },
+            'acc': (8./1.88),
+        },
     }
+
 
 Agent API
 ---------
