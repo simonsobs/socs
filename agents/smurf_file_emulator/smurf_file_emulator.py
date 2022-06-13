@@ -26,10 +26,12 @@ SMURF_FREQ_RANGE = (4e3, 8e3)
 SUBBANDS_PER_BAND = 512
 CHANS_PER_BAND = 512
 
+
 class Tune:
     """
     Helper class for generating tunes
     """
+
     def __init__(self, nchans=1720):
         self.log = txaio.make_logger()
 
@@ -41,7 +43,7 @@ class Tune:
 
         rs = self.res_freqs - SMURF_FREQ_RANGE[0]
         self.bands = (rs / band_width).astype(int)
-        self.subbands = ((rs / subband_width) % SUBBANDS_PER_BAND).astype(int) 
+        self.subbands = ((rs / subband_width) % SUBBANDS_PER_BAND).astype(int)
 
         # just assigns channels in order for each band, making sure this
         # doesn't go above chans_per_band
@@ -127,7 +129,7 @@ class Tune:
             m = self.bands == b
             d = np.array([
                 self.res_freqs[m],
-                self.subbands[m], 
+                self.subbands[m],
                 self.channels[m],
                 np.full(np.sum(m), -1)
             ]).T
@@ -222,6 +224,7 @@ class DataStreamer:
     """
     Helper class for streaming G3 data
     """
+
     def __init__(self, stream_id, sample_rate, tune, timestreamdir,
                  file_duration, frame_len):
         self.frame_gen = G3FrameGenerator(stream_id, sample_rate, tune)
@@ -280,8 +283,6 @@ class DataStreamer:
                     time.sleep(t1 - now)
             self.writer(self.frame_gen.get_data_frame(start, stop))
         self.end_file()
-        
-
 
 
 class SmurfFileEmulator:
@@ -474,7 +475,6 @@ class SmurfFileEmulator:
                                    action_time=action_time)
 
         return True, "Finished taking bgmap"
-
 
     def bias_dets(self, session, params=None):
         """bias_dets()
