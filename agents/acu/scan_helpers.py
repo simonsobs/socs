@@ -57,7 +57,7 @@ elevation velocities, azimuth flags, elevation flags)
     for n in range(ntimes):
         #print(str(n)+' '+str(sect_start_time))
         end_dir_time = sect_start_time + tot_time_dir
-        time_for_section = np.linspace(sect_start_time, end_dir_time, 
+        time_for_section = np.linspace(sect_start_time, end_dir_time,
                                        num_dirpoints)
         if n%2 != 0:
             new_az = np.linspace(azpts[1], azpts[0], num_dirpoints)
@@ -123,11 +123,11 @@ elevation velocities, azimuth flags, elevation flags)
         return False
     return conctimes, concaz, concel, concva, concve, az_flags, el_flags
 
-def ptstack_format(conctimes, concaz, concel, concva, concve, az_flags, 
+def ptstack_format(conctimes, concaz, concel, concva, concve, az_flags,
                    el_flags, start_offset=3., generator=False):
     """
     Produces a list of lines in the format necessary to upload to the ACU
-    to complete a scan. Params are the outputs of from_file, 
+    to complete a scan. Params are the outputs of from_file,
     constant_velocity_scanpoints, or generate_constant_velocity_scan.
 
     Parameters:
@@ -139,7 +139,7 @@ associated positions
         concve (list): Elevation velocities associated with conctimes
         az_flags (list): Flags associated with azimuth motions at
 conctimes
-        el_flags (list): Flags associated with elevation motions at 
+        el_flags (list): Flags associated with elevation motions at
 conctimes
         start_offset (float): Seconds to wait before starting the scan
         generator (bool): Toggles the start time. When true, start time is
@@ -168,8 +168,8 @@ start_offset, otherwise start time is time.time() + start_offset
     return all_lines
 
 def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
-                                    acc, el_endpoint1, el_endpoint2, 
-                                    el_speed, num_batches=None, 
+                                    acc, el_endpoint1, el_endpoint2,
+                                    el_speed, num_batches=None,
                                     start_time=None, wait_to_start=3.,
                                     step_time=0.1, batch_size=500,
                                     ptstack_fmt=True):
@@ -193,7 +193,7 @@ scans, set to 0.0
 generator to create. Default value is None (interpreted as infinite
 batches).
         start_time (float or None): a ctime at which to start the scan.
-Default is None, which is interpreted as starting now + wait_to_start. 
+Default is None, which is interpreted as starting now + wait_to_start.
         wait_to_start (float): number of seconds to wait between
 start_time and when the scan actually starts. Default is 3 seconds.
         step_time (float): time between points on the constant-velocity
