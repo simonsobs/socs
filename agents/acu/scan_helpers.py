@@ -10,17 +10,17 @@ def constant_velocity_scanpoints(azpts, el, azvel, acc, ntimes):
 
     Parameters:
         azpts (2-tuple): The endpoints of motion in azimuth, where the
-first point is the start position of the scan.
+            first point is the start position of the scan.
         el (float): The elevation that is maintained throughout the scan
         azvel (float): Desired speed of the azimuth motion in degrees/sec
         acc (float): The turnaround acceleration in degrees/sec^2
         ntimes(int): Number of times to travel between the endpoints.
-ntimes = 1 corresponds to a scan from, ex., left to right, and does not
-return to left.
+            ntimes = 1 corresponds to a scan from, ex., left to right, and does not
+            return to left.
 
     Returns:
-        tuple of lists (times, azimuths, elevations, azimuth veolicities,
-elevation velocities, azimuth flags, elevation flags)
+        tuple of lists : (times, azimuths, elevations, azimuth veolicities,
+        elevation velocities, azimuth flags, elevation flags)
     """
     if float(azvel) == 0.0:
         print('Azimuth velocity is zero, invalid scan parameter')
@@ -92,11 +92,11 @@ def from_file(filename):
 
     Parameters:
         filename (str): Full path to the numpy file containing scan
-parameter array
+            parameter array
 
     Returns:
-        tuple of lists (times, azimuths, elevations, azimuth velocities,
-elevation velocities, azimuth flags, elevation flags)
+        tuple of lists: (times, azimuths, elevations, azimuth velocities,
+        elevation velocities, azimuth flags, elevation flags)
 
     NOTE: Flags can be set in the numpy file (0=unspecified, 1=constant
     velocity, 2=last point before turnaround). If flags are not set in
@@ -131,21 +131,21 @@ def ptstack_format(conctimes, concaz, concel, concva, concve, az_flags,
 
     Parameters:
         conctimes (list): Times starting at 0 for the ACU to reach
-associated positions
+            associated positions
         concaz (list): Azimuth positions associated with conctimes
         concel (list): Elevation positions associated with conctimes
         concva (list): Azimuth velocities associated with conctimes
         concve (list): Elevation velocities associated with conctimes
         az_flags (list): Flags associated with azimuth motions at
-conctimes
+            conctimes
         el_flags (list): Flags associated with elevation motions at
-conctimes
+            conctimes
         start_offset (float): Seconds to wait before starting the scan
         generator (bool): Toggles the start time. When true, start time is
-start_offset, otherwise start time is time.time() + start_offset
+            start_offset, otherwise start time is time.time() + start_offset
 
     Returns:
-        all_lines (list): Lines in the correct format to upload to the ACU
+        list: Lines in the correct format to upload to the ACU
     """
 
     fmt = '%j, %H:%M:%S'
@@ -182,29 +182,31 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
         az_endpoint2 (float): second azimuth endpoint of the scan
         az_speed (float): speed of the constant-velocity azimuth motion
         acc (float): turnaround acceleration for the azimuth motion at the
-endpoints
+            endpoints
         el_endpoint1 (float): elevation endpoint for the scan start
         el_endpoint2 (float): second elevation endpoint of the scan. For
-constant az scans, this must be equal to el_endpoint1.
+            constant az scans, this must be equal to el_endpoint1.
         el_speed (float): speed of the elevation motion. For constant az
-scans, set to 0.0
+            scans, set to 0.0
         num_batches (int or None): sets the number of batches for the
-generator to create. Default value is None (interpreted as infinite
-batches).
+            generator to create. Default value is None (interpreted as infinite
+            batches).
         start_time (float or None): a ctime at which to start the scan.
-Default is None, which is interpreted as starting now + wait_to_start.
+            Default is None, which is interpreted as starting now +
+            wait_to_start.
         wait_to_start (float): number of seconds to wait between
-start_time and when the scan actually starts. Default is 3 seconds.
+            start_time and when the scan actually starts. Default is 3 seconds.
         step_time (float): time between points on the constant-velocity
-parts of the motion. Default value is 0.1 seconds. Minimum value is 0.05
-seconds.
+            parts of the motion. Default value is 0.1 seconds. Minimum value is
+            0.05 seconds.
         batch_size (int): number of values to produce in each iteration.
-Default is 500. Batch size is reset to the length of one leg of the motion
-if num_batches is not None.
+            Default is 500. Batch size is reset to the length of one leg of the
+            motion if num_batches is not None.
         ptstack_fmt (bool): determine whether values are produced with the
-necessary format to upload to the ACU. If False, this function will
-produce lists of time, azimuth, elevation, azimuth velocity, elevation
-velocity, azimuth flags, and elevation flags. Default is True.
+            necessary format to upload to the ACU. If False, this function will
+            produce lists of time, azimuth, elevation, azimuth velocity,
+            elevation velocity, azimuth flags, and elevation flags. Default is
+            True.
     """
     az_min = min(az_endpoint1, az_endpoint2)
     az_max = max(az_endpoint1, az_endpoint2)

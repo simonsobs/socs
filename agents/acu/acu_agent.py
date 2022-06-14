@@ -578,7 +578,7 @@ class ACUAgent:
             el (float): destination angle for the elevation axis
             wait (float): amount of time to wait for motion to end
             end_stop (bool): put the telescope in Stop mode at the end of
-the motion
+                the motion
             rounding (int): number of decimal places to round to
 
         """
@@ -774,8 +774,8 @@ the motion
 
         Parameters:
             filename (str): full path to desired numpy file. File contains
-an array of three lists ([list(times), list(azimuths), list(elevations)]).
-Times begin from 0.0.
+                an array of three lists ([list(times), list(azimuths),
+                list(elevations)]).  Times begin from 0.0.
             simulator (bool): toggle for using the ACU simulator.
         """
         filename = params.get('filename')
@@ -806,9 +806,9 @@ Times begin from 0.0.
             azvel (float): velocity of the azimuth axis
             acc (float): acceleration of the turnaround
             ntimes (int): number of times the platform traverses
-between azimuth endpoints
+                between azimuth endpoints
             azonly (bool): option for scans with azimuth motion and
-elevation in Stop
+                elevation in Stop
             simulator (bool): toggle option for ACU simulator
 
         """
