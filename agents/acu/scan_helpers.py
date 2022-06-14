@@ -1,6 +1,7 @@
 import numpy as np
 import time
 
+
 def constant_velocity_scanpoints(azpts, el, azvel, acc, ntimes):
     """
     Produces lists of times, azimuths, elevations, azimuthal velocities,
@@ -30,7 +31,7 @@ def constant_velocity_scanpoints(azpts, el, azvel, acc, ntimes):
         return False
     turn_time = 2 * azvel / acc
     tot_time_dir = float((abs(azpts[1] - azpts[0])) / azvel)
-    num_dirpoints = int(tot_time_dir*10.)
+    num_dirpoints = int(tot_time_dir * 10.)
     if num_dirpoints < 2:
         print('Scan is too short to run')
         return False
@@ -47,7 +48,7 @@ def constant_velocity_scanpoints(azpts, el, azvel, acc, ntimes):
     # 0 : unidentified portion of the scan
     # 1 : constant velocity, with the next point at the same velocity
     # 2 : final point before a turnaround
-    azflags = [1 for i in range(num_dirpoints-1)]
+    azflags = [1 for i in range(num_dirpoints - 1)]
     azflags += [2]
     all_azflags = []
 
@@ -59,14 +60,14 @@ def constant_velocity_scanpoints(azpts, el, azvel, acc, ntimes):
         end_dir_time = sect_start_time + tot_time_dir
         time_for_section = np.linspace(sect_start_time, end_dir_time,
                                        num_dirpoints)
-        if n%2 != 0:
+        if n % 2 != 0:
             new_az = np.linspace(azpts[1], azpts[0], num_dirpoints)
             new_va = np.zeros(num_dirpoints) + \
-                     np.sign(azpts[0]-azpts[1]) * azvel
+                np.sign(azpts[0] - azpts[1]) * azvel
         else:
             new_az = np.linspace(azpts[0], azpts[1], num_dirpoints)
             new_va = np.zeros(num_dirpoints) + \
-                     np.sign(azpts[1]-azpts[0]) * azvel
+                np.sign(azpts[1] - azpts[0]) * azvel
 
         conctimes.extend(time_for_section)
         concaz.extend(new_az)
@@ -80,7 +81,8 @@ def constant_velocity_scanpoints(azpts, el, azvel, acc, ntimes):
     all_azflags[-1] = 0
 
     return conctimes, concaz, concel, concva, concve, all_azflags, \
-           all_elflags
+        all_elflags
+
 
 def from_file(filename):
     """
@@ -104,7 +106,7 @@ def from_file(filename):
     """
     info = np.load(filename)
     if len(info) < 5:
-        raise TypeError('Not enough fields in numpy file! Expected '\
+        raise TypeError('Not enough fields in numpy file! Expected '
                         '5 fields.')
     conctimes = info[0]
     concaz = info[1]
@@ -121,6 +123,7 @@ def from_file(filename):
         print('File has too many parameters!')
         return False
     return conctimes, concaz, concel, concva, concve, az_flags, el_flags
+
 
 def ptstack_format(conctimes, concaz, concel, concva, concve, az_flags,
                    el_flags, start_offset=3., generator=False):
@@ -154,17 +157,18 @@ def ptstack_format(conctimes, concaz, concel, concva, concve, az_flags,
     else:
         start_time = time.time() + start_offset
     true_times = [start_time + i for i in conctimes]
-    fmt_times = [time.strftime(fmt, time.gmtime(t)) + \
-                ('{tt:.6f}'.format(tt=t%1.))[1:] for t in true_times]
+    fmt_times = [time.strftime(fmt, time.gmtime(t))
+                 + ('{tt:.6f}'.format(tt=t % 1.))[1:] for t in true_times]
 
-    all_lines = [('{ftime}; {az:.6f}; {el:.6f}; {azvel:.4f}; '\
-                '{elvel:.4f}; {azflag}; {elflag}'\
-                '\r\n'.format(ftime=fmt_times[n], az=concaz[n],
-                el=concel[n], azvel=concva[n], elvel=concve[n],
-                azflag=az_flags[n], elflag=el_flags[n]))
-                for n in range(len(fmt_times))]
+    all_lines = [('{ftime}; {az:.6f}; {el:.6f}; {azvel:.4f}; '
+                  '{elvel:.4f}; {azflag}; {elflag}'
+                  '\r\n'.format(ftime=fmt_times[n], az=concaz[n],
+                                el=concel[n], azvel=concva[n], elvel=concve[n],
+                                azflag=az_flags[n], elflag=el_flags[n]))
+                 for n in range(len(fmt_times))]
 
     return all_lines
+
 
 def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                                     acc, el_endpoint1, el_endpoint2,
@@ -210,7 +214,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
     """
     az_min = min(az_endpoint1, az_endpoint2)
     az_max = max(az_endpoint1, az_endpoint2)
-    if start_time == None:
+    if start_time is None:
         t0 = time.time() + wait_to_start
     else:
         t0 = start_time
@@ -219,7 +223,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
     az = az_endpoint1
     el = el_endpoint1
     if step_time < 0.05:
-        raise ValueError('Time step size too small, must be at least '\
+        raise ValueError('Time step size too small, must be at least '
                          '0.05 seconds')
     daz = step_time * az_speed
     el_vel = el_speed
@@ -230,10 +234,10 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
         az_vel = az_speed
     elif az > az_endpoint2:
         increasing = False
-        az_vel = -1*az_speed
+        az_vel = -1 * az_speed
     else:
         raise ValueError('Need two different motion endpoints')
-    if num_batches == None:
+    if num_batches is None:
         stop_iter = float('inf')
     else:
         stop_iter = num_batches
@@ -241,7 +245,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
     i = 0
     while i < stop_iter:
         i += 1
-        point_block = [[],[],[],[],[],[],[]]
+        point_block = [[], [], [], [], [], [], []]
         for j in range(batch_size):
             point_block[0].append(t + t0)
             point_block[1].append(az)
@@ -277,9 +281,9 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                     el_flag = 0
                     increasing = True
             else:
-                if az >= (az_min + 2*daz):
+                if az >= (az_min + 2 * daz):
                     az -= daz
-                    az_vel = -1*az_speed
+                    az_vel = -1 * az_speed
                     el_vel = el_speed
                     az_flag = 1
                     el_flag = 0
@@ -296,7 +300,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                     time_remaining = az_remaining / az_speed
                     az = az_min
                     t += (time_remaining - step_time)
-                    az_vel = -1*az_speed
+                    az_vel = -1 * az_speed
                     el_vel = el_speed
                     az_flag = 2
                     el_flag = 0
@@ -312,7 +316,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                    point_block[6])
 
 
-#if __name__ == "__main__":
+# if __name__ == "__main__":
 #    print(time.time())
 #    times, azs, els, vas, ves, azf, elf = linear_turnaround_scanpoints((120., 130.), 55., 1., 4, 2000)
 #    print(time.time())
