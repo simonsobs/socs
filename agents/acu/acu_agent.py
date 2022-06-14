@@ -456,18 +456,6 @@ class ACUAgent:
                              acustatus_acufails, acustatus_platform, acustatus_emergency]
             for block in status_blocks:
                 self.agent.publish_to_feed('acu_status', block)
-#            self.agent.publish_to_feed('acu_status_summary', acustatus_summary)
-#            self.agent.publish_to_feed('acu_status_axis_faults', acustatus_axisfaults)
-#            self.agent.publish_to_feed('acu_status_position_errs', acustatus_poserrors)
-#            self.agent.publish_to_feed('acu_status_axis_limits', acustatus_axislims)
-#            self.agent.publish_to_feed('acu_status_axis_warnings', acustatus_axiswarn)
-#            self.agent.publish_to_feed('acu_status_axis_failures', acustatus_axisfail)
-#            self.agent.publish_to_feed('acu_status_axis_state', acustatus_axisstate)
-#            self.agent.publish_to_feed('acu_status_osc_alarms', acustatus_oscalarm)
-#            self.agent.publish_to_feed('acu_status_commands', acustatus_commands)
-#            self.agent.publish_to_feed('acu_status_general_errs', acustatus_acufails)
-#            self.agent.publish_to_feed('acu_status_platform', acustatus_platform)
-#            self.agent.publish_to_feed('acu_status_emergency', acustatus_emergency)
             self.agent.publish_to_feed('acu_status_influx', acustatus_influx, from_reactor=True)
 
 #        self._set_job_stop('monitor')
