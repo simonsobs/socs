@@ -1,5 +1,4 @@
 import time
-import numpy as np
 import struct
 import datetime
 import calendar
@@ -135,7 +134,7 @@ class ACUAgent:
 
         self.take_data = False
 
-    #    self.web_agent = tclient.Agent(reactor)
+        # self.web_agent = tclient.Agent(reactor)
         tclient._HTTP11ClientFactory.noisy = False
 
         self.acu_control = aculib.AcuControl(
@@ -243,7 +242,7 @@ class ACUAgent:
             job_name (str): Name of the process you are trying to stop.
         """
         print('try to acquire stop')
-#        return (False, 'Could not stop')
+        # return (False, 'Could not stop')
         with self.lock.acquire_timeout(timeout=1.0, job=job_name) as acquired:
             if not acquired:
                 self.log.warn("Lock could not be acquired because it is"
@@ -251,12 +250,12 @@ class ACUAgent:
                 return False
             try:
                 self.jobs[job_name] = 'stop'
-#            state = self.jobs.get(job_name, 'idle')
-#            if state == 'idle':
-#                return False, 'Job not running.'
-#            if state == 'stop':
-#                return False, 'Stop already requested.'
-#            self.jobs[job_name] = 'stop'
+            # state = self.jobs.get(job_name, 'idle')
+            # if state == 'idle':
+            #     return False, 'Job not running.'
+            # if state == 'stop':
+            #     return False, 'Stop already requested.'
+            # self.jobs[job_name] = 'stop'
                 return True, 'Requested Process stop.'
             except Exception as e:
                 print(str(e))
@@ -463,9 +462,9 @@ class ACUAgent:
                 self.agent.publish_to_feed('acu_status', block)
             self.agent.publish_to_feed('acu_status_influx', acustatus_influx, from_reactor=True)
 
-#        self._set_job_stop('monitor')
-#        yield dsleep(1)
-#        self._set_job_done('monitor')
+        # self._set_job_stop('monitor')
+        # yield dsleep(1)
+        # self._set_job_done('monitor')
         return True, 'Acquisition exited cleanly.'
 
     @inlineCallbacks
@@ -608,7 +607,7 @@ class ACUAgent:
         self.agent.publish_to_feed('acu_upload', acu_upload)
 
         # Check whether the telescope is already at the point
-   #     self.log.info('Checking current position')
+        # self.log.info('Checking current position')
         yield self.acu_control.mode('Preset')
         if round(current_az, round_int) == az and \
                 round(current_el, round_int) == el:
@@ -616,10 +615,10 @@ class ACUAgent:
             self.log.info('Already at commanded position.')
             self._set_job_done('control')
             return True, 'Preset at commanded position'
-   #     yield self.acu.stop()
-   #     yield self.acu_control.mode('Stop')
-   #     self.log.info('Stopped')
-   #     yield dsleep(0.5)
+        # yield self.acu.stop()
+        # yield self.acu_control.mode('Stop')
+        # self.log.info('Stopped')
+        # yield dsleep(0.5)
         yield self.acu_control.go_to(az, el, wait=0.1)
         yield dsleep(0.3)
         mdata = self.data['status']['summary']
@@ -704,7 +703,7 @@ class ACUAgent:
         if not ok:
             return ok, msg
         bs_destination = params.get('b')
-#        yield self.acu_control.stop()
+        # yield self.acu_control.stop()
         yield dsleep(5)
         self.data['uploads']['Start_Boresight'] = self.data['status']['summary']['Boresight_current_position']
         self.data['uploads']['Command_Type'] = 1
@@ -724,7 +723,7 @@ class ACUAgent:
                           }
             self.agent.publish_to_feed('acu_upload', acu_upload)
             current_position = self.data['status']['summary']['Boresight_current_position']
-        if end_stop:
+        if params.get('end_stop'):
             yield self.acu_control.stop()
         self.data['uploads']['Start_Boresight'] = 0.0
         self.data['uploads']['Command_Type'] = 0
@@ -751,7 +750,7 @@ class ACUAgent:
             yield dsleep(0.1)
             self._try_set_job('control')
         self.log.info('_try_set_job ok')
-#        yield self.acu.stop()
+        # yield self.acu.stop()
         yield self.acu_control.mode('Stop')
         self.log.info('Stop called')
         yield dsleep(5)
@@ -781,7 +780,7 @@ class ACUAgent:
             return False, 'Azimuth location out of range!'
         if min(els) <= self.motion_limits['elevation']['lower'] or max(els) >= self.motion_limits['elevation']['upper']:
             return False, 'Elevation location out of range!'
-        yield self._run_specified_scan(session, times, azs, els, vas, ves, azflags, elflags, azonly=False)
+        yield self._run_specified_scan(session, times, azs, els, vas, ves, azflags, elflags, azonly=False, simulator=simulator)
         yield True, 'Track completed'
 
     @ocs_agent.param('azpts', type=tuple)

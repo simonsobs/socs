@@ -56,7 +56,7 @@ def constant_velocity_scanpoints(azpts, el, azvel, acc, ntimes):
     all_elflags = []
 
     for n in range(ntimes):
-        #print(str(n)+' '+str(sect_start_time))
+        # print(str(n)+' '+str(sect_start_time))
         end_dir_time = sect_start_time + tot_time_dir
         time_for_section = np.linspace(sect_start_time, end_dir_time,
                                        num_dirpoints)
