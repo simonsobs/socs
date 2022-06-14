@@ -559,15 +559,14 @@ class ACUAgent:
         self._set_job_done('broadcast')
         return True, 'Acquisition exited cleanly.'
 
-    @ocs_agent.param('az', default=None, type=float, check=lambda x: \
-                     self.motion_limits['azimuth']['lower'] <= x <= \
-                     self.motion_limits['azimuth']['upper'])
-    @ocs_agent.param('el', default=None, type=float, check=lambda x: \
-                     self.motion_limits['elevation']['lower'] <= x <= \
-                     self.motion_limits['elevation']['upper'])
+    @ocs_agent.param('az', type=float)
+    @ocs_agent.param('el', type=float)
+    @ocs_agent.param('wait', default=1., type=float)
+    @ocs_agent.param('end_stop', default=False, type=bool)
+    @ocs_agent.param('rounding', default=1, type=int)
     @inlineCallbacks
     def go_to(self, session, params):
-        """go_to(az=None, el=None, wait=1, end_stop=False, rounding=1)
+        """go_to(az=None, el=None, wait=1., end_stop=False, rounding=1)
 
         **Task** - Move the telescope to a particular point (azimuth,
         elevation) in Preset mode. When motion has ended and the telescope
@@ -585,15 +584,19 @@ class ACUAgent:
         ok, msg = self._try_set_job('control')
         if not ok:
             return ok, msg
-        az = params.get('az')
-        el = params.get('el')
-        end_stop = params.get('end_stop', False)
-#        if az <= self.motion_limits['azimuth']['lower'] or az >= self.motion_limits['azimuth']['upper']:
-#            return False, 'Azimuth location out of range!'
-#        if el <= self.motion_limits['elevation']['lower'] or el >= self.motion_limits['elevation']['upper']:
-#            return False, 'Elevation location out of range!'
-        wait_for_motion = params.get('wait', 1.)
-        round_int = params.get('rounding', 1)
+        az = params['az']
+        el = params['el']
+        if az <= self.motion_limits['azimuth']['lower'] or az >= self.motion_limits['azimuth']['upper']:
+            raise ocs_agent.ParamError("Azimuth out of range! Must be "
+                                       + f"{self.motion_limits['azimuth']['lower']} <= az "
+                                       + f"<= {self.motion_limits['azimuth']['upper']}")
+        if el <= self.motion_limits['elevation']['lower'] or el >= self.motion_limits['elevation']['upper']:
+            raise ocs_agent.ParamError("Elevation out of range! Must be "
+                                       + f"{self.motion_limits['elevation']['lower']} <= az "
+                                       + f"<= {self.motion_limits['elevation']['upper']}")
+        end_stop = params['end_stop']
+        wait_for_motion = params['wait']
+        round_int = params['rounding']
         self.log.info('Azimuth commanded position: ' + str(az))
         self.log.info('Elevation commanded position: ' + str(el))
         current_az = round(self.data['broadcast']['Corrected_Azimuth'], 4)
@@ -789,15 +792,17 @@ class ACUAgent:
         yield self._run_specified_scan(session, times, azs, els, vas, ves, azflags, elflags, azonly=False)
         yield True, 'Track completed'
 
-    @ocs_agent.param('acc', default=None, type=float, check=lambda x: \
-                     abs(x) <= self.motion_limits['acc'])
-    @ocs_agent.param('el', default=None, type=float, check=lambda x: \
-                     self.motion_limits['elevation']['lower'] <= x <= \
-                     self.motion_limits['elevation']['upper'])
+    @ocs_agent.param('azpts', type=tuple)
+    @ocs_agent.param('el', type=float)
+    @ocs_agent.param('azvel', type=float)
+    @ocs_agent.param('acc', type=float)
+    @ocs_agent.param('ntimes', type=int)
+    @ocs_agent.param('azonly', type=bool)
+    @ocs_agent.param('simulator', default=False, type=bool)
     @inlineCallbacks
     def constant_velocity_scan(self, session, params=None):
         """constant_velocity_scan(azpts=None, el=None, azvel=None, acc=None, \
-                                  ntimes=None, azonly=None, simulator=None)
+                                  ntimes=None, azonly=None, simulator=False)
 
         **Task** - Run a constant velocity scan.
 
@@ -813,19 +818,19 @@ class ACUAgent:
             simulator (bool): toggle option for ACU simulator
 
         """
-        azpts = params.get('azpts')
-        el = params.get('el')
-        azvel = params.get('azvel')
-        acc = params.get('acc')
-        ntimes = params.get('ntimes')
-        azonly = params.get('azonly')
-        simulator = params.get('simulator')
-#        if abs(acc) > self.motion_limits['acc']:
-#            return False, 'Acceleration too great!'
+        azpts = params['azpts']
+        el = params['el']
+        azvel = params['azvel']
+        acc = params['acc']
+        ntimes = params['ntimes']
+        azonly = params['azonly']
+        simulator = params['simulator']
+        if abs(acc) > self.motion_limits['acc']:
+            raise ocs_agent.ParamError('Acceleration too great!')
         if min(azpts) <= self.motion_limits['azimuth']['lower'] or max(azpts) >= self.motion_limits['azimuth']['upper']:
-            return False, 'Azimuth location out of range!'
-#        if el <= self.motion_limits['elevation']['lower'] or el >= self.motion_limits['elevation']['upper']:
-#            return False, 'Elevation location out of range!'
+            raise ocs_agent.ParamError('Azimuth location out of range!')
+        if el <= self.motion_limits['elevation']['lower'] or el >= self.motion_limits['elevation']['upper']:
+            raise ocs_agent.ParamError('Elevation location out of range!')
         times, azs, els, vas, ves, azflags, elflags = sh.constant_velocity_scanpoints(azpts, el, azvel, acc, ntimes)
         yield self._run_specified_scan(session, times, azs, els, vas, ves, azflags, elflags, azonly, simulator)
         return True, 'Track completed.'
