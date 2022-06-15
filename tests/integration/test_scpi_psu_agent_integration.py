@@ -21,7 +21,17 @@ run_agent = create_agent_runner_fixture(
     args=["--log-dir", "./logs/"],
 )
 client = create_client_fixture("psuK")
-gpib_emu = create_device_emulator({"SYST:REM": ""}, relay_type="tcp")
+gpib_emu = create_device_emulator(
+    {
+        "*idn?": "psuK,,,",
+        "++mode 1": "",
+        "++auto 1": "",
+        "++addr 1": "",
+        "SYST:REM": "",
+    },
+    relay_type="tcp",
+    port=1234,
+)
 
 
 @pytest.mark.integtest
