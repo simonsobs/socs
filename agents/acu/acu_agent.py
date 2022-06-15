@@ -780,13 +780,13 @@ class ACUAgent:
         yield self._run_specified_scan(session, times, azs, els, vas, ves, azflags, elflags, azonly=False)
         yield True, 'Track completed'
 
-    @ocs_agent.param('azpts', type=tuple)
-    @ocs_agent.param('el', type=float)
-    @ocs_agent.param('azvel', type=float)
-    @ocs_agent.param('acc', type=float)
-    @ocs_agent.param('ntimes', type=int)
-    @ocs_agent.param('azonly', type=bool)
-    @ocs_agent.param('simulator', default=False, type=bool)
+#    @ocs_agent.param('azpts', type=tuple)
+#    @ocs_agent.param('el', type=float)
+#    @ocs_agent.param('azvel', type=float)
+#    @ocs_agent.param('acc', type=float)
+#    @ocs_agent.param('ntimes', type=int)
+#    @ocs_agent.param('azonly', type=bool)
+#    @ocs_agent.param('simulator', default=False, type=bool)
     @inlineCallbacks
     def constant_velocity_scan(self, session, params=None):
         """constant_velocity_scan(azpts=None, el=None, azvel=None, acc=None, \
@@ -889,12 +889,16 @@ class ACUAgent:
                               }
                 self.agent.publish_to_feed('acu_upload', acu_upload, from_reactor=True)
             text = ''.join(upload_lines)
+            yield dsleep(0.05)
             free_positions = self.data['status']['summary']\
                 ['Free_upload_positions']
             while free_positions < 9899:
                 free_positions = self.data['status']['summary']\
                     ['Free_upload_positions']
-                yield dsleep(0.1)
+                yield dsleep(0.05)
+                if free_positions > 9997:
+                    self.log.warn('Scan aborted!')
+                    return False
             yield self.acu_control.http.UploadPtStack(text)
             self.log.info('Uploaded a group')
         self.log.info('No more lines to upload')
