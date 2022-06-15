@@ -1,3 +1,4 @@
+import time
 import socket
 
 
@@ -16,16 +17,17 @@ class PrologixInterface:
         self.sock.settimeout(5)
 
     def configure(self):
-        self.write('++mode 1\n')
-        self.write('++auto 1\n')
+        self.write('++mode 1')
+        self.write('++auto 1')
         self.write('++addr ' + str(self.gpibAddr))
 
     def write(self, msg):
         message = msg + '\n'
-        self.sock.send(message.encode())
+        self.sock.sendall(message.encode())
+        time.sleep(0.01)  # Don't send messages too quickly
 
     def read(self):
-        return self.sock.recv(128).decode().rstrip('\n').rstrip('\r')
+        return self.sock.recv(128).decode().strip()
 
     def version(self):
         self.write('++ver')
