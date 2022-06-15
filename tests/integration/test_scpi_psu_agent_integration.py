@@ -58,3 +58,17 @@ def test_scpi_psu_set_output(wait_for_crossbar, gpib_emu, run_agent, client):
 
     resp = client.set_output(channel=2, state=False)
     check_resp_success(resp)
+
+
+@pytest.mark.integtest
+def test_scpi_psu_set_current(wait_for_crossbar, gpib_emu, run_agent, client):
+    client.init()
+    resp = client.set_current(channel=1, current=2.5)
+    check_resp_success(resp)
+
+
+@pytest.mark.integtest
+def test_scpi_psu_set_voltage(wait_for_crossbar, gpib_emu, run_agent, client):
+    client.init()
+    resp = client.set_voltage(channel=3, volts=19.7)
+    check_resp_success(resp)
