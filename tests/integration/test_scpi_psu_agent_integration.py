@@ -23,10 +23,7 @@ run_agent = create_agent_runner_fixture(
 client = create_client_fixture("psuK")
 gpib_emu = create_device_emulator(
     {
-        "*idn?": "psuK,,,",
-        "++mode 1": "",
-        "++auto 1": "",
-        "++addr 1": "",
+        "*idn?": "(instance-id=psuK),,,",  # manufacturer, model, serial, firmware
         "SYST:REM": "",
     },
     relay_type="tcp",
@@ -41,9 +38,8 @@ def test_testing(wait_for_crossbar):
 
 
 @pytest.mark.integtest
-def test_scpi_psu_set_output(wait_for_crossbar, gpib_emu, run_agent, client):
-    client.init()
-    resp = client.set_output(channel=3, state=True)
+def test_scpi_psu_init_psu(wait_for_crossbar, gpib_emu, run_agent, client):
+    resp = client.init()
     print(resp)
     assert resp.status == ocs.OK
     print(resp.session)
