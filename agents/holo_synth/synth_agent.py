@@ -47,7 +47,15 @@ class SynthAgent:
 
     def init_synth(self, session, params=None):
         """init_synth(params=None)
-        Perform first time setup for communication with Synth.
+
+        **Process** - A process to initialize the synthesizers.
+
+        Parameters: holog_config.yaml
+
+        Examples:
+            Example for calling in a client::
+
+                client.init_synth()
         """
 
         self.log.debug("Trying to acquire lock")
@@ -130,11 +138,11 @@ class SynthAgent:
     def set_synth_status(self, session, params):
         """
         params:
-            dict: {'LO_ID': int
+            dict: {'lo_id_n': int
                    'status': int}
         """
 
-        LO_ID = params.get("lo_id", 0)
+        lo_id_n = params.get("lo_id", 0)
         switch = params.get("switch", 0)
 
         with self.lock.acquire_timeout(timeout=3, job="turn_on_or_off_synth") as acquired:
@@ -144,7 +152,7 @@ class SynthAgent:
                 )
                 return False, "Could not acquire lock"
 
-            synth3.set_RF_output(LO_ID, switch, self.lo_id)
+            synth3.set_RF_output(lo_id_n, switch, self.lo_id)
 
             data = {"timestamp": time.time(), "block_name": "synth_LO", "data": {}}
 
