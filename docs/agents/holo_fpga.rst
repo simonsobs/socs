@@ -2,9 +2,9 @@
 
 .. _holo_fpga_agent:
 
-==============
+========================
 Holography FPGA Agent
-==============
+========================
 
 The Holography FPGA Agent is provided with OCS to help demonstrate and debug issues with the holography ROACH2 FPGA.
 It will connect the computer to the ROACH via an ethernet port, take data, and pass it to the OCS feed.

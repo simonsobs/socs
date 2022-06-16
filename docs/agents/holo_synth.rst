@@ -2,9 +2,9 @@
 
 .. _holo_synth_agent:
 
-==============
+=============================
 Holography Synthesizer Agent
-==============
+=============================
 
 The Holography Synthesizer Agent is provided with OCS to help demonstrate and debug issues with the holography synthesizers, which provide a signal at a desired frequency for holography measurements.
 It will connect the computer to the two Local Oscillators (LO's) via USB port, initialize the LO's, set the frequency of each and pass the frequency to the OCS feed.
