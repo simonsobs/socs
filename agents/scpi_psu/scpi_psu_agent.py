@@ -66,6 +66,7 @@ class ScpiPsuAgent:
         wait_time = params.get('wait', 1)
         channels = params.get('channels', [1, 2, 3])
 
+        session.set_status('running')
         self.monitor = True
 
         while self.monitor:

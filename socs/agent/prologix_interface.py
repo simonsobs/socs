@@ -24,7 +24,7 @@ class PrologixInterface:
     def write(self, msg):
         message = msg + '\n'
         self.sock.sendall(message.encode())
-        time.sleep(0.01)  # Don't send messages too quickly
+        time.sleep(0.1)  # Don't send messages too quickly
 
     def read(self):
         return self.sock.recv(128).decode().strip()

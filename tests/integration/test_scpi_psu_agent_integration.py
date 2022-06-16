@@ -1,4 +1,5 @@
 import pytest
+import time
 
 import ocs
 from ocs.base import OpCode
@@ -72,3 +73,31 @@ def test_scpi_psu_set_voltage(wait_for_crossbar, gpib_emu, run_agent, client):
     client.init()
     resp = client.set_voltage(channel=3, volts=19.7)
     check_resp_success(resp)
+
+
+@pytest.mark.integtest
+def test_scpi_psu_monitor_output(wait_for_crossbar, gpib_emu, run_agent, client):
+    responses = {
+        "MEAS:VOLT? CH1": "3.14",
+        "MEAS:CURR? CH1": "6.28",
+        "MEAS:VOLT? CH2": "2.72",
+        "MEAS:CURR? CH2": "5.44",
+        "MEAS:VOLT? CH3": "1.23",
+        "MEAS:CURR? CH3": "2.46",
+    }
+    gpib_emu.define_responses(responses)
+
+    client.init()
+    resp = client.monitor_output.start()
+    assert resp.status == ocs.OK
+    assert resp.session["op_code"] == OpCode.STARTING.value
+
+    resp = client.monitor_output.status()
+    assert resp.session["op_code"] == OpCode.RUNNING.value
+
+    client.monitor_output.stop()
+    time.sleep(3)
+    resp = client.monitor_output.status()
+    print(resp)
+    print(resp.session)
+    assert resp.session["op_code"] in [OpCode.STOPPING.value, OpCode.SUCCEEDED.value]
