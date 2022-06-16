@@ -58,7 +58,7 @@ class FPGAAgent:
         # like limits and translate vary over different FTSes This is loaded
         # from a yaml file, which is assumed to be in the $OCS_CONFIG_DIR
         # directory.
-        if config_file == "None":
+        if config_file is None:
             raise Exception("No config file specified for the FTS mirror config")
         else:
             config_file_path = os.path.join(os.environ["OCS_CONFIG_DIR"], config_file)

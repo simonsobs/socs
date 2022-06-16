@@ -35,7 +35,7 @@ class SynthAgent:
             "synth_LO", record=True, agg_params=agg_params, buffer_time=0
         )
 
-        if config_file == "None":
+        if config_file is None:
             raise Exception("No config file specified for the FTS mirror config")
         else:
             config_file_path = os.path.join(os.environ["OCS_CONFIG_DIR"], config_file)
