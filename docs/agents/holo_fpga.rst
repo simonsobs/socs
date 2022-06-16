@@ -18,8 +18,8 @@ Dependencies
 ------------
 
 Python Packages:
-- casperfpga
-- holo_daq
+- casperfpga (https://pypi.org/project/casperfpga/)
+- holo_daq (https://github.com/McMahonCosmologyGroup/holog_daq)
 
 Configuration File Examples
 ---------------------------
@@ -58,3 +58,12 @@ To initialize the ROACH2 FPGA, use the "fpga" agent::
     from ocs.ocs_client import OCSClient
     agent_fpga = OCSClient("fpga")
     agent_fpga.init_FPGA()
+
+Example Config File
+-------------------
+
+roach: "192.168.4.20"
+ghz_to_mhz: 1000
+N_MULT: 8
+F_OFFSET: 10
+baseline: 'bd'
