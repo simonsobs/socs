@@ -24,8 +24,7 @@ Python Packages:
 Configuration File Examples
 ---------------------------
 
-Below are configuration examples for the ocs config file and for running the
-Agent in a docker container.
+Below are configuration examples for the ocs config file.
 
 OCS Site Config
 ````````````````

@@ -44,11 +44,6 @@ The SynthAgent contains functions which control the two synthesizers for hologra
 
 Once the synthesizers are initialized, the user can take set the frequency output using the set_frequencies() function.  This will set the frequency output of BOTH synthesizers.  The user-specified frequency should be in GHz
 
-Subsection
-``````````
-
-# Use subsections where appropriate.
-
 Agent API
 ---------
 

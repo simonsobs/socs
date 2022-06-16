@@ -29,7 +29,7 @@ class FPGAAgent:
     """
     Agent for connecting to the Synths for holography
 
-    Args:
+    Args: $OCS_CONFIG_DIR holog_config.yaml
     """
 
     def __init__(self, agent, config_file):

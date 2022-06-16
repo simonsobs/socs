@@ -15,7 +15,9 @@ if not ON_RTD:
 
 class SynthAgent:
     """
-    Agent for connecting to the Synths for holography
+    Agent for connecting to the Synths for holography.
+
+    Args: $OCS_CONFIG_DIR holog_config.yaml
     """
 
     def __init__(self, agent, config_file):
@@ -32,15 +34,7 @@ class SynthAgent:
         self.agent.register_feed(
             "synth_LO", record=True, agg_params=agg_params, buffer_time=0
         )
-        """
-        if mode == 'acq':
-            self.auto_acq = True
-        else:
-            self.auto_acq = False
-        self.sampling_frequency = float(samp)
 
-        ### register the position feeds
-        """
         if config_file == "None":
             raise Exception("No config file specified for the FTS mirror config")
         else:
