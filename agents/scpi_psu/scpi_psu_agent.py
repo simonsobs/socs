@@ -65,6 +65,7 @@ class ScpiPsuAgent:
 
         wait_time = params.get('wait', 1)
         channels = params.get('channels', [1, 2, 3])
+        test_mode = params.get('test_mode', False)
 
         session.set_status('running')
         self.monitor = True
@@ -93,6 +94,9 @@ class ScpiPsuAgent:
                     self.log.warn("Could not acquire in monitor_current")
 
             time.sleep(wait_time)
+
+            if test_mode:
+                break
 
         return True, "Finished monitoring current"
 

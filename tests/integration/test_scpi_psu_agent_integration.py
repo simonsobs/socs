@@ -88,16 +88,6 @@ def test_scpi_psu_monitor_output(wait_for_crossbar, gpib_emu, run_agent, client)
     gpib_emu.define_responses(responses)
 
     client.init()
-    resp = client.monitor_output.start()
-    assert resp.status == ocs.OK
-    assert resp.session["op_code"] == OpCode.STARTING.value
-
-    resp = client.monitor_output.status()
-    assert resp.session["op_code"] == OpCode.RUNNING.value
-
-    client.monitor_output.stop()
-    time.sleep(3)
-    resp = client.monitor_output.status()
-    print(resp)
-    print(resp.session)
-    assert resp.session["op_code"] in [OpCode.STOPPING.value, OpCode.SUCCEEDED.value]
+    resp = client.monitor_output.start(test_mode=True, wait=0)
+    resp = client.monitor_output.wait()
+    check_resp_success(resp)
