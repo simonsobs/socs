@@ -1,8 +1,6 @@
 import argparse
 import os
 import time
-
-import numpy as np
 import txaio
 import yaml
 
@@ -10,8 +8,7 @@ ON_RTD = os.environ.get("READTHEDOCS") == "True"
 if not ON_RTD:
     from holog_daq import synth3
     from ocs import ocs_agent, site_config
-    from ocs.ocs_twisted import Pacemaker, TimeoutLock
-
+    from ocs.ocs_twisted import TimeoutLock
 
 class SynthAgent:
     """
@@ -52,9 +49,6 @@ class SynthAgent:
         """init_synth(params=None)
         Perform first time setup for communication with Synth.
         """
-
-        if params is None:
-            params = {}
 
         self.log.debug("Trying to acquire lock")
         with self.lock.acquire_timeout(timeout=0, job="init") as acquired:

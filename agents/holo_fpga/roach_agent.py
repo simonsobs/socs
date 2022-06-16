@@ -1,21 +1,9 @@
 import argparse
 import os
-import time
-import platform
 import numpy as np
 import txaio
 import yaml
-import logging
-import subprocess
-import logging
-
-# check if you're in python 2 or 3
-import platform
 import time
-
-import casperfpga
-import holog_daq
-from holog_daq import fpga_daq3, poco3
 
 ON_RTD = os.environ.get("READTHEDOCS") == "True"
 if not ON_RTD:
