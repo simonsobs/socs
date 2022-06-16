@@ -104,7 +104,7 @@ class SynthAgent:
         f_offset = params.get("offset", 0)
 
         F_1 = int(f1 * self.ghz_to_mhz / self.N_MULT)  # Convert GHz -> MHz for synthesizers
-
+        print(self.N_MULT)
         print(F_1, F_1 + f_offset)
 
         with self.lock.acquire_timeout(timeout=3, job="set_frqeuencies") as acquired:
