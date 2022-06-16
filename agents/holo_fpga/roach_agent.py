@@ -20,9 +20,9 @@ from holog_daq import fpga_daq3, poco3
 ON_RTD = os.environ.get("READTHEDOCS") == "True"
 if not ON_RTD:
     import casperfpga
-    from holog_daq import fpga_daq3, poco3, synth3
+    from holog_daq import fpga_daq3, synth3
     from ocs import ocs_agent, site_config
-    from ocs.ocs_twisted import Pacemaker, TimeoutLock
+    from ocs.ocs_twisted import TimeoutLock
 
 
 class FPGAAgent:
