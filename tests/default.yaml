@@ -46,5 +46,12 @@ hosts:
                      ['--mode', 'init'],
                     ]
       },
+      {'agent-class': 'DLMAgent',
+       'instance-id': 'dlm',
+       'arguments': [['--ip-address', '127.0.0.1'],
+                      # ['--mode', 'acq'],
+                      ['--port', '9221'],
+                    ]
+      },
     ]
   }
