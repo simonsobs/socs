@@ -154,7 +154,7 @@ class ACUAgent:
                                startup=True)
         agent.register_process('generate_scan',
                                self.generate_scan,
-                               lambda session, params: self._set_job_stop('generate_scan'),
+                               lambda session, params: self._set_job_stop('control'),
                                blocking=False,
                                startup=False)
         basic_agg_params = {'frame_length': 60}
@@ -981,7 +981,7 @@ class ACUAgent:
         g = sh.generate_constant_velocity_scan(az_endpoint1, az_endpoint2,
                                                az_speed, acc, el_endpoint1, el_endpoint2, el_speed)
         self.acu_control.mode('ProgramTrack')
-        while True:
+        while self.jobs['control'] == 'run':
             lines = next(g)
             current_lines = lines
             group_size = 250
