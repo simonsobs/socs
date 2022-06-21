@@ -1,14 +1,6 @@
 name: Run Tests
 
 on:
-  push:
-    branches-ignore: [ develop ]
-    paths-ignore:
-      - 'docs/**'
-      - '**.rst'
-      - '**.md'
-      - '.flake8'
-      - '.pre-commit-config.yaml'
   pull_request:
     paths-ignore:
       - 'docs/**'
