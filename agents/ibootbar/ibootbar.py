@@ -211,12 +211,12 @@ class ibootbarSNMP:
                 self.oid_cache[field_name]["lastGet"] = timestamp
                 self.oid_cache[field_name]["description"] = oid_description
                 self.oid_cache['ibootbar_connection'] = {'last_attempt': time.time(),
-                                                         'connected': True}
+                                                      'connected': True}
         # This is a TypeError due to nothing coming back from the yield in
         # run_snmp_get, so get_result is None here and can't be iterated.
         except TypeError:
             self.oid_cache['ibootbar_connection'] = {'last_attempt': time.time(),
-                                                     'connected': False}
+                                                  'connected': False}
             raise ConnectionError('No SNMP response. Check your connection.')
 
     def _build_message(self, interval, get_result, time):
@@ -249,7 +249,7 @@ class ibootbarSNMP:
 
             if oid_value is None:
                 continue
-
+            
             message['data'][field_name] = oid_value
             message['data'][field_name + "_name"] = self.names[int(field_name[-1])]
             message['data'][field_name + "_description"] = oid_description
@@ -469,7 +469,7 @@ class ibootbarAgent:
 
                 return True, 'Rebooting system. This will take 30 seconds.'
             else:
-                return False, "Could not acquire lock"
+                return False, "Could not acquire lock"    
 
 
 def add_agent_args(parser=None):
