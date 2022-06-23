@@ -100,6 +100,7 @@ autodoc_mock_imports = ['spt3g',
                         'sodetlib',
                         'sodetlib.operations',
                         'sodetlib.det_config',
+                        'appmotion_motors_driver'
                         ]
 from unittest import mock
 for m in autodoc_mock_imports:

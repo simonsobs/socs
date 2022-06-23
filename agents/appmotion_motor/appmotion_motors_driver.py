@@ -60,137 +60,134 @@ AXIS_THREADS_PER_INCH_XYZ = 10.0
 # AXIS_THREADS_PER_INCH = 10.0 #Measured on stepper
 
 class Motor:
-    def __init__(self, ip, port, is_lin=True, name=None, index=None, m_res=False):
-        self.ip = ip,
-        self.port = port,
-        self.is_lin = is_lin,
-        self.name = name,
-        self.motor = index,
-        self.ser = Serial_TCPServer((ip, port)),
+    def __init__(self, ip, port, is_lin=True, mot_id=None, index=None, m_res=False):
+        self.ip = ip
+        self.port = port
+        self.is_lin = is_lin
+        self.mot_id = mot_id
+        self.motor = index
+        self.ser = Serial_TCPServer((ip, port))
         
         self.pos = 0 #Position in counts (should always be integer)
-        self.real_pos = 0.0 #Position in inches
+        self.real_pos = 0.0#Position in inches
+        self.sock_status = 0
         
         if not (ip and port):
             print("Invalid Motor information. No Motor control.")
-            self.motor = None
+            self.ser = None
         else:
             print('establishing serial server with motor!')
-            self.motor = Serial_TCPServer((ip, port))
-            if m_res == 'manual':
+            self.ser
+            if m_res:
                 self.res = 'manual'
                 self.s_p_rev = 8000.0 # Steps per revolution (thread)
             else:
                 self.res = 'default' # Corresponds to mapping above
                 self.s_p_rev = 20000.0 # Steps per revolution (thread)
         
-        if self.motor:
+        if self.ser:
             # Check to make sure the device is in receive mode and reset if
             # necessary
-            msg = self.writeread('RS\r')  # RS = Request Status
-            self.flushInput()
+            msg = self.ser.writeread('RS\r')  # RS = Request Status
+            self.ser.flushInput()
             print(msg)
             if (msg == 'RS=R'):
-                print("%s in receive mode." % (self.name))
+                print("%s in receive mode." % (self.mot_id))
             elif (msg != 'RS=R'):
                 print(
                     "%s not in receive mode.  Resetting." %
-                    (self.name))
+                    (self.mot_id))
                 print("Message was: ", msg)
-                self.kill_all_commands(self.motor)
+                self.kill_all_commands()
                 if (msg == 'RS=AR'):
-                    amsg = self.writeread('AL\r')  # AL = Alarm Code
+                    amsg = self.ser.writeread('AL\r')  # AL = Alarm Code
                     print('is message is: ', amsg)
                     print("Alarm was found. Resetting.")
-                    self.write('AR\r')  # AR = Alarm Reset
-                    self.flushInput()
+                    self.ser.write('AR\r')  # AR = Alarm Reset
+                    self.ser.flushInput()
                 else:
                     print('Irregular message received.')
                     sys.exit(1)
                     
         if m_res:
-            self.write('EG8000\r')  # EG = Electronic Gearing
-            self.write('SA\r')  # SA = Save Parameters
-            self.flushInput()
+            self.ser.write('EG8000\r')  # EG = Electronic Gearing
+            self.ser.write('SA\r')  # SA = Save Parameters
+            self.ser.flushInput()
             sleep(0.1)
-            msg = self.writeread('EG\r')
-            self.flushInput()
+            msg = self.ser.writeread('EG\r')
+            self.ser.flushInput()
             if (len(msg) <= 4):    # Need at least MR=X + \r, which is 5 characters
                 print(
-                    "Couldn't get microstep resolution for %s.  Assuming 8." %
-                    (self.name))
+                    "Couldn't get microstep resolution for %s.  Assuming 8,000." %
+                    (self.mot_id))
             else:
                 print(msg)
                 ms_info = msg[3:]
                 self.s_p_rev = float(ms_info)
         else:
-            msg = self.writeread('EG\r')
-            self.flushInput()
+            msg = self.ser.writeread('EG\r')
+            self.ser.flushInput()
             if (len(msg) <= 4):
                 print(
                     "Couldn't get microstep resolution for %s. Disconnect and retry." %
-                    (self.name))
+                    (self.mot_id))
             else:
                 print(msg)
                 ms_info = msg[3:]
                 self.s_p_rev = float(ms_info)
                 ms_info = float(ms_info)
 
-        if (self.motor is not None) and (self.is_lin):
+        if (self.ser is not None) and (self.is_lin):
             # DL1 = Define Limits for closed input (definition unclear in
             # manual, however)
-            msg = self.writeread('DL\r')
+            msg = self.ser.writeread('DL\r')
             print(f"msg: {msg}")
             if msg != 'DL=2':
                 print("Limits not defined as normally open. Resetting...")
-                self.write('DL2\r')  # DL2 = Define Limits for open input
+                self.ser.write('DL2\r')  # DL2 = Define Limits for open input
                 sleep(0.1)
-                self.flushInput()
-            msg = self.writeread('CC\r')  # CC = Change Current
+                self.ser.flushInput()
+            msg = self.ser.writeread('CC\r')  # CC = Change Current
             print(msg)
             current = float(msg[3:])
             if current < 1.5:
                 print("Operating current insufficient. Resetting...")
-                self.write('CC1.5\r')
+                self.ser.write('CC1.5\r')
         else:
-            if self.motor is not None:
-                self.write('JE\r')  # JE = Jog Enable
+            if self.ser is not None:
+                self.ser.write('JE\r')  # JE = Jog Enable
                 
 
-    def is_moving(self, motor=ALL, verbose=False):
+    def is_moving(self, verbose=False):
         """
         Returns True if either motor is moving, False if both motors
         are not moving. Also returns True if the motor provides an irregular
         status message, such as any alarm keys.
 
         Parameters:
-            motor (int): MOTOR1, MOTOR2, or ALL. (default ALL)
             verbose (bool): Prints output from motor requests if True.
                 (default False)
         """
-
-        self.flushInput()
+        self.ser.flushInput()
         # Get the status of the motor and print if verbose = True
-        msg = self.writeread('RS\r')  # RS = Request Status
-        name = self.name
-        self.flushInput()
+        msg = self.ser.writeread('RS\r')  # RS = Request Status
+        self.ser.flushInput()
         if verbose:
             print(msg)
             sys.stdout.flush()
         # If either motor is moving, immediately return True
         if (msg == 'RS=FMR'):
             if verbose:
-                print(f'Motor {name} is still moving.')
+                print(f'Motor {self.mot_id} is still moving.')
             return True
         elif (msg == 'RS=R'):
             if verbose:
-                print(f'Motor {name} is not moving.')
-                continue
+                print(f'Motor {self.mot_id} is not moving.')
         elif (msg == 'RS=AR'):
             if verbose:
                 print(msg)
             # Check what the alarm message is
-            msg = self.writeread('AL\r')
+            msg = self.ser.writeread('AL\r')
             if (msg == 'AL=0002'):
                 print('CCW limit switch hit unexpectedly.')
                 return True
@@ -198,67 +195,56 @@ class Motor:
                 print('CW limit switch hit unexpectedly.')
                 return True
         else:
-            print(f'Irregular error message for motor {name}: {msg}')
+            print(f'Irregular error message for motor {self.mot_id}: {msg}')
             return True
         if verbose:
             print('Neither motor is moving.')
-        return False
+            return False
 
-    def move_off_limit(self, motor=ALL):
+    def move_off_limit(self):
         """
         Ignores alarm to be able to move off the limit switch if 
         unexpectedly hit, and resets alarm. Function should be used when not
         able to move off limit switch due to alarm.
 
-        Parameters:
-            motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
         """
-
-        mot_id = self.motor
-        msg = self.writeread('AL\r')
+        msg = self.ser.writeread('AL\r')
         if (msg == 'AL=0002'):
             print(
                 'CCW limit switch hit unexpectedly. Moving one inch away from switch.')
-            self.move_axis_by_length(motor=mot_id, pos=1, pos_is_inches=True)
+            self.move_axis_by_length(pos=1, pos_is_inches=True)
             sleep(3)
-            self.reset_alarms(motor=mot_id)
+            self.reset_alarms()
         elif (msg == 'AL=0004'):
             print(
                 'CW limit switch hit unexpectedly. Moving one inch away from switch.')
-            self.move_axis_by_length(motor=mot_id, pos=-1, pos_is_inches=True)
+            self.move_axis_by_length(pos=-1, pos_is_inches=True)
             sleep(3)
-            self.reset_alarms(motor=mot_id)
+            self.reset_alarms()
         else:
-            print(f'Motor{motor} not on either switch')
+            print(f'Motor{self.mot_id} not on either switch')
 
-    def home_with_limits(self, motor=ALL):
+    def home_with_limits(self):
         """
         Uses the limit switches to zero all motor positions.
         This function should only be used if the linear stages do not have
         home switches, and should be done carefully. Does one motor at a time
         in order to be careful.
 
-        Parameters:
-            motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
         """
-        
-        if self.motor is None:
-            print('Specified motor is invalid -- exiting function')
-            return
-        mot_id = self.motor
         # Basically, move motors until it hits the limit switch. This will
         # trigger an alarm
-        self.move_axis_by_length(motor=mot_id, pos=-30, pos_is_inches=True)
+        self.move_axis_by_length(pos=-30, pos_is_inches=True)
         # Check if either motor is moving, and if yes exit function with an
         # error message
-        move_status = self.is_moving(motor)
+        move_status = self.is_moving()
         if move_status:
             print('Motors are still moving. Try again later.')
             return
         
         moving = True
         while moving:
-            msg = self.writeread('AL\r')
+            msg = self.ser.writeread('AL\r')
             # This is the error message for the limit switch near the motor
             if (msg == 'AL=0002'):
                 print(
@@ -268,153 +254,124 @@ class Motor:
                     AXIS_THREADS_PER_INCH_STAGE *
                     self.s_p_rev /
                     2.0)
-                self.write('DI%i\r' % (pos))  # DI = Distance/Position
-                self.write('FL\r')  # FL = Feed to Length
-                self.flushInput()
+                self.ser.write('DI%i\r' % (pos))  # DI = Distance/Position
+                self.ser.write('FL\r')  # FL = Feed to Length
+                self.ser.flushInput()
 
                 # Wait for motor to get off limit switch and reset alarms
                 sleep(3)
                 print('Resetting alarms')
-                self.reset_alarms(motor=mot_id)
+                self.reset_alarms()
 
-            if not self.is_moving(motor=mot_id):
+            if not self.is_moving():
                 # zero motor and encoder
-                print(f'Zeroing {motor}')
+                print(f'Zeroing {self.mot_id}')
                 sleep(1)
-                self.set_zero(motor=mot_id)
-                self.set_encoder_value(motor=mot_id)
+                self.set_zero()
+                self.set_encoder_value()
                 # move on to next stage
                 moving = False
         print('Stage zeroed using limit switch')
 
-    def start_jogging(self, motor=ALL):
+    def start_jogging(self):
         """
         Starts jogging control for specified motors.
     
-        Parameters:
-            motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
-        """
-        
-        if not self.motor:
-            print("Specified motor is invalid - not starting jogging.")
-            continue
-        self.write('JE\r')  # JE = Jog Enable
+        """ 
+        self.ser.write('JE\r')  # JE = Jog Enable
         # WI = Wait for Input - Set into wait mode on empty input pin
-        self.write('WI4L\r')
-        self.flushInput()
+        self.ser.write('WI4L\r')
+        self.ser.flushInput()
 
-    def stop_jogging(self, motor=ALL):
+    def stop_jogging(self):
         """
         Stop jogging control to all motors.
 
-        Parameters:
-            motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
         """
-        self.kill_all_commands(self.motor)
+        self.kill_all_commands()
 
-    def seek_home_linear_stage(self, motor=ALL):
+    def seek_home_linear_stage(self):
         """
         Move the linear stage to its home position using the home 
         limit switch.
 
-        Parameters:
-            motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
         """
-
         # Check if either motor is moving, and if yes exit function with an
         # error message
-        move_status = self.is_moving(self.motor)
+        move_status = self.is_moving()
         if move_status:
             print('Motors are still moving. Try again later.')
             return
-        if not self.motor:
-            print("Specified motor is invalid - no motion.")
-            continue
-
         elif not self.is_lin:
             print("Motor isn't connected to a linear stage.")
-            continue
-        self.write('VE2.0\r')  # VE = Velocity
-        self.write('AC2.0\r')  # AC = Acceleration Rate
-        self.write('DE2.0\r')  # DE = Deceleration
-        self.write('DI-1\r')  # DI = Distance/Position (sets direction)
-        self.write('SHX3L\r')  # SH = Seek Home
-        self.flushInput()
+        self.ser.write('VE2.0\r')  # VE = Velocity
+        self.ser.write('AC2.0\r')  # AC = Acceleration Rate
+        self.ser.write('DE2.0\r')  # DE = Deceleration
+        self.ser.write('DI-1\r')  # DI = Distance/Position (sets direction)
+        self.ser.write('SHX3L\r')  # SH = Seek Home
+        self.ser.flushInput()
         print("Linear stage homing...")
-        self.block_while_moving(self.motor, verbose=True)
+        self.block_while_moving(verbose=True)
 
         print("Linear stage home found.")
 
-    def set_zero(self, motor=ALL):
+    def set_zero(self):
         """
         Tell the motor to set the current position as the zero 
         point.
 
-        Parameters:
-            motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
         """
         # Check if either motor is moving, and if yes exit function with an
         # error message
-        move_status = self.is_moving(self.motor)
+        move_status = self.is_moving()
         if move_status:
             print('Motors are still moving. Try again later.')
             return
-
-        if not self.motor:
-            print("Specified motor is invalid.")
-            continue
         self.pos = 0
         self.real_pos = 0.0
-        self.write('SP0\r')  # SP = Set Position
-        self.flushInput()
+        self.ser.write('SP0\r')  # SP = Set Position
+        self.ser.flushInput()
 
-    def get_position(self, motor=ALL):
+    def get_position(self):
         """
         Get the position of the motor in counts, relative to the set
         zero point (or starting point).
-
-        Parameters:
-            motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
 
         Returns:
             positions (list): The positions in counts of the specified motors.
         """
         positions = []
-        if not self.motor:
+        if not self.ser:
             print("Specified motor is invalid - no position info.")
             positions.append(None)
         else:
             positions.append(self.pos)
         return positions
 
-    def get_position_in_inches(self, motor=ALL):
+    def get_position_in_inches(self):
         """
         Get the position of the motor in inches, relative to the set
         zero point (or starting point).
-
-        Parameters:
-            motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
 
         Returns:
             real_positions (list): The positions in inches of the specified
             motors.
         """
         real_positions = []
-        if not self.motor:
+        if not self.ser:
             print("Specified motor is invalid - no position info.")
             real_positions.append(None)
         else:
             real_positions.append(self.real_pos)
         return real_positions
 
-    def get_immediate_position(self, motor=ALL, inches=True):
+    def get_immediate_position(self, inches=True):
         """
         Get the position of the motor while it is currently in 
         motion. An estimate based on the calculated trajectory of the movement,
         relative to the zero point.
 
         Parameters:
-            motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
             inches (bool): Whether the returned position should be in units of
                 inches or not.
 
@@ -425,20 +382,16 @@ class Motor:
         """
         positions = []
         counts_to_inches = 100000  # empirically, 100,000 counts per inch
-
-        if not self.motor:
-            print("Specified motor is invalid - no encoder info.")
-            continue
         # Check that the motor position output is in the right mode
-        msg = self.writeread('IF\r')
+        msg = self.ser.writeread('IF\r')
         if msg == 'IF=H':
             # Output is coming out in hexadecimal, switching to decimal
             print('Changing output to decimal')
-            self.writeread('IFD\r')
+            self.ser.writeread('IFD\r')
 
-        i_pos = self.writeread('IP\r')
+        i_pos = self.ser.writeread('IP\r')
         sleep(0.1)
-        self.flushInput()
+        self.ser.flushInput()
         i_pos = int(i_pos.rstrip('\r')[3:])
         if inches:
             i_pos = i_pos / counts_to_inches
@@ -448,7 +401,6 @@ class Motor:
 
     def move_axis_to_position(
             self,
-            motor=MOTOR1,
             pos=0,
             pos_is_inches=False,
             lin_stage=True):
@@ -457,17 +409,13 @@ class Motor:
         inches.
 
         Parameters:
-            motor (int): MOTOR1, MOTOR2, or ALL. (default MOTOR1)
             pos (float): The desired position in counts or in inches, positive
                 indicates away from the motor. (default 0)
             pos_is_inches (bool): True if pos was specified in inches, False if
                 in counts. (default False)
             lin_stage (bool): True if the specified motor is for the linear
                 stage, False if not. (default True)
-        """
-        if not self.motor:
-            print("Specified motor is invalid - no motion.")
-            continue
+        """  
         # Set the threads per inch based on if the motor controls the FTS
         # linear stage
         if lin_stage:
@@ -488,9 +436,9 @@ class Motor:
         self.real_pos = 2.0 * unit_pos / \
             (AXIS_THREADS_PER_INCH * self.s_p_rev)  # See 2.0 note above
         # Move the motor
-        self.write('DI%i\r' % (unit_pos))  # DI = Distance/Position
-        self.write('FP\r')  # FL = Feed to Position
-        self.flushInput()
+        self.ser.write('DI%i\r' % (unit_pos))  # DI = Distance/Position
+        self.ser.write('FP\r')  # FL = Feed to Position
+        self.ser.flushInput()
 
     def move_axis_by_length(
             self,
@@ -503,7 +451,6 @@ class Motor:
         specified number of counts or inches.
 
         Parameters:
-            motor (int): MOTOR1, MOTOR2, or ALL (default MOTOR1)
             pos (float): the desired number of counts or inches to move from
                 current position, positive indicates away from the motor.
                 (default 0)
@@ -512,9 +459,6 @@ class Motor:
             lin_stage (bool): True if the specified motor is for the linear
                 stage, False if not. (default True)
         """
-        if not self.motor:
-            print("Specified motor is invalid - no motion.")
-            continue
         # Set the threads per inch based on if the motor controls the FTS
         # linear stage
         if lin_stage:
@@ -523,7 +467,7 @@ class Motor:
             AXIS_THREADS_PER_INCH = AXIS_THREADS_PER_INCH_XYZ
 
         # Convert from inches if necessary
-        if(pos_is_inches):
+        if pos_is_inches:
             unit_pos = int(
                 pos *
                 AXIS_THREADS_PER_INCH *
@@ -538,87 +482,73 @@ class Motor:
             (AXIS_THREADS_PER_INCH * self.s_p_rev)  # See 2.0 note above
 
         # Move the motor
-        self.write('DI%i\r' % (unit_pos))  # DI = Distance/Position
-        self.write('FL\r')  # FL = Feed to Length
-        self.flushInput()
+        self.ser.write('DI%i\r' % (unit_pos))  # DI = Distance/Position
+        self.ser.write('FL\r')  # FL = Feed to Length
+        self.ser.flushInput()
         print("Final position: ", pos)
 
-    def set_velocity(self, motor=ALL, velocity=1.0):
+    def set_velocity(self, velocity=1.0):
         """
         Set velocity in revolutions/second.  Range is 0.25 - 50.
         Accepts floating point values.
 
         Parameters:
-            motor(int): MOTOR1, MOTOR2, or ALL. (default ALL)
             velocity (float): Sets velocity of motor in revolutions per second
                 within range [0.25,50]. (default 1.0)
         """
         # Check if either motor is moving, and if yes exit function with an
         # error message
-        move_status = self.is_moving(self.motor)
+        move_status = self.is_moving()
         if move_status:
             print('Motors are still moving. Try again later.')
             return
 
-        if not self.motor:
-            print("Specified motor is invalid - no velocity set.")
-            continue
-        self.write('VE%1.3f\r' % (velocity))  # VE = Velocity
-        self.flushInput()
+        self.ser.write('VE%1.3f\r' % (velocity))  # VE = Velocity
+        self.ser.flushInput()
 
-    def set_acceleration(self, motor=ALL, accel=5):
+    def set_acceleration(self, accel=5):
         """
         Set acceleration of motors driving stages. (default 5)
         .. note::
             `accel` parameter will only accept integer values.
 
         Parameters:
-            motor (int): MOTOR1, MOTOR2, or ALL. (default ALL)
             accel (int): Sets acceleration in revolutions per second per second
                 within range [1,3000]. (default 5)
         """
-        if not self.motor:
-            print("Specified motor is invalid - no acceleration set.")
-            continue
-        self.write('AC%i\r' % (accel))  # AC = Acceleration Rate
-        self.write('DE%i\r' % (accel))  # DE = Deceleration
-        self.flushInput()
+        self.ser.write('AC%i\r' % (accel))  # AC = Acceleration Rate
+        self.ser.write('DE%i\r' % (accel))  # DE = Deceleration
+        self.ser.flushInput()
 
-    def kill_all_commands(self, motor=ALL):
+    def kill_all_commands(self):
         """
         Stop all active commands on the device.
-        Parameters:
-            motor(int): MOTOR1, MOTOR2, or ALL (default ALL)
         """
-        if not self.motor:
-            print("Specified motor is invalid - no motion.")
-            continue
         # SK = Stop & Kill - Stop/kill all commands, turn off waiting for
         # input
-        self.write('SK\r')
-        self.flushInput()
+        self.ser.write('SK\r')
+        self.ser.flushInput()
 
-    def block_while_moving(self, motor=ALL, update_period=.1, verbose=False):
+    def block_while_moving(self, update_period=.1, verbose=False):
         """
         Block until the specified axes have stop moving. Checks each
         axis every update_period seconds.
 
         Parameters:
-            motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
             update_period (float): Time after which to check each motor in
                 seconds. (default .1)
             verbose (bool): Prints output from motor requests if True.
                 (default False)
         """
-        self.flushInput()
-        msg = self.writeread('RS\r')
+        self.ser.flushInput()
+        msg = self.ser.writeread('RS\r')
         count = 0
         while(msg != 'RS=R'):
             count += 1
-            self.flushInput()
+            self.ser.flushInput()
             # Get the status of the motor and print if verbose = True
-            msg = self.writeread('RS\r')  # RS = Request Status
-            self.flushInput()
+            msg = self.ser.writeread('RS\r')  # RS = Request Status
+            self.ser.flushInput()
             if verbose:
                 print(msg)
                 sys.stdout.flush()
@@ -636,7 +566,7 @@ class Motor:
             sleep(update_period)
         print('')
 
-    def run_positions(self, pos_data, motor=ALL, pos_is_inches=False):
+    def run_positions(self, pos_data, pos_is_inches=False):
         """
         Runs a list of entries as positions. For
         motor=ALL, the first column must be the x-data, and the second column
@@ -645,62 +575,39 @@ class Motor:
         Parameters:
             pos_data (list): Tab-delimited list of entries. First column
                 is x-data, second column is y-data.
-            motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
             pos_is_inches (bool): True if pos was specified in inches, False if
                 in counts (default False)
         """
         # Check if either motor is moving, and if yes exit function with an
         # error message
-        move_status = self.is_moving(self.motor)
+        move_status = self.is_moving()
         if move_status:
             print('Motors are still moving. Try again later.')
             return
-
-        if (len(pos_data) > 0):
-            # This is for the 2-axis case.  In the 1-axis case, pos_data[0] will
-            # just be a floating point value
-            if motor == ALL and len(pos_data) < 2:
-                raise Exception(
-                    "You specified that both axes would be moving, but didn't provide data for both.")
-
-        if motor == ALL:
-            self.move_axis_to_position(
-                MOTOR1, pos_data[0], pos_is_inches=pos_is_inches)
-            self.move_axis_to_position(
-                MOTOR2, pos_data[1], pos_is_inches=pos_is_inches)
-        elif motor == MOTOR1:
-            self.move_axis_to_position(MOTOR1, pos_data, pos_is_inches=pos_is_inches)
-        elif motor == MOTOR2:
-            self.move_axis_to_position(MOTOR2, pos_data, pos_is_inches=pos_is_inches)
+        self.move_axis_to_position(pos_data, pos_is_inches=pos_is_inches)
 
         print(f'Moving position to {pos_data}')
 
-    def set_motor_enable(self, motor=ALL, enable=True):
+    def set_motor_enable(self, enable=True):
         """
         Set motor enable to true or false for given axis. Should
         disable motor when stopped for lower noise data acquisition.
 
         Parameters:
-            motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
             enable (bool): Enables specified motor if True, disables specified
                 motor if False.
         """
-        if not self.motor:
-            print("Specified motor is invalid - cannot enable.")
-            continue
         if enable:
-            self.write('ME\r')  # ME = Motor Enable
+            self.ser.write('ME\r')  # ME = Motor Enable
         else:
-            self.write('MD\r')  # MD = Motor Disable
-        self.flushInput()
+            self.ser.write('MD\r')  # MD = Motor Disable
+        self.ser.flushInput()
 
-    def retrieve_encoder_info(self, motor=ALL):
+    def retrieve_encoder_info(self):
         """
         Retrieve all motor step counts to verify movement.
-        Parameters:
-            motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
         """
-        move_status = self.is_moving(self.motor)
+        move_status = self.is_moving()
         e_positions = []
 
         # If the motors are moving, return NaNs to keep from querying the
@@ -709,133 +616,97 @@ class Motor:
             e_positions.append(np.nan)
             return e_positions
 
-        if not self.motor:
-            print("Specified motor is invalid - no encoder info.")
-            continue
-        e_pos = self.writeread('EP\r')  # EP = Encoder Position
+        e_pos = self.ser.writeread('EP\r')  # EP = Encoder Position
         sleep(0.1)
-        self.flushInput()
+        self.ser.flushInput()
         e_pos = int(e_pos.rstrip('\r')[3:])
         e_positions.append(e_pos)
 
         return e_positions
 
-    def set_encoder_value(self, motor=ALL, value=0):
+    def set_encoder_value(self, value=0):
         """
         Set the encoder values in order to keep track of absolute
         position.
 
         Parameters:
-            motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
             value (float): Sets encoder value. (default 0)
         """
         # Check if either motor is moving, and if yes exit function with an
         # error message
-        move_status = self.is_moving(self.motor)
+        move_status = self.is_moving()
         if move_status:
             print('Motors are still moving. Try again later.')
             return
 
         e_positions = []
-        if not self.motor:
-            print("Specified motor is invalid - encoder value not set.")
-            continue
         # Set the motor position
-        e_pos_set = self.write('EP%i\r' % (value))  # EP = Encoder Position
+        e_pos_set = self.ser.write('EP%i\r' % (value))  # EP = Encoder Position
         sleep(0.1)
-        self.flushInput()
+        self.ser.flushInput()
         # Read and return the new motor position
-        e_pos = self.writeread('EP\r')  # EP = Encoder Position
+        e_pos = self.ser.writeread('EP\r')  # EP = Encoder Position
         sleep(0.1)
-        self.flushInput()
+        self.ser.flushInput()
         e_pos = int(e_pos.rstrip('\r')[3:])
         print(e_pos)
         e_positions.append(e_pos)
         
         return e_positions
 
-    def start_rotation(self, motor=MOTOR2, velocity=12.0, rot_accel=1.0):
+    def start_rotation(self, velocity=12.0, rot_accel=1.0):
         """
         Starts jogging specifically for the rotation of the output
         polarizer in the FTS.
 
         Parameters:
-            motor (int): MOTOR1, MOTOR2, or ALL (default MOTOR2)
             velocity (float): The rotation velocity in revolutions per second (default 12.0)
             rot_accel (float): The acceleration in revolutions per second per
                 second within range [1,3000].  (default 1.0)
         """
-        if not self.motor:
-            print("Specified motor is invalid - not starting jogging.")
-            continue
-
         # Set the jog parameters
-        self.write('JS%1.3f\r' % (velocity))  # JS = Jog Speed
-        self.write('JA%i\r' % (rot_accel))  # JA = Jog Acceleration
-        self.write('JL%i\r' % (rot_accel))  # JL = Jog Decel
+        self.ser.write('JS%1.3f\r' % (velocity))  # JS = Jog Speed
+        self.ser.write('JA%i\r' % (rot_accel))  # JA = Jog Acceleration
+        self.ser.write('JL%i\r' % (rot_accel))  # JL = Jog Decel
 
         # Start rotation
-        self.write('CJ\r')  # CJ = Commence Jogging
-        self.flushInput()
+        self.ser.write('CJ\r')  # CJ = Commence Jogging
+        self.ser.flushInput()
 
-    def stop_rotation(self, motor=MOTOR2):
+    def stop_rotation(self):
         """
         Stops jogging for the rotation of the specified motor.
-        
-        Parameters:
-            motor (int): MOTOR1, MOTOR2, or ALL (default MOTOR2)
         """
-        if not self.motor:
-            print("Specified motor is invalid.")
-            continue
-        self.write('SJ\r')  # SJ = Stop Jogging
-        self.flushInput()
+        self.ser.write('SJ\r')  # SJ = Stop Jogging
+        self.ser.flushInput()
 
-    def reset_alarms(self, motor=ALL):
+    def reset_alarms(self):
         """
         Resets alarm codes present. Only advised if you have checked
         what the alarm is first!
-
-        Parameters:
-        motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
         """
-        if not self.motor:
-            print("Specified motor is invalid.")
-            continue
-        self.write('AR\r')
-        self.flushInput()
+        self.ser.write('AR\r')
+        self.ser.flushInput()
 
-    def close_connection(self, motor=ALL):
+    def close_connection(self):
         """
         Close the connection to the serial controller for the
         specified motor.
-
-        Parameters:
-            motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
         """
-        if not self.motor:
-            print("Specified motor is invalid - no connection to close.")
-            continue
         self.sock.close()
         print("Connection to serial controller disconnected.")
 
-#NEED TO FIX
-#    def reconnect_motor(self, motor=ALL):
-#        """
-#        Reestablish connection with specified motor.
-#        
-#        Parameters:
-#            motor (int): MOTOR1, MOTOR2, or ALL (default ALL)
-#        """
-#        if not self.motor:
-#            print("Specified motor is invalid - no connection to close.")
-#            continue
-#        print(f"port: {self.port}")
-#        try:
-#            self.sock.connect(self.port) #return 1
-#            print(f"Connection with motor{motor} has been reestablished.")
-#            sock_status = 1
-#        except:
-#            print(f"Connection with motor{motor} could not be reestablished.") #return 0
-#            sock_status = 0        
+
+    def reconnect_motor(self):
+        """
+        Reestablish connection with specified motor.
+        """
+        print(f"port: {self.port}")
+        try:
+            self.sock.connect(self.port) #return 1
+            print(f"Connection has been reestablished.")
+            self.sock_status = 1
+        except ConnectionError:
+            print(f"Connection could not be reestablished.") #return 0
+            self.sock_status = 0        
 

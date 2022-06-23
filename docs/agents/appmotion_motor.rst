@@ -2,9 +2,9 @@
 
 .. _appmotion_motor:
 
-==============
+============================
 Applied Motion Motors Agent
-==============
+============================
 
 This agent is used to communicate with NEMA motors, particularly the beam-
 mapper motors.
@@ -220,6 +220,6 @@ Below is a script for a beam-mapper scan using the appmotion_motor_agent.::
 Supporting APIs
 ---------------
 
-.. autoclass:: agents.appmotion_motor.appmotion_motors_driver.MotControl
+.. automodule:: agents.appmotion_motor.appmotion_motors_driver
     :members:
 
