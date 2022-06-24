@@ -23,8 +23,8 @@ run_agent = create_agent_runner_fixture(
 client = create_client_fixture("psuK")
 gpib_emu = create_device_emulator(
     {
-        "*idn?": "(instance-id=psuK),,,",  # manufacturer, model, serial, firmware
-        "SYST:REM": "",
+        # manufacturer, model, serial, firmware
+        "*idn?": "Keithley instruments, 2230G-30-1, 9203269, 1.16-1.04",
     },
     relay_type="tcp",
     port=1234,  # hard-coded in prologix_interface.py (line 16)
@@ -36,12 +36,6 @@ def check_resp_success(resp):
     assert resp.status == ocs.OK
     print(resp.session)
     assert resp.session["op_code"] == OpCode.SUCCEEDED.value
-
-
-@pytest.mark.integtest
-def test_testing(wait_for_crossbar):
-    """Just a quick test to make sure we can bring up crossbar."""
-    assert True
 
 
 @pytest.mark.integtest
