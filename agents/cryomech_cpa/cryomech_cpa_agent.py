@@ -82,6 +82,7 @@ class PTC:
             raise ValueError(f"Invalid state: {state}")
 
         self.comm.sendall(bytes(command))
+        self.comm.recv(1024)  # Discard the echoed command
 
     def breakdownReplyData(self, rawdata):
         """Take in raw ptc data, and return a dictionary.
