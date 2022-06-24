@@ -68,6 +68,7 @@ def _extract_oid_field_and_value(get_result):
 
     return field_name, oid_value, oid_description
 
+
 def _build_message(get_result, names, time):
     """Build the message for publication on an OCS Feed.
 
@@ -96,12 +97,13 @@ def _build_message(get_result, names, time):
 
         if oid_value is None:
             continue
-        
+
         message['data'][field_name] = oid_value
         message['data'][field_name + "_name"] = names[int(field_name[-1])]
         message['data'][field_name + "_description"] = oid_description
 
     return message
+
 
 def update_cache(get_result, names, timestamp):
     """Update the OID Value Cache.
@@ -141,16 +143,17 @@ def update_cache(get_result, names, timestamp):
             oid_cache[field_name]["name"] = names[int(field_name[-1])]
             oid_cache[field_name]["description"] = oid_description
             oid_cache['ibootbar_connection'] = {'last_attempt': time.time(),
-                                                    'connected': True}
+                                                'connected': True}
             oid_cache['timestamp'] = timestamp
-    # This is a TypeError due to nothing coming back from the yield, 
+    # This is a TypeError due to nothing coming back from the yield,
     # so get_result is None here and can't be iterated.
     except TypeError:
         oid_cache['ibootbar_connection'] = {'last_attempt': time.time(),
-                                                'connected': False}
+                                            'connected': False}
         raise ConnectionError('No SNMP response. Check your connection.')
 
     return oid_cache
+
 
 class ibootbarAgent:
     """Monitor the ibootbar system via SNMP.
@@ -190,7 +193,7 @@ class ibootbarAgent:
         self.lastGet = 0
 
         agg_params = {
-            'frame_length': 10*60  # [sec]
+            'frame_length': 10 * 60  # [sec]
         }
         self.agent.register_feed('ibootbar',
                                  record=True,
@@ -222,7 +225,7 @@ class ibootbarAgent:
 
         # Set initial default outlet names
         names = ['Outlet-1', 'Outlet-2', 'Outlet-3', 'Outlet-4',
-                     'Outlet-5', 'Outlet-6', 'Outlet-7', 'Outlet-8']
+                 'Outlet-5', 'Outlet-6', 'Outlet-7', 'Outlet-8']
 
         self.is_streaming = True
         while self.is_streaming:
@@ -248,7 +251,7 @@ class ibootbarAgent:
 
             for item in name_result:
                 names.append(item[1].prettyPrint())
-            
+
             # Do not publish if ibootbar connection has dropped
             try:
                 message = _build_message(get_result, names, read_time)
@@ -295,7 +298,7 @@ class ibootbarAgent:
                 state = 0
 
             # Issue SNMP SET command to given outlet
-            outlet = [('IBOOTPDU-MIB', 'outletControl', params['outlet']-1)]
+            outlet = [('IBOOTPDU-MIB', 'outletControl', params['outlet'] - 1)]
             setcmd = yield self.snmp.set(outlet, self.version, state)
             self.log.info('{}'.format(setcmd))
 
@@ -303,7 +306,7 @@ class ibootbarAgent:
         self.lastGet = self.lastGet - 60
 
         return True, 'Set outlet {} to {}'.\
-            format(params['outlet']-1, params['state'])
+            format(params['outlet'] - 1, params['state'])
 
     @ocs_agent.param('outlet', choices=[1, 2, 3, 4, 5, 6, 7, 8])
     @ocs_agent.param('cycle_time', default=10, type=int)
@@ -323,16 +326,16 @@ class ibootbarAgent:
             if not acquired:
                 return False, "Could not acquire lock"
             # Issue SNMP SET command for cycle time
-            set_cycle = [('IBOOTPDU-MIB', 'outletCycleTime', params['outlet']-1)]
+            set_cycle = [('IBOOTPDU-MIB', 'outletCycleTime', params['outlet'] - 1)]
             setcmd1 = yield self.snmp.set(set_cycle, self.version, params['cycle_time'])
             self.log.info('{}'.format(setcmd1))
 
             # Issue SNMP SET command to given outlet
-            outlet = [('IBOOTPDU-MIB', 'outletControl', params['outlet']-1)]
+            outlet = [('IBOOTPDU-MIB', 'outletControl', params['outlet'] - 1)]
             setcmd2 = yield self.snmp.set(outlet, self.version, 2)
             self.log.info('{}'.format(setcmd2))
-            self.log.info('Cycling outlet {} for {} seconds'.\
-                format(params['outlet']-1, params['cycle_time']))
+            self.log.info('Cycling outlet {} for {} seconds'.
+                          format(params['outlet'] - 1, params['cycle_time']))
 
         # Force SNMP GET status commands throughout the cycle time
         for i in range(params['cycle_time']):
@@ -340,7 +343,7 @@ class ibootbarAgent:
             yield dsleep(1)
 
         return True, 'Cycled outlet {} for {} seconds'.\
-            format(params['outlet']-1, params['cycle_time'])
+            format(params['outlet'] - 1, params['cycle_time'])
 
     @ocs_agent.param('_')
     @inlineCallbacks
@@ -360,7 +363,7 @@ class ibootbarAgent:
         # Force SNMP GET status commands
         self.lastGet = self.lastGet - 60
 
-        return True, 'Rebooting system. This will take about 30 seconds.'  
+        return True, 'Rebooting system. This will take about 30 seconds.'
 
 
 def add_agent_args(parser=None):
