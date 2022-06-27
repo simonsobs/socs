@@ -26,14 +26,8 @@ emu = create_device_emulator({"hello": "world"}, relay_type="tcp", port=9221)
 
 
 @pytest.mark.integtest
-def test_testing(wait_for_crossbar):
-    """Just a quick test to make sure we can bring up crossbar."""
-    assert True
-
-
-@pytest.mark.integtest
 def test_dlm_init(wait_for_crossbar, emu, run_agent, client):
-    resp = client.init_dlm()
+    resp = client.init_dlm(force=True)
     print(resp)
     assert resp.status == ocs.OK
     print(resp.session)
