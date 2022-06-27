@@ -142,7 +142,7 @@ class DLMAgent:
             pm = Pacemaker(f_sample, True)
         else:
             pm = Pacemaker(f_sample)
-        wait_time = 1 / f_sample
+        wait_time = 1 / f_sample  # variable never used
         # job='init' is set here and in other acquire_timeout calls
         # even though the job is not 'init'
         with self.lock.acquire_timeout(timeout=0, job='init') as acquired:
