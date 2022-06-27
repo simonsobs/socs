@@ -34,22 +34,26 @@ def test_dlm_init(wait_for_crossbar, emu, run_agent, client):
     assert resp.session["op_code"] == OpCode.SUCCEEDED.value
 
 
-# @pytest.mark.integtest
-# def test_dlm_acq(wait_for_crossbar, emu, run_agent, client):
-#     responses = {"SOUR:VOLT?;OPC?": "15"}
-#     emu.define_responses(responses)
+@pytest.mark.integtest
+def test_dlm_acq(wait_for_crossbar, emu, run_agent, client):
+    responses = {"SOUR:VOLT?;OPC?": "15", "MEAS:CURR?;OPC?": "1.85"}
+    emu.define_responses(responses)
 
-#     resp = client.acq.status()
-#     assert resp.session["op_code"] == OpCode.RUNNING.value
+    resp = client.acq.start()
+    assert resp.status == ocs.OK
+    assert resp.session["op_code"] == OpCode.STARTING.value
+    time.sleep(1)
+    resp = client.acq.status()
+    assert resp.status == ocs.OK
+    assert resp.session["op_code"] == OpCode.RUNNING.value
 
-#     client.acq.stop()
-#     time.sleep(3)
-#     client.acq.stop()
-#     time.sleep(3)
-#     resp = client.acq.status()
-#     print(resp)
-#     print(resp.session)
-#     assert resp.session["op_code"] in [OpCode.STOPPING.value, OpCode.SUCCEEDED.value]
+    client.acq.stop()
+    time.sleep(1)  # can implement a 'run_once' param for testing later
+    resp = client.acq.status()
+    print(resp)
+    assert resp.status == ocs.OK
+    print(resp.session)
+    assert resp.session["op_code"] in [OpCode.STOPPING.value, OpCode.SUCCEEDED.value]
 
 
 @pytest.mark.integtest
