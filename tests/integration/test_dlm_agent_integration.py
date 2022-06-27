@@ -27,7 +27,7 @@ emu = create_device_emulator({"hello": "world"}, relay_type="tcp", port=9221)
 
 @pytest.mark.integtest
 def test_dlm_init(wait_for_crossbar, emu, run_agent, client):
-    resp = client.init_dlm(force=True)
+    resp = client.init_dlm.status()
     print(resp)
     assert resp.status == ocs.OK
     print(resp.session)
