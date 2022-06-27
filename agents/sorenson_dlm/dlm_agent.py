@@ -77,7 +77,7 @@ class DLM:
         msg = self.rec_msg()
         return msg
 
-    def sys_err_check(self): # never used
+    def sys_err_check(self):  # never used
         """
         Queries sytem error and returns error byte
         """
@@ -98,7 +98,7 @@ class DLMAgent:
     """
 
     def __init__(self, agent, ip_address, port, f_sample=2.5):
-        self.active = True # not used elsewhere
+        self.active = True  # not used elsewhere
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
@@ -106,8 +106,8 @@ class DLMAgent:
         self.take_data = False
         self.over_volt = 0.
         self.initialized = False
-        self._acq_proc_lock = TimeoutLock() # is this necessary? only used in init_dlm
-        self._lock = TimeoutLock() # is this necessary? only used in init_dlm
+        self._acq_proc_lock = TimeoutLock()  # is this necessary? only used in init_dlm
+        self._lock = TimeoutLock()  # is this necessary? only used in init_dlm
 
         try:
             self.dlm = DLM(ip_address, int(port))
@@ -143,8 +143,8 @@ class DLMAgent:
         else:
             pm = Pacemaker(f_sample)
         wait_time = 1 / f_sample
-        ##### job='init' is set here and in other acquire_timeout calls
-        ##### even though the job is not 'init'
+        # job='init' is set here and in other acquire_timeout calls
+        # even though the job is not 'init'
         with self.lock.acquire_timeout(timeout=0, job='init') as acquired:
             # Locking mechanism stops code from proceeding if no lock acquired
             pm.sleep()
@@ -198,7 +198,7 @@ class DLMAgent:
 
         """
 
-        ##### job='init' set erroneously
+        # job='init' set erroneously
         with self.lock.acquire_timeout(timeout=3, job='init') as acquired:
             if acquired:
                 if self.over_volt == 0:
@@ -227,7 +227,7 @@ class DLMAgent:
 
         """
 
-        ##### job='init' set erroneously
+        # job='init' set erroneously
         with self.lock.acquire_timeout(timeout=3, job='init') as acquired:
             if acquired:
                 if not self.dlm.set_overv_prot(params['over_volt']):
@@ -253,13 +253,13 @@ class DLMAgent:
 
         """
 
-        ##### job='init' set erroneously
+        # job='init' set erroneously
         with self.lock.acquire_timeout(timeout=3, job='init') as acquired:
             if acquired:
                 if self.over_volt == 0:
                     return False, 'Over voltage protection not set'
-                ##### voltage not a param?
-                ##### what is the intended check here?
+                # voltage not a param?
+                # what is the intended check here?
                 # elif float(params['voltage']) > float(self.over_volt):
                 #     return False, 'Voltage greater then over voltage protection'
                 else:
@@ -291,7 +291,7 @@ class DLMAgent:
             self.log.info("DLM already initialized Returning...")
             return True, "Already initialized"
 
-        ##### purpose of these locks when they are not used elsewhere?
+        # purpose of these locks when they are not used elsewhere?
         with self._lock.acquire_timeout(job='init') as acquired1, \
                 self._acq_proc_lock.acquire_timeout(timeout=0., job='init') \
                 as acquired2:
@@ -303,8 +303,8 @@ class DLMAgent:
                 self.log.warn(f"Could not start init because "
                               f"{self._acq_proc_lock.job} is already running")
                 return False, "Could not acquire lock"
-            ##### no code is lock-protected here --- i.e., locks are acquired
-            ##### and then immediately freed
+            # no code is lock-protected here --- i.e., locks are acquired
+            # and then immediately freed
         session.set_status('running')
 
         # Start data acquisition if requested
