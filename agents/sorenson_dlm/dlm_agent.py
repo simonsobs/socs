@@ -339,11 +339,10 @@ if __name__ == '__main__':
 
     agent, runner = ocs_agent.init_site_agent(args)
     DLM_agent = DLMAgent(agent, args.ip_address, args.port)
-    agent.register_process('acq', DLM_agent.acq,
-                           DLM_agent._stop_acq, startup=False)
+    agent.register_process('acq', DLM_agent.acq, DLM_agent._stop_acq)
     agent.register_task('set_voltage', DLM_agent.set_voltage)
     agent.register_task('close', DLM_agent._stop_acq)
     agent.register_task('set_over_volt', DLM_agent.set_over_volt)
-    agent.register_task('init_dlm', DLM_agent.init_dlm)
+    agent.register_task('init_dlm', DLM_agent.init_dlm, startup=True)
     agent.register_task('set_current', DLM_agent.set_current)
     runner.run(agent, auto_reconnect=True)

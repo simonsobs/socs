@@ -21,7 +21,7 @@ run_agent = create_agent_runner_fixture(
     "dlm_agent",
     args=["--log-dir", "./logs/"],
 )
-client = create_client_fixture("dlm")  # not defined yet
+client = create_client_fixture("dlm")
 emu = create_device_emulator({"hello": "world"}, relay_type="tcp", port=9221)
 
 
@@ -106,6 +106,7 @@ def test_dlm_trigger_over_volt(wait_for_crossbar, emu, run_agent, client):
     assert resp.status == ocs.OK
     print(resp.session)
     assert resp.session["op_code"] == OpCode.FAILED.value
+
 
 @pytest.mark.integtest
 def test_dlm_set_current(wait_for_crossbar, emu, run_agent, client):
