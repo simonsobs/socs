@@ -581,12 +581,12 @@ class ACUAgent:
         el = params['el']
         if az <= self.motion_limits['azimuth']['lower'] or az >= self.motion_limits['azimuth']['upper']:
             raise ocs_agent.ParamError("Azimuth out of range! Must be "
-                                       + f"{self.motion_limits['azimuth']['lower']} <= az "
-                                       + f"<= {self.motion_limits['azimuth']['upper']}")
+                                       + f"{self.motion_limits['azimuth']['lower']} < az "
+                                       + f"< {self.motion_limits['azimuth']['upper']}")
         if el <= self.motion_limits['elevation']['lower'] or el >= self.motion_limits['elevation']['upper']:
             raise ocs_agent.ParamError("Elevation out of range! Must be "
-                                       + f"{self.motion_limits['elevation']['lower']} <= az "
-                                       + f"<= {self.motion_limits['elevation']['upper']}")
+                                       + f"{self.motion_limits['elevation']['lower']} < el "
+                                       + f"< {self.motion_limits['elevation']['upper']}")
         end_stop = params['end_stop']
         wait_for_motion = params['wait']
         round_int = params['rounding']
