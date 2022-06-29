@@ -7,7 +7,7 @@ import pytest
 import threading
 
 
-def create_device_emulator(responses, relay_type, port=9001):
+def create_device_emulator(responses, relay_type, port=9001, encoding='utf-8'):
     """Create a device emulator fixture.
 
     This provides a device emulator that can be used to mock a device during
@@ -19,6 +19,9 @@ def create_device_emulator(responses, relay_type, port=9001):
         relay_type (str): Communication relay type. Either 'serial' or 'tcp'.
         port (int): Port for the TCP relay to listen for connections on.
             Defaults to 9001. Only used if relay_type is 'tcp'.
+        encoding (str): Encoding for the messages and responses. See
+            :func:`socs.testing.device_emulator.DeviceEmulator` for more
+            details.
 
     Returns:
         function:
@@ -32,7 +35,7 @@ def create_device_emulator(responses, relay_type, port=9001):
 
     @pytest.fixture()
     def create_device():
-        device = DeviceEmulator(responses)
+        device = DeviceEmulator(responses, encoding)
 
         if relay_type == 'serial':
             device.create_serial_relay()
@@ -53,6 +56,11 @@ class DeviceEmulator:
     Args:
         responses (dict): Initial responses, any response required by Agent
             startup, if any.
+        encoding (str): Encoding for the messages and responses.
+            DeviceEmulator will try to encode and decode messages with the
+            given encoding. No encoding is used if set to None. That can be
+            useful if you need to use raw data from your hardware. Defaults
+            to 'utf-8'.
 
     Attributes:
         responses (dict): Current set of responses the DeviceEmulator would
@@ -61,6 +69,8 @@ class DeviceEmulator:
             unrecognized. No response is sent and an error message is logged if
             a command is unrecognized and the default response is set to None.
             Defaults to None.
+        encoding (str): Encoding for the messages and responses, set by the
+            encoding argument.
         _type (str): Relay type, either 'serial' or 'tcp'.
         _read (bool): Used to stop the background reading of data recieved on
             the relay.
@@ -68,9 +78,10 @@ class DeviceEmulator:
 
     """
 
-    def __init__(self, responses):
+    def __init__(self, responses, encoding='utf-8'):
         self.responses = responses
         self.default_response = None
+        self.encoding = encoding
         self._type = None
         self._read = True
         self._conn = None
@@ -116,7 +127,8 @@ class DeviceEmulator:
             baudrate=57600,
             timeout=5,
         )
-        bkg_read = threading.Thread(name='background', target=self._read_serial)
+        bkg_read = threading.Thread(name='background',
+                                    target=self._read_serial)
         bkg_read.start()
 
     def _get_response(self, msg):
@@ -156,16 +168,24 @@ class DeviceEmulator:
 
         while self._read:
             if self.ser.in_waiting > 0:
-                msg = self.ser.readline().strip().decode('utf-8')
+                msg = self.ser.readline()
+                if self.encoding:
+                    msg = msg.strip().decode(self.encoding)
                 print(f"msg='{msg}'")
 
                 response = self._get_response(msg)
+
+                # Avoid user providing bytes-like response
+                if isinstance(response, bytes) and self.encoding is not None:
+                    response = response.decode()
 
                 if response is None:
                     continue
 
                 print(f"response='{response}'")
-                self.ser.write((response + '\r\n').encode('utf-8'))
+                if self.encoding:
+                    response = (response + '\r\n').encode(self.encoding)
+                self.ser.write(response)
 
             time.sleep(0.01)
 
@@ -211,21 +231,30 @@ class DeviceEmulator:
         print(f"Client connection made from {client_address}")
 
         while self._read:
-            msg = self._conn.recv(4096).strip().decode('utf-8')
+            try:
+                msg = self._conn.recv(4096)
+            # Was seeing this on tests in the cryomech agent
+            except ConnectionResetError:
+                print('Caught connection reset on Agent clean up')
+                break
+            if self.encoding:
+                msg = msg.strip().decode(self.encoding)
             if msg:
                 print(f"msg='{msg}'")
 
                 response = self._get_response(msg)
 
                 # Avoid user providing bytes-like response
-                if isinstance(response, bytes):
+                if isinstance(response, bytes) and self.encoding is not None:
                     response = response.decode()
 
                 if response is None:
                     continue
 
                 print(f"response='{response}'")
-                self._conn.sendall((response).encode('utf-8'))
+                if self.encoding:
+                    response = response.encode(self.encoding)
+                self._conn.sendall(response)
 
             time.sleep(0.01)
 
@@ -272,8 +301,9 @@ class DeviceEmulator:
                                  'RDGFIELD?': ['+1.0E-01', '+1.2E-01', '+1.4E-01']}
 
         Notes:
-            The responses defined should all be strings, not bytes-like. The
-            DeviceEmulator will handle encoding/decoding.
+            The DeviceEmulator will handle encoding/decoding. The responses
+            defined should all be strings, not bytes-like, unless you set
+            ``encoding=None``.
 
         """
         print(f"responses set to {responses}")

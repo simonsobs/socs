@@ -1,19 +1,15 @@
 # Script to log and readout PTC data through ethernet connection.
 # Tamar Ervin and Jake Spisak, February 2019
+# Sanah Bhimani, May 2022
 
-import os
 import argparse
 import time
 import struct
 import socket
-import signal
-from contextlib import contextmanager
 import random
 
-ON_RTD = os.environ.get('READTHEDOCS') == 'True'
-if not ON_RTD:
-    from ocs import site_config, ocs_agent
-    from ocs.ocs_twisted import TimeoutLock
+from ocs import site_config, ocs_agent
+from ocs.ocs_twisted import TimeoutLock
 
 STX = '\x02'
 ADDR = '\x10'
@@ -25,22 +21,6 @@ ESC = '\x07'
 ESC_STX = '\x30'
 ESC_CR = '\x31'
 ESC_ESC = '\x32'
-
-
-class TimeoutException(Exception):
-    pass
-
-
-@contextmanager
-def time_limit(seconds):
-    def signal_handler(signum, frame):
-        raise TimeoutException("Timed out!")
-    signal.signal(signal.SIGALRM, signal_handler)
-    signal.alarm(seconds)
-    try:
-        yield
-    finally:
-        signal.alarm(0)
 
 
 class PTC:
@@ -67,7 +47,8 @@ class PTC:
 
         return data_flag, brd
 
-    def buildRegistersQuery(self):
+    @staticmethod
+    def buildRegistersQuery():
         query = bytes([0x09, 0x99,  # Message ID
                        0x00, 0x00,  # Unused
                        0x00, 0x06,  # Message size in bytes
@@ -76,6 +57,32 @@ class PTC:
                        0x00, 0x01,   # The starting Register Number
                        0x00, 0x35])  # How many to read
         return query
+
+    def power(self, state):
+        """Turn the PTC on or off.
+
+        Parameters
+        ----------
+        state : str
+            Desired power state of the PTC, either 'on', or 'off'.
+
+        """
+        command = [0x09, 0x99,  # Message ID
+                   0x00, 0x00,  # Unused
+                   0x00, 0x06,  # Message size in bytes
+                   0x01,        # Slave Address
+                   0x06,        # Function Code
+                   0x00, 0x01]   # Register Number
+
+        if state.lower() == 'on':
+            command.extend([0x00, 0x01])
+        elif state.lower() == 'off':
+            command.extend([0x00, 0xff])
+        else:
+            raise ValueError(f"Invalid state: {state}")
+
+        self.comm.sendall(bytes(command))
+        self.comm.recv(1024)  # Discard the echoed command
 
     def breakdownReplyData(self, rawdata):
         """Take in raw ptc data, and return a dictionary.
@@ -221,6 +228,7 @@ class PTCAgent:
                                  agg_params=agg_params,
                                  buffer_time=1)
 
+    @ocs_agent.param('auto_acquire', default=False, type=bool)
     def init(self, session, params=None):
         """init(auto_acquire=False)
 
@@ -228,14 +236,9 @@ class PTCAgent:
 
         Parameters:
             auto_acquire (bool): Automatically start acq process after
-                initialization
+                initialization if True. Defaults to False.
 
         """
-        if params is None:
-            params = {}
-
-        auto_acquire = params.get('auto_acquire', False)
-
         if self.initialized:
             return True, "Already Initialized"
 
@@ -245,7 +248,8 @@ class PTCAgent:
                               "{} is already running".format(self.lock.job))
                 return False, "Could not acquire lock."
 
-            session.set_status('starting')
+            session.set_status('running')
+
             # Establish connection to ptc
             self.ptc = PTC(self.ip_address, port=self.port,
                            fake_errors=self.fake_errors)
@@ -259,15 +263,45 @@ class PTCAgent:
         self.initialized = True
 
         # Start data acquisition if requested
-        if auto_acquire:
-            self.agent.start('acq')
+        if params['auto_acquire']:
+            resp = self.agent.start('acq', params={})
+            self.log.info(f'Response from acq.start(): {resp[1]}')
 
         return True, "PTC agent initialized"
 
-    def acq(self, session, params=None):
+    @ocs_agent.param('state', type=str, choices=['off', 'on'])
+    def power_ptc(self, session, params=None):
+        """power_ptc(state=None)
+
+        **Task** - Remotely turn the PTC on or off.
+
+        Parameters
+        ----------
+        state : str
+            Desired power state of the PTC, either 'on', or 'off'.
+
+        """
+        with self.lock.acquire_timeout(0, job='power_ptc') as acquired:
+            if not acquired:
+                self.log.warn("Could not start task because {} is already "
+                              "running".format(self.lock.job))
+                return False, "Could not acquire lock."
+
+            session.set_status('running')
+
+            self.ptc.power(params['state'])
+
+        return True, "PTC powered {}".format(params['state'])
+
+    @ocs_agent.param('test_mode', default=False, type=bool)
+    def acq(self, session, params):
         """acq()
 
         **Process** - Starts acqusition of data from the PTC.
+
+        Parameters:
+            test_mode (bool, optional): Run the Process loop only once.
+                This is meant only for testing. Default is False.
 
         """
         with self.lock.acquire_timeout(0, job='acq') as acquired:
@@ -292,11 +326,14 @@ class PTCAgent:
                     self.agent.publish_to_feed('ptc_status', pub_data)
                 time.sleep(1. / self.f_sample)
 
+                if params['test_mode']:
+                    break
+
             self.agent.feeds["ptc_status"].flush_buffer()
 
         return True, 'Acquisition exited cleanly.'
 
-    def _stop_acq(self, session, params=None):
+    def _stop_acq(self, session, params):
         """Stops acqusition of data from the PTC."""
         if self.take_data:
             self.take_data = False
@@ -349,6 +386,7 @@ def main():
 
     agent.register_task('init', ptc.init, startup=init_params)
     agent.register_process('acq', ptc.acq, ptc._stop_acq)
+    agent.register_task('power_ptc', ptc.power_ptc)
 
     runner.run(agent, auto_reconnect=True)
 
