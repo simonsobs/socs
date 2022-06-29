@@ -6,7 +6,7 @@
 iBootbar Agent
 ====================
 
-The iBootbar Agent is an OCS Agent which monitors and sends commands to the iBoot PDU. 
+The iBootbar Agent is an OCS Agent which monitors and sends commands to the iBoot PDU.
 Monitoring and commanding is performed via SNMP.
 
 .. argparse::
@@ -63,19 +63,19 @@ debugging. The default level is "info".
 Description
 -----------
 
-The iBootbar, or iBoot PDU, will be used to power various components on the SO 
-site. The iBootbar Agent allows the monitoring and commanding of the iBoot PDU. 
-It monitors the state of each outlet, can set the state of each outlet, can 
-cycle each outlet, and reboot the system. The iBootbar has an Simple Network 
+The iBootbar, or iBoot PDU, will be used to power various components on the SO
+site. The iBootbar Agent allows the monitoring and commanding of the iBoot PDU.
+It monitors the state of each outlet, can set the state of each outlet, can
+cycle each outlet, and reboot the system. The iBootbar has an Simple Network
 Management Protocol (SNMP) interface.
 
 The iBootbar Agent actively issues SNMP GET commands to request the
 status from several Object Identifiers (OIDs) specified by the Meinberg
 provided Management Information Base (MIB). We sample only a subset of the OIDs
-defined by the MIB. The MIB has been converted from the original .mib format to 
-a .py format that is consumable via pysnmp and is provided by socs. The iBootbar 
-Agent also contains three tasks: set_outlet, cycle_outlet, and reboot. These 
-tasks issues SNMP SET commands to change the value of OIDs, resulting in 
+defined by the MIB. The MIB has been converted from the original .mib format to
+a .py format that is consumable via pysnmp and is provided by socs. The iBootbar
+Agent also contains three tasks: set_outlet, cycle_outlet, and reboot. These
+tasks issues SNMP SET commands to change the value of OIDs, resulting in
 changing the state of outlets.
 
 Agent Fields
@@ -84,7 +84,7 @@ Agent Fields
 The fields returned by the Agent are built from the SNMP GET responses from the
 iBoot PDU. The field names consist of the OID name and the last value of the OID,
 which often serves as an index for duplicate pieces of hardware that share a
-OID string, i.e. outlets on the OID "outletStatus". This results in field names 
+OID string, i.e. outlets on the OID "outletStatus". This results in field names
 such as "outletStatus_0" and "outletStatus_1".
 
 These queries mostly return integers which map to some state. These integers
