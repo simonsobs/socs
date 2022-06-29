@@ -31,6 +31,7 @@ class PrologixInterface:
             self.sock.close()
             # connection error event here, maybe reconnect
             print('prologix interface connection error')
+            assert False, "select.error exception"
         return ready_to_read, ready_to_write
 
     def connection_check_read(self):
@@ -44,12 +45,32 @@ class PrologixInterface:
     def write(self, msg):
         self.connection_check_write()
         message = msg + '\n'
-        self.sock.sendall(message.encode())
+        try:
+            self.sock.sendall(message.encode())
+        except socket.error:
+            print("socket.error exception on socket write -- disconnect!")
+            self.disconnect_handler()
         time.sleep(0.1)  # Don't send messages too quickly
 
     def read(self):
         self.connection_check_read()
-        return self.sock.recv(128).decode().strip()
+        data = self.sock.recv(128)
+        if not data:
+            print("received no data from socket -- disconnect!")
+            self.disconnect_handler()
+        return data.decode().strip()
+
+    def disconnect_handler(self):
+        for i in range(5):
+            try:
+                self.conn_socket()
+                self.configure()
+                print(f"Successfully reconnected on attempt #{i}")
+                return
+            except Exception as e:
+                print(f"Reconnect attempt #{i} failed with: {e}")
+                time.sleep(1)
+        assert False, "Could not reconnect"
 
     def version(self):
         self.write('++ver')

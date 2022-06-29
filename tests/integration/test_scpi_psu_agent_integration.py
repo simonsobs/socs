@@ -88,26 +88,26 @@ def test_scpi_psu_monitor_output(wait_for_crossbar, gpib_emu, run_agent, client)
     check_resp_success(resp)
 
 
-# @pytest.mark.integtest
-# def test_scpi_psu_monitor_output_disconnect(
-#     wait_for_crossbar, gpib_emu, run_agent, client
-# ):
-#     responses = {
-#         "*idn?": "Keithley instruments, 2230G-30-1, 9203269, 1.16-1.04",
-#         "MEAS:VOLT? CH1": "3.14",
-#         "MEAS:CURR? CH1": "6.28",
-#         "MEAS:VOLT? CH2": "2.72",
-#         "MEAS:CURR? CH2": "5.44",
-#         "MEAS:VOLT? CH3": "1.23",
-#         "MEAS:CURR? CH3": "2.46",
-#     }
-#     gpib_emu.define_responses(responses)
+@pytest.mark.integtest
+def test_scpi_psu_monitor_output_disconnect(
+    wait_for_crossbar, gpib_emu, run_agent, client
+):
+    responses = {
+        "*idn?": "Keithley instruments, 2230G-30-1, 9203269, 1.16-1.04",
+        "MEAS:VOLT? CH1": "3.14",
+        "MEAS:CURR? CH1": "6.28",
+        "MEAS:VOLT? CH2": "2.72",
+        "MEAS:CURR? CH2": "5.44",
+        "MEAS:VOLT? CH3": "1.23",
+        "MEAS:CURR? CH3": "2.46",
+    }
+    gpib_emu.define_responses(responses)
 
-#     client.init()
-#     resp = client.monitor_output.start(test_mode=False, wait=0)
-#     time.sleep(5)
-#     gpib_emu.disconnect_reconnect(timeout=1, port=1234)
-#     time.sleep(10)
-#     client.init()
-#     resp = client.monitor_output.start(test_mode=True)
-#     check_resp_success(resp)
+    client.init()
+    resp = client.monitor_output.start(test_mode=False, wait=0)
+    time.sleep(5)
+    gpib_emu.disconnect_reconnect(timeout=3, port=1234)
+    # time.sleep(10)
+    # client.init()
+    # resp = client.monitor_output.start(test_mode=True)
+    # check_resp_success(resp)
