@@ -47,8 +47,8 @@ class PrologixInterface:
         message = msg + '\n'
         try:
             self.sock.sendall(message.encode())
-        except socket.error:
-            print("socket.error exception on socket write -- disconnect!")
+        except socket.error as e:
+            print(f"socket write failed (disconnect?): {e}")
             self.disconnect_handler()
         time.sleep(0.1)  # Don't send messages too quickly
 
@@ -56,7 +56,7 @@ class PrologixInterface:
         self.connection_check_read()
         data = self.sock.recv(128)
         if not data:
-            print("received no data from socket -- disconnect!")
+            print("received no data from socket (disconnect?)")
             self.disconnect_handler()
         return data.decode().strip()
 
@@ -67,7 +67,7 @@ class PrologixInterface:
                 self.configure()
                 print(f"Successfully reconnected on attempt #{i}")
                 return
-            except Exception as e:
+            except socket.error as e:
                 print(f"Reconnect attempt #{i} failed with: {e}")
                 time.sleep(1)
         assert False, "Could not reconnect"
