@@ -213,9 +213,10 @@ class ibootbarAgent:
                 {"fields":
                     {ibootbar:
                         {outletStatus_0: {"status": 1, "name": Outlet-1, "description": "on"},
-                         outletStatus_1: {"status": 1, "name": Outlet-2, "description": "on"},
-                         outletStatus_2: {"status": 0, "name": Outlet-3, "description": "off"},
-                         outletStatus_3: {"status": 0, "name": Outlet-4, "description": "off"}
+                         outletStatus_1: {"status": 0, "name": Outlet-2, "description": "off"},
+                         ...
+                         ibootbar_connection: {'last_attempt': 1656085022.680916, 'connected': True},
+                         timestamp: {1656085022.680916}
                         }
                     }
                 }
@@ -338,7 +339,7 @@ class ibootbarAgent:
                           format(params['outlet'] - 1, params['cycle_time']))
 
         # Force SNMP GET status commands throughout the cycle time
-        for i in range(params['cycle_time']):
+        for i in range(params['cycle_time'] + 1):
             self.lastGet = self.lastGet - 60
             yield dsleep(1)
 
@@ -363,7 +364,7 @@ class ibootbarAgent:
         # Force SNMP GET status commands
         self.lastGet = self.lastGet - 60
 
-        return True, 'Rebooting system. This will take about 30 seconds.'
+        return True, 'Rebooting system. Outlets will be set to their initial states.'
 
 
 def add_agent_args(parser=None):
