@@ -1,13 +1,8 @@
-import numpy as np
-from numpy import random
-import datetime
 import time
 import os
-from os import environ
 
 from twisted.internet.defer import inlineCallbacks
 from autobahn.twisted.util import sleep as dsleep
-from twisted.internet import reactor
 import argparse
 import txaio
 from ocs import ocs_agent, site_config
@@ -87,7 +82,7 @@ def _build_message(get_result, names, time):
         OCS Feed formatted message for publishing
     """
     message = {
-        'block_name': f'ibootbar',
+        'block_name': 'ibootbar',
         'timestamp': time,
         'data': {}
     }
