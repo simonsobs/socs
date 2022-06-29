@@ -780,13 +780,13 @@ class ACUAgent:
         yield self._run_specified_scan(session, times, azs, els, vas, ves, azflags, elflags, azonly=False)
         yield True, 'Track completed'
 
-#    @ocs_agent.param('azpts', type=tuple)
-#    @ocs_agent.param('el', type=float)
-#    @ocs_agent.param('azvel', type=float)
-#    @ocs_agent.param('acc', type=float)
-#    @ocs_agent.param('ntimes', type=int)
-#    @ocs_agent.param('azonly', type=bool)
-#    @ocs_agent.param('simulator', default=False, type=bool)
+    @ocs_agent.param('azpts', cast=tuple, type=tuple)
+    @ocs_agent.param('el', type=float)
+    @ocs_agent.param('azvel', type=float)
+    @ocs_agent.param('acc', type=float)
+    @ocs_agent.param('ntimes', type=int)
+    @ocs_agent.param('azonly', type=bool)
+    @ocs_agent.param('simulator', default=False, type=bool)
     @inlineCallbacks
     def constant_velocity_scan(self, session, params=None):
         """constant_velocity_scan(azpts=None, el=None, azvel=None, acc=None, \
