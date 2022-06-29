@@ -22,41 +22,38 @@ class PrologixInterface:
         self.write('++auto 1')
         self.write('++addr ' + str(self.gpibAddr))
 
-    def connection_check(self):
+    def connection_check(self, op):
+        assert op in ['read', 'write'], "'op' must be 'read' or 'write'"
         try:
             ready_to_read, ready_to_write, in_error = \
                 select.select([self.sock,], [self.sock,], [], 5)
         except select.error:
-            self.sock.shutdown(2)    # 0 = done receiving, 1 = done sending, 2 = both
+            self.sock.shutdown(2)
             self.sock.close()
-            # connection error event here, maybe reconnect
-            print('prologix interface connection error')
-            assert False, "select.error exception"
-        return ready_to_read, ready_to_write
+            print("Prologix interface connection error")
+            self.disconnect_handler()
+            self.connection_check(op)  # need to test on real hardware
+        if op == 'read':
+            assert len(ready_to_read) > 0
+        elif op == 'write':
+            assert len(ready_to_write) > 0
 
-    def connection_check_read(self):
-        ready_to_read, _ = self.connection_check()
-        assert len(ready_to_read) > 0
-
-    def connection_check_write(self):
-        _, ready_to_write = self.connection_check()
-        assert len(ready_to_write) > 0
 
     def write(self, msg):
-        self.connection_check_write()
+        self.connection_check('write')
         message = msg + '\n'
         try:
             self.sock.sendall(message.encode())
         except socket.error as e:
-            print(f"socket write failed (disconnect?): {e}")
+            print(f"Socket write failed (disconnect?): {e}")
             self.disconnect_handler()
         time.sleep(0.1)  # Don't send messages too quickly
 
     def read(self):
-        self.connection_check_read()
+        self.connection_check('read')
         data = self.sock.recv(128)
         if not data:
-            print("received no data from socket (disconnect?)")
+            print("Received no data from socket (disconnect?)")
             self.disconnect_handler()
         return data.decode().strip()
 
