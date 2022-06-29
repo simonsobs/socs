@@ -893,11 +893,9 @@ class ACUAgent:
                 self.agent.publish_to_feed('acu_upload', acu_upload, from_reactor=True)
             text = ''.join(upload_lines)
             yield dsleep(0.05)
-            free_positions = self.data['status']['summary']\
-                ['Free_upload_positions']
+            free_positions = self.data['status']['summary']['Free_upload_positions']
             while free_positions < 9899:
-                free_positions = self.data['status']['summary']\
-                    ['Free_upload_positions']
+                free_positions = self.data['status']['summary']['Free_upload_positions']
                 yield dsleep(0.05)
                 if free_positions > 9997:
                     self.log.warn('Scan aborted!')
