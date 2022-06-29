@@ -32,7 +32,7 @@ class PrologixInterface:
             self.sock.close()
             print("Prologix interface connection error")
             self.disconnect_handler()
-            self.connection_check(op)  # need to test on real hardware
+            return self.connection_check(op)  # need to test on real hardware
         if op == 'read':
             assert len(ready_to_read) > 0
         elif op == 'write':
