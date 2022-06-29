@@ -1,5 +1,4 @@
 import time
-import numpy as np
 import struct
 import datetime
 import calendar
@@ -25,11 +24,12 @@ def timecode(acutime):
         acutime (float): The time recorded by the ACU status stream,
                          corresponding to the fractional day of the year
     """
-    sec_of_day = (acutime-1)*60*60*24
+    sec_of_day = (acutime - 1) * 60 * 60 * 24
     year = datetime.datetime.now().year
     gyear = calendar.timegm(time.strptime(str(year), '%Y'))
-    comptime = gyear+sec_of_day
+    comptime = gyear + sec_of_day
     return comptime
+
 
 def uploadtime_to_ctime(ptstack_time, upload_year):
     year = int(upload_year)
@@ -38,8 +38,9 @@ def uploadtime_to_ctime(ptstack_time, upload_year):
     hour = float(ptstack_time.split(',')[1].split(':')[0])
     minute = float(ptstack_time.split(',')[1].split(':')[1])
     second = float(ptstack_time.split(',')[1].split(':')[2])
-    comptime = gyear + day_of_year*60*60*24 + hour*60*60 + minute*60 + second
+    comptime = gyear + day_of_year * 60 * 60 * 24 + hour * 60 * 60 + minute * 60 + second
     return comptime
+
 
 def pop_first_vals(data_dict, group_size):
     new_data_dict = {}
@@ -50,6 +51,7 @@ def pop_first_vals(data_dict, group_size):
             print('no more data')
     return new_data_dict
 
+
 def front_group(data_dict, group_size):
     new_data_dict = {}
     for key in data_dict.keys():
@@ -58,6 +60,7 @@ def front_group(data_dict, group_size):
         else:
             new_data_dict[key] = data_dict[key]
     return new_data_dict
+
 
 class ACUAgent:
     """
@@ -70,6 +73,7 @@ class ACUAgent:
             Default value is 'guess'.
 
     """
+
     def __init__(self, agent, acu_config='guess'):
         self.lock = TimeoutLock()
         self.jobs = {
@@ -77,7 +81,7 @@ class ACUAgent:
             'broadcast': 'idle',
             'control': 'idle',  # shared by all motion tasks/processes
             'scanspec': 'idle',
-            }
+        }
 
         self.acu_config = aculib.guess_config(acu_config)
         self.sleeptime = self.acu_config['motion_waittime']
@@ -109,20 +113,20 @@ class ACUAgent:
                                 },
                      'broadcast': {},
                      'uploads': {'Start_Azimuth': 0.0,
-                                'Start_Elevation': 0.0,
-                                'Start_Boresight': 0.0,
-                                'Command_Type': 0,
-                                'Preset_Azimuth': 0.0,
-                                'Preset_Elevation': 0.0,
-                                'Preset_Boresight': 0.0,
-                                'PtStack_Lines': 'False',
-                                'PtStack_Time': '000, 00:00:00.000000',
-                                'PtStack_Azimuth': 0.0,
-                                'PtStack_Elevation': 0.0,
-                                'PtStack_AzVelocity': 0.0,
-                                'PtStack_ElVelocity': 0.0,
-                                'PtStack_AzFlag': 0,
-                                'PtStack_ElFlag': 0},
+                                 'Start_Elevation': 0.0,
+                                 'Start_Boresight': 0.0,
+                                 'Command_Type': 0,
+                                 'Preset_Azimuth': 0.0,
+                                 'Preset_Elevation': 0.0,
+                                 'Preset_Boresight': 0.0,
+                                 'PtStack_Lines': 'False',
+                                 'PtStack_Time': '000, 00:00:00.000000',
+                                 'PtStack_Azimuth': 0.0,
+                                 'PtStack_Elevation': 0.0,
+                                 'PtStack_AzVelocity': 0.0,
+                                 'PtStack_ElVelocity': 0.0,
+                                 'PtStack_AzFlag': 0,
+                                 'PtStack_ElFlag': 0},
                      'scanspec': {},
                      }
 
@@ -130,7 +134,7 @@ class ACUAgent:
 
         self.take_data = False
 
-    #    self.web_agent = tclient.Agent(reactor)
+        # self.web_agent = tclient.Agent(reactor)
         tclient._HTTP11ClientFactory.noisy = False
 
         self.acu_control = aculib.AcuControl(
@@ -238,7 +242,7 @@ class ACUAgent:
             job_name (str): Name of the process you are trying to stop.
         """
         print('try to acquire stop')
-#        return (False, 'Could not stop')
+        # return (False, 'Could not stop')
         with self.lock.acquire_timeout(timeout=1.0, job=job_name) as acquired:
             if not acquired:
                 self.log.warn("Lock could not be acquired because it is"
@@ -246,12 +250,12 @@ class ACUAgent:
                 return False
             try:
                 self.jobs[job_name] = 'stop'
-#            state = self.jobs.get(job_name, 'idle')
-#            if state == 'idle':
-#                return False, 'Job not running.'
-#            if state == 'stop':
-#                return False, 'Stop already requested.'
-#            self.jobs[job_name] = 'stop'
+            # state = self.jobs.get(job_name, 'idle')
+            # if state == 'idle':
+            #     return False, 'Job not running.'
+            # if state == 'stop':
+            #     return False, 'Stop already requested.'
+            # self.jobs[job_name] = 'stop'
                 return True, 'Requested Process stop.'
             except Exception as e:
                 print(str(e))
@@ -343,11 +347,11 @@ class ACUAgent:
             for (key, value) in session.data.items():
                 for category in self.monitor_fields:
                     if key in self.monitor_fields[category]:
-                        if type(value) == bool:
+                        if isinstance(value, bool):
                             self.data['status'][category][self.monitor_fields[category][key]] = int(value)
-                        elif type(value) == int or type(value) == float:
+                        elif isinstance(value, int) or isinstance(value, float):
                             self.data['status'][category][self.monitor_fields[category][key]] = value
-                        elif value == None:
+                        elif value is None:
                             self.data['status'][category][self.monitor_fields[category][key]] = float('nan')
                         else:
                             self.data['status'][category][self.monitor_fields[category][key]] = str(value)
@@ -360,16 +364,16 @@ class ACUAgent:
             for category in self.data['status']:
                 if category != 'commands':
                     for statkey, statval in self.data['status'][category].items():
-                        if type(statval) == float:
+                        if isinstance(statval, float):
                             influx_status[statkey + '_influx'] = statval
-                        elif type(statval) == str:
+                        elif isinstance(statval, str):
                             if statval == 'None':
                                 influx_status[statkey + '_influx'] = float('nan')
                             elif statval in ['True', 'False']:
                                 influx_status[statkey + '_influx'] = tfn_key[statval]
                             else:
                                 influx_status[statkey + '_influx'] = mode_key[statval]
-                        elif type(statval) == int:
+                        elif isinstance(statval, int):
                             if statkey in ['Year', 'Free_upload_positions']:
                                 influx_status[statkey + '_influx'] = float(statval)
                             else:
@@ -458,9 +462,9 @@ class ACUAgent:
                 self.agent.publish_to_feed('acu_status', block)
             self.agent.publish_to_feed('acu_status_influx', acustatus_influx, from_reactor=True)
 
-#        self._set_job_stop('monitor')
-#        yield dsleep(1)
-#        self._set_job_done('monitor')
+        # self._set_job_stop('monitor')
+        # yield dsleep(1)
+        # self._set_job_done('monitor')
         return True, 'Acquisition exited cleanly.'
 
     @inlineCallbacks
@@ -480,13 +484,14 @@ class ACUAgent:
         UDP_PORT = self.udp['port']
         udp_data = []
         fields = self.udp_schema['fields']
+
         class MonitorUDP(protocol.DatagramProtocol):
 
             def datagramReceived(self, data, src_addr):
                 host, port = src_addr
                 offset = 0
                 while len(data) - offset >= FMT_LEN:
-                    d = struct.unpack(FMT, data[offset:offset+FMT_LEN])
+                    d = struct.unpack(FMT, data[offset:offset + FMT_LEN])
                     udp_data.append(d)
                     offset += FMT_LEN
         handler = reactor.listenUDP(int(UDP_PORT), MonitorUDP())
@@ -497,9 +502,9 @@ class ACUAgent:
                 year = datetime.datetime.now().year
                 gyear = calendar.timegm(time.strptime(str(year), '%Y'))
                 if len(process_data):
-                    sample_rate = (len(process_data) /
-                                  ((process_data[-1][0]-process_data[0][0])*86400
-                                  + process_data[-1][1]-process_data[0][1]))
+                    sample_rate = (len(process_data)
+                                   / ((process_data[-1][0] - process_data[0][0]) * 86400
+                                   + process_data[-1][1] - process_data[0][1]))
                 else:
                     sample_rate = 0.0
                 latest_az = process_data[2]
@@ -514,19 +519,19 @@ class ACUAgent:
                                 }
                 bcast_first = {}
                 pd0 = process_data[0]
-                pd0_gday = (pd0[0]-1) * 86400
+                pd0_gday = (pd0[0] - 1) * 86400
                 pd0_sec = pd0[1]
                 pd0_data_ctime = gyear + pd0_gday + pd0_sec
                 bcast_first['Time_bcast_influx'] = pd0_data_ctime
                 for i in range(2, len(pd0)):
-                    bcast_first[fields[i].replace(' ', '_')+'_bcast_influx'] = pd0[i]
+                    bcast_first[fields[i].replace(' ', '_') + '_bcast_influx'] = pd0[i]
                 acu_broadcast_influx = {'timestamp': bcast_first['Time_bcast_influx'],
                                         'block_name': 'ACU_position_bcast_influx',
                                         'data': bcast_first,
                                         }
                 self.agent.publish_to_feed('acu_broadcast_influx', acu_broadcast_influx, from_reactor=True)
                 for d in process_data:
-                    gday = (d[0]-1) * 86400
+                    gday = (d[0] - 1) * 86400
                     sec = d[1]
                     data_ctime = gyear + gday + sec
                     self.data['broadcast']['Time'] = data_ctime
@@ -536,7 +541,7 @@ class ACUAgent:
                                       'block_name': 'ACU_broadcast',
                                       'data': self.data['broadcast']
                                       }
-                    #print(acu_udp_stream)
+                    # print(acu_udp_stream)
                     self.agent.publish_to_feed('acu_udp_stream',
                                                acu_udp_stream, from_reactor=True)
             else:
@@ -602,18 +607,18 @@ class ACUAgent:
         self.agent.publish_to_feed('acu_upload', acu_upload)
 
         # Check whether the telescope is already at the point
-   #     self.log.info('Checking current position')
+        # self.log.info('Checking current position')
         yield self.acu_control.mode('Preset')
         if round(current_az, round_int) == az and \
-        round(current_el, round_int) == el:
+                round(current_el, round_int) == el:
             yield self.acu_control.go_to(az, el, wait=0.1)
             self.log.info('Already at commanded position.')
             self._set_job_done('control')
             return True, 'Preset at commanded position'
-   #     yield self.acu.stop()
-   #     yield self.acu_control.mode('Stop')
-   #     self.log.info('Stopped')
-   #     yield dsleep(0.5)
+        # yield self.acu.stop()
+        # yield self.acu_control.mode('Stop')
+        # self.log.info('Stopped')
+        # yield dsleep(0.5)
         yield self.acu_control.go_to(az, el, wait=0.1)
         yield dsleep(0.3)
         mdata = self.data['status']['summary']
@@ -630,7 +635,7 @@ class ACUAgent:
                 mdata = self.data['status']['summary']
             else:
                 if round(mdata['Azimuth_current_position'] - az, round_int) == 0. and \
-                round(mdata['Elevation_current_position'] - el, round_int) == 0.:
+                        round(mdata['Elevation_current_position'] - el, round_int) == 0.:
                     if end_stop:
                         yield self.acu_control.stop()
                         self.log.info('Az and el in Stop mode')
@@ -645,9 +650,9 @@ class ACUAgent:
         moving = True
         while moving:
             acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
-                      'block_name': 'ACU_upload',
-                      'data': self.data['uploads']
-                      }
+                          'block_name': 'ACU_upload',
+                          'data': self.data['uploads']
+                          }
             self.agent.publish_to_feed('acu_upload', acu_upload)
             mdata = self.data['status']['summary']
             ve = round(mdata['Elevation_current_velocity'], 2)
@@ -698,7 +703,7 @@ class ACUAgent:
         if not ok:
             return ok, msg
         bs_destination = params.get('b')
-#        yield self.acu_control.stop()
+        # yield self.acu_control.stop()
         yield dsleep(5)
         self.data['uploads']['Start_Boresight'] = self.data['status']['summary']['Boresight_current_position']
         self.data['uploads']['Command_Type'] = 1
@@ -709,8 +714,7 @@ class ACUAgent:
                       }
         self.agent.publish_to_feed('acu_upload', acu_upload)
         yield self.acu_control.go_3rd_axis(bs_destination)
-        current_position = self.data['status']['summary']\
-            ['Boresight_current_position']
+        current_position = self.data['status']['summary']['Boresight_current_position']
         while current_position != bs_destination:
             yield dsleep(1)
             acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
@@ -718,9 +722,8 @@ class ACUAgent:
                           'data': self.data['uploads']
                           }
             self.agent.publish_to_feed('acu_upload', acu_upload)
-            current_position = self.data['status']['summary']\
-                ['Boresight_current_position']
-        if end_stop:
+            current_position = self.data['status']['summary']['Boresight_current_position']
+        if params.get('end_stop'):
             yield self.acu_control.stop()
         self.data['uploads']['Start_Boresight'] = 0.0
         self.data['uploads']['Command_Type'] = 0
@@ -747,12 +750,12 @@ class ACUAgent:
             yield dsleep(0.1)
             self._try_set_job('control')
         self.log.info('_try_set_job ok')
-#        yield self.acu.stop()
+        # yield self.acu.stop()
         yield self.acu_control.mode('Stop')
         self.log.info('Stop called')
         yield dsleep(5)
         yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
-                                    'Clear Stack')
+                                            'Clear Stack')
         yield dsleep(0.1)
         self.log.info('Cleared stack.')
         self._set_job_done('control')
@@ -777,7 +780,7 @@ class ACUAgent:
             return False, 'Azimuth location out of range!'
         if min(els) <= self.motion_limits['elevation']['lower'] or max(els) >= self.motion_limits['elevation']['upper']:
             return False, 'Elevation location out of range!'
-        yield self._run_specified_scan(session, times, azs, els, vas, ves, azflags, elflags, azonly=False)
+        yield self._run_specified_scan(session, times, azs, els, vas, ves, azflags, elflags, azonly=False, simulator=simulator)
         yield True, 'Track completed'
 
     @ocs_agent.param('azpts', cast=tuple, type=tuple)
@@ -856,7 +859,7 @@ class ACUAgent:
         m = yield self.acu_control.mode()
         print(m)
         self.log.info('mode is now ProgramTrack')
-        if simulator == True:
+        if simulator:
             group_size = len(all_lines)
         else:
             group_size = 120
@@ -982,7 +985,7 @@ class ACUAgent:
 
         yield self.acu_control.stop()
         g = sh.generate_constant_velocity_scan(az_endpoint1, az_endpoint2,
-                        az_speed, acc, el_endpoint1, el_endpoint2, el_speed)
+                                               az_speed, acc, el_endpoint1, el_endpoint2, el_speed)
         self.acu_control.mode('ProgramTrack')
         while True:
             lines = next(g)
@@ -992,12 +995,10 @@ class ACUAgent:
                 upload_lines = current_lines[:group_size]
                 text = ''.join(upload_lines)
                 current_lines = current_lines[group_size:]
-                free_positions = self.data['status']['summary']\
-                    ['Free_upload_positions']
+                free_positions = self.data['status']['summary']['Free_upload_positions']
                 while free_positions < 5099:
                     yield dsleep(0.1)
-                    free_positions = self.data['status']['summary']\
-                        ['Free_upload_positions']
+                    free_positions = self.data['status']['summary']['Free_upload_positions']
                 yield self.acu_control.http.UploadPtStack(text)
         yield self.acu_control.stop()
         self._set_job_done('control')

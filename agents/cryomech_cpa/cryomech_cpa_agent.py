@@ -82,6 +82,7 @@ class PTC:
             raise ValueError(f"Invalid state: {state}")
 
         self.comm.sendall(bytes(command))
+        self.comm.recv(1024)  # Discard the echoed command
 
     def breakdownReplyData(self, rawdata):
         """Take in raw ptc data, and return a dictionary.
@@ -247,7 +248,8 @@ class PTCAgent:
                               "{} is already running".format(self.lock.job))
                 return False, "Could not acquire lock."
 
-            session.set_status('starting')
+            session.set_status('running')
+
             # Establish connection to ptc
             self.ptc = PTC(self.ip_address, port=self.port,
                            fake_errors=self.fake_errors)
@@ -262,7 +264,8 @@ class PTCAgent:
 
         # Start data acquisition if requested
         if params['auto_acquire']:
-            self.agent.start('acq')
+            resp = self.agent.start('acq', params={})
+            self.log.info(f'Response from acq.start(): {resp[1]}')
 
         return True, "PTC agent initialized"
 

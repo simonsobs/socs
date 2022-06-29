@@ -5,8 +5,8 @@ on:
     branches: [ develop ]
     paths-ignore:
       - 'docs/**'
-      - '*.rst'
-      - '*.md'
+      - '**.rst'
+      - '**.md'
       - '.flake8'
       - '.pre-commit-config.yaml'
 
