@@ -1,5 +1,6 @@
 from ocs.ocs_client import OCSClient
 
+
 class MultiSlotController:
     """
     Simple client controller useful for managing all pysmurf-controller
@@ -21,8 +22,9 @@ class MultiSlotController:
         dict will be ``<id>``. This is populated from the registry agent on
         init or using the funciton ``get_active_smurfs``.
     """
+
     def __init__(self, client_args=[]):
-        self.client_args=client_args
+        self.client_args = client_args
         self.reg = OCSClient('registry', args=client_args)
         self.smurfs = {}
         self.get_active_smurfs()
