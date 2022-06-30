@@ -48,7 +48,7 @@ def test_take_noise(tmp_path):
     emulator.take_noise(session)
 
 
-def take_bgmap(tmp_path):
+def test_take_bgmap(tmp_path):
     emulator = create_agent(str(tmp_path))
     session = mock.MagicMock()
     session.data = {}

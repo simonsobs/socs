@@ -238,7 +238,7 @@ class DataStreamer:
         self.file_list = []
         self.frame_len = frame_len
 
-    def get_g3_filename(self):
+    def _get_g3_filename(self):
         """
         Returns the file path for a g3-file with specified session id and seq
         idx.
@@ -248,9 +248,13 @@ class DataStreamer:
         filepath = os.path.join(subdir, f"{self.session_id}_{self.seq:0>3}.g3")
         return filepath
 
-    def new_file(self):
+    def _new_file(self):
+        """
+        Ends the current G3File (if one is open) and begins a new one,
+        incrementing ``seq`` after updating.
+        """
         self.end_file()
-        fname = self.get_g3_filename()
+        fname = self._get_g3_filename()
         os.makedirs(os.path.dirname(fname), exist_ok=True)
         self.writer = core.G3Writer(fname)
         if self.seq == 0:
@@ -261,21 +265,51 @@ class DataStreamer:
         self.seq += 1
 
     def end_file(self):
+        """
+        Ends the current file by sending a G3EndProcessing Frame.
+        """
         if self.writer is not None:
             self.writer(core.G3Frame(core.G3FrameType.EndProcessing))
 
-    def write_next(self, wait=True):
+    def write_next(self):
+        """
+        Writes the next data frame to disk. Will rotate files based on the
+        current file start time and the file duration. This sleep wait
+        for the frame-duration before writing the G3Frame to disk.
+        """
         start = time.time()
         if (start - self.file_start > self.file_duration) or (self.writer is None):
-            self.new_file()
+            self._new_file()
         time.sleep(self.frame_len)
         stop = time.time()
         self.writer(self.frame_gen.get_data_frame(start, stop))
 
     def stream_between(self, start, stop, wait=False):
+        """
+        This function will create a new observation and "stream" data between
+        a specified start and stop time. This function will by default generate
+        and write the data without sleeping for the specified amount of time.
+        To avoid confusion, this will not rotate G3Files since that gets kind
+        of complicated when you're not running in real time.
+
+        Args
+        ------
+        start : float
+            Start time of data
+        stop : float
+            Stop time of data
+        wait : bool
+            If True, will sleep for the correct amount of time between each
+            written frame. Defaults to False.
+        """
         frame_starts = np.arange(start, stop, self.frame_len)
         frame_stops = frame_starts + self.frame_len
-        self.new_file()
+        
+        # In case there's already an open file
+        self.seq = 0
+        self.end_file() 
+
+        self._new_file()
         for t0, t1 in zip(frame_starts, frame_stops):
             if wait:
                 now = time.time()
@@ -312,16 +346,6 @@ class SmurfFileEmulator:
             self.stream_id, self.sample_rate, self.tune, self.timestreamdir,
             self.file_duration, self.frame_len
         )
-
-    def _get_g3_filename(self, session_id, seq, makedirs=True):
-        """
-        Returns the file path for a g3-file with specified session id and seq
-        idx.
-        """
-        timecode = f"{session_id}"[:5]
-        subdir = os.path.join(self.timestreamdir, timecode, self.stream_id)
-        filepath = os.path.join(subdir, f"{session_id}_{seq:0>3}.g3")
-        return filepath
 
     def _get_action_dir(self, action, action_time=None, is_plot=False):
         t = int(time.time())
@@ -380,7 +404,7 @@ class SmurfFileEmulator:
 
     @ocs_agent.param('test_mode', type=bool, default=False)
     def uxm_setup(self, session, params):
-        """tune_dets()
+        """uxm_setup()
 
         **Task** - Emulates files that might come from a general tune dets
         function. These are some of the files found on simons1 registered when
@@ -426,8 +450,9 @@ class SmurfFileEmulator:
         return True, "Wrote tune files"
 
     def take_noise(self, session, params=None):
-        """
-        Takes a short noise timestream
+        """take_noise()
+
+        **Task** - Takes a short noise timestream
         """
         streamer = self._new_streamer()
         now = time.time()
@@ -436,9 +461,10 @@ class SmurfFileEmulator:
         return True, "Took noise data"
 
     def uxm_relock(self, session, params=None):
-        """
-        Normally this wouldn't involve a full find-freq, but for emulation
-        purposes it's ok if this is the same as uxm_setup.
+        """uxm_relock()
+
+        **Task** - Normally this wouldn't involve a full find-freq, but for
+        emulation purposes it's ok if this is the same as uxm_setup.
         """
         return self.uxm_setup(session, params)
 
@@ -468,6 +494,10 @@ class SmurfFileEmulator:
         return True, "Wrote Bias Step Files"
 
     def take_bgmap(self, session, params=None):
+        """take_bgmap()
+
+        **Task** - Creates files associated with taking a bias group mapping.
+        """
         action_time = time.time()
         files = ['bg_map.npy', 'bias_step_analysis.npy']
         for f in files:
@@ -574,7 +604,7 @@ if __name__ == '__main__':
     agent.register_task('uxm_relock', file_em.uxm_relock)
     agent.register_task('take_iv', file_em.take_iv)
     agent.register_task('take_bias_steps', file_em.take_bias_steps)
-    agent.register_task('take_bgmap', file_em.take_gmap)
+    agent.register_task('take_bgmap', file_em.take_bgmap)
     agent.register_task('bias_dets', file_em.bias_dets)
     agent.register_task('take_noise', file_em.take_noise)
     agent.register_process('stream', file_em.stream, file_em._stop_stream)
