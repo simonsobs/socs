@@ -63,3 +63,15 @@ Agent API
 
 .. autoclass:: agents.smurf_file_emulator.smurf_file_emulator.SmurfFileEmulator
     :members:
+
+Supporting API
+---------------
+
+.. autoclass:: agents.smurf_file_emulator.smurf_file_emulator.Tune
+    :members:
+
+.. autoclass:: agents.smurf_file_emulator.smurf_file_emulator.DataStreamer
+    :members:
+
+.. autoclass:: agents.smurf_file_emulator.smurf_file_emulator.G3FrameGenerator
+    :members:
