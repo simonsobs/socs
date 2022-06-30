@@ -304,10 +304,10 @@ class DataStreamer:
         """
         frame_starts = np.arange(start, stop, self.frame_len)
         frame_stops = frame_starts + self.frame_len
-        
+
         # In case there's already an open file
         self.seq = 0
-        self.end_file() 
+        self.end_file()
 
         self._new_file()
         for t0, t1 in zip(frame_starts, frame_stops):
