@@ -48,6 +48,8 @@ class PrologixInterface:
         except socket.error as e:
             print(f"Socket write failed (disconnect?): {e}")
             self.disconnect_handler()
+            # still write immediately after reconnect,
+            # may not be desirable in certain use cases
             self.write(msg)
             return
         time.sleep(0.1)  # Don't send messages too quickly
@@ -58,7 +60,12 @@ class PrologixInterface:
         if not data:
             print("Received no data from socket (disconnect?)")
             self.disconnect_handler()
-            return self.read()
+            # reading from socket immediately after reconnect
+            # should timeout or give irrelevant data,
+            # so raise exception and let caller handle it
+            raise ConnectionResetError(
+                "Recovered connection during read attempt -- this read cannot be satisfied"
+            )
         return data.decode().strip()
 
     def disconnect_handler(self):
