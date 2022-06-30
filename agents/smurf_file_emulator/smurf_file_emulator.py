@@ -404,7 +404,7 @@ class SmurfFileEmulator:
 
     @ocs_agent.param('test_mode', type=bool, default=False)
     def uxm_setup(self, session, params):
-        """uxm_setup()
+        """uxm_setup(test_mode=False)
 
         **Task** - Emulates files that might come from a general tune dets
         function. These are some of the files found on simons1 registered when
