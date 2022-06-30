@@ -208,7 +208,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
             motion if num_batches is not None.
         az_start (str): part of the scan to start at. Options are:
             'az_endpoint1', 'az_endpoint2', 'mid_inc' (start in the middle of
-            the scan and start with increasing azimuth), 'mid_dec' (start in 
+            the scan and start with increasing azimuth), 'mid_dec' (start in
             the middle of the scan and start with decreasing azimuth).
         ptstack_fmt (bool): determine whether values are produced with the
             necessary format to upload to the ACU. If False, this function will
