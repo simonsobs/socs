@@ -107,7 +107,7 @@ def test_scpi_psu_monitor_output_disconnect(
     resp = client.monitor_output.start(test_mode=False, wait=0)
     time.sleep(5)
     gpib_emu.disconnect_reconnect(timeout=3, port=1234)
-    # time.sleep(10)
+    time.sleep(10)
     # client.init()
     # resp = client.monitor_output.start(test_mode=True)
     # check_resp_success(resp)

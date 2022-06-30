@@ -32,11 +32,12 @@ class PrologixInterface:
             self.sock.close()
             print("Prologix interface connection error")
             self.disconnect_handler()
-            return self.connection_check(op)  # need to test on real hardware
+            self.connection_check(op)  # need to test on real hardware
+            return
         if op == 'read':
-            assert len(ready_to_read) > 0
+            assert len(ready_to_read) > 0, "No sockets ready for reading"
         elif op == 'write':
-            assert len(ready_to_write) > 0
+            assert len(ready_to_write) > 0, "No sockets ready for writing"
 
 
     def write(self, msg):
@@ -47,6 +48,8 @@ class PrologixInterface:
         except socket.error as e:
             print(f"Socket write failed (disconnect?): {e}")
             self.disconnect_handler()
+            self.write(msg)
+            return
         time.sleep(0.1)  # Don't send messages too quickly
 
     def read(self):
@@ -55,6 +58,7 @@ class PrologixInterface:
         if not data:
             print("Received no data from socket (disconnect?)")
             self.disconnect_handler()
+            return self.read()
         return data.decode().strip()
 
     def disconnect_handler(self):

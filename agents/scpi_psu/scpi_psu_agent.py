@@ -79,9 +79,15 @@ class ScpiPsuAgent:
                         'data': {}
                     }
 
-                    for chan in channels:
-                        data['data']["Voltage_{}".format(chan)] = self.psu.get_volt(chan)
-                        data['data']["Current_{}".format(chan)] = self.psu.get_curr(chan)
+                    try:
+                        for chan in channels:
+                            data['data']["Voltage_{}".format(chan)] = self.psu.get_volt(chan)
+                            data['data']["Current_{}".format(chan)] = self.psu.get_curr(chan)
+                    except AssertionError as e:
+                        print(
+                            f"Failed to get volt/curr in monitor_output, skipping this iteration: {e}"
+                        )
+                        continue
 
                     # self.log.info(str(data))
                     # print(data)
