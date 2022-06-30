@@ -641,7 +641,7 @@ class Motor:
 
         e_positions = []
         # Set the motor position
-        e_pos_set = self.ser.write('EP%i\r' % (value))  # EP = Encoder Position
+        self.ser.write('EP%i\r' % (value))  # EP = Encoder Position
         sleep(0.1)
         self.ser.flushInput()
         # Read and return the new motor position
@@ -703,10 +703,10 @@ class Motor:
         """
         print(f"port: {self.port}")
         try:
-            self.sock.connect(self.port) #return 1
-            print(f"Connection has been reestablished.")
+            self.sock.connect(self.port) 
+            print("Connection has been reestablished.")
             self.sock_status = 1
         except ConnectionError:
-            print(f"Connection could not be reestablished.") #return 0
+            print("Connection could not be reestablished.") 
             self.sock_status = 0        
 
