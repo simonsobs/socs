@@ -77,6 +77,17 @@ The ``Lakeshore/`` directory contains code that supports the various Lakeshore
 devices used in socs. For details, see the "Supporting APIs" section of the
 relevant Agent page.
 
+socs.smurf
+----------
+
+socs.smurf.MultiSlotController
+``````````````````````````````
+
+.. automodule:: socs.smurf.MultiSlotController
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 socs.snmp
 ---------
 
