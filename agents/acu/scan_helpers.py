@@ -175,7 +175,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                                     el_speed, num_batches=None,
                                     start_time=None, wait_to_start=3.,
                                     step_time=0.1, batch_size=500,
-                                    ptstack_fmt=True):
+                                    az_start='mid_inc', ptstack_fmt=True):
     """
     Python generator to produce times, azimuth and elevation positions,
     azimuth and elevation velocities, azimuth and elevation flags for
@@ -206,6 +206,10 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
         batch_size (int): number of values to produce in each iteration.
             Default is 500. Batch size is reset to the length of one leg of the
             motion if num_batches is not None.
+        az_start (str): part of the scan to start at. Options are:
+            'az_endpoint1', 'az_endpoint2', 'mid_inc' (start in the middle of
+            the scan and start with increasing azimuth), 'mid_dec' (start in 
+            the middle of the scan and start with decreasing azimuth).
         ptstack_fmt (bool): determine whether values are produced with the
             necessary format to upload to the ACU. If False, this function will
             produce lists of time, azimuth, elevation, azimuth velocity,
@@ -214,13 +218,36 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
     """
     az_min = min(az_endpoint1, az_endpoint2)
     az_max = max(az_endpoint1, az_endpoint2)
+    if az_max == az_min:
+        raise ValueError('Generator requires two different az endpoints!')
+    if az_start in ['az_endpoint1', 'az_endpoint2']:
+        if az_start == 'az_endpoint1':
+            az = az_endpoint1
+        else:
+            az = az_endpoint2
+        if az == az_min:
+            increasing = True
+            az_vel = az_speed
+        elif az == az_max:
+            increasing = False
+            az_vel = -1 * az_speed
+    elif az_start in ['mid_inc', 'mid_dec']:
+        az = (az_endpoint1 + az_endpoint2) / 2
+        if az_start == 'mid_inc':
+            increasing = True
+            az_vel = az_speed
+        else:
+            increasing = False
+            az_vel = -1 * az_speed
+    else:
+        raise ValueError('az_start value not supported. Choose from '
+                         'az_endpoint1, az_endpoint2, mid_inc, mid_dec')
     if start_time is None:
         t0 = time.time() + wait_to_start
     else:
         t0 = start_time
     t = 0
     turntime = 2.0 * az_speed / acc
-    az = az_endpoint1
     el = el_endpoint1
     if step_time < 0.05:
         raise ValueError('Time step size too small, must be at least '
@@ -229,14 +256,6 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
     el_vel = el_speed
     az_flag = 0
     el_flag = 0
-    if az < az_endpoint2:
-        increasing = True
-        az_vel = az_speed
-    elif az > az_endpoint2:
-        increasing = False
-        az_vel = -1 * az_speed
-    else:
-        raise ValueError('Need two different motion endpoints')
     if num_batches is None:
         stop_iter = float('inf')
     else:
