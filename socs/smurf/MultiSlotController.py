@@ -21,6 +21,20 @@ class MultiSlotController:
         can be the uxm-id or something like ``crate1slot2``. The keys of this
         dict will be ``<id>``. This is populated from the registry agent on
         init or using the funciton ``get_active_smurfs``.
+
+    Example
+    ----------
+    >>> msc = MultiSlotController()
+    >>> print(msc.keys())
+    dict_keys(['c1s2', 'c1s3', 'c1s4', 'c1s5', 'c1s6', 'c1s7'])
+    >>> msc.start('uxm_setup')  # Run UXM Setup on all slots
+    >>> # Waits for all slots to finish setup. You should monitor logs or check
+    >>> # returned session-data to make sure this ran correctly
+    >>> msc.wait('uxm_setup')  
+    >>> # Streams for 30 seconds on slots 2 and 3
+    >>> msc.start('stream', ids=['c1s2', 'c1s3'], duration=30)  
+    >>> msc.wait('stream')  # Waits for controllers to finish streaming
+
     """
 
     def __init__(self, client_args=[]):
@@ -115,4 +129,27 @@ class MultiSlotController:
         rv = {}
         for smurf_id in ids:
             rv[smurf_id] = getattr(self.smurfs[smurf_id], op_name).status()
+        return rv
+
+    def wait(self, op_name, ids=None):
+        """
+        Waits for an operation to finish on any or all pysmurf controllers.
+        This will block until the operation sessions of all speicified ID's
+        have been completed.
+
+        Args
+        ----
+        op_name : str
+            Name of the operation to stop
+        ids : list, optional
+            List of pysmurf-controller id's. This defaults to running on all
+            controllers.
+        """
+        if ids is None:
+            ids = list(self.smurfs.keys())
+        elif isinstance(ids, str):
+            ids = [ids]
+        rv = {}
+        for smurf_id in ids:
+            rv[smurf_id] = getattr(self.smurfs[smurf_id], op_name).wait()
         return rv
