@@ -30,9 +30,9 @@ class MultiSlotController:
     >>> msc.start('uxm_setup')  # Run UXM Setup on all slots
     >>> # Waits for all slots to finish setup. You should monitor logs or check
     >>> # returned session-data to make sure this ran correctly
-    >>> msc.wait('uxm_setup')  
+    >>> msc.wait('uxm_setup')
     >>> # Streams for 30 seconds on slots 2 and 3
-    >>> msc.start('stream', ids=['c1s2', 'c1s3'], duration=30)  
+    >>> msc.start('stream', ids=['c1s2', 'c1s3'], duration=30)
     >>> msc.wait('stream')  # Waits for controllers to finish streaming
 
     """
