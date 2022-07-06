@@ -24,9 +24,10 @@ class PrologixInterface:
 
     def connection_check(self, op):
         assert op in ['read', 'write'], "'op' must be 'read' or 'write'"
+        select_lists = ([self.com,], [], []) if op == 'read' else ([], [self.com,], [])
         try:
             ready_to_read, ready_to_write, in_error = \
-                select.select([self.sock,], [self.sock,], [], 5)
+                select.select(*select_lists, 5)
         except select.error:
             self.sock.shutdown(2)
             self.sock.close()
