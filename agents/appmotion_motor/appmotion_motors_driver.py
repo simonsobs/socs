@@ -59,6 +59,7 @@ AXIS_THREADS_PER_INCH_STAGE = 10.0
 AXIS_THREADS_PER_INCH_XYZ = 10.0
 # AXIS_THREADS_PER_INCH = 10.0 #Measured on stepper
 
+
 class Motor:
     def __init__(self, ip, port, is_lin=True, mot_id=None, index=None, m_res=False):
         self.ip = ip
@@ -67,11 +68,11 @@ class Motor:
         self.mot_id = mot_id
         self.motor = index
         self.ser = Serial_TCPServer((ip, port))
-        
-        self.pos = 0 #Position in counts (should always be integer)
-        self.real_pos = 0.0#Position in inches
+
+        self.pos = 0  # Position in counts (should always be integer)
+        self.real_pos = 0.0  # Position in inches
         self.sock_status = 0
-        
+
         if not (ip and port):
             print("Invalid Motor information. No Motor control.")
             self.ser = None
@@ -80,11 +81,11 @@ class Motor:
             self.ser
             if m_res:
                 self.res = 'manual'
-                self.s_p_rev = 8000.0 # Steps per revolution (thread)
+                self.s_p_rev = 8000.0  # Steps per revolution (thread)
             else:
-                self.res = 'default' # Corresponds to mapping above
-                self.s_p_rev = 20000.0 # Steps per revolution (thread)
-        
+                self.res = 'default'  # Corresponds to mapping above
+                self.s_p_rev = 20000.0  # Steps per revolution (thread)
+
         if self.ser:
             # Check to make sure the device is in receive mode and reset if
             # necessary
@@ -108,7 +109,7 @@ class Motor:
                 else:
                     print('Irregular message received.')
                     sys.exit(1)
-                    
+
         if m_res:
             self.ser.write('EG8000\r')  # EG = Electronic Gearing
             self.ser.write('SA\r')  # SA = Save Parameters
@@ -156,7 +157,6 @@ class Motor:
         else:
             if self.ser is not None:
                 self.ser.write('JE\r')  # JE = Jog Enable
-                
 
     def is_moving(self, verbose=False):
         """
@@ -203,7 +203,7 @@ class Motor:
 
     def move_off_limit(self):
         """
-        Ignores alarm to be able to move off the limit switch if 
+        Ignores alarm to be able to move off the limit switch if
         unexpectedly hit, and resets alarm. Function should be used when not
         able to move off limit switch due to alarm.
 
@@ -241,7 +241,7 @@ class Motor:
         if move_status:
             print('Motors are still moving. Try again later.')
             return
-        
+
         moving = True
         while moving:
             msg = self.ser.writeread('AL\r')
@@ -250,10 +250,10 @@ class Motor:
                 print(
                     'Reached CCW limit switch. Moving 1 inch away from limit switch')
                 pos = int(
-                    1.0 *
-                    AXIS_THREADS_PER_INCH_STAGE *
-                    self.s_p_rev /
-                    2.0)
+                    1.0
+                    * AXIS_THREADS_PER_INCH_STAGE
+                    * self.s_p_rev
+                    / 2.0)
                 self.ser.write('DI%i\r' % (pos))  # DI = Distance/Position
                 self.ser.write('FL\r')  # FL = Feed to Length
                 self.ser.flushInput()
@@ -276,8 +276,8 @@ class Motor:
     def start_jogging(self):
         """
         Starts jogging control for specified motors.
-    
-        """ 
+
+        """
         self.ser.write('JE\r')  # JE = Jog Enable
         # WI = Wait for Input - Set into wait mode on empty input pin
         self.ser.write('WI4L\r')
@@ -292,7 +292,7 @@ class Motor:
 
     def seek_home_linear_stage(self):
         """
-        Move the linear stage to its home position using the home 
+        Move the linear stage to its home position using the home
         limit switch.
 
         """
@@ -317,7 +317,7 @@ class Motor:
 
     def set_zero(self):
         """
-        Tell the motor to set the current position as the zero 
+        Tell the motor to set the current position as the zero
         point.
 
         """
@@ -367,7 +367,7 @@ class Motor:
 
     def get_immediate_position(self, inches=True):
         """
-        Get the position of the motor while it is currently in 
+        Get the position of the motor while it is currently in
         motion. An estimate based on the calculated trajectory of the movement,
         relative to the zero point.
 
@@ -415,7 +415,7 @@ class Motor:
                 in counts. (default False)
             lin_stage (bool): True if the specified motor is for the linear
                 stage, False if not. (default True)
-        """  
+        """
         # Set the threads per inch based on if the motor controls the FTS
         # linear stage
         if lin_stage:
@@ -427,8 +427,8 @@ class Motor:
         if(pos_is_inches):
             # 2.0 is because threads go twice the distance for one
             # revolution
-            unit_pos = int(pos * AXIS_THREADS_PER_INCH *
-                          self.s_p_rev / 2.0)
+            unit_pos = int(pos * AXIS_THREADS_PER_INCH
+                           * self.s_p_rev / 2.0)
         else:
             unit_pos = int(pos)
         # Set the new pos and real_pos parameters of the motor object
@@ -447,7 +447,7 @@ class Motor:
             pos_is_inches=False,
             lin_stage=True):
         """
-        Move the axis relative to the current position by the 
+        Move the axis relative to the current position by the
         specified number of counts or inches.
 
         Parameters:
@@ -469,10 +469,10 @@ class Motor:
         # Convert from inches if necessary
         if pos_is_inches:
             unit_pos = int(
-                pos *
-                AXIS_THREADS_PER_INCH *
-                self.s_p_rev /
-                2.0)  # See 2.0 note above
+                pos
+                * AXIS_THREADS_PER_INCH
+                * self.s_p_rev
+                / 2.0)  # See 2.0 note above
         else:
             unit_pos = int(pos)
 
@@ -651,7 +651,7 @@ class Motor:
         e_pos = int(e_pos.rstrip('\r')[3:])
         print(e_pos)
         e_positions.append(e_pos)
-        
+
         return e_positions
 
     def start_rotation(self, velocity=12.0, rot_accel=1.0):
@@ -696,7 +696,6 @@ class Motor:
         self.sock.close()
         print("Connection to serial controller disconnected.")
 
-
     def reconnect_motor(self):
         """
         Reestablish connection with specified motor.
@@ -708,5 +707,4 @@ class Motor:
             self.sock_status = 1
         except ConnectionError:
             print("Connection could not be reestablished.") 
-            self.sock_status = 0        
-
+            self.sock_status = 0

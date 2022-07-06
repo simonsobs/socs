@@ -62,7 +62,7 @@ Agent API
 
 .. autoclass:: agents.appmotion_motor.appmotion_motors_agent.appMotionMotorsAgent
     :members:
-    
+
 Example Clients
 ---------------
 
@@ -222,4 +222,3 @@ Supporting APIs
 
 .. automodule:: agents.appmotion_motor.appmotion_motors_driver
     :members:
-
