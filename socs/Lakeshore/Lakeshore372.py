@@ -325,6 +325,8 @@ class LS372:
                     if attempt == 1:
                         raise RuntimeError('Query response to Lakeshore timed out after two '
                                            'attempts. Check connection.')
+                except ConnectionResetError:
+                    raise
         else:
             self.write(message)
             resp = ''
