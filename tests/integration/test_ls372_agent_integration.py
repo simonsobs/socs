@@ -238,7 +238,8 @@ def test_ls372_disconnect_reconnect(wait_for_crossbar, emulator, run_agent, clie
     emulator.disconnect_reconnect(timeout=3, port=7777)
     time.sleep(5)
 
-    # client.acq.wait()
-    # resp = client.acq.status()
-    # assert resp.status == ocs.OK
-    # assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+    client.acq.stop()
+    time.sleep(1)
+    resp = client.acq.status()
+    assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
