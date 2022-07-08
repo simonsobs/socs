@@ -620,11 +620,9 @@ class ACUAgent:
         # self.log.info('Stopped')
         # yield dsleep(0.5)
         yield self.acu_control.go_to(az, el, wait=0.1)
-        yield dsleep(0.3)
         mdata = self.data['status']['summary']
         # Wait for telescope to start moving
         self.log.info('Moving to commanded position')
-        yield dsleep(5)
         wait_for_motion_start = time.time()
         elapsed_wait_for_motion = 0.0
         while mdata['Azimuth_current_velocity'] == 0.0 and\
