@@ -253,22 +253,23 @@ class LS372:
             # return
             raise Exception("Triggered select.error block unexpectedly") from e
         if op == 'read' and not ready_to_read:
-            self.disconnect_handler()
-            raise ConnectionResetError("No sockets ready for reading")
+            self.disconnect_handler("No sockets ready for reading")
         elif op == 'write' and not ready_to_write:
-            self.disconnect_handler()
-            raise ConnectionResetError("No sockets ready for writing")
+            self.disconnect_handler("No sockets ready for writing")
 
-    def disconnect_handler(self):
-        for i in range(500):
+    def disconnect_handler(self, reset_reason):
+        max_attempts = 500
+        for i in range(max_attempts):
             try:
                 self.reset()
-                print(f"Successfully reconnected on attempt #{i}")
-                return
+                break
             except socket.error as e:
                 print(f"Reconnect attempt #{i} failed with: {e}")
+                if i == max_attempts - 1:
+                    assert False, "Could not reconnect"
                 time.sleep(1)
-        assert False, "Could not reconnect"
+        print(f"Successfully reconnected on attempt #{i}")
+        raise ConnectionResetError(reset_reason) # should be caught by agent
 
     def write(self, message):
         self.connection_check('write')
@@ -276,24 +277,13 @@ class LS372:
         try:
             self.com.send(msg_str)
         except socket.error as e:
-            print(f"Socket write failed (disconnect?): {e}")
-            self.disconnect_handler()
-            # still write immediately after reconnect,
-            # may not be desirable in certain use cases
-            self.write(message)
+            self.disconnect_handler(f"Socket write failed (disconnect?): {e}")
 
     def read(self):
         self.connection_check('read')
         data = self.com.recv(4096)
         if not data:
-            print("Received no data from socket (disconnect?)")
-            self.disconnect_handler()
-            # reading from socket immediately after reconnect
-            # should timeout or give irrelevant data,
-            # so raise exception and let caller handle it
-            raise ConnectionResetError(
-                "Recovered connection during read attempt -- this read cannot be satisfied"
-            )
+            self.disconnect_handler("Received no data from socket recv")
         resp = str(data, 'utf-8').strip()
         return resp
 
