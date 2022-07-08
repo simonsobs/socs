@@ -252,12 +252,18 @@ class LS372:
             self.connection_check(op)  # need to test on real hardware
             return
         if op == 'read':
-            assert len(ready_to_read) > 0, "No sockets ready for reading"
+#            assert len(ready_to_read) > 0, "No sockets ready for reading"
+            if not len(ready_to_read) > 0:
+                self.disconnect_handler()
+                raise ConnectionResetError("No sockets ready for reading")
         elif op == 'write':
-            assert len(ready_to_write) > 0, "No sockets ready for writing"
+            if not len(ready_to_write) > 0:
+                self.disconnect_handler()
+                raise ConnectionResetError("No sockets ready for writing")
+#            assert len(ready_to_write) > 0, "No sockets ready for writing"
 
     def disconnect_handler(self):
-        for i in range(5):
+        for i in range(500):
             try:
                 self.reset()
                 print(f"Successfully reconnected on attempt #{i}")
