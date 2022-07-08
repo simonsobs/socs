@@ -244,23 +244,20 @@ class LS372:
         try:
             ready_to_read, ready_to_write, in_error = \
                 select.select(*select_lists, 5)
-        except select.error:
-            self.com.shutdown(2)
-            self.com.close()
-            print("Lakeshore372 connection error")
+        except select.error as e:
+            # self.com.shutdown(2)
+            # self.com.close()
+            # print("Lakeshore372 connection error")
+            # self.disconnect_handler()
+            # self.connection_check(op)  # need to test on real hardware
+            # return
+            raise Exception("Triggered select.error block unexpectedly") from e
+        if op == 'read' and not ready_to_read:
             self.disconnect_handler()
-            self.connection_check(op)  # need to test on real hardware
-            return
-        if op == 'read':
-#            assert len(ready_to_read) > 0, "No sockets ready for reading"
-            if not len(ready_to_read) > 0:
-                self.disconnect_handler()
-                raise ConnectionResetError("No sockets ready for reading")
-        elif op == 'write':
-            if not len(ready_to_write) > 0:
-                self.disconnect_handler()
-                raise ConnectionResetError("No sockets ready for writing")
-#            assert len(ready_to_write) > 0, "No sockets ready for writing"
+            raise ConnectionResetError("No sockets ready for reading")
+        elif op == 'write' and not ready_to_write:
+            self.disconnect_handler()
+            raise ConnectionResetError("No sockets ready for writing")
 
     def disconnect_handler(self):
         for i in range(500):
