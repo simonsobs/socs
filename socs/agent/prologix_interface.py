@@ -28,17 +28,18 @@ class PrologixInterface:
         try:
             ready_to_read, ready_to_write, in_error = \
                 select.select(*select_lists, 5)
-        except select.error:
-            self.sock.shutdown(2)
-            self.sock.close()
-            print("Prologix interface connection error")
-            self.disconnect_handler()
-            self.connection_check(op)  # need to test on real hardware
-            return
-        if op == 'read':
-            assert len(ready_to_read) > 0, "No sockets ready for reading"
-        elif op == 'write':
-            assert len(ready_to_write) > 0, "No sockets ready for writing"
+        except select.error as e:
+            # self.sock.shutdown(2)
+            # self.sock.close()
+            # print("Lakeshore372 connection error")
+            # self.disconnect_handler()
+            # self.connection_check(op)  # need to test on real hardware
+            # return
+            raise Exception("Triggered select.error block unexpectedly") from e
+        if op == 'read' and not ready_to_read:
+            self.disconnect_handler("No sockets ready for reading")
+        elif op == 'write' and not ready_to_write:
+            self.disconnect_handler("No sockets ready for writing")
 
 
     def write(self, msg):
@@ -47,39 +48,30 @@ class PrologixInterface:
         try:
             self.sock.sendall(message.encode())
         except socket.error as e:
-            print(f"Socket write failed (disconnect?): {e}")
-            self.disconnect_handler()
-            # still write immediately after reconnect,
-            # may not be desirable in certain use cases
-            self.write(msg)
-            return
+            self.disconnect_handler(f"Socket write failed (disconnect?): {e}")
         time.sleep(0.1)  # Don't send messages too quickly
 
     def read(self):
         self.connection_check('read')
         data = self.sock.recv(128)
         if not data:
-            print("Received no data from socket (disconnect?)")
-            self.disconnect_handler()
-            # reading from socket immediately after reconnect
-            # should timeout or give irrelevant data,
-            # so raise exception and let caller handle it
-            raise ConnectionResetError(
-                "Recovered connection during read attempt -- this read cannot be satisfied"
-            )
+            self.disconnect_handler("Received no data from socket (disconnect?)")
         return data.decode().strip()
 
-    def disconnect_handler(self):
-        for i in range(5):
+    def disconnect_handler(self, reset_reason):
+        max_attempts = 500
+        for i in range(max_attempts):
             try:
                 self.conn_socket()
                 self.configure()
-                print(f"Successfully reconnected on attempt #{i}")
-                return
+                break
             except socket.error as e:
                 print(f"Reconnect attempt #{i} failed with: {e}")
+                if i == max_attempts - 1:
+                    assert False, "Could not reconnect"
                 time.sleep(1)
-        assert False, "Could not reconnect"
+        print(f"Successfully reconnected on attempt #{i}")
+        raise ConnectionResetError(reset_reason) # should be caught by agent
 
     def version(self):
         self.write('++ver')
