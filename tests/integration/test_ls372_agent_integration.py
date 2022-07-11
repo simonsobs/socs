@@ -227,6 +227,7 @@ def test_ls372_get_still_output(wait_for_crossbar, emulator, run_agent, client):
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
+
 @pytest.mark.integtest
 def test_ls372_disconnect_reconnect(wait_for_crossbar, emulator, run_agent, client):
     client.init_lakeshore()

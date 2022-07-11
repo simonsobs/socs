@@ -240,7 +240,7 @@ class LS372:
 
     def connection_check(self, op):
         assert op in ['read', 'write'], "'op' must be 'read' or 'write'"
-        select_lists = ([self.com,], [], []) if op == 'read' else ([], [self.com,], [])
+        select_lists = ([self.com, ], [], []) if op == 'read' else ([], [self.com, ], [])
         try:
             ready_to_read, ready_to_write, in_error = \
                 select.select(*select_lists, 5)
@@ -269,7 +269,7 @@ class LS372:
                     assert False, "Could not reconnect"
                 time.sleep(1)
         print(f"Successfully reconnected on attempt #{i}")
-        raise ConnectionResetError(reset_reason) # should be caught by agent
+        raise ConnectionResetError(reset_reason)  # should be caught by agent
 
     def write(self, message):
         self.connection_check('write')
