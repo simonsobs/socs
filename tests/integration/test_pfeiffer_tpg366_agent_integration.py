@@ -22,6 +22,8 @@ run_agent = create_agent_runner_fixture(
     args=["--log-dir", "./logs/"],
 )
 client = create_client_fixture("pfeiffer366")
+# correct responses found here (page 11):
+# https://www.ajvs.com/library/TPG_366_Communication_Protocol_BG5511BEN.pdf
 emu = create_device_emulator(
     {
         "PRX": "\x06\r\n",
