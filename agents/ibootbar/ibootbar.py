@@ -123,6 +123,8 @@ def update_cache(get_result, names, timestamp):
     ----------
     get_result : pysnmp.smi.rfc1902.ObjectType
         Result from a pysnmp GET command.
+    names : list
+        List of strings for outlet names
     timestamp : float
         Timestamp for when the SNMP GET was issued.
     """

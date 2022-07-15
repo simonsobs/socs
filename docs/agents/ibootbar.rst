@@ -70,10 +70,10 @@ cycle each outlet, and reboot the system. The iBootbar has an Simple Network
 Management Protocol (SNMP) interface.
 
 The iBootbar Agent actively issues SNMP GET commands to request the
-status from several Object Identifiers (OIDs) specified by the Meinberg
-provided Management Information Base (MIB). We sample only a subset of the OIDs
-defined by the MIB. The MIB has been converted from the original .mib format to 
-a .py format that is consumable via pysnmp and is provided by socs. The iBootbar 
+status from several Object Identifiers (OIDs) specified by the provided 
+Management Information Base (MIB). We sample only a subset of the OIDs defined 
+by the MIB. The MIB has been converted from the original .mib format to a .py 
+format that is consumable via pysnmp and is provided by socs. The iBootbar 
 Agent also contains three tasks: set_outlet, cycle_outlet, and reboot. These 
 tasks issues SNMP SET commands to change the value of OIDs, resulting in 
 changing the state of outlets.
