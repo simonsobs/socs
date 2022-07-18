@@ -12,18 +12,19 @@ import ctypes
 from picosdk.ps3000a import ps3000a as ps
 from picosdk.functions import adc2mV, assert_pico_ok, splitMSODataFast
 
+
 class ps3000a():
     def __init__(self, sizeofbuffer, samplerate):
         self.status = {}
         self.chandle = ctypes.c_int16()
-        self.interval = int(1./samplerate*1e9) # unit ns
+        self.interval = int(1. / samplerate * 1e9)  # unit ns
 
         # Size of capture
         self.sizeOfOneBuffer = sizeofbuffer
         self.numBuffersToCapture = 1
         self.totalSamples = self.sizeOfOneBuffer * self.numBuffersToCapture
 
-        print('sample points: {}, sampling rate: {} (MHz), length: {} (sec)'.format(self.totalSamples, samplerate*1e-6, self.totalSamples*self.interval*1e-9))
+        print('sample points: {}, sampling rate: {} (MHz), length: {} (sec)'.format(self.totalSamples, samplerate * 1e-6, self.totalSamples * self.interval * 1e-9))
 
         # Opens the device/s
         self.status["openunit"] = ps.ps3000aOpenUnit(ctypes.byref(self.chandle), None)
@@ -31,11 +32,11 @@ class ps3000a():
         self.info = {}
         self.info['sample_points'] = self.totalSamples
         self.info['sampling_rate_Hz'] = samplerate
-        self.info['length_sec'] = self.totalSamples*self.interval*1e-9
+        self.info['length_sec'] = self.totalSamples * self.interval * 1e-9
 
         try:
             assert_pico_ok(self.status["openunit"])
-        except:
+        except BaseException:
 
             # powerstate becomes the status number of openunit
             powerstate = self.status["openunit"]
@@ -46,7 +47,7 @@ class ps3000a():
                 self.status["ChangePowerSource"] = ps.ps3000aChangePowerSource(self.chandle, 282)
             # If the powerstate is the same as 286 then it will run this if statement
             elif powerstate == 286:
-            # Changes the power input to "PICO_USB3_0_DEVICE_NON_USB3_0_PORT"
+                # Changes the power input to "PICO_USB3_0_DEVICE_NON_USB3_0_PORT"
                 self.status["ChangePowerSource"] = ps.ps3000aChangePowerSource(self.chandle, 286)
             else:
                 raise
@@ -90,25 +91,25 @@ class ps3000a():
         triggerSource = ctypes.c_int32(0)
 
         offsetVoltage = 0
-        pkToPk = ptp #(uV)
-        print('Drive frequency: {} (Hz), PKtoPK: {} (V)'.format(frequency, pkToPk*1e-6))
+        pkToPk = ptp  # (uV)
+        print('Drive frequency: {} (Hz), PKtoPK: {} (V)'.format(frequency, pkToPk * 1e-6))
         self.info['Drive_frequency_Hz'] = frequency
-        self.info['PKtoPk'] = pkToPk*1e-6
+        self.info['PKtoPk'] = pkToPk * 1e-6
 
-        start_frequency = frequency #Hz
-        stop_frequency = frequency #Hz
+        start_frequency = frequency  # Hz
+        stop_frequency = frequency  # Hz
         increment = 0
-        dwelltime = 1 
+        dwelltime = 1
 
         self.status["SetSigGenBuiltIn"] = ps.ps3000aSetSigGenBuiltIn(
-            self.chandle, offsetVoltage, pkToPk, 
-            wavetype, start_frequency, stop_frequency, increment, dwelltime, sweepType, 
-            0, #operation
-            0, #shots
-            0, #sweeps
-            triggertype, 
+            self.chandle, offsetVoltage, pkToPk,
+            wavetype, start_frequency, stop_frequency, increment, dwelltime, sweepType,
+            0,  # operation
+            0,  # shots
+            0,  # sweeps
+            triggertype,
             triggerSource,
-            1, #extInThreshold
+            1,  # extInThreshold
         )
         assert_pico_ok(self.status["SetSigGenBuiltIn"])
 
@@ -119,17 +120,17 @@ class ps3000a():
         triggerSource = ctypes.c_int32(0)
 
         offsetVoltage = 0
-        pkToPk = 2000000 #(uV)
+        pkToPk = 2000000  # (uV)
 
         self.status["SetSigGenBuiltIn"] = ps.ps3000aSetSigGenBuiltIn(
-            self.chandle, offsetVoltage, pkToPk, 
-            wavetype, start_frequency, stop_frequency, increment, dwelltime, sweepType, 
-            0, #operation
-            0, #shots
-            0, #sweeps
-            triggertype, 
+            self.chandle, offsetVoltage, pkToPk,
+            wavetype, start_frequency, stop_frequency, increment, dwelltime, sweepType,
+            0,  # operation
+            0,  # shots
+            0,  # sweeps
+            triggertype,
             triggerSource,
-            1, #extInThreshold
+            1,  # extInThreshold
         )
         assert_pico_ok(self.status["SetSigGenBuiltIn"])
 
@@ -172,15 +173,15 @@ class ps3000a():
         self.channel_range = ps.PS3000A_RANGE['PS3000A_2V']
 
         for ch in ['A', 'B', 'C', 'D']:
-            self.status['setCh'+ch] = ps.ps3000aSetChannel(
+            self.status['setCh' + ch] = ps.ps3000aSetChannel(
                 self.chandle,
-                ps.PS3000A_CHANNEL['PS3000A_CHANNEL_'+ch],
+                ps.PS3000A_CHANNEL['PS3000A_CHANNEL_' + ch],
                 enabled,
                 ps.PS3000A_COUPLING['PS3000A_DC'],
                 self.channel_range,
                 analogue_offset
             )
-            assert_pico_ok(self.status['setCh'+ch])
+            assert_pico_ok(self.status['setCh' + ch])
 
     def SetBuffer(self):
         # Create buffers ready for assigning pointers for data collection
@@ -273,8 +274,8 @@ class ps3000a():
     def Stream(self):
         # Begin streaming mode:
         sampleInterval = ctypes.c_int32(500)
-        #print(sampleInterval.value)
-        sampleUnits = ps.PS3000A_TIME_UNITS['PS3000A_NS'] # PS3000A_US, PS3000A_NS
+        # print(sampleInterval.value)
+        sampleUnits = ps.PS3000A_TIME_UNITS['PS3000A_NS']  # PS3000A_US, PS3000A_NS
         # We are not triggering:
         maxPreTriggerSamples = 0
         autoStopOn = 1
@@ -294,7 +295,7 @@ class ps3000a():
         assert_pico_ok(self.status["runStreaming"])
 
         actualSampleInterval = sampleInterval.value
-        #print(sampleInterval.value)
+        # print(sampleInterval.value)
         self.actualSampleIntervalNs = actualSampleInterval * 1000
 
         print("Capturing at sample interval %s ns" % self.actualSampleIntervalNs)
@@ -310,8 +311,8 @@ class ps3000a():
         # Convert the python function into a C function pointer.
         cFuncPtr = ps.StreamingReadyType(self._streaming_callback)
 
-        # Fetch data from the driver in a loop, 
-        #copying it out of the registered buffers and into our complete one.
+        # Fetch data from the driver in a loop,
+        # copying it out of the registered buffers and into our complete one.
 
         while self.nextSample < self.totalSamples and not self.autoStopOuter:
             self.wasCalledBack = False
@@ -321,13 +322,13 @@ class ps3000a():
                 None
             )
             if not self.wasCalledBack:
-                # If we weren't called back by the driver, this means no data is ready. 
+                # If we weren't called back by the driver, this means no data is ready.
                 # Sleep for a short while before trying
                 # again.
                 time.sleep(0.01)
 
         print("Done grabbing values.")
-        print("Capturing interval %s sec" %(actualSampleInterval * 1000 * self.totalSamples/1e12) )
+        print("Capturing interval %s sec" % (actualSampleInterval * 1000 * self.totalSamples / 1e12))
 
     def _streaming_callback(self, handle, noOfSamples, startIndex, overflow, triggerAt, triggered, autoStop, param):
         #global nextSample, autoStopOuter, wasCalledBack
@@ -364,7 +365,7 @@ class ps3000a():
     def save_value(self, dir):
         np.savez(dir, t=self.t, A=self.adc2mVChAMax, B=self.adc2mVChBMax, C=self.adc2mVChCMax, D=self.adc2mVChDMax)
 
-    #### code-related-digital Input
+    # code-related-digital Input
     def set_digital_port(self):
         # Set up digital port
         # handle = chandle
@@ -389,12 +390,12 @@ class ps3000a():
         # Segment index = 0
         # Ratio mode = PS3000A_RATIO_MODE_NONE = 0
         self.status["SetDataBuffers"] = ps.ps3000aSetDataBuffers(self.chandle,
-                                                            ps.PS3000A_DIGITAL_PORT["PS3000A_DIGITAL_PORT0"],#digital_port0,
-                                                            ctypes.byref(self.bufferDPort0Max),
-                                                            ctypes.byref(self.bufferDPort0Min),
-                                                            self.totalSamples,
-                                                            0,
-                                                            0)
+                                                                 ps.PS3000A_DIGITAL_PORT["PS3000A_DIGITAL_PORT0"],  # digital_port0,
+                                                                 ctypes.byref(self.bufferDPort0Max),
+                                                                 ctypes.byref(self.bufferDPort0Min),
+                                                                 self.totalSamples,
+                                                                 0,
+                                                                 0)
         assert_pico_ok(self.status["SetDataBuffers"])
 
     def get_digital_values_simple(self):
@@ -408,8 +409,8 @@ class ps3000a():
     def Stream_AD(self):
         # Begin streaming mode:
         sampleInterval = ctypes.c_int32(self.interval)
-        #print(sampleInterval.value)
-        sampleUnits = ps.PS3000A_TIME_UNITS['PS3000A_NS'] # PS3000A_US, PS3000A_NS
+        # print(sampleInterval.value)
+        sampleUnits = ps.PS3000A_TIME_UNITS['PS3000A_NS']  # PS3000A_US, PS3000A_NS
         # We are not triggering:
         maxPreTriggerSamples = 0
         autoStopOn = 1
@@ -429,7 +430,7 @@ class ps3000a():
         assert_pico_ok(self.status["runStreaming"])
 
         actualSampleInterval = sampleInterval.value
-        #print(sampleInterval.value)
+        # print(sampleInterval.value)
         self.actualSampleIntervalNs = actualSampleInterval * 1000
 
         print("Capturing at sample interval %s ns" % self.actualSampleIntervalNs)
@@ -448,24 +449,24 @@ class ps3000a():
         # Convert the python function into a C function pointer.
         cFuncPtr = ps.StreamingReadyType(self._streaming_callback_AD)
 
-        # Fetch data from the driver in a loop, 
-        #copying it out of the registered buffers and into our complete one.
+        # Fetch data from the driver in a loop,
+        # copying it out of the registered buffers and into our complete one.
 
         while self.nextSample < self.totalSamples and not self.autoStopOuter:
             self.wasCalledBack = False
             self.status["getStreamingLastestValues"] = ps.ps3000aGetStreamingLatestValues(
-                self.chandle, 
-                cFuncPtr, 
+                self.chandle,
+                cFuncPtr,
                 None
             )
             if not self.wasCalledBack:
-                # If we weren't called back by the driver, this means no data is ready. 
+                # If we weren't called back by the driver, this means no data is ready.
                 # Sleep for a short while before trying
                 # again.
                 time.sleep(0.01)
 
         print("Done grabbing values.")
-        print("Capturing interval %s sec" %(actualSampleInterval * 1000 * self.totalSamples/1e12) )
+        print("Capturing interval %s sec" % (actualSampleInterval * 1000 * self.totalSamples / 1e12))
 
     def _streaming_callback_AD(self, handle, noOfSamples, startIndex, overflow, triggerAt, triggered, autoStop, param):
         #global nextSample, autoStopOuter, wasCalledBack

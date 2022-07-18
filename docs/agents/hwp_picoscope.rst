@@ -29,7 +29,7 @@ To install the drivers wget the picotech library and clone the picosdk-python-wr
 
 Configuration File Examples
 ---------------------------
-Below are useful configurations examples for the relevant OCS files and for 
+Below are useful configurations examples for the relevant OCS files and for
 running the agent in a docker container.
 
 ocs-config
@@ -44,7 +44,7 @@ using all of the available arguments::
 
 Docker
 ``````
-The HWP picoscope agent can be run via a Docker container. The following is an 
+The HWP picoscope agent can be run via a Docker container. The following is an
 example of what to insert into your institution's docker-compose file.
 Currently this agent is confirmed to work by privileded true, but this needs to be improved.
 ::
@@ -52,7 +52,7 @@ Currently this agent is confirmed to work by privileded true, but this needs to 
   picoscope:
     image: simonsobs/ocs-hwp-picoscope-agent:latest
     hostname: ocs-docker
-    privileged: true 
+    privileged: true
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
       - /dev:/dev
