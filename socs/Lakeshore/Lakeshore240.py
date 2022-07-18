@@ -7,10 +7,8 @@ Created on Fri Feb 23 14:15:51 2018
 """
 
 from serial import Serial
-from serial.serialutil import SerialException
 import time
 import sys
-import numpy as np
 from collections import OrderedDict
 import socket
 from typing import List
@@ -18,10 +16,6 @@ from typing import List
 
 BUFF_SIZE = 1024
 
-try:
-    from tqdm import *
-except ModuleNotFoundError:
-    tqdm = lambda x: x
 
 class Module:
     """
@@ -62,11 +56,11 @@ class Module:
         # after plugging in the LS240. Try three times, then give up.
         for i in range(3):
             try:
-                print('attempt %s'%i)
+                print('attempt %s' % i)
                 idn = self.msg("*IDN?")
                 break
             except TimeoutError:
-                print("Comms failed on attempt %s"%i)
+                print("Comms failed on attempt %s" % i)
 
         self.manufacturer, self.model, self.inst_sn, self.firmware_version = idn.split(',')
         num_channels = int(self.model[-2])
@@ -75,7 +69,7 @@ class Module:
 
         self.channels: List[Channel] = []
         for i in range(num_channels):
-            c = Channel(self, i+1)
+            c = Channel(self, i + 1)
             self.channels.append(c)
 
     def close(self):
@@ -91,7 +85,7 @@ class Module:
             Return response (within timeout) if message is a query.
         """
         if self.simulator:
-            message_string = "{};".format(msg)
+            message_string = "{}".format(msg)
             self.com.send(message_string.encode())
             resp = ''
             if '?' in msg:
@@ -100,7 +94,7 @@ class Module:
 
         else:
             # Writes message
-            message_string = "{}\r\n;".format(msg).encode()
+            message_string = "{}\r\n".format(msg).encode()
 
             # write(message_string)
             self.com.write(message_string)
@@ -132,7 +126,7 @@ class Module:
 # ==============================================================================
 
 # To convert from int representation to string
-sensorStrings = ["None","Diode", "PlatRTC", "NTCRTC"]
+sensorStrings = ["None", "Diode", "PlatRTC", "NTCRTC"]
 unitStrings = ["None", "Kelvin", "Celsius", "Sensor", "Fahrenheit"]
 
 # To convert from int representation to excitation or range
@@ -157,6 +151,7 @@ class Channel:
         enabled (int): Sets whether channel is enabled. (1,0)
 
     """
+
     def __init__(self, ls, channel_num):
         self.ls = ls
         self.channel_num = channel_num
@@ -291,9 +286,9 @@ class Channel:
         self.ls.msg("INNAME {},{!s}".format(self.channel_num, self.name))
 
         input_type_message = "INTYPE "
-        input_type_message += ",".join(["{}".format(c) for c in [ self.channel_num, self._sensor, self._auto_range,
-                                                                    self._range, self._current_reversal, self._unit,
-                                                                    int(self._enabled)]])
+        input_type_message += ",".join(["{}".format(c) for c in [self.channel_num, self._sensor, self._auto_range,
+                                                                 self._range, self._current_reversal, self._unit,
+                                                                 int(self._enabled)]])
         self.ls.msg(input_type_message)
 
     def read_curve(self):
@@ -358,7 +353,7 @@ class Channel:
         hdr = self.curve.header
         keys = list(hdr)
 
-        #loads header
+        # loads header
         cmd = "CRVHDR {}".format(self.channel_num)
         for key in keys[:5]:
             cmd += ",{}".format(hdr[key])
@@ -368,12 +363,12 @@ class Channel:
         bps = self.curve.breakpoints
         assert len(bps) <= 200, "Curve must have 200 breakpoints or less"
 
-        print ("Loading Curve to {}".format(self.name))
+        print("Loading Curve to {}".format(self.name))
         for i in range(200):
             if i < len(bps):
-                self.load_curve_point(i+1, bps[i][0], bps[i][1])
+                self.load_curve_point(i + 1, bps[i][0], bps[i][1])
             else:
-                self.load_curve_point(i+1, 0, 0)
+                self.load_curve_point(i + 1, 0, 0)
         print("Curve loaded")
 
     def delete_curve(self):
@@ -384,14 +379,14 @@ class Channel:
     def __str__(self):
         string = "-" * 40 + "\n"
         string += "{} -- Channel {}: {}\n".format(self.ls.inst_sn, self.channel_num, self.name)
-        string += "-"*40 + "\n"
+        string += "-" * 40 + "\n"
 
         string += "{!s:<18} {!s:>13}\n".format("Enabled:", self._enabled)
         string += "{!s:<18} {!s:>13} ({})\n".format("Sensor:", self._sensor, sensorStrings[self._sensor])
         string += "{!s:<18} {!s:>13}\n".format("Auto Range:", self._auto_range)
 
         range_unit = "V" if self._sensor == 1 else "Ohm"
-        string += "{!s:<18} {!s:>13} ({} {})\n".format("Range:", self._range, ranges[self._sensor-1][self._range], range_unit)
+        string += "{!s:<18} {!s:>13} ({} {})\n".format("Range:", self._range, ranges[self._sensor - 1][self._range], range_unit)
         string += "{!s:<18} {!s:>13}\n".format("Current Reversal:", self._current_reversal)
         string += "{!s:<18} {!s:>13}\n".format("Units:", units_key[self._unit])
 
@@ -410,6 +405,7 @@ class Curve:
         :Number of Breakpoints:     Number of curve points
 
     """
+
     def __init__(self, filename=None, header=None, breakpoints=None):
 
         if filename is not None:
@@ -433,8 +429,8 @@ class Curve:
             file.write('No.\tUnits\tTemperature (K)\n')
             file.write('\n')
 
-            for i,bp in enumerate(self.breakpoints):
-                file.write('{}\t{:.4f} {:.4f}\n'.format(i+1, bp[0], bp[1]))
+            for i, bp in enumerate(self.breakpoints):
+                file.write('{}\t{:.4f} {:.4f}\n'.format(i + 1, bp[0], bp[1]))
 
     def load_from_file(self, filename):
         with open(filename, 'r') as file:
@@ -442,7 +438,7 @@ class Curve:
 
         self.header = OrderedDict({})
         for line in content:
-            if line.strip()=='':
+            if line.strip() == '':
                 break
             key, v = line.split(':')
             val = v.split('(')[0].strip()
@@ -456,9 +452,10 @@ class Curve:
     def __str__(self):
         string = ""
         for key, val in self.header.items():
-            string += "%-15s: %s\n"%(key, val)
+            string += "%-15s: %s\n" % (key, val)
         return string
+
 
 if __name__ == "__main__":
     ls = Module(port=sys.argv[1])
-    print (ls)
+    print(ls)

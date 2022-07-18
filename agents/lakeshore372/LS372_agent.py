@@ -5,13 +5,14 @@ import time
 import numpy as np
 import txaio
 import threading
+import yaml
 from contextlib import contextmanager
 from twisted.internet import reactor
 
 from socs.Lakeshore.Lakeshore372 import LS372
 
 from ocs import ocs_agent, site_config
-from ocs.ocs_twisted import TimeoutLock
+from ocs.ocs_twisted import TimeoutLock, Pacemaker
 
 
 class YieldingLock:
@@ -25,6 +26,7 @@ class YieldingLock:
     method release_and_acquire() is provided to make this a one-liner.
 
     """
+
     def __init__(self, default_timeout=None):
         self.job = None
         self._next = threading.Lock()
@@ -85,6 +87,7 @@ class LS372_Agent:
             If True, will read data from the control channel each iteration of
             the acq loop. Defaults to False.
     """
+
     def __init__(self, agent, name, ip, fake_data=False, dwell_time_delay=0,
                  enable_control_chan=False):
 
@@ -115,7 +118,7 @@ class LS372_Agent:
         self.agent = agent
         # Registers temperature feeds
         agg_params = {
-            'frame_length': 10*60 #[sec]
+            'frame_length': 10 * 60  # [sec]
         }
         self.agent.register_feed('temperatures',
                                  record=True,
@@ -145,8 +148,10 @@ class LS372_Agent:
     @ocs_agent.param('auto_acquire', default=False, type=bool)
     @ocs_agent.param('acq_params', type=dict, default=None)
     @ocs_agent.param('force', default=False, type=bool)
+    @ocs_agent.param('configfile', type=str, default=None)
     def init_lakeshore(self, session, params=None):
-        """init_lakeshore(auto_acquire=False, acq_params=None, force=False)
+        """init_lakeshore(auto_acquire=False, acq_params=None, force=False,
+                          configfile=None)
 
         **Task** - Perform first time setup of the Lakeshore 372 communication.
 
@@ -157,18 +162,19 @@ class LS372_Agent:
                 auto_acquire is True.
             force (bool, optional): Force initialization, even if already
                 initialized. Defaults to False.
+            configfile (str, optional): .yaml file for initializing 372 channel
+                settings
 
         """
         if params is None:
             params = {}
-
         if self.initialized and not params.get('force', False):
             self.log.info("Lakeshore already initialized. Returning...")
             return True, "Already initialized"
 
         with self._lock.acquire_timeout(job='init') as acquired1, \
-             self._acq_proc_lock.acquire_timeout(timeout=0., job='init') \
-             as acquired2:
+                self._acq_proc_lock.acquire_timeout(timeout=0., job='init') \
+                as acquired2:
             if not acquired1:
                 self.log.warn(f"Could not start init because "
                               f"{self._lock.job} is already running")
@@ -197,11 +203,15 @@ class LS372_Agent:
                     return False, 'Lakeshore initialization failed'
 
                 print("Initialized Lakeshore module: {!s}".format(self.module))
-                session.add_message("Lakeshore initilized with ID: %s"%self.module.id)
+                session.add_message("Lakeshore initilized with ID: %s" % self.module.id)
 
                 self.thermometers = [channel.name for channel in self.module.channels]
 
             self.initialized = True
+
+        if params.get('configfile') is not None:
+            self.input_configfile(session, params)
+            session.add_message("Lakeshore initial configurations uploaded using: %s" % params['configfile'])
 
         # Start data acquisition if requested
         if params.get('auto_acquire', False):
@@ -237,9 +247,11 @@ class LS372_Agent:
                 }
 
         """
+        pm = Pacemaker(10, quantize=True)
+
         with self._acq_proc_lock.acquire_timeout(timeout=0, job='acq') \
-             as acq_acquired, \
-             self._lock.acquire_timeout(job='acq') as acquired:
+                as acq_acquired, \
+                self._lock.acquire_timeout(job='acq') as acquired:
             if not acq_acquired:
                 self.log.warn(f"Could not start Process because "
                               f"{self._acq_proc_lock.job} is already running")
@@ -258,6 +270,7 @@ class LS372_Agent:
 
             self.take_data = True
             while self.take_data:
+                pm.sleep()
 
                 # Relinquish sampling lock occasionally.
                 if time.time() - last_release > 1.:
@@ -300,12 +313,12 @@ class LS372_Agent:
 
                             # Check user set dwell time isn't too long
                             if self.dwell_time_delay > dwell_time:
-                                self.log.warn("WARNING: User set dwell_time_delay of " + \
-                                              "{delay} s is larger than channel " + \
-                                              "dwell time of {chan_time} s. If " + \
-                                              "you are autoscanning this will " + \
-                                              "cause no data to be collected. " + \
-                                              "Reducing dwell time delay to {s} s.",
+                                self.log.warn("WARNING: User set dwell_time_delay of "
+                                              + "{delay} s is larger than channel "
+                                              + "dwell time of {chan_time} s. If "
+                                              + "you are autoscanning this will "
+                                              + "cause no data to be collected. "
+                                              + "Reducing dwell time delay to {s} s.",
                                               delay=self.dwell_time_delay,
                                               chan_time=dwell_time,
                                               s=dwell_time - 1)
@@ -315,7 +328,7 @@ class LS372_Agent:
 
                             for i in range(total_time):
                                 self.log.debug("Sleeping for {t} more seconds...",
-                                               t=total_time-i)
+                                               t=total_time - i)
                                 time.sleep(1)
 
                         # Track the last channel we measured
@@ -443,7 +456,7 @@ class LS372_Agent:
 
         return True, f'Set {heater_string} heater range to {params["range"]}'
 
-    @ocs_agent.param('channel', type=int, check=lambda x: 1<=x<=16)
+    @ocs_agent.param('channel', type=int, check=lambda x: 1 <= x <= 16)
     @ocs_agent.param('mode', type=str, choices=['current', 'voltage'])
     def set_excitation_mode(self, session, params):
         """set_excitation_mode(channel=None, mode=None)
@@ -471,7 +484,7 @@ class LS372_Agent:
 
         return True, f'return text for Set channel {params["channel"]} excitation mode to {params["mode"]}'
 
-    @ocs_agent.param('channel', type=int, check=lambda x: 1<=x<=16)
+    @ocs_agent.param('channel', type=int, check=lambda x: 1 <= x <= 16)
     @ocs_agent.param('value', type=float)
     def set_excitation(self, session, params):
         """set_excitation(channel=None, value=None)
@@ -507,11 +520,11 @@ class LS372_Agent:
 
         return True, f'Set channel {params["channel"]} excitation to {params["value"]} {units}'
 
-    @ocs_agent.param('channel', type=int, check=lambda x: 1<=x<=16)
+    @ocs_agent.param('channel', type=int, check=lambda x: 1 <= x <= 16)
     def get_excitation(self, session, params):
         """get_excitation(channel=None)
 
-        **Task** - Get the excitation voltage/current value of a specified 
+        **Task** - Get the excitation voltage/current value of a specified
         channel.
 
         Parameters:
@@ -534,7 +547,7 @@ class LS372_Agent:
 
         return True, f'Channel {params["channel"]} excitation {mode} is {current_excitation} {units}'
 
-    @ocs_agent.param('channel', type=int, check=lambda x: 1<=x<=16)
+    @ocs_agent.param('channel', type=int, check=lambda x: 1 <= x <= 16)
     @ocs_agent.param('resistance_range', type=float)
     def set_resistance_range(self, session, params):
         """set_resistance_range(channel=None,resistance_range=None)
@@ -571,7 +584,7 @@ class LS372_Agent:
 
         return True, f'Set channel {params["channel"]} resistance range to {params["resistance_range"]}'
 
-    @ocs_agent.param('channel', type=int, check=lambda x: 1<=x<=16)
+    @ocs_agent.param('channel', type=int, check=lambda x: 1 <= x <= 16)
     def get_resistance_range(self, session, params):
         """get_resistance_range(channel=None)
 
@@ -595,15 +608,15 @@ class LS372_Agent:
 
         return True, f'Channel {params["channel"]} resistance range is {current_resistance_range}'
 
-    @ocs_agent.param('channel', type=int, check=lambda x: 1<=x<=16)
-    @ocs_agent.param('dwell', type=int, check=lambda x: 1<=x<=200)
+    @ocs_agent.param('channel', type=int, check=lambda x: 1 <= x <= 16)
+    @ocs_agent.param('dwell', type=int, check=lambda x: 1 <= x <= 200)
     def set_dwell(self, session, params):
         """set_dwell(channel=None, dwell=None)
 
         **Task** - Set the autoscanning dwell time for a particular channel.
 
         Parameters:
-            channel (int): Channel to set the dwell time for. Valid values 
+            channel (int): Channel to set the dwell time for. Valid values
                 are 1-16.
             dwell (int): Dwell time in seconds, type is int and must be in the
                 range 1-200 inclusive.
@@ -616,13 +629,12 @@ class LS372_Agent:
 
             session.set_status('running')
 
-            current_dwell = self.module.channels[params["channel"]].set_dwell(params["dwell"])
+            self.module.channels[params["channel"]].set_dwell(params["dwell"])
             session.add_message(f'Set dwell to {params["dwell"]}')
-
 
         return True, f'Set channel {params["channel"]} dwell time to {params["dwell"]}'
 
-    @ocs_agent.param('channel', type=int, check=lambda x: 1<=x<=16)
+    @ocs_agent.param('channel', type=int, check=lambda x: 1 <= x <= 16)
     def get_dwell(self, session, params):
         """get_dwell(channel=None, dwell=None)
 
@@ -643,7 +655,6 @@ class LS372_Agent:
             current_dwell = self.module.channels[params["channel"]].get_dwell()
             session.add_message(f'Dwell time for channel {params["channel"]} is {current_dwell}')
             session.data = {"dwell_time": current_dwell}
-
 
         return True, f'Channel {params["channel"]} dwell time is {current_dwell}'
 
@@ -750,27 +761,27 @@ class LS372_Agent:
 
             # Check we're in correct control mode for servo.
             if self.module.sample_heater.mode != 'Closed Loop':
-                session.add_message(f'Changing control to Closed Loop mode for servo.')
+                session.add_message('Changing control to Closed Loop mode for servo.')
                 self.module.sample_heater.set_mode("Closed Loop")
 
             # Check we aren't autoscanning.
             if self.module.get_autoscan() is True:
-                session.add_message(f'Autoscan is enabled, disabling for PID control on dedicated channel.')
+                session.add_message('Autoscan is enabled, disabling for PID control on dedicated channel.')
                 self.module.disable_autoscan()
 
             # Check we're scanning same channel expected by heater for control.
             if self.module.get_active_channel().channel_num != int(self.module.sample_heater.input):
-                session.add_message(f'Changing active channel to expected heater control input')
+                session.add_message('Changing active channel to expected heater control input')
                 self.module.set_active_channel(int(self.module.sample_heater.input))
 
             # Check we're setup to take correct units.
             if self.module.get_active_channel().units != 'kelvin':
-                session.add_message(f'Setting preferred units to Kelvin on heater control input.')
+                session.add_message('Setting preferred units to Kelvin on heater control input.')
                 self.module.get_active_channel().set_units('kelvin')
 
             # Make sure we aren't servoing too high in temperature.
             if params["temperature"] > 1:
-                return False, f'Servo temperature is set above 1K. Aborting.'
+                return False, 'Servo temperature is set above 1K. Aborting.'
 
             self.module.sample_heater.set_setpoint(params["temperature"])
 
@@ -815,14 +826,14 @@ class LS372_Agent:
 
             if np.abs(mean - setpoint) < params['threshold']:
                 print("passed threshold")
-                session.add_message(f'Setpoint Difference: ' + str(mean - setpoint))
+                session.add_message('Setpoint Difference: ' + str(mean - setpoint))
                 session.add_message(f'Average is within {params["threshold"]} K threshold. Proceeding with calibration.')
 
                 return True, f"Servo temperature is stable within {params['threshold']} K"
 
             else:
                 print("we're in the else")
-                #adjust_heater(t,rest)
+                # adjust_heater(t,rest)
 
         return False, f"Temperature not stable within {params['threshold']}."
 
@@ -909,7 +920,7 @@ class LS372_Agent:
             session.app.publish_to_feed('temperatures', data)
 
         return True, "Set {} display to {}, output to {}".format(heater, display, output)
-                                    
+
     @ocs_agent.param('output', type=float, check=lambda x: 0 <= x <= 100)
     def set_still_output(self, session, params=None):
         """set_still_output(output=None)
@@ -974,6 +985,90 @@ class LS372_Agent:
 
         return True, "Current still output is {}".format(still_output)
 
+    @ocs_agent.param('configfile', type=str)
+    def input_configfile(self, session, params=None):
+        """input_configfile(configfile=None)
+
+        **Task** - Upload 372 configuration file to initialize channel/device
+        settings.
+
+        Parameters:
+            configfile (str): name of .yaml config file
+
+        """
+        with self._lock.acquire_timeout(job='input_configfile') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            # path to configfile in docker container
+            configpath = os.environ.get("OCS_CONFIG_DIR", "/config/")
+            configfile = params['configfile']
+
+            ls372configs = os.path.join(configpath, configfile)
+            with open(ls372configs) as f:
+                config = yaml.safe_load(f)
+
+            ls = self.module
+            ls_serial = ls.id.split(',')[2]
+
+            device_config = config[ls_serial]['device_settings']
+            ls_chann_settings = config[ls_serial]['channel']
+
+            session.set_status('running')
+
+            # enable/disable autoscan
+            if device_config['autoscan'] == 'on':
+                ls.enable_autoscan()
+                self.log.info("autoscan enabled")
+            elif device_config['autoscan'] == 'off':
+                ls.disable_autoscan()
+                self.log.info("autoscan disabled")
+
+            for i in ls_chann_settings:
+                # enable/disable channel
+                if ls_chann_settings[i]['enable'] == 'on':
+                    ls.channels[i].enable_channel()
+                    self.log.info("CH.{channel} enabled".format(channel=i))
+                elif ls_chann_settings[i]['enable'] == 'off':
+                    ls.channels[i].disable_channel()
+                    self.log.info("CH.{channel} disabled".format(channel=i))
+
+                # autorange
+                if ls_chann_settings[i]['autorange'] == 'on':
+                    ls.channels[i].enable_autorange()
+                    self.log.info("autorange on")
+                elif ls_chann_settings[i]['autorange'] == 'off':
+                    ls.channels[i].disable_autorange()
+                    self.log.info("autorange off")
+
+                excitation_mode = ls_chann_settings[i]['excitation_mode']
+                ls.channels[i].set_excitation_mode(excitation_mode)
+                self.log.info("excitation mode for CH.{channel} set to {exc_mode}".format(channel=i, exc_mode=excitation_mode))
+
+                excitation_value = ls_chann_settings[i]['excitation_value']
+                ls.channels[i].set_excitation(excitation_value)
+                self.log.info("excitation for CH.{channel} set to {exc}".format(channel=i, exc=excitation_value))
+
+                dwell = ls_chann_settings[i]['dwell']
+                ls.channels[i].set_dwell(dwell)
+                self.log.info("dwell for CH.{channel} is set to {dwell}".format(channel=i, dwell=dwell))
+
+                pause = ls_chann_settings[i]['pause']
+                ls.channels[i].set_pause(pause)
+                self.log.info("pause for CH.{channel} is set to {pause}".format(channel=i, pause=pause))
+
+                calibration_curvenum = ls_chann_settings[i]['calibration_curve_num']
+                ls.channels[i].set_calibration_curve(calibration_curvenum)
+                self.log.info("calibration curve for CH.{channel} set to {cal_curve}".format(channel=i, cal_curve=calibration_curvenum))
+                tempco = ls_chann_settings[i]['temperature_coeff']
+                ls.channels[i].set_temperature_coefficient(tempco)
+                self.log.info("temperature coeff. for CH.{channel} set to {tempco}".format(channel=i, tempco=tempco))
+
+        return True, "Uploaded {}".format(configfile)
+
+
 def make_parser(parser=None):
     """Build the argument parser for the Agent. Allows sphinx to automatically
     build documentation based on this function.
@@ -986,7 +1081,6 @@ def make_parser(parser=None):
     pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--ip-address')
     pgroup.add_argument('--serial-number')
-    pgroup.add_argument('--mode')
     pgroup.add_argument('--fake-data', type=int, default=0,
                         help='Set non-zero to fake data, without hardware.')
     pgroup.add_argument('--dwell-time-delay', type=int, default=0,
@@ -998,14 +1092,17 @@ def make_parser(parser=None):
                               second if it is set longer than a channel's dwell\
                               time. This ensures at least one second of data\
                               collection at the end of a scan.")
-    pgroup.add_argument('--auto-acquire', action='store_true',
-                        help='Automatically start data acquisition on startup')
+    pgroup.add_argument('--mode', type=str, default='acq',
+                        choices=['idle', 'init', 'acq'],
+                        help="Starting action for the Agent.")
     pgroup.add_argument('--sample-heater', type=bool, default=False,
                         help='Record sample heater output during acquisition.')
     pgroup.add_argument('--enable-control-chan', action='store_true',
                         help='Enable reading of the control input each acq cycle')
+    pgroup.add_argument('--configfile', type=str, help='Yaml file for initializing 372 settings')
 
     return parser
+
 
 if __name__ == '__main__':
     # For logging
@@ -1020,7 +1117,11 @@ if __name__ == '__main__':
 
     # Automatically acquire data if requested (default)
     init_params = False
-    if args.auto_acquire:
+    if args.mode == 'init':
+        init_params = {'auto_acquire': False,
+                       'acq_params': {'sample_heater': args.sample_heater},
+                       'configfile': args.configfile}
+    elif args.mode == 'acq':
         init_params = {'auto_acquire': True,
                        'acq_params': {'sample_heater': args.sample_heater}}
 
@@ -1056,5 +1157,6 @@ if __name__ == '__main__':
     agent.register_process('acq', lake_agent.acq, lake_agent._stop_acq)
     agent.register_task('enable_control_chan', lake_agent.enable_control_chan)
     agent.register_task('disable_control_chan', lake_agent.disable_control_chan)
+    agent.register_task('input_configfile', lake_agent.input_configfile)
 
     runner.run(agent, auto_reconnect=True)

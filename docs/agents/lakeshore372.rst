@@ -34,12 +34,85 @@ configuration block::
    'arguments': [['--serial-number', 'LSA22YG'],
                  ['--ip-address', '10.10.10.2'],
                  ['--dwell-time-delay', 0],
-                 ['--auto-acquire'],
+                 ['--mode', 'acq'],
                  ['--sample-heater', False],
-                 ['--enable-control-chan']]},
+                 ['--enable-control-chan'],
+                 ['--configfile', 'ls372_config.yaml']]},
+
 
 Each device requires configuration under 'agent-instances'. See the OCS site
 configs documentation for more details.
+
+Lakeshore 372 Config
+`````````````````````
+A Lakeshore 372 configuration file allows the user to define device and channel
+settings (autoscan, enable/disable, calibration curve, etc.) for each Lakeshore
+372 in use within one .yaml file. Here is an example for how to build a
+Lakeshore 372 configuration file::
+
+    LSA22YG:
+        device_settings:
+          autoscan: 'off'
+        channel:
+          1:
+             enable: 'on'
+             excitation_mode: 'voltage'
+             excitation_value: 2.0e-6
+             autorange: 'on'
+             dwell: 15 # seconds
+             pause: 10 # seconds
+             calibration_curve_num: 23
+             temperature_coeff: 'negative'
+          2:
+             enable: 'off'
+             excitation_mode: 'voltage'
+             excitation_value: 2.0e-6
+             autorange: 'off'
+             dwell: 10 # seconds
+             pause: 3 # seconds
+             calibruation_curve_num: 28
+             temperature_coeff: 'negative'
+    LSA2761:
+        device_settings:
+          autoscan: 'on'
+        channel:
+          1:
+             enable: 'on'
+             excitation_mode: 'voltage'
+             excitation_value: 2.0e-6
+             autorange: 'on'
+             dwell: 15 # seconds
+             pause: 10 # seconds
+             calibration_curve_num: 33
+             temperature_coeff: 'negative'
+          2:
+             enable: 'off'
+             excitation_mode: 'voltage'
+             excitation_value: 2.0e-6
+             autorange: 'off'
+             dwell: 10 # seconds
+             pause: 3 # seconds
+             calibruation_curve_num: 36
+             temperature_coeff: 'negative'
+          3:
+             enable: 'on'
+             excitation_mode: 'voltage'
+             excitation_value: 2.0e-6
+             autorange: 'on'
+             dwell: 15 # seconds
+             pause: 10 # seconds
+             calibration_curve_num: 34
+             temperature_coeff: 'negative'
+          4:
+             enable: 'on'
+             excitation_mode: 'voltage'
+             excitation_value: 2.0e-6
+             autorange: 'off'
+             dwell: 10 # seconds
+             pause: 3 # seconds
+             calibruation_curve_num: 35
+             temperature_coeff: 'negative'
+
 
 Docker Compose
 ``````````````

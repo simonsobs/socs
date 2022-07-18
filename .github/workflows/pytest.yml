@@ -1,33 +1,42 @@
 name: Run Tests
 
 on:
-  push:
-    branches-ignore: [ develop ]
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '**.rst'
+      - '**.md'
+      - '.flake8'
+      - '.pre-commit-config.yaml'
+  workflow_call:
 
 jobs:
-  build:
-    runs-on: ubuntu-18.04
+  test:
+    name: pytest with coverage
+    runs-on: ubuntu-latest
 
     steps:
+    - name: Cancel Previous Runs
+      uses: styfle/cancel-workflow-action@0.10.0
+      with:
+        access_token: ${{ github.token }}
+
+    - name: Install system packages
+      run: |
+        sudo apt-get install -y socat
+
     - name: Set up Python 3.8
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
         python-version: 3.8
 
     # Install
-    - name: clone ocs
-      uses: actions/checkout@v2
-      with:
-        repository: 'simonsobs/ocs'
-
-    - name: Install ocs
+    - name: Install so3g
       run: |
-        pip3 install -r requirements.txt
-        pip3 install .
+        pip3 install so3g
 
     - name: clone socs
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
 
     - name: Install socs
       run: |
@@ -38,21 +47,13 @@ jobs:
     - name: Run unit tests
       working-directory: ./tests
       run: |
-        COVERAGE_FILE=.coverage.unit python3 -m pytest --cov -m 'not (integtest or spt3g)'
+        COVERAGE_FILE=.coverage.unit python3 -m pytest --cov -m 'not integtest'
 
     - name: Build docker test images
       run: |
         docker-compose build socs
 
-    - name: Test with spt3g dependent tests wtihin a docker container
-      run: |
-        docker run -v $PWD:/coverage --rm -w="/app/socs/tests/" socs sh -c "COVERAGE_FILE=/coverage/.coverage.docker python3 -m pytest --cov --order-dependencies -m 'spt3g'"
-
     # Integration Tests
-    - name: Build images for integration tests
-      run: |
-        docker-compose build ocs-lakeshore372-simulator
-
     - name: Run integration tests
       working-directory: ./tests
       run: |

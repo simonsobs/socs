@@ -15,6 +15,7 @@ txaio.use_twisted()
 ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 if not ON_RTD:
     from ocs import ocs_agent, site_config
+    import so3g  # noqa: F401
     from spt3g import core
 
 
@@ -43,6 +44,7 @@ class StreamChannel:
         Standard deviation of Gaussian to simulate data
 
     """
+
     def __init__(self, mean, stdev):
         self.mean = mean
         self.stdev = stdev
@@ -97,6 +99,7 @@ class SmurfStreamSimulator:
         List of simulated channels to stream
 
     """
+
     def __init__(self, agent, target_host="*", port=4536, num_chans=528,
                  stream_id='stream_sim'):
         self.agent = agent
@@ -338,8 +341,8 @@ def make_parser(parser=None):
     # Add options specific to this agent.
     pgroup = parser.add_argument_group("Agent Options")
     pgroup.add_argument("--auto-start", default=False, type=bool,
-                        help="Automatically start streaming at " +
-                        "Agent startup.")
+                        help="Automatically start streaming at "
+                        + "Agent startup.")
     pgroup.add_argument("--target-host", default="*",
                         help="Target remote host.")
     pgroup.add_argument("--port", default=50000,

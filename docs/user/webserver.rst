@@ -42,48 +42,48 @@ configuration file provided within the nginx docker image.
 
     user       nginx;  ## Default: nobody
     worker_processes  1;  ## Default: 1
-    
+
     error_log  /var/log/nginx/error.log;
     pid        /var/run/nginx.pid;
     worker_rlimit_nofile 8192;
-    
+
     events {
       worker_connections  1024;  ## Default: 1024
     }
-    
+
     http {
       include    /etc/nginx/mime.types;
       #include    /etc/nginx/proxy.conf;
       #include    /etc/nginx/fastcgi.conf;
       index    index.html index.htm index.php;
-    
+
       default_type application/octet-stream;
       log_format   main '$remote_addr - $remote_user [$time_local]  $status '
         '"$request" $body_bytes_sent "$http_referer" '
         '"$http_user_agent" "$http_x_forwarded_for"';
       access_log   /var/log/nginx/access.log  main;
-      sendfile     on; 
-      tcp_nopush   on; 
+      sendfile     on;
+      tcp_nopush   on;
       server_names_hash_bucket_size 128; # this seems to be required for some vhosts
-    
+
       server { # simple reverse-proxy
-        listen       80; 
-        server_name  {{ domain }}; 
+        listen       80;
+        server_name  {{ domain }};
         access_log   /var/log/nginx/{{ domain }}.log  main;
         root         /usr/share/nginx/html;
-    
+
         # serve static files
         # location ~ ^/(images|javascript|js|css|flash|media|static)/  {
         #   root    /var/www/virtual/big.server.com/htdocs;
         #   expires 30d;
-        # } 
-    
+        # }
+
         auth_basic "Restricted Content";
         auth_basic_user_file /etc/nginx/.htpasswd;
-    
+
         location /grafana/ {
           proxy_pass http://grafana:3000/;
-        }   
+        }
       }
     }
 

@@ -1,11 +1,9 @@
-FROM simonsobs/sodetlib:v0.3.0
+FROM simonsobs/sodetlib:v0.4.0
 
 WORKDIR /app
 
 # SOCS installation
-RUN git clone https://github.com/simonsobs/socs.git \
-    && pip3 install -r socs/requirements.txt \
-    && pip3 install -e socs
+RUN python3 -m pip install --src=/app/ -e git+https://github.com/simonsobs/socs.git@py36#egg=socs
 
 ENV OCS_CONFIG_DIR /config
 

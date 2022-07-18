@@ -13,6 +13,7 @@ if not on_rtd:
     from ocs import ocs_agent, site_config
     from ocs.ocs_twisted import TimeoutLock
 
+
 class LS240_Agent:
 
     def __init__(self, agent, port="/dev/ttyUSB0", f_sample=2.5):
@@ -67,7 +68,7 @@ class LS240_Agent:
 
             self.module = Module(port=self.port)
             print("Initialized Lakeshore module: {!s}".format(self.module))
-            session.add_message("Lakeshore initialized with ID: %s"%self.module.inst_sn)
+            session.add_message("Lakeshore initialized with ID: %s" % self.module.inst_sn)
 
         self.initialized = True
 
@@ -192,7 +193,7 @@ class LS240_Agent:
         if f_sample is None:
             f_sample = self.f_sample
 
-        sleep_time = 1/f_sample - 0.01
+        sleep_time = 1 / f_sample - 0.01
 
         with self.lock.acquire_timeout(0, job='acq') as acquired:
             if not acquired:
@@ -272,11 +273,12 @@ def main():
 
     parser = make_parser()
 
-    #Not used anymore, but we don't it to break the agent if these args are passed
+    # Not used anymore, but we don't it to break the agent if these args are passed
     parser.add_argument('--fake-data', help=argparse.SUPPRESS)
     parser.add_argument('--num-channels', help=argparse.SUPPRESS)
 
-    args = parser.parse_args()
+    # Interpret options in the context of site_config.
+    args = site_config.parse_args(agent_class='Lakeshore240Agent', parser=parser)
 
     if args.fake_data is not None:
         warnings.warn("WARNING: the --fake-data parameter is deprecated, please "
@@ -284,10 +286,7 @@ def main():
 
     if args.num_channels is not None:
         warnings.warn("WARNING: the --num-channels parameter is deprecated, please "
-            "remove from your site-config file", DeprecationWarning)
-
-    # Interpret options in the context of site_config.
-    args = site_config.parse_args(agent_class='Lakeshore240Agent', parser=parser)
+                      "remove from your site-config file", DeprecationWarning)
 
     # Automatically acquire data if requested (default)
     init_params = False
@@ -295,7 +294,6 @@ def main():
         init_params = {'auto_acquire': False}
     elif args.mode == 'acq':
         init_params = {'auto_acquire': True}
-
 
     device_port = None
     if args.port is not None:

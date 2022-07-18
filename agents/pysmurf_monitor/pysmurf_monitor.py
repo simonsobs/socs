@@ -1,24 +1,58 @@
 import json
-from twisted.internet.protocol import DatagramProtocol
-from twisted.internet import reactor
-import datetime
-
-import socs
-from socs.db import pysmurf_files_manager
-
-from twisted.python.failure import Failure
+import time
+import queue
 import os
 import argparse
 
-from twisted.enterprise import adbapi
+from twisted.internet.protocol import DatagramProtocol
+from twisted.internet import reactor
 
-from socs.util import get_md5sum
-from ocs.agent.aggregator import Provider
+from ocs import ocs_agent, site_config, ocs_feed
 
-on_rtd = os.environ.get('READTHEDOCS') == 'True'
-if not on_rtd:
-    import mysql.connector
-    from ocs import ocs_agent, site_config
+from socs.db.suprsync import SupRsyncFilesManager, create_file
+
+
+def create_remote_path(meta, archive_name):
+    """
+    Creates "remote path" for file.
+
+    For pysmurf ancilliary files (in the ``smurf`` archive), paths are
+    generated from the pysmurf action / action timestamp::
+
+        <archive_dir>/<5 ctime digits>/<pub_id>/<action_timestamp>_<action>/<plots or outputs>
+
+    For timestream files, the path will be the relative path of the file
+    from  whatever the g3_dir is.
+
+    Args
+    -----
+        meta (dict):
+            A dict containing file metadata that's sent from the pysmurf
+            publisher when a new file is registered. Contains info such as the
+            pysmurf action, file timestamp, path, publisher id, etc.
+        archive_name (str):
+            Name of the archive the file belongs to. 'smurf' if it is a pysmurf
+            ancilliary file, in which case the path will be generated based on
+            the pysmurf action / timestamp
+
+    """
+    if archive_name == 'smurf':
+        ts = meta['timestamp']
+        action_timestamp = meta['action_ts']
+        action = meta['action']
+        basename = os.path.basename(meta['path'])
+        dir_type = 'plots' if meta['plot'] else 'outputs'
+        pub_id = meta['pub_id']
+
+        return os.path.join(
+            f"{str(ts):.5}",                 # 5 ctime digits
+            pub_id,                          # Pysmurf publisher id
+            f"{action_timestamp}_{action}",  # grouptime_action
+            dir_type,                        # plots/outputs
+            basename,
+        )
+    elif archive_name == 'timestreams':
+        return str(os.path.join(*os.path.normpath(meta['path']).split(os.sep)[-3:]))
 
 
 class PysmurfMonitor(DatagramProtocol):
@@ -43,47 +77,26 @@ class PysmurfMonitor(DatagramProtocol):
             OCSAgent object
         log (txaio.tx.Logger):
             txaio logger object created by agent
-        base_file_info (dict):
-            shared file info added to all file entries registered by this agent
-        dbpool (twisted.enterprise.adbapi.ConnectionPool):
-            DB connection pool
+        file_queue (queue.Queue):
+            Queue containing metadata for registered files
+        db_path (str):
+            Path to the suprsync database where files should be entered
+        running (bool):
+            True if the main process is running.
+        echo_sql (bool):
+            If True, will echo all sql statements whenever writing to the
+            suprsync db.
     """
+
     def __init__(self, agent, args):
         self.agent: ocs_agent.OCSAgent = agent
         self.log = agent.log
+        self.file_queue = queue.Queue()
+        self.db_path = args.db_path
+        self.running = False
+        self.echo_sql = args.echo_sql
 
         self.agent.register_feed('pysmurf_session_data')
-
-        self.create_table = bool(args.create_table)
-
-        site, instance = self.agent.agent_address.split('.')
-        self.base_file_info = {
-            'site': site,
-            'instance_id': instance,
-            'copied': 0,
-            'failed_copy_attempts': 0,
-            'socs_version': socs.__version__
-        }
-
-        sql_config = {
-            'user': os.environ["MYSQL_USER"],
-            'passwd': os.environ["MYSQL_PASSWORD"],
-            'database': 'files'
-        }
-        db_host = os.environ.get('MYSQL_HOST')
-        if db_host is not None:
-            sql_config['host'] = db_host
-
-        self.dbpool = adbapi.ConnectionPool('mysql.connector', **sql_config, cp_reconnect=True)
-
-    def _add_file_callback(self, res, d):
-        """Callback for when a file is successfully added to DB"""
-        self.log.info("Added {} to {}".format(d['path'], pysmurf_files_manager.table))
-
-    def _add_file_errback(self, failure: Failure, d):
-        """Errback for when there is an exception when adding file to DB"""
-        self.log.error(f"ERROR!!! {d['path']} was not added to the database")
-        self.log.error(f"Failure:\n{failure}")
 
     def datagramReceived(self, _data, addr):
         """
@@ -91,43 +104,18 @@ class PysmurfMonitor(DatagramProtocol):
 
         Args:
             _data (str):
-                Raw data passed over UDP port. Pysmurf publisher will send a JSON
-                string
+                Raw data passed over UDP port. Pysmurf publisher will send a
+                JSON string
             addr (tuple):
                 (host, port) of the sender.
         """
         data = json.loads(_data)
         pub_id = data['id']
 
-        if data['type'] in ['data_file']:
+        if data['type'] in ['data_file', 'g3_file']:
             self.log.info("New file: {fname}", fname=data['payload']['path'])
-            d = data['payload']
-
-            site, instance = self.agent.agent_address.split('.')
-
-            path = d['path']
-            if (d['format'] == 'npy') and (not d['path'].endswith('.npy')):
-                path += '.npy'
-
-            entry = {
-                'path':                 path,
-                'action':               d['action'],
-                'timestamp':            datetime.datetime.utcfromtimestamp(d['timestamp']),
-                'action_timestamp':     d.get('action_ts'),
-                'format':               d['format'],
-                'plot':                 int(d['plot']),
-                'site':                 site,
-                'pub_id':               data['id'],
-                'instance_id':          instance,
-                'copied':               0,
-                'failed_copy_attempts': 0,
-                'md5sum':               get_md5sum(path),
-                'socs_version':         socs.__version__,
-            }
-
-            deferred = self.dbpool.runInteraction(pysmurf_files_manager.add_entry, entry)
-            deferred.addErrback(self._add_file_errback, d)
-            deferred.addCallback(self._add_file_callback, d)
+            data['payload']['pub_id'] = pub_id
+            self.file_queue.put(data['payload'])
 
         elif data['type'] == "session_data" or data['type'] == "session_log":
             self.agent.publish_to_feed(
@@ -150,9 +138,9 @@ class PysmurfMonitor(DatagramProtocol):
 
             path = data['payload']['path']
             val = data['payload']['value']
-            val_type = data['payload']['type']
+            data['payload']['type']
 
-            field_name = Provider._enforce_field_name_rules(path)
+            field_name = ocs_feed.Feed.enforce_field_name_rules(path)
             feed_name = f'{stream_id}_meta'
 
             if feed_name not in self.agent.feeds:
@@ -164,31 +152,63 @@ class PysmurfMonitor(DatagramProtocol):
 
             self.agent.publish_to_feed(feed_name, feed_data, from_reactor=True)
 
-    def init(self, session, params=None):
-        """init(create_table=True)
+    def run(self, session, params=None):
+        """run()
 
-        **Task** - Initizes agent by creating / updating the pysmurf_files
-        table if requested, and initializing the database connection pool.
-
-        Parameters:
-            create_table (bool):
-                If true will attempt to create/update pysmurf_files table.
-
+        **Process** - Main process for the pysmurf monitor agent. Processes
+        files that have been added to the queue, adding them to the suprsync
+        database.
         """
-        if params is None:
-            params = {}
+        srfm = SupRsyncFilesManager(self.db_path, create_all=True, echo=self.echo_sql)
 
-        if params.get('create_table', self.create_table):
-            con: mysql.connector.MySQLConnection = self.dbpool.connect()
-            cur = con.cursor()
+        self.running = True
+        session.set_status('running')
+        while self.running:
+            files = []
+            while not self.file_queue.empty():
+                meta = self.file_queue.get()
+                # Archive name defaults to pysmurf because that is currently
+                # the only archive. The smurf-streamer will set the
+                # archive_name to "timestreams"
+                archive_name = meta.get('archive_name', 'smurf')
+                try:
+                    if (meta.get('format') == 'npy') and (not meta['path'].endswith('.npy')):
+                        meta['path'] += '.npy'
+                    local_path = meta['path']
+                    remote_path = create_remote_path(meta, archive_name)
 
-            try:
-                pysmurf_files_manager.create_table(cur, update=True)
-                con.commit()
-            finally:
-                self.dbpool.disconnect(con)
+                    # Only delete files that are in timestamped directories
+                    # /data/smurf_data/<timestamp> and are not IV, channel
+                    # assignment, or tune files. We may want to add more to
+                    # this list of "semi-permanent files" later
+                    deletable = True
+                    if archive_name == 'smurf':
+                        if not local_path.split('/')[3].isdigit():
+                            deletable = False
+                        for key in ["iv", "channel_assignment", "tune"]:
+                            if key in local_path:
+                                deletable = False
 
-        return True, "Initialized agent"
+                    files.append(
+                        create_file(local_path, remote_path, archive_name,
+                                    deletable=deletable)
+                    )
+                except Exception as e:
+                    self.agent.log.error(
+                        "Could not generate SupRsync file object from "
+                        "metadata:\n{meta}\nRaised Exception: {e}",
+                        meta=meta, e=e
+                    )
+
+            if files:
+                with srfm.Session.begin() as session:
+                    session.add_all(files)
+
+            time.sleep(1)
+
+    def _stop(self, session, params=None):
+        self.running = False
+        session.set_status('stopping')
 
 
 def make_parser(parser=None):
@@ -201,7 +221,9 @@ def make_parser(parser=None):
     pgroup.add_argument('--create-table', type=bool,
                         help="Specifies whether agent should create or update "
                              "pysmurf_files table if non exists.", default=True)
-
+    pgroup.add_argument('--db-path', type=str, default='/data/so/databases/suprsync.db',
+                        help="Path to suprsync sqlite database")
+    pgroup.add_argument('--echo-sql', action='store_true')
     return parser
 
 
@@ -212,7 +234,7 @@ if __name__ == '__main__':
     agent, runner = ocs_agent.init_site_agent(args)
     monitor = PysmurfMonitor(agent, args)
 
-    agent.register_task('init', monitor.init, startup=True)
+    agent.register_process('run', monitor.run, monitor._stop, startup=True)
 
     reactor.listenUDP(args.udp_port, monitor)
 

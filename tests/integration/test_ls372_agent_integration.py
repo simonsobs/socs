@@ -1,17 +1,13 @@
 import os
-import time
 import pytest
-import signal
-import subprocess
-import coverage.data
-import urllib.request
-
-from urllib.error import URLError
-
-from ocs.matched_client import MatchedClient
 
 import ocs
 from ocs.base import OpCode
+from ocs.testing import create_agent_runner_fixture, create_client_fixture
+
+from integration.util import create_crossbar_fixture
+
+from socs.testing.device_emulator import create_device_emulator
 
 pytest_plugins = ("docker_compose")
 
@@ -19,66 +15,47 @@ pytest_plugins = ("docker_compose")
 os.environ['OCS_CONFIG_DIR'] = os.getcwd()
 
 
-# Fixture to wait for crossbar server to be available.
-# Speeds up tests a bit to have this session scoped
-# If tests start interfering with one another this should be changed to
-# "function" scoped and session_scoped_container_getter should be changed to
-# function_scoped_container_getter
-@pytest.fixture(scope="session")
-def wait_for_crossbar(session_scoped_container_getter):
-    """Wait for the crossbar server from docker-compose to become
-    responsive.
-
-    """
-    attempts = 0
-
-    while attempts < 6:
-        try:
-            code = urllib.request.urlopen("http://localhost:18001/info").getcode()
-        except (URLError, ConnectionResetError):
-            print("Crossbar server not online yet, waiting 5 seconds.")
-            time.sleep(5)
-
-        attempts += 1
-
-    assert code == 200
-    print("Crossbar server online.")
+run_agent = create_agent_runner_fixture(
+    '../agents/lakeshore372/LS372_agent.py',
+    'ls372')
+client = create_client_fixture('LSASIM')
+wait_for_crossbar = create_crossbar_fixture()
 
 
-@pytest.fixture()
-def run_agent(cov):
-    env = os.environ.copy()
-    env['COVERAGE_FILE'] = '.coverage.agent'
-    env['OCS_CONFIG_DIR'] = os.getcwd()
-    agentproc = subprocess.Popen(['coverage', 'run',
-                                  '--rcfile=./.coveragerc',
-                                  '../agents/lakeshore372/LS372_agent.py',
-                                  '--site-file',
-                                  './default.yaml'],
-                                 env=env,
-                                 stdout=subprocess.PIPE,
-                                 stderr=subprocess.PIPE,
-                                 preexec_fn=os.setsid)
+def build_init_responses():
+    values = {'*IDN?': 'LSCI,MODEL372,LSASIM,1.3',
+              'SCAN?': '01,1',
+              'INSET? A': '0,010,003,00,1',
+              'INNAME? A': 'Input A',
+              'INTYPE? A': '1,04,0,15,0,2',
+              'TLIMIT? A': '+0000',
+              'OUTMODE? 0': '2,6,1,0,0,001',
+              'HTRSET? 0': '+120.000,8,+0000.00,1',
+              'OUTMODE? 2': '4,16,1,0,0,001',
+              'HTRSET? 2': '+120.000,8,+0000.00,1'}
 
-    # wait for Agent to connect
-    time.sleep(1)
+    for i in range(1, 17):
+        values[f'INSET? {i}'] = '1,007,003,21,1'
+        values[f'INNAME? {i}'] = f'Channel {i:02}'
+        values[f'INTYPE? {i}'] = '0,07,1,10,0,1'
+        values[f'TLIMIT? {i}'] = '+0000'
 
-    yield
+    # Heaters
+    values.update({'RANGE? 0': '0',
+                   'RANGE? 2': '1',
+                   'STILL?': '+10.60',
+                   'HTR?': '+00.0005E+00'})
 
-    # shutdown Agent
-    agentproc.send_signal(signal.SIGINT)
-    time.sleep(1)
+    # Senor readings
+    values.update({'KRDG? 1': '+293.873E+00',
+                   'SRDG? 1': '+108.278E+00',
+                   'KRDG? A': '+00.0000E-03',
+                   'SRDG? A': '+000.000E+09'})
 
-    # report coverage
-    agentcov = coverage.data.CoverageData(basename='.coverage.agent')
-    agentcov.read()
-    cov.get_data().update(agentcov)
+    return values
 
 
-@pytest.fixture()
-def client():
-    client = MatchedClient('LSASIM')
-    return client
+emulator = create_device_emulator(build_init_responses(), relay_type='tcp', port=7777)
 
 
 @pytest.mark.integtest
@@ -88,7 +65,7 @@ def test_testing(wait_for_crossbar):
 
 
 @pytest.mark.integtest
-def test_ls372_init_lakeshore(wait_for_crossbar, run_agent, client):
+def test_ls372_init_lakeshore(wait_for_crossbar, emulator, run_agent, client):
     resp = client.init_lakeshore()
     # print(resp)
     assert resp.status == ocs.OK
@@ -97,7 +74,7 @@ def test_ls372_init_lakeshore(wait_for_crossbar, run_agent, client):
 
 
 @pytest.mark.integtest
-def test_ls372_enable_control_chan(wait_for_crossbar, run_agent, client):
+def test_ls372_enable_control_chan(wait_for_crossbar, emulator, run_agent, client):
     client.init_lakeshore()
     resp = client.enable_control_chan()
     assert resp.status == ocs.OK
@@ -105,7 +82,7 @@ def test_ls372_enable_control_chan(wait_for_crossbar, run_agent, client):
 
 
 @pytest.mark.integtest
-def test_ls372_disable_control_chan(wait_for_crossbar, run_agent, client):
+def test_ls372_disable_control_chan(wait_for_crossbar, emulator, run_agent, client):
     client.init_lakeshore()
     resp = client.disable_control_chan()
     assert resp.status == ocs.OK
@@ -113,25 +90,20 @@ def test_ls372_disable_control_chan(wait_for_crossbar, run_agent, client):
 
 
 @pytest.mark.integtest
-def test_ls372_start_acq(wait_for_crossbar, run_agent, client):
+def test_ls372_start_acq(wait_for_crossbar, emulator, run_agent, client):
     client.init_lakeshore()
     resp = client.acq.start(sample_heater=False, run_once=True)
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.STARTING.value
 
-    # We stopped the process with run_once=True, but that will leave us in the
-    # RUNNING state
+    client.acq.wait()
     resp = client.acq.status()
-    assert resp.session['op_code'] == OpCode.RUNNING.value
-
-    # Now we request a formal stop, which should put us in STOPPING
-    client.acq.stop()
-    resp = client.acq.status()
-    assert resp.session['op_code'] == OpCode.STOPPING.value
+    assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 
 @pytest.mark.integtest
-def test_ls372_set_heater_range(wait_for_crossbar, run_agent, client):
+def test_ls372_set_heater_range(wait_for_crossbar, emulator, run_agent, client):
     client.init_lakeshore()
     resp = client.set_heater_range(range=1e-3, heater='sample', wait=0)
     assert resp.status == ocs.OK
@@ -139,7 +111,7 @@ def test_ls372_set_heater_range(wait_for_crossbar, run_agent, client):
 
 
 @pytest.mark.integtest
-def test_ls372_set_excitation_mode(wait_for_crossbar, run_agent, client):
+def test_ls372_set_excitation_mode(wait_for_crossbar, emulator, run_agent, client):
     client.init_lakeshore()
     resp = client.set_excitation_mode(channel=1, mode='current')
     assert resp.status == ocs.OK
@@ -147,7 +119,7 @@ def test_ls372_set_excitation_mode(wait_for_crossbar, run_agent, client):
 
 
 @pytest.mark.integtest
-def test_ls372_set_excitation(wait_for_crossbar, run_agent, client):
+def test_ls372_set_excitation(wait_for_crossbar, emulator, run_agent, client):
     client.init_lakeshore()
     resp = client.set_excitation(channel=1, value=1e-9)
     assert resp.status == ocs.OK
@@ -155,17 +127,16 @@ def test_ls372_set_excitation(wait_for_crossbar, run_agent, client):
 
 
 @pytest.mark.integtest
-def test_ls372_get_excitation(wait_for_crossbar, run_agent, client):
+def test_ls372_get_excitation(wait_for_crossbar, emulator, run_agent, client):
     client.init_lakeshore()
-    client.set_excitation(channel=1, value=1e-9)
     resp = client.get_excitation(channel=1)
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
-    assert resp.session['data']['excitation'] == 1e-9
+    assert resp.session['data']['excitation'] == 2e-3
 
 
 @pytest.mark.integtest
-def test_ls372_set_resistance_range(wait_for_crossbar, run_agent, client):
+def test_ls372_set_resistance_range(wait_for_crossbar, emulator, run_agent, client):
     client.init_lakeshore()
     resp = client.set_resistance_range(channel=1, resistance_range=2)
     assert resp.status == ocs.OK
@@ -173,17 +144,17 @@ def test_ls372_set_resistance_range(wait_for_crossbar, run_agent, client):
 
 
 @pytest.mark.integtest
-def test_ls372_get_resistance_range(wait_for_crossbar, run_agent, client):
+def test_ls372_get_resistance_range(wait_for_crossbar, emulator, run_agent, client):
     client.init_lakeshore()
     client.set_resistance_range(channel=1, resistance_range=2)
     resp = client.get_resistance_range(channel=1)
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
-    assert resp.session['data']['resistance_range'] == 2
+    assert resp.session['data']['resistance_range'] == 63.2
 
 
 @pytest.mark.integtest
-def test_ls372_set_dwell(wait_for_crossbar, run_agent, client):
+def test_ls372_set_dwell(wait_for_crossbar, emulator, run_agent, client):
     client.init_lakeshore()
     resp = client.set_dwell(channel=1, dwell=3)
     assert resp.status == ocs.OK
@@ -191,17 +162,16 @@ def test_ls372_set_dwell(wait_for_crossbar, run_agent, client):
 
 
 @pytest.mark.integtest
-def test_ls372_get_dwell(wait_for_crossbar, run_agent, client):
+def test_ls372_get_dwell(wait_for_crossbar, emulator, run_agent, client):
     client.init_lakeshore()
-    client.set_dwell(channel=1, dwell=3)
     resp = client.get_dwell(channel=1)
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
-    assert resp.session['data']['dwell_time'] == 3
+    assert resp.session['data']['dwell_time'] == 7
 
 
 @pytest.mark.integtest
-def test_ls372_set_pid(wait_for_crossbar, run_agent, client):
+def test_ls372_set_pid(wait_for_crossbar, emulator, run_agent, client):
     client.init_lakeshore()
     resp = client.set_pid(P=40, I=2, D=0)
     assert resp.status == ocs.OK
@@ -209,7 +179,7 @@ def test_ls372_set_pid(wait_for_crossbar, run_agent, client):
 
 
 @pytest.mark.integtest
-def test_ls372_set_active_channel(wait_for_crossbar, run_agent, client):
+def test_ls372_set_active_channel(wait_for_crossbar, emulator, run_agent, client):
     client.init_lakeshore()
     resp = client.set_active_channel(channel=1)
     assert resp.status == ocs.OK
@@ -217,7 +187,7 @@ def test_ls372_set_active_channel(wait_for_crossbar, run_agent, client):
 
 
 @pytest.mark.integtest
-def test_ls372_set_autoscan(wait_for_crossbar, run_agent, client):
+def test_ls372_set_autoscan(wait_for_crossbar, emulator, run_agent, client):
     client.init_lakeshore()
     resp = client.set_autoscan(autoscan=True)
     assert resp.status == ocs.OK
@@ -225,7 +195,7 @@ def test_ls372_set_autoscan(wait_for_crossbar, run_agent, client):
 
 
 @pytest.mark.integtest
-def test_ls372_set_output_mode(wait_for_crossbar, run_agent, client):
+def test_ls372_set_output_mode(wait_for_crossbar, emulator, run_agent, client):
     client.init_lakeshore()
     resp = client.set_output_mode(heater='still', mode='Off')
     assert resp.status == ocs.OK
@@ -233,7 +203,7 @@ def test_ls372_set_output_mode(wait_for_crossbar, run_agent, client):
 
 
 @pytest.mark.integtest
-def test_ls372_set_heater_output(wait_for_crossbar, run_agent, client):
+def test_ls372_set_heater_output(wait_for_crossbar, emulator, run_agent, client):
     client.init_lakeshore()
     resp = client.set_heater_output(heater='still', output=50)
     assert resp.status == ocs.OK
@@ -241,7 +211,7 @@ def test_ls372_set_heater_output(wait_for_crossbar, run_agent, client):
 
 
 @pytest.mark.integtest
-def test_ls372_set_still_output(wait_for_crossbar, run_agent, client):
+def test_ls372_set_still_output(wait_for_crossbar, emulator, run_agent, client):
     client.init_lakeshore()
     resp = client.set_still_output(output=50)
     assert resp.status == ocs.OK
@@ -249,7 +219,7 @@ def test_ls372_set_still_output(wait_for_crossbar, run_agent, client):
 
 
 @pytest.mark.integtest
-def test_ls372_get_still_output(wait_for_crossbar, run_agent, client):
+def test_ls372_get_still_output(wait_for_crossbar, emulator, run_agent, client):
     client.init_lakeshore()
     resp = client.get_still_output()
     assert resp.status == ocs.OK

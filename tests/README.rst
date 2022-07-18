@@ -19,7 +19,7 @@ to limit which tests run. Here are some examples.
 
 Run only one test file::
 
-    $ python3 -m pytest --cov agents/test_ls372_agent.py
+    $ python3 -m pytest --cov socs agents/test_ls372_agent.py
 
 Run tests based on test name(s)::
 

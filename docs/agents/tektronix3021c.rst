@@ -24,8 +24,8 @@ Agent in a docker container.
 
 ocs-config
 ``````````
-To configure the Tektronix AWG Agent we need to add a block to our ocs 
-configuration file. Here is an example configuration block using all of 
+To configure the Tektronix AWG Agent we need to add a block to our ocs
+configuration file. Here is an example configuration block using all of
 the available arguments::
 
       {'agent-class': 'TektronixAWGAgent',
@@ -35,7 +35,7 @@ the available arguments::
           ['--gpib-slot', '1']
           ]},
 
-Most function generators (including the Tektronix 3021c) 
+Most function generators (including the Tektronix 3021c)
 have GPIB ports rather than ethernet ports. Therefore a GPIB-to-ethernet
 converter is required, and the gpib slot must be specified in the ocs
 configuration file. The IP address is then associated with the converter.
@@ -60,20 +60,20 @@ Note that all tasks can be run even while the data acquisition process
 is running.::
 
     from ocs.matched_client import MatchedClient
-    
+
     #Initialize the power supply
     tek = MatchedClient('tektronix', args=[])
     tek.init.start()
     tek.init.wait()
-    
+
     #Set AWG frequency
     psuK.set_frequency.start(frequency=200)
     psuK.set_frequency.wait()
-    
+
     #Set AWG peak to peak voltage
     psuK.set_amplitude.start(amplitude=5)
     psuK.set_amplitude.wait()
-    
+
     #Set AWG on/off
     psuK.set_output.start(state=True)
     psuK.set_output.wait()
