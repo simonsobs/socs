@@ -13,6 +13,10 @@ if not ON_RTD:
     import socs.agent.class_ps3000a as ps 
 
 class PicoAgent:
+    """Agent for interfacing with a Picoscope 3403D MSO device.
+    Args:
+        agent (ocs.ocs_agent.OCSAgent): Instantiated OCSAgent class for this Agent
+    """
     def __init__(self, agent):
 
         self.agent: ocs_agent.OCSAgent = agent

@@ -14,6 +14,19 @@ This agent biases the LC sensors and measures the 4 channels of analog input and
     :func: make_parser
     :prog: python3 pico_agent.py
 
+Dependencies
+---------------------------
+The Picoscope 3403 MSO requires some drivers to be compiled for your machine.
+To install the drivers wget the picotech library and clone the picosdk-python-wrappers repository and build the drivers::
+
+    $ wget https://labs.picotech.com/debian/pool/main/libp/libpicoipp/libpicoipp_1.3.0-4r21_amd64.deb &&\
+    $ wget https://labs.picotech.com/debian/pool/main/libp/libps3000a/libps3000a_2.1.0-6r570_amd64.deb &&\
+    $ dpkg -i *deb
+    $ git clone https://github.com/picotech/picosdk-python-wrappers.git
+    $ cd picosdk-python-wrappers
+    $ git switch -c 89003868b5bc52511ee57419f0afbfade25f1882
+    $ python3 setup.py install
+
 Configuration File Examples
 ---------------------------
 Below are useful configurations examples for the relevant OCS files and for 

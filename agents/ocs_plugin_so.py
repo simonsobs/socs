@@ -21,5 +21,6 @@ for n, f in [
         ('ACUAgent', 'acu/acu_agent.py'),
         ('FTSAerotechAgent', 'fts_aerotech_stage/fts_aerotech_agent.py'),
         ('VantagePro2Agent', 'vantagePro2_agent/vantage_pro2_agent.py')
+        ('HWPPicoscopeAgent', 'hwp_picoscope/pico_agent.py')
 ]:
     ocs.site_config.register_agent_class(n, os.path.join(root, f))
