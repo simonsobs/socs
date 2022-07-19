@@ -53,15 +53,7 @@ def test_synacc_start(wait_for_crossbar, app, ctx, run_agent, client):
         return "Bye world"
 
     with ctx:
-        r = requests.get(
-            "http://"
-            + "admin"
-            + ":"
-            + "admin"
-            + "@"
-            + "127.0.0.1:5000"
-            + "/cmd.cgi?$A5"
-        )
+        r = requests.get("http://admin:admin@127.0.0.1:5000/cmd.cgi?$A5")
         assert r.status_code == 200
         assert r.text == "Bye world"
 

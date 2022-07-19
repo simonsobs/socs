@@ -21,6 +21,7 @@ class SynaccessAgent:
             password(str): password credential to login to strip
         """
         self.agent = agent
+        self.log = agent.log
         self.lock = TimeoutLock()
         self.ip_address = ip_address
         self.user = username
