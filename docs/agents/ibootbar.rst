@@ -116,3 +116,10 @@ Below is an example client to control outlets::
 
     # Reboot system
     client.reboot()
+
+Supporting APIs
+---------------
+
+.. autoclass:: agents.ibootbar.ibootbar.update_cache
+    :members:
+    :noindex:
