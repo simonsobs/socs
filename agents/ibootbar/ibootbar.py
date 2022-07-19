@@ -107,17 +107,16 @@ def update_cache(get_result, names, timestamp):
     session.data
 
     The cache consists of a dictionary, with the unique OIDs as keys, and
-    another dictionary as the value. Each of these nested dictionaries contains the
-    OID values, name, and description (decoded string). An example for a single OID::
-        {"outletStatus_0":
-            {"status": 1,
-                "name": Outlet-1,
-                "description": "on"}}
-    Additionally there is connection status and timestamp information under::
-        {"ibootbar_connection":
-            {"last_attempt": 1598543359.6326838,
-            "connected": True}
-        {"timestamp": 1656085022.680916}
+    another dictionary as the value. Each of these nested dictionaries contains
+    the OID values, name, and description (decoded string). An example for a
+    single OID, with connection status and timestamp information::
+
+        {"outletStatus_0": {"status": 1,
+                            "name": Outlet-1,
+                            "description": "on"},
+         "ibootbar_connection": {"last_attempt": 1598543359.6326838,
+                                 "connected": True},
+         "timestamp": 1656085022.680916}
 
     Parameters
     ----------
@@ -203,20 +202,22 @@ class ibootbarAgent:
 
         **Process** - Fetch values from the ibootbar via SNMP.
 
-        Notes:
-            The most recent data collected is stored in session.data in the
-            structure::
-                >>> response.session['data']
-                {"fields":
-                    {ibootbar:
-                        {outletStatus_0: {"status": 1, "name": Outlet-1, "description": "on"},
-                         outletStatus_1: {"status": 0, "name": Outlet-2, "description": "off"},
-                         ...
-                         ibootbar_connection: {'last_attempt': 1656085022.680916, 'connected': True},
-                         timestamp: {1656085022.680916}
-                        }
+        Notes
+        -----
+        The most recent data collected is stored in session.data in the
+        structure::
+
+            >>> response.session['data']
+            {"fields":
+                {ibootbar:
+                    {outletStatus_0: {"status": 1, "name": Outlet-1, "description": "on"},
+                     outletStatus_1: {"status": 0, "name": Outlet-2, "description": "off"},
+                     ...
+                     ibootbar_connection: {'last_attempt': 1656085022.680916, 'connected': True},
+                     timestamp: {1656085022.680916}
                     }
                 }
+            }
         """
         if params is None:
             params = {}
@@ -276,8 +277,9 @@ class ibootbarAgent:
     @ocs_agent.param('state', choices=['on', 'off'])
     @inlineCallbacks
     def set_outlet(self, session, params=None):
-        """
-        **Task** - Sets a particular outlet to on/off
+        """set_outlet(outlet, state)
+
+        **Task** - Set a particular outlet to on/off.
 
         Parameters
         ----------
@@ -310,8 +312,9 @@ class ibootbarAgent:
     @ocs_agent.param('cycle_time', default=10, type=int)
     @inlineCallbacks
     def cycle_outlet(self, session, params=None):
-        """
-        **Task** - Cycles a particular outlet for given amount of seconds
+        """cycle_outlet(outlet, cycle_time=10)
+
+        **Task** - Cycle a particular outlet for given amount of seconds.
 
         Parameters
         ----------
@@ -346,9 +349,12 @@ class ibootbarAgent:
     @ocs_agent.param('_')
     @inlineCallbacks
     def reboot(self, session, params=None):
-        """
-        **Task** - Reboots the entire system. The outlets are then set to their
-                   respective initial states. This tasks takes about 30 seconds.
+        """reboot()
+
+        **Task** - Reboot the entire system.
+
+        The outlets are then set to their respective initial states. This tasks
+        takes about 30 seconds.
         """
         with self.lock.acquire_timeout(3, job='reboot') as acquired:
             if not acquired:
