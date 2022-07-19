@@ -202,7 +202,7 @@ def make_parser(parser=None):
 
 if __name__ == '__main__':
     parser = make_parser()
-    args = site_config.parse_args(agent_class='SynAccAgent', parser=parser)
+    args = site_config.parse_args(agent_class='SynaccessAgent', parser=parser)
 
     agent, runner = ocs_agent.init_site_agent(args)
 
