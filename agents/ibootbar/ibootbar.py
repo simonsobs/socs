@@ -196,6 +196,7 @@ class ibootbarAgent:
                                  agg_params=agg_params,
                                  buffer_time=0)
 
+    @ocs_agent.param('_')
     @inlineCallbacks
     def acq(self, session, params=None):
         """acq()
@@ -219,9 +220,6 @@ class ibootbarAgent:
                 }
             }
         """
-        if params is None:
-            params = {}
-
         # Set initial default outlet names
         names = ['Outlet-1', 'Outlet-2', 'Outlet-3', 'Outlet-4',
                  'Outlet-5', 'Outlet-6', 'Outlet-7', 'Outlet-8']
