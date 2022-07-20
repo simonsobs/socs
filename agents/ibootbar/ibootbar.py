@@ -249,8 +249,10 @@ class ibootbarAgent:
             get_result = yield self.snmp.get(get_list, self.version)
             name_result = yield self.snmp.get(name_list, self.version)
 
-            for item in name_result:
-                names.append(item[1].prettyPrint())
+            # If device gets disconnected, name_result is None
+            if name_result is not None:
+                for item in name_result:
+                    names.append(item[1].prettyPrint())
 
             # Do not publish if ibootbar connection has dropped
             try:
@@ -266,11 +268,8 @@ class ibootbarAgent:
                 session.app.publish_to_feed('ibootbar', message)
             except ConnectionError as e:
                 self.log.error(f'{e}')
-
-            # Update session.data
-            # session.data = update_cache(get_result, names, read_time)
-            # self.log.debug("{data}", data=session.data)
-            # self.lastGet = time.time()
+                yield dsleep(1)
+                self.log.info('Trying to reconnect.')
 
         return True, "Finished Recording"
 
