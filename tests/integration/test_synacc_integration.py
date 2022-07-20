@@ -43,7 +43,7 @@ def check_resp_state(resp, opcode=OpCode.SUCCEEDED.value):
 
 
 @pytest.mark.integtest
-def test_synacc_start(wait_for_crossbar, app, ctx, run_agent, client):
+def test_synacc_startup(wait_for_crossbar, app, ctx, run_agent, client):
     @app.route("/cmd.cgi", methods=["GET"])
     def status():
         query = request.query_string.decode()
@@ -56,3 +56,17 @@ def test_synacc_start(wait_for_crossbar, app, ctx, run_agent, client):
         check_resp_state(resp)
         resp = client.status_acq.status()
         check_resp_state(resp, OpCode.RUNNING.value)
+
+
+@pytest.mark.integtest
+def test_synacc_reboot(wait_for_crossbar, app, ctx, run_agent, client):
+    @app.route("/cmd.cgi", methods=["GET"])
+    def reboot():
+        query = request.query_string.decode()
+        print("query:", query)
+        assert query == "$A4%203"
+        return ""
+
+    with ctx:
+        resp = client.reboot(outlet=3)
+        check_resp_state(resp)
