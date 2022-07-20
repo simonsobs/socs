@@ -1,7 +1,5 @@
-import time
 import pytest
 from http_server_mock import HttpServerMock
-import requests
 from flask import request
 
 import ocs
