@@ -209,17 +209,17 @@ class ibootbarAgent:
         structure::
 
             >>> response.session['data']
-            {'outletStatus_0': 
-                {'status': 1, 
-                 'name': 'Outlet-1', 
+            {'outletStatus_0':
+                {'status': 1,
+                 'name': 'Outlet-1',
                  'description': 'on'},
-             'outletStatus_1': 
-                {'status': 0, 
-                 'name': 'Outlet-2', 
+             'outletStatus_1':
+                {'status': 0,
+                 'name': 'Outlet-2',
                  'description': 'off'},
              ...
-             'ibootbar_connection': 
-                {'last_attempt': 1656085022.680916, 
+             'ibootbar_connection':
+                {'last_attempt': 1656085022.680916,
                  'connected': True},
              'timestamp': 1656085022.680916}
         """
@@ -361,7 +361,7 @@ class ibootbarAgent:
 
         **Task** - Set outlets to their initial states.
 
-        Performs a software reboot. The outlets are then set to their 
+        Performs a software reboot. The outlets are then set to their
         respective initial states. This takes about 30 seconds.
         """
         with self.lock.acquire_timeout(3, job='reboot') as acquired:
