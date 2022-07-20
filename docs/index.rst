@@ -43,6 +43,7 @@ API Reference        Full API documentation for core parts of the SOCS library.
     agents/cryomech_cpa
     agents/fts_agent
     agents/hwp_rotation_agent
+    agents/ibootbar
     agents/labjack
     agents/lakeshore240
     agents/lakeshore336
