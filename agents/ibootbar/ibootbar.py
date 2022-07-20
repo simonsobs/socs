@@ -209,16 +209,19 @@ class ibootbarAgent:
         structure::
 
             >>> response.session['data']
-            {"fields":
-                {ibootbar:
-                    {outletStatus_0: {"status": 1, "name": Outlet-1, "description": "on"},
-                     outletStatus_1: {"status": 0, "name": Outlet-2, "description": "off"},
-                     ...
-                     ibootbar_connection: {'last_attempt': 1656085022.680916, 'connected': True},
-                     timestamp: {1656085022.680916}
-                    }
-                }
-            }
+            {'outletStatus_0': 
+                {'status': 1, 
+                 'name': 'Outlet-1', 
+                 'description': 'on'},
+             'outletStatus_1': 
+                {'status': 0, 
+                 'name': 'Outlet-2', 
+                 'description': 'off'},
+             ...
+             'ibootbar_connection': 
+                {'last_attempt': 1656085022.680916, 
+                 'connected': True},
+             'timestamp': 1656085022.680916}
         """
         # Set initial default outlet names
         names = ['Outlet-1', 'Outlet-2', 'Outlet-3', 'Outlet-4',
@@ -251,6 +254,13 @@ class ibootbarAgent:
 
             # Do not publish if ibootbar connection has dropped
             try:
+                # Update session.data
+                oid_cache = update_cache(get_result, names, read_time)
+                session.data = oid_cache
+                self.log.debug("{data}", data=session.data)
+                self.lastGet = time.time()
+
+                # Publish to feed
                 message = _build_message(get_result, names, read_time)
                 self.log.debug("{msg}", msg=message)
                 session.app.publish_to_feed('ibootbar', message)
@@ -258,9 +268,9 @@ class ibootbarAgent:
                 self.log.error(f'{e}')
 
             # Update session.data
-            session.data = update_cache(get_result, names, read_time)
-            self.log.debug("{data}", data=session.data)
-            self.lastGet = time.time()
+            # session.data = update_cache(get_result, names, read_time)
+            # self.log.debug("{data}", data=session.data)
+            # self.lastGet = time.time()
 
         return True, "Finished Recording"
 
@@ -346,13 +356,13 @@ class ibootbarAgent:
 
     @ocs_agent.param('_')
     @inlineCallbacks
-    def reboot(self, session, params=None):
-        """reboot()
+    def set_initial_state(self, session, params=None):
+        """set_initial_state()
 
-        **Task** - Reboot the entire system.
+        **Task** - Set outlets to their initial states.
 
-        The outlets are then set to their respective initial states. This tasks
-        takes about 30 seconds.
+        Performs a software reboot. The outlets are then set to their 
+        respective initial states. This takes about 30 seconds.
         """
         with self.lock.acquire_timeout(3, job='reboot') as acquired:
             if not acquired:
@@ -365,7 +375,7 @@ class ibootbarAgent:
         # Force SNMP GET status commands
         self.lastGet = self.lastGet - 60
 
-        return True, 'Rebooting system. Outlets will be set to their initial states.'
+        return True, 'Rebooting. Outlets will be set to their initial states.'
 
 
 def add_agent_args(parser=None):
@@ -410,6 +420,6 @@ if __name__ == "__main__":
 
     agent.register_task("set_outlet", p.set_outlet, blocking=False)
     agent.register_task("cycle_outlet", p.cycle_outlet, blocking=False)
-    agent.register_task("reboot", p.reboot, blocking=False)
+    agent.register_task("set_initial_state", p.set_initial_state, blocking=False)
 
     runner.run(agent, auto_reconnect=True)
