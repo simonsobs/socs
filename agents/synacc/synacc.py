@@ -35,7 +35,7 @@ class SynaccessAgent:
         req = "http://" + self.user + ":" + self.passw + "@" +\
             self.ip_address + "/cmd.cgi?$A5"
         r = requests.get(req)
-        resp = str(r.content)[6:11][::-1]
+        resp = r.content.decode()[:-6:-1] # get last 5 elements, in reverse
         return resp
 
     def get_status(self, session, params=None):

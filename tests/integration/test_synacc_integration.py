@@ -1,3 +1,4 @@
+import time
 import pytest
 from http_server_mock import HttpServerMock
 import requests
@@ -49,13 +50,18 @@ def test_synacc_start(wait_for_crossbar, app, ctx, run_agent, client):
 
     @app.route("/cmd.cgi", methods=["GET"])
     def status():
-        print("query string:", request.query_string)
-        return "Bye world"
+        query = request.query_string.decode()
+        print("query:", query)
+        if query == "$A5":
+            return "$A0,00101"
+        else:
+            return "Bye world"
 
     with ctx:
-        r = requests.get("http://admin:admin@127.0.0.1:5000/cmd.cgi?$A5")
+        r = requests.get("http://admin:admin@127.0.0.1:5000/cmd.cgi?$xx")
         assert r.status_code == 200
         assert r.text == "Bye world"
 
-        # resp = client.get_status()
-        # check_resp_success(resp)
+        time.sleep(2)
+        resp = client.get_status.status()
+        check_resp_success(resp)
