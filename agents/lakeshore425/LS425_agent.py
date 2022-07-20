@@ -123,7 +123,14 @@ class LS425Agent:
 
             session.data = {"fields": {}}
 
+            last_release = time.time()
             while self.take_data:
+                if time.time() - last_release > 1.:
+                    last_release = time.time()
+                    if not self.lock.release_and_acquire(timeout=10):
+                        self.log.warn(f"Failed to re-acquire lock, currently held by {self.lock.job}.")
+                        continue
+
                 Bfield = self.dev.get_field()
                 current_time = time.time()
                 data = {
@@ -157,7 +164,7 @@ class LS425Agent:
         **Task** - Check operational status.
 
         """
-        with self.lock.acquire_timeout(0, job='operational_status') as acquired:
+        with self.lock.acquire_timeout(3, job='operational_status') as acquired:
             if not acquired:
                 self.log.warn('Could not start operational_status because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
@@ -172,7 +179,7 @@ class LS425Agent:
         **Task** - Calibrate the zero point.
 
         """
-        with self.lock.acquire_timeout(0, job='zero_calibration') as acquired:
+        with self.lock.acquire_timeout(3, job='zero_calibration') as acquired:
             if not acquired:
                 self.log.warn('Could not start zero_calibration because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
@@ -201,7 +208,7 @@ class LS425Agent:
 
         """
         command = params['command']
-        with self.lock.acquire_timeout(0, job='any_command') as acquired:
+        with self.lock.acquire_timeout(3, job='any_command') as acquired:
             if not acquired:
                 self.log.warn('Could not any_command because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'

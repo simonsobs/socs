@@ -253,7 +253,6 @@ class SupRsyncFilesManager:
         now = time.time()
         for f in query.all():
             if f.local_md5sum == f.remote_md5sum:
-                print(f.local_path, f.timestamp)
                 if now > f.timestamp + delete_after:
                     files.append(f)
 

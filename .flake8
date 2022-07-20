@@ -17,6 +17,3 @@ exclude =
     agents/ibootbar/mibs/IBOOTPDU-MIB.py,
     versioneer.py,
     docs/conf.py,
-    # ignore while postfat_updates under review
-    agents/acu/acu_agent.py,
-    agents/acu/scan_helpers.py
