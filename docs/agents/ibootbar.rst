@@ -74,8 +74,8 @@ status from several Object Identifiers (OIDs) specified by the provided
 Management Information Base (MIB). We sample only a subset of the OIDs defined
 by the MIB. The MIB has been converted from the original .mib format to a .py
 format that is consumable via pysnmp and is provided by socs. The iBootbar
-Agent also contains three tasks: set_outlet, cycle_outlet, and reboot. These
-tasks issues SNMP SET commands to change the value of OIDs, resulting in
+Agent also contains three tasks: set_outlet, cycle_outlet, and set_initial_state.
+These tasks issues SNMP SET commands to change the value of OIDs, resulting in
 changing the state of outlets.
 
 Agent Fields
@@ -114,8 +114,8 @@ Below is an example client to control outlets::
     # Cycle outlet for 10 seconds
     client.cycle_outlet(outlet=1, cycle_time=10)
 
-    # Reboot system
-    client.reboot()
+    # Set outlets to their initial states
+    client.set_initial_state()
 
 Supporting APIs
 ---------------
