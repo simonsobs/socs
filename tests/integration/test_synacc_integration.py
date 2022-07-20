@@ -79,8 +79,22 @@ def test_synacc_set_outlet(wait_for_crossbar, app, ctx, run_agent, client):
         query = request.query_string.decode()
         print("query:", query)
         assert query == "$A3%204%201"
-        return "$A0,00101"
+        return ""
 
     with ctx:
         resp = client.set_outlet(outlet=4, on=True)
+        check_resp_state(resp)
+
+
+@pytest.mark.integtest
+def test_synacc_set_all(wait_for_crossbar, app, ctx, run_agent, client):
+    @app.route("/cmd.cgi", methods=["GET"])
+    def status():
+        query = request.query_string.decode()
+        print("query:", query)
+        assert query == "$A7%201"
+        return ""
+
+    with ctx:
+        resp = client.set_all(on=True)
         check_resp_state(resp)
