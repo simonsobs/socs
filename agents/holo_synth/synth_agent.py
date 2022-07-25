@@ -48,14 +48,19 @@ class SynthAgent:
     def init_synth(self, session, params=None):
         """init_synth(params=None)
 
-        **Process** - A process to initialize the synthesizers.
+        **Task** - A task to initialize the synthesizers.
 
-        Parameters: holog_config.yaml
+        Parameters: None
 
         Examples:
             Example for calling in a client::
+                import ocs
+                from ocs.ocs_client import OCSClient
+                agent = OCSClient("synth_LO")
+                agent.init_synth()
 
-                client.init_synth()
+        Notes: 
+            This task is called to turn on the synthesizers.
         """
 
         self.log.debug("Trying to acquire lock")
@@ -90,18 +95,27 @@ class SynthAgent:
         return True, "Synth Initialized."
 
     def set_frequencies(self, session, params):
-        """
-        params:
+        """set_frequencies(freq0=0, freq1=0)
+
+        **Task** - A task to set the frequencies of the synthesizers.
+
+        Parameters:
             dict: {'freq0': float
                    'freq1': float}
-        """
+        Examples:
+            Example for calling in a client::
+                import ocs
+                from ocs.ocs_client import OCSClient
+                agent = OCSClient("synth_LO")
+                agent.set_frequencies(freq0=int(freqs[0]), freq1=int(freqs[0] + F_OFFSET))
 
+        Notes:
+            The input frequencies are in GHz and are then converted to MHz as the input to the synthesizers.
+        """
         f1 = params.get("freq1", 0)
         f_offset = params.get("offset", 0)
 
         F_1 = int(f1 * self.ghz_to_mhz / self.N_MULT)  # Convert GHz -> MHz for synthesizers
-        print(self.N_MULT)
-        print(F_1, F_1 + f_offset)
 
         with self.lock.acquire_timeout(timeout=3, job="set_frqeuencies") as acquired:
             if not acquired:
@@ -124,24 +138,35 @@ class SynthAgent:
         return True, "Frequencies Updated"
 
     # This function is not finished, need to figure out how to read out frequency from USB connection.
-    def read_frequencies(self, session, params=None):
+    # def read_frequencies(self, session, params=None):
 
-        with self.lock.acquire_timeout(timeout=3, job="read_frqeuencies") as acquired:
-            if not acquired:
-                self.log.warn(
-                    f"Could not set position because lock held by {self.lock.job}"
-                )
-                return False, "Could not acquire lock"
+    #     with self.lock.acquire_timeout(timeout=3, job="read_frqeuencies") as acquired:
+    #         if not acquired:
+    #             self.log.warn(
+    #                 f"Could not set position because lock held by {self.lock.job}"
+    #             )
+    #             return False, "Could not acquire lock"
 
-        return True, "Frequencies Updated"
+    #     return True, "Frequencies Updated"
 
     def set_synth_status(self, session, params):
-        """
-        params:
+        """set_synth_status(arg1=None, arg2=7)
+
+        **Task** - A task to set the status of the synthesizers.
+
+        Parameters:
             dict: {'lo_id_n': int
                    'status': int}
-        """
+        Examples:
+            Example for calling in a client::
 
+                import ocs
+                from ocs.ocs_client import OCSClient
+                agent = OCSClient("synth_LO")
+                agent.set_synth_status(lo_id_n=0, status=1)
+        Notes:
+            Set the status of the synthesizers either on (1) or off (0).
+        """
         lo_id_n = params.get("lo_id", 0)
         switch = params.get("switch", 0)
 

@@ -78,7 +78,30 @@ class FPGAAgent:
             print("ok\n")
 
     def take_data(self, session, params=None):
+        """take_data(params=None)
 
+        **Task** - A task to take data from the FPGA.
+
+        Parameters: None
+
+        Examples:
+            Example for calling in a client::
+
+                import ocs
+                from ocs.ocs_client import OCSClient
+                agent_fpga = OCSClient("fpga") # create agent
+                agent_fpga.take_data() # take data
+
+
+        Notes:
+            An example of the session data::
+
+                >>> response.session['data']
+                {"fields":
+                    {"timestamp": 1601924482.722671, "block_name": "fpga", "data":{"amp_AA": 293.644, "amp_BB": 33.752, "amp_AB": 33.752, "arr_P": 33.752}
+                    }
+                }
+        """
         with self.lock.acquire_timeout(timeout=3, job="take_data") as acquired:
             if not acquired:
                 self.log.warn(
