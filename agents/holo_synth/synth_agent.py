@@ -10,6 +10,7 @@ if not ON_RTD:
     from ocs import ocs_agent, site_config
     from ocs.ocs_twisted import TimeoutLock
 
+
 class SynthAgent:
     """
     Agent for connecting to the Synths for holography.
