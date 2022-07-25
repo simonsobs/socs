@@ -702,9 +702,9 @@ class Motor:
         """
         print(f"port: {self.port}")
         try:
-            self.sock.connect(self.port) 
+            self.sock.connect(self.port)
             print("Connection has been reestablished.")
             self.sock_status = 1
         except ConnectionError:
-            print("Connection could not be reestablished.") 
+            print("Connection could not be reestablished.")
             self.sock_status = 0
