@@ -45,6 +45,7 @@ class appMotionMotorsAgent:
 
         self.job = None
         # Pass these through site config
+        
         self.motor1_ip = motor1_ip
         self.motor1_port = motor1_port
         self.motor1_is_lin = motor1_is_lin
@@ -102,9 +103,9 @@ class appMotionMotorsAgent:
             self.log.debug("Lock Acquired Connecting to Stages")
 
             print('establishing serial server with motor1!')
-            self.motor1 = Motor(self.motor1_ip, self.motor1_port, self.motor1_is_lin, self.mot_id='motor1', self.index=MOTOR1, self.m_res=m_res)
+            self.motor1 = Motor(self.motor1_ip, self.motor1_port, self.motor1_is_lin, mot_id='motor1', index=MOTOR1, m_res=self.m_res)
             print('establishing serial server with motor2!')
-            self.motor2 = Motor(self.motor2_ip, self.motor2_port, self.motor2_is_lin, self.mot_id='motor2', self.index=MOTOR2, self.m_res=m_res)
+            self.motor2 = Motor(self.motor2_ip, self.motor2_port, self.motor2_is_lin, mot_id='motor2', index=MOTOR2, m_res=self.m_res)
 
         # This part is for the record and to allow future calls to proceed,
         # so does not require the lock
@@ -140,7 +141,7 @@ class appMotionMotorsAgent:
         """
         
         self.move_status = self.is_moving('motor')[1][1]
-        with self.lock.acquire_timeout(1, job=f'move_axis_to_position_motor{'motor'}') as acquired:
+        with self.lock.acquire_timeout(1, job=f'move_axis_to_position_motor{"motor"}') as acquired:
             if self.move_status:
                 return False, "Motors are already moving."
             if not acquired:
@@ -186,7 +187,7 @@ class appMotionMotorsAgent:
         """
 
         self.move_status = self.is_moving('motor')[1][1]
-        with self.lock.acquire_timeout(1, job=f'move_axis_by_length_motor{'motor'}') as acquired:
+        with self.lock.acquire_timeout(1, job=f'move_axis_by_length_motor{"motor"}') as acquired:
             if self.move_status:
                 return False, "Motors are already moving."
             if not acquired:
@@ -220,7 +221,7 @@ class appMotionMotorsAgent:
         """
 
         self.move_status = self.is_moving('motor')[1][1]
-        with self.lock.acquire_timeout(timeout=1, job=f'set_velocity{'motor'}') as acquired:
+        with self.lock.acquire_timeout(timeout=1, job=f'set_velocity{"motor"}') as acquired:
             if self.move_status:
                 return False, "Motors are already moving."
             if not acquired:
@@ -257,7 +258,7 @@ class appMotionMotorsAgent:
         """
         
         self.move_status = self.is_moving('motor')[1][1]
-        with self.lock.acquire_timeout(timeout=1, job=f'set_acceleration_motor{'motor'}') as acquired:
+        with self.lock.acquire_timeout(timeout=1, job=f'set_acceleration_motor{"motor"}') as acquired:
             if self.move_status:
                 return False, "Motors are already moving."
             if not acquired:
@@ -344,7 +345,7 @@ class appMotionMotorsAgent:
         """
         
         self.move_status = self.is_moving('motor')[1][1]
-        with self.lock.acquire_timeout(timeout=1, job=f'seek_home_linear_stage_motor{'motor'}') as acquired
+        with self.lock.acquire_timeout(timeout=1, job=f'seek_home_linear_stage_motor{"motor"}') as acquired:
             if self.move_status:
                 return False, "Motors are already moving."
             if not acquired:
@@ -553,7 +554,7 @@ class appMotionMotorsAgent:
                 self.motor1.reconnect_motor()
             elif 'motor'==2:
                 self.motor2.reconnect_motor()
-            elif 'motor'==3
+            elif 'motor'==3:
                 self.motor1.reconnect_motor()
                 self.motor2.reconnect_motor()
             else:
@@ -931,9 +932,7 @@ class appMotionMotorsAgent:
         pm = Pacemaker('f_sample', quantize=True)
 
         if not self.initialized:
-            raise Exception("Connection to motors is not initialized")
-        elif self.motor1 is None and self.motor2 is None:
-            raise Exception("Connection to motors is not initialized")
+            raise Exception("Motors are not initialized")
 
         with self.lock.acquire_timeout(timeout=0, job='acq') as acquired:
             if not acquired:
@@ -962,29 +961,28 @@ class appMotionMotorsAgent:
                     'data': {}}
 
                 for mot in mot_list:
-                    if mot.mot_id is None:
-                        continue
-                    try:
-                        self.log.debug(
-                            f"getting position/move status of motor{'motor'}")
-                        self.move_status = mot.is_moving('verbose')
-                        pos = mot.get_position_in_inches()
-                        if self.move_status:
-                            data['data'][f'motor{mot}_encoder'] = -1
-                        else:
-                            e_pos = mot.retrieve_encoder_info()
-                            data['data'][f'motor{'motor'}_encoder'] = e_pos[0]
-                        data['data'][f'motor{'motor'}_stepper'] = pos[0]
-                        data['data'][f'motor{'motor'}_connection'] = 1
-                        data['data'][f'motor{'motor'}_move_status'] = self.move_status
+                    if mot.mot_id is not None:
+                        try:
+                            self.log.debug(
+                                f"getting position/move status of motor{'motor'}")
+                            self.move_status = mot.is_moving('verbose')
+                            pos = mot.get_position_in_inches()
+                            if self.move_status:
+                                data['data'][f'motor{mot}_encoder'] = -1
+                            else:
+                                e_pos = mot.retrieve_encoder_info()
+                                data['data'][f'motor{"motor"}_encoder'] = e_pos[0]
+                            data['data'][f'motor{"motor"}_stepper'] = pos[0]
+                            data['data'][f'motor{"motor"}_connection'] = 1
+                            data['data'][f'motor{"motor"}_move_status'] = self.move_status
 
-                    except Exception as e:
-                        self.log.debug(f'error: {e}')
-                        self.log.debug(
-                            f"could not get position/move status of motor{'motor'}")
-                        data['data'][f'motor{'motor'}_encoder'] = 0
-                        data['data'][f'motor{'motor'}_stepper'] = 0.0
-                        data['data'][f'motor{'motor'}_connection'] = 0
+                        except Exception as e:
+                            self.log.debug(f'error: {e}')
+                            self.log.debug(
+                                f"could not get position/move status of motor{'motor'}")
+                            data['data'][f'motor{"motor"}_encoder'] = 0
+                            data['data'][f'motor{"motor"}_stepper'] = 0.0
+                            data['data'][f'motor{"motor"}_connection'] = 0
 
                 self.agent.publish_to_feed('positions', data)
                 session.data = data
