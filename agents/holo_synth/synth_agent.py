@@ -60,7 +60,7 @@ class SynthAgent:
                 agent = OCSClient("synth_LO")
                 agent.init_synth()
 
-        Notes: 
+        Notes:
             This task is called to turn on the synthesizers.
         """
 
