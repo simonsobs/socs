@@ -18,6 +18,8 @@ ht = Heater(ls, 0)
 still = Heater(ls, 1)
 
 # Heater Tests
+
+
 def test_set_get_heater_input():
     init_value = ht.get_input_channel()
     ht.set_input_channel('1')
@@ -257,11 +259,11 @@ def test_set_get_resistance_range():
                   6.32, 20.0, 63.2, 200, 632, 2e3, 6.32e3, 20.0e3, 63.2e3,
                   200e3, 632e3, 2e6, 6.32e6, 20.0e6, 63.2e6]
 
-        return min(ranges, key=lambda x: abs(x-num))
+        return min(ranges, key=lambda x: abs(x - num))
 
     init_range = ch.range
-    ch.set_resistance_range(init_range*3)
-    assert ch.get_resistance_range() == get_closest_range(init_range*3)
+    ch.set_resistance_range(init_range * 3)
+    assert ch.get_resistance_range() == get_closest_range(init_range * 3)
     ch.set_resistance_range(init_range)
 
 
@@ -279,6 +281,7 @@ def test_set_get_excitation():
         assert True is False, "Unknown excitation mode -- this shouldn't happen"
 
     ch.set_excitation(init_excitation)
+
 
 def test_set_get_manual_output():
     """

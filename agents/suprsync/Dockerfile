@@ -2,7 +2,7 @@
 FROM socs:latest
 
 # Sets up the cryo / smurf user and group so this can run on smurf-servers
-# See link for how all other smurf-containers are set up: 
+# See link for how all other smurf-containers are set up:
 #   https://github.com/slaclab/smurf-base-docker/blob/master/Dockerfile
 RUN useradd -d /home/cryo -M cryo -u 1000 && \
     groupadd smurf -g 1001 && \
@@ -14,7 +14,7 @@ RUN useradd -d /home/cryo -M cryo -u 1000 && \
 # Set the working directory to registry directory
 WORKDIR /app/socs/agents/suprsync
 # Copy this agent into the app/agents directory
-RUN apt-get install rsync -y
+RUN apt-get update && apt-get install -y rsync
 COPY . .
 RUN pip3 install -r requirements.txt
 

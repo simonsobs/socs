@@ -12,7 +12,6 @@ from ocs import ocs_agent, site_config, ocs_feed
 from socs.db.suprsync import SupRsyncFilesManager, create_file
 
 
-
 def create_remote_path(meta, archive_name):
     """
     Creates "remote path" for file.
@@ -41,7 +40,7 @@ def create_remote_path(meta, archive_name):
         ts = meta['timestamp']
         action_timestamp = meta['action_ts']
         action = meta['action']
-        basename= os.path.basename(meta['path'])
+        basename = os.path.basename(meta['path'])
         dir_type = 'plots' if meta['plot'] else 'outputs'
         pub_id = meta['pub_id']
 
@@ -88,6 +87,7 @@ class PysmurfMonitor(DatagramProtocol):
             If True, will echo all sql statements whenever writing to the
             suprsync db.
     """
+
     def __init__(self, agent, args):
         self.agent: ocs_agent.OCSAgent = agent
         self.log = agent.log
@@ -138,7 +138,7 @@ class PysmurfMonitor(DatagramProtocol):
 
             path = data['payload']['path']
             val = data['payload']['value']
-            val_type = data['payload']['type']
+            data['payload']['type']
 
             field_name = ocs_feed.Feed.enforce_field_name_rules(path)
             feed_name = f'{stream_id}_meta'
@@ -172,7 +172,7 @@ class PysmurfMonitor(DatagramProtocol):
                 # archive_name to "timestreams"
                 archive_name = meta.get('archive_name', 'smurf')
                 try:
-                    if (meta['format']  == 'npy') and (not meta['path'].endswith('.npy')):
+                    if (meta.get('format') == 'npy') and (not meta['path'].endswith('.npy')):
                         meta['path'] += '.npy'
                     local_path = meta['path']
                     remote_path = create_remote_path(meta, archive_name)
@@ -205,7 +205,6 @@ class PysmurfMonitor(DatagramProtocol):
                     session.add_all(files)
 
             time.sleep(1)
-
 
     def _stop(self, session, params=None):
         self.running = False

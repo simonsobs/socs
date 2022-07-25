@@ -80,6 +80,7 @@ pygments_style = 'sphinx'
 
 autodoc_mock_imports = ['spt3g',
                         'so3g',
+                        'so3g.proj',
                         'labjack',
                         'labjack.ljm',
                         'labjack.ljm.ljm',
@@ -87,12 +88,22 @@ autodoc_mock_imports = ['spt3g',
                         'ocs.agent',
                         'ocs.ocs_twisted',
                         'ocs.ocs_agent',
+                        'ocs.ocs_client',
                         'ocs.agent.aggregator',
                         'xy_agent',
                         'xy_agent.xy_connect',
                         'soaculib',
                         'scan_helpers',
                         'soaculib.twisted_backend',
+                        'soaculib.status_keys',
+                        'pfeiffer_vacuum_protocol',
+                        'pfeiffer_vacuum_protocol.pfeiffer_vacuum_protocol',
+                        'pfeiffer_tc400_driver',
+                        'sodetlib',
+                        'sodetlib.operations',
+                        'sodetlib.det_config',
+                        'src',
+                        'src.pid_controller',
                         ]
 from unittest import mock
 for m in autodoc_mock_imports:
@@ -199,4 +210,3 @@ texinfo_documents = [
 
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = True
-

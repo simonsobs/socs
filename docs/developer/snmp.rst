@@ -32,22 +32,22 @@ An example which converted the MBG-SNMP-LTNG-MIB .mib file::
     MIBs to compile: MBG-SNMP-LTNG-MIB
     Destination format: pysnmp
     Parser grammar cache directory: not used
-    Also compile all relevant MIBs: yes 
+    Also compile all relevant MIBs: yes
     Rebuild MIBs regardless of age: no
     Dry run mode: no
-    Create/update MIBs: yes 
-    Byte-compile Python modules: yes (optimization level no) 
+    Create/update MIBs: yes
+    Byte-compile Python modules: yes (optimization level no)
     Ignore compilation errors: no
     Generate OID->MIB index: no
     Generate texts in MIBs: no
     Keep original texts layout: no
-    Try various file names while searching for MIB module: yes 
+    Try various file names while searching for MIB module: yes
     Created/updated MIBs: MBG-SNMP-LTNG-MIB, MBG-SNMP-ROOT-MIB, SNMPv2-MIB
-    Pre-compiled MIBs borrowed: 
+    Pre-compiled MIBs borrowed:
     Up to date MIBs: SNMPv2-CONF, SNMPv2-SMI, SNMPv2-TC
-    Missing source MIBs: 
-    Ignored MIBs: 
-    Failed MIBs: 
+    Missing source MIBs:
+    Ignored MIBs:
+    Failed MIBs:
 
 .. note::
     There can be several "gotchas" during the conversion process, mostly to do
@@ -62,21 +62,21 @@ A standalone example of using ``SNMPTwister`` to interact with a device::
     from twisted.internet import reactor
     from twisted.internet.defer import inlineCallbacks
     from socs.snmp import SNMPTwister
-    
+
     # Setup communication with M1000
     snmp = SNMPTwister('10.10.10.186', 161)
-    
+
     # Define OIDs to query
     get_list = [('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockState', 1),
                 ('MBG-SNMP-LTNG-MIB', 'mbgLtNgSysPsStatus', 1),
                 ('MBG-SNMP-LTNG-MIB', 'mbgLtNgSysPsStatus', 2)]
-    
+
     @inlineCallbacks
     def query_snmp():
         x = yield snmp.get(get_list)
         print(x)
         reactor.stop()
-    
+
     # Call query_snmp within the reactor
     reactor.callWhenRunning(query_snmp)
     reactor.run()
@@ -97,3 +97,4 @@ interface is available for use and detailed here:
 
 .. autoclass:: socs.snmp.SNMPTwister
     :members:
+    :noindex:

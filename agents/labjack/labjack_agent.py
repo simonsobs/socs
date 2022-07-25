@@ -84,6 +84,7 @@ class LabJackFunctions:
     """
     Labjack helper class to provide unit conversion from analog input voltage
     """
+
     def __init__(self):
         self.log = txaio.make_logger()
 
@@ -116,7 +117,7 @@ class LabJackFunctions:
         Conversion function for the MKS390 Micro-Ion ATM
         Modular Vaccum Gauge.
         """
-        value = 1.3332*10**(2*v_array - 11)
+        value = 1.3332 * 10**(2 * v_array - 11)
         units = 'mBar'
         return value, units
 
@@ -129,7 +130,7 @@ class LabJackFunctions:
         for the thermistor model, serial number 10K4D25.
         """
         # LJTick voltage to resistance conversion
-        R = (2.5-v_array)*10000/v_array
+        R = (2.5 - v_array) * 10000 / v_array
 
         # Import the Ohms to Celsius cal curve and apply cubic
         # interpolation to find the temperature
@@ -165,6 +166,7 @@ class LabJackAgent:
         sampling_frequency (float): Sampling rate in Hz.
 
     """
+
     def __init__(self, agent, ip_address, active_channels, function_file,
                  sampling_frequency):
         self.active = True
@@ -219,9 +221,9 @@ class LabJackAgent:
                                  agg_params=agg_params_downsampled,
                                  buffer_time=1)
         self.agent.register_feed('registers',
-                                 record = True,
-                                 agg_params = {'frame_length':10*60},
-                                 buffer_time = 1.)
+                                 record=True,
+                                 agg_params={'frame_length': 10 * 60},
+                                 buffer_time=1.)
 
     # Task functions
     def init_labjack(self, session, params=None):
@@ -258,7 +260,7 @@ class LabJackAgent:
 
         # Start data acquisition if requested in site-config
         auto_acquire = params.get('auto_acquire', False)
-        auto_acquire_reg = params.get('auto_acquire_reg',False)
+        auto_acquire_reg = params.get('auto_acquire_reg', False)
 
         if auto_acquire:
             self.agent.start('acq')
@@ -334,8 +336,8 @@ class LabJackAgent:
 
                 # The labjack outputs at exactly the scan rate but doesn't
                 # generate timestamps. So create them here.
-                timestamps = [cur_time+i/scan_rate for i in range(scans_per_read)]
-                cur_time += scans_per_read/scan_rate
+                timestamps = [cur_time + i / scan_rate for i in range(scans_per_read)]
+                cur_time += scans_per_read / scan_rate
                 data['timestamps'] = timestamps
 
                 self.agent.publish_to_feed('sensors', data)
@@ -367,13 +369,15 @@ class LabJackAgent:
         else:
             return False, 'acq is not currently running'
 
-    def start_acq_reg(self, session, params=None):
-        """
-        Task to start data acquisition when you want to read out
-        non-standard registers. In particular the custom registers
-        labjack has built for reading out thermocouples. Maximum is
-        about 2.5 Hz but is set by the register read time which is
-        estimated at the beginning of the acq_reg setup step.
+    def acq_reg(self, session, params=None):
+        """acq_reg(sampling_frequency=2.5)
+
+        **Task** - Start data acquisition when you want to read out
+        non-standard registers.
+
+        In particular the custom registers labjack was built for reading out
+        thermocouples. Maximum is about 2.5 Hz but is set by the register read
+        time which is estimated at the beginning of the acq_reg setup step.
 
         Args:
             sampling_frequency (float):
@@ -383,24 +387,24 @@ class LabJackAgent:
         """
         if params is None:
             params = {}
-        #Determine the read time latency to set the max allowable
-        #sampling rate by reading the register 100 times in a row
-        #and recording the time it takes to read each time. Then
-        #setting the max sample rate to be 50mS greater than the median
-        #of the time it took to read.
+        # Determine the read time latency to set the max allowable
+        # sampling rate by reading the register 100 times in a row
+        # and recording the time it takes to read each time. Then
+        # setting the max sample rate to be 50mS greater than the median
+        # of the time it took to read.
         num_chs = len(self.chs)
         times = []
         for i in range(100):
             times.append(time.time())
-            ljm.eReadNames(self.handle,num_chs,self.chs)[0]
-        read_dt = np.round(np.median(np.diff(times)),2)+0.05
-        max_fsamp = min(2.5,1/read_dt)
+            ljm.eReadNames(self.handle, num_chs, self.chs)[0]
+        read_dt = np.round(np.median(np.diff(times)), 2) + 0.05
+        max_fsamp = min(2.5, 1 / read_dt)
         # Setup streaming parameters. Data is collected and published in
         # blocks at 1 Hz or the scan rate, whichever is less.
         scan_rate_input = params.get('sampling_frequency',
                                      self.sampling_frequency)
-        #Warn user that they input too fast of a sample rate and set
-        #to maximum allowable.
+        # Warn user that they input too fast of a sample rate and set
+        # to maximum allowable.
         if scan_rate_input > max_fsamp:
             self.log.warn(f'Sampling rate {scan_rate_input} exceeds'
                           'allowable range for register read mode'
@@ -411,7 +415,7 @@ class LabJackAgent:
             scan_rate_input = max_fsamp
             scan_rate_dt = 0
         else:
-            scan_rate_dt = (1/scan_rate_input) - read_dt
+            scan_rate_dt = (1 / scan_rate_input) - read_dt
 
         with self.lock.acquire_timeout(0, job='acq_reg') as acquired:
             if not acquired:
@@ -431,7 +435,7 @@ class LabJackAgent:
                 # Get a timestamp
                 timestamp = time.time()
                 # Query the labjack
-                output = ljm.eReadNames(self.handle,num_chs,self.chs)
+                output = ljm.eReadNames(self.handle, num_chs, self.chs)
 
                 # Data comes in form ['reg1', 'reg2', 'reg3', ...]
                 # where regn are the registers in your active_channels
@@ -456,6 +460,7 @@ class LabJackAgent:
             ljm.close(self.handle)
             self.log.info("Data stream stopped")
         return True, 'Acquisition exited cleanly.'
+
 
 def make_parser(parser=None):
     """
@@ -487,7 +492,7 @@ def make_parser(parser=None):
     acq_txt += ', **acq_reg**: read out custom configured registers'
     acq_txt += ', or **idle**: leave device idle at startup.'
     pgroup.add_argument('--mode', default='acq',
-                        choices=['idel','acq','acq_reg'], help=acq_txt)
+                        choices=['idel', 'acq', 'acq_reg'], help=acq_txt)
 
     return parser
 
@@ -521,7 +526,7 @@ if __name__ == '__main__':
     agent.register_task('init_labjack',
                         sensors.init_labjack,
                         startup=init_params)
-    agent.register_process('acq', sensors.start_acq, sensors.stop_acq)
-    agent.register_process('acq_reg', sensors.start_acq_reg,
-                           sensors.stop_acq)
+    agent.register_process('acq', sensors.acq, sensors._stop_acq)
+    agent.register_process('acq_reg', sensors.acq_reg,
+                           sensors._stop_acq)
     runner.run(agent, auto_reconnect=True)

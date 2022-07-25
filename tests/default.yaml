@@ -16,7 +16,7 @@ hosts:
                      ['--ip-address', '127.0.0.1'],
                      ['--dwell-time-delay', 0],
                      ['--sample-heater', False],
-                     ['--mode', 'init']]},
+                     ['--mode', 'idle']]},
       {'agent-class': 'Lakeshore425Agent',
       'instance-id': 'LS425',
       'arguments': [
@@ -29,6 +29,41 @@ hosts:
        'arguments': [['--serial-number', 'LSA240S'],
                      ['--mode', 'idle'],
                      ['--port', './responder'],
+                    ]
+      },
+      {'agent-class': 'PfeifferTC400Agent',
+       'instance-id': 'pfeifferturboA',
+       'arguments': [['--ip-address', '127.0.0.1'],
+                       ['--port-number', '9001'],
+                       ['--turbo-address', '1']]},
+      {'agent-class': 'RotationAgent',
+       'instance-id': 'rotator',
+       'arguments': [['--kikusui-ip', '127.0.0.1'],
+                     ['--kikusui-port', '2000'],
+                     ['--pid-ip', '127.0.0.1'],
+                     ['--pid-port', '2001'],
+                     ['-v'],
+                     ['--mode', 'init'],
+                    ]
+      },
+      {'agent-class': 'CryomechCPAAgent',
+       'instance-id': 'cryomech',
+       'arguments':[['--ip-address', '127.0.0.1'],
+                    ['--serial-number', 'CPA1234TEST-111111A'],
+                    ['--mode', 'init'],
+                    ['--port', 5502],
+                   ]
+      },
+      {'agent-class': 'ScpiPsuAgent',
+       'instance-id': 'psuK',
+       'arguments': [['--ip-address', '127.0.0.1'],
+                     ['--gpib-slot', '1']
+                    ]
+      },
+      {'agent-class': 'PfeifferAgent',
+       'instance-id': 'pfeiffer366',
+       'arguments': [['--ip_address', '127.0.0.1'],
+                     ['--port', '8000'],
                     ]
       },
     ]

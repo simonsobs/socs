@@ -25,6 +25,7 @@ class TektronixAWGAgent:
             on the function generator.
 
     """
+
     def __init__(self, agent, ip_address, gpib_slot):
         self.agent = agent
         self.log = agent.log

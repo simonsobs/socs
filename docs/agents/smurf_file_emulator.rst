@@ -34,7 +34,10 @@ Here is an example of the file-emulator site-configuration block::
     'arguments': [[
        '--stream-id', 'emulator',
        '--base-dir', '/path/to/fake/data/directory',
-       '--file-duration', 60
+       '--file-duration', 60,
+       '--nchans', 1024,
+       '--sample-rate', 200,
+       '--frame-len', 2
     ]]}
 
 
@@ -59,4 +62,16 @@ Agent API
 ---------
 
 .. autoclass:: agents.smurf_file_emulator.smurf_file_emulator.SmurfFileEmulator
+    :members:
+
+Supporting API
+---------------
+
+.. autoclass:: agents.smurf_file_emulator.smurf_file_emulator.Tune
+    :members:
+
+.. autoclass:: agents.smurf_file_emulator.smurf_file_emulator.DataStreamer
+    :members:
+
+.. autoclass:: agents.smurf_file_emulator.smurf_file_emulator.G3FrameGenerator
     :members:
