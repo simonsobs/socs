@@ -103,9 +103,9 @@ class appMotionMotorsAgent:
             self.log.debug("Lock Acquired Connecting to Stages")
 
             print('establishing serial server with motor1!')
-            self.motor1 = Motor(self.motor1_ip, self.motor1_port, self.motor1_is_lin, mot_id='motor1', index=MOTOR1, m_res=self.m_res)
+            self.motor1 = Motor(self.motor1_ip, self.motor1_port, self.motor1_is_lin, mot_id='motor1', index=1, m_res=self.m_res)
             print('establishing serial server with motor2!')
-            self.motor2 = Motor(self.motor2_ip, self.motor2_port, self.motor2_is_lin, mot_id='motor2', index=MOTOR2, m_res=self.m_res)
+            self.motor2 = Motor(self.motor2_ip, self.motor2_port, self.motor2_is_lin, mot_id='motor2', index=2, m_res=self.m_res)
 
         # This part is for the record and to allow future calls to proceed,
         # so does not require the lock
