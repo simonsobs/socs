@@ -37,7 +37,7 @@ class SynthAgent:
             raise Exception("No config file specified for the FTS mirror config")
         else:
             config_file_path = os.path.join(os.environ["OCS_CONFIG_DIR"], config_file)
-            print(config_file_path)
+
             with open(config_file_path) as stream:
                 self.holog_configs = yaml.safe_load(stream)
                 if self.holog_configs is None:

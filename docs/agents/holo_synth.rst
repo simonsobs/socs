@@ -10,7 +10,7 @@ The Holography Synthesizer Agent is provided with OCS to help demonstrate and de
 It will connect the computer to the two Local Oscillators (LO's) via USB port, initialize the LO's, set the frequency of each and pass the frequency to the OCS feed.
 
 .. argparse::
-   :module: agents.holo_synth.holo_synth_agent
+   :module: agents.holo_synth.synth_agent
    :func: make_parser
    :prog: synth_agent.py
 

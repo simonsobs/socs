@@ -10,7 +10,7 @@ The Holography FPGA Agent is provided with OCS to help demonstrate and debug iss
 It will connect the computer to the ROACH via an ethernet port, take data, and pass it to the OCS feed.
 
 .. argparse::
-   :module: agents.holo_fpga.holo_fpga_agent
+   :module: agents.holo_fpga.roach_agent
    :func: make_parser
    :prog: roach_agent.py
 
