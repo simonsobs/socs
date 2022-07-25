@@ -152,7 +152,8 @@ class SynthAgent:
 
     #     return True, "Frequencies Updated"
 
-    @ocs_agent.params("freq1", type=float, default=0, check=lambda x: 0 <= x <= 1000)
+    @ocs_agent.params("lo_id_n", type=int, default=0, check=lambda x: (x == 0) or (x == 1))
+    @ocs_agent.params("status", type=int, default=0, check=lambda x: (x == 0) or (x == 1))
     def set_synth_status(self, session, params):
         """set_synth_status(lo_id_n=0, status=1)
 
