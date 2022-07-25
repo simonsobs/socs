@@ -95,6 +95,8 @@ class SynthAgent:
 
         return True, "Synth Initialized."
 
+    @ocs_agent.params("freq0", type=float, default=0, check=lambda x: 0 <= x <= 1000)
+    @ocs_agent.params("freq1", type=float, default=0, check=lambda x: 0 <= x <= 1000)
     def set_frequencies(self, session, params):
         """set_frequencies(freq0=0, freq1=0)
 
@@ -150,8 +152,9 @@ class SynthAgent:
 
     #     return True, "Frequencies Updated"
 
+    @ocs_agent.params("freq1", type=float, default=0, check=lambda x: 0 <= x <= 1000)
     def set_synth_status(self, session, params):
-        """set_synth_status(arg1=None, arg2=7)
+        """set_synth_status(lo_id_n=0, status=1)
 
         **Task** - A task to set the status of the synthesizers.
 
