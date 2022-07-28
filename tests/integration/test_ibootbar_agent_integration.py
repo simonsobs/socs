@@ -1,5 +1,5 @@
 import pytest
-import threading
+from multiprocessing import Process
 import time
 from unittest.mock import patch
 from snmpsim.commands import responder
@@ -47,8 +47,10 @@ def start_responder():
         ):
             responder.main()
 
-    t = threading.Thread(target=f)
-    t.start()
+    p = Process(target=f)
+    p.start()
+    yield
+    p.terminate()
 
 
 @pytest.mark.integtest
