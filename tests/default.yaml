@@ -66,5 +66,13 @@ hosts:
                      ['--port', '8000'],
                     ]
       },
+      {'agent-class': 'ibootbarAgent',
+       'instance-id': 'ibootbar',
+       'arguments': [['--address', '127.0.0.1'],
+                     ['--port', 1024],
+                     ['--auto-start', True],
+                     ['--snmp-version', 2]
+                     ]
+      },
     ]
   }
