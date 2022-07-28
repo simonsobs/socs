@@ -948,7 +948,9 @@ class ACUAgent:
     def generate_scan(self, session, params):
         """generate_scan(az_endpoint1=None, az_endpoint2=None, az_speed=None, \
                          acc=None, el_endpoint1=None, el_endpoint2=None, \
-                         el_speed=None)
+                         el_speed=None, num_batches=None, start_time=None, \
+                         wait_to_start=None, step_time=None, batch_size=None, \
+                         az_start=None, ptstack_fmt=None)
 
         **Process** - Scan generator, currently only works for
         constant-velocity az scans with fixed elevation.
@@ -963,7 +965,26 @@ class ACUAgent:
                 currently both el endpoints should be equal
             el_speed (float): speed of motion for a scan with changing
                 elevation. For dev, currently set to 0.0
-
+            num_batches (int or None): number of times to traverse a direction
+                of the scan. Default value is None, interpreted as infinite
+            start_time (float or None): a ctime at which to start the scan.
+                Default is None, interpreted as now
+            wait_to_start (float): number of seconds to wait before starting a
+                scan. Default is 3 seconds
+            step_time (float): time between points on the constant-velocity
+                parts of the motion. Default is 0.1 s. Minimum 0,05 s
+            batch_size (int): number of values to produce in each iteration.
+            Default is 500. Batch size is reset to the length of one leg of the
+            motion if num_batches is not None.
+        az_start (str): part of the scan to start at. Options are:
+            'az_endpoint1', 'az_endpoint2', 'mid_inc' (start in the middle of
+            the scan and start with increasing azimuth), 'mid_dec' (start in
+            the middle of the scan and start with decreasing azimuth).
+        ptstack_fmt (bool): determine whether values are produced with the
+            necessary format to upload to the ACU. If False, this function will
+            produce lists of time, azimuth, elevation, azimuth velocity,
+            elevation velocity, azimuth flags, and elevation flags. Default is
+            True.
         """
         ok, msg = self._try_set_job('control')
         if not ok:
@@ -976,10 +997,20 @@ class ACUAgent:
         el_endpoint1 = params.get('el_endpoint1')
         el_endpoint2 = params.get('el_endpoint2')
         el_speed = params.get('el_speed')
+        num_batches = params.get('num_batches')
+        start_time = params.get('start_time')
+        wait_to_start = params.get('wait_to_start')
+        step_time = params.get('step_time')
+        batch_size = params.get('batch_size')
+        az_start = params.get('az_start')
 
         yield self.acu_control.stop()
         g = sh.generate_constant_velocity_scan(az_endpoint1, az_endpoint2,
-                                               az_speed, acc, el_endpoint1, el_endpoint2, el_speed)
+                                               az_speed, acc, el_endpoint1,
+                                               el_endpoint2, el_speed,
+                                               num_batches, start_time,
+                                               wait_to_start, step_time,
+                                               batch_size, az_start)
         self.acu_control.mode('ProgramTrack')
         while True:
             lines = next(g)
