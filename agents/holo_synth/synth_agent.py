@@ -95,22 +95,22 @@ class SynthAgent:
 
         return True, "Synth Initialized."
 
-    @ocs_agent.params("freq0", type=float, default=0, check=lambda x: 0 <= x <= 1000)
-    @ocs_agent.params("freq1", type=float, default=0, check=lambda x: 0 <= x <= 1000)
+    @ocs_agent.param("offset", type=float, default=0, check=lambda x: 0 <= x <= 1000)
+    @ocs_agent.param("freq1", type=float, default=0, check=lambda x: 0 <= x <= 1000)
     def set_frequencies(self, session, params):
-        """set_frequencies(freq0=0, freq1=0)
+        """set_frequencies(freq1=0, offset=0)
 
         **Task** - A task to set the frequencies of the synthesizers.
 
         Parameters:
-            dict: {'freq0': float
-                   'freq1': float}
+            dict: {'freq1': float
+                   'offset': float}
         Examples:
             Example for calling in a client::
                 import ocs
                 from ocs.ocs_client import OCSClient
                 agent = OCSClient("synth_LO")
-                agent.set_frequencies(freq0=int(freqs[0]), freq1=int(freqs[0] + F_OFFSET))
+                agent.set_frequencies(freq1=int(freqs[0]), offset=int( F_OFFSET))
 
         Notes:
             The input frequencies are in GHz and are then converted to MHz as the input to the synthesizers.
@@ -141,19 +141,19 @@ class SynthAgent:
         return True, "Frequencies Updated"
 
     # This function is not finished, need to figure out how to read out frequency from USB connection.
-    # def read_frequencies(self, session, params=None):
+    def read_frequencies(self, session, params=None):
 
-    #     with self.lock.acquire_timeout(timeout=3, job="read_frqeuencies") as acquired:
-    #         if not acquired:
-    #             self.log.warn(
-    #                 f"Could not set position because lock held by {self.lock.job}"
-    #             )
-    #             return False, "Could not acquire lock"
+        with self.lock.acquire_timeout(timeout=3, job="read_frqeuencies") as acquired:
+            if not acquired:
+                self.log.warn(
+                    f"Could not set position because lock held by {self.lock.job}"
+                )
+                return False, "Could not acquire lock"
 
-    #     return True, "Frequencies Updated"
+        return True, "Frequencies Updated"
 
-    @ocs_agent.params("lo_id_n", type=int, default=0, check=lambda x: (x == 0) or (x == 1))
-    @ocs_agent.params("status", type=int, default=0, check=lambda x: (x == 0) or (x == 1))
+    @ocs_agent.param("lo_id_n", type=int, default=0, check=lambda x: (x == 0) or (x == 1))
+    @ocs_agent.param("status", type=int, default=0, check=lambda x: (x == 0) or (x == 1))
     def set_synth_status(self, session, params):
         """set_synth_status(lo_id_n=0, status=1)
 
