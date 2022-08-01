@@ -965,8 +965,9 @@ class ACUAgent:
                 currently both el endpoints should be equal
             el_speed (float): speed of motion for a scan with changing
                 elevation. For dev, currently set to 0.0
-            num_batches (int or None): number of times to traverse a direction
-                of the scan. Default value is None, interpreted as infinite
+            num_batches (int or None): sets the number of batches for the
+                generator to create. Default value is None (interpreted as infinite
+                batches).
             start_time (float or None): a ctime at which to start the scan.
                 Default is None, interpreted as now
             wait_to_start (float): number of seconds to wait before starting a
@@ -980,11 +981,6 @@ class ACUAgent:
             'az_endpoint1', 'az_endpoint2', 'mid_inc' (start in the middle of
             the scan and start with increasing azimuth), 'mid_dec' (start in
             the middle of the scan and start with decreasing azimuth).
-        ptstack_fmt (bool): determine whether values are produced with the
-            necessary format to upload to the ACU. If False, this function will
-            produce lists of time, azimuth, elevation, azimuth velocity,
-            elevation velocity, azimuth flags, and elevation flags. Default is
-            True.
         """
         ok, msg = self._try_set_job('control')
         if not ok:
@@ -995,14 +991,14 @@ class ACUAgent:
         az_speed = params.get('az_speed')
         acc = params.get('acc')
         el_endpoint1 = params.get('el_endpoint1')
-        el_endpoint2 = params.get('el_endpoint2')
-        el_speed = params.get('el_speed')
-        num_batches = params.get('num_batches')
-        start_time = params.get('start_time')
-        wait_to_start = params.get('wait_to_start')
-        step_time = params.get('step_time')
-        batch_size = params.get('batch_size')
-        az_start = params.get('az_start')
+        el_endpoint2 = params.get('el_endpoint2', el_endpoint1)
+        el_speed = params.get('el_speed', 0.0)
+        num_batches = params.get('num_batches', None)
+        start_time = params.get('start_time', None)
+        wait_to_start = params.get('wait_to_start', 3)
+        step_time = params.get('step_time', 0.1)
+        batch_size = params.get('batch_size', 500)
+        az_start = params.get('az_start', 'mid_inc')
 
         yield self.acu_control.stop()
         g = sh.generate_constant_velocity_scan(az_endpoint1, az_endpoint2,
