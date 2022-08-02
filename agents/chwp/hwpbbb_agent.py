@@ -533,6 +533,9 @@ class HWPBBBAgent:
                 # This is blocking until data are available
                 self.parser.grab_and_parse_data()
 
+                # Session data
+                data_cache = {'fields': {'approx_hwp_freq': None}, 'last_updated': time.time()}
+
                 # IRIG data; normally every sec
                 while len(self.parser.irig_queue):
                     irig_data = self.parser.irig_queue.popleft()
@@ -574,6 +577,10 @@ class HWPBBBAgent:
                     data['data']['irig_info'] = list(irig_info)
                     self.agent.publish_to_feed('HWPEncoder', data)
 
+                    # Update session.data
+                    data_cache['fields']['irig_time'] = irig_time
+                    data_cache['last_updated'] = time.time()
+
                 # Reducing the packet size, less frequent publishing
                 # Encoder data; packet coming rate = 570*2*2/150/4 ~ 4Hz packet at 2 Hz rotation
                 while len(self.parser.counter_queue):
@@ -589,6 +596,7 @@ class HWPBBBAgent:
                     quad_list.append(quad_data)
                     quad_counter_list.append(counter_data[0][0])
                     ct = time.time()
+
                     if len(counter_list) >= NUM_ENCODER_TO_PUBLISH \
                        or (len(counter_list)
                            and (ct - time_encoder_published) > SEC_ENCODER_TO_PUBLISH):
@@ -642,6 +650,12 @@ class HWPBBBAgent:
                         received_time_list = []
 
                         time_encoder_published = ct
+
+                        # Update session.data
+                        data_cache['fields']['approx_hwp_freq'] = hwp_freq
+                        data_cache['last_updated'] = ct
+
+                session.data.update(data_cache)
 
         self.agent.feeds['HWPEncoder'].flush_buffer()
         return True, 'Acquisition exited cleanly.'

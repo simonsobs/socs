@@ -1,7 +1,7 @@
 # CHWP Agent
 
 # Use socs base image
-FROM socs:latest
+FROM simonsobs/socs:latest
 
 # Set the working directory to registry directory
 WORKDIR /app/socs/agents/chwp/
@@ -15,5 +15,3 @@ ENTRYPOINT ["dumb-init", "python3", "-u", "hwpbbb_agent.py"]
 # Sensible default arguments
 CMD ["--site-hub=ws://crossbar:8001/ws", \
      "--site-http=http://crossbar:8001/call"]
-
-EXPOSE 8080/udp
