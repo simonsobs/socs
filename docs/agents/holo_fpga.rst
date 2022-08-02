@@ -47,7 +47,7 @@ Once the FPGA is initialized, the user can take data using the take_data() funct
 Agent API
 ---------
 
-.. autoclass:: agents.holo_fpga.holo_fpga_agent.FPGAAgent
+.. autoclass:: agents.holo_fpga.roach_agent.FPGAAgent
     :members:
 
 Example Clients

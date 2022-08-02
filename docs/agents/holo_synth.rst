@@ -47,7 +47,7 @@ Once the synthesizers are initialized, the user can take set the frequency outpu
 Agent API
 ---------
 
-.. autoclass:: agents.holo_fpga.holo_fpga_agent.FPGAAgent
+.. autoclass:: agents.holo_synth.synth_agent.SynthAgent
     :members:
 
 Example Clients
