@@ -910,7 +910,7 @@ class ACUAgent:
             self.log.info('Uploaded a group')
         self.log.info('No more lines to upload')
         free_positions = self.data['status']['summary']['Free_upload_positions']
-        while free_positions < FULL_STACK:
+        while free_positions < FULL_STACK - 1:
             yield dsleep(0.1)
             modes = (self.data['status']['summary']['Azimuth_mode'],
                      self.data['status']['summary']['Elevation_mode'])
@@ -924,21 +924,18 @@ class ACUAgent:
         self.log.info('No more points in the queue')
         current_az = self.data['broadcast']['Corrected_Azimuth']
         current_el = self.data['broadcast']['Corrected_Elevation']
-        az_attempt_number = 0
-        while az_attempt_number < 10:
-            while round(current_az - end_az, 1) != 0.:
-                self.log.info('Waiting to settle at azimuth position')
-                yield dsleep(0.1)
-                az_attempt_number += 1
-                current_az = self.data['broadcast']['Corrected_Azimuth']
+        while round(current_az - end_az, 1) != 0.:
+            print('still rounding az')
+            self.log.info('Waiting to settle at azimuth position')
+            yield dsleep(0.1)
+            current_az = self.data['broadcast']['Corrected_Azimuth']
         if not azonly:
-            el_attempt_number = 0
-            while el_attempt_number < 10:
-                while round(current_el - end_el, 1) != 0.:
-                    self.log.info('Waiting to settle at elevation position')
-                    yield dsleep(0.1)
-                    el_attempt_number += 1
-                    current_el = self.data['broadcast']['Corrected_Elevation']
+            while round(current_el - end_el, 1) != 0.:
+                print('still rounding el')
+                self.log.info('Waiting to settle at elevation position')
+                yield dsleep(0.1)
+                current_el = self.data['broadcast']['Corrected_Elevation']
+        print('rounding completed')
         yield dsleep(self.sleeptime)
         yield self.acu_control.stop()
         self.data['uploads']['Start_Azimuth'] = 0.0
