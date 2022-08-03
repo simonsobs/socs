@@ -61,3 +61,9 @@ def test_ibootbar_acq(wait_for_crossbar, start_responder, run_agent, client):
     time.sleep(1)
     resp = client.acq.status()
     check_resp_success(resp)
+
+
+@pytest.mark.integtest
+def test_ibootbar_set_outlet(wait_for_crossbar, start_responder, run_agent, client):
+    resp = client.set_outlet(outlet=3, state="on")
+    check_resp_success(resp)
