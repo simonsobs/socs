@@ -57,7 +57,8 @@ class FPGAAgent:
                 self.log.info(f"Loaded mirror configs from file {config_file_path}")
                 self.baseline = self.holog_configs.pop("baseline", None)
                 self.roach = self.holog_configs.pop("roach", None)
-
+                self.path_to_roach_init = self.holog_configs.pop("path_to_roach_init", None)
+                self.python2_env = self.holog_configs.pop("python2_env", None)
                 # The other mirror configs (speed, timeout) are optional and
                 # have defaults so we leave them as the dictionary.
                 if self.roach is None or self.baseline is None:
@@ -66,7 +67,7 @@ class FPGAAgent:
 
         self.roach, self.opts, self.baseline = fpga_daq3.roach2_init()
 
-        err = os.system("/opt/anaconda2/bin/python2 ~/Desktop/holog_daq/scripts/upload_fpga_py2.py")
+        err = os.system(self.python2_env+self.path_to_roach_init)
         assert err == 0
 
         print("Connecting to server %s ... " % (self.roach))
