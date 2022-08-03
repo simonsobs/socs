@@ -43,6 +43,7 @@ def start_responder():
                 "test_ibootbar_agent_integration.py",
                 "--data-dir=./integration/ibootbar_snmp_data",
                 "--agent-udpv4-endpoint=127.0.0.1:1024",
+                # "--variation-modules-dir=???/.local/share/snmpsim/variation"
             ],
         ):
             responder.main()
@@ -55,4 +56,8 @@ def start_responder():
 
 @pytest.mark.integtest
 def test_ibootbar_acq(wait_for_crossbar, start_responder, run_agent, client):
-    resp = client.acq.wait()
+    time.sleep(5)
+    client.acq.stop()
+    time.sleep(1)
+    resp = client.acq.status()
+    check_resp_success(resp)
