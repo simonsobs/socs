@@ -19,6 +19,7 @@ class SynthAgent:
     Args:
         config_file (str): ocs-site-configs/uchicago/field/holog_config.yaml
     """
+
     def __init__(self, agent, config_file):
 
         self.lo_id = None

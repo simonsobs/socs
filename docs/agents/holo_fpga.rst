@@ -51,11 +51,11 @@ Holography Config File
 Description
 -----------
 
-The FPGAAgent contains functions which control the FPGA for holography measurements.  
-Before the FPGA can take measuremnts, the user needs to initialize the FPGA using the init_FPGA() function.  
+The FPGAAgent contains functions which control the FPGA for holography measurements.
+Before the FPGA can take measuremnts, the user needs to initialize the FPGA using the init_FPGA() function.
 This will connect to the FPGA via an ethernet port (user specified in the holog_config.yaml file) and programs the FPGA using a .fpg file.
 
-Once the FPGA is initialized, the user can take data using the take_data() function.  
+Once the FPGA is initialized, the user can take data using the take_data() function.
 This will record the cross-correlations A, BB, AB, and phase.
 
 Agent API
