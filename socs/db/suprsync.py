@@ -382,8 +382,6 @@ class SupRsyncFileHandler:
                     self.log.info(f"Local md5: {file.local_md5sum}, "
                                   f"remote_md5: {file.remote_md5sum}")
 
-
-
     def delete_files(self, delete_after):
         """
         Gets deletable files, deletes them, and updates file info

@@ -18,6 +18,7 @@ def check_func(args):
         print(file)
         print('-' * 80)
 
+
 def next_func(args):
     srfm = SupRsyncFilesManager(args.db, create_all=False)
 
