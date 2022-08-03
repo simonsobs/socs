@@ -57,8 +57,8 @@ class SynthAgent:
             Example for calling in a client::
 
                 from ocs.ocs_client import OCSClient
-                agent = OCSClient("synth_lo")
-                agent.init_synth()
+                client = OCSClient("synth_lo")
+                client.init_synth()
 
         Notes:
             This task is called to turn on the synthesizers.
@@ -103,17 +103,15 @@ class SynthAgent:
         **Task** - A task to set the frequencies of the synthesizers.
 
         Parameters:
-            dict: {'freq1': float
-                   'offset': float}
+            freq1 (float): Frequency of holography measuremnt [GHz].
+            offset (float): Frequency offset of holography measurement [MHz].
+
         Examples:
             Example for calling in a client::
-                import ocs
-                from ocs.ocs_client import OCSClient
-                agent = OCSClient("synth_lo")
-                agent.set_frequencies(freq1=int(freqs[0]), offset=int( F_OFFSET))
 
-        Notes:
-            The input frequencies are in GHz and are then converted to MHz as the input to the synthesizers.
+                from ocs.ocs_client import OCSClient
+                client = OCSClient("synth_lo")
+                client.set_frequencies(freq1=210, offset=10)
         """
         f1 = params.get("freq1", 0)
         f_offset = params.get("offset", 0)
@@ -141,19 +139,19 @@ class SynthAgent:
         return True, "Frequencies Updated"
 
     # This function is not finished, need to figure out how to read out frequency from USB connection.
-    def read_frequencies(self, session, params=None):
+    # def read_frequencies(self, session, params=None):
 
-        with self.lock.acquire_timeout(timeout=3, job="read_frqeuencies") as acquired:
-            if not acquired:
-                self.log.warn(
-                    f"Could not set position because lock held by {self.lock.job}"
-                )
-                return False, "Could not acquire lock"
+    #     with self.lock.acquire_timeout(timeout=3, job="read_frqeuencies") as acquired:
+    #         if not acquired:
+    #             self.log.warn(
+    #                 f"Could not set position because lock held by {self.lock.job}"
+    #             )
+    #             return False, "Could not acquire lock"
 
-        return True, "Frequencies Updated"
+    #     return True, "Frequencies Updated"
 
-    @ocs_agent.param("lo_id_n", type=int, default=0, check=lambda x: (x == 0) or (x == 1))
-    @ocs_agent.param("status", type=int, default=0, check=lambda x: (x == 0) or (x == 1))
+    @ocs_agent.param("lo_id_n", type=int, default=0, choices=[0, 1])
+    @ocs_agent.param("status", type=int, default=0, choices=[0, 1])
     def set_synth_status(self, session, params):
         """set_synth_status(lo_id_n=0, status=1)
 
@@ -162,15 +160,16 @@ class SynthAgent:
         Parameters:
             dict: {'lo_id_n': int
                    'status': int}
+        Parameters:
+            lo_id (int): Local Oscillator ID (either 0 or 1).
+            status (int): Status of local oscillator (0 is off, 1 is on).
+
         Examples:
             Example for calling in a client::
 
-                import ocs
                 from ocs.ocs_client import OCSClient
                 agent = OCSClient("synth_lo")
                 agent.set_synth_status(lo_id_n=0, status=1)
-        Notes:
-            Set the status of the synthesizers either on (1) or off (0).
         """
         lo_id_n = params.get("lo_id", 0)
         switch = params.get("switch", 0)
@@ -227,7 +226,7 @@ if __name__ == "__main__":
 
     agent.register_task("init_synth", synth_agent.init_synth)
     agent.register_task("set_frequencies", synth_agent.set_frequencies)
-    agent.register_task("read_frequencies", synth_agent.read_frequencies)
+    # agent.register_task("read_frequencies", synth_agent.read_frequencies)
     agent.register_task("set_synth_status", synth_agent.set_synth_status)
 
     runner.run(agent, auto_reconnect=True)

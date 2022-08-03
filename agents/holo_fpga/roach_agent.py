@@ -31,13 +31,6 @@ class FPGAAgent:
         self.log = agent.log
         self.lock = TimeoutLock()
 
-        """
-        ### register the position feeds
-
-        ### Agent registers data feed, things published to feed go to grafana and .g3 files
-        ### pick a good name for feeds, once it's registered it's kinda permanent
-
-        """
         agg_params = {"frame_length": 10 * 60}  # [sec]
         self.agent.register_feed(
             "fpga", record=True, agg_params=agg_params, buffer_time=0
