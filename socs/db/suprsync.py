@@ -347,7 +347,6 @@ class SupRsyncFileHandler:
 
                     os.symlink(file.local_path, tmp_path)
 
-
                     remote_path = os.path.normpath(
                         os.path.join(self.remote_basedir, file.remote_path)
                     )
