@@ -61,7 +61,7 @@ class FPGAAgent:
 
         self.roach, self.opts, self.baseline = fpga_daq3.roach2_init()
 
-        err = os.system(self.python2_env+self.path_to_roach_init)
+        err = os.system(self.python2_env + self.path_to_roach_init)
         assert err == 0
 
         print("Connecting to server %s ... " % (self.roach))
