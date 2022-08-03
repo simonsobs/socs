@@ -4,14 +4,13 @@ import numpy as np
 import txaio
 import yaml
 import time
+from ocs import ocs_agent, site_config
+from ocs.ocs_twisted import TimeoutLock
 
 ON_RTD = os.environ.get("READTHEDOCS") == "True"
 if not ON_RTD:
     import casperfpga
     from holog_daq import fpga_daq3, synth3
-    from ocs import ocs_agent, site_config
-    from ocs.ocs_twisted import TimeoutLock
-
 
 class FPGAAgent:
     """
@@ -82,12 +81,9 @@ class FPGAAgent:
 
         **Task** - A task to take data from the FPGA.
 
-        Parameters: None
-
         Examples:
             Example for calling in a client::
 
-                import ocs
                 from ocs.ocs_client import OCSClient
                 agent_fpga = OCSClient("fpga") # create agent
                 agent_fpga.take_data() # take data

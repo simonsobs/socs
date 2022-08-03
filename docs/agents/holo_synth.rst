@@ -34,7 +34,7 @@ ocs configuration file. Here is an example configuration block using all of the
 available arguments::
 
       {'agent-class': 'SynthAgent',
-       'instance-id': 'synth_LO',
+       'instance-id': 'synth_lo',
        'arguments': [['--config_file','holog_config.yaml']]}
 
 Description
@@ -47,17 +47,17 @@ Once the synthesizers are initialized, the user can take set the frequency outpu
 Agent API
 ---------
 
-.. autoclass:: agents.holo_fpga.holo_fpga_agent.FPGAAgent
+.. autoclass:: agents.holo_synth.synth_agent.SynthAgent
     :members:
 
 Example Clients
 ---------------
 
-To initialize the ROACH2 FPGA, use the "fpga" agent::
+To initialize the synthesizers, use the "synth_lo" agent::
 
     from ocs.ocs_client import OCSClient
-    agent_fpga = OCSClient("fpga")
-    agent_fpga.init_FPGA()
+    client = OCSClient("synth_lo")
+    client.init_synth()
 
 Example Config File
 -------------------

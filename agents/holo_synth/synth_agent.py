@@ -15,9 +15,9 @@ class SynthAgent:
     """
     Agent for connecting to the Synths for holography.
 
-    Args: $OCS_CONFIG_DIR holog_config.yaml
+    Args:
+        config_file (str): ocs-site-configs/uchicago/field/holog_config.yaml
     """
-
     def __init__(self, agent, config_file):
 
         self.lo_id = None
@@ -30,7 +30,7 @@ class SynthAgent:
 
         agg_params = {"frame_length": 10 * 60}  # [sec]
         self.agent.register_feed(
-            "synth_LO", record=True, agg_params=agg_params, buffer_time=0
+            "synth_lo", record=True, agg_params=agg_params, buffer_time=0
         )
 
         if config_file is None:
@@ -47,17 +47,15 @@ class SynthAgent:
                 self.ghz_to_mhz = self.holog_configs.pop("ghz_to_mhz", None)
 
     def init_synth(self, session, params=None):
-        """init_synth(params=None)
+        """init_synth()
 
         **Task** - A task to initialize the synthesizers.
 
-        Parameters: None
-
         Examples:
             Example for calling in a client::
-                import ocs
+
                 from ocs.ocs_client import OCSClient
-                agent = OCSClient("synth_LO")
+                agent = OCSClient("synth_lo")
                 agent.init_synth()
 
         Notes:
@@ -81,12 +79,12 @@ class SynthAgent:
             synth3.set_RF_output(0, 1, self.lo_id)  # LO ID, On=1, USB connection ID
             synth3.set_RF_output(1, 1, self.lo_id)  # LO ID, On=1, USB connection ID
 
-            # data = {"timestamp": time.time(), "block_name": "synth_LO", "data": {}}
+            # data = {"timestamp": time.time(), "block_name": "synth_lo", "data": {}}
 
             # data["data"]["F1_status"] = 1
             # data["data"]["F2_status"] = 1
 
-            # self.agent.publish_to_feed("synth_LO", data)
+            # self.agent.publish_to_feed("synth_lo", data)
             # session.data.update(data["data"])
 
         # This part is for the record and to allow future calls to proceed,
@@ -109,7 +107,7 @@ class SynthAgent:
             Example for calling in a client::
                 import ocs
                 from ocs.ocs_client import OCSClient
-                agent = OCSClient("synth_LO")
+                agent = OCSClient("synth_lo")
                 agent.set_frequencies(freq1=int(freqs[0]), offset=int( F_OFFSET))
 
         Notes:
@@ -130,12 +128,12 @@ class SynthAgent:
             synth3.set_f(0, F_1, self.lo_id)
             synth3.set_f(1, F_1 + f_offset, self.lo_id)
 
-            data = {"timestamp": time.time(), "block_name": "synth_LO", "data": {}}
+            data = {"timestamp": time.time(), "block_name": "synth_lo", "data": {}}
 
             data["data"]["F1"] = F_1
             data["data"]["F2"] = F_1 + f_offset
 
-            self.agent.publish_to_feed("synth_LO", data)
+            self.agent.publish_to_feed("synth_lo", data)
             session.data.update(data["data"])
 
         return True, "Frequencies Updated"
@@ -167,7 +165,7 @@ class SynthAgent:
 
                 import ocs
                 from ocs.ocs_client import OCSClient
-                agent = OCSClient("synth_LO")
+                agent = OCSClient("synth_lo")
                 agent.set_synth_status(lo_id_n=0, status=1)
         Notes:
             Set the status of the synthesizers either on (1) or off (0).
@@ -184,11 +182,11 @@ class SynthAgent:
 
             synth3.set_RF_output(lo_id_n, switch, self.lo_id)
 
-            data = {"timestamp": time.time(), "block_name": "synth_LO", "data": {}}
+            data = {"timestamp": time.time(), "block_name": "synth_lo", "data": {}}
 
             data["data"]["F1_status"] = switch
 
-            self.agent.publish_to_feed("synth_LO", data)
+            self.agent.publish_to_feed("synth_lo", data)
             session.data.update(data["data"])
 
         return True, "Frequencies Updated"
