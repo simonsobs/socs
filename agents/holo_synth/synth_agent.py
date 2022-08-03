@@ -4,11 +4,12 @@ import time
 import txaio
 import yaml
 
+from ocs import ocs_agent, site_config
+from ocs.ocs_twisted import TimeoutLock
+
 ON_RTD = os.environ.get("READTHEDOCS") == "True"
 if not ON_RTD:
     from holog_daq import synth3
-    from ocs import ocs_agent, site_config
-    from ocs.ocs_twisted import TimeoutLock
 
 
 class SynthAgent:
