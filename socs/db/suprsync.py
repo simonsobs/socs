@@ -371,6 +371,18 @@ class SupRsyncFileHandler:
                 md5sum, path = line.split()
                 file_map[os.path.normpath(path)].remote_md5sum = md5sum
 
+            for file in files:
+                if file.remote_md5sum != file.local_md5sum:
+                    file.failed_copy_attempts += 1
+                    self.log.info(
+                        f"Copy failed for file {file.local_path}! "
+                        f"(copy attempts: {file.failed_copy_attempts})"
+                    )
+                    self.log.info(f"Local md5: {file.local_md5sum}, "
+                                  f"remote_md5: {file.remote_md5sum}")
+
+
+
     def delete_files(self, delete_after):
         """
         Gets deletable files, deletes them, and updates file info
