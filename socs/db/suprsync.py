@@ -206,20 +206,21 @@ class SupRsyncFilesManager:
         if session is None:
             session = self.Session()
 
+        if max_copy_attempts is None:
+            max_copy_attempts = 2**10
+
         query = session.query(SupRsyncFile).filter(
             SupRsyncFile.removed == None,  # noqa: E711
             SupRsyncFile.archive_name == archive_name,
+            SupRsyncFile.failed_copy_attempts < max_copy_attempts
         )
-
-        if max_copy_attempts is not None:
-            query.filter(SupRsyncFile.failed_copy_attempts < max_copy_attempts)
 
         files = []
         for f in query.all():
             if f.local_md5sum != f.remote_md5sum:
                 files.append(f)
             if num_files is not None:
-                if len(files) == num_files:
+                if len(files) >= num_files:
                     break
 
         return files
