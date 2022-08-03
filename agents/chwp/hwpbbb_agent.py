@@ -530,10 +530,14 @@ class HWPBBBAgent:
             self.take_data = True
 
             # Prepare data_cache for session.data
-            self.hwp_freq = None
+            self.hwp_freq = -1
             self.ct = time.time()
-            data_cache = {'fields': {'approx_hwp_freq': self.hwp_freq},
-                          'last_updated': self.ct}
+            data_cache = {
+                'approx_hwp_freq': self.hwp_freq,
+                'encoder_last_updated': self.ct,
+                'irig_time': self.irig_time,
+                'irig_last_updated': self.ct,
+            }
 
             while self.take_data:
                 # This is blocking until data are available
@@ -579,6 +583,10 @@ class HWPBBBAgent:
                     data['data']['irig_synch_pulse_clock_counts'] = synch_pulse_clock_counts
                     data['data']['irig_info'] = list(irig_info)
                     self.agent.publish_to_feed('HWPEncoder', data)
+
+                    data_cache['irig_time'] = self.irig_time
+                    data_cache['irig_last_updated'] = sys_time
+                    session.data.update(data_cache)
 
                 # Reducing the packet size, less frequent publishing
                 # Encoder data; packet coming rate = 570*2*2/150/4 ~ 4Hz packet at 2 Hz rotation
@@ -654,8 +662,8 @@ class HWPBBBAgent:
                         self.hwp_freq = hwp_freq
                         self.ct = ct
 
-                data_cache['fields']['approx_hwp_freq'] = self.hwp_freq
-                data_cache['last_updated'] = self.ct
+                data_cache['approx_hwp_freq'] = self.hwp_freq
+                data_cache['encoder_last_updated'] = self.ct
                 session.data.update(data_cache)
 
         self.agent.feeds['HWPEncoder'].flush_buffer()
