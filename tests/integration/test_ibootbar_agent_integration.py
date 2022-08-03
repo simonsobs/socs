@@ -70,6 +70,6 @@ def test_ibootbar_set_outlet(wait_for_crossbar, start_responder, run_agent, clie
 
 
 @pytest.mark.integtest
-def test_ibootbar_cycle_outlet(wait_for_crossbar, start_responder, run_agent, client):
-    resp = client.cycle_outlet(outlet=5, cycle_time=5)
+def test_ibootbar_set_initial_state(wait_for_crossbar, start_responder, run_agent, client):
+    resp = client.set_initial_state()
     check_resp_success(resp)
