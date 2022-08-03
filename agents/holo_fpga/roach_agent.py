@@ -12,6 +12,7 @@ if not ON_RTD:
     import casperfpga
     from holog_daq import fpga_daq3, synth3
 
+
 class FPGAAgent:
     """
     Agent for programming FPGA and data acquisition for holography.
