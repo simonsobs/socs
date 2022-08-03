@@ -18,8 +18,8 @@ Dependencies
 ------------
 
 Python Packages:
-- casperfpga (https://pypi.org/project/casperfpga/)
-- holo_daq (https://github.com/McMahonCosmologyGroup/holog_daq)
+- `casperfpga <https://pypi.org/project/casperfpga/>`_
+- `holo_daq <https://github.com/McMahonCosmologyGroup/holog_daq>`_
 
 Configuration File Examples
 ---------------------------
@@ -37,12 +37,26 @@ available arguments::
        'instance-id' : 'fpga',
         'arguments': [['--config_file','holog_config.yaml']]},
 
+Holography Config File
+````````````````
+
+.. code-block:: yaml
+
+    roach: "192.168.4.20"
+    ghz_to_mhz: 1000
+    N_MULT: 8
+    F_OFFSET: 10
+    baseline: 'bd'
+
 Description
 -----------
 
-The FPGAAgent contains functions which control the FPGA for holography measurements.  Before the FPGA can take measuremnts, the user needs to initialize the FPGA using the init_FPGA() function.  This will connect to the FPGA via an ethernet port (user specified in the holog_config.yaml file) and programs the FPGA using a .fpg file.
+The FPGAAgent contains functions which control the FPGA for holography measurements.  
+Before the FPGA can take measuremnts, the user needs to initialize the FPGA using the init_FPGA() function.  
+This will connect to the FPGA via an ethernet port (user specified in the holog_config.yaml file) and programs the FPGA using a .fpg file.
 
-Once the FPGA is initialized, the user can take data using the take_data() function.  This will record the cross-correlations A, BB, AB, and phase.
+Once the FPGA is initialized, the user can take data using the take_data() function.  
+This will record the cross-correlations A, BB, AB, and phase.
 
 Agent API
 ---------
@@ -58,12 +72,3 @@ To initialize the ROACH2 FPGA, use the "fpga" agent::
     from ocs.ocs_client import OCSClient
     agent_fpga = OCSClient("fpga")
     agent_fpga.init_FPGA()
-
-Example Config File
--------------------
-
-roach: "192.168.4.20"
-ghz_to_mhz: 1000
-N_MULT: 8
-F_OFFSET: 10
-baseline: 'bd'

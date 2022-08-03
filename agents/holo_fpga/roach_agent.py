@@ -14,9 +14,10 @@ if not ON_RTD:
 
 class FPGAAgent:
     """
-    Agent for connecting to the Synths for holography
+    Agent for programming FPGA and data acquisition for holography.
 
-    Args: $OCS_CONFIG_DIR holog_config.yaml
+    Args:
+        config_file (str): ocs-site-configs/uchicago/field/holog_config.yaml
     """
 
     def __init__(self, agent, config_file):
@@ -77,7 +78,7 @@ class FPGAAgent:
             print("ok\n")
 
     def take_data(self, session, params=None):
-        """take_data(params=None)
+        """take_data()
 
         **Task** - A task to take data from the FPGA.
 
@@ -88,14 +89,11 @@ class FPGAAgent:
                 agent_fpga = OCSClient("fpga") # create agent
                 agent_fpga.take_data() # take data
 
-
         Notes:
             An example of the session data::
 
                 >>> response.session['data']
-                {"fields":
-                    {"timestamp": 1601924482.722671, "block_name": "fpga", "data":{"amp_AA": 293.644, "amp_BB": 33.752, "amp_AB": 33.752, "arr_P": 33.752}
-                    }
+                {"timestamp": 1601924482.722671, "block_name": "fpga", "data":{"amp_AA": 293.644, "amp_BB": 33.752, "amp_AB": 33.752, "arr_P": 33.752}
                 }
         """
         with self.lock.acquire_timeout(timeout=3, job="take_data") as acquired:

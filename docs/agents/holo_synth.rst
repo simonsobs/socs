@@ -6,8 +6,10 @@
 Holography Synthesizer Agent
 =============================
 
-The Holography Synthesizer Agent is provided with OCS to help demonstrate and debug issues with the holography synthesizers, which provide a signal at a desired frequency for holography measurements.
-It will connect the computer to the two Local Oscillators (LO's) via USB port, initialize the LO's, set the frequency of each and pass the frequency to the OCS feed.
+The Holography Synthesizer Agent is provided with OCS to help demonstrate and debug issues with the holography synthesizers. 
+The synthesizers provide a signal at a desired frequency for holography measurements.
+This agent will connect the computer to the two Local Oscillators (LO's) via USB port, initialize the LO's, set the frequency of 
+each and pass the frequency to the OCS feed.
 
 .. argparse::
    :module: agents.holo_synth.synth_agent
@@ -18,7 +20,7 @@ Dependencies
 ------------
 
 Python Packages:
-- holo_daq (https://github.com/McMahonCosmologyGroup/holog_daq)
+- `holo_daq <https://github.com/McMahonCosmologyGroup/holog_daq>`_
 
 
 Configuration File Examples
@@ -37,12 +39,26 @@ available arguments::
        'instance-id': 'synth_lo',
        'arguments': [['--config_file','holog_config.yaml']]}
 
+Holography Config File
+````````````````
+
+.. code-block:: yaml
+
+    roach: "192.168.4.20"
+    ghz_to_mhz: 1000
+    N_MULT: 8
+    F_OFFSET: 10
+    baseline: 'bd'
+
 Description
 -----------
 
-The SynthAgent contains functions which control the two synthesizers for holography measurements.  Before the synthesizers can output a frequency, the user needs to initialize both using the init_synth() function.  This will connect to the 2 synthesizers via 2 USB ports and prepares them to read in the user-desired frequency as the signal output.
+The SynthAgent contains functions which control the two synthesizers for holography measurements.  
+Before the synthesizers can output a frequency, the user needs to initialize both using the init_synth() function.  
+This will connect to the 2 synthesizers via 2 USB ports and prepares them to read in the user-desired frequency as the signal output.
 
-Once the synthesizers are initialized, the user can take set the frequency output using the set_frequencies() function.  This will set the frequency output of BOTH synthesizers.  The user-specified frequency should be in GHz
+Once the synthesizers are initialized, the user can take set the frequency output using the set_frequencies() function.  
+This will set the frequency output of BOTH synthesizers.  The user-specified frequency should be in GHz.
 
 Agent API
 ---------
@@ -58,12 +74,3 @@ To initialize the synthesizers, use the "synth_lo" agent::
     from ocs.ocs_client import OCSClient
     client = OCSClient("synth_lo")
     client.init_synth()
-
-Example Config File
--------------------
-
-roach: "192.168.4.20"
-ghz_to_mhz: 1000
-N_MULT: 8
-F_OFFSET: 10
-baseline: 'bd'
