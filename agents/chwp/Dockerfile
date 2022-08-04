@@ -15,3 +15,5 @@ ENTRYPOINT ["dumb-init", "python3", "-u", "hwpbbb_agent.py"]
 # Sensible default arguments
 CMD ["--site-hub=ws://crossbar:8001/ws", \
      "--site-http=http://crossbar:8001/call"]
+
+EXPOSE 8080/udp
