@@ -79,8 +79,10 @@ Description
 
 session.data
 ````````````
-The most recent data collected is stored in session.data in the structure::
-
+The most recent data collected is stored in session.data in the following structure.
+The approx_hwp_freq is initialized by -1 and will be updated by non-negative rotation frequency
+if encoder agent is receiving encoder signal.
+If chwp is completely stopped, approx_hwp_freq will not be updated.::
     >>> response.session['data']
     {'approx_hwp_freq':      2.0,
      'encoder_last_updated': 1659486962.3731978,
