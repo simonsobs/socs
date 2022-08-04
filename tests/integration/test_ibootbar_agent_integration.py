@@ -1,5 +1,7 @@
 import pytest
 from multiprocessing import Process
+import signal
+import os
 import time
 from unittest.mock import patch
 from snmpsim.commands import responder
@@ -36,22 +38,19 @@ def check_resp_success(resp):
 
 @pytest.fixture
 def start_responder():
-    def f():
-        with patch(
-            "sys.argv",
-            [
-                "test_ibootbar_agent_integration.py",
-                "--data-dir=./integration/ibootbar_snmp_data",
-                "--agent-udpv4-endpoint=127.0.0.1:1024",
-                "--variation-modules-dir=../agents/ibootbar/snmpsim_variation_modules",
-            ],
-        ):
-            responder.main()
-
-    p = Process(target=f)
-    p.start()
-    yield
-    p.terminate()
+    with patch(
+        "sys.argv",
+        [
+            "test_ibootbar_agent_integration.py",
+            "--data-dir=./integration/ibootbar_snmp_data",
+            "--agent-udpv4-endpoint=127.0.0.1:1024",
+            "--variation-modules-dir=../agents/ibootbar/snmpsim_variation_modules",
+        ],
+    ):
+        p = Process(target=responder.main)
+        p.start()
+        yield
+        os.kill(p.pid, signal.SIGINT)
 
 
 @pytest.mark.integtest
