@@ -126,7 +126,7 @@ def variate(oid, tag, value, **context):
 
     else:
         log.info('SQL table not specified for OID '
-                '%s' % (context['origOid'],))
+                 '%s' % (context['origOid'],))
         return context['origOid'], tag, context['errorStatus']
 
     orig_oid = context['origOid']

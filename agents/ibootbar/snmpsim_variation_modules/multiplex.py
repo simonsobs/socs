@@ -63,7 +63,7 @@ def init(**context):
 
         if not os.path.exists(moduleContext['dir']):
             log.info('multiplex: creating '
-                    '%s...' % moduleContext['dir'])
+                     '%s...' % moduleContext['dir'])
 
             os.makedirs(moduleContext['dir'])
 
@@ -101,7 +101,7 @@ def variate(oid, tag, value, **context):
 
             else:
                 log.info('multiplex: directory %s not '
-                        'found' % recordContext['settings']['dir'])
+                         'found' % recordContext['settings']['dir'])
                 return context['origOid'], tag, context['errorStatus']
 
         else:
@@ -157,13 +157,13 @@ def variate(oid, tag, value, **context):
 
     if context['setFlag']:
         if 'control' in (
-                recordContext['settings'] and
-                recordContext['settings']['control'] == context['origOid']):
+                recordContext['settings']
+                and recordContext['settings']['control'] == context['origOid']):
 
             fileno = int(context['origValue'])
             if fileno >= len(recordContext['keys']):
                 log.info('multiplex: .snmprec file number %s over limit of'
-                        ' %s' % (fileno, len(recordContext['keys'])))
+                         ' %s' % (fileno, len(recordContext['keys'])))
 
                 return context['origOid'], tag, context['errorStatus']
 
@@ -183,8 +183,8 @@ def variate(oid, tag, value, **context):
         if 'fileno' not in moduleContext[oid]:
             moduleContext[oid]['fileno'] = 0
 
-        if (not context['nextFlag'] and
-                recordContext['settings']['control'] == context['origOid']):
+        if (not context['nextFlag']
+                and recordContext['settings']['control'] == context['origOid']):
 
             val = rfc1902.Integer32(moduleContext[oid]['fileno'])
 
@@ -200,9 +200,9 @@ def variate(oid, tag, value, **context):
 
         fileno = bisect.bisect(recordContext['keys'], fileslot) - 1
 
-        if ('fileno' not in moduleContext[oid] or
-                moduleContext[oid]['fileno'] < fileno or
-                recordContext['settings']['wrap']):
+        if ('fileno' not in moduleContext[oid]
+                or moduleContext[oid]['fileno'] < fileno
+                or recordContext['settings']['wrap']):
             moduleContext[oid]['fileno'] = fileno
 
     datafile = recordContext['dirmap'][
@@ -210,8 +210,8 @@ def variate(oid, tag, value, **context):
 
     parser = recordContext['parsermap'][datafile]
 
-    if ('datafile' not in moduleContext[oid] or
-            moduleContext[oid]['datafile'] != datafile):
+    if ('datafile' not in moduleContext[oid]
+            or moduleContext[oid]['datafile'] != datafile):
 
         if 'datafileobj' in moduleContext[oid]:
             moduleContext[oid]['datafileobj'].close()
@@ -283,7 +283,7 @@ def record(oid, tag, value, **context):
 
         if 'iterations' in moduleContext and moduleContext['iterations']:
             log.info('multiplex: %s iterations '
-                    'remaining' % moduleContext['iterations'])
+                     'remaining' % moduleContext['iterations'])
 
             moduleContext['started'] = time.time()
             moduleContext['iterations'] -= 1

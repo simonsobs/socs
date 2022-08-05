@@ -201,8 +201,8 @@ def record(oid, tag, value, **context):
 
             return oid, tag, value
 
-        if ('taglist' not in moduleContext['settings'] or
-                tag not in moduleContext['settings']['taglist']):
+        if ('taglist' not in moduleContext['settings']
+                or tag not in moduleContext['settings']['taglist']):
             return oid, tag, value
 
         value = 'initial=%s' % value
@@ -240,7 +240,7 @@ def record(oid, tag, value, **context):
     if moduleContext['iterations']:
         if context['stopFlag']:  # switching to final iteration
             log.info('numeric: %s iterations '
-                    'remaining' % moduleContext['iterations'])
+                     'remaining' % moduleContext['iterations'])
 
             moduleContext['iterations'] -= 1
             moduleContext['started'] = time.time()

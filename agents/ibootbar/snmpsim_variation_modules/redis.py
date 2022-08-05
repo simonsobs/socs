@@ -90,7 +90,6 @@ def init(**context):
 unpackTag = SnmprecRecord().unpack_tag
 
 
-
 # It turned out, that `py-redis` package emits bytes when running
 # on Py3 and `str` on Py2. So let's add simple wrappers to all
 # Redis calls that return non-ints to overcome this hassle.
@@ -139,7 +138,7 @@ def variate(oid, tag, value, **context):
         if 'evalsha' in settings:
             if not dbConn.script_exists(settings['evalsha']):
                 log.info('redis: lua script %s does not exist '
-                        'at Redis' % settings['evalsha'])
+                         'at Redis' % settings['evalsha'])
                 return context['origOid'], tag, context['errorStatus']
 
         recordContext['ready'] = True
@@ -160,11 +159,11 @@ def variate(oid, tag, value, **context):
 
     keySpace = lindex(dbConn, keySpacesId, keySpaceIdx)
 
-    if ('current-keyspace' not in recordContext or
-            recordContext['current-keyspace'] != keySpace):
+    if ('current-keyspace' not in recordContext
+            or recordContext['current-keyspace'] != keySpace):
         log.info('redis: now using keyspace %s (cycling period'
-                ' %s)' % (
-            keySpace, recordContext['settings']['period'] or '<disabled>'))
+                 ' %s)' % (
+                     keySpace, recordContext['settings']['period'] or '<disabled>'))
 
         recordContext['current-keyspace'] = keySpace
 
@@ -203,7 +202,7 @@ def variate(oid, tag, value, **context):
 
         if redisScript:
             evalsha(dbConn, redisScript, 1, keySpace + '-' + dbOid,
-                           textTag + '|' + textValue)
+                    textTag + '|' + textValue)
 
         else:
             dbConn.set(keySpace + '-' + dbOid, textTag + '|' + textValue)
@@ -281,7 +280,7 @@ def record(oid, tag, value, **context):
     redisScript = moduleContext.get('evalsha')
 
     keySpace = '%.10d' % (
-            moduleContext['key-spaces-id'] + moduleContext.get('iterations', 0))
+        moduleContext['key-spaces-id'] + moduleContext.get('iterations', 0))
 
     if context['stopFlag']:
         dbConn.sort(
@@ -320,8 +319,8 @@ def record(oid, tag, value, **context):
     dbConn.lpush(keySpace + '-temp_oids_ordering', keySpace + '-' + dbOid)
 
     if redisScript:
-        evalsha(dbConn, 
-            redisScript, 1, keySpace + '-' + dbOid, textTag + '|' + textValue)
+        evalsha(dbConn,
+                redisScript, 1, keySpace + '-' + dbOid, textTag + '|' + textValue)
 
     else:
         dbConn.set(keySpace + '-' + dbOid, textTag + '|' + textValue)

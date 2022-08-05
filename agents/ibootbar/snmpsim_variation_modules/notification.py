@@ -137,16 +137,16 @@ def variate(oid, tag, value, **context):
     args = recordContext['settings']
 
     if context['setFlag'] and 'vlist' in args:
-        if ('eq' in args['vlist'] and
-                context['origValue'] in args['vlist']['eq']):
+        if ('eq' in args['vlist']
+                and context['origValue'] in args['vlist']['eq']):
             pass
 
-        elif ('lt' in args['vlist'] and
-                context['origValue'] < args['vlist']['lt']):
+        elif ('lt' in args['vlist']
+                and context['origValue'] < args['vlist']['lt']):
             pass
 
-        elif ('gt' in args['vlist'] and
-                context['origValue'] > args['vlist']['gt']):
+        elif ('gt' in args['vlist']
+                and context['origValue'] > args['vlist']['gt']):
             pass
 
         else:
@@ -158,9 +158,9 @@ def variate(oid, tag, value, **context):
             '%s' % args['op'])
         return context['origOid'], tag, context['errorStatus']
 
-    if (args['op'] == 'get' and not context['setFlag'] or
-                args['op'] == 'set' and context['setFlag'] or
-                args['op'] in ('any', '*')):
+    if (args['op'] == 'get' and not context['setFlag']
+        or args['op'] == 'set' and context['setFlag']
+            or args['op'] in ('any', '*')):
 
         if args['version'] in ('1', '2c'):
             authData = CommunityData(
@@ -178,7 +178,7 @@ def variate(oid, tag, value, **context):
 
             else:
                 log.info('notification: unknown auth proto '
-                        '%s' % args['authproto'])
+                         '%s' % args['authproto'])
                 return context['origOid'], tag, context['errorStatus']
 
             if args['privproto'] == 'des':
@@ -192,7 +192,7 @@ def variate(oid, tag, value, **context):
 
             else:
                 log.info('notification: unknown privacy proto '
-                        '%s' % args['privproto'])
+                         '%s' % args['privproto'])
                 return context['origOid'], tag, context['errorStatus']
 
             authData = UsmUserData(
@@ -206,7 +206,7 @@ def variate(oid, tag, value, **context):
 
         if 'host' not in args:
             log.info('notification: target hostname not configured for '
-                    'OID %s' % (oid,))
+                     'OID %s' % (oid,))
             return context['origOid'], tag, context['errorStatus']
 
         if args['proto'] == 'udp':
@@ -232,7 +232,7 @@ def variate(oid, tag, value, **context):
 
             else:
                 log.info('notification: incompatible network transport types used by '
-                        'CommandResponder vs NotificationOriginator')
+                         'CommandResponder vs NotificationOriginator')
 
                 if 'bindaddr' in args:
                     localAddress = args['bindaddr']
@@ -241,7 +241,7 @@ def variate(oid, tag, value, **context):
             log.info('notification: binding to local address %s' % localAddress)
             target.setLocalAddress((localAddress, 0))
 
-        # this will make target objects different based on their bind address 
+        # this will make target objects different based on their bind address
         target.transportDomain = target.transportDomain + context['transportDomain']
 
         varBinds = []
@@ -279,7 +279,7 @@ def variate(oid, tag, value, **context):
         )
 
         log.info('notification: sending Notification to %s with credentials '
-                '%s' % (authData, target))
+                 '%s' % (authData, target))
 
     if context['setFlag'] or 'value' not in args:
         return oid, tag, context['origValue']
