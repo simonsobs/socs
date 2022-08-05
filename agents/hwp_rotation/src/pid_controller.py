@@ -44,10 +44,16 @@ class PID:
 
         """
         conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            conn.connect((ip, port))
-        except ConnectionRefusedError:
-            print(f"Failed to connect to device at {ip}:{port}")
+        # unit tests might fail on first connection attempt
+        attempts = 3
+        for attempt in range(attempts):
+            try:
+                conn.connect((ip, port))
+                break
+            except ConnectionRefusedError:
+                print(f"Failed to connect to device at {ip}:{port}")
+                print(f"Connection attempts remaining: {attempts-attempt-1}")
+            time.sleep(1)
         conn.settimeout(timeout)
 
         return conn

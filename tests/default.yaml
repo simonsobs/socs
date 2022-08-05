@@ -60,5 +60,11 @@ hosts:
                      ['--gpib-slot', '1']
                     ]
       },
+      {'agent-class': 'PfeifferAgent',
+       'instance-id': 'pfeiffer366',
+       'arguments': [['--ip_address', '127.0.0.1'],
+                     ['--port', '8000'],
+                    ]
+      },
     ]
   }

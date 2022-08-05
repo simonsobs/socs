@@ -93,7 +93,7 @@ class Lakeshore240_Simulator:
                 if e.errno == 48:
                     self.log.warning(f"Address {p} is already in use")
                 else:
-                    raise(e)
+                    raise e
         else:
             print(f"Could not connect to ports in {range(self.port, self.port+5)}")
 
