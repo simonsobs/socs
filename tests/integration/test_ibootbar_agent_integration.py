@@ -18,8 +18,6 @@ from ocs.testing import (
 
 from integration.util import create_crossbar_fixture
 
-from socs.testing.device_emulator import create_device_emulator
-
 pytest_plugins = "docker_compose"
 
 wait_for_crossbar = create_crossbar_fixture()
@@ -77,9 +75,7 @@ def test_ibootbar_set_outlet(wait_for_crossbar, start_responder, run_agent, clie
     # Simulate internal state transition of hardware
     snmp = SNMPTwister(address, port)
     outlet = [("IBOOTPDU-MIB", "outletStatus", outlet_number - 1)]
-    setcmd = yield snmp.set(
-        oid_list=outlet, version=2, setvalue=1, community_name="public"
-    )
+    yield snmp.set(oid_list=outlet, version=2, setvalue=1, community_name="public")
 
     while not (resp := client.acq.status()).session["data"]:
         time.sleep(0.1)
