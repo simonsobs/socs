@@ -3,6 +3,7 @@ from multiprocessing import Process
 import signal
 import os
 import time
+import subprocess
 from unittest.mock import patch
 from twisted.internet.defer import inlineCallbacks
 from snmpsim.commands import responder
@@ -27,6 +28,11 @@ run_agent = create_agent_runner_fixture(
     args=["--log-dir", "./logs/"],
 )
 client = create_client_fixture("ibootbar")
+
+subprocess.run(
+    "mkdir -p ~/.pysnmp/mibs && cp -r ../agents/ibootbar/mibs/. ~/.pysnmp/mibs",
+    shell=True,
+)
 
 address = "127.0.0.1"
 port = 1024
