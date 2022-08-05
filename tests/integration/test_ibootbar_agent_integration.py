@@ -84,11 +84,7 @@ def test_ibootbar_set_outlet(wait_for_crossbar, start_responder, run_agent, clie
     while not (resp := client.acq.status()).session["data"]:
         time.sleep(0.1)
 
-    for i in range(8):
-        if i == outlet_number - 1:
-            assert resp.session["data"][f"outletStatus_{i}"]["status"] == 1
-        else:
-            assert resp.session["data"][f"outletStatus_{i}"]["status"] == 0
+    assert resp.session["data"][f"outletStatus_{outlet_number - 1}"]["status"] == 1
 
 
 @pytest.mark.integtest
