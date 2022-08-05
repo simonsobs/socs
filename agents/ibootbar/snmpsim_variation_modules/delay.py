@@ -74,7 +74,7 @@ def variate(oid, tag, value, **context):
 
                 else:
                     log.info('delay: bad vlist syntax: '
-                            '%s' % recordContext['settings']['vlist'])
+                             '%s' % recordContext['settings']['vlist'])
 
             recordContext['settings']['vlist'] = vlist
 
@@ -103,21 +103,21 @@ def variate(oid, tag, value, **context):
 
                 else:
                     log.info('delay: bad tlist syntax: '
-                            '%s' % recordContext['settings']['tlist'])
+                             '%s' % recordContext['settings']['tlist'])
 
             recordContext['settings']['tlist'] = tlist
 
     if context['setFlag'] and 'vlist' in recordContext['settings']:
-        if ('eq' in recordContext['settings']['vlist'] and
-                    context['origValue'] in recordContext['settings']['vlist']['eq']):
+        if ('eq' in recordContext['settings']['vlist']
+                and context['origValue'] in recordContext['settings']['vlist']['eq']):
             delay = recordContext['settings']['vlist']['eq'][context['origValue']]
 
-        elif ('lt' in recordContext['settings']['vlist'] and
-                context['origValue'] < recordContext['settings']['vlist']['lt'][0]):
+        elif ('lt' in recordContext['settings']['vlist']
+                and context['origValue'] < recordContext['settings']['vlist']['lt'][0]):
             delay = recordContext['settings']['vlist']['lt'][1]
 
-        elif ('gt' in recordContext['settings']['vlist'] and
-                context['origValue'] > recordContext['settings']['vlist']['gt'][0]):
+        elif ('gt' in recordContext['settings']['vlist']
+                and context['origValue'] > recordContext['settings']['vlist']['gt'][0]):
             delay = recordContext['settings']['vlist']['gt'][1]
 
         else:
@@ -125,16 +125,16 @@ def variate(oid, tag, value, **context):
 
     elif 'tlist' in recordContext['settings']:
         now = int(time.time())
-        if ('eq' in recordContext['settings']['tlist'] and
-                now == recordContext['settings']['tlist']['eq']):
+        if ('eq' in recordContext['settings']['tlist']
+                and now == recordContext['settings']['tlist']['eq']):
             delay = recordContext['settings']['tlist']['eq'][now]
 
-        elif ('lt' in recordContext['settings']['tlist'] and
-                now < recordContext['settings']['tlist']['lt'][0]):
+        elif ('lt' in recordContext['settings']['tlist']
+                and now < recordContext['settings']['tlist']['lt'][0]):
             delay = recordContext['settings']['tlist']['lt'][1]
 
-        elif ('gt' in recordContext['settings']['tlist'] and
-                now > recordContext['settings']['tlist']['gt'][0]):
+        elif ('gt' in recordContext['settings']['tlist']
+                and now > recordContext['settings']['tlist']['gt'][0]):
             delay = recordContext['settings']['tlist']['gt'][1]
 
         else:
