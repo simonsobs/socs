@@ -85,7 +85,7 @@ def test_ibootbar_set_outlet(wait_for_crossbar, start_responder, run_agent, clie
         time.sleep(0.1)
 
     for i in range(8):
-        if i == 2:
+        if i == outlet_number - 1:
             assert resp.session["data"][f"outletStatus_{i}"]["status"] == 1
         else:
             assert resp.session["data"][f"outletStatus_{i}"]["status"] == 0
