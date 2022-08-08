@@ -53,7 +53,7 @@ class appMotionMotorsAgent:
         self.motor2_port = motor2_port
         self.motor2_is_lin = motor2_is_lin
         self.m_res = m_res
-        self.sampling_frequency = samp
+        self.samp = samp
         self.move_status = False
 
         self.initialized = False
@@ -1038,7 +1038,7 @@ def make_parser(parser=None):
         help="Manually enter microstep resolution",
         action='store_true')
     pgroup.add_argument(
-        '--sampling-frequency',
+        '--samp',
         help="Frequency to sample at for data acq",
         type=float)
     pgroup.add_argument(
@@ -1073,7 +1073,7 @@ if __name__ == '__main__':
         args.motor2_is_lin,
         args.m_res,
         args.mode,
-        args.sampling_frequency)
+        args.samp)
 
     agent.register_task('init_motors', m.init_motors_task)
     agent.register_task('move_to_position', m.move_axis_to_position)
