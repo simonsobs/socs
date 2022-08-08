@@ -71,16 +71,30 @@ def test_synacc_reboot(wait_for_crossbar, app, ctx, run_agent, client):
 
 
 @pytest.mark.integtest
-def test_synacc_set_outlet(wait_for_crossbar, app, ctx, run_agent, client):
+def test_synacc_set_outlet_on(wait_for_crossbar, app, ctx, run_agent, client):
     @app.route("/cmd.cgi", methods=["GET"])
     def status():
         query = request.query_string.decode()
         print("query:", query)
-        assert query == "$A3%204%201"
+        assert query == "$A3%204%201"  # recall that %20 is a space
         return ""
 
     with ctx:
         resp = client.set_outlet(outlet=4, on=True)
+        check_resp_state(resp)
+
+
+@pytest.mark.integtest
+def test_synacc_set_outlet_off(wait_for_crossbar, app, ctx, run_agent, client):
+    @app.route("/cmd.cgi", methods=["GET"])
+    def status():
+        query = request.query_string.decode()
+        print("query:", query)
+        assert query == "$A3%203%200"  # recall that %20 is a space
+        return ""
+
+    with ctx:
+        resp = client.set_outlet(outlet=3, on=False)
         check_resp_state(resp)
 
 
