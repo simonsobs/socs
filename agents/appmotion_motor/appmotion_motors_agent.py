@@ -67,7 +67,7 @@ class appMotionMotorsAgent:
             self.auto_acq = True
         else:
             self.auto_acq = False
-        
+
         # register the position feeds
         agg_params = {
             'frame_length': 10 * 60,  # [sec]
