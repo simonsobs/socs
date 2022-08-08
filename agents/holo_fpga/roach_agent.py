@@ -88,7 +88,12 @@ class FPGAAgent:
             An example of the session data::
 
                 >>> response.session['data']
-                {"timestamp": 1601924482.722671, "block_name": "fpga", "data":{"amp_AA": 293.644, "amp_BB": 33.752, "amp_AB": 33.752, "arr_P": 33.752}
+                {"timestamp": 1601924482.722671,
+                 "block_name": "fpga",
+                 "data": {"amp_AA": 293.644,
+                          "amp_BB": 33.752,
+                          "amp_AB": 33.752,
+                          "arr_P": 33.752}
                 }
         """
         with self.lock.acquire_timeout(timeout=3, job="take_data") as acquired:
