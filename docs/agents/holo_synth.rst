@@ -71,12 +71,3 @@ Agent API
 
 .. autoclass:: agents.holo_synth.synth_agent.SynthAgent
     :members:
-
-Example Clients
----------------
-
-To initialize the synthesizers, use the "synth_lo" agent::
-
-    from ocs.ocs_client import OCSClient
-    client = OCSClient("synth_lo")
-    client.init_synth()

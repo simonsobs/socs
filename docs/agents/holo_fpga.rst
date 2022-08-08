@@ -67,12 +67,3 @@ Agent API
 
 .. autoclass:: agents.holo_fpga.roach_agent.FPGAAgent
     :members:
-
-Example Clients
----------------
-
-To initialize the ROACH2 FPGA, use the "fpga" agent::
-
-    from ocs.ocs_client import OCSClient
-    agent_fpga = OCSClient("fpga")
-    agent_fpga.init_FPGA()
