@@ -53,7 +53,7 @@ class appMotionMotorsAgent:
         self.motor2_port = motor2_port
         self.motor2_is_lin = motor2_is_lin
         self.m_res = m_res
-        self.samp = samp
+        self.samp = float(samp)
         self.move_status = False
 
         self.initialized = False
@@ -67,8 +67,7 @@ class appMotionMotorsAgent:
             self.auto_acq = True
         else:
             self.auto_acq = False
-        self.sampling_frequency = float(samp)
-
+        
         # register the position feeds
         agg_params = {
             'frame_length': 10 * 60,  # [sec]
