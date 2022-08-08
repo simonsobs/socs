@@ -112,6 +112,13 @@ class SynthAgent:
                 from ocs.ocs_client import OCSClient
                 client = OCSClient("synth_lo")
                 client.set_frequencies(freq1=210, offset=10)
+
+        Notes:
+            An example of the session data::
+
+                >>> response.session['data']
+                {"timestamp": 1601924482.722671, "block_name": "synth_lo", "data":{"F1": 11 , "F2": 11.1}}
+                }
         """
         f1 = params.get("freq1", 0)
         f_offset = params.get("offset", 0)
@@ -150,16 +157,13 @@ class SynthAgent:
 
     #     return True, "Frequencies Updated"
 
-    @ocs_agent.param("lo_id_n", type=int, default=0, choices=[0, 1])
+    @ocs_agent.param("lo_id", type=int, default=0, choices=[0, 1])
     @ocs_agent.param("status", type=int, default=0, choices=[0, 1])
     def set_synth_status(self, session, params):
-        """set_synth_status(lo_id_n=0, status=1)
+        """set_synth_status(lo_id=0, status=1)
 
         **Task** - A task to set the status of the synthesizers.
 
-        Parameters:
-            dict: {'lo_id_n': int
-                   'status': int}
         Parameters:
             lo_id (int): Local Oscillator ID (either 0 or 1).
             status (int): Status of local oscillator (0 is off, 1 is on).
@@ -169,9 +173,16 @@ class SynthAgent:
 
                 from ocs.ocs_client import OCSClient
                 agent = OCSClient("synth_lo")
-                agent.set_synth_status(lo_id_n=0, status=1)
+                agent.set_synth_status(lo_id=0, status=1)
+
+        Notes:
+            An example of the session data::
+
+                >>> response.session['data']
+                {"timestamp": 1601924482.722671, "block_name": "synth_lo", "data":{"F1_status": 1}
+                }
         """
-        lo_id_n = params.get("lo_id", 0)
+        lo_id = params.get("lo_id", 0)
         switch = params.get("switch", 0)
 
         with self.lock.acquire_timeout(timeout=3, job="turn_on_or_off_synth") as acquired:
@@ -181,7 +192,7 @@ class SynthAgent:
                 )
                 return False, "Could not acquire lock"
 
-            synth3.set_RF_output(lo_id_n, switch, self.lo_id)
+            synth3.set_RF_output(lo_id, switch, self.lo_id)
 
             data = {"timestamp": time.time(), "block_name": "synth_lo", "data": {}}
 

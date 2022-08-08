@@ -47,6 +47,8 @@ Holography Config File
     N_MULT: 8
     F_OFFSET: 10
     baseline: 'bd'
+    path_to_roach_init: "~/Desktop/holog_daq/scripts/upload_fpga_py2.py"
+    python2_env: "/opt/anaconda2/bin/python2 "
 
 Description
 -----------
