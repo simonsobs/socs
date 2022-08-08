@@ -30,7 +30,7 @@ def app():
 
 @pytest.fixture
 def ctx(app):
-    return app.run("localhost", 5000)
+    return app.run("localhost", 8000)
 
 
 def check_resp_state(resp, opcode=OpCode.SUCCEEDED.value):
