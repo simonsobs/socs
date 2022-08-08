@@ -53,7 +53,7 @@ def start_responder():
             "test_ibootbar_agent_integration.py",
             "--data-dir=./integration/ibootbar_snmp_data",
             f"--agent-udpv4-endpoint={address}:{port}",
-            "--variation-modules-dir=../agents/ibootbar/snmpsim_variation_modules",
+            f"--variation-modules-dir={os.path.expanduser('~/.local/share/snmpsim/variation')}",
         ],
     ):
         p = Process(target=responder.main)
