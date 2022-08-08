@@ -73,7 +73,7 @@ def test_synacc_reboot(wait_for_crossbar, app, ctx, run_agent, client):
 @pytest.mark.integtest
 def test_synacc_set_outlet_on(wait_for_crossbar, app, ctx, run_agent, client):
     @app.route("/cmd.cgi", methods=["GET"])
-    def status():
+    def set_on():
         query = request.query_string.decode()
         print("query:", query)
         assert query == "$A3%204%201"  # recall that %20 is a space
@@ -87,7 +87,7 @@ def test_synacc_set_outlet_on(wait_for_crossbar, app, ctx, run_agent, client):
 @pytest.mark.integtest
 def test_synacc_set_outlet_off(wait_for_crossbar, app, ctx, run_agent, client):
     @app.route("/cmd.cgi", methods=["GET"])
-    def status():
+    def set_off():
         query = request.query_string.decode()
         print("query:", query)
         assert query == "$A3%203%200"  # recall that %20 is a space
@@ -101,7 +101,7 @@ def test_synacc_set_outlet_off(wait_for_crossbar, app, ctx, run_agent, client):
 @pytest.mark.integtest
 def test_synacc_set_all(wait_for_crossbar, app, ctx, run_agent, client):
     @app.route("/cmd.cgi", methods=["GET"])
-    def status():
+    def set_all():
         query = request.query_string.decode()
         print("query:", query)
         assert query == "$A7%201"

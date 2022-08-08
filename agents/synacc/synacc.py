@@ -130,7 +130,7 @@ class SynaccessAgent:
 
         """
 
-        with self.lock.acquire_timeout(timeout=0, job='status_acq')\
+        with self.lock.acquire_timeout(timeout=3, job='status_acq')\
                 as acquired:
             if not acquired:
                 self.log.warn(
