@@ -117,8 +117,10 @@ class SynthAgent:
             An example of the session data::
 
                 >>> response.session['data']
-                {"timestamp": 1601924482.722671, "block_name": "synth_lo", "data":{"F1": 11 , "F2": 11.1}}
-                }
+                {"timestamp": 1601924482.722671,
+                 "block_name": "synth_lo",
+                 "data": {"F1": 11 ,
+                          "F2": 11.1}}}
         """
         f1 = params.get("freq1", 0)
         f_offset = params.get("offset", 0)
@@ -179,8 +181,9 @@ class SynthAgent:
             An example of the session data::
 
                 >>> response.session['data']
-                {"timestamp": 1601924482.722671, "block_name": "synth_lo", "data":{"F1_status": 1}
-                }
+                {"timestamp": 1601924482.722671,
+                 "block_name": "synth_lo",
+                 "data": {"F1_status": 1}}
         """
         lo_id = params.get("lo_id", 0)
         switch = params.get("switch", 0)
