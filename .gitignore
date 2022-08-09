@@ -123,6 +123,9 @@ ENV/
 # mypy
 .mypy_cache/
 
+# vscode
+*.code-workspace
+
 # Custom
 .crossbar/
 ocs/Lakeshore/ls.cfg

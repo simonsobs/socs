@@ -19,6 +19,8 @@ for n, f in [
         ('LATRtXYStageAgent', 'xy_stage/xy_latrt_agent.py'),
         ('ACUAgent', 'acu/acu_agent.py'),
         ('FTSAerotechAgent', 'fts_aerotech_stage/fts_aerotech_agent.py'),
-        ('VantagePro2Agent', 'vantagePro2_agent/vantage_pro2_agent.py')
+        ('VantagePro2Agent', 'vantagePro2_agent/vantage_pro2_agent.py'),
+        ('FPGAAgent', 'holo_fpga/roach_agent.py'),
+        ('SynthAgent', 'holo_synth/synth_agent.py')
 ]:
     ocs.site_config.register_agent_class(n, os.path.join(root, f))
