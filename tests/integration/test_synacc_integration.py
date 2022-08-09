@@ -24,13 +24,25 @@ client = create_client_fixture("synacc")
 
 
 @pytest.fixture
-def app():
-    return HttpServerMock(__name__)
+def http_mock():
+    app = HttpServerMock(__name__)
 
+    @app.route("/cmd.cgi", methods=["GET"])
+    def route_fn():
+        query = request.query_string.decode()
+        print("query:", query)
+        if query == "$A5":
+            return "$A0,00101"
+        elif query == "$A4%203":
+            return ""
+        elif query == "$A3%204%201":  # recall that %20 is a space
+            return ""
+        elif query == "$A3%203%200":  # recall that %20 is a space
+            return ""
+        elif query == "$A7%201":
+            return ""
 
-@pytest.fixture
-def ctx(app):
-    yield app.run("localhost", 8000)
+    return app.run("localhost", 8000)
 
 
 def check_resp_state(resp, opcode=OpCode.SUCCEEDED.value):
@@ -41,15 +53,8 @@ def check_resp_state(resp, opcode=OpCode.SUCCEEDED.value):
 
 
 @pytest.mark.integtest
-def test_synacc_startup(wait_for_crossbar, app, ctx, run_agent, client):
-    @app.route("/cmd.cgi", methods=["GET"])
-    def status():
-        query = request.query_string.decode()
-        print("query:", query)
-        assert query == "$A5"
-        return "$A0,00101"
-
-    with ctx:
+def test_synacc_startup(wait_for_crossbar, http_mock, run_agent, client):
+    with http_mock:
         resp = client.get_status.wait()  # get_status runs on startup
         check_resp_state(resp)
         resp = client.status_acq.status()
@@ -57,56 +62,28 @@ def test_synacc_startup(wait_for_crossbar, app, ctx, run_agent, client):
 
 
 @pytest.mark.integtest
-def test_synacc_reboot(wait_for_crossbar, app, ctx, run_agent, client):
-    @app.route("/cmd.cgi", methods=["GET"])
-    def reboot():
-        query = request.query_string.decode()
-        print("query:", query)
-        assert query == "$A4%203"
-        return ""
-
-    with ctx:
+def test_synacc_reboot(wait_for_crossbar, http_mock, run_agent, client):
+    with http_mock:
         resp = client.reboot(outlet=3)
         check_resp_state(resp)
 
 
 @pytest.mark.integtest
-def test_synacc_set_outlet_on(wait_for_crossbar, app, ctx, run_agent, client):
-    @app.route("/cmd.cgi", methods=["GET"])
-    def set_on():
-        query = request.query_string.decode()
-        print("query:", query)
-        assert query == "$A3%204%201"  # recall that %20 is a space
-        return ""
-
-    with ctx:
+def test_synacc_set_outlet_on(wait_for_crossbar, http_mock, run_agent, client):
+    with http_mock:
         resp = client.set_outlet(outlet=4, on=True)
         check_resp_state(resp)
 
 
 @pytest.mark.integtest
-def test_synacc_set_outlet_off(wait_for_crossbar, app, ctx, run_agent, client):
-    @app.route("/cmd.cgi", methods=["GET"])
-    def set_off():
-        query = request.query_string.decode()
-        print("query:", query)
-        assert query == "$A3%203%200"  # recall that %20 is a space
-        return ""
-
-    with ctx:
+def test_synacc_set_outlet_off(wait_for_crossbar, http_mock, run_agent, client):
+    with http_mock:
         resp = client.set_outlet(outlet=3, on=False)
         check_resp_state(resp)
 
 
 @pytest.mark.integtest
-def test_synacc_set_all(wait_for_crossbar, app, ctx, run_agent, client):
-    @app.route("/cmd.cgi", methods=["GET"])
-    def set_all():
-        query = request.query_string.decode()
-        print("query:", query)
-        assert query == "$A7%201"
-        return ""
-
-    with ctx:
+def test_synacc_set_all(wait_for_crossbar, http_mock, run_agent, client):
+    with http_mock:
         resp = client.set_all(on=True)
         check_resp_state(resp)
