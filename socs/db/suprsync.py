@@ -345,6 +345,11 @@ class SupRsyncFileHandler:
                         file.failed_copy_attempts += 1
                         continue
 
+                    if os.path.exists(tmp_path):
+                        self.log.warn("Temp file {path} already exists!", path=tmp_path)
+                        file.failed_copy_attempts += 1
+                        continue
+
                     os.symlink(file.local_path, tmp_path)
 
                     remote_path = os.path.normpath(
