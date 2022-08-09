@@ -41,6 +41,8 @@ def http_mock():
             return ""
         elif query == "$A7%201":
             return ""
+        else:
+            assert False, "Bad query"
 
     return app.run("localhost", 8000)
 
