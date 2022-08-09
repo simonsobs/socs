@@ -31,14 +31,19 @@ def http_mock():
     def route_fn():
         query = request.query_string.decode()
         print("query:", query)
+        # test_synacc_startup
         if query == "$A5":
             return "$A0,00101"
+        # test_synacc_reboot
         elif query == "$A4%203":
             return ""
-        elif query == "$A3%204%201":  # recall that %20 is a space
+        # test_synacc_set_outlet_on (recall that %20 is a space)
+        elif query == "$A3%204%201":
             return ""
-        elif query == "$A3%203%200":  # recall that %20 is a space
+        # test_synacc_set_outlet_off (recall that %20 is a space)
+        elif query == "$A3%203%200":
             return ""
+        # test_synacc_set_all
         elif query == "$A7%201":
             return ""
         else:
