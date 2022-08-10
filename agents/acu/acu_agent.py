@@ -162,7 +162,7 @@ class ACUAgent:
                                self.restart_idle,
                                lambda session, params: self._set_job_stop('restart_idle'),
                                blocking=False,
-                               startup=True)
+                               startup=False)
         basic_agg_params = {'frame_length': 60}
         fullstatus_agg_params = {'frame_length': 60,
                                  'exclude_influx': True,
