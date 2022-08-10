@@ -81,6 +81,7 @@ class ACUAgent:
             'broadcast': 'idle',
             'control': 'idle',  # shared by all motion tasks/processes
             'scanspec': 'idle',
+            'restartidle': 'idle',
         }
 
         self.acu_config = aculib.guess_config(acu_config)
@@ -157,6 +158,11 @@ class ACUAgent:
                                lambda session, params: self._set_job_stop('generate_scan'),
                                blocking=False,
                                startup=False)
+        agent.register_process('restart_idle',
+                               self.restart_idle,
+                               lambda session, params: self._set_job_stop('restart_idle'),
+                               blocking=False,
+                               startup=True)
         basic_agg_params = {'frame_length': 60}
         fullstatus_agg_params = {'frame_length': 60,
                                  'exclude_influx': True,
@@ -277,6 +283,20 @@ class ACUAgent:
     #
     # The Operations
     #
+
+    @inlineCallbacks
+    def restart_idle(self, session, params):
+        ok, msg = self._try_set_job('restart_idle')
+        if not ok:
+            return ok, msg
+        session.set_status('running')
+        while True:
+            yield self.acu_control.http.Command('DataSets.CmdModeTransfer',
+                                                'RestartIdleTime')
+            self.log.info('Sent RestartIdleTime')
+            yield dsleep(5.*59.)     
+        self._set_job_done('restart_idle')
+        return True, 'Process "restart_idle" exited cleanly.'
 
     @inlineCallbacks
     def monitor(self, session, params):
