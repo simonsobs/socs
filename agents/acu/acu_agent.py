@@ -391,12 +391,13 @@ class ACUAgent:
                                          'data': {'Elevation_commanded_position_influx': self.data['status']['commands']['Elevation_commanded_position']}
                                          }
                         self.agent.publish_to_feed('acu_commands_influx', acucommand_el)
-                    if str(self.data['status']['commands']['Boresight_commanded_position']) != 'nan':
-                        acucommand_bs = {'timestamp': self.data['status']['summary']['ctime'],
-                                         'block_name': 'ACU_commanded_positions_boresight',
-                                         'data': {'Boresight_commanded_position_influx': self.data['status']['commands']['Boresight_commanded_position']}
+                    if self.acu_config['platform'] == 'satp':
+                        if str(self.data['status']['commands']['Boresight_commanded_position']) != 'nan':
+                            acucommand_bs = {'timestamp': self.data['status']['summary']['ctime'],
+                                             'block_name': 'ACU_commanded_positions_boresight',
+                                             'data': {'Boresight_commanded_position_influx': self.data['status']['commands']['Boresight_commanded_position']}
                                          }
-                        self.agent.publish_to_feed('acu_commands_influx', acucommand_bs)
+                            self.agent.publish_to_feed('acu_commands_influx', acucommand_bs)
             if self.data['uploads']['PtStack_Time'] == '000, 00:00:00.000000':
                 self.data['uploads']['PtStack_ctime'] = self.data['status']['summary']['ctime']
 
