@@ -784,13 +784,13 @@ class ACUAgent:
         yield self._run_specified_scan(session, times, azs, els, vas, ves, azflags, elflags, azonly=False, simulator=simulator)
         yield True, 'Track completed'
 
-    @ocs_agent.param('azpts', cast=tuple, type=tuple)
-    @ocs_agent.param('el', type=float)
-    @ocs_agent.param('azvel', type=float)
-    @ocs_agent.param('acc', type=float)
-    @ocs_agent.param('ntimes', type=int)
-    @ocs_agent.param('azonly', type=bool)
-    @ocs_agent.param('simulator', default=False, type=bool)
+#    @ocs_agent.param('azpts', type=tuple)
+#    @ocs_agent.param('el', type=float)
+#    @ocs_agent.param('azvel', type=float)
+#    @ocs_agent.param('acc', type=float)
+#    @ocs_agent.param('ntimes', type=int)
+#    @ocs_agent.param('azonly', type=bool)
+#    @ocs_agent.param('simulator', default=False, type=bool)
     @inlineCallbacks
     def constant_velocity_scan(self, session, params=None):
         """constant_velocity_scan(azpts=None, el=None, azvel=None, acc=None, \
@@ -1011,7 +1011,7 @@ class ACUAgent:
         el_endpoint2 = params.get('el_endpoint2', el_endpoint1)
         el_speed = params.get('el_speed', 0.0)
 
-        yield self.acu_control.stop()
+   #     yield self.acu_control.stop()
         g = sh.generate_constant_velocity_scan(az_endpoint1=az_endpoint1,
                                                az_endpoint2=az_endpoint2,
                                                az_speed=az_speed, acc=acc,
@@ -1020,11 +1020,16 @@ class ACUAgent:
                                                el_speed=el_speed,
                                                **scan_params)
         self.acu_control.mode('ProgramTrack')
-        while True:
+        yield dsleep(0.5)
+        current_modes = {'Az': self.data['status']['summary']['Azimuth_mode'],
+                         'El': self.data['status']['summary']['Elevation_mode']}
+        while current_modes['Az']=='ProgramTrack':
             lines = next(g)
             current_lines = lines
             group_size = 250
             while len(current_lines):
+                current_modes = {'Az': self.data['status']['summary']['Azimuth_mode'],
+                                 'El': self.data['status']['summary']['Elevation_mode']}
                 upload_lines = current_lines[:group_size]
                 text = ''.join(upload_lines)
                 current_lines = current_lines[group_size:]
