@@ -784,7 +784,7 @@ class ACUAgent:
         yield self._run_specified_scan(session, times, azs, els, vas, ves, azflags, elflags, azonly=False, simulator=simulator)
         yield True, 'Track completed'
 
-    @ocs_agent.param('azpts', type=tuple)
+    @ocs_agent.param('azpts', cast=tuple, type=tuple)
     @ocs_agent.param('el', type=float)
     @ocs_agent.param('azvel', type=float)
     @ocs_agent.param('acc', type=float)
@@ -834,6 +834,10 @@ class ACUAgent:
             return ok, msg
         self.log.info('_try_set_job ok')
 
+        FULL_STACK = 10000
+        UPLOAD_GROUP_SIZE = 120
+        UPLOAD_THRESHOLD = FULL_STACK - 100
+
         start_az = azs[0]
         start_el = els[0]
         end_az = azs[-1]
@@ -857,13 +861,11 @@ class ACUAgent:
             yield self.acu_control.azmode('ProgramTrack')
         else:
             yield self.acu_control.mode('ProgramTrack')
-        m = yield self.acu_control.mode()
-        print(m)
         self.log.info('mode is now ProgramTrack')
         if simulator:
             group_size = len(all_lines)
         else:
-            group_size = 120
+            group_size = UPLOAD_GROUP_SIZE
         spec = {'times': times,
                 'azs': azs,
                 'els': els,
@@ -893,15 +895,23 @@ class ACUAgent:
                               }
                 self.agent.publish_to_feed('acu_upload', acu_upload, from_reactor=True)
             text = ''.join(upload_lines)
+            yield dsleep(0.05)
             free_positions = self.data['status']['summary']['Free_upload_positions']
-            while free_positions < 9899:
+            while free_positions < UPLOAD_THRESHOLD:
                 free_positions = self.data['status']['summary']['Free_upload_positions']
-                yield dsleep(0.1)
+                az_mode = self.data['status']['summary']['Azimuth_mode']
+                yield dsleep(0.05)
+                if az_mode == 'Stop':
+                    self.log.warn('Scan aborted!')
+                    return False
+                elif az_mode not in ['Stop', 'ProgramTrack']:
+                    self.log.warn('Azimuth mode no longer ProgramTrack!')
+                    return False
             yield self.acu_control.http.UploadPtStack(text)
             self.log.info('Uploaded a group')
         self.log.info('No more lines to upload')
         free_positions = self.data['status']['summary']['Free_upload_positions']
-        while free_positions < 9999:
+        while free_positions < FULL_STACK - 1:
             yield dsleep(0.1)
             modes = (self.data['status']['summary']['Azimuth_mode'],
                      self.data['status']['summary']['Elevation_mode'])
@@ -916,14 +926,17 @@ class ACUAgent:
         current_az = self.data['broadcast']['Corrected_Azimuth']
         current_el = self.data['broadcast']['Corrected_Elevation']
         while round(current_az - end_az, 1) != 0.:
+            print('still rounding az')
             self.log.info('Waiting to settle at azimuth position')
             yield dsleep(0.1)
             current_az = self.data['broadcast']['Corrected_Azimuth']
         if not azonly:
             while round(current_el - end_el, 1) != 0.:
+                print('still rounding el')
                 self.log.info('Waiting to settle at elevation position')
                 yield dsleep(0.1)
                 current_el = self.data['broadcast']['Corrected_Elevation']
+        print('rounding completed')
         yield dsleep(self.sleeptime)
         yield self.acu_control.stop()
         self.data['uploads']['Start_Azimuth'] = 0.0
