@@ -142,13 +142,16 @@ class G3FrameGenerator:
     Helper class for generating G3 Streams.
     """
 
-    def __init__(self, stream_id, sample_rate, tune):
+    def __init__(self, stream_id, sample_rate, tune,
+                 action=None, action_time=None):
         self.frame_num = 0
         self.session_id = int(time.time())
         self.tune = tune
         self.nchans = np.sum(tune.channels != -1)
         self.sample_rate = sample_rate
         self.stream_id = stream_id
+        self.action = action
+        self.action_time = action_time
 
     def tag_frame(self, fr):
         fr['frame_num'] = self.frame_num
@@ -159,8 +162,15 @@ class G3FrameGenerator:
         self.frame_num += 1
         return fr
 
-    def get_obs_frame(self):
+    def get_obs_start_frame(self):
         fr = core.G3Frame(core.G3FrameType.Observation)
+        fr['stream_placement'] = 'start'
+        self.tag_frame(fr)
+        return fr
+
+    def get_obs_end_frame(self):
+        fr = core.G3Frame(core.G3FrameType.Observation)
+        fr['stream_placement'] = 'end'
         self.tag_frame(fr)
         return fr
 
@@ -176,6 +186,12 @@ class G3FrameGenerator:
 
         s['AMCc.SmurfProcessor.ChannelMapper.Mask'] = str(chmask.tolist())
         s['AMCc.SmurfProcessor.ChannelMapper.NumChannels'] = self.nchans.item()
+
+        pysmurf_root = "AMCc.SmurfProcessor.SOStream"
+        if self.action is not None:
+            s[f'{pysmurf_root}.pysmurf_action'] = self.action
+        if self.action_timestamp is not None:
+            s[f'{pysmurf_root}.pysmurf_action_timestamp'] = self.action_timestamp
 
         fr['status'] = yaml.dump(s)
         fr['dump'] = True
@@ -226,8 +242,9 @@ class DataStreamer:
     """
 
     def __init__(self, stream_id, sample_rate, tune, timestreamdir,
-                 file_duration, frame_len):
-        self.frame_gen = G3FrameGenerator(stream_id, sample_rate, tune)
+                 file_duration, frame_len, action=None, action_time=None):
+        self.frame_gen = G3FrameGenerator(stream_id, sample_rate, tune,
+                                          action=action, action_time=action_time)
         self.session_id = self.frame_gen.session_id
         self.stream_id = stream_id
         self.timestreamdir = timestreamdir
@@ -258,7 +275,7 @@ class DataStreamer:
         os.makedirs(os.path.dirname(fname), exist_ok=True)
         self.writer = core.G3Writer(fname)
         if self.seq == 0:
-            self.writer(self.frame_gen.get_obs_frame())
+            self.writer(self.frame_gen.get_obs_start_frame())
             self.writer(self.frame_gen.get_status_frame())
         self.file_start = time.time()
         self.file_list.append(fname)
@@ -269,6 +286,7 @@ class DataStreamer:
         Ends the current file by sending a G3EndProcessing Frame.
         """
         if self.writer is not None:
+            self.writer(self.frame_gen.get_obs_end_frame())
             self.writer(core.G3Frame(core.G3FrameType.EndProcessing))
 
     def write_next(self):
@@ -341,10 +359,11 @@ class SmurfFileEmulator:
         self.streaming = False
         self.tune = None
 
-    def _new_streamer(self):
+    def _new_streamer(self, action=None, action_time=None):
         return DataStreamer(
             self.stream_id, self.sample_rate, self.tune, self.timestreamdir,
-            self.file_duration, self.frame_len
+            self.file_duration, self.frame_len,
+            action=action, action_time=action_time,
         )
 
     def _get_action_dir(self, action, action_time=None, is_plot=False):
@@ -402,7 +421,41 @@ class SmurfFileEmulator:
             f.write(f'start: {time.time()}\n')
         return filepath
 
-    @ocs_agent.param('test_mode', type=bool, default=False)
+    def _run_setup(self, action=None, action_time=None, session=None):
+        """
+        Helper function to run setup operations, used by uxm_setup and
+        uxm_relock.
+        """
+        self.tune = Tune(nchans=self.nchans)
+
+        if action is None:
+            action = 'uxm_setup'
+        if action_time is None:
+            action_time = time.time()
+
+        # Find Freq
+        files = ['amp_sweep_freq.txt', 'amp_sweep_resonance.txt',
+                 'amp_sweep_resp.txt']
+        for f in files:
+            self._write_smurf_file(f, action, action_time=action_time)
+
+        # Setup Notches
+        sdir = self._get_action_dir(action, action_time=action_time)
+        self.tune.write_channel_assignments(basedir=sdir)
+        self.tune.write_tune(basedir=sdir)
+
+        # tracking setup
+        action_time = time.time()
+        fname = f"{int(time.time())}.dat"
+        self._write_smurf_file(fname, action, action_time=action_time, prepend_ctime=False)
+
+        # Short g3 stream
+        streamer = self._new_streamer(action=action, action_time=action_time)
+        now = time.time()
+        streamer.stream_between(now, now + 30, wait=False)
+        if session is not None:
+            session.data['noise_file'] = streamer.file_list[0]
+
     def uxm_setup(self, session, params):
         """uxm_setup(test_mode=False)
 
@@ -414,40 +467,10 @@ class SmurfFileEmulator:
              2. setup_notches
              3. tracking_setup
              4. short g3 stream
-
-        Args
-        ----
-        test_mode : bool
-            If True, will skip any wait times associated with writing
-            g3 files.
         """
-        self.tune = Tune(nchans=self.nchans)
-
-        # Find Freq
-        action_time = time.time()
-        files = ['amp_sweep_freq.txt', 'amp_sweep_resonance.txt',
-                 'amp_sweep_resp.txt']
-        for f in files:
-            self._write_smurf_file(f, 'find_freq',
-                                   action_time=action_time)
-
-        # Setup Notches
-        sdir = self._get_action_dir('setup_notches')
-        self.tune.write_channel_assignments(basedir=sdir)
-        self.tune.write_tune(basedir=sdir)
-
-        # tracking setup
-        action_time = time.time()
-        fname = f"{int(time.time())}.dat"
-        self._write_smurf_file(fname, 'tracking_setup', prepend_ctime=False)
-
-        # Short g3 stream
-        streamer = self._new_streamer()
-        now = time.time()
-        streamer.stream_between(now, now + 30, wait=False)
-        session.data['noise_file'] = streamer.file_list[0]
+        self._run_setup(action='uxm_setup', action_time=time.time(),
+                        session=session)
         time.sleep(1)
-
         return True, "Wrote tune files"
 
     def take_noise(self, session, params=None):
@@ -455,7 +478,10 @@ class SmurfFileEmulator:
 
         **Task** - Takes a short noise timestream
         """
-        streamer = self._new_streamer()
+        action = 'take_noise'
+        action_time = time.time()
+
+        streamer = self._new_streamer(action=action, action_time=action_time)
         now = time.time()
         streamer.stream_between(now, now + 30, wait=False)
         session.data['noise_file'] = streamer.file_list[0]
@@ -468,7 +494,10 @@ class SmurfFileEmulator:
         **Task** - Normally this wouldn't involve a full find-freq, but for
         emulation purposes it's ok if this is the same as uxm_setup.
         """
-        return self.uxm_setup(session, params)
+        self._run_setup(action='uxm_relock', action_time=time.time(),
+                        session=session)
+        time.sleep(1)
+        return True, "Wrote tune files"
 
     def take_iv(self, session, params=None):
         """take_iv()
@@ -540,18 +569,22 @@ class SmurfFileEmulator:
             raise ValueError("No tune loaded!")
 
         # Write initial smurf metadata
+        if 'duration' in params:
+            action='take_g3_data'
+        else:
+            action='stream_g3_on'
+
         action_time = time.time()
         files = ['freq.txt', 'mask.txt']
         for f in files:
-            self._write_smurf_file(f, 'take_g3_data',
-                                   action_time=action_time)
+            self._write_smurf_file(f, action, action_time=action_time)
 
         end_time = None
         if params.get('duration') is not None:
             end_time = time.time() + params['duration']
 
         session.set_status('running')
-        streamer = self._new_streamer()
+        streamer = self._new_streamer(action=action, action_time=action_time)
         session.data['session_id'] = streamer.session_id
         session.data['g3_files'] = streamer.file_list
 
