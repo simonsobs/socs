@@ -416,7 +416,7 @@ class Motor:
             AXIS_THREADS_PER_INCH = AXIS_THREADS_PER_INCH_XYZ
 
         # Convert from inches if necessary
-        if(pos_is_inches):
+        if (pos_is_inches):
             # 2.0 is because threads go twice the distance for one
             # revolution
             unit_pos = int(pos * AXIS_THREADS_PER_INCH
@@ -535,7 +535,7 @@ class Motor:
         self.ser.flushInput()
         msg = self.ser.writeread('RS\r')
         count = 0
-        while(msg != 'RS=R'):
+        while (msg != 'RS=R'):
             count += 1
             self.ser.flushInput()
             # Get the status of the motor and print if verbose = True

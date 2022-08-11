@@ -1115,7 +1115,6 @@ if __name__ == '__main__':
     agent.register_task('init_motors', m.init_motors_task)
     agent.register_task('move_to_position', m.move_axis_to_position)
     agent.register_task('move_by_length', m.move_axis_by_length)
-    #agent.register_task('move_motors', m.move_motors)
     agent.register_task('set_velocity', m.set_velocity)
     agent.register_task('set_accel', m.set_acceleration)
     agent.register_task('start_jog', m.start_jogging)
