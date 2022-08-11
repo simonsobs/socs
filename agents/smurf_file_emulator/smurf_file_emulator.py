@@ -446,6 +446,7 @@ class SmurfFileEmulator:
         now = time.time()
         streamer.stream_between(now, now + 30, wait=False)
         session.data['noise_file'] = streamer.file_list[0]
+        time.sleep(1)
 
         return True, "Wrote tune files"
 
@@ -458,6 +459,7 @@ class SmurfFileEmulator:
         now = time.time()
         streamer.stream_between(now, now + 30, wait=False)
         session.data['noise_file'] = streamer.file_list[0]
+        time.sleep(1)
         return True, "Took noise data"
 
     def uxm_relock(self, session, params=None):
@@ -478,6 +480,7 @@ class SmurfFileEmulator:
         for f in files:
             self._write_smurf_file(f, 'take_iv',
                                    action_time=action_time)
+        time.sleep(1)
         return True, "Wrote IV files"
 
     def take_bias_steps(self, session, params=None):
@@ -491,6 +494,7 @@ class SmurfFileEmulator:
             self._write_smurf_file(f, 'take_bias_steps',
                                    action_time=action_time)
 
+        time.sleep(1)
         return True, "Wrote Bias Step Files"
 
     def take_bgmap(self, session, params=None):
@@ -504,6 +508,7 @@ class SmurfFileEmulator:
             self._write_smurf_file(f, 'take_bgmap',
                                    action_time=action_time)
 
+        time.sleep(1)
         return True, "Finished taking bgmap"
 
     def bias_dets(self, session, params=None):
@@ -511,6 +516,7 @@ class SmurfFileEmulator:
 
         **Task** - Creates files associated with biasing dets, which is none.
         """
+        time.sleep(1)
         return True, 'Wrote det biasing files'
 
     @ocs_agent.param('duration', default=None)
@@ -558,6 +564,8 @@ class SmurfFileEmulator:
                     break
 
         streamer.end_file()
+
+        time.sleep(1)
         return True, "Finished Stream"
 
     def _stop_stream(self, session, params=None):
