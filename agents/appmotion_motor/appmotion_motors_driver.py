@@ -158,7 +158,7 @@ class Motor:
             if self.ser is not None:
                 self.ser.write('JE\r')  # JE = Jog Enable
 
-    def is_moving(self, verbose=False):
+    def is_moving(self, verbose=True):
         """
         Returns True if either motor is moving, False if both motors
         are not moving. Also returns True if the motor provides an irregular
@@ -170,10 +170,11 @@ class Motor:
         """
         self.ser.flushInput()
         # Get the status of the motor and print if verbose = True
+        print(f'*************\n Driver: is_moving for motor: {self.motor}\n***********')
         msg = self.ser.writeread('RS\r')  # RS = Request Status
         self.ser.flushInput()
         if verbose:
-            print(msg)
+            print(f'verbose; message: {msg}')
             sys.stdout.flush()
         # If either motor is moving, immediately return True
         if (msg == 'RS=FMR'):
@@ -197,9 +198,6 @@ class Motor:
         else:
             print(f'Irregular error message for motor {self.mot_id}: {msg}')
             return True
-        if verbose:
-            print('Neither motor is moving.')
-            return False
 
     def move_off_limit(self):
         """
@@ -234,13 +232,7 @@ class Motor:
         """
         # Basically, move motors until it hits the limit switch. This will
         # trigger an alarm
-        self.move_axis_by_length(pos=-30, pos_is_inches=True)
-        # Check if either motor is moving, and if yes exit function with an
-        # error message
-        move_status = self.is_moving()
-        if move_status:
-            print('Motors are still moving. Try again later.')
-            return
+        self.move_axis_by_length(pos=-60, pos_is_inches=True, lin_stage=True)
 
         moving = True
         while moving:
@@ -442,9 +434,8 @@ class Motor:
 
     def move_axis_by_length(
             self,
-            motor=MOTOR1,
             pos=0,
-            pos_is_inches=False,
+            pos_is_inches=True,
             lin_stage=True):
         """
         Move the axis relative to the current position by the
@@ -485,6 +476,7 @@ class Motor:
         self.ser.write('DI%i\r' % (unit_pos))  # DI = Distance/Position
         self.ser.write('FL\r')  # FL = Feed to Length
         self.ser.flushInput()
+        print(unit_pos)
         print("Final position: ", pos)
 
     def set_velocity(self, velocity=1.0):
@@ -693,7 +685,7 @@ class Motor:
         Close the connection to the serial controller for the
         specified motor.
         """
-        self.sock.close()
+        self.ser.close()
         print("Connection to serial controller disconnected.")
 
     def reconnect_motor(self):
