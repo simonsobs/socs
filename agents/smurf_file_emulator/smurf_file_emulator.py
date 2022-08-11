@@ -570,9 +570,9 @@ class SmurfFileEmulator:
 
         # Write initial smurf metadata
         if 'duration' in params:
-            action='take_g3_data'
+            action = 'take_g3_data'
         else:
-            action='stream_g3_on'
+            action = 'stream_g3_on'
 
         action_time = time.time()
         files = ['freq.txt', 'mask.txt']
