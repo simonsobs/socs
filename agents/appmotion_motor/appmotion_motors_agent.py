@@ -156,7 +156,7 @@ class appMotionMotorsAgent:
                 self.motor1.move_axis_to_position(params['pos'], params['pos_is_inches'], params['lin_stage'])
                 self.move_status = self.motor1.is_moving(params['verbose'])
                 while self.move_status:
-                    self.move_status = self.motor1.is_moving(params['verbose']) 
+                    self.move_status = self.motor1.is_moving(params['verbose'])
                 self.motor2.move_axis_to_position(params['pos'], params['pos_is_inches'], params['lin_stage'])
             else:
                 print("Motor ID invalid argument")
@@ -203,10 +203,10 @@ class appMotionMotorsAgent:
             elif params['motor'] == 2:
                 self.motor2.move_axis_by_length(params['pos'], params['pos_is_inches'], params['lin_stage'])
             elif params['motor'] == 3:
-                self.motor1.move_axis_by_length(params['pos'], params['pos_is_inches'], params['lin_stage'])          
+                self.motor1.move_axis_by_length(params['pos'], params['pos_is_inches'], params['lin_stage'])
                 self.move_status = self.motor1.is_moving(params['verbose'])
                 while self.move_status:
-                    self.move_status = self.motor1.is_moving(params['verbose'])          
+                    self.move_status = self.motor1.is_moving(params['verbose'])
                 self.motor2.move_axis_by_length(params['pos'], params['pos_is_inches'], params['lin_stage'])
             else:
                 print("Motor ID invalid argument")
@@ -244,7 +244,7 @@ class appMotionMotorsAgent:
                 self.motor1.set_velocity(params['velocity'])
                 self.move_status = self.motor1.is_moving(params['verbose'])
                 while self.move_status:
-                    self.move_status = self.motor1.is_moving(params['verbose']) 
+                    self.move_status = self.motor1.is_moving(params['verbose'])
                 self.motor2.set_velocity(params['velocity'])
             else:
                 print("Motor ID invalid argument")
@@ -285,7 +285,7 @@ class appMotionMotorsAgent:
                 self.motor1.set_acceleration(params['accel'])
                 self.move_status = self.motor1.is_moving(params['verbose'])
                 while self.move_status:
-                    self.move_status = self.motor1.is_moving(params['verbose']) 
+                    self.move_status = self.motor1.is_moving(params['verbose'])
                 self.motor2.set_acceleration(params['accel'])
             else:
                 print("Motor ID invalid argument")
@@ -376,7 +376,7 @@ class appMotionMotorsAgent:
                 self.motor1.seek_home_linear_stage()
                 self.move_status = self.motor1.is_moving(params['verbose'])
                 while self.move_status:
-                    self.move_status = self.motor1.is_moving(params['verbose']) 
+                    self.move_status = self.motor1.is_moving(params['verbose'])
                 self.motor2.seek_home_linear_stage()
             else:
                 print("Motor ID invalid argument")
@@ -412,7 +412,7 @@ class appMotionMotorsAgent:
                 self.motor1.set_zero()
                 self.move_status = self.motor1.is_moving(params['verbose'])
                 while self.move_status:
-                    self.move_status = self.motor1.is_moving(params['verbose']) 
+                    self.move_status = self.motor1.is_moving(params['verbose'])
                 self.motor2.set_zero()
             else:
                 print("Motor ID invalid argument")
@@ -460,7 +460,7 @@ class appMotionMotorsAgent:
                 self.motor1.run_positions(params['pos_data[0]'], params['pos_is_inches'])
                 self.move_status = self.motor1.is_moving(params['verbose'])
                 while self.move_status:
-                    self.move_status = self.motor1.is_moving(params['verbose']) 
+                    self.move_status = self.motor1.is_moving(params['verbose'])
                 self.motor2.run_positions(params['pos_data[1]'], params['pos_is_inches'])
             else:
                 print("Motor ID invalid argument")
@@ -686,7 +686,7 @@ class appMotionMotorsAgent:
                 e_positions = self.motor1.set_encoder_value(params['value'])
                 self.move_status = self.motor1.is_moving(params['verbose'])
                 while self.move_status:
-                    self.move_status = self.motor1.is_moving(params['verbose']) 
+                    self.move_status = self.motor1.is_moving(params['verbose'])
                 e_positions = self.motor2.set_encoder_value(params['value'])
             else:
                 e_positions = None
@@ -912,7 +912,7 @@ class appMotionMotorsAgent:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 1)
         """
-        
+
         self.move_status = self.is_moving(session, params)[1][1]
         with self.lock.acquire_timeout(30, job=f"home_with_limits_motor{params['motor']}") as acquired:
             if not acquired:
