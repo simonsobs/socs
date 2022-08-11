@@ -190,8 +190,8 @@ class G3FrameGenerator:
         pysmurf_root = "AMCc.SmurfProcessor.SOStream"
         if self.action is not None:
             s[f'{pysmurf_root}.pysmurf_action'] = self.action
-        if self.action_timestamp is not None:
-            s[f'{pysmurf_root}.pysmurf_action_timestamp'] = self.action_timestamp
+        if self.action_time is not None:
+            s[f'{pysmurf_root}.pysmurf_action_time'] = self.action_time
 
         fr['status'] = yaml.dump(s)
         fr['dump'] = True
