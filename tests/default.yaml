@@ -66,5 +66,12 @@ hosts:
                      ['--port', '8000'],
                     ]
       },
+      {'agent-class': 'SynaccessAgent',
+       'instance-id': 'synacc',
+       'arguments':[['--ip-address', '127.0.0.1:8000'],
+                    ['--username', 'admin'],
+                    ['--password', 'admin'],
+                   ]
+      },
     ]
   }

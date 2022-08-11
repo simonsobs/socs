@@ -120,7 +120,7 @@ def make_parser(parser=None):
                         help="Time (sec) after which this agent will delete "
                              "local copies of successfully transfered files. "
                              "If None, will not delete files.")
-    pgroup.add_argument('--max-copy-attempts', type=int,
+    pgroup.add_argument('--max-copy-attempts', type=int, default=5,
                         help="Number of failed copy attempts before the agent "
                              "will stop trying to copy a file")
     pgroup.add_argument('--copy-timeout', type=float,
