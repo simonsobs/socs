@@ -537,7 +537,7 @@ class SmurfFileEmulator:
         action_time = time.time()
         files = ['freq.txt', 'mask.txt']
         for f in files:
-            self._write_smurf_file(f, 'take_g3_stream',
+            self._write_smurf_file(f, 'take_g3_data',
                                    action_time=action_time)
 
         end_time = None
