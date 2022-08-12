@@ -2,6 +2,7 @@ import time
 import struct
 import datetime
 import calendar
+import numpy as np
 import soaculib as aculib
 import scan_helpers as sh
 from soaculib.twisted_backend import TwistedHttpBackend
@@ -78,6 +79,7 @@ class ACUAgent:
         self.lock = TimeoutLock()
         self.jobs = {
             'monitor': 'idle',
+            'monitorspem': 'idle',
             'broadcast': 'idle',
             'control': 'idle',  # shared by all motion tasks/processes
             'scanspec': 'idle',
@@ -112,6 +114,7 @@ class ACUAgent:
                                 'platform_status': {},
                                 'ACU_emergency': {},
                                 },
+                     'spem': {},
                      'broadcast': {},
                      'uploads': {'Start_Azimuth': 0.0,
                                  'Start_Elevation': 0.0,
@@ -148,6 +151,9 @@ class ACUAgent:
                                lambda session, params: self._set_job_stop('monitor'),
                                blocking=False,
                                startup=True)
+#        agent.register_process('monitor_spem',
+#                               self.monitor_spem,
+#                               lambda
         agent.register_process('broadcast',
                                self.broadcast,
                                lambda session, params: self._set_job_stop('broadcast'),
@@ -216,6 +222,9 @@ class ACUAgent:
                             blocking=False)
         agent.register_task('stop_and_clear',
                             self.stop_and_clear,
+                            blocking=False)
+        agent.register_task('preset_stop_clear',
+                            self.preset_stop_clear,
                             blocking=False)
 
     # Operation management.  This agent has several Processes that
@@ -291,9 +300,10 @@ class ACUAgent:
             return ok, msg
         session.set_status('running')
         while True:
-            yield self.acu_control.http.Command('DataSets.CmdModeTransfer',
+            resp = yield self.acu_control.http.Command('DataSets.CmdModeTransfer',
                                                 'RestartIdleTime')
             self.log.info('Sent RestartIdleTime')
+            self.log.info(resp)
             yield dsleep(5.*59.)     
         self._set_job_done('restart_idle')
         return True, 'Process "restart_idle" exited cleanly.'
@@ -761,6 +771,43 @@ class ACUAgent:
         self.agent.publish_to_feed('acu_upload', acu_upload)
         self._set_job_done('control')
         return True, 'Moved to new 3rd axis position'
+
+    @inlineCallbacks
+    def preset_stop_clear(self, session, params):
+        ok, msg = self._try_set_job('control')
+        if not ok:
+            self._set_job_done('control')
+            yield dsleep(0.1)
+            self._try_set_job('control')
+        self.log.info('_try_set_job ok')
+        current_data = self.data['status']['summary']
+        current_vel = current_data['Azimuth_current_velocity']
+        current_pos = {'Az': current_data['Azimuth_current_position'],
+                       'El': current_data['Elevation_current_position']}
+        new_pos = {'Az': current_pos['Az'] + np.sign(current_vel)*current_vel,
+                   'El': current_pos['El']}
+        print(current_pos)
+        print(new_pos)
+        self.log.info('Changed to Preset')
+        yield self.acu_control.go_to(new_pos['Az'], new_pos['El'])
+        while round(current_pos['Az'] - new_pos['Az'], 1) != 0.:
+            yield dsleep(0.5)
+            current_data = self.data['status']['summary']
+            current_pos = {'Az': current_data['Azimuth_current_position'],
+                           'El': current_data['Elevation_current_position']}
+        yield dsleep(2) # give the platform time to settle in position
+        yield self.acu_control.stop()
+        self.log.info('Stopped')
+        yield dsleep(2)
+        yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
+                                            'Clear Stack')
+        self.log.info('Cleared stack (first attempt)')
+        yield dsleep(5)
+        yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
+                                            'Clear Stack')
+        self.log.info('Cleared stack (second attempt)')
+        self._set_job_done('control')
+        return True, 'Job completed'
 
     @inlineCallbacks
     def stop_and_clear(self, session, params):
