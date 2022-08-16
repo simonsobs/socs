@@ -1092,6 +1092,7 @@ class ACUAgent:
                                                el_speed=el_speed,
                                                **scan_params)
         self.acu_control.mode('ProgramTrack')
+        self.data['uploads']['Command_Type'] = 2
         yield dsleep(0.5)
         current_modes = {'Az': self.data['status']['summary']['Azimuth_mode'],
                          'El': self.data['status']['summary']['Elevation_mode']}
@@ -1103,6 +1104,19 @@ class ACUAgent:
                 current_modes = {'Az': self.data['status']['summary']['Azimuth_mode'],
                                  'El': self.data['status']['summary']['Elevation_mode']}
                 upload_lines = current_lines[:group_size]
+                for u in range(len(upload_lines)):
+                    self.data['uploads']['PtStack_Time'] = upload_lines[u].split(';')[0]
+                    self.data['uploads']['PtStack_Azimuth'] = float(upload_lines[u].split(';')[1])
+                    self.data['uploads']['PtStack_Elevation'] = float(upload_lines[u].split(';')[2])
+                    self.data['uploads']['PtStack_AzVelocity'] = float(upload_lines[u].split(';')[3])
+                    self.data['uploads']['PtStack_ElVelocity'] = float(upload_lines[u].split(';')[4])
+                    self.data['uploads']['PtStack_AzFlag'] = int(upload_lines[u].split(';')[5])
+                    self.data['uploads']['PtStack_ElFlag'] = int(upload_lines[u].split(';')[6].strip())
+                    self.data['uploads']['PtStack_ctime'] = uploadtime_to_ctime(self.data['uploads']['PtStack_Time'], int(self.data['status']['summary']['Year']))
+                   acu_upload = {'timestamp': self.data['uploads']['PtStack_ctime'],
+                                 'block_name': 'ACU_upload',
+                                 'data': self.data['uploads']}
+                   self.agent.publish_to_feed('acu_upload', acu_upload, from_reactor=True)
                 text = ''.join(upload_lines)
                 current_lines = current_lines[group_size:]
                 free_positions = self.data['status']['summary']['Free_upload_positions']
@@ -1110,7 +1124,25 @@ class ACUAgent:
                     yield dsleep(0.1)
                     free_positions = self.data['status']['summary']['Free_upload_positions']
                 yield self.acu_control.http.UploadPtStack(text)
-        yield self.acu_control.stop()
+#        yield self.acu_control.stop()
+        yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
+                                            'Clear Stack')
+        self.data['uploads']['Start_Azimuth'] = 0.0
+        self.data['uploads']['Start_Elevation'] = 0.0
+        self.data['uploads']['Command_Type'] = 0
+        self.data['uploads']['PtStack_Lines'] = 'False'
+        self.data['uploads']['PtStack_Time'] = '000, 00:00:00.000000'
+        self.data['uploads']['PtStack_Azimuth'] = 0.0
+        self.data['uploads']['PtStack_Elevation'] = 0.0
+        self.data['uploads']['PtStack_AzVelocity'] = 0.0
+        self.data['uploads']['PtStack_ElVelocity'] = 0.0
+        self.data['uploads']['PtStack_AzFlag'] = 0
+        self.data['uploads']['PtStack_ElFlag'] = 0
+        acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
+                      'block_name': 'ACU_upload',
+                      'data': self.data['uploads']
+                      }
+        self.agent.publish_to_feed('acu_upload', acu_upload)
         self._set_job_done('control')
         return True, 'Track generation ended cleanly'
 
