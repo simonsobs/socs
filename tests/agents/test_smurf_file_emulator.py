@@ -53,7 +53,7 @@ def test_take_bgmap(tmp_path):
     session = mock.MagicMock()
     session.data = {}
     params = dict(wait=False)
-    emulator.uxm_setup(session, {'test_mode': True}) # Need this to create tune
+    emulator.uxm_setup(session, {'test_mode': True})  # Need this to create tune
     emulator.take_bgmap(session, params)
 
 
@@ -61,7 +61,7 @@ def test_take_iv(tmp_path):
     emulator = create_agent(str(tmp_path))
     session = mock.MagicMock()
     params = dict(wait=False)
-    emulator.uxm_setup(session, {'test_mode': True}) # Need this to create tune
+    emulator.uxm_setup(session, {'test_mode': True})  # Need this to create tune
     emulator.take_iv(session, params)
 
 
@@ -69,7 +69,7 @@ def test_take_bias_steps(tmp_path):
     emulator = create_agent(str(tmp_path))
     session = mock.MagicMock()
     params = dict(wait=False)
-    emulator.uxm_setup(session, {'test_mode': True}) # Need this to create tune
+    emulator.uxm_setup(session, {'test_mode': True})  # Need this to create tune
     emulator.take_bias_steps(session, params)
 
 
