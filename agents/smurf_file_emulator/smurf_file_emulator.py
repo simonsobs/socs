@@ -499,45 +499,61 @@ class SmurfFileEmulator:
         time.sleep(1)
         return True, "Wrote tune files"
 
+    @ocs_agent.param('wait', default=True)
     def take_iv(self, session, params=None):
         """take_iv()
 
         **Task** - Creates files generated associated with iv taking / analysis
         """
+        action = 'take_iv'
         action_time = time.time()
         files = ['iv_analyze.npy', 'iv_bias_all.npy', 'iv_info.npy']
+
+        streamer = self._new_streamer(action=action, action_time=action_time)
+        now = time.time()
+        streamer.stream_between(now, now + 5, wait=params['wait'])
+
         for f in files:
-            self._write_smurf_file(f, 'take_iv',
-                                   action_time=action_time)
-        time.sleep(1)
+            self._write_smurf_file(f, action, action_time=action_time)
+
         return True, "Wrote IV files"
 
+    @ocs_agent.param('wait', default=True)
     def take_bias_steps(self, session, params=None):
         """take_bias_steps()
 
         **Task** - Creates files associated with taking bias steps
         """
+        action = 'take_bias_steps'
         action_time = time.time()
         files = ['bias_step_analysis.npy']
-        for f in files:
-            self._write_smurf_file(f, 'take_bias_steps',
-                                   action_time=action_time)
 
-        time.sleep(1)
+        streamer = self._new_streamer(action=action, action_time=action_time)
+        now = time.time()
+        streamer.stream_between(now, now + 5, wait=params['wait'])
+
+        for f in files:
+            self._write_smurf_file(f, action, action_time=action_time)
+
         return True, "Wrote Bias Step Files"
 
+    @ocs_agent.param('wait', default=True)
     def take_bgmap(self, session, params=None):
         """take_bgmap()
 
         **Task** - Creates files associated with taking a bias group mapping.
         """
+        action = 'take_bgmap'
         action_time = time.time()
+
+        streamer = self._new_streamer(action=action, action_time=action_time)
+        now = time.time()
+        streamer.stream_between(now, now + 5, wait=params['wait'])
+
         files = ['bg_map.npy', 'bias_step_analysis.npy']
         for f in files:
-            self._write_smurf_file(f, 'take_bgmap',
-                                   action_time=action_time)
+            self._write_smurf_file(f, action, action_time=action_time)
 
-        time.sleep(1)
         return True, "Finished taking bgmap"
 
     def bias_dets(self, session, params=None):
