@@ -78,7 +78,8 @@ hosts:
        'arguments': [['--udp-port', 8200],
                      ['--create-table', True],
                      ['--db-path', './integration/pysmurf_monitor_data/suprsync.db'],
-                     ['--echo-sql']
+                     ['--echo-sql'],
+                     ['--test-mode', True]
                     ]
       },
     ]

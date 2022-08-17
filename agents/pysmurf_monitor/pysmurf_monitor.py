@@ -152,12 +152,19 @@ class PysmurfMonitor(DatagramProtocol):
 
             self.agent.publish_to_feed(feed_name, feed_data, from_reactor=True)
 
+    @ocs_agent.param('test_mode', default=False, type=bool)
     def run(self, session, params=None):
         """run()
 
         **Process** - Main process for the pysmurf monitor agent. Processes
         files that have been added to the queue, adding them to the suprsync
         database.
+
+        Parameters:
+            test_mode (bool, optional):
+                Stop the Process loop after processing any file(s).
+                This is meant only for testing. Default is False.
+
         """
         srfm = SupRsyncFilesManager(self.db_path, create_all=True, echo=self.echo_sql)
 
@@ -204,11 +211,17 @@ class PysmurfMonitor(DatagramProtocol):
                 with srfm.Session.begin() as session:
                     session.add_all(files)
 
+                if params['test_mode']:
+                    break
+
             time.sleep(1)
+
+        return True, 'Monitor exited cleanly.'
 
     def _stop(self, session, params=None):
         self.running = False
         session.set_status('stopping')
+        return True, 'Done monitoring.'
 
 
 def make_parser(parser=None):
@@ -224,6 +237,10 @@ def make_parser(parser=None):
     pgroup.add_argument('--db-path', type=str, default='/data/so/databases/suprsync.db',
                         help="Path to suprsync sqlite database")
     pgroup.add_argument('--echo-sql', action='store_true')
+    pgroup.add_argument("--test-mode", type=bool,
+        help="Specifies whether agent should run in test mode, "
+        "meaning it shuts down after processing any file(s).",
+        default=False)
     return parser
 
 
@@ -234,7 +251,8 @@ if __name__ == '__main__':
     agent, runner = ocs_agent.init_site_agent(args)
     monitor = PysmurfMonitor(agent, args)
 
-    agent.register_process('run', monitor.run, monitor._stop, startup=True)
+    agent.register_process('run', monitor.run, monitor._stop,
+        startup={"test_mode": args.test_mode})
 
     reactor.listenUDP(args.udp_port, monitor)
 
