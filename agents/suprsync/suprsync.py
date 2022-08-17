@@ -132,6 +132,10 @@ def make_parser(parser=None):
                         "is None, which will copy over all available files.")
     pgroup.add_argument('--sleep-time', type=float, default=60,
                         help="Time to sleep (sec) in between copy iterations")
+    pgroup.add_argument('--compression', action='store_true', default=False,
+                        help="Activate gzip on data transfer (rsync -z)")
+    pgroup.add_argument('--bwlimit', type=str, default=None,
+                        help="Bandwidth limit arg (passed through to rsync)")
     return parser
 
 
