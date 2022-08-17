@@ -336,7 +336,14 @@ class SupRsyncFileHandler:
                 Max number of failed copy atempts
             num_files : int
                 Number of files to return
+
+        Returns
+        -------
+            copy_attempts : list of (str, bool)
+                Each entry of the list provides the path to the copied file,
+                and a bool indicating wheter the remote md5sum matched.
         """
+        output = []
         with self.srfm.Session.begin() as session:
             files = self.srfm.get_copyable_files(
                 self.archive_name, max_copy_attempts=max_copy_attempts,
@@ -344,7 +351,7 @@ class SupRsyncFileHandler:
             )
 
             if not files:
-                return
+                return []
 
             if self.ssh_host is not None:
                 dest = self.ssh_host + ':' + self.remote_basedir
@@ -410,7 +417,9 @@ class SupRsyncFileHandler:
                     file_map[key].remote_md5sum = md5sum
 
             for file in files:
-                if file.remote_md5sum != file.local_md5sum:
+                md5_ok = (file.remote_md5sum == file.local_md5sum)
+                output.append((file.local_path, md5_ok))
+                if not md5_ok:
                     file.failed_copy_attempts += 1
                     self.log.info(
                         f"Copy failed for file {file.local_path}! "
@@ -420,6 +429,8 @@ class SupRsyncFileHandler:
                                   f"remote_md5: {file.remote_md5sum}")
 
             self.log.info("Copy session complete.")
+
+        return output
 
     def delete_files(self, delete_after):
         """

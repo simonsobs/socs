@@ -81,14 +81,22 @@ class SupRsync:
         session.set_status('running')
 
         while self.running:
+            op = {'start_time': time.time()}
             try:
-                handler.copy_files(max_copy_attempts=self.max_copy_attempts,
-                                   num_files=self.files_per_batch)
+                session.data['activity'] = 'copying'
+                op['files'] = handler.copy_files(max_copy_attempts=self.max_copy_attempts,
+                                                 num_files=self.files_per_batch)
             except subprocess.TimeoutExpired as e:
                 self.log.error("Timeout when copying files! {e}", e=e)
+                op['error'] = 'timed out'
+            op['stop_time'] = time.time()
+            session.data['last_copy'] = op
 
             if self.delete_after is not None:
+                session.data['activity'] = 'deleting'
                 handler.delete_files(self.delete_after)
+
+            session.data['activity'] = 'idle'
             time.sleep(self.sleep_time)
 
         return True, "Stopped run process"
