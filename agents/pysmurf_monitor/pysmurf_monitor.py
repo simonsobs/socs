@@ -238,9 +238,9 @@ def make_parser(parser=None):
                         help="Path to suprsync sqlite database")
     pgroup.add_argument('--echo-sql', action='store_true')
     pgroup.add_argument("--test-mode", type=bool,
-        help="Specifies whether agent should run in test mode, "
-        "meaning it shuts down after processing any file(s).",
-        default=False)
+                        help="Specifies whether agent should run in test mode, "
+                        "meaning it shuts down after processing any file(s).",
+                        default=False)
     return parser
 
 
@@ -252,7 +252,7 @@ if __name__ == '__main__':
     monitor = PysmurfMonitor(agent, args)
 
     agent.register_process('run', monitor.run, monitor._stop,
-        startup={"test_mode": args.test_mode})
+                           startup={"test_mode": args.test_mode})
 
     reactor.listenUDP(args.udp_port, monitor)
 
