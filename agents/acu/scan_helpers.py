@@ -172,12 +172,16 @@ def ptstack_format(conctimes, concaz, concel, concva, concve, az_flags,
 
 def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                                     acc, el_endpoint1, el_endpoint2,
-                                    el_speed, num_batches=None,
-                                    start_time=None, wait_to_start=3.,
-                                    step_time=0.1, batch_size=500,
-                                    az_start='mid_inc', ptstack_fmt=True):
-    """
-    Python generator to produce times, azimuth and elevation positions,
+                                    el_speed,
+                                    num_batches=None,
+                                    num_scans=None,
+                                    start_time=None,
+                                    wait_to_start=10.,
+                                    step_time=1.,
+                                    batch_size=500,
+                                    az_start='mid_inc',
+                                    ptstack_fmt=True):
+    """Python generator to produce times, azimuth and elevation positions,
     azimuth and elevation velocities, azimuth and elevation flags for
     arbitrarily long constant-velocity azimuth scans.
 
@@ -192,6 +196,8 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
             constant az scans, this must be equal to el_endpoint1.
         el_speed (float): speed of the elevation motion. For constant az
             scans, set to 0.0
+        num_scans (int or None): if not None, limits the points
+          returned to the specified number of constant velocity legs.
         num_batches (int or None): sets the number of batches for the
             generator to create. Default value is None (interpreted as infinite
             batches).
@@ -199,9 +205,9 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
             Default is None, which is interpreted as starting now +
             wait_to_start.
         wait_to_start (float): number of seconds to wait between
-            start_time and when the scan actually starts. Default is 3 seconds.
+            start_time and when the scan actually starts. Default is 10 seconds.
         step_time (float): time between points on the constant-velocity
-            parts of the motion. Default value is 0.1 seconds. Minimum value is
+            parts of the motion. Default value is 1.0 seconds. Minimum value is
             0.05 seconds.
         batch_size (int): number of values to produce in each iteration.
             Default is 500. Batch size is reset to the length of one leg of the
@@ -215,6 +221,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
             produce lists of time, azimuth, elevation, azimuth velocity,
             elevation velocity, azimuth flags, and elevation flags. Default is
             True.
+
     """
     az_min = min(az_endpoint1, az_endpoint2)
     az_max = max(az_endpoint1, az_endpoint2)
@@ -261,8 +268,16 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
     else:
         stop_iter = num_batches
         batch_size = int(np.ceil((az_max - az_min) / daz))
+
+    def dec_num_scans():
+        nonlocal num_scans
+        if num_scans is not None:
+            num_scans -= 1
+    def check_num_scans():
+        return num_scans is None or num_scans > 0
+
     i = 0
-    while i < stop_iter:
+    while i < stop_iter and check_num_scans():
         i += 1
         point_block = [[], [], [], [], [], [], []]
         for j in range(batch_size):
@@ -274,6 +289,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
             point_block[5].append(az_flag)
             point_block[6].append(el_flag)
             t += step_time
+
             if increasing:
                 if az <= (az_max - 2 * daz):
                     az += daz
@@ -289,6 +305,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                     az_flag = 1
                     el_flag = 0
                     increasing = False
+                    dec_num_scans()
                 else:
                     az_remaining = az_max - az
                     time_remaining = az_remaining / az_speed
@@ -314,6 +331,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                     az_flag = 1
                     el_flag = 0
                     increasing = True
+                    dec_num_scans()
                 else:
                     az_remaining = az - az_min
                     time_remaining = az_remaining / az_speed
@@ -324,6 +342,15 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                     az_flag = 2
                     el_flag = 0
                     increasing = False
+
+            if not check_num_scans():
+                # Kill the velocity on the last point and exit -- this
+                # was recommended at LAT FAT for smoothly stopping the
+                # motino at end of program.
+                point_block[3][-1] = 0
+                point_block[4][-1] = 0
+                break
+
         if ptstack_fmt:
             yield ptstack_format(point_block[0], point_block[1],
                                  point_block[2], point_block[3],
