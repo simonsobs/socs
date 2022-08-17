@@ -2,7 +2,8 @@ import time
 import os
 import socket
 import argparse
-from socs.agent.scpi_psu_driver import PsuInterface
+from socs.agent.scpi_psu_driver import PsuPrologixInterface
+from socs.agent.scpi_psu_driver import PsuEthernetInterface
 
 on_rtd = os.environ.get('READTHEDOCS') == 'True'
 if not on_rtd:
@@ -11,7 +12,7 @@ if not on_rtd:
 
 
 class ScpiPsuAgent:
-    def __init__(self, agent, ip_address, gpib_slot):
+    def __init__(self, agent, ip_address, gpib_slot, port_number, interface_type):
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
@@ -19,9 +20,12 @@ class ScpiPsuAgent:
         self.job = None
         self.ip_address = ip_address
         self.gpib_slot = gpib_slot
+        self.port_number = port_number
+        self.interface_type = interface_type
         self.monitor = False
 
         self.psu = None
+        self.idn = None
 
         # Registers Temperature and Voltage feeds
         agg_params = {
@@ -33,18 +37,33 @@ class ScpiPsuAgent:
                                  buffer_time=0)
 
     def init_psu(self, session, params=None):
-        """ Task to connect to power supply """
+        """
+            Task to connect to power supply.
+            Requires interface_type to be defined: 'gpib' or 'ethernet'.
+            Incorrectly defining interface_type will cause the socket to not initialize.
+        """
 
         with self.lock.acquire_timeout(0) as acquired:
             if not acquired:
                 return False, "Could not acquire lock"
 
             try:
-                self.psu = PsuInterface(self.ip_address, self.gpib_slot)
+                if self.interface_type == 'gpib':
+                    self.psu = PsuPrologixInterface(self.ip_address, self.gpib_slot)
+
+                elif self.interface_type == 'ethernet':
+                    self.psu = PsuEthernetInterface(self.ip_address, self.port_number)
+
                 self.idn = self.psu.identify()
+
+            except AttributeError as e:
+                self.log.error(f"Socket not initialized. Check interface type in config: {e}")
+                return False, "Socket not initialized"
+
             except socket.timeout as e:
                 self.log.error(f"PSU timed out during connect: {e}")
                 return False, "Timeout"
+
             self.log.info("Connected to psu: {}".format(self.idn))
 
         return True, 'Initialized PSU.'
@@ -166,6 +185,8 @@ def make_parser(parser=None):
     pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--ip-address')
     pgroup.add_argument('--gpib-slot')
+    pgroup.add_argument('--port-number')
+    pgroup.add_argument('--interface-type')
 
     return parser
 
@@ -176,7 +197,8 @@ if __name__ == '__main__':
 
     agent, runner = ocs_agent.init_site_agent(args)
 
-    p = ScpiPsuAgent(agent, args.ip_address, int(args.gpib_slot))
+    p = ScpiPsuAgent(agent, args.ip_address, int(args.gpib_slot),
+                    int(args.port_number), args.interface_type)
 
     agent.register_task('init', p.init_psu)
     agent.register_task('set_voltage', p.set_voltage)
