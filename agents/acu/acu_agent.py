@@ -1136,7 +1136,11 @@ class ACUAgent:
         current_modes = {'Az': self.data['status']['summary']['Azimuth_mode'],
                          'El': self.data['status']['summary']['Elevation_mode']}
         while current_modes['Az']=='ProgramTrack':
-            lines = next(g)
+            try:
+                lines = next(g)
+            except StopIteration:
+                break
+
             current_lines = lines
             group_size = 250
             while len(current_lines):
@@ -1163,9 +1167,20 @@ class ACUAgent:
                     yield dsleep(0.1)
                     free_positions = self.data['status']['summary']['Free_upload_positions']
                 yield self.acu_control.http.UploadPtStack(text)
-#        yield self.acu_control.stop()
-        yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
-                                            'Clear Stack')
+
+        self.log.info('All points uploaded, waiting for stack to clear.')
+        while free_positions < FULL_STACK - 1:
+            yield dsleep(0.5)
+            free_positions = self.data['status']['summary']['Free_upload_positions']
+            # todo: Should also watch for mode change, here, to exit cleanly...
+
+        # Go to Stop mode?
+        #yield self.acu_control.stop()
+
+        # Clear the stack?
+        #yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
+        #                                    'Clear Stack')
+
        # self.data['uploads']['Start_Azimuth'] = 0.0
        # self.data['uploads']['Start_Elevation'] = 0.0
        # self.data['uploads']['Command_Type'] = 0
@@ -1183,7 +1198,7 @@ class ACUAgent:
        #               }
        # self.agent.publish_to_feed('acu_upload', acu_upload)
         self._set_job_done('control')
-        return True, 'Track generation ended cleanly'
+        return True, 'Track ended cleanly'
 
 
 def add_agent_args(parser_in=None):
