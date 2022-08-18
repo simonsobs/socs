@@ -1069,7 +1069,8 @@ class ACUAgent:
     def generate_scan(self, session, params):
         """generate_scan(az_endpoint1=None, az_endpoint2=None, az_speed=None, \
                          acc=None, el_endpoint1=None, el_endpoint2=None, \
-                         el_speed=None, num_batches=None, start_time=None, \
+                         el_speed=None, \
+                         num_scans=None, num_batches=None, start_time=None, \
                          wait_to_start=None, step_time=None, batch_size=None, \
                          az_start=None)
 
@@ -1086,6 +1087,8 @@ class ACUAgent:
                 currently both el endpoints should be equal
             el_speed (float): speed of motion for a scan with changing
                 elevation. For dev, currently set to 0.0
+            num_scans (int or None): if not None, limits the scan
+                to the specified number of constant velocity legs.
             num_batches (int or None): sets the number of batches for the
                 generator to create. Default value is None (interpreted as infinite
                 batches).
@@ -1112,8 +1115,9 @@ class ACUAgent:
         az_speed = params.get('az_speed')
         acc = params.get('acc')
         el_endpoint1 = params.get('el_endpoint1')
-        scan_params = {k: params.get(k) for k in ['num_batches', 'start_time',
-                       'wait_to_start', 'step_time', 'batch_size', 'az_start']
+        scan_params = {k: params.get(k) for k in [
+            'num_scans', 'num_batches', 'start_time',
+            'wait_to_start', 'step_time', 'batch_size', 'az_start']
                        if params.get(k) is not None}
         el_endpoint2 = params.get('el_endpoint2', el_endpoint1)
         el_speed = params.get('el_speed', 0.0)
