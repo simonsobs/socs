@@ -61,6 +61,8 @@ class SupRsync:
         self.copy_timeout = args.copy_timeout
         self.files_per_batch = args.files_per_batch
         self.sleep_time = args.sleep_time
+        self.compression = args.compression
+        self.bwlimit = args.bwlimit
 
     def run(self, session, params=None):
         """run()
@@ -74,7 +76,8 @@ class SupRsync:
         handler = SupRsyncFileHandler(
             srfm, self.archive_name, self.remote_basedir, ssh_host=self.ssh_host,
             ssh_key=self.ssh_key, cmd_timeout=self.cmd_timeout,
-            copy_timeout=self.copy_timeout
+            copy_timeout=self.copy_timeout, compression=self.compression,
+            bwlimit=self.bwlimit
         )
 
         self.running = True
