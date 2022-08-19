@@ -16,6 +16,10 @@ from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
 
+#: The number of free ProgramTrack positions, when stack is empty.
+FULL_STACK = 10000
+
+
 def timecode(acutime):
     """
     Takes the time code produced by the ACU status stream and returns
@@ -337,12 +341,17 @@ class ACUAgent:
 
         mode_key = {'Stop': 0,
                     'Preset': 1,
-                    'ProgramTrack': 2,
-                    'Stow': 3,
-                    'SurvivalMode': 4,
-                    'Rate': 5,
-                    'StarTrack': 6,
-                    'ElSync': 7,
+                    'Rate': 2,
+                    'GeoSync': 3,
+                    'StepTrack': 4,
+                    'OPT': 5,
+                    'TLE': 6,
+                    'StarTrack': 7,
+                    'SunTrack': 8,
+                    'MoonTrack': 9,
+                    'Surivial': 10,
+                    'ProgramTrack': 11,
+                    'ElSync': 12,
                     }
         # fault_key digital values taken from ICD (correspond to byte-encoding)
         fault_key = {
@@ -941,7 +950,6 @@ class ACUAgent:
             return ok, msg
         self.log.info('_try_set_job ok')
 
-        FULL_STACK = 10000
         UPLOAD_GROUP_SIZE = 120
         UPLOAD_THRESHOLD = FULL_STACK - 100
 
@@ -1115,6 +1123,7 @@ class ACUAgent:
         az_speed = params.get('az_speed')
         acc = params.get('acc')
         el_endpoint1 = params.get('el_endpoint1')
+        azonly = params.get('azonly', True)
         scan_params = {k: params.get(k) for k in [
             'num_scans', 'num_batches', 'start_time',
             'wait_to_start', 'step_time', 'batch_size', 'az_start']
@@ -1130,7 +1139,11 @@ class ACUAgent:
                                                el_endpoint2=el_endpoint2,
                                                el_speed=el_speed,
                                                **scan_params)
-        self.acu_control.mode('ProgramTrack')
+        if azonly:
+            yield self.acu_control.azmode('ProgramTrack')
+        else:
+            yield self.acu_control.mode('ProgramTrack')
+
         self.data['uploads']['Command_Type'] = 2
         yield dsleep(0.5)
         current_modes = {'Az': self.data['status']['summary']['Azimuth_mode'],
@@ -1169,9 +1182,14 @@ class ACUAgent:
                 yield self.acu_control.http.UploadPtStack(text)
 
         self.log.info('All points uploaded, waiting for stack to clear.')
+
+        # Wait at least 1 second before reading the free positions, to
+        # make sure its updated.
+        free_positions = 0
         while free_positions < FULL_STACK - 1:
-            yield dsleep(0.5)
+            yield dsleep(1)
             free_positions = self.data['status']['summary']['Free_upload_positions']
+            self.log.info(f'There are {FULL_STACK - free_positions} track points remaining.')
             # todo: Should also watch for mode change, here, to exit cleanly...
 
         # Go to Stop mode?
