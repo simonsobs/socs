@@ -1109,6 +1109,11 @@ class ACUAgent:
             batch_size (int): number of values to produce in each iteration.
                 Default is 500. Batch size is reset to the length of one leg of the
                 motion if num_batches is not None.
+            ramp_up (float or None): make the first scan leg longer, by
+                this number of degrees, on the starting end.  This is used
+                to help the servo match the first leg velocity smoothly
+                before it has to start worrying about the first
+                turn-around.
             az_start (str): part of the scan to start at. Options are:
                 'az_endpoint1', 'az_endpoint2', 'mid_inc' (start in the middle of
                 the scan and start with increasing azimuth), 'mid_dec' (start in
@@ -1126,7 +1131,7 @@ class ACUAgent:
         azonly = params.get('azonly', True)
         scan_params = {k: params.get(k) for k in [
             'num_scans', 'num_batches', 'start_time',
-            'wait_to_start', 'step_time', 'batch_size', 'az_start']
+            'wait_to_start', 'step_time', 'batch_size', 'ramp_up', 'az_start']
                        if params.get(k) is not None}
         el_endpoint2 = params.get('el_endpoint2', el_endpoint1)
         el_speed = params.get('el_speed', 0.0)

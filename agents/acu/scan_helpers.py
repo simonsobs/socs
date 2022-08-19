@@ -180,6 +180,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                                     step_time=1.,
                                     batch_size=500,
                                     az_start='mid_inc',
+                                    ramp_up=None,
                                     ptstack_fmt=True):
     """Python generator to produce times, azimuth and elevation positions,
     azimuth and elevation velocities, azimuth and elevation flags for
@@ -216,6 +217,11 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
             'az_endpoint1', 'az_endpoint2', 'mid_inc' (start in the middle of
             the scan and start with increasing azimuth), 'mid_dec' (start in
             the middle of the scan and start with decreasing azimuth).
+        ramp_up (float or None): make the first scan leg longer, by
+            this number of degrees, on the starting end.  This is used
+            to help the servo match the first leg velocity smoothly
+            before it has to start worrying about the first
+            turn-around.
         ptstack_fmt (bool): determine whether values are produced with the
             necessary format to upload to the ACU. If False, this function will
             produce lists of time, azimuth, elevation, azimuth velocity,
@@ -249,6 +255,14 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
     else:
         raise ValueError('az_start value not supported. Choose from '
                          'az_endpoint1, az_endpoint2, mid_inc, mid_dec')
+
+    # Bias the starting point for the first leg?
+    if ramp_up is not None:
+        if increasing:
+            az -= ramp_up
+        else:
+            az += ramp_up
+
     if start_time is None:
         t0 = time.time() + wait_to_start
     else:
