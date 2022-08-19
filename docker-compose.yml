@@ -188,6 +188,15 @@ services:
       - "socs"
 
   # --------------------------------------------------------------------------
+  # HWP Supervisor Agent
+  # --------------------------------------------------------------------------
+  ocs-hwp-supervisor-agent:
+    image: "ocs-hwp-supervisor-agent"
+    build: ./agents/hwp_supervisor/
+    depends_on:
+      - "socs"
+
+  # --------------------------------------------------------------------------
   # Smurf file emulator agent
   # --------------------------------------------------------------------------
   ocs-smurf-file-emulator-agent:
