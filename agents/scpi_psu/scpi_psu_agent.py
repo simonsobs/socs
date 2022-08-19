@@ -97,10 +97,15 @@ class ScpiPsuAgent:
                         'block_name': 'output',
                         'data': {}
                     }
-
-                    for chan in channels:
-                        data['data']["Voltage_{}".format(chan)] = self.psu.get_volt(chan)
-                        data['data']["Current_{}".format(chan)] = self.psu.get_curr(chan)
+                    
+                    if channels is None:
+                        data['data']["Voltage"] = self.psu.get_volt(None)
+                        data['data']["Current"] = self.psu.get_curr(None)
+                    
+                    else:
+                        for chan in channels:
+                            data['data']["Voltage_{}".format(chan)] = self.psu.get_volt(chan)
+                            data['data']["Current_{}".format(chan)] = self.psu.get_curr(chan)
 
                     # self.log.info(str(data))
                     # print(data)

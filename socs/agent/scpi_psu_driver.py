@@ -159,13 +159,21 @@ class PsuEthernetInterface(EthernetInterface):
             print("CH " + str(ch) + " is set to " + str(current) + " A")
 
     def get_volt(self, ch):
-        self.set_chan(ch)
-        self.write('MEAS:VOLT? CH' + str(ch))
+        if ch is None:
+            self.write('MEAS:VOLT?')
+        
+        else:
+            self.set_chan(ch)
+            self.write('MEAS:VOLT? CH' + str(ch))
         voltage = float(self.read())
         return voltage
 
     def get_curr(self, ch):
-        self.set_chan(ch)
-        self.write('MEAS:CURR? CH' + str(ch))
+        if ch is None:
+            self.write('MEAS:CURR?')
+            
+        else:
+            self.set_chan(ch)
+            self.write('MEAS:CURR? CH' + str(ch))
         current = float(self.read())
         return current
