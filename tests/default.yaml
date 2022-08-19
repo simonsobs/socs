@@ -73,5 +73,11 @@ hosts:
                     ['--password', 'admin'],
                    ]
       },
+      {'agent-class': 'HwpSupervisorAgent',
+       'instance-id': 'hwp-supervisor',
+       'arguments': [['--mode', 'idle'],
+                     ['--config', 'hwp_supervisor.yaml'],
+                    ]
+      },
     ]
   }

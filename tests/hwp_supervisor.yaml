@@ -1,0 +1,14 @@
+lakeshore-device:
+    instance-id: "lakeshore-240-1"
+    field: "Channel_1"
+    valid-range: (0, 60)
+ups-device:
+    instance-id: "ups-1"
+    field: "battery_remaining"
+    valid-range: (90, 100)
+hwp-rotation-agent:
+    instance-id: "rotation-agent1"
+hwp-gripper-agent:
+    instance-id: "gripper-agent1"
+hwp-encoder-agent:
+    instance-id: "encoder-agent1"
