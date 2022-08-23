@@ -60,3 +60,9 @@ Currently this agent is confirmed to work by privileded true, but this needs to 
       - "--instance-id=picoscope"
       - "--site-hub=ws://crossbar:8001/ws"
       - "--site-http=http://crossbar:8001/call"
+
+Agent API
+---------
+
+.. autoclass:: agents.hwp_picoscope.pico_agent.PicoAgent
+    :members:

@@ -15,8 +15,10 @@ if not ON_RTD:
 
 class PicoAgent:
     """Agent for interfacing with a Picoscope 3403D MSO device.
+
     Args:
-        agent (ocs.ocs_agent.OCSAgent): Instantiated OCSAgent class for this Agent
+        agent (ocs.ocs_agent.OCSAgent): Instantiated OCSAgent class for this
+            Agent
     """
 
     def __init__(self, agent):
