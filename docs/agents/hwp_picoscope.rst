@@ -44,10 +44,15 @@ using all of the available arguments::
 
 Docker
 ``````
+
+.. warning::
+    This agent is only confirmed to work with the privileged flag, which disables
+    the features that isolate a container from the host system. It is recommended
+    that you instead run this Agent directly on the host via the Host Manager
+    Agent.
+
 The HWP picoscope agent can be run via a Docker container. The following is an
-example of what to insert into your institution's docker-compose file.
-Currently this agent is confirmed to work by privileded true, but this needs to be improved.
-::
+example of what to insert into your institution's docker-compose file::
 
   picoscope:
     image: simonsobs/ocs-hwp-picoscope-agent:latest
