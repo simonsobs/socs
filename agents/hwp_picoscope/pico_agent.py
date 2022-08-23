@@ -103,8 +103,8 @@ class PicoAgent:
             ch = np.array([int(d) for d in ch])
             rising_edge = list(np.flatnonzero((ch[:-1] < .5) & (ch[1:] > .5)) + 1)
             falling_edge = list(np.flatnonzero((ch[:-1] > .5) & (ch[1:] < .5)) + 1)
-            #data_downsampled['data']['ch_%d_rise'%i] = rising_edge
-            #data_downsampled['data']['ch_%d_fall'%i] = falling_edge
+            # data_downsampled['data']['ch_%d_rise'%i] = rising_edge
+            # data_downsampled['data']['ch_%d_fall'%i] = falling_edge
             data_downsampled['data']['ch_%d_rate' % i] = (len(rising_edge or []) + len(falling_edge or [])) / pico.info['length_sec']
         self.agent.publish_to_feed('downsampled_sensors', data_downsampled)
         print(data_downsampled['data'])
@@ -170,9 +170,9 @@ def make_parser(parser=None):
     if parser is None:
         parser = argparse.ArgumentParser()
 
-    pgroup = parser.add_argument_group('Agent Options')
     # Fix me after correcting "priviledged true"
-    #pgroup.add_argument('--port', type=stri, help="Path to USB node for the picoscope.")
+    # pgroup = parser.add_argument_group('Agent Options')
+    # pgroup.add_argument('--port', type=stri, help="Path to USB node for the picoscope.")
     return parser
 
 

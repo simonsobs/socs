@@ -136,7 +136,7 @@ class ps3000a():
 
     def SetScope(self):
         enabled = 1
-        disabled = 0
+        disabled = 0  # noqa: F841
         analogue_offset = 0.0
 
         # Set up channel A
@@ -160,7 +160,7 @@ class ps3000a():
 
     def SetScopeAll(self):
         enabled = 1
-        disabled = 0
+        disabled = 0  # noqa: F841
         analogue_offset = 0.0
 
         # Set up channel A
@@ -331,7 +331,7 @@ class ps3000a():
         print("Capturing interval %s sec" % (actualSampleInterval * 1000 * self.totalSamples / 1e12))
 
     def _streaming_callback(self, handle, noOfSamples, startIndex, overflow, triggerAt, triggered, autoStop, param):
-        #global nextSample, autoStopOuter, wasCalledBack
+        # global nextSample, autoStopOuter, wasCalledBack
         self.wasCalledBack = True
         destEnd = self.nextSample + noOfSamples
         sourceEnd = startIndex + noOfSamples
@@ -373,7 +373,7 @@ class ps3000a():
         # enabled = 1
         # logicLevel = 10000
         self.status["SetDigitalPort"] = ps.ps3000aSetDigitalPort(self.chandle, ps.PS3000A_DIGITAL_PORT["PS3000A_DIGITAL_PORT0"], 1, 10000)
-        #self.status["SetDigitalPort"] = ps.ps3000aSetDigitalPort(self.chandle, ps.PS3000A_DIGITAL_PORT["PS3000A_DIGITAL_PORT1"], 1, 10000)
+        # self.status["SetDigitalPort"] = ps.ps3000aSetDigitalPort(self.chandle, ps.PS3000A_DIGITAL_PORT["PS3000A_DIGITAL_PORT1"], 1, 10000)
         assert_pico_ok(self.status["SetDigitalPort"])
 
     def set_digital_buffer(self):
@@ -469,7 +469,7 @@ class ps3000a():
         print("Capturing interval %s sec" % (actualSampleInterval * 1000 * self.totalSamples / 1e12))
 
     def _streaming_callback_AD(self, handle, noOfSamples, startIndex, overflow, triggerAt, triggered, autoStop, param):
-        #global nextSample, autoStopOuter, wasCalledBack
+        # global nextSample, autoStopOuter, wasCalledBack
         self.wasCalledBack = True
         destEnd = self.nextSample + noOfSamples
         sourceEnd = startIndex + noOfSamples
