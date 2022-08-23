@@ -144,7 +144,7 @@ class PfeifferAgent:
                 self.agent.publish_to_feed('pressures', data)
                 time.sleep(sleep_time)
 
-            self.agents.feeds['pressures'].flush_buffer()
+            self.agent.feeds['pressures'].flush_buffer()
         return True, 'Acquistion exited cleanly'
 
     def stop_acq(self, session, params=None):

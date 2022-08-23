@@ -154,7 +154,7 @@ class ACUAgent:
                                startup=True)
         agent.register_process('generate_scan',
                                self.generate_scan,
-                               lambda session, params: self._set_job_stop('generate_scan'),
+                               lambda session, params: self._set_job_stop('control'),
                                blocking=False,
                                startup=False)
         basic_agg_params = {'frame_length': 60}
@@ -581,12 +581,12 @@ class ACUAgent:
         el = params['el']
         if az <= self.motion_limits['azimuth']['lower'] or az >= self.motion_limits['azimuth']['upper']:
             raise ocs_agent.ParamError("Azimuth out of range! Must be "
-                                       + f"{self.motion_limits['azimuth']['lower']} <= az "
-                                       + f"<= {self.motion_limits['azimuth']['upper']}")
+                                       + f"{self.motion_limits['azimuth']['lower']} < az "
+                                       + f"< {self.motion_limits['azimuth']['upper']}")
         if el <= self.motion_limits['elevation']['lower'] or el >= self.motion_limits['elevation']['upper']:
             raise ocs_agent.ParamError("Elevation out of range! Must be "
-                                       + f"{self.motion_limits['elevation']['lower']} <= az "
-                                       + f"<= {self.motion_limits['elevation']['upper']}")
+                                       + f"{self.motion_limits['elevation']['lower']} < el "
+                                       + f"< {self.motion_limits['elevation']['upper']}")
         end_stop = params['end_stop']
         wait_for_motion = params['wait']
         round_int = params['rounding']
@@ -620,11 +620,9 @@ class ACUAgent:
         # self.log.info('Stopped')
         # yield dsleep(0.5)
         yield self.acu_control.go_to(az, el, wait=0.1)
-        yield dsleep(0.3)
         mdata = self.data['status']['summary']
         # Wait for telescope to start moving
         self.log.info('Moving to commanded position')
-        yield dsleep(5)
         wait_for_motion_start = time.time()
         elapsed_wait_for_motion = 0.0
         while mdata['Azimuth_current_velocity'] == 0.0 and\
@@ -981,7 +979,7 @@ class ACUAgent:
         g = sh.generate_constant_velocity_scan(az_endpoint1, az_endpoint2,
                                                az_speed, acc, el_endpoint1, el_endpoint2, el_speed)
         self.acu_control.mode('ProgramTrack')
-        while True:
+        while self.jobs['control'] == 'run':
             lines = next(g)
             current_lines = lines
             group_size = 250

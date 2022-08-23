@@ -21,6 +21,7 @@ class SynaccessAgent:
             password(str): password credential to login to strip
         """
         self.agent = agent
+        self.log = agent.log
         self.lock = TimeoutLock()
         self.ip_address = ip_address
         self.user = username
@@ -34,7 +35,7 @@ class SynaccessAgent:
         req = "http://" + self.user + ":" + self.passw + "@" +\
             self.ip_address + "/cmd.cgi?$A5"
         r = requests.get(req)
-        resp = str(r.content)[6:11][::-1]
+        resp = r.content.decode()[:-6:-1]  # get last 5 elements, in reverse
         return resp
 
     def get_status(self, session, params=None):
@@ -129,7 +130,7 @@ class SynaccessAgent:
 
         """
 
-        with self.lock.acquire_timeout(timeout=0, job='status_acq')\
+        with self.lock.acquire_timeout(timeout=3, job='status_acq')\
                 as acquired:
             if not acquired:
                 self.log.warn(
@@ -202,7 +203,7 @@ def make_parser(parser=None):
 
 if __name__ == '__main__':
     parser = make_parser()
-    args = site_config.parse_args(agent_class='SynAccAgent', parser=parser)
+    args = site_config.parse_args(agent_class='SynaccessAgent', parser=parser)
 
     agent, runner = ocs_agent.init_site_agent(args)
 
