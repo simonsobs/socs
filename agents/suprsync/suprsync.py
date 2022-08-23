@@ -92,6 +92,9 @@ class SupRsync:
             except subprocess.TimeoutExpired as e:
                 self.log.error("Timeout when copying files! {e}", e=e)
                 op['error'] = 'timed out'
+            except subprocess.CalledProcessError as e:
+                self.log.error("rsync returned non-zero exit code! {e}", e=e)
+                op['error'] = 'nonzero exit'
             op['stop_time'] = time.time()
             session.data['last_copy'] = op
 
