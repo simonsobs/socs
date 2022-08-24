@@ -71,7 +71,6 @@ class SupRsync:
                                      'exclude_aggregator': True,
                                  })
 
-
     def run(self, session, params=None):
         """run()
 
