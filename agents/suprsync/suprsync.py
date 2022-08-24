@@ -64,11 +64,41 @@ class SupRsync:
         self.compression = args.compression
         self.bwlimit = args.bwlimit
 
+        # Feed for counting transfer errors, loop iterations.
+        self.agent.register_feed('transfer_stats',
+                                 record=True,
+                                 agg_params={
+                                     'exclude_aggregator': True,
+                                 })
+
+
     def run(self, session, params=None):
         """run()
 
         **Process** - Main run process for the SupRsync agent. Continuosly
         checks the suprsync db checking for files that need to be handled.
+
+        Notes:
+
+            The session data object contains info about recent
+            transfers::
+
+                >>> response.session['data']
+                {
+                  "activity": "idle",
+                  "timestamp": 1661284493.5398622,
+                  "last_copy": {
+                    "start_time": 1661284493.5333128,
+                    "files": [],
+                    "stop_time": 1661284493.5398622
+                  },
+                  "counters": {
+                    "iterations": 1,
+                    "copies": 0,
+                    "errors_timeout": 0,
+                    "errors_nonzero": 0
+                  },
+                }
         """
 
         srfm = SupRsyncFilesManager(self.db_path, create_all=True)
@@ -83,20 +113,51 @@ class SupRsync:
         self.running = True
         session.set_status('running')
 
+        # Note this will also be stored directly in session.data
+        counters = {
+            'iterations': 0,
+            'copies': 0,
+            'errors_timeout': 0,
+            'errors_nonzero': 0,
+        }
+
+        session.data = {
+            'activity': 'idle',
+            'last_copy': {},
+            'counters': counters,
+        }
+
+        next_feed_update = 0
+
         while self.running:
+            counters['iterations'] += 1
+
             op = {'start_time': time.time()}
             try:
                 session.data['activity'] = 'copying'
                 op['files'] = handler.copy_files(max_copy_attempts=self.max_copy_attempts,
                                                  num_files=self.files_per_batch)
+                counters['copies'] += len(op['files'])
             except subprocess.TimeoutExpired as e:
                 self.log.error("Timeout when copying files! {e}", e=e)
                 op['error'] = 'timed out'
+                counters['errors_timeout'] += 1
             except subprocess.CalledProcessError as e:
                 self.log.error("rsync returned non-zero exit code! {e}", e=e)
                 op['error'] = 'nonzero exit'
-            op['stop_time'] = time.time()
+                counters['errors_nonzero'] += 1
+
+            now = time.time()
+            op['stop_time'] = now
             session.data['last_copy'] = op
+            session.data['timestamp'] = now
+
+            if now >= next_feed_update:
+                self.agent.publish_to_feed('transfer_stats', {
+                    'block_name': 'block0',
+                    'timestamp': now,
+                    'data': counters})
+                next_feed_update = now + 10 * 60
 
             if self.delete_after is not None:
                 session.data['activity'] = 'deleting'
