@@ -26,6 +26,12 @@ SMURF_FREQ_RANGE = (4e3, 8e3)
 SUBBANDS_PER_BAND = 512
 CHANS_PER_BAND = 512
 
+primary_names = [
+    'UnixTime', 'FluxRampIncrement', 'FluxRampOffset', 'Counter0',
+    'Counter1', 'Counter2', 'AveragingResetBits', 'FrameCounter',
+    'TESRelaySetting'
+]
+primary_idxs = {name: idx for idx, name in enumerate(primary_names)}
 
 class Tune:
     """
@@ -144,6 +150,7 @@ class G3FrameGenerator:
 
     def __init__(self, stream_id, sample_rate, tune):
         self.frame_num = 0
+        self.sample_num = 0
         self.session_id = int(time.time())
         self.tune = tune
         self.nchans = np.sum(tune.channels != -1)
@@ -186,6 +193,8 @@ class G3FrameGenerator:
 
         times = np.arange(start, stop, 1. / self.sample_rate)
         nsamps = len(times)
+        frame_counter = np.arange(self.sample_num, self.sample_num + nsamps, dtype=int)
+        self.sample_num += nsamps
         chans = np.arange(self.nchans)
         names = [f'r{ch:0>4}' for ch in chans]
 
@@ -200,13 +209,10 @@ class G3FrameGenerator:
         g3times = core.G3VectorTime(times * core.G3Units.s)
         fr['data'] = so3g.G3SuperTimestream(names, g3times, data)
 
-        primary_names = [
-            'UnixTime', 'FluxRampIncrement', 'FluxRampOffset', 'Counter0',
-            'Counter1', 'Counter2', 'AveragingResetBits', 'FrameCounter',
-            'TESRelaySetting'
-        ]
+
         primary_data = np.zeros((len(primary_names), nsamps), dtype=np.int64)
-        primary_data[0, :] = (times * 1e9).astype(int)
+        primary_data[primary_idxs['UnixTime'], :] = (times * 1e9).astype(int)
+        primary_data[primary_idxs['FrameCounter'], :] = frame_counter
         fr['primary'] = so3g.G3SuperTimestream(primary_names, g3times, primary_data)
 
         tes_bias_names = [f'bias{bg:0>2}' for bg in range(NBIASLINES)]

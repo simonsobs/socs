@@ -136,3 +136,5 @@ key.*
 node.pid
 
 .DS_Store
+
+.vscode
