@@ -33,6 +33,7 @@ primary_names = [
 ]
 primary_idxs = {name: idx for idx, name in enumerate(primary_names)}
 
+
 class Tune:
     """
     Helper class for generating tunes
@@ -208,7 +209,6 @@ class G3FrameGenerator:
 
         g3times = core.G3VectorTime(times * core.G3Units.s)
         fr['data'] = so3g.G3SuperTimestream(names, g3times, data)
-
 
         primary_data = np.zeros((len(primary_names), nsamps), dtype=np.int64)
         primary_data[primary_idxs['UnixTime'], :] = (times * 1e9).astype(int)
