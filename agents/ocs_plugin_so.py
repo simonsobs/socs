@@ -22,6 +22,7 @@ for n, f in [
         ('VantagePro2Agent', 'vantagePro2_agent/vantage_pro2_agent.py'),
         ('HWPPicoscopeAgent', 'hwp_picoscope/pico_agent.py'),
         ('FPGAAgent', 'holo_fpga/roach_agent.py'),
-        ('SynthAgent', 'holo_synth/synth_agent.py')
+        ('SynthAgent', 'holo_synth/synth_agent.py'),
+        ('SupRsync', 'suprsync/suprsync.py'),
 ]:
     ocs.site_config.register_agent_class(n, os.path.join(root, f))
