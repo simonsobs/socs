@@ -339,20 +339,33 @@ class ACUAgent:
         version = yield self.acu_read.http.Version()
         self.log.info(version)
 
-        mode_key = {'Stop': 0,
-                    'Preset': 1,
-                    'Rate': 2,
-                    'GeoSync': 3,
-                    'StepTrack': 4,
-                    'OPT': 5,
-                    'TLE': 6,
-                    'StarTrack': 7,
-                    'SunTrack': 8,
-                    'MoonTrack': 9,
-                    'Surivial': 10,
-                    'ProgramTrack': 11,
-                    'ElSync': 12,
-                    }
+        # Numbering as per ICD.
+        mode_key = {
+            'Stop': 0,
+            'Preset': 1,
+            'ProgramTrack': 2,
+            'Rate': 3,
+            'SectorScan': 4,
+            'SearchSpiral': 5,
+            'SurvivalMode': 6,
+            'StepTrack': 7,
+            'GeoSync': 8,
+            'OPT': 9,
+            'TLE': 10,
+            'Stow': 11,
+            'StarTrack': 12,
+            'SunTrack': 13,
+            'MoonTrack': 14,
+            'I11P': 15,
+            'AutoTrack/Preset': 16,
+            'AutoTrack/PositionMemory': 17,
+            'AutoTrack/PT': 18,
+            'AutoTrack/OPT': 19,
+            'AutoTrack/PT/Search': 20,
+            'AutoTrack/TLE': 21,
+            'AutoTrack/TLE/Search': 22,
+        }
+
         # fault_key digital values taken from ICD (correspond to byte-encoding)
         fault_key = {
             'No Fault': 0,
@@ -1135,6 +1148,8 @@ class ACUAgent:
                        if params.get(k) is not None}
         el_endpoint2 = params.get('el_endpoint2', el_endpoint1)
         el_speed = params.get('el_speed', 0.0)
+
+        print('Scan params are', scan_params)
 
    #     yield self.acu_control.stop()
         g = sh.generate_constant_velocity_scan(az_endpoint1=az_endpoint1,
