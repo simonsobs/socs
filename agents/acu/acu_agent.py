@@ -364,6 +364,13 @@ class ACUAgent:
             'AutoTrack/PT/Search': 20,
             'AutoTrack/TLE': 21,
             'AutoTrack/TLE/Search': 22,
+
+            # Currently we do not have ICD values for these, but they
+            # are included in the output of Meta.  ElSync, at least,
+            # is a known third axis mode for the LAT.
+            'ElSync': 100,
+            'Unstow': 101,
+            'MaintenanceStow': 102,
         }
 
         # fault_key digital values taken from ICD (correspond to byte-encoding)
