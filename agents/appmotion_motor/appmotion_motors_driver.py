@@ -501,8 +501,6 @@ class Motor:
     def set_acceleration(self, accel=5):
         """
         Set acceleration of motors driving stages. (default 5)
-        .. note::
-            `accel` parameter will only accept integer values.
 
         Parameters:
             accel (int): Sets acceleration in revolutions per second per second

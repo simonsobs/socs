@@ -58,8 +58,6 @@ An example docker-compose configuration::
 Agent API
 ---------
 
-# Autoclass the Agent, this is for users to reference when writing clients.
-
 .. autoclass:: agents.appmotion_motor.appmotion_motors_agent.appMotionMotorsAgent
     :members:
 
@@ -220,5 +218,5 @@ Below is a script for a beam-mapper scan using the appmotion_motor_agent.::
 Supporting APIs
 ---------------
 
-.. automodule:: agents.appmotion_motor.appmotion_motors_driver
+.. autoclass:: agents.appmotion_motor.appmotion_motors_driver.Motor
     :members:

@@ -79,17 +79,12 @@ class appMotionMotorsAgent:
                                  buffer_time=0)
 
     def init_motors_task(self, session, params=None):
-        """init_motors_task(params)
+        """init_motors_task()
 
         **Task** - Connect to the motors, either one or both.
 
-        Parameters:
-            params (dict): Parameters dictionary for passing
-                parameters to task.
         """
 
-        if params is None:
-            params = {}
         self.log.debug("Trying to acquire lock")
         with self.lock.acquire_timeout(timeout=0, job='init') as acquired:
             # Locking mechanism stops code from proceeding if no lock acquired
@@ -119,15 +114,11 @@ class appMotionMotorsAgent:
     @ocs_agent.param('pos', default=0, type=float)
     @ocs_agent.param('verbose', default=True, type=bool)
     def move_axis_to_position(self, session, params):
-        """move_axis_to_position(motor=1, pos=0, pos_is_inches=False,
-            lin_stage=True)
+        """move_axis_to_position(motor=1, pos=0, pos_is_inches=False,\
+        lin_stage=True)
 
-        ** Task** - Move the axis to the given absolute position in counts or
+        **Task** - Move the axis to the given absolute position in counts or
         inches.
-
-        .. note::
-            If moving multiple axes, function will assume ``lin_stage`` value
-            for all axes.
 
         Parameters:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
@@ -138,6 +129,11 @@ class appMotionMotorsAgent:
                 if in counts (default False)
             lin_stage (bool): True if the specified motor is for the linear
                 stage, False if not (default True)
+
+        .. note::
+            If moving multiple axes, function will assume ``lin_stage`` value
+            for all axes.
+
         """
 
         self.move_status = self.is_moving(session, params)[1][1]
@@ -169,15 +165,11 @@ class appMotionMotorsAgent:
     @ocs_agent.param('pos', default=0, type=float)
     @ocs_agent.param('verbose', default=True, type=bool)
     def move_axis_by_length(self, session, params):
-        """move_axis_by_length(motor=1, pos=0, pos_is_inches=False,
-            lin_stage=True)
+        """move_axis_by_length(motor=1, pos=0, pos_is_inches=False,\
+        lin_stage=True)
 
         **Task** - Move the axis relative to the current position by the
         specified number of counts or inches.
-
-        .. note::
-            If moving multiple axes, function will assume ``lin_stage`` value
-                for all axes.
 
         Parameters:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
@@ -188,6 +180,11 @@ class appMotionMotorsAgent:
                 in counts (default False)
             lin_stage (bool): True if the specified motor is for the linear
                 stage, False if not (default True)
+
+        .. note::
+            If moving multiple axes, function will assume ``lin_stage`` value
+            for all axes.
+
         """
 
         self.move_status = self.is_moving(session, params)[1][1]
@@ -221,7 +218,7 @@ class appMotionMotorsAgent:
 
         **Task** - Set velocity of motors driving stages.
 
-        Parameter:
+        Parameters:
             motor (int):Determines which motor, either 1 or 2, 3 is for all
                 motors.(default 3)
             velocity (float): Sets velocity of motor in revolutions per second
@@ -258,9 +255,6 @@ class appMotionMotorsAgent:
         """set_acceleration(motor=3, accel=1)
 
         **Task** - Set acceleration of motors driving stages.
-
-        .. note::
-            `accel` parameter will only accept integer values.
 
         Parameters:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
@@ -475,9 +469,6 @@ class appMotionMotorsAgent:
 
         **Task** - Start rotating motor of polarizer.
 
-        .. note::
-            Give acceleration and velocity values as arguments here.
-
         Parameters:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 1)
@@ -631,7 +622,7 @@ class appMotionMotorsAgent:
     def kill_all_commands(self, session, params):
         """kill_all_commands(motor=3)
 
-        **Task** Stops all active commands on the device.
+        **Task** - Stops all active commands on the device.
 
         Parameters:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
@@ -1031,8 +1022,6 @@ class appMotionMotorsAgent:
 
         **Task** - Stop data acquisition.
 
-        Parameters:
-            None
         """
 
         if self.take_data:
