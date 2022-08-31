@@ -125,6 +125,7 @@ ENV/
 
 # vscode
 *.code-workspace
+.vscode
 
 # Custom
 .crossbar/
@@ -136,5 +137,3 @@ key.*
 node.pid
 
 .DS_Store
-
-.vscode
