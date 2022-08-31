@@ -125,6 +125,7 @@ ENV/
 
 # vscode
 *.code-workspace
+.vscode
 
 # Custom
 .crossbar/
