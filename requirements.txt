@@ -18,6 +18,9 @@ pysmi
 # suprsync agent and tests
 sqlalchemy
 
+# acu agent
+soaculib @ git+https://github.com/simonsobs/soaculib.git@master
+
 # Docs
 # see docs/requirements.txt
 

@@ -13,6 +13,11 @@ setup(name='socs',
       description='Simons Observatory Control System',
       package_dir={'socs': 'socs'},
       packages=find_packages(),
+      entry_points={
+          'ocs.plugins': [
+              'socs = socs.plugin',
+          ],
+      },
       url="https://github.com/simonsobs/socs",
       project_urls={
           "Source Code": "https://github.com/simonsobs/ocs",
@@ -34,6 +39,7 @@ setup(name='socs',
           'pyserial',
           'sqlalchemy',
           'pysnmp',
+          'soaculib @ git+https://github.com/simonsobs/soaculib.git@master',
       ],
       extras_require={
           "so3g": ["so3g"],

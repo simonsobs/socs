@@ -3,7 +3,7 @@ import struct
 import datetime
 import calendar
 import soaculib as aculib
-import scan_helpers as sh
+import socs.agents.acu.drivers as sh
 from soaculib.twisted_backend import TwistedHttpBackend
 import argparse
 import soaculib.status_keys as status_keys
@@ -1030,11 +1030,15 @@ def add_agent_args(parser_in=None):
     return parser_in
 
 
-if __name__ == '__main__':
+def main():
     parser = add_agent_args()
     args = site_config.parse_args(agent_class='ACUAgent', parser=parser)
 
     agent, runner = ocs_agent.init_site_agent(args)
-    acu_agent = ACUAgent(agent, args.acu_config)
+    _ = ACUAgent(agent, args.acu_config)
 
     runner.run(agent, auto_reconnect=True)
+
+
+if __name__ == '__main__':
+    main()
