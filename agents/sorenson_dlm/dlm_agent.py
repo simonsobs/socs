@@ -136,7 +136,6 @@ class DLMAgent:
             pm = Pacemaker(f_sample, True)
         else:
             pm = Pacemaker(f_sample)
-        wait_time = 1 / f_sample
         with self.lock.acquire_timeout(timeout=0, job='init') as acquired:
             # Locking mechanism stops code from proceeding if no lock acquired
             pm.sleep()
@@ -319,7 +318,8 @@ def make_parser(parser=None):
                         + "converter ip address")
     pgroup.add_argument('--port', type=int, help="Serial-to-ethernet "
                         + "converter port")
-
+    pgroup.add_argument('--mode', default='acq',
+                        choices=['idel', 'acq', 'acq_reg'])
     return parser
 
 
@@ -327,6 +327,15 @@ if __name__ == '__main__':
     parser = make_parser()
     args = site_config.parse_args(agent_class='DLMAgent',
                                   parser=parser)
+    # Automatically acquire data if request (default)
+    init_params = False
+    if args.mode == 'init':
+        init_params = {'auto_acquire': False,
+                       'acq_params': {},
+                       'configfile': args.configfile}
+    elif args.mode == 'acq':
+        init_params = {'auto_acquire': True,
+                       'acq_params': {}}
 
     agent, runner = ocs_agent.init_site_agent(args)
     DLM_agent = DLMAgent(agent, args.ip_address, args.port)
