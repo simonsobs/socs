@@ -12,3 +12,9 @@ WORKDIR /app/socs/
 # Install socs
 RUN pip3 install -r requirements.txt && \
     pip3 install .
+
+# Reset workdir to avoid local imports
+WORKDIR /
+
+# Run agent on container startup
+ENTRYPOINT ["dumb-init", "ocs-agent-cli"]

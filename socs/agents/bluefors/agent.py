@@ -526,7 +526,7 @@ def make_parser(parser=None):
     return parser
 
 
-if __name__ == '__main__':
+def main():
     # Start logging
     txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
 
@@ -543,3 +543,7 @@ if __name__ == '__main__':
                            bluefors_agent._stop_acq, startup=True)
 
     runner.run(agent, auto_reconnect=True)
+
+
+if __name__ == '__main__':
+    main()

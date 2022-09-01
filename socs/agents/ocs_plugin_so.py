@@ -10,5 +10,6 @@ root = os.path.abspath(os.path.split(__file__)[0])
 
 for n, f in [
         ('ACUAgent', 'acu/agent.py'),
+        ('BlueforsAgent', 'bluefors/agent.py'),
 ]:
     ocs.site_config.register_agent_class(n, os.path.join(root, f))
