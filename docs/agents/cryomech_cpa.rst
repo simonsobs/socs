@@ -13,9 +13,9 @@ temperature and pressure, oil temperature, and more. Control is not yet
 implemented.
 
 .. argparse::
-    :filename: ../agents/cryomech_cpa/cryomech_cpa_agent.py
+    :filename: ../socs/agents/cryomech_cpa/agent.py
     :func: make_parser
-    :prog: python3 crypmech_cpa_agent.py
+    :prog: python3 agent.py
 
 
 Configuration File Examples
@@ -50,7 +50,7 @@ The Cryomech CPA Agent should be configured to run in a Docker container.
 An example docker-compose service configuration is shown here::
 
   ocs-ptc1:
-    image: simonsobs/ocs-cryomech-cpa-agent:latest
+    image: simonsobs/socs:latest
     hostname: ocs-docker
     network_mode: "host"
     volumes:
@@ -83,11 +83,11 @@ Below is an example client to start data acquisition::
 Agent API
 ---------
 
-.. autoclass:: agents.cryomech_cpa.cryomech_cpa_agent.PTCAgent
+.. autoclass:: socs.agents.cryomech_cpa.agent.PTCAgent
     :members:
 
 Supporting APIs
 ---------------
 
-.. autoclass:: agents.cryomech_cpa.cryomech_cpa_agent.PTC
+.. autoclass:: socs.agents.cryomech_cpa.agent.PTC
     :members:

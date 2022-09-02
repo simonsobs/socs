@@ -14,7 +14,6 @@ for n, f in [
         ('Lakeshore240Agent', 'lakeshore240/LS240_agent.py'),
         ('Keithley2230G-PSU', 'keithley2230G-psu/keithley_agent.py'),
         ('PysmurfController', 'pysmurf_controller/pysmurf_controller.py'),
-        ('CryomechCPAAgent', 'cryomech_cpa/cryomech_cpa_agent.py'),
         ('LATRtXYStageAgent', 'xy_stage/xy_latrt_agent.py'),
         ('FTSAerotechAgent', 'fts_aerotech_stage/fts_aerotech_agent.py'),
         ('VantagePro2Agent', 'vantagePro2_agent/vantage_pro2_agent.py'),

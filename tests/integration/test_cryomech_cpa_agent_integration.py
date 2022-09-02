@@ -26,9 +26,9 @@ init_res = b'\t\x99\x00\x00\x00m\x01\x04j\x00\x00\x00\x00\x00\x00\x80\x00\x00\x0
 
 wait_for_crossbar = create_crossbar_fixture()
 run_agent = create_agent_runner_fixture(
-    '../agents/cryomech_cpa/cryomech_cpa_agent.py', 'cryomech_cpa_agent')
+    '../socs/agents/cryomech_cpa/agent.py', 'cryomech_cpa_agent')
 run_agent_acq = create_agent_runner_fixture(
-    '../agents/cryomech_cpa/cryomech_cpa_agent.py', 'cryomech_cpa_agent', args=['--mode', 'acq'])
+    '../socs/agents/cryomech_cpa/agent.py', 'cryomech_cpa_agent', args=['--mode', 'acq'])
 client = create_client_fixture('cryomech')
 emulator = create_device_emulator({init_msg: init_res}, relay_type='tcp', port=5502, encoding=None)
 
