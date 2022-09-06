@@ -10,9 +10,9 @@ This agent is used to communicate with the FTS mirror stage for two FTSs with
 Aerotech motion controllers.
 
 .. argparse::
-    :filename: ../agents/fts_aerotech_stage/fts_aerotech_agent.py
+    :filename: ../socs/agents/fts_aerotech/agent.py
     :func: make_parser
-    :prog: python3 fts_aerotech_agent.py
+    :prog: python3 agent.py
 
 
 Configuration File Examples
@@ -72,5 +72,5 @@ is running.::
 Agent API
 ---------
 
-.. autoclass:: agents.fts_aerotech_stage.fts_aerotech_agent.FTSAerotechAgent
+.. autoclass:: socs.agents.fts_aerotech.agent.FTSAerotechAgent
     :members: init_stage_task, home_task, move_to, start_acq, stop_acq

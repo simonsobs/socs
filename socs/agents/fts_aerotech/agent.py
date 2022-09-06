@@ -322,11 +322,10 @@ def make_parser(parser=None):
     return parser
 
 
-if __name__ == '__main__':
-
+def main():
     # For logging
     txaio.use_twisted()
-    LOG = txaio.make_logger()
+    txaio.make_logger()
 
     # Start logging
     txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
@@ -350,3 +349,7 @@ if __name__ == '__main__':
     agent.register_process('acq', fts_agent.start_acq, fts_agent.stop_acq)
 
     runner.run(agent, auto_reconnect=True)
+
+
+if __name__ == '__main__':
+    main()
