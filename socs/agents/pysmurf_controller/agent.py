@@ -117,6 +117,8 @@ class PysmurfController:
                 self._on_session_data,
                 'observatory.{}.feeds.pysmurf_session_data'.format(args.monitor_id),
             )
+        
+        self.agent.register_feed('responsivity_quantiles', record=True)
 
     def _on_session_data(self, _data):
         data, feed = _data
@@ -708,6 +710,22 @@ class PysmurfController:
             bsa = bias_steps.take_bias_steps(
                 S, cfg, **params['kwargs']
             )
+
+            if not np.isnan(bsa.Si).all():
+                quantiles = np.array([15, 25, 50, 75, 85])
+                labels = [f'responsivity_q{q}' for q in quantiles]
+                block = {
+                    k: np.nanquantile(bsa.Si, q/1000)
+                    for k, q in zip(labels, quantiles)
+                }
+                block['responsivity_count'] = np.sum(~np.isnan(bsa.Si))
+                data = {
+                    'timestamp': time.time(),
+                    'block_name': 'repsonsivity_quantile',
+                    'data': block
+                }
+                self.agent.publish_to_feed('responsivity_quantiles', data)
+
             session.data = {
                 'filepath': bsa.filepath
             }
