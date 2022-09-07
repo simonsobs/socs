@@ -1094,8 +1094,7 @@ def make_parser(parser=None):
     return parser
 
 
-if __name__ == '__main__':
-
+def main():
     # Create an argument parser
     parser = make_parser()
     args = site_config.parse_args(
@@ -1143,3 +1142,7 @@ if __name__ == '__main__':
 
     # Run the agent
     runner.run(agent, auto_reconnect=True)
+
+
+if __name__ == '__main__':
+    main()
