@@ -153,6 +153,77 @@ class LabJackFunctions:
 
         return values, units
 
+    def cold_therm(self, v_array):
+        """
+        Conversion function for LATR cold thermometry readout.
+        An 830Hz 20mV peak-to-peak sinusoidal bias is inputted from 
+        an external signal generator, divided down by a factor of
+        100 with a voltage divider internal to the cold thermometry 
+        box, making the voltage that biases our cold thermometers
+        200uV peak-to-peak.
+        After passing through the cold thermometers, our signal
+        passes through a preamp board which amplifies it by a 
+        factor of 160 and bandpass filters it at ~830Hz. The 
+        filtered signal then passes through an RMS board with a high 
+        pass filter on its input at ~530Hz, is converted from AC to 
+        DC RMS, then its output is filtered with a low-pass at 20Hz.
+        The final filtered DC RMS signal is passed to a multiplexing
+        board connected to the following 24 labjack analog inputs:
+        ['AIN48','AIN49','AIN50', 'AIN51', 'AIN52', 'AIN53',
+         'AIN54','AIN55','AIN80', 'AIN81', 'AIN82', 'AIN83',
+         'AIN84','AIN85','AIN86', 'AIN87', 'AIN96', 'AIN97',
+         'AIN98','AIN99','AIN100','AIN101','AIN102','AIN103']
+        In order to use the system, it first must be calibrated with
+        a decade box, by plotting inputed resistance vs. measured
+        resistance. From that, extract the slope of the linear curve
+        (i.e. the calibration factor) and its offset. 
+        Voltage is converted to resistance using inputted bias and
+        known voltage divider resistance. Resistance is converted 
+        to kelvin via numpy interpolate with the ROX calibration 
+        curve kept in the directory socs/agents/labjack/cal_curves/
+        """
+        # calibration constants:
+        # offset is extracted from plot, adjusted for units
+        # calibration factor is the slope of the plot
+        offset = -.30/1000 
+        calibration_factor = .7 
+        
+        # gain of pre-amp board
+        gain = 160
+
+        # get current from inputted peak-to-peak bias (in V) divided 
+        # by the resistance of the voltage divider (in ohms)
+        I = .02 / 1950000
+
+        # calculate resistance of thermometer
+        # RMS is voltage at the RMS board
+        # PreampV is voltage at the preamp board
+        # PotentialDrop is the V in V=IR
+        RMS = v_array*(calibration_factor*2) + offset
+        PreampV = RMS / 0.3535
+        PotentialDrop = PreampV / gain
+        R = PotentialDrop / I
+    
+        # Import the Ohms to Kelvin cal curve and apply cubic
+        # interpolation to find the temperature
+        reader = csv.reader(open('cal_curves/ROX_cal_curve.txt'),
+                            delimiter=' ')
+        lists = [el for el in [row for row in reader]]
+        T_cal = np.array([float(RT[0]) for RT in lists[1:]])
+        R_cal = np.array([float(RT[1]) for RT in lists[1:]])
+    
+        try:
+            RtoT = interp1d(R_cal, T_cal, kind='cubic')
+            values = RtoT(R)
+            values = values*1000 # convert to mK
+        except ValueError:
+            self.log.error('Temperature outside thermometer range')
+            values = -1000 + np.zeros(len(R))
+    
+        units = 'mK'
+    
+        return values, units
+
 
 class LabJackAgent:
     """Agent to collect data from LabJack device.
