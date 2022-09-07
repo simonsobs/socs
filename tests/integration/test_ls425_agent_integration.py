@@ -19,9 +19,9 @@ pytest_plugins = ("docker_compose")
 
 wait_for_crossbar = create_crossbar_fixture()
 run_agent = create_agent_runner_fixture(
-    '../agents/lakeshore425/LS425_agent.py', 'ls425_agent')
+    '../socs/agents/lakeshore425/agent.py', 'ls425_agent')
 run_agent_acq = create_agent_runner_fixture(
-    '../agents/lakeshore425/LS425_agent.py', 'ls425_agent', args=['--mode', 'acq'])
+    '../socs/agents/lakeshore425/agent.py', 'ls425_agent', args=['--mode', 'acq'])
 client = create_client_fixture('LS425')
 emulator = create_device_emulator({'*IDN?': 'LSCI,MODEL425,LSA425T,1.3'},
                                   relay_type='serial')

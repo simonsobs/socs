@@ -10,9 +10,9 @@ The Lakeshore Model 425 gaussmeter is a device which measure the magnetic field 
 This agent is used to measure the magnetic field from the superconducting magnetic bearing of the CHWP rotation mechanism and to monitoring the status of floating and rotating CHWP.
 
 .. argparse::
-    :filename: ../agents/lakeshore425/LS425_agent.py
+    :filename: ../socs/agents/lakeshore425/agent.py
     :func: make_parser
-    :prog: python3 LS425_agent.py
+    :prog: python3 agent.py
 
 Configuration File Examples
 ---------------------------
@@ -41,7 +41,7 @@ The ocs-lakeshore425-agent can be run via a Docker container. The following is a
 example of what to insert into your institution's docker-compose file.::
 
   ocs-lakeshore425-agent:
-    image: simonsobs/ocs-lakeshore425-agent:latest
+    image: simonsobs/socs:latest
     device:
       - /dev/LS425:/dev/LS425
     hostname: ocs-docker
@@ -55,7 +55,7 @@ example of what to insert into your institution's docker-compose file.::
 Agent API
 ---------
 
-.. autoclass:: agents.lakeshore425.LS425_agent.LS425Agent
+.. autoclass:: socs.agents.lakeshore425.agent.LS425Agent
     :members:
 
 Supporting APIs
