@@ -1104,10 +1104,10 @@ def make_parser(parser=None):
     return parser
 
 
-if __name__ == '__main__':
+def main():
     # For logging
     txaio.use_twisted()
-    LOG = txaio.make_logger()
+    txaio.make_logger()
 
     # Start logging
     txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
@@ -1160,3 +1160,7 @@ if __name__ == '__main__':
     agent.register_task('input_configfile', lake_agent.input_configfile)
 
     runner.run(agent, auto_reconnect=True)
+
+
+if __name__ == '__main__':
+    main()

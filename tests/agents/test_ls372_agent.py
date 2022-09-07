@@ -1,6 +1,4 @@
-import sys
-sys.path.insert(0, '../agents/lakeshore372/')
-from LS372_agent import LS372_Agent
+from socs.agents.lakeshore372.agent import LS372_Agent
 
 from ocs.ocs_agent import OpSession
 
@@ -127,7 +125,7 @@ def test_ls372_init_lakeshore_already_initialized(agent):
 
 
 # If we don't patch the reactor out, it'll mess up pytest when stop is called
-@mock.patch('LS372_agent.reactor', mock.MagicMock())
+@mock.patch('socs.agents.lakeshore372.agent.reactor', mock.MagicMock())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_init_lakeshore_failed_connection(agent):
     """Leaving off the connection Mock, if the connection fails the init task
@@ -140,7 +138,7 @@ def test_ls372_init_lakeshore_failed_connection(agent):
 
 
 # If we don't patch the reactor out, it'll mess up pytest when stop is called
-@mock.patch('LS372_agent.reactor', mock.MagicMock())
+@mock.patch('socs.agents.lakeshore372.agent.reactor', mock.MagicMock())
 @mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_failed_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_init_lakeshore_unhandled_error(agent):
