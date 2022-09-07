@@ -7,9 +7,9 @@ HWP Rotation Agent
 ==================
 
 .. argparse::
-    :filename: ../agents/hwp_rotation/rotation_agent.py
+    :filename: ../socs/agents/hwp_rotation/agent.py
     :func: make_parser
-    :prog: python3 rotation_agent.py
+    :prog: python3 agent.py
 
 Configuration File Examples
 ---------------------------
@@ -36,13 +36,13 @@ Docker Compose
 An example docker-compose configuration::
 
   ocs-hwp-rotation:
-    image: simonsobs/ocs-hwp-rotation-agent:latest
+    image: simonsobs/socs:latest
     hostname: ocs-docker
     network_mode: "host"
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
     command:
-      - "--instance-id=hwp-rotation"
+      - "--instance-id=rotator"
       - "--site-hub=ws://127.0.0.1:8001/ws"
       - "--site-http=http://127.0.0.1:8001/call"
 
@@ -59,7 +59,7 @@ Description
 Agent API
 ---------
 
-.. autoclass:: agents.hwp_rotation.rotation_agent.RotationAgent
+.. autoclass:: socs.agents.hwp_rotation.agent.RotationAgent
     :members:
 
 Supporting APIs

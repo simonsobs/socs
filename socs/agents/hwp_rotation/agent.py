@@ -7,7 +7,7 @@ from ocs.ocs_twisted import TimeoutLock
 
 from socs.agent.pmx import PMX, Command
 
-import src.pid_controller as pd
+import socs.agents.hwp_rotation.drivers.pid_controller as pd
 
 
 class RotationAgent:
@@ -461,7 +461,7 @@ def make_parser(parser=None):
     return parser
 
 
-if __name__ == '__main__':
+def main():
     parser = make_parser()
     args = site_config.parse_args(agent_class='RotationAgent', parser=parser)
 
@@ -497,3 +497,7 @@ if __name__ == '__main__':
     agent.register_task('ign_ext', rotation_agent.ign_ext)
 
     runner.run(agent, auto_reconnect=True)
+
+
+if __name__ == '__main__':
+    main()

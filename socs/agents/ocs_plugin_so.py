@@ -12,6 +12,7 @@ for n, f in [
         ('ACUAgent', 'acu/agent.py'),
         ('BlueforsAgent', 'bluefors/agent.py'),
         ('CryomechCPAAgent', 'cryomech_cpa/agent.py'),
-        ('FTSAerotechAgent', 'fts_aerotech/agent.py')
+        ('FTSAerotechAgent', 'fts_aerotech/agent.py'),
+        ('RotationAgent', 'hwp_rotation/agent.py'),
 ]:
     ocs.site_config.register_agent_class(n, os.path.join(root, f))
