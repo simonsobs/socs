@@ -11,7 +11,6 @@ root = os.path.abspath(os.path.split(__file__)[0])
 for n, f in [
         ('Lakeshore372Agent', 'lakeshore372/LS372_agent.py'),
         ('Lakeshore370Agent', 'lakeshore370/LS370_agent.py'),
-        ('Lakeshore240Agent', 'lakeshore240/LS240_agent.py'),
         ('Keithley2230G-PSU', 'keithley2230G-psu/keithley_agent.py'),
         ('PysmurfController', 'pysmurf_controller/pysmurf_controller.py'),
         ('LATRtXYStageAgent', 'xy_stage/xy_latrt_agent.py'),
