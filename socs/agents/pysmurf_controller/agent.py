@@ -870,6 +870,7 @@ def main(args=None):
     agent.register_task('uxm_setup', controller.uxm_setup)
     agent.register_task('uxm_relock', controller.uxm_relock)
     agent.register_task('take_bgmap', controller.take_bgmap)
+    agent.register_task('bias_dets', controller.bias_dets)
     agent.register_task('take_iv', controller.take_iv)
     agent.register_task('take_bias_steps', controller.take_bias_steps)
     agent.register_task('overbias_tes', controller.overbias_tes)
