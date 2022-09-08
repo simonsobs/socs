@@ -2,7 +2,7 @@ import time
 import os
 import socket
 import argparse
-from socs.agent.scpi_psu_driver import PsuInterface
+from socs.agents.scpi_psu.drivers import PsuInterface
 
 on_rtd = os.environ.get('READTHEDOCS') == 'True'
 if not on_rtd:
@@ -170,7 +170,7 @@ def make_parser(parser=None):
     return parser
 
 
-if __name__ == '__main__':
+def main():
     parser = make_parser()
     args = site_config.parse_args(agent_class='ScpiPsuAgent', parser=parser)
 
@@ -186,3 +186,7 @@ if __name__ == '__main__':
     agent.register_process('monitor_output', p.monitor_output, p.stop_monitoring)
 
     runner.run(agent, auto_reconnect=True)
+
+
+if __name__ == '__main__':
+    main()

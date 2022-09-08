@@ -28,24 +28,6 @@ services:
       - "socs"
 
   # --------------------------------------------------------------------------
-  # Smurf stream simulator agent
-  # --------------------------------------------------------------------------
-  ocs-smurf-stream-sim-agent:
-    image: "ocs-smurf-stream-sim"
-    build: ./agents/smurf_stream_simulator/
-    depends_on:
-      - "socs"
-
-  # --------------------------------------------------------------------------
-  # Power Supply control Agent
-  # --------------------------------------------------------------------------
-  ocs-scpi-psu-agent:
-    image: "ocs-scpi-psu-agent"
-    build: ./agents/scpi_psu/
-    depends_on:
-      - "socs"
-
-  # --------------------------------------------------------------------------
   # LabJack Agent
   # --------------------------------------------------------------------------
   ocs-labjack-agent:
