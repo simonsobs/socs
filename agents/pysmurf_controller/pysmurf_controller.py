@@ -120,7 +120,7 @@ class PysmurfController:
                 self._on_session_data,
                 'observatory.{}.feeds.pysmurf_session_data'.format(args.monitor_id),
             )
-        
+
         self.agent.register_feed('responsivity_quantiles', record=True)
 
     def _on_session_data(self, _data):
@@ -713,7 +713,7 @@ class PysmurfController:
                 quantiles = np.array([15, 25, 50, 75, 85])
                 labels = [f'responsivity_q{q}' for q in quantiles]
                 block = {
-                    k: np.nanquantile(bsa.Si, q/1000)
+                    k: np.nanquantile(bsa.Si, q / 1000)
                     for k, q in zip(labels, quantiles)
                 }
                 block['responsivity_count'] = np.sum(~np.isnan(bsa.Si))
