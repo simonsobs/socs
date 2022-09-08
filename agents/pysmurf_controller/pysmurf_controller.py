@@ -607,7 +607,12 @@ class PysmurfController:
 
             session.set_status('running')
             S, cfg = self._get_smurf_control(session=session)
-            bsa = bias_steps.take_bgmap(S, cfg, **params['kwargs'])
+
+            kwargs = {
+                'show_plots': False,
+            }
+            kwargs.update(params['kwargs'])
+            bsa = bias_steps.take_bgmap(S, cfg, **kwargs)
             nchans_per_bg = [0 for _ in range(NBIASLINES + 1)]
             for bg in range(NBIASLINES):
                 nchans_per_bg[bg] = int(np.sum(bsa.bgmap == bg))
