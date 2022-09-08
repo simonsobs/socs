@@ -17,7 +17,7 @@ pytest_plugins = "docker_compose"
 
 wait_for_crossbar = create_crossbar_fixture()
 run_agent = create_agent_runner_fixture(
-    "../agents/pfeiffer_tpg366/pfeiffer_tpg366_agent.py",
+    "../socs/agents/pfeiffer_tpg366/agent.py",
     "pfeiffer_tpg366_agent",
     args=["--log-dir", "./logs/"],
 )

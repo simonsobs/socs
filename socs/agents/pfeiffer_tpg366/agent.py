@@ -174,7 +174,7 @@ def make_parser(parser=None):
     return parser
 
 
-if __name__ == '__main__':
+def main():
     parser = make_parser()
     args = site_config.parse_args(agent_class='PfeifferAgent', parser=parser)
 
@@ -184,3 +184,7 @@ if __name__ == '__main__':
                            pfeiffer_agent.stop_acq, startup=True)
     agent.register_task('close', pfeiffer_agent.stop_acq)
     runner.run(agent, auto_reconnect=True)
+
+
+if __name__ == '__main__':
+    main()

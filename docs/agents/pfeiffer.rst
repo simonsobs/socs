@@ -12,9 +12,9 @@ Pfeiffer agent communicates with the Controller module, and reads out
 pressure readingss from the six different channels.
 
 .. argparse::
-    :filename: ../agents/pfeiffer_tpg366/pfeiffer_tpg366_agent.py
+    :filename: ../socs/agents/pfeiffer_tpg366/agent.py
     :func: make_parser
-    :prog: python3 pfeiffer_tpg366_agent.py
+    :prog: python3 agent.py
 
 Configuration File Examples
 ---------------------------
@@ -47,7 +47,7 @@ example of what to insest into your institution's docker-compose file. ::
 
 
   ocs-pfeiffer:
-    image: simonsobs/ocs-pfeiffer-tpg366-agent:latest
+    image: simonsobs/socs:latest
     hostname: ocs-docker
     network_mode: "host"
     volumes:
