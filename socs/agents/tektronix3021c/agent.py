@@ -6,7 +6,7 @@ import os
 import socket
 import argparse
 
-from socs.agent.tektronix3021c_driver import TektronixInterface
+from socs.agents.tektronix3021c.drivers import TektronixInterface
 
 on_rtd = os.environ.get('READTHEDOCS') == 'True'
 if not on_rtd:
@@ -195,8 +195,7 @@ def make_parser(parser=None):
     return parser
 
 
-if __name__ == '__main__':
-
+def main():
     parser = make_parser()
     args = site_config.parse_args(agent_class="Tektronix AWG", parser=parser)
 
@@ -210,3 +209,7 @@ if __name__ == '__main__':
     agent.register_task('set_output', p.set_output)
 
     runner.run(agent, auto_reconnect=True)
+
+
+if __name__ == '__main__':
+    main()

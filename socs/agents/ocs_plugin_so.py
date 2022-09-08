@@ -22,5 +22,6 @@ for n, f in [
         ('PfeifferAgent', 'pfeiffer_tpg366/agent.py'),
         ('RotationAgent', 'hwp_rotation/agent.py'),
         ('ScpiPsuAgent', 'scpi_psu/agent.py'),
+        ('TektronixAWGAgent', 'tektronix3021c/agent.py'),
 ]:
     ocs.site_config.register_agent_class(n, os.path.join(root, f))

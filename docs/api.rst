@@ -32,22 +32,6 @@ socs.agent.prologix_interface
     :undoc-members:
     :show-inheritance:
 
-socs.agent.tektronix3021c_driver
-````````````````````````````````
-
-.. automodule:: socs.agent.tektronix3021c_driver
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-socs.agent.vantage_pro2
-```````````````````````
-
-.. automodule:: socs.agent.vantage_pro2.vantage_pro2
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
 socs.agents
 -----------
 
@@ -55,6 +39,22 @@ socs.agents.scpi_psu.drivers
 ````````````````````````````
 
 .. automodule:: socs.agents.scpi_psu.drivers
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+socs.agents.tektronix3021c.drivers
+``````````````````````````````````
+
+.. automodule:: socs.agents.tektronix3021c.drivers
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+socs.agents.vantagepro2.drivers
+```````````````````````````````
+
+.. automodule:: socs.agents.vantagepro2.drivers
     :members:
     :undoc-members:
     :show-inheritance:
