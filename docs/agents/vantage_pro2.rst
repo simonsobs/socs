@@ -12,9 +12,9 @@ the laboratory computer via usb cable and data is sent though that connection.
 Here is the `VantagePro2 Operations manual`_.
 
 .. argparse::
-    :filename: ../agents/vantagePro2_agent/vantage_pro2_agent.py
+    :filename: ../socs/agents/vantagepro2/agent.py
     :func: make_parser
-    :prog: python3 vantage_pro2_agent.py
+    :prog: python3 agent.py
 
 .. _`VantagePro2 Operations manual`: https://www.davisinstruments.com/support/weather/download/VantageSerialProtocolDocs_v261.pdf
 
@@ -129,8 +129,8 @@ The Vantage Pro2 Agent should be configured to run in a Docker container. An
 example docker-compose service configuration is shown here::
 
   ocs-vantage-pro2:
-    build: /socs/agents/vantagePro2_agent
-
+    image: simonsobs/socs:latest
+    hostname: ocs-docker
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
     command:
@@ -141,5 +141,5 @@ example docker-compose service configuration is shown here::
 Agent API
 ---------
 
-.. autoclass:: agents.vantagePro2_agent.vantage_pro2_agent.VantagePro2Agent
+.. autoclass:: socs.agents.vantagepro2.agent.VantagePro2Agent
     :members: init_VantagePro2_task, start_acq

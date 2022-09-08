@@ -4,7 +4,7 @@ import os
 import argparse
 
 from typing import Optional
-from socs.agent.vantage_pro2.vantage_pro2 import VantagePro2
+from socs.agents.vantagepro2.drivers import VantagePro2
 
 # from LS240_agent
 on_rtd = os.environ.get('READTHEDOCS') == 'True'
@@ -167,7 +167,7 @@ def make_parser(parser=None):
                         help="Serial number of VantagePro2 Monitor")
     pgroup.add_argument('--mode', type=str, choices=['idle', 'init', 'acq'],
                         help="Starting action for the agent.")
-    pgroup.add_argument('--sample_freq', type=float,
+    pgroup.add_argument('--sample-freq', type=float,
                         help="Sample frequency for weather data collection")
     return parser
 

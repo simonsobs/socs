@@ -11,7 +11,6 @@ root = os.path.abspath(os.path.split(__file__)[0])
 for n, f in [
         ('PysmurfController', 'pysmurf_controller/pysmurf_controller.py'),
         ('LATRtXYStageAgent', 'xy_stage/xy_latrt_agent.py'),
-        ('VantagePro2Agent', 'vantagePro2_agent/vantage_pro2_agent.py'),
         ('HWPPicoscopeAgent', 'hwp_picoscope/pico_agent.py'),
         ('FPGAAgent', 'holo_fpga/roach_agent.py'),
         ('SynthAgent', 'holo_synth/synth_agent.py'),

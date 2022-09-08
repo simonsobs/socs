@@ -23,5 +23,6 @@ for n, f in [
         ('RotationAgent', 'hwp_rotation/agent.py'),
         ('ScpiPsuAgent', 'scpi_psu/agent.py'),
         ('TektronixAWGAgent', 'tektronix3021c/agent.py'),
+        ('VantagePro2Agent', 'vantagepro2/agent.py'),
 ]:
     ocs.site_config.register_agent_class(n, os.path.join(root, f))
