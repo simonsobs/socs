@@ -22,9 +22,9 @@ command 'clia sensordata' and parses its output to identify all of the available
 sensors then stream and publish them.
 
 .. argparse::
-    :filename: ../agents/smurf_crate_monitor/smurf_crate_monitor.py
+    :filename: ../socs/agents/smurf_crate_monitor/agent.py
     :func: make_parser
-    :prog: python3 smurf_crate_monitor.py
+    :prog: python3 agent.py
 
 Configuration File Examples
 ---------------------------
@@ -76,7 +76,7 @@ example docker-compose service configuration is shown here::
 
   ocs-smurf-crate-monitor:
     <<: *ocs-base
-    image: simonsobs/ocs-smurf-crate-monitor:latest
+    image: simonsobs/socs:latest
     hostname: adaq1-docker
     network_mode: "host"
     volumes:
@@ -98,5 +98,5 @@ An example of the 'ocs-base' anchor is shown here::
 Agent API
 ---------
 
-.. autoclass:: agents.smurf_crate_monitor.smurf_crate_monitor.SmurfCrateMonitor
+.. autoclass:: socs.agents.smurf_crate_monitor.agent.SmurfCrateMonitor
     :members: init_crate, start_acq

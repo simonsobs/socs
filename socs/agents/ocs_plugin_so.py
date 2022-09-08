@@ -11,6 +11,7 @@ root = os.path.abspath(os.path.split(__file__)[0])
 for n, f in [
         ('ACUAgent', 'acu/agent.py'),
         ('BlueforsAgent', 'bluefors/agent.py'),
+        ('CrateAgent', 'smurf_crate_monitor/agent.py'),
         ('CryomechCPAAgent', 'cryomech_cpa/agent.py'),
         ('FTSAerotechAgent', 'fts_aerotech/agent.py'),
         ('Lakeshore240Agent', 'lakeshore240/agent.py'),

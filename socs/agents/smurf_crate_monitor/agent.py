@@ -27,6 +27,8 @@ def get_sensors(shm_addr):
         sensids (str list):
             List of sensor identification names, same length as ipmbs list.
     """
+    log = txaio.make_logger()
+
     # SSH to shelf manager
     cmd = ['ssh', f'{shm_addr}']
     # Send command to shelf manager
@@ -47,7 +49,7 @@ def get_sensors(shm_addr):
     # Parse readback data line by line unless empty
     if result == []:
         error = ssh.stderr.readlines()
-        LOG.error("ERROR: %s" % error)
+        log.error("ERROR: %s" % error)
     else:
         for r in result:
             if ': LUN' in r.decode('utf-8'):
@@ -124,6 +126,8 @@ def get_data_dict(shm_addr, ipmbs, sensids, chan_names,
             of all of the sensors passed into the fuction. Ensures the
             keys match the influxdb feedname requirements
     """
+    log = txaio.make_logger()
+
     data_dict = {}
     cmd = ['ssh', f'{shm_addr}', 'clia', 'sensordata']
     ssh = subprocess.Popen(cmd,
@@ -133,7 +137,7 @@ def get_data_dict(shm_addr, ipmbs, sensids, chan_names,
     result = ssh.stdout.readlines()
     if result == []:
         error = ssh.stderr.readlines()
-        LOG.error("ERROR: %s" % error)
+        log.error("ERROR: %s" % error)
     else:
         for ipmb, sensid, chan_name in zip(ipmbs, sensids, chan_names):
             sense_chan = False
@@ -276,8 +280,7 @@ def make_parser(parser=None):
     return parser
 
 
-if __name__ == '__main__':
-    LOG = txaio.make_logger()
+def main():
     parser = make_parser()
     args = site_config.parse_args(agent_class='CrateAgent',
                                   parser=parser)
@@ -294,3 +297,7 @@ if __name__ == '__main__':
                            smurfcrate.stop_acq)
 
     runner.run(agent, auto_reconnect=True)
+
+
+if __name__ == '__main__':
+    main()
