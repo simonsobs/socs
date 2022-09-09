@@ -1,5 +1,4 @@
 import time
-import os
 import socket
 import argparse
 import txaio
@@ -8,9 +7,7 @@ from os import environ
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
-on_rtd = os.environ.get('READTHEDOCS') == 'True'
-if not on_rtd:
-    from pfeiffer_tc400_driver import PfeifferTC400
+from socs.agents.pfeiffer_tc400.drivers import PfeifferTC400
 
 
 class PfeifferTC400Agent:
@@ -234,7 +231,7 @@ def make_parser(parser=None):
     return parser
 
 
-if __name__ == '__main__':
+def main():
     # Start logging
     txaio.start_logging(level=environ.get("LOGLEVEL", "info"))
 
@@ -263,3 +260,7 @@ if __name__ == '__main__':
     agent.register_process('acq', p.acq, p._stop_acq)
 
     runner.run(agent, auto_reconnect=True)
+
+
+if __name__ == '__main__':
+    main()

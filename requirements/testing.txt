@@ -5,5 +5,3 @@ pytest-dependency
 pytest-order
 so3g
 http-server-mock
-
--r ../agents/pfeiffer_tc400/requirements.txt

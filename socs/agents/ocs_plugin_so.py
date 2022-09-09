@@ -22,6 +22,7 @@ for n, f in [
         ('Lakeshore425Agent', 'lakeshore425/agent.py'),
         ('LATRtXYStageAgent', 'xy_stage/agent.py'),
         ('PfeifferAgent', 'pfeiffer_tpg366/agent.py'),
+        ('PfeifferTC400Agent', 'pfeiffer_tc400/agent.py'),
         ('RotationAgent', 'hwp_rotation/agent.py'),
         ('ScpiPsuAgent', 'scpi_psu/agent.py'),
         ('SmurfStreamSimulator', 'smurf_stream_simulator/agent.py'),

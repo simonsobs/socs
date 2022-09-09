@@ -21,6 +21,9 @@ sqlalchemy
 # synacc agent
 requests
 
+# pfeiffer tc 400
+pfeiffer-vacuum-protocol==0.4
+
 # xy_stage
 xy_stage_control @ git+https://github.com/kmharrington/xy_stage_control.git@main
 
