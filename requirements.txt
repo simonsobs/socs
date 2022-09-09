@@ -18,6 +18,9 @@ pysmi
 # suprsync agent and tests
 sqlalchemy
 
+# synacc agent
+requests
+
 # xy_stage
 xy_stage_control @ git+https://github.com/kmharrington/xy_stage_control.git@main
 

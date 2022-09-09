@@ -16,7 +16,7 @@ pytest_plugins = "docker_compose"
 
 wait_for_crossbar = create_crossbar_fixture()
 run_agent = create_agent_runner_fixture(
-    "../agents/synacc/synacc.py",
+    "../socs/agents/synacc/agent.py",
     "synacc",
     args=["--log-dir", "./logs/"],
 )

@@ -1,13 +1,10 @@
 #!/usr/bin/env python
-import os
 import requests
 import argparse
 import time
 
-on_rtd = os.environ.get('READTHEDOCS') == 'True'
-if not on_rtd:
-    from ocs import ocs_agent, site_config
-    from ocs.ocs_twisted import TimeoutLock
+from ocs import ocs_agent, site_config
+from ocs.ocs_twisted import TimeoutLock
 
 
 class SynaccessAgent:
@@ -201,7 +198,7 @@ def make_parser(parser=None):
     return parser
 
 
-if __name__ == '__main__':
+def main():
     parser = make_parser()
     args = site_config.parse_args(agent_class='SynaccessAgent', parser=parser)
 
@@ -219,3 +216,7 @@ if __name__ == '__main__':
     agent.register_task('set_all', p.set_all)
 
     runner.run(agent, auto_reconnect=True)
+
+
+if __name__ == '__main__':
+    main()
