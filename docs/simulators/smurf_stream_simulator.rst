@@ -13,9 +13,9 @@ connect the timestream aggregator to it and simulate recording data to disk in
 .g3 files.
 
 .. argparse::
-    :filename: ../agents/smurf_stream_simulator/smurf_stream_simulator.py
+    :filename: ../socs/agents/smurf_stream_simulator/agent.py
     :func: make_parser
-    :prog: python3 smurf_stream_simulator.py
+    :prog: python3 agent.py
 
 Configuration File Examples
 ---------------------------
@@ -32,7 +32,7 @@ using all of the available arguments::
        'instance-id': 'smurf-stream',
        'arguments': [['--auto-start', True],
                      ['--port', '50000'],
-                     ['--num_chans', '528'],
+                     ['--num-chans', '528'],
                      ['--stream-id', 'stream_sim']]},
 
 Docker
@@ -41,15 +41,17 @@ The simulator should be configured to run in a Docker container. An example
 docker-compose service configuration is shown here::
 
   smurf-stream-sim:
-    image: simonsobs/smurf-stream-sim
+    image: simonsobs/socs:latest
     hostname: ocs-docker
     ports:
       - "50000:50000"
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
+    command:
+        - "--instance-id=smurf-stream"
 
 Agent API
 ---------
 
-.. autoclass:: agents.smurf_stream_simulator.smurf_stream_simulator.SmurfStreamSimulator
-    :members: start_background_streamer, stop_background_streamer, set_stream_on, set_stream_off
+.. autoclass:: socs.agents.smurf_stream_simulator.agent.SmurfStreamSimulator
+    :members:

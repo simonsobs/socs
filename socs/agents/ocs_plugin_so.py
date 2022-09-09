@@ -23,6 +23,7 @@ for n, f in [
         ('PfeifferAgent', 'pfeiffer_tpg366/agent.py'),
         ('RotationAgent', 'hwp_rotation/agent.py'),
         ('ScpiPsuAgent', 'scpi_psu/agent.py'),
+        ('SmurfStreamSimulator', 'smurf_stream_simulator/agent.py'),
         ('TektronixAWGAgent', 'tektronix3021c/agent.py'),
         ('VantagePro2Agent', 'vantagepro2/agent.py'),
         ('WiregridKikusuiAgent', 'wiregrid_kikusui/agent.py'),
