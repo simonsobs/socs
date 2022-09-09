@@ -39,9 +39,9 @@ API Reference        Full API documentation for core parts of the SOCS library.
 
     agents/acu_agent
     agents/bluefors_agent
-    agents/chwp_encoder
     agents/cryomech_cpa
     agents/fts_agent
+    agents/hwp_encoder
     agents/hwp_picoscope
     agents/hwp_rotation_agent
     agents/holo_fpga

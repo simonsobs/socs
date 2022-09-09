@@ -2,9 +2,9 @@
 
 .. _chwp_encoder:
 
-======================
-CHWP Encoder BBB Agent
-======================
+=====================
+HWP Encoder BBB Agent
+=====================
 
 The optical encoder signals of the CHWP are captured by Beaglebone Black (BBB)
 boards with the IRIG-B timing reference.
@@ -12,9 +12,9 @@ This agent receives and decodes UDP packets from BBB and publishes the data
 feeds.
 
 .. argparse::
-    :filename: ../agents/chwp/hwpbbb_agent.py
+    :filename: ../socs/agents/hwp_encoder/agent.py
     :func: make_parser
-    :prog: python3 hwpbbb_agent.py
+    :prog: python3 agent.py
 
 Configuration File Examples
 ---------------------------
@@ -51,7 +51,7 @@ example of what to insert into your institution's docker-compose file.
 This again is an example to run multiple agents::
 
   ocs-hwpbbb-agent-HBA0:
-    image: simonsobs/ocs-hwpbb-agent:latest
+    image: simonsobs/socs:latest
     ports:
       - "8080:8080/udp"
     hostname: ocs-docker
@@ -63,7 +63,7 @@ This again is an example to run multiple agents::
       - "--site-http=http://crossbar:8001/call"
 
   ocs-hwpbbb-agent-HBA1:
-    image: simonsobs/ocs-hwpbb-agent:latest
+    image: simonsobs/socs:latest
     ports:
       - "8081:8081/udp"
     hostname: ocs-docker
@@ -83,6 +83,7 @@ The most recent data collected is stored in session.data in the following struct
 The approx_hwp_freq is initialized by -1 and will be updated by non-negative rotation frequency
 if encoder agent is receiving encoder signal.
 If chwp is completely stopped, approx_hwp_freq will not be updated.::
+
     >>> response.session['data']
     {'approx_hwp_freq':      2.0,
      'encoder_last_updated': 1659486962.3731978,

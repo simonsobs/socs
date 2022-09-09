@@ -692,7 +692,7 @@ def make_parser(parser=None):
 
 
 # Portion of the code that runs
-if __name__ == '__main__':
+def main():
     parser = make_parser()
     args = site_config.parse_args(agent_class='HWPBBBAgent', parser=parser)
     agent, runner = ocs_agent.init_site_agent(args)
@@ -700,3 +700,7 @@ if __name__ == '__main__':
     agent.register_process('acq', hwp_bbb_agent.start_acq, hwp_bbb_agent.stop_acq, startup=True)
 
     runner.run(agent, auto_reconnect=True)
+
+
+if __name__ == '__main__':
+    main()

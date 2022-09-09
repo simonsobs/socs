@@ -16,5 +16,8 @@ RUN pip3 install -r requirements.txt && \
 # Reset workdir to avoid local imports
 WORKDIR /
 
+# Port for HWP Encoder Beaglebone connection
+EXPOSE 8080/udp
+
 # Run agent on container startup
 ENTRYPOINT ["dumb-init", "ocs-agent-cli"]
