@@ -12,9 +12,9 @@ by checking the md5sum and deleting the local files after a specified amount
 of time if the local and remote checksums match.
 
 .. argparse::
-    :filename: ../agents/suprsync/suprsync.py
+    :filename: ../socs/agents/suprsync/agent.py
     :func: make_parser
-    :prog: python3 suprsync.py
+    :prog: python3 agent.py
 
 Configuration File Examples
 ---------------------------
@@ -76,7 +76,7 @@ only possible because the ``cryo:smurf`` user is already built into the
 SuprSync docker::
 
   ocs-timestream-sync:
-       image: simonsobs/ocs-suprsync-agent:latest
+       image: simonsobs/socs:latest
        hostname: ocs-docker
        user: cryo:smurf
        network_mode: host
@@ -91,7 +91,7 @@ SuprSync docker::
            - "--site-http=http://${CB_HOST}:8001/call"
 
   ocs-smurf-sync:
-       image: simonsobs/ocs-suprsync-agent:latest
+       image: simonsobs/socs:latest
        hostname: ocs-docker
        user: cryo:smurf
        network_mode: host
@@ -173,7 +173,7 @@ we'll be running one SupRsync agent for each of these two archives.
 Agent API
 ---------
 
-.. autoclass:: agents.suprsync.suprsync.SupRsync
+.. autoclass:: socs.agents.suprsync.agent.SupRsync
     :members:
 
 Supporting APIs

@@ -1,9 +1,7 @@
-import sys
 import os
 import numpy as np
 import txaio
 
-sys.path.insert(0, '../agents/suprsync/')
 from socs.db.suprsync import SupRsyncFilesManager, SupRsyncFileHandler
 
 txaio.use_twisted()

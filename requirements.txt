@@ -16,7 +16,7 @@ pysnmp
 pysmi
 
 # suprsync agent and tests
-sqlalchemy
+sqlalchemy>=1.4
 
 # synacc agent
 requests

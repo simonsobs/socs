@@ -213,7 +213,7 @@ def make_parser(parser=None):
     return parser
 
 
-if __name__ == '__main__':
+def main():
     parser = make_parser()
     args = site_config.parse_args('SupRsync', parser=parser)
     txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
@@ -223,3 +223,7 @@ if __name__ == '__main__':
     agent.register_process('run', suprsync.run, suprsync._stop, startup=True)
 
     runner.run(agent, auto_reconnect=True)
+
+
+if __name__ == '__main__':
+    main()

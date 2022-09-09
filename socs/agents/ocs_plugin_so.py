@@ -26,6 +26,7 @@ for n, f in [
         ('RotationAgent', 'hwp_rotation/agent.py'),
         ('ScpiPsuAgent', 'scpi_psu/agent.py'),
         ('SmurfStreamSimulator', 'smurf_stream_simulator/agent.py'),
+        ('SupRsync', 'suprsync/agent.py'),
         ('SynaccessAgent', 'synacc/agent.py'),
         ('TektronixAWGAgent', 'tektronix3021c/agent.py'),
         ('VantagePro2Agent', 'vantagepro2/agent.py'),
