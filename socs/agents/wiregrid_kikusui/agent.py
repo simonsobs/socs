@@ -1,4 +1,3 @@
-import os
 import argparse
 import time
 import numpy as np
@@ -7,11 +6,8 @@ from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 from ocs.ocs_client import OCSClient
 
-ON_RTD = os.environ.get('READTHEDOCS') == 'True'
-if not ON_RTD:
-    # import classes
-    from socs.agent import pmx
-    from src.common import openlog, writelog
+from socs.agent import pmx
+from socs.agents.wiregrid_kikusui.drivers.common import openlog, writelog
 
 
 class WiregridKikusuiAgent:
@@ -622,7 +618,7 @@ def make_parser(parser=None):
     return parser
 
 
-if __name__ == '__main__':
+def main():
     parser = make_parser()
     args = site_config.parse_args(
         agent_class='WiregridKikusuiAgent', parser=parser)
@@ -645,3 +641,7 @@ if __name__ == '__main__':
                         kikusui_agent.stepwise_rotation)
 
     runner.run(agent, auto_reconnect=True)
+
+
+if __name__ == '__main__':
+    main()
