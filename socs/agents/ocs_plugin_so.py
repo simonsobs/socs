@@ -26,6 +26,7 @@ for n, f in [
         ('SmurfStreamSimulator', 'smurf_stream_simulator/agent.py'),
         ('TektronixAWGAgent', 'tektronix3021c/agent.py'),
         ('VantagePro2Agent', 'vantagepro2/agent.py'),
+        ('WiregridEncoderAgent', 'wiregrid_encoder/agent.py'),
         ('WiregridKikusuiAgent', 'wiregrid_kikusui/agent.py'),
 ]:
     ocs.site_config.register_agent_class(n, os.path.join(root, f))

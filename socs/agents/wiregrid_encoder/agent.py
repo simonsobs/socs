@@ -1,4 +1,3 @@
-import os
 import time
 import numpy as np
 import argparse
@@ -7,10 +6,7 @@ import traceback
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
-# Required by OCS
-ON_RTD = os.environ.get('READTHEDOCS') == 'True'
-if not ON_RTD:
-    from signal_parser import EncoderParser
+from socs.agents.wiregrid_encoder.drivers import EncoderParser
 
 NUM_ENCODER_TO_PUBLISH = 1000
 SEC_ENCODER_TO_PUBLISH = 1
@@ -350,8 +346,7 @@ def make_parser(parser=None):
     return parser
 
 
-if __name__ == '__main__':
-
+def main():
     parser = make_parser()
     args = site_config.parse_args(
         agent_class='WiregridEncoderAgent', parser=parser)
@@ -366,3 +361,7 @@ if __name__ == '__main__':
                            startup=True)
 
     runner.run(agent, auto_reconnect=True)
+
+
+if __name__ == '__main__':
+    main()
