@@ -227,7 +227,7 @@ def make_parser(parser=None):
     return parser
 
 
-if __name__ == '__main__':
+def main():
     parser = make_parser()
     args = site_config.parse_args(agent_class='PysmurfMonitor', parser=parser)
 
@@ -239,3 +239,7 @@ if __name__ == '__main__':
     reactor.listenUDP(args.udp_port, monitor)
 
     runner.run(agent, auto_reconnect=True)
+
+
+if __name__ == '__main__':
+    main()

@@ -23,6 +23,7 @@ for n, f in [
         ('LATRtXYStageAgent', 'xy_stage/agent.py'),
         ('PfeifferAgent', 'pfeiffer_tpg366/agent.py'),
         ('PfeifferTC400Agent', 'pfeiffer_tc400/agent.py'),
+        ('PysmurfMonitor', 'pysmurf_monitor/agent.py'),
         ('RotationAgent', 'hwp_rotation/agent.py'),
         ('ScpiPsuAgent', 'scpi_psu/agent.py'),
         ('SmurfStreamSimulator', 'smurf_stream_simulator/agent.py'),

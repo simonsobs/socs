@@ -19,15 +19,6 @@ services:
     build: ./agents/pysmurf_controller/
 
   # --------------------------------------------------------------------------
-  # The Pysmurf Monitor Agent
-  # --------------------------------------------------------------------------
-  ocs-pysmurf-monitor-agent:
-    image: "ocs-pysmurf-monitor-agent"
-    build: ./agents/pysmurf_monitor/
-    depends_on:
-      - "socs"
-
-  # --------------------------------------------------------------------------
   # LabJack Agent
   # --------------------------------------------------------------------------
   ocs-labjack-agent:
