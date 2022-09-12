@@ -30,6 +30,9 @@ xy_stage_control @ git+https://github.com/kmharrington/xy_stage_control.git@main
 # acu agent
 soaculib @ git+https://github.com/simonsobs/soaculib.git@master
 
+# magpie agent
+pandas
+
 # Docs
 # see docs/requirements.txt
 

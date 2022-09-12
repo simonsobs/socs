@@ -1015,7 +1015,7 @@ def make_parser(parser=None):
     return parser
 
 
-if __name__ == '__main__':
+def main():
     txaio.use_twisted()
     txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
     parser = make_parser()
@@ -1044,3 +1044,7 @@ if __name__ == '__main__':
     )
 
     runner.run(agent, auto_reconnect=True)
+
+
+if __name__ == '__main__':
+    main()
