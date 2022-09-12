@@ -46,13 +46,6 @@ services:
       - "socs"
 
   # --------------------------------------------------------------------------
-  # Smurf file emulator agent
-  # --------------------------------------------------------------------------
-  ocs-smurf-file-emulator-agent:
-    image: "ocs-smurf-file-emulator-agent"
-    build: ./agents/smurf_file_emulator/
-
-  # --------------------------------------------------------------------------
   # Wiregrid actuator agent
   # --------------------------------------------------------------------------
   ocs-wgactuator-agent:

@@ -1,6 +1,4 @@
-import sys
-sys.path.insert(0, '../agents/smurf_file_emulator/')
-from smurf_file_emulator import SmurfFileEmulator, make_parser
+from socs.agents.smurf_file_emulator.agent import SmurfFileEmulator, make_parser
 
 from unittest import mock
 

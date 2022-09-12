@@ -13,6 +13,7 @@ setup(name='socs',
       description='Simons Observatory Control System',
       package_dir={'socs': 'socs'},
       packages=find_packages(),
+      package_data={'socs': ['agents/smurf_file_emulator/*.yaml']},
       entry_points={
           'ocs.plugins': [
               'socs = socs.plugin',
