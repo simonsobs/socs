@@ -10,3 +10,6 @@ omit =
   # omit lab only Agents for now
   */Lakeshore336.py
   */Lakeshore370.py
+
+[coverage:report]
+skip_empty = true
