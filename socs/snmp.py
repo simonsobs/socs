@@ -1,10 +1,17 @@
+import os
 import txaio
 
 from pysnmp.hlapi.twisted import getCmd, setCmd, SnmpEngine, CommunityData, UdpTransportTarget,\
     ContextData, ObjectType, ObjectIdentity, UsmUserData
 
+from socs import mibs
+
 # For logging
 txaio.use_twisted()
+
+
+# https://pysnmp.readthedocs.io/en/latest/faq/pass-custom-mib-to-manager.html
+MIB_SOURCE = f"file://{os.path.dirname(mibs.__file__)}"
 
 
 class SNMPTwister:
@@ -124,7 +131,11 @@ class SNMPTwister:
             instances representing MIB variables returned in SNMP response.
 
         """
-        oid_list = [ObjectType(ObjectIdentity(*x)) if isinstance(x, tuple) else x for x in oid_list]
+        oid_list = [ObjectType(ObjectIdentity(*x).addAsn1MibSource(MIB_SOURCE))
+                    if isinstance(x, tuple)
+                    else x
+                    for x
+                    in oid_list]
 
         if version == 1:
             version_object = CommunityData('public', mpModel=0)  # SNMPv1
@@ -172,7 +183,11 @@ class SNMPTwister:
             instances representing MIB variables returned in SNMP response.
 
         """
-        oid_list = [ObjectType(ObjectIdentity(*x), setvalue) if isinstance(x, tuple) else x for x in oid_list]
+        oid_list = [ObjectType(ObjectIdentity(*x).addAsn1MibSource(MIB_SOURCE), setvalue)
+                    if isinstance(x, tuple)
+                    else x
+                    for x
+                    in oid_list]
 
         if version == 1:
             version_object = CommunityData('private', mpModel=0)  # SNMPv1

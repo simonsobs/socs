@@ -22,6 +22,7 @@ for n, f in [
         ('Lakeshore425Agent', 'lakeshore425/agent.py'),
         ('LATRtXYStageAgent', 'xy_stage/agent.py'),
         ('MagpieAgent', 'magpie/agent.py'),
+        ('MeinbergM1000Agent', 'meinberg_m1000/agent.py'),
         ('PfeifferAgent', 'pfeiffer_tpg366/agent.py'),
         ('PfeifferTC400Agent', 'pfeiffer_tc400/agent.py'),
         ('PysmurfMonitor', 'pysmurf_monitor/agent.py'),

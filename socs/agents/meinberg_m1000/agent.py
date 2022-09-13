@@ -1,4 +1,3 @@
-import os
 from os import environ
 
 import time
@@ -9,14 +8,11 @@ from autobahn.twisted.util import sleep as dsleep
 from twisted.internet.defer import inlineCallbacks
 from twisted.internet import reactor
 
+from ocs import ocs_agent, site_config
 from socs.snmp import SNMPTwister
 
 # For logging
 txaio.use_twisted()
-
-on_rtd = os.environ.get('READTHEDOCS') == 'True'
-if not on_rtd:
-    from ocs import ocs_agent, site_config
 
 
 class MeinbergSNMP:
@@ -459,7 +455,7 @@ def make_parser(parser=None):
     return parser
 
 
-if __name__ == "__main__":
+def main():
     # Start logging
     txaio.start_logging(level=environ.get("LOGLEVEL", "info"))
 
@@ -478,3 +474,7 @@ if __name__ == "__main__":
                            startup=bool(args.auto_start), blocking=False)
 
     runner.run(agent, auto_reconnect=True)
+
+
+if __name__ == "__main__":
+    main()
