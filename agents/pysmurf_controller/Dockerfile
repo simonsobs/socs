@@ -12,7 +12,7 @@ ENV OCS_CONFIG_DIR /config
 WORKDIR /app/socs/agents/pysmurf_controller
 
 COPY . .
-RUN pip3 install -r requirements.txt
+RUN pip3 install dumb-init
 
 ENTRYPOINT ["dumb-init", "python3", "-u", "pysmurf_controller.py"]
 
