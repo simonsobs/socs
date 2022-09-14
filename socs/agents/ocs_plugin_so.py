@@ -36,6 +36,7 @@ for n, f in [
         ('SynaccessAgent', 'synacc/agent.py'),
         ('TektronixAWGAgent', 'tektronix3021c/agent.py'),
         ('VantagePro2Agent', 'vantagepro2/agent.py'),
+        ('WiregridActuatorAgent', 'wiregrid_actuator/agent.py'),
         ('WiregridEncoderAgent', 'wiregrid_encoder/agent.py'),
         ('WiregridKikusuiAgent', 'wiregrid_kikusui/agent.py'),
 ]:

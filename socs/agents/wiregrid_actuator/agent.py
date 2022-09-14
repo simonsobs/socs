@@ -1,4 +1,3 @@
-import os
 import argparse
 import time
 
@@ -6,16 +5,9 @@ from ocs import ocs_agent
 from ocs import site_config
 from ocs.ocs_twisted import TimeoutLock
 
-# add PATH to ./src directory
-# this_dir = os.path.dirname(os.path.abspath(__file__))
-# sys.path.append(os.path.join(this_dir, 'src'))
-
-on_rtd = os.environ.get('READTHEDOCS') == 'True'
-if not on_rtd:
-    # import classes / configs
-    from src.Actuator import Actuator
-    import limitswitch_config
-    import stopper_config
+from socs.agents.wiregrid_actuator.drivers.Actuator import Actuator
+import socs.agents.wiregrid_actuator.limitswitch_config as limitswitch_config
+import socs.agents.wiregrid_actuator.stopper_config as stopper_config
 
 
 class WiregridActuatorAgent:
@@ -855,8 +847,7 @@ def make_parser(parser=None):
     return parser
 
 
-if __name__ == '__main__':
-
+def main():
     parser = make_parser()
     args = site_config.parse_args(
         agent_class='WiregridActuatorAgent', parser=parser)
@@ -884,3 +875,7 @@ if __name__ == '__main__':
                            actuator_agent.stop_acq, startup=True)
 
     runner.run(agent, auto_reconnect=True)
+
+
+if __name__ == '__main__':
+    main()

@@ -27,6 +27,7 @@ agents = {
     'SynaccessAgent': {'module': 'socs.agents.synacc.agent', 'entry_point': 'main'},
     'TektronixAWGAgent': {'module': 'socs.agents.tektronix3021c.agent', 'entry_point': 'main'},
     'VantagePro2Agent': {'module': 'socs.agents.vantagepro2.agent', 'entry_point': 'main'},
+    'WiregridActuatorAgent': {'module': 'socs.agents.wiregrid_actuator.agent', 'entry_point': 'main'},
     'WiregridEncoderAgent': {'module': 'socs.agents.wiregrid_encoder.agent', 'entry_point': 'main'},
     'WiregridKikusuiAgent': {'module': 'socs.agents.wiregrid_kikusui.agent', 'entry_point': 'main'},
 }

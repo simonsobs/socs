@@ -5,7 +5,7 @@ import os
 on_rtd = os.environ.get('READTHEDOCS') == 'True'
 if not on_rtd:
     import gclib
-from .DigitalIO import DigitalIO
+from socs.agents.wiregrid_actuator.drivers.DigitalIO import DigitalIO
 
 
 class Actuator:

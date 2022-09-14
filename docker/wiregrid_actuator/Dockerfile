@@ -1,6 +1,6 @@
 FROM socs:latest
 
-WORKDIR /app/socs/agents/wiregrid_actuator
+WORKDIR /home/ocs/
 
 RUN apt-get update \
  && apt-get install -y apt-utils \

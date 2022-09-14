@@ -41,7 +41,7 @@ services:
   # --------------------------------------------------------------------------
   ocs-wgactuator-agent:
     image: "ocs-wgactuator-agent"
-    build: ./agents/wiregrid_actuator/
+    build: ./docker/wiregrid_actuator/
     depends_on:
       - "socs"
 

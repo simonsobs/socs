@@ -5,4 +5,4 @@
 /usr/sbin/gcapsd &
 
 # "$@" is all of the arguments on this script: wg-actuator-entrypoint.sh
-dumb-init python3 -u wiregrid_actuator.py "$@"
+dumb-init ocs-agent-cli "$@"
