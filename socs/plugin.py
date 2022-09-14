@@ -6,6 +6,7 @@ agents = {
     'CryomechCPAAgent': {'module': 'socs.agents.cryomech_cpa.agent', 'entry_point': 'main'},
     'FTSAerotechAgent': {'module': 'socs.agents.fts_aerotech.agent', 'entry_point': 'main'},
     'HWPBBBAgent': {'module': 'socs.agents.hwp_encoder.agent', 'entry_point': 'main'},
+    'HWPPicoscopeAgent': {'module': 'socs.agents.hwp_picoscope.agent', 'entry_point': 'main'},
     'ibootbarAgent': {'module': 'socs.agents.ibootbar.agent', 'entry_point': 'main'},
     'LabJackAgent': {'module': 'socs.agents.labjack.agent', 'entry_point': 'main'},
     'Lakeshore240Agent': {'module': 'socs.agents.lakeshore240.agent', 'entry_point': 'main'},

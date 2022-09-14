@@ -15,6 +15,7 @@ for n, f in [
         ('CryomechCPAAgent', 'cryomech_cpa/agent.py'),
         ('FTSAerotechAgent', 'fts_aerotech/agent.py'),
         ('HWPBBBAgent', 'hwp_encoder/agent.py'),
+        ('HWPPicoscopeAgent', 'hwp_picoscope/agent.py'),
         ('ibootbarAgent', 'ibootbar/agent.py'),
         ('LabJackAgent', 'labjack/agent.py'),
         ('Lakeshore240Agent', 'lakeshore240/agent.py'),

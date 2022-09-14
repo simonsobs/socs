@@ -1,4 +1,5 @@
-FROM simonsobs/socs
+# hwp_picoscope Agent image
+FROM socs:latest
 
 RUN apt update && apt install -y wget udev libusb-1.0-0
 
@@ -13,13 +14,5 @@ WORKDIR /make/picosdk-python-wrappers
 RUN git switch -c 89003868b5bc52511ee57419f0afbfade25f1882
 RUN python3 setup.py install
 
-WORKDIR /app/socs/agents/picoscope/
-
-# Copy this agent into the app/agents directory
-COPY . .
-
-# Run registry on container startup
-ENTRYPOINT ["dumb-init", "python3", "-u", "pico_agent.py"]
-
-CMD ["--site-hub=ws://crossbar:8001/ws", \
-     "--site-http=http://crossbar:8001/call"]
+# Run agent on container startup
+ENTRYPOINT ["dumb-init", "ocs-agent-cli"]

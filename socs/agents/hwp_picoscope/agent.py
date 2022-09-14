@@ -10,7 +10,7 @@ txaio.use_twisted()
 
 ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 if not ON_RTD:
-    import socs.agent.class_ps3000a as ps
+    import socs.agents.hwp_picoscope.drivers.class_ps3000a as ps
 
 
 class PicoAgent:
