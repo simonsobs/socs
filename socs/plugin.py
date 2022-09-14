@@ -7,6 +7,7 @@ agents = {
     'FTSAerotechAgent': {'module': 'socs.agents.fts_aerotech.agent', 'entry_point': 'main'},
     'HWPBBBAgent': {'module': 'socs.agents.hwp_encoder.agent', 'entry_point': 'main'},
     'ibootbarAgent': {'module': 'socs.agents.ibootbar.agent', 'entry_point': 'main'},
+    'LabJackAgent': {'module': 'socs.agents.labjack.agent', 'entry_point': 'main'},
     'Lakeshore240Agent': {'module': 'socs.agents.lakeshore240.agent', 'entry_point': 'main'},
     'Lakeshore336Agent': {'module': 'socs.agents.lakeshore336.agent', 'entry_point': 'main'},
     'Lakeshore370Agent': {'module': 'socs.agents.lakeshore370.agent', 'entry_point': 'main'},

@@ -19,11 +19,11 @@ services:
     build: ./agents/pysmurf_controller/
 
   # --------------------------------------------------------------------------
-  # LabJack Agent
+  # The Pysmurf Monitor Agent
   # --------------------------------------------------------------------------
-  ocs-labjack-agent:
-    image: "ocs-labjack-agent"
-    build: ./agents/labjack/
+  ocs-pysmurf-monitor-agent:
+    image: "ocs-pysmurf-monitor-agent"
+    build: ./agents/pysmurf_monitor/
     depends_on:
       - "socs"
 

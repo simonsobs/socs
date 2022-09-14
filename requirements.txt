@@ -2,14 +2,16 @@ ocs
 autobahn[serialization]
 twisted
 
+# multiple agents
+pyyaml
+
 # Lakeshore240
 pyserial
 
 # LabJack Agent
-pymodbus
 numexpr
-pyyaml
 scipy
+labjack-ljm
 
 # Meinberg M1000
 pysnmp

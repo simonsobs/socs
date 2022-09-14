@@ -8,14 +8,13 @@ import csv
 from scipy.interpolate import interp1d
 import numpy as np
 import txaio
-txaio.use_twisted()
 
-ON_RTD = os.environ.get('READTHEDOCS') == 'True'
-if not ON_RTD:
-    from labjack import ljm
-    from labjack.ljm.ljm import LJMError
-    from ocs import ocs_agent, site_config
-    from ocs.ocs_twisted import TimeoutLock
+from labjack import ljm
+from labjack.ljm.ljm import LJMError
+from ocs import ocs_agent, site_config
+from ocs.ocs_twisted import TimeoutLock
+
+txaio.use_twisted()
 
 
 # Convert Data
@@ -497,7 +496,7 @@ def make_parser(parser=None):
     return parser
 
 
-if __name__ == '__main__':
+def main():
     # Start logging
     txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
 
@@ -530,3 +529,7 @@ if __name__ == '__main__':
     agent.register_process('acq_reg', sensors.acq_reg,
                            sensors._stop_acq)
     runner.run(agent, auto_reconnect=True)
+
+
+if __name__ == '__main__':
+    main()
