@@ -10,9 +10,9 @@ The iBootbar Agent is an OCS Agent which monitors and sends commands to the iBoo
 Monitoring and commanding is performed via SNMP.
 
 .. argparse::
-    :filename: ../agents/ibootbar/ibootbar.py
+    :filename: ../socs/agents/ibootbar/agent.py
     :func: add_agent_args
-    :prog: python3 ibootbar.py
+    :prog: python3 agent.py
 
 Configuration File Examples
 ---------------------------
@@ -44,7 +44,7 @@ The iBootbar Agent should be configured to run in a Docker container. An
 example docker-compose service configuration is shown here::
 
   ocs-ibootbar:
-    image: simonsobs/ocs-ibootbar
+    image: simonsobs/socs:latest
     hostname: ocs-docker
     network_mode: "host"
     volumes:
@@ -96,7 +96,7 @@ values, refer to the MIB file.
 Agent API
 ---------
 
-.. autoclass:: agents.ibootbar.ibootbar.ibootbarAgent
+.. autoclass:: socs.agents.ibootbar.agent.ibootbarAgent
     :members:
 
 Example Clients
@@ -120,6 +120,6 @@ Below is an example client to control outlets::
 Supporting APIs
 ---------------
 
-.. autoclass:: agents.ibootbar.ibootbar.update_cache
+.. autoclass:: socs.agents.ibootbar.agent.update_cache
     :members:
     :noindex:

@@ -14,6 +14,6 @@ exclude =
     socs/mibs/MBG-SNMP-LTNG-MIB.py,
     socs/mibs/SNMPv2-MIB.py,
     socs/mibs/MBG-SNMP-ROOT-MIB.py,
-    agents/ibootbar/mibs/IBOOTPDU-MIB.py,
+    socs/mibs/IBOOTPDU-MIB.py,
     versioneer.py,
     docs/conf.py,
