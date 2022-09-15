@@ -19,6 +19,7 @@ for n, f in [
         ('Lakeshore370Agent', 'lakeshore370/agent.py'),
         ('Lakeshore372Agent', 'lakeshore372/agent.py'),
         ('Lakeshore425Agent', 'lakeshore425/agent.py'),
+        ('LATRtXYStageAgent', 'xy_stage/agent.py'),
         ('PfeifferAgent', 'pfeiffer_tpg366/agent.py'),
         ('RotationAgent', 'hwp_rotation/agent.py'),
         ('ScpiPsuAgent', 'scpi_psu/agent.py'),

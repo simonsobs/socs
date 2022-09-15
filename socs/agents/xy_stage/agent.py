@@ -3,12 +3,12 @@ import argparse
 import time
 import txaio
 
+from ocs import ocs_agent, site_config
+from ocs.ocs_twisted import TimeoutLock, Pacemaker
+
 
 ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 if not ON_RTD:
-    from ocs import ocs_agent, site_config
-    from ocs.ocs_twisted import TimeoutLock, Pacemaker
-
     # yes I shouldn't have named that module agent
     from xy_agent.xy_connect import XY_Stage
 
@@ -230,10 +230,10 @@ def make_parser(parser=None):
     return parser
 
 
-if __name__ == '__main__':
+def main():
     # For logging
     txaio.use_twisted()
-    LOG = txaio.make_logger()
+    txaio.make_logger()
 
     # Start logging
     txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
@@ -255,3 +255,7 @@ if __name__ == '__main__':
     agent.register_process('acq', xy_agent.start_acq, xy_agent.stop_acq)
 
     runner.run(agent, auto_reconnect=True)
+
+
+if __name__ == '__main__':
+    main()

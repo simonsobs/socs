@@ -39,6 +39,7 @@ setup(name='socs',
           'pyserial',
           'sqlalchemy',
           'pysnmp',
+          'xy_stage_control @ git+https://github.com/kmharrington/xy_stage_control.git@main',
           'soaculib @ git+https://github.com/simonsobs/soaculib.git@master',
       ],
       extras_require={
