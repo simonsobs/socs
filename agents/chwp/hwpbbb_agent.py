@@ -62,19 +62,19 @@ import numpy as np
 import txaio
 txaio.use_twisted()
 
-## Required by OCS
+# Required by OCS
 ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 if not ON_RTD:
     from ocs import ocs_agent, site_config
     from ocs.ocs_twisted import TimeoutLock
 
-## These three values (COUNTER_INFO_LENGTH, COUNTER_PACKET_SIZE, IRIG_PACKET_SIZE)
-## should be consistent with the software on beaglebone.
+# These three values (COUNTER_INFO_LENGTH, COUNTER_PACKET_SIZE, IRIG_PACKET_SIZE)
+# should be consistent with the software on beaglebone.
 # The number of datapoints in every encoder packet from the Beaglebone
 COUNTER_INFO_LENGTH = 120
 # The size of the encoder packet from the beaglebone
 #    (header + 3*COUNTER_INFO_LENGTH datapoint information + 1 quadrature readout)
-COUNTER_PACKET_SIZE = 4 + 4 * COUNTER_INFO_LENGTH+8 * COUNTER_INFO_LENGTH + 4
+COUNTER_PACKET_SIZE = 4 + 4 * COUNTER_INFO_LENGTH + 8 * COUNTER_INFO_LENGTH + 4
 # The size of the IRIG packet from the Beaglebone
 IRIG_PACKET_SIZE = 132
 
@@ -87,7 +87,6 @@ SEC_ENCODER_TO_PUBLISH = 10
 # Subsampling facot for the encoder counter data to influxdb
 NUM_SUBSAMPLE = 500
 
-### Definitions of utility functions ###
 
 def de_irig(val, base_shift=0):
     """Converts the IRIG signal into sec/min/hours/day/year depending on the parameters
@@ -105,14 +104,15 @@ def de_irig(val, base_shift=0):
        Either of sec/min/hourds/day/year
 
     """
-    return (((val >> (0+base_shift)) & 1)
-            + ((val >> (1+base_shift)) & 1) * 2
-            + ((val >> (2+base_shift)) & 1) * 4
-            + ((val >> (3+base_shift)) & 1) * 8
-            + ((val >> (5+base_shift)) & 1) * 10
-            + ((val >> (6+base_shift)) & 1) * 20
-            + ((val >> (7+base_shift)) & 1) * 40
-            + ((val >> (8+base_shift)) & 1) * 80)
+    return (((val >> (0 + base_shift)) & 1)
+            + ((val >> (1 + base_shift)) & 1) * 2
+            + ((val >> (2 + base_shift)) & 1) * 4
+            + ((val >> (3 + base_shift)) & 1) * 8
+            + ((val >> (5 + base_shift)) & 1) * 10
+            + ((val >> (6 + base_shift)) & 1) * 20
+            + ((val >> (7 + base_shift)) & 1) * 40
+            + ((val >> (8 + base_shift)) & 1) * 80)
+
 
 def count2time(counts, t_offset=0.):
     """Quick etimation of time using Beagleboneblack clock counts
@@ -138,6 +138,7 @@ def count2time(counts, t_offset=0.):
     t_array += t_offset
 
     return t_array.tolist()
+
 
 class EncoderParser:
     """Class which will parse the incoming packets from the BeagleboneBlack and store the data
@@ -172,6 +173,7 @@ class EncoderParser:
        read_chunk_size: This value shouldn't need to change
 
     """
+
     def __init__(self, beaglebone_port=8080, read_chunk_size=8196):
         # Creates twoe queues to hold the data from the encoder, IRIG, and quadrature respectively
         self.counter_queue = deque()
@@ -189,7 +191,7 @@ class EncoderParser:
         # Binds the socket to a specific ip address and port
         # The ip address can be blank for accepting any UDP packet to the port
         self.sock.bind(('', beaglebone_port))
-        #self.sock.setblocking(0)
+        # self.sock.setblocking(0)
 
         # String which will hold the raw data from the Beaglebone before it is parsed
         self.data = ''
@@ -221,7 +223,7 @@ class EncoderParser:
         mins = de_irig(irig_info[1], 0)
         hours = de_irig(irig_info[2], 0)
         day = de_irig(irig_info[3], 0) \
-              + de_irig(irig_info[4], 0) * 100
+            + de_irig(irig_info[4], 0) * 100
         year = de_irig(irig_info[5], 0)
 
         # If it is the first time that the function is called then set self.start_time
@@ -249,14 +251,14 @@ class EncoderParser:
                 dmins = dmins - 1
 
             # Print UTC time, run time, and current clock count of the beaglebone
-            print('Current Time:', ('%d:%d:%d'%(hours, mins, secs)), \
-                  'Run Time', ('%d:%d:%d'%(dhours, dmins, dsecs)), \
+            print('Current Time:', ('%d:%d:%d' % (hours, mins, secs)),
+                  'Run Time', ('%d:%d:%d' % (dhours, dmins, dsecs)),
                   'Clock Count', edge)
 
         # Set the current time in seconds (changed to seconds from unix epoch)
-        #self.current_time = secs + mins*60 + hours*3600
+        # self.current_time = secs + mins*60 + hours*3600
         try:
-            st_time = time.strptime("%d %d %d:%d:%d"%(year, day, hours, mins, secs), \
+            st_time = time.strptime("%d %d %d:%d:%d" % (year, day, hours, mins, secs),
                                     "%y %j %H:%M:%S")
             self.current_time = calendar.timegm(st_time)
         except ValueError:
@@ -327,7 +329,7 @@ class EncoderParser:
                     header = self.data[0:4]
                     # Convert a structure value from the beaglebone (header) to an int
                     header = struct.unpack('<I', header)[0]
-                    #print('header ', '0x%x'%header)
+                    # print('header ', '0x%x'%header)
 
                     # 0x1EAF = Encoder Packet
                     # 0xCAFE = IRIG Packet
@@ -340,7 +342,7 @@ class EncoderParser:
                             self.log.error('Error 1')
                             break
                         # Call the meathod self.parse_counter_info() to parse the Encoder Packet
-                        self.parse_counter_info(self.data[4 : COUNTER_PACKET_SIZE])
+                        self.parse_counter_info(self.data[4: COUNTER_PACKET_SIZE])
                         if len(self.data) >= COUNTER_PACKET_SIZE:
                             self.data = self.data[COUNTER_PACKET_SIZE:]
 
@@ -351,7 +353,7 @@ class EncoderParser:
                             self.log.error('Error 2')
                             break
                         # Call the meathod self.parse_irig_info() to parse the IRIG Packet
-                        self.parse_irig_info(self.data[4 : IRIG_PACKET_SIZE])
+                        self.parse_irig_info(self.data[4: IRIG_PACKET_SIZE])
                         if len(self.data) >= IRIG_PACKET_SIZE:
                             self.data = self.data[IRIG_PACKET_SIZE:]
 
@@ -407,12 +409,12 @@ class EncoderParser:
         """
 
         # Convert the Encoder Packet structure into a numpy array
-        derter = np.array(struct.unpack('<' + 'I'+ 'III'*COUNTER_INFO_LENGTH, data))
+        derter = np.array(struct.unpack('<' + 'I' + 'III' * COUNTER_INFO_LENGTH, data))
 
         # self.quad_queue.append(derter[0].item()) # merged to counter_queue
-        self.counter_queue.append((derter[1:COUNTER_INFO_LENGTH+1]\
-                                + (derter[COUNTER_INFO_LENGTH+1:2*COUNTER_INFO_LENGTH+1] << 32), \
-                                   derter[2*COUNTER_INFO_LENGTH+1:3*COUNTER_INFO_LENGTH+1], \
+        self.counter_queue.append((derter[1:COUNTER_INFO_LENGTH + 1]
+                                   + (derter[COUNTER_INFO_LENGTH + 1:2 * COUNTER_INFO_LENGTH + 1] << 32),
+                                   derter[2 * COUNTER_INFO_LENGTH + 1:3 * COUNTER_INFO_LENGTH + 1],
                                    derter[0].item(), time.time()))
 
     def parse_irig_info(self, data):
@@ -445,11 +447,11 @@ class EncoderParser:
         """
 
         # Convert the IRIG Packet structure into a numpy array
-        unpacked_data = struct.unpack('<L' + 'L' + 'L'*10 + 'L'*10 + 'L'*10, data)
+        unpacked_data = struct.unpack('<L' + 'L' + 'L' * 10 + 'L' * 10 + 'L' * 10, data)
 
         # Start of the packet clock count
-        #overflow.append(unpacked_data[1])
-        #print "overflow: ", overflow
+        # overflow.append(unpacked_data[1])
+        # print "overflow: ", overflow
 
         rising_edge_time = unpacked_data[0] + (unpacked_data[1] << 32)
 
@@ -466,11 +468,12 @@ class EncoderParser:
         # self.irig_queue = [Packet clock count,Packet UTC time in sec,
         #                    [binary encoded IRIG data],[synch pulses clock counts],
         #                    [current system time]]
-        self.irig_queue.append((rising_edge_time, irig_time, irig_info, \
+        self.irig_queue.append((rising_edge_time, irig_time, irig_info,
                                 synch_pulse_clock_times, time.time()))
 
     def __del__(self):
         self.sock.close()
+
 
 class HWPBBBAgent:
     """OCS agent for HWP encoder DAQ using Beaglebone Black
@@ -526,6 +529,16 @@ class HWPBBBAgent:
 
             self.take_data = True
 
+            # Prepare data_cache for session.data
+            self.hwp_freq = -1
+            self.ct = time.time()
+            data_cache = {
+                'approx_hwp_freq': self.hwp_freq,
+                'encoder_last_updated': self.ct,
+                'irig_time': self.irig_time,
+                'irig_last_updated': self.ct,
+            }
+
             while self.take_data:
                 # This is blocking until data are available
                 self.parser.grab_and_parse_data()
@@ -538,20 +551,20 @@ class HWPBBBAgent:
                     irig_info = irig_data[2]
                     synch_pulse_clock_counts = irig_data[3]
                     sys_time = irig_data[4]
-                    data = {'timestamp':sys_time, 'block_name':'HWPEncoder_irig', 'data':{}}
+                    data = {'timestamp': sys_time, 'block_name': 'HWPEncoder_irig', 'data': {}}
                     data['data']['irig_time'] = irig_time
                     data['data']['rising_edge_count'] = rising_edge_count
                     data['data']['irig_sec'] = de_irig(irig_info[0], 1)
                     data['data']['irig_min'] = de_irig(irig_info[1], 0)
                     data['data']['irig_hour'] = de_irig(irig_info[2], 0)
                     data['data']['irig_day'] = de_irig(irig_info[3], 0) \
-                                                    + de_irig(irig_info[4], 0) * 100
+                        + de_irig(irig_info[4], 0) * 100
                     data['data']['irig_year'] = de_irig(irig_info[5], 0)
 
                     # Beagleboneblack clock frequency measured by IRIG
                     if self.rising_edge_count > 0 and irig_time > 0:
                         bbb_clock_freq = float(rising_edge_count - self.rising_edge_count) \
-                                         / (irig_time - self.irig_time)
+                            / (irig_time - self.irig_time)
                     else:
                         bbb_clock_freq = 0.
                     data['data']['bbb_clock_freq'] = bbb_clock_freq
@@ -561,17 +574,21 @@ class HWPBBBAgent:
                     self.irig_time = irig_time
 
                     # saving clock counts for every refernce edge and every irig bit info
-                    data = {'timestamps':[], 'block_name':'HWPEncoder_irig_raw', 'data':{}}
+                    data = {'timestamps': [], 'block_name': 'HWPEncoder_irig_raw', 'data': {}}
                     # 0.09: time difference in seconds b/w reference marker and
                     #       the first index marker
                     data['timestamps'] = sys_time + 0.09 + np.arange(10) * 0.1
-                    data['data']['irig_synch_pulse_clock_time'] = list(irig_time + 0.09 + \
-                                                                       np.arange(10) * 0.1)
+                    data['data']['irig_synch_pulse_clock_time'] = list(irig_time + 0.09
+                                                                       + np.arange(10) * 0.1)
                     data['data']['irig_synch_pulse_clock_counts'] = synch_pulse_clock_counts
                     data['data']['irig_info'] = list(irig_info)
                     self.agent.publish_to_feed('HWPEncoder', data)
 
-                ## Reducing the packet size, less frequent publishing
+                    data_cache['irig_time'] = self.irig_time
+                    data_cache['irig_last_updated'] = sys_time
+                    session.data.update(data_cache)
+
+                # Reducing the packet size, less frequent publishing
                 # Encoder data; packet coming rate = 570*2*2/150/4 ~ 4Hz packet at 2 Hz rotation
                 while len(self.parser.counter_queue):
                     counter_data = self.parser.counter_queue.popleft()
@@ -586,37 +603,35 @@ class HWPBBBAgent:
                     quad_list.append(quad_data)
                     quad_counter_list.append(counter_data[0][0])
                     ct = time.time()
+
                     if len(counter_list) >= NUM_ENCODER_TO_PUBLISH \
-                       or (len(counter_list) \
+                       or (len(counter_list)
                            and (ct - time_encoder_published) > SEC_ENCODER_TO_PUBLISH):
                         # Publishing quadratic data first
-                        data = {'timestamps':[], 'block_name':'HWPEncoder_quad', 'data':{}}
+                        data = {'timestamps': [], 'block_name': 'HWPEncoder_quad', 'data': {}}
                         data['timestamps'] = received_time_list
                         data['data']['quad'] = quad_list
                         self.agent.publish_to_feed('HWPEncoder', data)
 
                         # Publishing counter data
                         # (full sampled data will not be recorded in influxdb)
-                        data = {'timestamps':[], 'block_name':'HWPEncoder_counter', 'data':{}}
+                        data = {'timestamps': [], 'block_name': 'HWPEncoder_counter', 'data': {}}
                         data['data']['counter'] = counter_list
                         data['data']['counter_index'] = counter_index_list
 
                         data['timestamps'] = count2time(counter_list, received_time_list[0])
                         self.agent.publish_to_feed('HWPEncoder_full', data)
 
-                        ## Subsampled data for influxdb display
-                        data_subsampled = {'block_name':'HWPEncoder_counter_sub', 'data':{}}
-                        data_subsampled['timestamps'] = np.array(data['timestamps'])\
-                                                        [::NUM_SUBSAMPLE].tolist()
-                        data_subsampled['data']['counter_sub'] = np.array(counter_list)\
-                                                                 [::NUM_SUBSAMPLE].tolist()
-                        data_subsampled['data']['counter_index_sub'] = np.array(counter_index_list)\
-                                                                       [::NUM_SUBSAMPLE].tolist()
+                        # Subsampled data for influxdb display
+                        data_subsampled = {'block_name': 'HWPEncoder_counter_sub', 'data': {}}
+                        data_subsampled['timestamps'] = np.array(data['timestamps'])[::NUM_SUBSAMPLE].tolist()
+                        data_subsampled['data']['counter_sub'] = np.array(counter_list)[::NUM_SUBSAMPLE].tolist()
+                        data_subsampled['data']['counter_index_sub'] = np.array(counter_index_list)[::NUM_SUBSAMPLE].tolist()
                         self.agent.publish_to_feed('HWPEncoder', data_subsampled)
 
                         # For rough estimation of HWP rotation frequency
                         data = {'timestamp': received_time_list[0],
-                                'block_name':'HWPEncoder_freq', 'data':{}}
+                                'block_name': 'HWPEncoder_freq', 'data': {}}
                         dclock_counter = counter_list[-1] - counter_list[0]
                         dindex_counter = counter_index_list[-1] - counter_index_list[0]
                         # Assuming Beagleboneblack clock is 200 MHz
@@ -642,6 +657,14 @@ class HWPBBBAgent:
                         received_time_list = []
 
                         time_encoder_published = ct
+
+                        # Update session.data
+                        self.hwp_freq = hwp_freq
+                        self.ct = ct
+
+                data_cache['approx_hwp_freq'] = self.hwp_freq
+                data_cache['encoder_last_updated'] = self.ct
+                session.data.update(data_cache)
 
         self.agent.feeds['HWPEncoder'].flush_buffer()
         return True, 'Acquisition exited cleanly.'

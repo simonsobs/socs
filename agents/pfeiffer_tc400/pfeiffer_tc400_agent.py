@@ -27,6 +27,7 @@ class PfeifferTC400Agent:
         An internal address used to communicate between the power supplies and
         the tc400. Found on the front screen of the power supplies.
     """
+
     def __init__(self, agent, ip_address, port_number, turbo_address):
         self.agent = agent
         self.log = agent.log
@@ -42,7 +43,7 @@ class PfeifferTC400Agent:
 
         # Registers Temperature and Voltage feeds
         agg_params = {
-            'frame_length': 10*60,
+            'frame_length': 10 * 60,
         }
         self.agent.register_feed('pfeiffer_turbo',
                                  record=True,
@@ -71,8 +72,8 @@ class PfeifferTC400Agent:
                                            self.port_number,
                                            self.turbo_address)
             except socket.timeout as e:
-                self.log.error("Turbo Controller timed out" +
-                               f"during connect with error {e}")
+                self.log.error("Turbo Controller timed out"
+                               + f"during connect with error {e}")
                 return False, "Timeout"
             self.log.info("Connected to turbo controller")
 
@@ -221,14 +222,14 @@ def make_parser(parser=None):
 
     # Add options specific to this agent.
     pgroup = parser.add_argument_group('Agent Options')
-    pgroup.add_argument('--ip-address', type=str, help="Serial-to-ethernet " +
-                        "converter ip address")
-    pgroup.add_argument('--port-number', type=int, help="Serial-to-ethernet " +
-                        "converter port")
-    pgroup.add_argument('--turbo-address', type=int, help="Internal address " +
-                        "used by power supplies")
-    pgroup.add_argument('--mode', type=str, help="Set to acq to run acq on " +
-                        "startup")
+    pgroup.add_argument('--ip-address', type=str, help="Serial-to-ethernet "
+                        + "converter ip address")
+    pgroup.add_argument('--port-number', type=int, help="Serial-to-ethernet "
+                        + "converter port")
+    pgroup.add_argument('--turbo-address', type=int, help="Internal address "
+                        + "used by power supplies")
+    pgroup.add_argument('--mode', type=str, help="Set to acq to run acq on "
+                        + "startup")
 
     return parser
 

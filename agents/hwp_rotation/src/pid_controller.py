@@ -19,6 +19,7 @@ class PID:
             controller.
 
     """
+
     def __init__(self, pid_ip, pid_port, verb=False):
         self.verb = verb
         self.hex_freq = '00000'
@@ -43,10 +44,16 @@ class PID:
 
         """
         conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            conn.connect((ip, port))
-        except ConnectionRefusedError:
-            print(f"Failed to connect to device at {ip}:{port}")
+        # unit tests might fail on first connection attempt
+        attempts = 3
+        for attempt in range(attempts):
+            try:
+                conn.connect((ip, port))
+                break
+            except ConnectionRefusedError:
+                print(f"Failed to connect to device at {ip}:{port}")
+                print(f"Connection attempts remaining: {attempts-attempt-1}")
+            time.sleep(1)
         conn.settimeout(timeout)
 
         return conn
@@ -243,8 +250,8 @@ class PID:
                 data = self.conn.recv(4096).decode().strip()
                 break
             except socket.timeout:
-                print("Caught timeout waiting for response from PID controller. " +
-                      "Trying again...")
+                print("Caught timeout waiting for response from PID controller. "
+                      + "Trying again...")
                 time.sleep(1)
                 if attempt == 1:
                     raise RuntimeError(

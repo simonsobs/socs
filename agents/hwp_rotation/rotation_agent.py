@@ -1,4 +1,3 @@
-import os
 import argparse
 import time
 from twisted.internet import reactor
@@ -8,9 +7,7 @@ from ocs.ocs_twisted import TimeoutLock
 
 from socs.agent.pmx import PMX, Command
 
-on_rtd = os.environ.get('READTHEDOCS') == 'True'
-if not on_rtd:
-    import src.pid_controller as pd
+import src.pid_controller as pd
 
 
 class RotationAgent:

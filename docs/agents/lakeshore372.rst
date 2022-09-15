@@ -46,8 +46,8 @@ configs documentation for more details.
 Lakeshore 372 Config
 `````````````````````
 A Lakeshore 372 configuration file allows the user to define device and channel
-settings (autoscan, enable/disable, calibration curve, etc.) for each Lakeshore 
-372 in use within one .yaml file. Here is an example for how to build a 
+settings (autoscan, enable/disable, calibration curve, etc.) for each Lakeshore
+372 in use within one .yaml file. Here is an example for how to build a
 Lakeshore 372 configuration file::
 
     LSA22YG:

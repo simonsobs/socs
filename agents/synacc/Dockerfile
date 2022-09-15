@@ -12,7 +12,7 @@ COPY . .
 RUN pip3 install -r requirements.txt
 
 # Run registry on container startup
-ENTRYPOINT ["python3", "-u", "synacc.py"]
+ENTRYPOINT ["dumb-init", "python3", "-u", "synacc.py"]
 
 # Sensible default arguments
 CMD ["--site-hub=ws://crossbar:8001/ws", \

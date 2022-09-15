@@ -45,6 +45,7 @@ class SupRsync:
     copy_timeout : float
         Time (sec) after which a copy command will timeout
     """
+
     def __init__(self, agent, args):
         self.agent = agent
         self.log = txaio.make_logger()
@@ -60,12 +61,43 @@ class SupRsync:
         self.copy_timeout = args.copy_timeout
         self.files_per_batch = args.files_per_batch
         self.sleep_time = args.sleep_time
+        self.compression = args.compression
+        self.bwlimit = args.bwlimit
+
+        # Feed for counting transfer errors, loop iterations.
+        self.agent.register_feed('transfer_stats',
+                                 record=True,
+                                 agg_params={
+                                     'exclude_aggregator': True,
+                                 })
 
     def run(self, session, params=None):
         """run()
 
         **Process** - Main run process for the SupRsync agent. Continuosly
         checks the suprsync db checking for files that need to be handled.
+
+        Notes:
+
+            The session data object contains info about recent
+            transfers::
+
+                >>> response.session['data']
+                {
+                  "activity": "idle",
+                  "timestamp": 1661284493.5398622,
+                  "last_copy": {
+                    "start_time": 1661284493.5333128,
+                    "files": [],
+                    "stop_time": 1661284493.5398622
+                  },
+                  "counters": {
+                    "iterations": 1,
+                    "copies": 0,
+                    "errors_timeout": 0,
+                    "errors_nonzero": 0
+                  },
+                }
         """
 
         srfm = SupRsyncFilesManager(self.db_path, create_all=True)
@@ -73,21 +105,64 @@ class SupRsync:
         handler = SupRsyncFileHandler(
             srfm, self.archive_name, self.remote_basedir, ssh_host=self.ssh_host,
             ssh_key=self.ssh_key, cmd_timeout=self.cmd_timeout,
-            copy_timeout=self.copy_timeout
+            copy_timeout=self.copy_timeout, compression=self.compression,
+            bwlimit=self.bwlimit
         )
 
         self.running = True
         session.set_status('running')
 
+        # Note this will also be stored directly in session.data
+        counters = {
+            'iterations': 0,
+            'copies': 0,
+            'errors_timeout': 0,
+            'errors_nonzero': 0,
+        }
+
+        session.data = {
+            'activity': 'idle',
+            'last_copy': {},
+            'counters': counters,
+        }
+
+        next_feed_update = 0
+
         while self.running:
+            counters['iterations'] += 1
+
+            op = {'start_time': time.time()}
             try:
-                handler.copy_files(max_copy_attempts=self.max_copy_attempts,
-                                   num_files=self.files_per_batch)
+                session.data['activity'] = 'copying'
+                op['files'] = handler.copy_files(max_copy_attempts=self.max_copy_attempts,
+                                                 num_files=self.files_per_batch)
+                counters['copies'] += len(op['files'])
             except subprocess.TimeoutExpired as e:
                 self.log.error("Timeout when copying files! {e}", e=e)
+                op['error'] = 'timed out'
+                counters['errors_timeout'] += 1
+            except subprocess.CalledProcessError as e:
+                self.log.error("rsync returned non-zero exit code! {e}", e=e)
+                op['error'] = 'nonzero exit'
+                counters['errors_nonzero'] += 1
+
+            now = time.time()
+            op['stop_time'] = now
+            session.data['last_copy'] = op
+            session.data['timestamp'] = now
+
+            if now >= next_feed_update:
+                self.agent.publish_to_feed('transfer_stats', {
+                    'block_name': 'block0',
+                    'timestamp': now,
+                    'data': counters})
+                next_feed_update = now + 10 * 60
 
             if self.delete_after is not None:
+                session.data['activity'] = 'deleting'
                 handler.delete_files(self.delete_after)
+
+            session.data['activity'] = 'idle'
             time.sleep(self.sleep_time)
 
         return True, "Stopped run process"
@@ -119,7 +194,7 @@ def make_parser(parser=None):
                         help="Time (sec) after which this agent will delete "
                              "local copies of successfully transfered files. "
                              "If None, will not delete files.")
-    pgroup.add_argument('--max-copy-attempts', type=int,
+    pgroup.add_argument('--max-copy-attempts', type=int, default=5,
                         help="Number of failed copy attempts before the agent "
                              "will stop trying to copy a file")
     pgroup.add_argument('--copy-timeout', type=float,
@@ -131,6 +206,10 @@ def make_parser(parser=None):
                         "is None, which will copy over all available files.")
     pgroup.add_argument('--sleep-time', type=float, default=60,
                         help="Time to sleep (sec) in between copy iterations")
+    pgroup.add_argument('--compression', action='store_true', default=False,
+                        help="Activate gzip on data transfer (rsync -z)")
+    pgroup.add_argument('--bwlimit', type=str, default=None,
+                        help="Bandwidth limit arg (passed through to rsync)")
     return parser
 
 

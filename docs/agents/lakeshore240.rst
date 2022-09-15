@@ -135,4 +135,3 @@ Supporting APIs
 
 .. autoclass:: socs.Lakeshore.Lakeshore240.Curve
     :members:
-

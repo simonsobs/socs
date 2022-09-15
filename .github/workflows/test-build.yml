@@ -4,8 +4,8 @@ on:
   pull_request:
     paths-ignore:
       - 'docs/**'
-      - '*.rst'
-      - '*.md'
+      - '**.rst'
+      - '**.md'
       - '.flake8'
       - '.pre-commit-config.yaml'
 

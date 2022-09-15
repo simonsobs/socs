@@ -12,7 +12,7 @@ other bird calls, though not as good as `the superb lyrebird
 of the Magpie agent is to take detector data from the SMuRF Streamer and
 translate into G3Frames that are compatible with lyrebird. This requires
 a small bit of pre-processing and downsampling that is done whenever a new
-frame is received. 
+frame is received.
 
 .. argparse::
    :filename: ../agents/magpie/magpie_agent.py
@@ -46,6 +46,8 @@ a detmap csv file, with a target sample rate of 20 Hz::
          # Detmap CSV file
          '--det-map', '/home/jlashner/lyrebird_demo/detmap.csv',
          '--offset', 0, 0,
+         '--demod-freq', 8,
+         '--demod-bandwidth', 0.5
        ]},
 
 It is  possible to tell magpie to stream data from existing G3Files instead of
@@ -93,9 +95,9 @@ not able to use the spt3g / so3g pypi package. You can follow the instructions
 on `the SPT3G github page <https://github.com/CMB-S4/spt3g_software>`_ to
 build.
 
-Once that is successful, clone the simonsobs fork of 
+Once that is successful, clone the simonsobs fork of
 `lyrebird <https://github.com/simonsobs/lyrebird/tree/generic_datastream>`_,
-and follow the build instructions on the lyrebird readme. 
+and follow the build instructions on the lyrebird readme.
 
 After lyrebird is built successfully, you'll want to add the following lines
 to your bashrc:
@@ -105,7 +107,7 @@ to your bashrc:
    export PATH=/path/to/lyrebird/build/lyrebird-bin:$PATH
    export PATH=/path/to/lyrebird/bin:$PATH
 
-This will add two scripts to your path: 
+This will add two scripts to your path:
 
  - ``lyrebird``, the main lyrebird executable which takes in the path to a cfg
    file specifying data vals, streamer ports, etc. and starts lyrebird from
@@ -199,9 +201,9 @@ Lyrebird can also store any number of **equations** for each detector channel.
 This number can be different from the number of data values, but the number
 of equations must be the same for each detector.
 These equations are what are actually visualized for each channel in the
-lyrebird GUI. 
+lyrebird GUI.
 
-The equations are registered as strings in the 
+The equations are registered as strings in the
 `Polish Notation <https://en.wikipedia.org/wiki/Polish_notation>`_. This is
 a method of describing equations where the operator comes before the operands,
 and is a notation that is very easy to parse and evaluate. For example, the
@@ -316,7 +318,7 @@ frequency or band / channel id.
 Wafer Layout
 `````````````
 
-The Wafer layout takes in a det-map CSV file generated from the simonsobs 
+The Wafer layout takes in a det-map CSV file generated from the simonsobs
 `detmap <https://github.com/simonsobs/DetMap.git>`_ package, and uses it
 to generate a focal-plane layout.
 
@@ -335,7 +337,13 @@ Supporting APIs
 .. autoclass:: agents.magpie.magpie_agent.FIRFilter
   :members:
 
-.. autoclass:: agents.magpie.magpie_agent.RollingAvg
+.. autoclass:: agents.magpie.magpie_agent.Demodulator
+  :members:
+
+.. autoclass:: agents.magpie.magpie_agent.WhiteNoiseCalculator
+  :members:
+
+.. autoclass:: agents.magpie.magpie_agent.VisElem
   :members:
 
 .. autoclass:: agents.magpie.magpie_agent.FocalplaneConfig

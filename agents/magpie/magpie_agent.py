@@ -1,5 +1,5 @@
 import argparse
-import so3g
+import so3g  # noqa: F401
 from spt3g import core
 import txaio
 import os
@@ -12,6 +12,8 @@ import time
 from ocs import ocs_agent, site_config
 
 MAX_CHANS = 4096
+CHANS_PER_BAND = 512
+pA_per_rad = 9e6 / (2 * np.pi)
 
 
 # Map from primary key-names to their index in the SuperTimestream
@@ -43,10 +45,10 @@ def load_frame_data(frame):
         nchans, nsamps = len(d), d.n_samples
         data = np.ndarray((nchans, nsamps), dtype=np.float32)
         for i in range(nchans):
-            data[i] = d[f'r{i:0>4}'] * (2*np.pi) / 2**16
+            data[i] = d[f'r{i:0>4}'] * (2 * np.pi) / 2**16
 
     else:  # G3SuperTimestream probably
-        data = d.data * (2*np.pi) / 2**16
+        data = d.data * (2 * np.pi) / 2**16
 
     return times, data
 
@@ -78,20 +80,34 @@ def sleep_while_running(duration, session, interval=1):
 
 class FIRFilter:
     """
-    Class for Finite Input Response filter. Filter phases are preserved between
-    `lfilt` calls so you can filter frame-based data.
+    Class for Finite Input Response filter. Filter state is preserved
+    between `lfilt` calls so you can filter frame-based data.
+
+    From scipy docs, the output of the filter is determined by:
+
+        a[0]*y[n] = b[0]*x[n] + b[1]*x[n-1] + ... + b[M]*x[n-M]
+                              - a[1]*y[n-1] - ... - a[N]*y[n-N]
     """
+
     def __init__(self, b, a, nchans=None):
         if nchans is None:
             nchans = MAX_CHANS
         self.b = b
         self.a = a
-        self.z = np.zeros((nchans, len(b)-1))
+        self.z = np.zeros((nchans, len(b) - 1))
 
-    def lfilt(self, data):
+    def lfilt(self, data, in_place=True):
         """Filters data in place"""
         n = len(data)
-        data[:, :], self.z[:n] = signal.lfilter(self.b, self.a, data, axis=1,)
+        if in_place:
+            data[:, :], self.z[:n] = signal.lfilter(
+                self.b, self.a, data, axis=1, zi=self.z[:n]
+            )
+        else:
+            d, self.z[:n] = signal.lfilter(
+                self.b, self.a, data, axis=1, zi=self.z[:n]
+            )
+            return d
 
     @classmethod
     def butter_highpass(cls, cutoff, fs, order=5):
@@ -131,45 +147,189 @@ class FIRFilter:
         b, a = signal.butter(order, normal_cutoff, btype='low', analog=False)
         return cls(b, a)
 
-
-class RollingAvg:
-    """
-    Class for calculating rolling averages across multiple frames. Useful
-    for simple filtering and calculating the rms.
-
-    Args
-    -----
-        N (int):
-            Number of samples to average together
-        nchans (int):
-            Number of channels this will be operating on.
-    """
-    def __init__(self, N, nchans):
-        self.N = N
-        self.nchans = nchans
-        self.rollover = np.zeros((nchans, N))
-
-    def apply(self, data):
+    @classmethod
+    def moving_avg(cls, width):
         """
-        Apply rolling avg to data array.
+        Creates a moving avg filter
 
         Args
         -----
-            data (np.ndarray):
-                Array of data. Must be of shape (nchans, nsamps)
+        width : int
+            number of samples to average together
         """
-        nsamps = data.shape[1]
-        summed = 1./self.N * np.cumsum(
-            np.concatenate((self.rollover, data), axis=1), axis=1)
-        if self.N <= nsamps:
-            # Replace entire rollover array
-            self.rollover = data[:, -self.N:]
-        else:
-            # Roll back and just update with samples available
-            self.rollover = np.roll(self.rollover, -nsamps)
-            self.rollover[:, -nsamps:] = data[:, :]
+        b = 1. / width * np.ones(width, dtype=float)
+        a = np.zeros_like(b)
+        a[0] = 1
+        return cls(b, a)
 
-        return summed[:, self.N:] - summed[:, :-self.N]
+    @classmethod
+    def differ(cls, delay=1):
+        """
+        FIR filter to calculate a rolling diff of incoming data.
+
+        Args
+        ----
+        delay : int
+            Sets the diff spacing
+        """
+        b = np.zeros(1 + int(delay))
+        a = np.zeros_like(b)
+        b[0], b[-1] = 1, -1
+        a[0] = 1
+        return cls(b, a)
+
+
+class Demodulator:
+    """
+    Helper class for demodulating a live timestream
+
+    Args
+    -----
+    f : float
+        Demodulation frequency
+    bw : float
+        Bandwidth. This will be the filter-cutoff of the applied lowpass filter
+    fs : float
+        Sample rate of incoming data
+    """
+
+    def __init__(self, f, bw=1, fs=200):
+        self.f = f
+        self.lp_sin = FIRFilter.butter_lowpass(bw, fs)
+        self.lp_cos = FIRFilter.butter_lowpass(bw, fs)
+
+    def apply(self, times, data):
+        """
+        Applies demodulation to data segment.
+
+        Returns
+        --------
+        demod : np.ndarray
+            Array of (unnormalized) demodulated data in the same shape as the
+            input data
+        """
+        sin = np.sin(2 * np.pi * self.f * times)
+        cos = np.cos(2 * np.pi * self.f * times)
+
+        # We don't really care about normalization
+        demod_sin = self.lp_sin.lfilt(data * sin[None, :], in_place=False)
+        demod_cos = self.lp_cos.lfilt(data * cos[None, :], in_place=False)
+
+        return np.sqrt(demod_sin**2 + demod_cos**2)
+
+
+class WhiteNoiseCalculator:
+    """
+    Helper class for calculating white noise levels of incoming data
+
+    Args
+    -----
+    fs : float
+        Sample rate of incoming data
+    navg : int
+        Number of samples to average over in the RMS calc
+    """
+
+    def __init__(self, fs=200, navg=200):
+        # Aiming for 20 Hz
+        delay = fs // 20
+        self.differ = FIRFilter.differ(delay=delay)
+        self.averager = FIRFilter.moving_avg(navg)
+        self.fsamp = fs
+
+    def apply(self, data):
+        """
+        Returns rms / sqrt(fsamp), which estimates the white noise level
+        """
+        return np.sqrt(
+            self.averager.lfilt(
+                self.differ.lfilt(data, in_place=False)**2, in_place=False
+            ) / self.fsamp
+        )
+
+
+class VisElem:
+    """
+    Container for config info for Lyrebird visual elements.
+
+    Attributes
+    --------------
+    name : str
+        Name of the channel
+    x : float
+        x-coord of the element
+    y : float
+        y-coord of the element
+    rot : float
+        Rotation angle of the element (rads)
+    vals : List[str]
+        List containing the names of the data values corresponding to this
+        visual element. All vis-elems must have the same number of
+        data-values. Data-values must be unique, such as
+        ``<channel_name>/rms``
+    eqs : List[str]
+        List of equations to be displayed by the visual element. Equations
+        are written in Polish Notation, and may contain a combination of
+        numbers and data-values. Data-values can be global as defined in
+        the lyrebird config file, or channel values as defined in the
+        ``value_names`` argument. There must be the same number of eqs per
+        visual element.
+
+        Polish notation is a method of writing equations where operators
+        precede the operands, making it easier to parse and evaluate. For
+        example, the operation :math:`a + b` will be ``+ a b`` in polish
+        notation, and :math:`(a + b) / 2` can be written as ``/ + a b 2``.
+        See the magpie docs page for a full list of operators that are
+        accepted by lyrebird.
+    eq_labels : List[str]
+        List of strings used to label equations in the lyrebird gui. This
+        list must have the same size as the ``eqs`` array.
+    cmaps : List[str]
+        List of colormaps to use for each equation. This must be the same
+        size as the ``eqs`` array.
+    template : str
+        Template used for this vis-elem. Templates are defined in the
+        lyrebird cfg file.
+    abs_smurf_chan : int
+        Absolute smurf-channel corresponding to this visual element.
+    eq_color_is_dynamic : List[bool]
+        List of booleans that determine if each equation's color-scale is
+        dynamic or fixed. This must be the same size as the ``eqs`` array.
+    """
+
+    def __init__(self, name, x, y, rot, template, abs_smurf_chan, cmap_idx=0):
+        self.x = x
+        self.y = y
+        self.rot = rot
+        self.template = template
+        self.abs_smurf_chan = abs_smurf_chan
+        self.name = name
+
+        vals = [
+            '{name}/raw', '{name}/demod', '{name}/wl', '{name}/flagged',
+            '{name}/smurf_band', '{name}/smurf_chan'
+        ]
+        self.vals = [v.format(name=name) for v in vals]
+        eq_templates = {
+            'raw': '{name}/raw',
+            'demod': '* {name}/demod rms_scale',
+            'wl': '* {name}/wl wl_scale',
+            'flagged': '{name}/flagged',
+            'smurf_band': f'{self.abs_smurf_chan // CHANS_PER_BAND}',
+            'smurf_chan': f'{self.abs_smurf_chan % 512}',
+        }
+
+        self.eqs = [
+            eq.format(name=name) for eq in eq_templates.values()
+        ]
+        self.eq_labels = [k for k in eq_templates.keys()]
+        self.color_is_dynamic = [False for _ in self.eqs]
+        self.color_is_dynamic[0] = True
+
+        self.cmaps = [
+            ['red_cmap' for _ in eq_templates],
+            ['blue_cmap' for _ in eq_templates]
+        ][cmap_idx]
 
 
 class FocalplaneConfig:
@@ -181,98 +341,59 @@ class FocalplaneConfig:
         -------------
         chan_mask : np.ndarray
             Map from absolute_smurf_chan --> Visual Element index
+        channels : list
+            List of visual elements
         """
-        self.num_dets = 0
-        self.xs = []
-        self.ys = []
-        self.rots = []
-        self.cnames = []
-        self.templates = []
-        self.value_names = []
-        self.eqs = []
-        self.eq_labels = []
-        self.eq_color_is_dynamic = []
-        self.cmaps = []
+        self.channels = []
         self.chan_mask = np.full(MAX_CHANS, -1)
 
     def config_frame(self):
         """
         Generates a config frame for lyrebird
         """
+        xs = []
+        ys = []
+        rots = []
+        cnames = []
+        templates = []
+        value_names = []
+        eqs = []
+        eq_labels = []
+        eq_color_is_dynamic = []
+        cmaps = []
+
+        for c in self.channels:
+            xs.append(c.x)
+            ys.append(c.y)
+            rots.append(c.rot)
+            cnames.append(c.name)
+            templates.append(c.template)
+            value_names.extend(c.vals)
+            eqs.extend(c.eqs)
+            eq_labels.extend(c.eq_labels)
+            eq_color_is_dynamic.extend(c.color_is_dynamic)
+            cmaps.extend(c.cmaps)
+
         frame = core.G3Frame(core.G3FrameType.Wiring)
-        frame['x'] = core.G3VectorDouble(self.xs)
-        frame['y'] = core.G3VectorDouble(self.ys)
-        frame['cname'] = core.G3VectorString(self.cnames)
-        frame['rotation'] = core.G3VectorDouble(self.rots)
-        frame['templates'] = core.G3VectorString(self.templates)
-        frame['values'] = core.G3VectorString(self.value_names)
-        frame['color_is_dynamic'] = core.G3VectorBool(self.eq_color_is_dynamic)
-        frame['equations'] = core.G3VectorString(self.eqs)
-        frame['eq_labels'] = core.G3VectorString(self.eq_labels)
-        frame['cmaps'] = core.G3VectorString(self.cmaps)
+        frame['x'] = core.G3VectorDouble(xs)
+        frame['y'] = core.G3VectorDouble(ys)
+        frame['cname'] = core.G3VectorString(cnames)
+        frame['rotation'] = core.G3VectorDouble(rots)
+        frame['templates'] = core.G3VectorString(templates)
+        frame['values'] = core.G3VectorString(value_names)
+        frame['color_is_dynamic'] = core.G3VectorBool(eq_color_is_dynamic)
+        frame['equations'] = core.G3VectorString(eqs)
+        frame['eq_labels'] = core.G3VectorString(eq_labels)
+        frame['cmaps'] = core.G3VectorString(cmaps)
         return frame
-        
-    def add_vis_elem(self, name, x, y, rot, value_names, eqs, eq_labels, cmaps,
-                     template, abs_smurf_chan, eq_color_is_dynamic):
-        """
-        Adds a visual element to the focal-plane.
 
-        Args
-        ----
-        name : str
-            Name of the channel
-        x : float
-            x-coord of the element
-        y : float
-            y-coord of the element
-        rot : float
-            Rotation angle of the element (rads)
-        value_names : List[str]
-            List containing the names of the data values corresponding to this
-            visual element. All vis-elems must have the same number of
-            data-values. Data-values must be unique, such as
-            ``<channel_name>/rms``
-        eqs : List[str]
-            List of equations to be displayed by the visual element. Equations
-            are written in Polish Notation, and may contain a combination of
-            numbers and data-values. Data-values can be global as defined in
-            the lyrebird config file, or channel values as defined in the
-            ``value_names`` argument. There must be the same number of eqs per
-            visual element.
-
-            Polish notation is a method of writing equations where operators
-            precede the operands, making it easier to parse and evaluate. For
-            example, the operation :math:`a + b` will be ``+ a b`` in polish
-            notation, and :math:`(a + b) / 2` can be written as ``/ + a b 2``.
-            See the magpie docs page for a full list of operators that are
-            accepted by lyrebird.
-        eq_labels : List[str]
-            List of strings used to label equations in the lyrebird gui. This
-            list must have the same size as the ``eqs`` array.
-        cmaps : List[str]
-            List of colormaps to use for each equation. This must be the same
-            size as the ``eqs`` array.
-        template : str
-            Template used for this vis-elem. Templates are defined in the
-            lyrebird cfg file.
-        abs_smurf_chan : int
-            Absolute smurf-channel corresponding to this visual element.
-        eq_color_is_dynamic : List[bool]
-            List of booleans that determine if each equation's color-scale is
-            dynamic or fixed. This must be the same size as the ``eqs`` array.
+    def add_vis_elem(self, *args, **kwargs):
         """
-        self.cnames.append(name)
-        self.xs.append(float(x))
-        self.ys.append(float(y))
-        self.rots.append(rot)
-        self.templates.append(template)
-        self.value_names.extend(value_names)
-        self.cmaps.extend(cmaps)
-        self.eqs.extend(eqs)
-        self.eq_labels.extend(eq_labels)
-        self.eq_color_is_dynamic.extend(eq_color_is_dynamic)
-        self.chan_mask[abs_smurf_chan] = self.num_dets
-        self.num_dets += 1
+        Adds a visual element to the focal-plane and updates the channel mask
+        """
+        c = VisElem(*args, **kwargs)
+        self.channels.append(c)
+        self.chan_mask[c.abs_smurf_chan] = len(self.channels) - 1
 
     @classmethod
     def grid(cls, stream_id, xdim, ydim, ygap=0, offset=(0., 0.)):
@@ -305,16 +426,10 @@ class FocalplaneConfig:
             ys = ys + .5 * (ys // ygap)
 
         template = 'box'
-        cmaps = ['red_cmap', 'blue_cmap']
-        eq_color_is_dynamic = [True, False]
         for i in range(xdim * ydim):
             x, y = xs[i % xdim], ys[i // xdim]
             name = f"{stream_id}/channel_{i}"
-            value_names = [f'{name}/raw', f'{name}/rms']
-            eqs = [f'{name}/raw', f'* {name}/rms rms_scale']
-            eq_labels = ['raw', 'rms']
-            fp.add_vis_elem(name, x, y, 0, value_names, eqs, eq_labels, cmaps,
-                            template, i, eq_color_is_dynamic)
+            fp.add_vis_elem(name, x, y, 0, template, i)
 
         return fp
 
@@ -343,11 +458,7 @@ class FocalplaneConfig:
         fp = cls()
         df = pd.read_csv(detmap_file)
 
-        cmaps = [
-            ['red_cmap', 'blue_cmap'],
-            ['blue_cmap', 'red_cmap'],
-        ]
-        templates = ["template_c0_p0", "template_c1_p0",]
+        templates = ["template_c0_p0", "template_c1_p0", ]
 
         color_idxs = {}
         ncolors = 0
@@ -372,13 +483,13 @@ class FocalplaneConfig:
             x += offset[0]
             y += offset[1]
 
-            name = f"{stream_id}/det_{i}"
-            eqs = [f'{name}/raw', f'* {name}/rms rms_scale']
-            value_names = [f'{name}/raw', f'{name}/rms']
-            eq_labels = ['raw', 'rms']
+            band, chan = row['smurf_band'], row['smurf_channel']
+            if chan == -1:
+                continue
+            abs_smurf_chan = band * CHANS_PER_BAND + chan
 
-            fp.add_vis_elem(name, x, y, rot, value_names, eqs, eq_labels,
-                            cmaps[cidx], template, i, [True, False])
+            name = f"{stream_id}/det_{i}"
+            fp.add_vis_elem(name, x, y, rot, template, abs_smurf_chan, cmap_idx=cidx)
 
         return fp
 
@@ -392,6 +503,8 @@ class MagpieAgent:
     target_rate : float
         This is the target sample rate of data to be sent to lyrebird.
         Incoming data will be downsampled to this rate before being sent out.
+    ds_offset : int
+        Offset for downsample to avoid hiccups at frame boundaries
     fp : FocalplaneConfig
         This is the FocalplaneConfig object that contains info about what
         channels are present in the focal-plane representation, and their
@@ -413,11 +526,20 @@ class MagpieAgent:
         Two Rolling Averagers which are used to calculate the rolling RMS data.
     monitored_channels : list
         List of monitored channels whose data should be sent to grafana.
-        This list will contain entries which look like 
+        This list will contain entries which look like
         ``(readout_chan_number, field_name)``.
     monitored_chan_sample_rate : float
         Sample rate (Hz) to target when downsampling monitored channel data for
         grafana.
+    demod : Demodulator
+        Demodulator used to calculate demod signal for incoming timestreams
+    self.demod_freq : float
+        Demodulation frequency
+    self.demod_bandwidth : float
+        Filter cutoff for demodulation lowpass
+    wlcalc : WhiteNoiseCalculator
+        WhiteNoiseCalculator used to calculate white noise levels for incoming
+        timestreams
     """
     mask_register = 'AMCc.SmurfProcessor.ChannelMapper.Mask'
 
@@ -427,6 +549,7 @@ class MagpieAgent:
         self._running = False
 
         self.target_rate = args.target_rate
+        self.ds_offset = 0
         layout = args.layout.lower()
         if layout == 'grid':
             self.fp = FocalplaneConfig.grid(
@@ -445,7 +568,11 @@ class MagpieAgent:
         self.out_queue = queue.Queue(1000)
         self.delay = args.delay
 
-        self.avg1, self.avg2 = None, None
+        self.demod = None
+        self.demod_freq = args.demod_freq
+        self.demod_bandwidth = args.demod_bandwidth
+
+        self.wncalc = None
 
         self.monitored_channels = []
         self.monitored_chan_sample_rate = 10
@@ -453,7 +580,7 @@ class MagpieAgent:
             'detector_tods', record=True,
             agg_params={'exclude_aggregator': True}
         )
-
+        self.agent.register_feed('white_noise', record=True,)
 
     @ocs_agent.param('target_rate', type=float)
     def set_target_rate(self, session, params):
@@ -468,7 +595,6 @@ class MagpieAgent:
         self.target_rate = params['target_rate']
         return True, f'Set target rate to {self.target_rate}'
 
-
     @ocs_agent.param('delay', type=float)
     def set_delay(self, session, params):
         """set_delay(delay)
@@ -482,9 +608,8 @@ class MagpieAgent:
         self.delay = params['delay']
         return True, f'Set delay param to {self.delay}'
 
-
     @ocs_agent.param('chan_info', type=list, check=lambda x: len(x) <= 6)
-    @ocs_agent.param('sample_rate', type=float, default=10, 
+    @ocs_agent.param('sample_rate', type=float, default=10,
                      check=lambda x: 0 < x <= 20)
     def set_monitored_channels(self, session, params):
         """set_monitored_channels(chan_info, sample_rate=10)
@@ -523,7 +648,7 @@ class MagpieAgent:
         for ch_info in params['chan_info']:
             if isinstance(ch_info, int):
                 field_name = f"r{ch_info:0>4}"
-                monitored_chans.append((ch_info,field_name))
+                monitored_chans.append((ch_info, field_name))
             elif isinstance(ch_info, (tuple, list)):
                 monitored_chans.append(ch_info)
             else:
@@ -561,7 +686,7 @@ class MagpieAgent:
         if len(times) <= 1:
             ds_factor = 1
         else:
-            input_rate = 1./np.median(np.diff(times))
+            input_rate = 1. / np.median(np.diff(times))
             ds_factor = max(int(input_rate // target_rate), 1)
 
         sl = slice(None, None, ds_factor)
@@ -572,7 +697,7 @@ class MagpieAgent:
                 self.log.warn(
                     f"Readout channel {rc} is larger than the number of"
                     f"streamed channels ({len(data)})! Data won't be published"
-                     "to grafana."
+                    "to grafana."
                 )
                 continue
             _data = {
@@ -584,6 +709,22 @@ class MagpieAgent:
             }
             self.agent.publish_to_feed('detector_tods', _data)
 
+    def _publish_wls(self, wls):
+        """
+        Publishes white-noise quantiles to ocs feed
+        """
+        quantiles = [15, 25, 50, 75, 85]
+        labels = [f'white_noise_q{q}' for q in quantiles]
+        data = {
+            'timestamp': time.time(),
+            'block_name': 'white_noise',
+            'data': {
+                k: np.quantile(wls, q / 100)
+                for k, q in zip(labels, quantiles)
+            }
+        }
+        self.agent.publish_to_feed('white_noise', data)
+
     def _process_data(self, frame, source_offset=0):
         """
         Processes a Scan frame. If lyrebird is enabled, this will return a seq
@@ -594,24 +735,25 @@ class MagpieAgent:
 
         # Calculate downsample factor
         times_in, data_in = load_frame_data(frame)
-        times_in  = times_in - source_offset
-        sample_rate = 1./np.median(np.diff(times_in))
+        times_in = times_in - source_offset
+        sample_rate = 1. / np.median(np.diff(times_in))
         nsamps = len(times_in)
         nchans = len(data_in)
 
         self._process_monitored_chans(times_in, data_in)
 
-        if self.avg1 is None:
-            self.avg1 = RollingAvg(200, nchans)
-            self.avg2 = RollingAvg(200, nchans)
-        elif self.avg1.nchans != nchans:
-            self.log.warn(f"Channel count has changed! {self.avg1.nchans}->{nchans}")
-            self.avg1 = RollingAvg(200, nchans)
-            self.avg2 = RollingAvg(200, nchans)
+        if self.demod is None:
+            self.demod = Demodulator(self.demod_freq, self.demod_bandwidth,
+                                     fs=sample_rate)
+        if self.wncalc is None:
+            self.wncalc = WhiteNoiseCalculator(
+                fs=sample_rate, navg=int(sample_rate)
+            )
 
-        # Calc RMS
-        hpf_data = data_in - self.avg1.apply(data_in)  # To high-pass filter
-        rms = np.sqrt(self.avg2.apply(hpf_data**2))  # To calc rolling rms
+        demod = self.demod.apply(times_in, data_in)
+        # white noise in units of pA/rt(Hz)
+        wl = self.wncalc.apply(data_in * pA_per_rad)
+        self._publish_wls(np.median(wl, axis=1))
 
         ds_factor = sample_rate // self.target_rate
         if np.isnan(ds_factor):  # There is only one element in the timestream
@@ -619,15 +761,17 @@ class MagpieAgent:
         ds_factor = max(int(ds_factor), 1)  # Prevents downsample factors < 1
 
         # Arrange output data structure
-        sample_idxs = np.arange(0, nsamps, ds_factor, dtype=np.int32)
+        sample_idxs = np.arange(self.ds_offset, nsamps, ds_factor, dtype=np.int32)
+        self.ds_offset = ds_factor - (nsamps - self.ds_offset) % ds_factor
         num_frames = len(sample_idxs)
 
         times_out = times_in[sample_idxs]
-
         abs_chans = self.mask[np.arange(nchans)]
 
-        raw_out = np.zeros((num_frames, self.fp.num_dets))
-        rms_out = np.zeros((num_frames, self.fp.num_dets))
+        nelems = len(self.fp.channels)
+        raw_out = np.zeros((num_frames, nelems))
+        demod_out = np.zeros((num_frames, nelems))
+        wl_out = np.zeros((num_frames, nelems))
 
         for i, c in enumerate(abs_chans):
             if c >= len(self.fp.chan_mask):
@@ -635,7 +779,8 @@ class MagpieAgent:
             idx = self.fp.chan_mask[c]
             if idx >= 0:
                 raw_out[:, idx] = data_in[i, sample_idxs]
-                rms_out[:, idx] = rms[i, sample_idxs]
+                demod_out[:, idx] = demod[i, sample_idxs]
+                wl_out[:, idx] = wl[i, sample_idxs]
 
         out = []
         for i in range(num_frames):
@@ -647,11 +792,17 @@ class MagpieAgent:
 
             fr = core.G3Frame(core.G3FrameType.Scan)
             fr['idx'] = 1
-            fr['data'] = core.G3VectorDouble(rms_out[i])
+            fr['data'] = core.G3VectorDouble(demod_out[i])
             fr['timestamp'] = core.G3Time(times_out[i] * core.G3Units.s)
             out.append(fr)
-        return out
 
+            fr = core.G3Frame(core.G3FrameType.Scan)
+            fr['idx'] = 2
+            fr['data'] = core.G3VectorDouble(wl_out[i])
+            fr['timestamp'] = core.G3Time(times_out[i] * core.G3Units.s)
+            out.append(fr)
+
+        return out
 
     def read(self, session, params=None):
         """read(src='tcp://localhost:4532')
@@ -668,7 +819,7 @@ class MagpieAgent:
         self._running = True
         session.set_status('running')
 
-        src_idx = 0 
+        src_idx = 0
         if isinstance(params['src'], str):
             sources = [params['src']]
         else:
@@ -714,7 +865,7 @@ class MagpieAgent:
             # timestamps in the file
             if source_is_file and (not source_offset):
                 source_offset = frame['time'].time / core.G3Units.s \
-                                - time.time()
+                    - time.time()
             elif not source_is_file:
                 source_offset = 0
 
@@ -737,7 +888,6 @@ class MagpieAgent:
         self._running = False
         return True, "Stopping read process"
 
-
     def stream_fake_data(self, session, params=None):
         """stream_fake_data()
 
@@ -745,18 +895,18 @@ class MagpieAgent:
         G3Frames full of fake data to be sent to lyrebird.
         """
         self._run_fake_stream = True
-        ndets = self.fp.num_dets
+        ndets = len(self.fp.channels)
         chans = np.arange(ndets)
         frame_start = time.time()
         while self._run_fake_stream:
             time.sleep(2)
             frame_stop = time.time()
-            ts = np.arange(frame_start, frame_stop, 1./self.target_rate)
+            ts = np.arange(frame_start, frame_stop, 1. / self.target_rate)
             frame_start = frame_stop
             nframes = len(ts)
 
             data_out = np.random.normal(0, 1, (nframes, ndets))
-            data_out += np.sin(2*np.pi*ts[:, None] + .2 * chans[None, :])
+            data_out += np.sin(2 * np.pi * ts[:, None] + .2 * chans[None, :])
 
             for t, d in zip(ts, data_out):
                 fr = core.G3Frame(core.G3FrameType.Scan)
@@ -773,11 +923,9 @@ class MagpieAgent:
 
         return True, "Stopped fake stream process"
 
-
     def _stop_stream_fake_data(self, session, params=None):
         self._run_fake_stream = False
         return True, "Stopping fake stream process"
-
 
     @ocs_agent.param('dest', type=int)
     def send(self, session, params=None):
@@ -809,7 +957,7 @@ class MagpieAgent:
                 stream_start_time = now
 
             this_frame_time = stream_start_time + (t - first_frame_time) + self.delay
-            res = sleep_while_running(this_frame_time - now, session)
+            sleep_while_running(this_frame_time - now, session)
             sender.Process(f)
 
         return True, "Stopped send process"
@@ -860,6 +1008,10 @@ def make_parser(parser=None):
                         help="Readout channels to start monitoring on startup")
     pgroup.add_argument('--monitored-channel-rate', type=float, default=10,
                         help="Target sample rate for monitored channels")
+    pgroup.add_argument('--demod-freq', type=float, default=8,
+                        help="Demodulation frequency")
+    pgroup.add_argument('--demod-bandwidth', type=float, default=0.5,
+                        help="Demodulation bandwidth")
     return parser
 
 
@@ -879,16 +1031,16 @@ if __name__ == '__main__':
 
     agent.register_process('read', magpie.read, magpie._stop_read,
                            startup=read_startup)
-    agent.register_process('stream_fake_data', magpie.stream_fake_data, 
+    agent.register_process('stream_fake_data', magpie.stream_fake_data,
                            magpie._stop_stream_fake_data, startup=args.fake_data)
     agent.register_process('send', magpie.send, magpie._send_stop,
                            startup={'dest': args.dest})
     agent.register_task('set_target_rate', magpie.set_target_rate)
     agent.register_task('set_delay', magpie.set_delay)
     agent.register_task(
-        'set_monitored_channels', magpie.set_monitored_channels, 
-        startup={'chan_info': args.monitored_channels, 
-                'sample_rate': args.monitored_channel_rate}
+        'set_monitored_channels', magpie.set_monitored_channels,
+        startup={'chan_info': args.monitored_channels,
+                 'sample_rate': args.monitored_channel_rate}
     )
 
     runner.run(agent, auto_reconnect=True)

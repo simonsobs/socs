@@ -136,6 +136,7 @@ class SupRsyncFilesManager:
         echo : bool
             If true, writes sql statements to stdout
     """
+
     def __init__(self, db_path, create_all=True, echo=False):
         db_path = os.path.abspath(db_path)
         if not os.path.exists(os.path.dirname(db_path)):
@@ -205,20 +206,21 @@ class SupRsyncFilesManager:
         if session is None:
             session = self.Session()
 
-        query = session.query(SupRsyncFile).filter(
-            SupRsyncFile.removed == None,
-            SupRsyncFile.archive_name == archive_name,
-        )
+        if max_copy_attempts is None:
+            max_copy_attempts = 2**10
 
-        if max_copy_attempts is not None:
-            query.filter(SupRsyncFile.failed_copy_attempts < max_copy_attempts)
+        query = session.query(SupRsyncFile).filter(
+            SupRsyncFile.removed == None,  # noqa: E711
+            SupRsyncFile.archive_name == archive_name,
+            SupRsyncFile.failed_copy_attempts < max_copy_attempts
+        )
 
         files = []
         for f in query.all():
             if f.local_md5sum != f.remote_md5sum:
                 files.append(f)
             if num_files is not None:
-                if len(files) == num_files:
+                if len(files) >= num_files:
                     break
 
         return files
@@ -243,7 +245,7 @@ class SupRsyncFilesManager:
             session = self.Session()
 
         query = session.query(SupRsyncFile).filter(
-            SupRsyncFile.removed == None,
+            SupRsyncFile.removed == None,  # noqa: E711
             SupRsyncFile.archive_name == archive_name,
             SupRsyncFile.deletable,
         )
@@ -252,11 +254,30 @@ class SupRsyncFilesManager:
         now = time.time()
         for f in query.all():
             if f.local_md5sum == f.remote_md5sum:
-                print(f.local_path, f.timestamp)
                 if now > f.timestamp + delete_after:
                     files.append(f)
 
         return files
+
+    def get_known_files(self, archive_name, session=None):
+        """Gets all files.  This can be used to help avoid
+        double-registering files.
+
+        Args
+        -----
+            archive_name : str
+                Name of archive to pull files from
+            session : sqlalchemy session
+                Session to use to query files.
+        """
+        if session is None:
+            session = self.Session()
+
+        query = session.query(SupRsyncFile).filter(
+            SupRsyncFile.archive_name == archive_name,
+        )
+
+        return list(query.all())
 
 
 class SupRsyncFileHandler:
@@ -264,9 +285,10 @@ class SupRsyncFileHandler:
     Helper class to handle files in the suprsync db and copy them to their
     dest / delete them if enough time has passed.
     """
+
     def __init__(self, file_manager, archive_name, remote_basedir,
                  ssh_host=None, ssh_key=None, cmd_timeout=None,
-                 copy_timeout=None):
+                 copy_timeout=None, compression=None, bwlimit=None):
         self.srfm = file_manager
         self.archive_name = archive_name
         self.ssh_host = ssh_host
@@ -275,6 +297,8 @@ class SupRsyncFileHandler:
         self.log = txaio.make_logger()
         self.cmd_timeout = cmd_timeout
         self.copy_timeout = copy_timeout
+        self.compression = compression
+        self.bwlimit = bwlimit
 
     def run_on_remote(self, cmd, timeout=None):
         """
@@ -312,7 +336,14 @@ class SupRsyncFileHandler:
                 Max number of failed copy atempts
             num_files : int
                 Number of files to return
+
+        Returns
+        -------
+            copy_attempts : list of (str, bool)
+                Each entry of the list provides the path to the copied file,
+                and a bool indicating wheter the remote md5sum matched.
         """
+        output = []
         with self.srfm.Session.begin() as session:
             files = self.srfm.get_copyable_files(
                 self.archive_name, max_copy_attempts=max_copy_attempts,
@@ -320,7 +351,7 @@ class SupRsyncFileHandler:
             )
 
             if not files:
-                return
+                return []
 
             if self.ssh_host is not None:
                 dest = self.ssh_host + ':' + self.remote_basedir
@@ -330,34 +361,47 @@ class SupRsyncFileHandler:
             # Creates temp directory with remote dir structure of symlinks for
             # rsync to copy.
             file_map = {}
+            remote_paths = []
             with tempfile.TemporaryDirectory() as tmp_dir:
                 self.log.info("Copying files:")
                 for file in files:
                     self.log.info(f"- {file.local_path}")
                     tmp_path = os.path.join(tmp_dir, file.remote_path)
                     os.makedirs(os.path.dirname(tmp_path), exist_ok=True)
+
+                    if not os.path.exists(file.local_path):
+                        self.log.warn("Cannot find file {path}", path=file.local_path)
+                        file.failed_copy_attempts += 1
+                        continue
+
+                    if os.path.exists(tmp_path):
+                        self.log.warn("Temp file {path} already exists!", path=tmp_path)
+                        file.failed_copy_attempts += 1
+                        continue
+
                     os.symlink(file.local_path, tmp_path)
 
                     remote_path = os.path.normpath(
                         os.path.join(self.remote_basedir, file.remote_path)
                     )
+                    remote_paths.append(remote_path)
                     file_map[remote_path] = file
 
                 cmd = ['rsync', '-Lrt']
+                if self.compression:
+                    cmd.append('-z')
+                if self.bwlimit:
+                    cmd.append(f'--bwlimit={self.bwlimit}')
                 if self.ssh_key is not None:
                     cmd.extend(['--rsh', f'ssh -i {self.ssh_key}'])
-                cmd.extend([tmp_dir+'/', dest])
+                cmd.extend([tmp_dir + '/', dest])
 
                 subprocess.run(cmd, check=True, timeout=self.copy_timeout)
 
             for file in files:
                 file.copied = time.time()
 
-            remote_paths = [
-                os.path.join(self.remote_basedir, f.remote_path)
-                for f in files
-            ]
-
+            self.log.info("Checksumming on remote.")
             res = self.run_on_remote(['md5sum'] + remote_paths)
             for line in res.stdout.decode().split('\n'):
                 split = line.split()
@@ -368,7 +412,25 @@ class SupRsyncFileHandler:
                     continue
 
                 md5sum, path = line.split()
-                file_map[os.path.normpath(path)].remote_md5sum = md5sum
+                key = os.path.normpath(path)
+                if key in file_map:
+                    file_map[key].remote_md5sum = md5sum
+
+            for file in files:
+                md5_ok = (file.remote_md5sum == file.local_md5sum)
+                output.append((file.local_path, md5_ok))
+                if not md5_ok:
+                    file.failed_copy_attempts += 1
+                    self.log.info(
+                        f"Copy failed for file {file.local_path}! "
+                        f"(copy attempts: {file.failed_copy_attempts})"
+                    )
+                    self.log.info(f"Local md5: {file.local_md5sum}, "
+                                  f"remote_md5: {file.remote_md5sum}")
+
+            self.log.info("Copy session complete.")
+
+        return output
 
     def delete_files(self, delete_after):
         """

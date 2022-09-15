@@ -325,7 +325,7 @@ def test_ls372_set_heater_range_identical_range(agent):
     agent.init_lakeshore(session, None)
 
     # Mock the heater interface
-    #agent.module.sample_heater.get_heater_range = mock.Mock(return_value="Off")
+    # agent.module.sample_heater.get_heater_range = mock.Mock(return_value="Off")
     agent.module.sample_heater.set_heater_range = mock.Mock()
 
     params = {'range': 'Off', 'heater': 'sample', 'wait': 0}
@@ -525,9 +525,9 @@ def test_ls372_set_autoscan_off(agent):
 
 
 # servo_to_temperature
-## this task should really get reworked, mostly into a client
+# this task should really get reworked, mostly into a client
 # check_temperature_stability
-## this task should become a client function really
+# this task should become a client function really
 
 
 # set_output_mode

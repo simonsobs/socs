@@ -3,7 +3,7 @@
 # ASN.1 source file://./MBG-SNMP-LTNG-MIB.mib
 # Produced by pysmi-0.3.4 at Fri May  1 22:39:55 2020
 # On host grumpy platform Linux version 4.15.0-88-generic by user bjk49
-# Using Python version 3.6.9 (default, Apr 18 2020, 01:56:04) 
+# Using Python version 3.6.9 (default, Apr 18 2020, 01:56:04)
 #
 OctetString, Integer, ObjectIdentifier = mibBuilder.importSymbols("ASN1", "OctetString", "Integer", "ObjectIdentifier")
 NamedValues, = mibBuilder.importSymbols("ASN1-ENUMERATION", "NamedValues")

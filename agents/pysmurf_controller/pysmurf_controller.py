@@ -48,6 +48,7 @@ class PysmurfScriptProtocol(protocol.ProcessProtocol):
     end_status : twisted.python.failure.Failure
         Reason that the process ended.
     """
+
     def __init__(self, path, log=None):
         self.path = path
         self.log = log
@@ -100,6 +101,7 @@ class PysmurfController:
         slot (int):
             ATCA Slot of the smurf-card this agent is commanding.
     """
+
     def __init__(self, agent, args):
         self.agent: ocs_agent.OCSAgent = agent
         self.log = agent.log
@@ -145,7 +147,6 @@ class PysmurfController:
             S.load_tune(cfg.dev.exp['tunefile'])
         S._ocs_session = session
         return S, cfg
-
 
     @inlineCallbacks
     def _run_script(self, script, args, log, session):
@@ -269,7 +270,7 @@ class PysmurfController:
         **Process** - Continuously checks the current state of the smurf. This
         will not modify the smurf state, so this task can be run in conjunction
         with other smurf operations. This will continuously poll smurf metadata
-        and update the ``session.data`` object. 
+        and update the ``session.data`` object.
 
         Args
         -----
@@ -301,15 +302,15 @@ class PysmurfController:
         while session.status in ['starting', 'running']:
             try:
                 d = dict(
-                    channel_mask = S.get_channel_mask(**kw).tolist(),
-                    downsample_factor = S.get_downsample_factor(**kw),
-                    agg_time = reg.agg_time.get(**kw),
-                    open_g3stream = reg.open_g3stream.get(**kw),
-                    pysmurf_action = reg.pysmurf_action.get(**kw, as_string=True),
-                    pysmurf_action_timestamp = reg.pysmurf_action_timestamp.get(**kw),
-                    stream_tag = reg.stream_tag.get(**kw, as_string=True),
-                    last_update = time.time(),
-                    stream_id = cfg.stream_id,
+                    channel_mask=S.get_channel_mask(**kw).tolist(),
+                    downsample_factor=S.get_downsample_factor(**kw),
+                    agg_time=reg.agg_time.get(**kw),
+                    open_g3stream=reg.open_g3stream.get(**kw),
+                    pysmurf_action=reg.pysmurf_action.get(**kw, as_string=True),
+                    pysmurf_action_timestamp=reg.pysmurf_action_timestamp.get(**kw),
+                    stream_tag=reg.stream_tag.get(**kw, as_string=True),
+                    last_update=time.time(),
+                    stream_id=cfg.stream_id,
                 )
                 session.data.update(d)
             except RuntimeError:
@@ -530,7 +531,7 @@ class PysmurfController:
 
         **Task** - Takes a short timestream and calculates noise statistics.
         Median white noise level for each band will be stored in the session
-        data. See the `sodetlib noise docs 
+        data. See the `sodetlib noise docs
         <https://simons1.princeton.edu/docs/sodetlib/noise.html>`_ for more
         information on the noise function and possible keyword arguments.
 
@@ -728,7 +729,7 @@ class PysmurfController:
         rfrac : float, tuple
             Target rfrac range to aim for. If this is a float, bias voltages
             will be chosen to get the median rfrac of each bias group as close
-            as possible to that value. If 
+            as possible to that value. If
         kwargs : dict
             Additional kwargs to pass to the ``bias_dets`` function.
 
@@ -738,7 +739,7 @@ class PysmurfController:
 
             >> response.session['data']
             {
-                'biases': List of voltage bias values for each bias-group 
+                'biases': List of voltage bias values for each bias-group
             }
         """
         if params['kwargs'] is None:
@@ -780,6 +781,7 @@ def make_parser(parser=None):
     pgroup.add_argument('--poll-interval', type=float,
                         help="Time between check-state polls")
     return parser
+
 
 if __name__ == '__main__':
     parser = make_parser()
