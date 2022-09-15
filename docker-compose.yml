@@ -1,7 +1,7 @@
 version: '3.2'
 services:
   # --------------------------------------------------------------------------
-  # The socs library.
+  # SOCS Base Image
   # --------------------------------------------------------------------------
   socs:
     image: "socs"
@@ -10,26 +10,16 @@ services:
   # --------------------------------------------------------------------------
   # SOCS Agents
   # --------------------------------------------------------------------------
-
-  # --------------------------------------------------------------------------
-  # The Pysmurf Controller Agent
-  # --------------------------------------------------------------------------
   ocs-pysmurf-agent:
     image: "ocs-pysmurf-agent"
     build: ./docker/pysmurf_controller/
 
-  # --------------------------------------------------------------------------
-  # The Pysmurf Monitor Agent
-  # --------------------------------------------------------------------------
-  ocs-pysmurf-monitor-agent:
-    image: "ocs-pysmurf-monitor-agent"
-    build: ./agents/pysmurf_monitor/
+  ocs-wgactuator-agent:
+    image: "ocs-wgactuator-agent"
+    build: ./docker/wiregrid_actuator/
     depends_on:
       - "socs"
 
-  # --------------------------------------------------------------------------
-  # CHWP picoscope agent
-  # --------------------------------------------------------------------------
   # Only works with --privileged, will insist users build image themselves
   # ocs-hwp-picoscope-agent:
   #   image: "ocs-hwp-picoscope-agent"
@@ -38,20 +28,7 @@ services:
   #     - "socs"
 
   # --------------------------------------------------------------------------
-  # Wiregrid actuator agent
-  # --------------------------------------------------------------------------
-  ocs-wgactuator-agent:
-    image: "ocs-wgactuator-agent"
-    build: ./docker/wiregrid_actuator/
-    depends_on:
-      - "socs"
-
-  # --------------------------------------------------------------------------
   # SOCS Simulators
-  # --------------------------------------------------------------------------
-
-  # --------------------------------------------------------------------------
-  # Lakeshore240 Simulator
   # --------------------------------------------------------------------------
   ocs-lakeshore240-simulator:
     image: "ocs-lakeshore240-simulator"
