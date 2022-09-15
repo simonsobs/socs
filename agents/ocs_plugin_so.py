@@ -9,7 +9,6 @@ import os
 root = os.path.abspath(os.path.split(__file__)[0])
 
 for n, f in [
-        ('PysmurfController', 'pysmurf_controller/pysmurf_controller.py'),
         ('FPGAAgent', 'holo_fpga/roach_agent.py'),
         ('SynthAgent', 'holo_synth/synth_agent.py'),
 ]:

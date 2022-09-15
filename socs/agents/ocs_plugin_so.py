@@ -28,6 +28,7 @@ for n, f in [
         ('MeinbergM1000Agent', 'meinberg_m1000/agent.py'),
         ('PfeifferAgent', 'pfeiffer_tpg366/agent.py'),
         ('PfeifferTC400Agent', 'pfeiffer_tc400/agent.py'),
+        ('PysmurfController', 'pysmurf_controller/agent.py'),
         ('PysmurfMonitor', 'pysmurf_monitor/agent.py'),
         ('RotationAgent', 'hwp_rotation/agent.py'),
         ('ScpiPsuAgent', 'scpi_psu/agent.py'),

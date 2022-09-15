@@ -10,9 +10,9 @@ The Pysmurf Controller OCS agent provides an interface to run pysmurf and
 sodetlib control scripts on the smurf-server through an OCS client.
 
 .. argparse::
-    :filename: ../agents/pysmurf_controller/pysmurf_controller.py
+    :filename: ../socs/agents/pysmurf_controller/agent.py
     :func: make_parser
-    :prog: python3 pysmurf_controller.py
+    :prog: python3 agent.py
 
 Configuration File Examples
 -----------------------------------
@@ -187,11 +187,11 @@ This prints the dictionary::
 
 Agent API
 ---------------
-.. autoclass:: agents.pysmurf_controller.pysmurf_controller.PysmurfController
+.. autoclass:: socs.agents.pysmurf_controller.agent.PysmurfController
     :members:
 
 Supporting APIs
 ---------------
 
-.. autoclass:: agents.pysmurf_controller.pysmurf_controller.PysmurfScriptProtocol
+.. autoclass:: socs.agents.pysmurf_controller.agent.PysmurfScriptProtocol
     :members:

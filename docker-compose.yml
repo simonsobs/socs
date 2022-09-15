@@ -16,7 +16,7 @@ services:
   # --------------------------------------------------------------------------
   ocs-pysmurf-agent:
     image: "ocs-pysmurf-agent"
-    build: ./agents/pysmurf_controller/
+    build: ./docker/pysmurf_controller/
 
   # --------------------------------------------------------------------------
   # The Pysmurf Monitor Agent

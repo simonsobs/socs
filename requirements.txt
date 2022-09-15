@@ -35,6 +35,11 @@ soaculib @ git+https://github.com/simonsobs/soaculib.git@master
 # magpie agent
 pandas
 
+# pysmurf controller
+matplotlib
+numpy
+sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master
+
 # Docs
 # see docs/requirements.txt
 
