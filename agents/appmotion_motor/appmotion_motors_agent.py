@@ -78,8 +78,8 @@ class appMotionMotorsAgent:
                                  agg_params=agg_params,
                                  buffer_time=0)
 
-    def init_motors_task(self, session, params=None):
-        """init_motors_task()
+    def init_motors(self, session, params=None):
+        """init_motors()
 
         **Task** - Connect to the motors, either one or both.
 
@@ -129,6 +129,8 @@ class appMotionMotorsAgent:
                 if in counts (default False)
             lin_stage (bool): True if the specified motor is for the linear
                 stage, False if not (default True)
+            verbose (bool): Prints output from motor requests if True.
+                (default True)
 
         .. note::
             If moving multiple axes, function will assume ``lin_stage`` value
@@ -136,8 +138,8 @@ class appMotionMotorsAgent:
 
         """
 
-        self.move_status = self.is_moving(session, params)[1][1]
         with self.lock.acquire_timeout(1, job=f'move_axis_to_position_motor{params["motor"]}') as acquired:
+            self.move_status = self.is_moving(session, params)[1][1]
             if self.move_status:
                 return False, "Motors are already moving."
             if not acquired:
@@ -153,6 +155,7 @@ class appMotionMotorsAgent:
                 self.move_status = self.motor1.is_moving(params['verbose'])
                 while self.move_status:
                     self.move_status = self.motor1.is_moving(params['verbose'])
+                    time.sleep(1)
                 self.motor2.move_axis_to_position(params['pos'], params['pos_is_inches'], params['lin_stage'])
             else:
                 print("Motor ID invalid argument")
@@ -187,8 +190,8 @@ class appMotionMotorsAgent:
 
         """
 
-        self.move_status = self.is_moving(session, params)[1][1]
         with self.lock.acquire_timeout(1, job=f"move_axis_by_length_motor{params['motor']}") as acquired:
+            self.move_status = self.is_moving(session, params)[1][1]
             if self.move_status:
                 return False, "Motors are already moving."
             if not acquired:
@@ -204,6 +207,7 @@ class appMotionMotorsAgent:
                 self.move_status = self.motor1.is_moving(params['verbose'])
                 while self.move_status:
                     self.move_status = self.motor1.is_moving(params['verbose'])
+                    time.sleep(1)
                 self.motor2.move_axis_by_length(params['pos'], params['pos_is_inches'], params['lin_stage'])
             else:
                 print("Motor ID invalid argument")
@@ -223,10 +227,12 @@ class appMotionMotorsAgent:
                 motors.(default 3)
             velocity (float): Sets velocity of motor in revolutions per second
                 within range [0.25,50]. (default 12.0)
+            verbose (bool): Prints output from motor requests if True.
+                (default True)
         """
 
-        self.move_status = self.is_moving(session, params)[1][1]
         with self.lock.acquire_timeout(timeout=1, job=f'set_velocity{params["motor"]}') as acquired:
+            self.move_status = self.is_moving(session, params)[1][1]
             if self.move_status:
                 return False, "Motors are already moving."
             if not acquired:
@@ -242,6 +248,7 @@ class appMotionMotorsAgent:
                 self.move_status = self.motor1.is_moving(params['verbose'])
                 while self.move_status:
                     self.move_status = self.motor1.is_moving(params['verbose'])
+                    time.sleep(1)
                 self.motor2.set_velocity(params['velocity'])
             else:
                 print("Motor ID invalid argument")
@@ -261,10 +268,12 @@ class appMotionMotorsAgent:
                 motors. (default 3)
             accel (int): Sets acceleration in revolutions per second per second
                 within range [1,3000]. (default 1)
+            verbose (bool): Prints output from motor requests if True.
+                (default True)
         """
 
-        self.move_status = self.is_moving(session, params)[1][1]
         with self.lock.acquire_timeout(timeout=1, job=f'set_acceleration_motor{params["motor"]}') as acquired:
+            self.move_status = self.is_moving(session, params)[1][1]
             if self.move_status:
                 return False, "Motors are already moving."
             if not acquired:
@@ -279,6 +288,7 @@ class appMotionMotorsAgent:
                 self.motor1.set_acceleration(params['accel'])
                 self.move_status = self.motor1.is_moving(params['verbose'])
                 while self.move_status:
+                    time.sleep(1)
                     self.move_status = self.motor1.is_moving(params['verbose'])
                 self.motor2.set_acceleration(params['accel'])
             else:
@@ -298,6 +308,7 @@ class appMotionMotorsAgent:
         """
 
         with self.lock.acquire_timeout(1, job=f"start_jogging_motor{params['motor']}") as acquired:
+            self.move_status = self.is_moving(session, params)[1][1]
             if not acquired:
                 self.log.warn(
                     f'Could not start_jogging because lock held by {self.lock.job}')
@@ -352,10 +363,12 @@ class appMotionMotorsAgent:
         Parameters:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 1)
+            verbose (bool): Prints output from motor requests if True.
+                (default True)
         """
 
-        self.move_status = self.is_moving(session, params)[1][1]
         with self.lock.acquire_timeout(timeout=1, job=f'seek_home_linear_stage_motor{params["motor"]}') as acquired:
+            self.move_status = self.is_moving(session, params)[1][1]
             if self.move_status:
                 return False, "Motors are already moving."
             if not acquired:
@@ -370,6 +383,7 @@ class appMotionMotorsAgent:
                 self.motor1.seek_home_linear_stage()
                 self.move_status = self.motor1.is_moving(params['verbose'])
                 while self.move_status:
+                    time.sleep(1)
                     self.move_status = self.motor1.is_moving(params['verbose'])
                 self.motor2.seek_home_linear_stage()
             else:
@@ -388,10 +402,12 @@ class appMotionMotorsAgent:
         Parameters:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 1)
+            verbose (bool): Prints output from motor requests if True.
+                (default True)
         """
 
-        self.move_status = self.is_moving(session, params)[1][1]
         with self.lock.acquire_timeout(1, job=f"set_zero_motor{params['motor']}") as acquired:
+            self.move_status = self.is_moving(session, params)[1][1]
             if self.move_status:
                 return False, "Motors are already moving."
             if not acquired:
@@ -406,6 +422,7 @@ class appMotionMotorsAgent:
                 self.motor1.set_zero()
                 self.move_status = self.motor1.is_moving(params['verbose'])
                 while self.move_status:
+                    time.sleep(1)
                     self.move_status = self.motor1.is_moving(params['verbose'])
                 self.motor2.set_zero()
             else:
@@ -431,10 +448,12 @@ class appMotionMotorsAgent:
                 is x-data, second column is y-data.
             pos_is_inches (bool): True if pos was specified in inches, False if
                 in counts (default False)
+            verbose (bool): Prints output from motor requests if True.
+                (default True)
         """
 
-        self.move_status = self.is_moving(session, params)[1][1]
         with self.lock.acquire_timeout(1, job=f"run_positions_motor{params['motor']}") as acquired:
+            self.move_status = self.is_moving(session, params)[1][1]
             if self.move_status:
                 return False, "Motors are already moving."
             if not acquired:
@@ -454,6 +473,7 @@ class appMotionMotorsAgent:
                 self.motor1.run_positions(params['pos_data[0]'], params['pos_is_inches'])
                 self.move_status = self.motor1.is_moving(params['verbose'])
                 while self.move_status:
+                    time.sleep(1)
                     self.move_status = self.motor1.is_moving(params['verbose'])
                 self.motor2.run_positions(params['pos_data[1]'], params['pos_is_inches'])
             else:
@@ -659,10 +679,12 @@ class appMotionMotorsAgent:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 1)
             value (float): Sets encoder value. (default 0)
+            verbose (bool): Prints output from motor requests if True.
+                (default True)
         """
 
-        self.move_status = self.is_moving(session, params)[1][1]
         with self.lock.acquire_timeout(1, job=f"set_encoder_value_motor{params['motor']}") as acquired:
+            self.move_status = self.is_moving(session, params)[1][1]
             if self.move_status:
                 return False, "Motors are already moving."
             if not acquired:
@@ -677,6 +699,7 @@ class appMotionMotorsAgent:
                 e_positions = self.motor1.set_encoder_value(params['value'])
                 self.move_status = self.motor1.is_moving(params['verbose'])
                 while self.move_status:
+                    time.sleep(1)
                     self.move_status = self.motor1.is_moving(params['verbose'])
                 e_positions = self.motor2.set_encoder_value(params['value'])
             else:
@@ -765,8 +788,8 @@ class appMotionMotorsAgent:
 
     @ocs_agent.param('motor', default=1, type=int)
     @ocs_agent.param('pos_is_inches', default=True, type=bool)
-    def pos_while_moving(self, session, params):
-        """pos_while_moving(motor=1, inches=True)
+    def get_immediate_position(self, session, params):
+        """get_immediate_position(motor=1, inches=True)
 
         **Task** - Get the position of the motor while it is currently in
         motion. An estimate based on the calculated trajectory of the movement,
@@ -782,10 +805,10 @@ class appMotionMotorsAgent:
             positions (list): The positions of the specified motors.
         """
 
-        with self.lock.acquire_timeout(1, job=f"pos_while_moving_motor{params['motor']}") as acquired:
+        with self.lock.acquire_timeout(1, job=f"get_immediate_position_motor{params['motor']}") as acquired:
             if not acquired:
                 self.log.warn(
-                    f'Could not pos_while_moving because lock held by {self.lock.job}')
+                    f'Could not get_immediate_position because lock held by {self.lock.job}')
                 return False, "Could not acquire lock"
             if params['motor'] == 1:
                 i_positions = self.motor1.get_immediate_position(params['pos_is_inches'])
@@ -902,10 +925,12 @@ class appMotionMotorsAgent:
         Parameters:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 1)
+            verbose (bool): Prints output from motor requests if True.
+                (default True)
         """
 
-        self.move_status = self.is_moving(session, params)[1][1]
         with self.lock.acquire_timeout(30, job=f"home_with_limits_motor{params['motor']}") as acquired:
+            self.move_status = self.is_moving(session, params)[1][1]
             if not acquired:
                 self.log.warn(
                     f"Could not move motor{params['motor']} to home because lock held by {self.lock.job}")
@@ -918,6 +943,7 @@ class appMotionMotorsAgent:
                 self.motor1.home_with_limits()
                 self.move_status = self.motor1.is_moving(params['verbose'])
                 while self.move_status:
+                    time.sleep(1)
                     self.move_status = self.motor1.is_moving(params['verbose'])
                 self.motor2.home_with_limits()
             else:
@@ -928,7 +954,7 @@ class appMotionMotorsAgent:
     @ocs_agent.param('motor', default=3, type=int)
     @ocs_agent.param('verbose', default=True, type=bool)
     @ocs_agent.param('f_sample', default=2, type=float)
-    def start_acq(self, session, params):
+    def acq(self, session, params):
         """start_acq(motor=3, verbose=False, f_sample=2)
 
         **Process** - Start acquisition of data.
@@ -951,7 +977,7 @@ class appMotionMotorsAgent:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
                     motors. (default 3)
             verbose (bool): Prints output from motor requests if True.
-                (default False)
+                (default True)
             f_sample (float): Sampling rate in Hz. (default 2)
         """
         if params is None:
@@ -1005,8 +1031,8 @@ class appMotionMotorsAgent:
                             data['data'][f'motor{params["motor"]}_move_status'] = self.move_status
 
                         except Exception as e:
-                            self.log.debug(f'error: {e}')
-                            self.log.debug(
+                            self.log.error(f'error: {e}')
+                            self.log.error(
                                 f"could not get position/move status of motor{params['motor']}")
                             data['data'][f'motor{params["motor"]}_encoder'] = 0
                             data['data'][f'motor{params["motor"]}_stepper'] = 0.0
@@ -1017,7 +1043,7 @@ class appMotionMotorsAgent:
 
         return True, 'Acquisition exited cleanly.'
 
-    def stop_acq(self, session, params):
+    def _stop_acq(self, session, params):
         """stop_acq(params)
 
         **Task** - Stop data acquisition.
@@ -1101,31 +1127,31 @@ if __name__ == '__main__':
         args.mode,
         args.samp)
 
-    agent.register_task('init_motors', m.init_motors_task)
-    agent.register_task('move_to_position', m.move_axis_to_position)
-    agent.register_task('move_by_length', m.move_axis_by_length)
+    agent.register_task('init_motors', m.init_motors)
+    agent.register_task('move_axis_to_position', m.move_axis_to_position)
+    agent.register_task('move_axis_by_length', m.move_axis_by_length)
     agent.register_task('set_velocity', m.set_velocity)
-    agent.register_task('set_accel', m.set_acceleration)
-    agent.register_task('start_jog', m.start_jogging)
-    agent.register_task('stop_jog', m.stop_jogging)
-    agent.register_task('seek_home', m.seek_home_linear_stage)
+    agent.register_task('set_acceleration', m.set_acceleration)
+    agent.register_task('start_jogging', m.start_jogging)
+    agent.register_task('stop_jogging', m.stop_jogging)
+    agent.register_task('seek_home_linear_stage', m.seek_home_linear_stage)
     agent.register_task('set_zero', m.set_zero)
     agent.register_task('run_positions', m.run_positions)
     agent.register_task('start_rotation', m.start_rotation)
     agent.register_task('stop_rotation', m.stop_rotation)
-    agent.register_task('close_connect', m.close_connection)
+    agent.register_task('close_connecttion', m.close_connection)
     agent.register_task('reconnect_motor', m.reconnect_motor)
     agent.register_task('block_while_moving', m.block_while_moving)
-    agent.register_task('kill_all', m.kill_all_commands)
-    agent.register_task('set_encoder', m.set_encoder_value)
-    agent.register_task('get_encoder', m.get_encoder_value)
-    agent.register_task('get_position', m.get_positions)
+    agent.register_task('kill_all_commands', m.kill_all_commands)
+    agent.register_task('set_encoder_value', m.set_encoder_value)
+    agent.register_task('get_encoder_value', m.get_encoder_value)
+    agent.register_task('get_positions', m.get_positions)
     agent.register_task('is_moving', m.is_moving)
-    agent.register_task('get_imm_position', m.pos_while_moving)
+    agent.register_task('get_immediate_position', m.get_immediate_position)
     agent.register_task('move_off_limit', m.move_off_limit)
-    agent.register_task('reset_alarm', m.reset_alarms)
+    agent.register_task('reset_alarms', m.reset_alarms)
     agent.register_task('home_with_limits', m.home_with_limits)
 
-    agent.register_process('acq', m.start_acq, m.stop_acq)
+    agent.register_process('acq', m.acq, m._stop_acq)
 
     runner.run(agent, auto_reconnect=True)
