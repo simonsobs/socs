@@ -108,15 +108,15 @@ class appMotionMotorsAgent:
             self.agent.start('acq')
         return True, 'Motor(s) Initialized.'
 
-    @ocs_agent.param('motor', default=1, choices=[1,2,3], type=int)
+    @ocs_agent.param('motor', default=1, choices=[1, 2, 3], type=int)
     @ocs_agent.param('verbose', default=True, type=bool)
     def movement_check(self, params):
         """movement_check(motor=1, verbose)
-        
-        **Helper Function** - Checks if motors are moving OR 
+
+        **Helper Function** - Checks if motors are moving OR
         if limit switches are tripped.
         Used within tasks to check movement status.
-        
+
         Parameters:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 1)
@@ -132,10 +132,10 @@ class appMotionMotorsAgent:
             status = self.motor2.is_moving(params['verbose'])
         else:
             status = self.motor1.is_moving(params['verbose']) or self.motor2.is_moving(params['verbose'])
-        
+
         return status
-    
-    @ocs_agent.param('motor', default=1, choices=[1,2,3], type=int)
+
+    @ocs_agent.param('motor', default=1, choices=[1, 2, 3], type=int)
     @ocs_agent.param('verbose', default=True, type=bool)
     def is_moving(self, session, params):
         """is_moving(motor=1, verbose=True)
@@ -155,15 +155,14 @@ class appMotionMotorsAgent:
                     f"Could not check because lock held by {self.lock.job}")
                 return False
             self.move_status = movement_check(params)
-            
+
         if self.move_status:
             return True, ("Motors are moving.", self.move_status)
         else:
             return True, ("Motors are not moving.", self.move_status)
 
-    
     @ocs_agent.param('lin_stage', default=True, type=bool)
-    @ocs_agent.param('motor', default=1, choices=[1,2,3], type=int)
+    @ocs_agent.param('motor', default=1, choices=[1, 2, 3], type=int)
     @ocs_agent.param('pos_is_inches', default=False, type=bool)
     @ocs_agent.param('pos', default=0, type=float)
     @ocs_agent.param('verbose', default=True, type=bool)
@@ -217,7 +216,7 @@ class appMotionMotorsAgent:
         return True, "Moved motor {} to {}".format(params['motor'], params['pos'])
 
     @ocs_agent.param('lin_stage', default=True, type=bool)
-    @ocs_agent.param('motor', default=1, choices=[1,2,3], type=int)
+    @ocs_agent.param('motor', default=1, choices=[1, 2, 3], type=int)
     @ocs_agent.param('pos_is_inches', default=False, type=bool)
     @ocs_agent.param('pos', default=0, type=float)
     @ocs_agent.param('verbose', default=True, type=bool)
@@ -267,7 +266,7 @@ class appMotionMotorsAgent:
 
         return True, "Moved motor {} by {}".format(params['motor'], params['pos'])
 
-    @ocs_agent.param('motor', default=3, choices=[1,2,3], type=int)
+    @ocs_agent.param('motor', default=3, choices=[1, 2, 3], type=int)
     @ocs_agent.param('velocity', default=12.0, type=float, check=lambda x: 0.25 <= x <= 50)
     @ocs_agent.param('verbose', default=True, type=bool)
     def set_velocity(self, session, params):
@@ -302,7 +301,7 @@ class appMotionMotorsAgent:
 
         return True, "Set velocity of motor {} to {}".format(params['motor'], params['velocity'])
 
-    @ocs_agent.param('motor', default=3, choices=[1,2,3], type=int)
+    @ocs_agent.param('motor', default=3, choices=[1, 2, 3], type=int)
     @ocs_agent.param('accel', default=1, type=int, check=lambda x: 1 <= x <= 3000)
     @ocs_agent.param('verbose', default=True, type=bool)
     def set_acceleration(self, session, params):
@@ -334,10 +333,10 @@ class appMotionMotorsAgent:
             else:
                 self.motor1.set_acceleration(params['accel'])
                 self.motor2.set_acceleration(params['accel'])
-            
+
         return True, "Set acceleration of motor {} to {}".format(params['motor'], params['accel'])
 
-    @ocs_agent.param('motor', default=1, choices=[1,2,3], type=int)
+    @ocs_agent.param('motor', default=1, choices=[1, 2, 3], type=int)
     def start_jogging(self, session, params):
         """start_jogging(motor=1)
 
@@ -360,10 +359,10 @@ class appMotionMotorsAgent:
             else:
                 self.motor1.start_jogging()
                 self.motor2.start_jogging()
-            
+
         return True, "Started jogging motor {}".format(params['motor'])
 
-    @ocs_agent.param('motor', default=1, choices=[1,2,3], type=int)
+    @ocs_agent.param('motor', default=1, choices=[1, 2, 3], type=int)
     def stop_jogging(self, session, params):
         """stop_jogging(motor=1)
         **Task** - Stops the jogging of motor(s) set by params.
@@ -388,7 +387,7 @@ class appMotionMotorsAgent:
 
         return True, "Stopped jogging motor {}".format(params['motor'])
 
-    @ocs_agent.param('motor', default=1, choices=[1,2,3], type=int)
+    @ocs_agent.param('motor', default=1, choices=[1, 2, 3], type=int)
     @ocs_agent.param('verbose', default=True, type=bool)
     def seek_home_linear_stage(self, session, params):
         """seek_home_linear_stage(motor=1)
@@ -426,7 +425,7 @@ class appMotionMotorsAgent:
 
         return True, "Moving motor {} to home".format(params['motor'])
 
-    @ocs_agent.param('motor', default=1, choices=[1,2,3], type=int)
+    @ocs_agent.param('motor', default=1, choices=[1, 2, 3], type=int)
     @ocs_agent.param('verbose', default=True, type=bool)
     def set_zero(self, session, params):
         """set_zero(motor=1)
@@ -459,7 +458,7 @@ class appMotionMotorsAgent:
 
         return True, "Zeroing motor {} position".format(params['motor'])
 
-    @ocs_agent.param('motor', default=1, choices=[1,2,3], type=int)
+    @ocs_agent.param('motor', default=1, choices=[1, 2, 3], type=int)
     @ocs_agent.param('pos_is_inches', default=True, type=bool)
     @ocs_agent.param('pos_data', type=list)
     @ocs_agent.param('verbose', default=True, type=bool)
@@ -467,16 +466,16 @@ class appMotionMotorsAgent:
         """run_positions(pos_data=None, motor=1, pos_is_inches=False)
 
         **Task** - Takes (up to) two elements in a list, and runs each motor
-        to their respective position. 
-        If motor==3, Motor1 moves to the first element, 
+        to their respective position.
+        If motor==3, Motor1 moves to the first element,
         motor2 to the second element in the list. Can be different positions,
         thus differentiating this task from other movement tasks.
-        
+
         Parameters:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 1)
             pos_data (list): Up to 2 element list of positions
-                for motors to go to. 
+                for motors to go to.
             pos_is_inches (bool): True if pos was specified in inches, False if
                 in counts (default False)
             verbose (bool): Prints output from motor requests if True.
@@ -511,7 +510,7 @@ class appMotionMotorsAgent:
 
         return True, "Moving stage to {}".format(params['pos_data'])
 
-    @ocs_agent.param('motor', default=1, choices=[1,2,3], type=int)
+    @ocs_agent.param('motor', default=1, choices=[1, 2, 3], type=int)
     @ocs_agent.param('velocity', default=12.0, type=float, check=lambda x: 0.25 <= x <= 50)
     @ocs_agent.param('rot_accel', default=1.0, type=float, check=lambda x: 1.0 <= x <= 3000)
     def start_rotation(self, session, params):
@@ -544,7 +543,7 @@ class appMotionMotorsAgent:
         return True, "Started rotating motor at velocity {} and acceleration {}".format(
             'velocity', 'rot_accel')
 
-    @ocs_agent.param('motor', default=1, choices=[1,2,3], type=int)
+    @ocs_agent.param('motor', default=1, choices=[1, 2, 3], type=int)
     def stop_rotation(self, session, params):
         """stop_rotation(motor=1)
 
@@ -570,7 +569,7 @@ class appMotionMotorsAgent:
 
         return True, "Stopped rotating motor"
 
-    @ocs_agent.param('motor', default=3, choices=[1,2,3], type=int)
+    @ocs_agent.param('motor', default=3, choices=[1, 2, 3], type=int)
     def close_connection(self, session, params):
         """close_connection(motor=3)
 
@@ -596,7 +595,7 @@ class appMotionMotorsAgent:
 
         return True, "Closed connection to motor {}".format(params['motor'])
 
-    @ocs_agent.param('motor', default=1, choices=[1,2,3], type=int)
+    @ocs_agent.param('motor', default=1, choices=[1, 2, 3], type=int)
     def reconnect_motor(self, session, params):
         """reconnect_motor(motor=1)
 
@@ -621,8 +620,8 @@ class appMotionMotorsAgent:
                 self.motor2.reconnect_motor()
 
         return True, "Motor{} reconnection task completed".format(params['motor'])
-        
-    @ocs_agent.param('motor', default=1, choices=[1,2,3], type=int)
+
+    @ocs_agent.param('motor', default=1, choices=[1, 2, 3], type=int)
     @ocs_agent.param('update_period', default=.1, type=float)
     @ocs_agent.param('verbose', default=False, type=bool)
     def block_while_moving(self, session, params):
@@ -657,7 +656,7 @@ class appMotionMotorsAgent:
 
         return True, "Motor {} stopped moving".format(params['motor'])
 
-    @ocs_agent.param('motor', default=3, choices=[1,2,3] type=int)
+    @ocs_agent.param('motor', default=3, choices=[1, 2, 3] type=int)
     def kill_all_commands(self, session, params):
         """kill_all_commands(motor=3)
 
@@ -683,7 +682,7 @@ class appMotionMotorsAgent:
 
         return True, "Killing all active commands on motor {}".format(params['motor'])
 
-    @ocs_agent.param('motor', default=1, choices=[1,2,3], type=int)
+    @ocs_agent.param('motor', default=1, choices=[1, 2, 3], type=int)
     @ocs_agent.param('value', default=0, type=float)
     @ocs_agent.param('verbose', default=True, type=bool)
     def set_encoder_value(self, session, params):
@@ -743,7 +742,7 @@ class appMotionMotorsAgent:
         return True, "Current encoder positions: {}".format(
             e_positions)
 
-    @ocs_agent.param('motor', default=1, choices=[1,2,3], type=int)
+    @ocs_agent.param('motor', default=1, choices=[1, 2, 3], type=int)
     @ocs_agent.param('pos_is_inches', default=True, type=bool)
     def get_positions(self, session, params):
         """get_positions(motor=1, inches=True)
@@ -784,7 +783,7 @@ class appMotionMotorsAgent:
 
         return True, "Current motor positions: {}".format(positions)
 
-    @ocs_agent.param('motor', default=1, choices=[1,2,3], type=int)
+    @ocs_agent.param('motor', default=1, choices=[1, 2, 3], type=int)
     @ocs_agent.param('pos_is_inches', default=True, type=bool)
     def get_immediate_position(self, session, params):
         """get_immediate_position(motor=1, inches=True)
@@ -817,7 +816,7 @@ class appMotionMotorsAgent:
 
         return True, "Current motor positions: {}".format(i_positions)
 
-    @ocs_agent.param('motor', default=3, choices=[1,2,3], type=int)
+    @ocs_agent.param('motor', default=3, choices=[1, 2, 3], type=int)
     def move_off_limit(self, session, params):
         """move_off_limit(motor=3)
 
@@ -844,7 +843,7 @@ class appMotionMotorsAgent:
 
         return True, "Motor {} moved off limit switch".format(params['motor'])
 
-    @ocs_agent.param('motor', default=1, choices=[1,2,3], type=int)
+    @ocs_agent.param('motor', default=1, choices=[1, 2, 3], type=int)
     def reset_alarms(self, session, params):
         """reset_alarms(motor=1)
 
@@ -871,7 +870,7 @@ class appMotionMotorsAgent:
 
         return True, "Alarms reset for motor {}".format(params['motor'])
 
-    @ocs_agent.param('motor', default=1, choices=[1,2,3], type=int)
+    @ocs_agent.param('motor', default=1, choices=[1, 2, 3], type=int)
     @ocs_agent.param('verbose', default=True, type=bool)
     def home_with_limits(self, session, params):
         """home_with_limits(motor=1)
@@ -906,7 +905,7 @@ class appMotionMotorsAgent:
 
         return True, "Zeroed stages using limit switches"
 
-    @ocs_agent.param('motor', default=3, choices=[1,2,3], type=int)
+    @ocs_agent.param('motor', default=3, choices=[1, 2, 3], type=int)
     @ocs_agent.param('verbose', default=True, type=bool)
     @ocs_agent.param('f_sample', default=2, type=float)
     def acq(self, session, params):
