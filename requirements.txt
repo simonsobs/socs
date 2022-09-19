@@ -40,6 +40,9 @@ matplotlib
 numpy
 sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master
 
+# holography agent - python 3.8 only!
+# -r requirements/holography.txt
+
 # Docs
 # see docs/requirements.txt
 

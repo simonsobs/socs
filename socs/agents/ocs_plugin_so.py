@@ -13,6 +13,7 @@ for n, f in [
         ('BlueforsAgent', 'bluefors/agent.py'),
         ('CrateAgent', 'smurf_crate_monitor/agent.py'),
         ('CryomechCPAAgent', 'cryomech_cpa/agent.py'),
+        ('FPGAAgent', 'holo_fpga/agent.py'),
         ('FTSAerotechAgent', 'fts_aerotech/agent.py'),
         ('HWPBBBAgent', 'hwp_encoder/agent.py'),
         ('HWPPicoscopeAgent', 'hwp_picoscope/agent.py'),

@@ -58,5 +58,9 @@ setup(name='socs',
       ],
       extras_require={
           "so3g": ["so3g"],
+          "holography": [  # Note: supports python 3.8 only!
+              'casperfpga @ git+https://github.com/casper-astro/casperfpga.git@py38',
+              'holog_daq @ git+https://github.com/McMahonCosmologyGroup/holog_daq.git@main',
+          ],
       },
       )

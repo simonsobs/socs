@@ -9,7 +9,6 @@ import os
 root = os.path.abspath(os.path.split(__file__)[0])
 
 for n, f in [
-        ('FPGAAgent', 'holo_fpga/roach_agent.py'),
         ('SynthAgent', 'holo_synth/synth_agent.py'),
 ]:
     ocs.site_config.register_agent_class(n, os.path.join(root, f))

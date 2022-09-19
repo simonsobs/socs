@@ -11,17 +11,34 @@ issues with the holography ROACH2 FPGA. It will connect the computer to the
 ROACH via an ethernet port, take data, and pass it to the OCS feed.
 
 .. argparse::
-   :module: agents.holo_fpga.roach_agent
+   :module: socs.agents.holo_fpga.agent
    :func: make_parser
-   :prog: roach_agent.py
+   :prog: python3 agent.py
 
 Dependencies
 ------------
 
-Python Packages:
+.. note::
+    These dependencies only support Python 3.8! As such, they are not
+    automatically installed when you install ``socs``. You can manually install
+    them, or follow the instructions below.
 
 - `casperfpga <https://pypi.org/project/casperfpga/>`_
 - `holo_daq <https://github.com/McMahonCosmologyGroup/holog_daq>`_
+
+You can install these by first checking you are running Python 3.8::
+
+    $ python --version
+    Python 3.8.13
+
+Then by either installing via the optional dependency "holography"::
+
+    $ python -m pip install socs[holography]
+
+Or by cloning the socs repository and using the provided requirements file::
+
+    $ git clone https://github.com/simonsobs/socs.git
+    $ python -m pip install -r socs/requirements/holography.txt
 
 Configuration File Examples
 ---------------------------
@@ -67,5 +84,5 @@ function. This will record the cross-correlations A, BB, AB, and phase.
 Agent API
 ---------
 
-.. autoclass:: agents.holo_fpga.roach_agent.FPGAAgent
+.. autoclass:: socs.agents.holo_fpga.agent.FPGAAgent
     :members:
