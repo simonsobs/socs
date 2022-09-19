@@ -37,6 +37,7 @@ for n, f in [
         ('SmurfStreamSimulator', 'smurf_stream_simulator/agent.py'),
         ('SupRsync', 'suprsync/agent.py'),
         ('SynaccessAgent', 'synacc/agent.py'),
+        ('SynthAgent', 'holo_synth/agent.py'),
         ('TektronixAWGAgent', 'tektronix3021c/agent.py'),
         ('VantagePro2Agent', 'vantagepro2/agent.py'),
         ('WiregridActuatorAgent', 'wiregrid_actuator/agent.py'),

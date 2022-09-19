@@ -28,6 +28,7 @@ agents = {
     'SmurfStreamSimulator': {'module': 'socs.agents.smurf_stream_simulator.agent', 'entry_point': 'main'},
     'SupRsync': {'module': 'socs.agents.suprsync.agent', 'entry_point': 'main'},
     'SynaccessAgent': {'module': 'socs.agents.synacc.agent', 'entry_point': 'main'},
+    'SynthAgent': {'module': 'socs.agents.holo_synth.agent', 'entry_point': 'main'},
     'TektronixAWGAgent': {'module': 'socs.agents.tektronix3021c.agent', 'entry_point': 'main'},
     'VantagePro2Agent': {'module': 'socs.agents.vantagepro2.agent', 'entry_point': 'main'},
     'WiregridActuatorAgent': {'module': 'socs.agents.wiregrid_actuator.agent', 'entry_point': 'main'},
