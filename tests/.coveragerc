@@ -10,5 +10,8 @@ omit =
   */Lakeshore336.py
   */Lakeshore370.py
 
+  # omit mibs
+  */mibs/*.py
+
 [coverage:report]
 skip_empty = true
