@@ -656,7 +656,7 @@ class appMotionMotorsAgent:
 
         return True, "Motor {} stopped moving".format(params['motor'])
 
-    @ocs_agent.param('motor', default=3, choices=[1, 2, 3] type=int)
+    @ocs_agent.param('motor', default=3, choices=[1, 2, 3], type=int)
     def kill_all_commands(self, session, params):
         """kill_all_commands(motor=3)
 
