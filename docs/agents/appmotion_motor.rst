@@ -46,13 +46,12 @@ Docker Compose
 An example docker-compose configuration::
 
     ocs-beam-mapper:
-    <<: *ocs-base
-    image: motor_test_image
-    network_mode: "host"
-    environment:
-      LOGLEVEL: debug
-    command:
-      - "--instance-id=beammap-motors"
+        image: simonsobs/ocs-app-motion-motors-agent
+        network_mode: "host"
+        environment:
+          LOGLEVEL: debug
+        command:
+          - "--instance-id=beammap-motors"
 
 
 Agent API

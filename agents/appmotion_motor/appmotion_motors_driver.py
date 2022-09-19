@@ -692,8 +692,11 @@ class Motor:
         """
         print(f"port: {self.port}")
         try:
-            self.sock.connect(self.port)
-            print("Connection has been reestablished.")
+            self.ser.sock.close()
+            time.sleep(1)
+            del self.ser
+            self.ser = Serial_TCPServer((self.ip, self.port))
+            print("Connection has been established.")
             self.sock_status = 1
         except ConnectionError:
             print("Connection could not be reestablished.")

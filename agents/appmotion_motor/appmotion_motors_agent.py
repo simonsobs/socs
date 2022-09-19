@@ -108,8 +108,62 @@ class appMotionMotorsAgent:
             self.agent.start('acq')
         return True, 'Motor(s) Initialized.'
 
+    @ocs_agent.param('motor', default=1, choices=[1,2,3], type=int)
+    @ocs_agent.param('verbose', default=True, type=bool)
+    def movement_check(self, params):
+        """movement_check(motor=1, verbose)
+        
+        **Helper Function** - Checks if motors are moving OR 
+        if limit switches are tripped.
+        Used within tasks to check movement status.
+        
+        Parameters:
+            motor (int): Determines which motor, either 1 or 2, 3 is for all
+                motors. (default 1)
+            verbose (bool): Prints output from motor requests if True.
+                (default True)
+        Returns:
+            status (bool): Movement status, True if motor is moving,
+                False if not.
+        """
+        if params['motor'] == 1:
+            status = self.motor1.is_moving(params['verbose'])
+        elif params['motor'] == 2:
+            status = self.motor2.is_moving(params['verbose'])
+        else:
+            status = self.motor1.is_moving(params['verbose']) or self.motor2.is_moving(params['verbose'])
+        
+        return status
+    
+    @ocs_agent.param('motor', default=1, choices=[1,2,3], type=int)
+    @ocs_agent.param('verbose', default=True, type=bool)
+    def is_moving(self, session, params):
+        """is_moving(motor=1, verbose=True)
+
+        **Tasks** - Checks if motors are moving OR if limit switches are
+        tripped.
+
+        Parameters:
+            motor (int): Determines which motor, either 1 or 2, 3 is for all
+                motors. (default 1)
+            verbose (bool): Prints output from motor requests if True.
+                (default True)
+        """
+        with self.lock.acquire_timeout(1, job=f"is_moving_motor{params['motor']}") as acquired:
+            if not acquired:
+                self.log.warn(
+                    f"Could not check because lock held by {self.lock.job}")
+                return False
+            self.move_status = movement_check(params)
+            
+        if self.move_status:
+            return True, ("Motors are moving.", self.move_status)
+        else:
+            return True, ("Motors are not moving.", self.move_status)
+
+    
     @ocs_agent.param('lin_stage', default=True, type=bool)
-    @ocs_agent.param('motor', default=1, type=int)
+    @ocs_agent.param('motor', default=1, choices=[1,2,3], type=int)
     @ocs_agent.param('pos_is_inches', default=False, type=bool)
     @ocs_agent.param('pos', default=0, type=float)
     @ocs_agent.param('verbose', default=True, type=bool)
@@ -139,7 +193,7 @@ class appMotionMotorsAgent:
         """
 
         with self.lock.acquire_timeout(1, job=f'move_axis_to_position_motor{params["motor"]}') as acquired:
-            self.move_status = self.is_moving(session, params)[1][1]
+            self.move_status = self.movement_check(params)
             if self.move_status:
                 return False, "Motors are already moving."
             if not acquired:
@@ -150,20 +204,20 @@ class appMotionMotorsAgent:
                 self.motor1.move_axis_to_position(params['pos'], params['pos_is_inches'], params['lin_stage'])
             elif params['motor'] == 2:
                 self.motor2.move_axis_to_position(params['pos'], params['pos_is_inches'], params['lin_stage'])
-            elif params['motor'] == 3:
+            else:
+                # move motor1 THEN motor2
                 self.motor1.move_axis_to_position(params['pos'], params['pos_is_inches'], params['lin_stage'])
+                # could probably use movement_check here
                 self.move_status = self.motor1.is_moving(params['verbose'])
                 while self.move_status:
                     self.move_status = self.motor1.is_moving(params['verbose'])
                     time.sleep(1)
                 self.motor2.move_axis_to_position(params['pos'], params['pos_is_inches'], params['lin_stage'])
-            else:
-                print("Motor ID invalid argument")
 
         return True, "Moved motor {} to {}".format(params['motor'], params['pos'])
 
     @ocs_agent.param('lin_stage', default=True, type=bool)
-    @ocs_agent.param('motor', default=1, type=int)
+    @ocs_agent.param('motor', default=1, choices=[1,2,3], type=int)
     @ocs_agent.param('pos_is_inches', default=False, type=bool)
     @ocs_agent.param('pos', default=0, type=float)
     @ocs_agent.param('verbose', default=True, type=bool)
@@ -191,7 +245,7 @@ class appMotionMotorsAgent:
         """
 
         with self.lock.acquire_timeout(1, job=f"move_axis_by_length_motor{params['motor']}") as acquired:
-            self.move_status = self.is_moving(session, params)[1][1]
+            self.move_status = self.movement_check(params)
             if self.move_status:
                 return False, "Motors are already moving."
             if not acquired:
@@ -202,19 +256,18 @@ class appMotionMotorsAgent:
                 self.motor1.move_axis_by_length(params['pos'], params['pos_is_inches'], params['lin_stage'])
             elif params['motor'] == 2:
                 self.motor2.move_axis_by_length(params['pos'], params['pos_is_inches'], params['lin_stage'])
-            elif params['motor'] == 3:
+            else:
+                # move motor1 THEN motor2
                 self.motor1.move_axis_by_length(params['pos'], params['pos_is_inches'], params['lin_stage'])
                 self.move_status = self.motor1.is_moving(params['verbose'])
                 while self.move_status:
                     self.move_status = self.motor1.is_moving(params['verbose'])
                     time.sleep(1)
                 self.motor2.move_axis_by_length(params['pos'], params['pos_is_inches'], params['lin_stage'])
-            else:
-                print("Motor ID invalid argument")
 
         return True, "Moved motor {} by {}".format(params['motor'], params['pos'])
 
-    @ocs_agent.param('motor', default=3, type=int)
+    @ocs_agent.param('motor', default=3, choices=[1,2,3], type=int)
     @ocs_agent.param('velocity', default=12.0, type=float, check=lambda x: 0.25 <= x <= 50)
     @ocs_agent.param('verbose', default=True, type=bool)
     def set_velocity(self, session, params):
@@ -232,7 +285,7 @@ class appMotionMotorsAgent:
         """
 
         with self.lock.acquire_timeout(timeout=1, job=f'set_velocity{params["motor"]}') as acquired:
-            self.move_status = self.is_moving(session, params)[1][1]
+            self.move_status = self.movement_check(params)
             if self.move_status:
                 return False, "Motors are already moving."
             if not acquired:
@@ -243,19 +296,13 @@ class appMotionMotorsAgent:
                 self.motor1.set_velocity(params['velocity'])
             elif params['motor'] == 2:
                 self.motor2.set_velocity(params['velocity'])
-            elif params['motor'] == 3:
-                self.motor1.set_velocity(params['velocity'])
-                self.move_status = self.motor1.is_moving(params['verbose'])
-                while self.move_status:
-                    self.move_status = self.motor1.is_moving(params['verbose'])
-                    time.sleep(1)
-                self.motor2.set_velocity(params['velocity'])
             else:
-                print("Motor ID invalid argument")
+                self.motor1.set_velocity(params['velocity'])
+                self.motor2.set_velocity(params['velocity'])
 
         return True, "Set velocity of motor {} to {}".format(params['motor'], params['velocity'])
 
-    @ocs_agent.param('motor', default=3, type=int)
+    @ocs_agent.param('motor', default=3, choices=[1,2,3], type=int)
     @ocs_agent.param('accel', default=1, type=int, check=lambda x: 1 <= x <= 3000)
     @ocs_agent.param('verbose', default=True, type=bool)
     def set_acceleration(self, session, params):
@@ -273,7 +320,7 @@ class appMotionMotorsAgent:
         """
 
         with self.lock.acquire_timeout(timeout=1, job=f'set_acceleration_motor{params["motor"]}') as acquired:
-            self.move_status = self.is_moving(session, params)[1][1]
+            self.move_status = self.movement_check(params)
             if self.move_status:
                 return False, "Motors are already moving."
             if not acquired:
@@ -284,19 +331,13 @@ class appMotionMotorsAgent:
                 self.motor1.set_acceleration(params['accel'])
             elif params['motor'] == 2:
                 self.motor2.set_acceleration(params['accel'])
-            elif params['motor'] == 3:
-                self.motor1.set_acceleration(params['accel'])
-                self.move_status = self.motor1.is_moving(params['verbose'])
-                while self.move_status:
-                    time.sleep(1)
-                    self.move_status = self.motor1.is_moving(params['verbose'])
-                self.motor2.set_acceleration(params['accel'])
             else:
-                print("Motor ID invalid argument")
-
+                self.motor1.set_acceleration(params['accel'])
+                self.motor2.set_acceleration(params['accel'])
+            
         return True, "Set acceleration of motor {} to {}".format(params['motor'], params['accel'])
 
-    @ocs_agent.param('motor', default=1, type=int)
+    @ocs_agent.param('motor', default=1, choices=[1,2,3], type=int)
     def start_jogging(self, session, params):
         """start_jogging(motor=1)
 
@@ -308,7 +349,6 @@ class appMotionMotorsAgent:
         """
 
         with self.lock.acquire_timeout(1, job=f"start_jogging_motor{params['motor']}") as acquired:
-            self.move_status = self.is_moving(session, params)[1][1]
             if not acquired:
                 self.log.warn(
                     f'Could not start_jogging because lock held by {self.lock.job}')
@@ -317,15 +357,13 @@ class appMotionMotorsAgent:
                 self.motor1.start_jogging()
             elif params['motor'] == 2:
                 self.motor2.start_jogging()
-            elif params['motor'] == 3:
+            else:
                 self.motor1.start_jogging()
                 self.motor2.start_jogging()
-            else:
-                print("Motor ID invalid argument")
-
+            
         return True, "Started jogging motor {}".format(params['motor'])
 
-    @ocs_agent.param('motor', default=1, type=int)
+    @ocs_agent.param('motor', default=1, choices=[1,2,3], type=int)
     def stop_jogging(self, session, params):
         """stop_jogging(motor=1)
         **Task** - Stops the jogging of motor(s) set by params.
@@ -344,15 +382,13 @@ class appMotionMotorsAgent:
                 self.motor1.stop_jogging()
             elif params['motor'] == 2:
                 self.motor2.stop_jogging()
-            elif params['motor'] == 3:
+            else:
                 self.motor1.stop_jogging()
                 self.motor2.stop_jogging()
-            else:
-                print("Motor ID invalid argument")
 
         return True, "Stopped jogging motor {}".format(params['motor'])
 
-    @ocs_agent.param('motor', default=1, type=int)
+    @ocs_agent.param('motor', default=1, choices=[1,2,3], type=int)
     @ocs_agent.param('verbose', default=True, type=bool)
     def seek_home_linear_stage(self, session, params):
         """seek_home_linear_stage(motor=1)
@@ -368,7 +404,7 @@ class appMotionMotorsAgent:
         """
 
         with self.lock.acquire_timeout(timeout=1, job=f'seek_home_linear_stage_motor{params["motor"]}') as acquired:
-            self.move_status = self.is_moving(session, params)[1][1]
+            self.move_status = self.movement_check(params)
             if self.move_status:
                 return False, "Motors are already moving."
             if not acquired:
@@ -379,19 +415,18 @@ class appMotionMotorsAgent:
                 self.motor1.seek_home_linear_stage()
             elif params['motor'] == 2:
                 self.motor2.seek_home_linear_stage()
-            elif params['motor'] == 3:
+            else:
+                # move motor1 THEN motor2
                 self.motor1.seek_home_linear_stage()
                 self.move_status = self.motor1.is_moving(params['verbose'])
                 while self.move_status:
                     time.sleep(1)
                     self.move_status = self.motor1.is_moving(params['verbose'])
                 self.motor2.seek_home_linear_stage()
-            else:
-                print("Motor ID invalid argument")
 
         return True, "Moving motor {} to home".format(params['motor'])
 
-    @ocs_agent.param('motor', default=1, type=int)
+    @ocs_agent.param('motor', default=1, choices=[1,2,3], type=int)
     @ocs_agent.param('verbose', default=True, type=bool)
     def set_zero(self, session, params):
         """set_zero(motor=1)
@@ -407,7 +442,7 @@ class appMotionMotorsAgent:
         """
 
         with self.lock.acquire_timeout(1, job=f"set_zero_motor{params['motor']}") as acquired:
-            self.move_status = self.is_moving(session, params)[1][1]
+            self.move_status = self.movement_check(params)
             if self.move_status:
                 return False, "Motors are already moving."
             if not acquired:
@@ -418,34 +453,30 @@ class appMotionMotorsAgent:
                 self.motor1.set_zero()
             elif params['motor'] == 2:
                 self.motor2.set_zero()
-            elif params['motor'] == 3:
-                self.motor1.set_zero()
-                self.move_status = self.motor1.is_moving(params['verbose'])
-                while self.move_status:
-                    time.sleep(1)
-                    self.move_status = self.motor1.is_moving(params['verbose'])
-                self.motor2.set_zero()
             else:
-                print("Motor ID invalid argument")
+                self.motor1.set_zero()
+                self.motor2.set_zero()
 
         return True, "Zeroing motor {} position".format(params['motor'])
 
-    @ocs_agent.param('motor', default=1, type=int)
+    @ocs_agent.param('motor', default=1, choices=[1,2,3], type=int)
     @ocs_agent.param('pos_is_inches', default=True, type=bool)
     @ocs_agent.param('pos_data', type=list)
     @ocs_agent.param('verbose', default=True, type=bool)
     def run_positions(self, session, params):
         """run_positions(pos_data=None, motor=1, pos_is_inches=False)
 
-        **Task** - Runs a list of entries as positions. For
-        motor=ALL, the first column must be the x-data, and the second column
-        the y-data. Each position will be attained.
-
+        **Task** - Takes (up to) two elements in a list, and runs each motor
+        to their respective position. 
+        If motor==3, Motor1 moves to the first element, 
+        motor2 to the second element in the list. Can be different positions,
+        thus differentiating this task from other movement tasks.
+        
         Parameters:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 1)
-            pos_data (list): Tab-delimited list of entries. First column
-                is x-data, second column is y-data.
+            pos_data (list): Up to 2 element list of positions
+                for motors to go to. 
             pos_is_inches (bool): True if pos was specified in inches, False if
                 in counts (default False)
             verbose (bool): Prints output from motor requests if True.
@@ -453,7 +484,7 @@ class appMotionMotorsAgent:
         """
 
         with self.lock.acquire_timeout(1, job=f"run_positions_motor{params['motor']}") as acquired:
-            self.move_status = self.is_moving(session, params)[1][1]
+            self.move_status = self.movement_check(params)
             if self.move_status:
                 return False, "Motors are already moving."
             if not acquired:
@@ -469,19 +500,18 @@ class appMotionMotorsAgent:
                 self.motor1.run_positions(params['pos_data'], params['pos_is_inches'])
             elif params['motor'] == 2:
                 self.motor2.run_positions(params['pos_data'], params['pos_is_inches'])
-            elif params['motor'] == 3:
+            else:
+                # move motor1 THEN motor2
                 self.motor1.run_positions(params['pos_data[0]'], params['pos_is_inches'])
                 self.move_status = self.motor1.is_moving(params['verbose'])
                 while self.move_status:
                     time.sleep(1)
                     self.move_status = self.motor1.is_moving(params['verbose'])
                 self.motor2.run_positions(params['pos_data[1]'], params['pos_is_inches'])
-            else:
-                print("Motor ID invalid argument")
 
         return True, "Moving stage to {}".format(params['pos_data'])
 
-    @ocs_agent.param('motor', default=1, type=int)
+    @ocs_agent.param('motor', default=1, choices=[1,2,3], type=int)
     @ocs_agent.param('velocity', default=12.0, type=float, check=lambda x: 0.25 <= x <= 50)
     @ocs_agent.param('rot_accel', default=1.0, type=float, check=lambda x: 1.0 <= x <= 3000)
     def start_rotation(self, session, params):
@@ -507,16 +537,14 @@ class appMotionMotorsAgent:
                 self.motor1.start_rotation(params['velocity'], params['rot_accel'])
             elif params['motor'] == 2:
                 self.motor2.start_rotation(params['velocity'], params['rot_accel'])
-            elif params['motor'] == 3:
+            else:
                 self.motor1.start_rotation(params['velocity'], params['rot_accel'])
                 self.motor2.start_rotation(params['velocity'], params['rot_accel'])
-            else:
-                print("Motor ID invalid argument")
 
         return True, "Started rotating motor at velocity {} and acceleration {}".format(
             'velocity', 'rot_accel')
 
-    @ocs_agent.param('motor', default=1, type=int)
+    @ocs_agent.param('motor', default=1, choices=[1,2,3], type=int)
     def stop_rotation(self, session, params):
         """stop_rotation(motor=1)
 
@@ -536,15 +564,13 @@ class appMotionMotorsAgent:
                 self.motor1.stop_rotation()
             elif params['motor'] == 2:
                 self.motor2.stop_rotation()
-            elif params['motor'] == 3:
+            else:
                 self.motor1.stop_rotation()
                 self.motor2.stop_rotation()
-            else:
-                print("Motor ID invalid argument")
 
         return True, "Stopped rotating motor"
 
-    @ocs_agent.param('motor', default=3, type=int)
+    @ocs_agent.param('motor', default=3, choices=[1,2,3], type=int)
     def close_connection(self, session, params):
         """close_connection(motor=3)
 
@@ -564,15 +590,13 @@ class appMotionMotorsAgent:
                 self.motor1.close_connection()
             elif params['motor'] == 2:
                 self.motor2.close_connection()
-            elif params['motor'] == 3:
+            else:
                 self.motor1.close_connection()
                 self.motor2.close_connection()
-            else:
-                print("Motor ID invalid argument")
 
         return True, "Closed connection to motor {}".format(params['motor'])
 
-    @ocs_agent.param('motor', default=1, type=int)
+    @ocs_agent.param('motor', default=1, choices=[1,2,3], type=int)
     def reconnect_motor(self, session, params):
         """reconnect_motor(motor=1)
 
@@ -592,18 +616,13 @@ class appMotionMotorsAgent:
                 self.motor1.reconnect_motor()
             elif params['motor'] == 2:
                 self.motor2.reconnect_motor()
-            elif params['motor'] == 3:
+            else:
                 self.motor1.reconnect_motor()
                 self.motor2.reconnect_motor()
-            else:
-                print("Motor ID invalid argument")
 
-        if Motor.reconnect_motor.sock_status == 1:
-            return True, "Reestablished connection with motor{}".format(params['motor'])
-        elif Motor.reconnect_motor.sock_status == 0:
-            return False, "Failed to reestablish connection with motor{}".format(params['motor'])
-
-    @ocs_agent.param('motor', default=1, type=int)
+        return True, "Motor{} reconnection task completed".format(params['motor'])
+        
+    @ocs_agent.param('motor', default=1, choices=[1,2,3], type=int)
     @ocs_agent.param('update_period', default=.1, type=float)
     @ocs_agent.param('verbose', default=False, type=bool)
     def block_while_moving(self, session, params):
@@ -638,7 +657,7 @@ class appMotionMotorsAgent:
 
         return True, "Motor {} stopped moving".format(params['motor'])
 
-    @ocs_agent.param('motor', default=3, type=int)
+    @ocs_agent.param('motor', default=3, choices=[1,2,3] type=int)
     def kill_all_commands(self, session, params):
         """kill_all_commands(motor=3)
 
@@ -658,15 +677,13 @@ class appMotionMotorsAgent:
                 self.motor1.kill_all_commands()
             elif params['motor'] == 2:
                 self.motor2.kill_all_commands()
-            elif params['motor'] == 3:
+            else:
                 self.motor1.kill_all_commands()
                 self.motor2.kill_all_commands()
-            else:
-                print("Motor ID invalid argument")
 
         return True, "Killing all active commands on motor {}".format(params['motor'])
 
-    @ocs_agent.param('motor', default=1, type=int)
+    @ocs_agent.param('motor', default=1, choices=[1,2,3], type=int)
     @ocs_agent.param('value', default=0, type=float)
     @ocs_agent.param('verbose', default=True, type=bool)
     def set_encoder_value(self, session, params):
@@ -684,7 +701,7 @@ class appMotionMotorsAgent:
         """
 
         with self.lock.acquire_timeout(1, job=f"set_encoder_value_motor{params['motor']}") as acquired:
-            self.move_status = self.is_moving(session, params)[1][1]
+            self.move_status = self.movement_check(params)
             if self.move_status:
                 return False, "Motors are already moving."
             if not acquired:
@@ -695,16 +712,8 @@ class appMotionMotorsAgent:
                 e_positions = self.motor1.set_encoder_value(params['value'])
             elif params['motor'] == 2:
                 e_positions = self.motor2.set_encoder_value(params['value'])
-            elif params['motor'] == 3:
-                e_positions = self.motor1.set_encoder_value(params['value'])
-                self.move_status = self.motor1.is_moving(params['verbose'])
-                while self.move_status:
-                    time.sleep(1)
-                    self.move_status = self.motor1.is_moving(params['verbose'])
-                e_positions = self.motor2.set_encoder_value(params['value'])
             else:
-                e_positions = None
-                print("Motor ID invalid argument")
+                e_positions = [self.motor1.set_encoder_value(params['value']), self.motor2.set_encoder_value(params['value'])]
 
         return True, "Setting encoder position of motor {} to {}".format(params['motor'], e_positions)
 
@@ -728,17 +737,13 @@ class appMotionMotorsAgent:
                 e_positions = self.motor1.retrieve_encoder_info()
             elif params['motor'] == 2:
                 e_positions = self.motor2.retrieve_encoder_info()
-            elif params['motor'] == 3:
-                e_positions = self.motor1.retrieve_encoder_info()
-                e_positions = self.motor2.retrieve_encoder_info()
             else:
-                e_positions = None
-                print("Motor ID invalid argument")
+                e_positions = [self.motor1.retrieve_encoder_info(), self.motor2.retrieve_encoder_info()]
 
-        return True, ("Current encoder positions: {}".format(
-            e_positions), e_positions)
+        return True, "Current encoder positions: {}".format(
+            e_positions)
 
-    @ocs_agent.param('motor', default=1, type=int)
+    @ocs_agent.param('motor', default=1, choices=[1,2,3], type=int)
     @ocs_agent.param('pos_is_inches', default=True, type=bool)
     def get_positions(self, session, params):
         """get_positions(motor=1, inches=True)
@@ -766,27 +771,20 @@ class appMotionMotorsAgent:
                     positions = self.motor1.get_position_in_inches()
                 elif params['motor'] == 2:
                     positions = self.motor2.get_position_in_inches()
-                elif params['motor'] == 3:
+                else:
                     positions = self.motor1.get_position_in_inches()
                     positions = self.motor2.get_position_in_inches()
-                else:
-                    print("Motor ID invalid argument")
-            elif not params['pos_is_inches']:
+            else:
                 if params['motor'] == 1:
                     positions = self.motor1.get_position()
                 elif params['motor'] == 2:
                     positions = self.motor2.get_position()
-                elif params['motor'] == 3:
-                    positions = self.motor1.get_position()
-                    positions = self.motor2.get_position()
                 else:
-                    print("Motor ID invalid argument")
-            else:
-                return False, "Invalid choice for inches parameter, must be boolean"
+                    positions = [self.motor1.get_position(), self.motor2.get_position()]
 
         return True, "Current motor positions: {}".format(positions)
 
-    @ocs_agent.param('motor', default=1, type=int)
+    @ocs_agent.param('motor', default=1, choices=[1,2,3], type=int)
     @ocs_agent.param('pos_is_inches', default=True, type=bool)
     def get_immediate_position(self, session, params):
         """get_immediate_position(motor=1, inches=True)
@@ -814,49 +812,12 @@ class appMotionMotorsAgent:
                 i_positions = self.motor1.get_immediate_position(params['pos_is_inches'])
             elif params['motor'] == 2:
                 i_positions = self.motor2.get_immediate_position(params['pos_is_inches'])
-            elif params['motor'] == 3:
-                i_positions = self.motor1.get_immediate_position(params['pos_is_inches'])
-                i_positions = self.motor2.get_immediate_position(params['pos_is_inches'])
             else:
-                i_positions = None
-                print("Motor ID invalid argument")
+                i_positions = [self.motor1.get_immediate_position(params['pos_is_inches']), self.motor2.get_immediate_position(params['pos_is_inches'])]
 
         return True, "Current motor positions: {}".format(i_positions)
 
-    @ocs_agent.param('motor', default=1, type=int)
-    @ocs_agent.param('verbose', default=True, type=bool)
-    def is_moving(self, session, params):
-        """is_moving(motor=1, verbose=True)
-
-        **Tasks** - Checks if motors are moving OR if limit switches are
-        tripped.
-
-        Parameters:
-            motor (int): Determines which motor, either 1 or 2, 3 is for all
-                motors. (default 1)
-            verbose (bool): Prints output from motor requests if True.
-                (default True)
-        """
-        with self.lock.acquire_timeout(1, job=f"is_moving_motor{params['motor']}") as acquired:
-            if not acquired:
-                self.log.warn(
-                    f"Could not check because lock held by {self.lock.job}")
-                return False
-            if params['motor'] == 1:
-                self.move_status1 = self.motor1.is_moving(params['verbose'])
-            elif params['motor'] == 2:
-                self.move_status2 = self.motor2.is_moving(params['verbose'])
-            elif params['motor'] == 3:
-                self.move_status = self.motor1.is_moving(params['verbose']) or self.motor2.is_moving(params['verbose'])
-            else:
-                print("Motor ID invalid argument")
-
-        if self.move_status:
-            return True, ("Motors are moving.", self.move_status)
-        else:
-            return True, ("Motors are not moving.", self.move_status)
-
-    @ocs_agent.param('motor', default=3, type=int)
+    @ocs_agent.param('motor', default=3, choices=[1,2,3], type=int)
     def move_off_limit(self, session, params):
         """move_off_limit(motor=3)
 
@@ -877,15 +838,13 @@ class appMotionMotorsAgent:
                 self.motor1.move_off_limit()
             elif params['motor'] == 2:
                 self.motor2.move_off_limit()
-            elif params['motor'] == 3:
+            else:
                 self.motor1.move_off_limit()
                 self.motor2.move_off_limit()
-            else:
-                print("Motor ID invalid argument")
 
         return True, "Motor {} moved off limit switch".format(params['motor'])
 
-    @ocs_agent.param('motor', default=1, type=int)
+    @ocs_agent.param('motor', default=1, choices=[1,2,3], type=int)
     def reset_alarms(self, session, params):
         """reset_alarms(motor=1)
 
@@ -906,15 +865,13 @@ class appMotionMotorsAgent:
                 self.motor1.reset_alarms()
             elif params['motor'] == 2:
                 self.motor2.reset_alarms()
-            elif params['motor'] == 3:
+            else:
                 self.motor1.reset_alarms()
                 self.motor2.reset_alarms()
-            else:
-                print("Motor ID invalid argument.")
 
         return True, "Alarms reset for motor {}".format(params['motor'])
 
-    @ocs_agent.param('motor', default=1, type=int)
+    @ocs_agent.param('motor', default=1, choices=[1,2,3], type=int)
     @ocs_agent.param('verbose', default=True, type=bool)
     def home_with_limits(self, session, params):
         """home_with_limits(motor=1)
@@ -939,19 +896,17 @@ class appMotionMotorsAgent:
                 self.motor1.home_with_limits()
             elif params['motor'] == 2:
                 self.motor2.home_with_limits()
-            elif params['motor'] == 3:
+            else:
                 self.motor1.home_with_limits()
                 self.move_status = self.motor1.is_moving(params['verbose'])
                 while self.move_status:
                     time.sleep(1)
                     self.move_status = self.motor1.is_moving(params['verbose'])
                 self.motor2.home_with_limits()
-            else:
-                print("Motor ID invalid argument.")
 
         return True, "Zeroed stages using limit switches"
 
-    @ocs_agent.param('motor', default=3, type=int)
+    @ocs_agent.param('motor', default=3, choices=[1,2,3], type=int)
     @ocs_agent.param('verbose', default=True, type=bool)
     @ocs_agent.param('f_sample', default=2, type=float)
     def acq(self, session, params):
@@ -1019,16 +974,13 @@ class appMotionMotorsAgent:
                         try:
                             self.log.debug(
                                 f"getting position/move status of motor{params['motor']}")
-                            self.move_status = mot.is_moving(session, params)
+                            move_status = mot.is_moving(params)
                             pos = mot.get_position_in_inches()
-                            if self.move_status:
-                                data['data'][f'motor{mot}_encoder'] = -1
-                            else:
-                                e_pos = mot.retrieve_encoder_info()
-                                data['data'][f'motor{params["motor"]}_encoder'] = e_pos[0]
+                            e_pos = mot.retrieve_encoder_info()
+                            data['data'][f'motor{params["motor"]}_encoder'] = e_pos[0]
                             data['data'][f'motor{params["motor"]}_stepper'] = pos[0]
                             data['data'][f'motor{params["motor"]}_connection'] = 1
-                            data['data'][f'motor{params["motor"]}_move_status'] = self.move_status
+                            data['data'][f'motor{params["motor"]}_move_status'] = move_status
 
                         except Exception as e:
                             self.log.error(f'error: {e}')
