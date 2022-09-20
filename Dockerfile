@@ -26,19 +26,23 @@ RUN apt-get update && apt-get install -y rsync \
 # Install labjack ljm module
 # Copied from the labjack ljm dockerfile:
 # https://hub.docker.com/r/labjack/ljm/dockerfile
+WORKDIR /app/labjack/
 RUN wget https://labjack.com/sites/default/files/software/labjack_ljm_minimal_2020_03_30_x86_64_beta.tar.gz
 RUN tar zxf ./labjack_ljm_minimal_2020_03_30_x86_64_beta.tar.gz
 RUN ./labjack_ljm_minimal_2020_03_30_x86_64/labjack_ljm_installer.run -- --no-restart-device-rules
 RUN pip3 install --no-cache-dir https://labjack.com/sites/default/files/software/Python_LJM_2019_04_03.zip
 
+# Copy in and install requirements
+COPY requirements/ /app/socs/requirements
+COPY requirements.txt /app/socs/requirements.txt
+WORKDIR /app/socs/
+RUN pip3 install -r requirements.txt
+
 # Copy the current directory contents into the container at /app
 COPY . /app/socs/
 
-WORKDIR /app/socs/
-
 # Install socs
-RUN pip3 install -r requirements.txt && \
-    pip3 install .
+RUN pip3 install .
 
 # Reset workdir to avoid local imports
 WORKDIR /
