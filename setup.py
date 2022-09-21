@@ -6,31 +6,51 @@ with open("README.rst", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 # Optional Dependencies
+# ACU Agent
 acu_deps = ['soaculib @ git+https://github.com/simonsobs/soaculib.git@master']
+
+# Holography FPGA and Synthesizer Agents
 holography_deps = [  # Note: supports python 3.8 only!
     'casperfpga @ git+https://github.com/casper-astro/casperfpga.git@py38',
     'holog_daq @ git+https://github.com/McMahonCosmologyGroup/holog_daq.git@main',
 ]
+
+# Labjack Agent
 labjack_deps = [
     'labjack-ljm',
     'numexpr',
     'scipy',
 ]
+
+# Magpie Agent
 magpie_deps = [
     'pandas',
     'scipy',
     'so3g',
 ]
+
+# Pfeiffer TC 400 Agent
 pfeiffer_deps = ['pfeiffer-vacuum-protocol==0.4']
+
+# Pysmurf Controller Agent
 pysmurf_deps = [
     'matplotlib',
+    'pysmurf @ git+https://github.com/slaclab/pysmurf.git@develop',
     'sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master',
 ]
+
+# SMuRF File Emulator, SMuRF Stream Simulator
 smurf_sim_deps = ['so3g']
+
+# Synaccess Agent
 synacc_deps = ['requests']
+
+# LATRt XY Stage Agent
 xy_stage_deps = [
     'xy_stage_control @ git+https://github.com/kmharrington/xy_stage_control.git@main',
 ]
+
+# Note: Note including the holograph deps, which are Python 3.8 only
 all_deps = acu_deps + labjack_deps + magpie_deps + pfeiffer_deps + \
     pysmurf_deps + smurf_sim_deps + synacc_deps + xy_stage_deps
 all_deps = list(set(all_deps))
