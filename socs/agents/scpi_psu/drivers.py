@@ -1,5 +1,5 @@
 # Tucker Elleflot
-from socs.agent.prologix_interface import PrologixInterface
+from socs.common.prologix_interface import PrologixInterface
 
 
 class PsuInterface(PrologixInterface):

@@ -65,6 +65,6 @@ Agent API
 Supporting APIs
 ---------------
 
-.. automodule:: socs.agent.pmx
+.. automodule:: socs.common.pmx
     :members:
     :noindex:

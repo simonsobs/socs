@@ -3,35 +3,6 @@ API
 
 This page contains the auto-generated documentation for the socs package.
 
-socs.agent
-----------
-
-The ``agent/`` directory contains code that supports one or more socs Agents.
-
-socs.agent.moxaSerial
-`````````````````````
-
-.. automodule:: socs.agent.moxaSerial
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-socs.agent.pmx
-``````````````
-
-.. automodule:: socs.agent.pmx
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-socs.agent.prologix_interface
-`````````````````````````````
-
-.. automodule:: socs.agent.prologix_interface
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
 socs.agents
 -----------
 
@@ -55,6 +26,36 @@ socs.agents.vantagepro2.drivers
 ```````````````````````````````
 
 .. automodule:: socs.agents.vantagepro2.drivers
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+socs.common
+-----------
+
+The ``common/`` directory contains driver code that is used by multiple socs
+Agents.
+
+socs.common.moxa_serial
+```````````````````````
+
+.. automodule:: socs.common.moxa_serial
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+socs.common.pmx
+```````````````
+
+.. automodule:: socs.common.pmx
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+socs.common.prologix_interface
+``````````````````````````````
+
+.. automodule:: socs.common.prologix_interface
     :members:
     :undoc-members:
     :show-inheritance:

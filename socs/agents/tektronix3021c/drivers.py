@@ -1,7 +1,7 @@
 """Michael Randall
     mrandall@ucsd.edu"""
 
-from socs.agent.prologix_interface import PrologixInterface
+from socs.common.prologix_interface import PrologixInterface
 
 
 class TektronixInterface(PrologixInterface):

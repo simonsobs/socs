@@ -6,7 +6,7 @@ from ocs.ocs_twisted import TimeoutLock
 from twisted.internet import reactor
 
 import socs.agents.hwp_rotation.drivers.pid_controller as pd
-from socs.agent.pmx import PMX, Command
+from socs.common.pmx import PMX, Command
 
 
 class RotationAgent:

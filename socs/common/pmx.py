@@ -3,7 +3,7 @@ import time
 
 import serial
 
-from socs.agent import moxaSerial as mx
+from socs.common import moxa_serial as mx
 
 
 class PMX:
