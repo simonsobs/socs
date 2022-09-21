@@ -1,13 +1,12 @@
-import time
-import os
 import argparse
-import txaio
+import os
+import time
+
 import numpy as np
-
-from ocs import ocs_agent, site_config
-import yaml
-
 import so3g
+import txaio
+import yaml
+from ocs import ocs_agent, site_config
 from spt3g import core
 
 

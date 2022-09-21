@@ -1,14 +1,13 @@
+import argparse
+import time
 from os import environ
 
-import time
-import argparse
 import txaio
-
 from autobahn.twisted.util import sleep as dsleep
-from twisted.internet.defer import inlineCallbacks
-from twisted.internet import reactor
-
 from ocs import ocs_agent, site_config
+from twisted.internet import reactor
+from twisted.internet.defer import inlineCallbacks
+
 from socs.snmp import SNMPTwister
 
 # For logging

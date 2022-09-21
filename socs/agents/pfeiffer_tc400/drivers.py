@@ -7,9 +7,12 @@
 # It also uses a slightly modified version of a Pfeiffer Vacuum Protocol package found on GitHub
 
 import serial
-from pfeiffer_vacuum_protocol.pfeiffer_vacuum_protocol import _send_data_request as send_data_request
-from pfeiffer_vacuum_protocol.pfeiffer_vacuum_protocol import _send_control_command as send_control_command
-from pfeiffer_vacuum_protocol.pfeiffer_vacuum_protocol import _read_gauge_response as read_gauge_response
+from pfeiffer_vacuum_protocol.pfeiffer_vacuum_protocol import \
+    _read_gauge_response as read_gauge_response
+from pfeiffer_vacuum_protocol.pfeiffer_vacuum_protocol import \
+    _send_control_command as send_control_command
+from pfeiffer_vacuum_protocol.pfeiffer_vacuum_protocol import \
+    _send_data_request as send_data_request
 
 # Data type 0 from TC400 Manual Section 8.3 - Applied data types
 PFEIFFER_BOOL = {'111111': True,

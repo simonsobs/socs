@@ -1,15 +1,16 @@
 import argparse
-import so3g  # noqa: F401
-from spt3g import core
-import txaio
-import os
-import numpy as np
-import yaml
 import ast
-from scipy import signal
+import os
 import queue
 import time
+
+import numpy as np
+import so3g  # noqa: F401
+import txaio
+import yaml
 from ocs import ocs_agent, site_config
+from scipy import signal
+from spt3g import core
 
 MAX_CHANS = 4096
 CHANS_PER_BAND = 512

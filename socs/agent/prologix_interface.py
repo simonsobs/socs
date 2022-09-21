@@ -1,5 +1,5 @@
-import time
 import socket
+import time
 
 
 class PrologixInterface:

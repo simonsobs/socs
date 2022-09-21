@@ -1,15 +1,16 @@
-import socket
+import argparse
 import os
+import socket
 import time
+
 import txaio
 import yaml
-import argparse
 from twisted.internet import reactor
 
 ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 if not ON_RTD:
     from ocs import ocs_agent, site_config
-    from ocs.ocs_twisted import TimeoutLock, Pacemaker
+    from ocs.ocs_twisted import Pacemaker, TimeoutLock
 
 
 class FTSAerotechStage:

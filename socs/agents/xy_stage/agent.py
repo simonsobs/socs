@@ -1,11 +1,10 @@
-import os
 import argparse
+import os
 import time
+
 import txaio
-
 from ocs import ocs_agent, site_config
-from ocs.ocs_twisted import TimeoutLock, Pacemaker
-
+from ocs.ocs_twisted import Pacemaker, TimeoutLock
 
 ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 if not ON_RTD:

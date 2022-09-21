@@ -1,9 +1,11 @@
-import os
-import time
 import argparse
-import numpy as np
+import os
 import subprocess
+import time
+
+import numpy as np
 import txaio
+
 txaio.use_twisted()
 
 ON_RTD = os.environ.get('READTHEDOCS') == 'True'

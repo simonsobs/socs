@@ -1,12 +1,12 @@
 import argparse
-import time
-import threading
-import glob
-import re
 import datetime
-import txaio
+import glob
 import os
+import re
+import threading
+import time
 
+import txaio
 from ocs import ocs_agent, site_config
 
 # Notes:

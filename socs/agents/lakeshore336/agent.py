@@ -3,13 +3,14 @@
 # Author: zatkins, zhuber
 # Acknowledgments: LS372 agent -- bkoopman, mhasselfield, jlashner
 
-from ocs import ocs_agent, site_config
-from ocs.ocs_twisted import TimeoutLock
-from socs.Lakeshore.Lakeshore336 import LS336
-
-import numpy as np
 import argparse
 import time
+
+import numpy as np
+from ocs import ocs_agent, site_config
+from ocs.ocs_twisted import TimeoutLock
+
+from socs.Lakeshore.Lakeshore336 import LS336
 
 
 class LS336_Agent:

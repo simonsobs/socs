@@ -1,10 +1,10 @@
-import time
-import os
 import argparse
+import os
+import time
 import warnings
-import txaio
-
 from typing import Optional
+
+import txaio
 
 from socs.Lakeshore.Lakeshore240 import Module
 

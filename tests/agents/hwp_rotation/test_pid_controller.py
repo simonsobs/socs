@@ -1,5 +1,4 @@
 from socs.agents.hwp_rotation.drivers.pid_controller import PID
-
 from socs.testing.device_emulator import create_device_emulator
 
 pid_emu = create_device_emulator(

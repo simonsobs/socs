@@ -1,8 +1,9 @@
 import os
+
 import numpy as np
 import txaio
 
-from socs.db.suprsync import SupRsyncFilesManager, SupRsyncFileHandler
+from socs.db.suprsync import SupRsyncFileHandler, SupRsyncFilesManager
 
 txaio.use_twisted()
 

@@ -1,13 +1,12 @@
 import argparse
 import time
-from twisted.internet import reactor
 
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
-
-from socs.agent.pmx import PMX, Command
+from twisted.internet import reactor
 
 import socs.agents.hwp_rotation.drivers.pid_controller as pd
+from socs.agent.pmx import PMX, Command
 
 
 class RotationAgent:

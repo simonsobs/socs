@@ -1,8 +1,8 @@
 #!/usr/bin/env python
-import requests
 import argparse
 import time
 
+import requests
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 

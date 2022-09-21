@@ -1,13 +1,12 @@
 import argparse
 import time
 
-from ocs import ocs_agent
-from ocs import site_config
+from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
-from socs.agents.wiregrid_actuator.drivers.Actuator import Actuator
 import socs.agents.wiregrid_actuator.limitswitch_config as limitswitch_config
 import socs.agents.wiregrid_actuator.stopper_config as stopper_config
+from socs.agents.wiregrid_actuator.drivers.Actuator import Actuator
 
 
 class WiregridActuatorAgent:

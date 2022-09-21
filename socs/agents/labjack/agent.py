@@ -1,18 +1,18 @@
 import argparse
-import time
-import struct
-import os
-import numexpr
-import yaml
 import csv
-from scipy.interpolate import interp1d
+import os
+import struct
+import time
+
+import numexpr
 import numpy as np
 import txaio
-
+import yaml
 from labjack import ljm
 from labjack.ljm.ljm import LJMError
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
+from scipy.interpolate import interp1d
 
 txaio.use_twisted()
 

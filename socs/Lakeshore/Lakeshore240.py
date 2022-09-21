@@ -6,13 +6,13 @@ Created on Fri Feb 23 14:15:51 2018
 @author: jacoblashner
 """
 
-from serial import Serial
-import time
-import sys
-from collections import OrderedDict
 import socket
+import sys
+import time
+from collections import OrderedDict
 from typing import List
 
+from serial import Serial
 
 BUFF_SIZE = 1024
 

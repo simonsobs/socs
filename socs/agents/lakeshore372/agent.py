@@ -1,18 +1,18 @@
+import argparse
 import os
 import random
-import argparse
+import threading
 import time
+from contextlib import contextmanager
+
 import numpy as np
 import txaio
-import threading
 import yaml
-from contextlib import contextmanager
+from ocs import ocs_agent, site_config
+from ocs.ocs_twisted import Pacemaker, TimeoutLock
 from twisted.internet import reactor
 
 from socs.Lakeshore.Lakeshore372 import LS372
-
-from ocs import ocs_agent, site_config
-from ocs.ocs_twisted import TimeoutLock, Pacemaker
 
 
 class YieldingLock:

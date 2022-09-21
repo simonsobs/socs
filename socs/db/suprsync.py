@@ -1,12 +1,12 @@
 import os
-import time
 import subprocess
 import tempfile
-import txaio
+import time
 
-from sqlalchemy import (Column, create_engine, Integer, String, Float, Boolean)
-from sqlalchemy.orm import sessionmaker
+import txaio
+from sqlalchemy import Boolean, Column, Float, Integer, String, create_engine
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 
 from socs.util import get_md5sum
 

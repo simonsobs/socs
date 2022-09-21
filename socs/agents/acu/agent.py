@@ -1,18 +1,20 @@
-import time
-import struct
-import datetime
-import calendar
-import soaculib as aculib
-import socs.agents.acu.drivers as sh
-from soaculib.twisted_backend import TwistedHttpBackend
 import argparse
+import calendar
+import datetime
+import struct
+import time
+
+import soaculib as aculib
 import soaculib.status_keys as status_keys
-from twisted.internet import reactor, protocol
-from twisted.internet.defer import inlineCallbacks
 import twisted.web.client as tclient
 from autobahn.twisted.util import sleep as dsleep
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
+from soaculib.twisted_backend import TwistedHttpBackend
+from twisted.internet import protocol, reactor
+from twisted.internet.defer import inlineCallbacks
+
+import socs.agents.acu.drivers as sh
 
 
 def timecode(acutime):

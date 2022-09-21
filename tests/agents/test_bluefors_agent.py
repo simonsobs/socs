@@ -1,6 +1,6 @@
-from socs.agents.bluefors.agent import BlueforsAgent
-
 from unittest import mock
+
+from socs.agents.bluefors.agent import BlueforsAgent
 
 
 def test_bluefors():

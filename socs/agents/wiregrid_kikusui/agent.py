@@ -1,10 +1,10 @@
 import argparse
 import time
-import numpy as np
 
+import numpy as np
 from ocs import ocs_agent, site_config
-from ocs.ocs_twisted import TimeoutLock
 from ocs.ocs_client import OCSClient
+from ocs.ocs_twisted import TimeoutLock
 
 from socs.agent import pmx
 from socs.agents.wiregrid_kikusui.drivers.common import openlog, writelog

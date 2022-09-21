@@ -1,7 +1,8 @@
-import time
+import argparse
 import os
 import socket
-import argparse
+import time
+
 from socs.agents.scpi_psu.drivers import PsuInterface
 
 on_rtd = os.environ.get('READTHEDOCS') == 'True'

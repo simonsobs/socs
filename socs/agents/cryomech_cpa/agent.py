@@ -3,12 +3,12 @@
 # Sanah Bhimani, May 2022
 
 import argparse
-import time
-import struct
-import socket
 import random
+import socket
+import struct
+import time
 
-from ocs import site_config, ocs_agent
+from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
 STX = '\x02'

@@ -1,8 +1,8 @@
-from serial import Serial
-import time
-import struct
 import array as arr
+import struct
+import time
 
+from serial import Serial
 
 # some commands require a CRC code (cyclic redundancy check) -
 # these require the provided CRC table

@@ -1,11 +1,12 @@
+import argparse
 import os
 import random
-import argparse
+import threading
 import time
+from contextlib import contextmanager
+
 import numpy as np
 import txaio
-import threading
-from contextlib import contextmanager
 
 from socs.Lakeshore.Lakeshore370 import LS370
 

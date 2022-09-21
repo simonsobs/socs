@@ -1,9 +1,9 @@
 import time
+
 import pytest
 
 from socs.agent import moxaSerial
 from socs.testing.device_emulator import create_device_emulator
-
 
 tcp_emulator = create_device_emulator({'ping': 'pong\r'},
                                       'tcp', 9001)

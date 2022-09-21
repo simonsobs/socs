@@ -1,10 +1,12 @@
 # Built-in python modules
-import time
 import os
+import time
+
 # Specific module for actuator controller
 on_rtd = os.environ.get('READTHEDOCS') == 'True'
 if not on_rtd:
     import gclib
+
 from socs.agents.wiregrid_actuator.drivers.DigitalIO import DigitalIO
 
 

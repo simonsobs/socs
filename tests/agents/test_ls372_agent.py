@@ -1,11 +1,11 @@
-from socs.agents.lakeshore372.agent import LS372_Agent
-
-from ocs.ocs_agent import OpSession
-
-import pytest
 from unittest import mock
 
+import pytest
 import txaio
+from ocs.ocs_agent import OpSession
+
+from socs.agents.lakeshore372.agent import LS372_Agent
+
 txaio.use_twisted()
 
 

@@ -1,9 +1,9 @@
-import time
-import socket
 import argparse
-import txaio
+import socket
+import time
 from os import environ
 
+import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 

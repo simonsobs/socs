@@ -1,8 +1,10 @@
-from socs.agents.smurf_file_emulator.agent import SmurfFileEmulator, make_parser
-
 from unittest import mock
 
 import txaio
+
+from socs.agents.smurf_file_emulator.agent import (SmurfFileEmulator,
+                                                   make_parser)
+
 txaio.use_twisted()
 
 

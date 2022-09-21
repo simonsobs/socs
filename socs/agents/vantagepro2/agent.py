@@ -1,17 +1,16 @@
 
-import time
-import os
 import argparse
-
+import os
+import time
 from typing import Optional
+
 from socs.agents.vantagepro2.drivers import VantagePro2
 
 # from LS240_agent
 on_rtd = os.environ.get('READTHEDOCS') == 'True'
 if not on_rtd:
     from ocs import ocs_agent, site_config
-    from ocs.ocs_twisted import Pacemaker
-    from ocs.ocs_twisted import TimeoutLock
+    from ocs.ocs_twisted import Pacemaker, TimeoutLock
 
 
 class VantagePro2Agent:

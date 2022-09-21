@@ -1,11 +1,13 @@
+import calendar
+import select
 import socket
 import struct
-import select
 import time
-import calendar
-import numpy as np
 from collections import deque
+
+import numpy as np
 import txaio
+
 txaio.use_twisted()
 
 # should be consistent with the software on beaglebone

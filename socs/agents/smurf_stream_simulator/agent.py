@@ -1,21 +1,20 @@
+import argparse
 import os
 import time
-import argparse
-
-from os import environ
-from enum import Enum
 from collections import deque
+from enum import Enum
+from os import environ
 
-import txaio
 import numpy as np
+import txaio
 
 # For logging
 txaio.use_twisted()
 
 ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 if not ON_RTD:
-    from ocs import ocs_agent, site_config
     import so3g  # noqa: F401
+    from ocs import ocs_agent, site_config
     from spt3g import core
 
 

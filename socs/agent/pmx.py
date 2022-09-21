@@ -1,6 +1,7 @@
-import time
-import serial
 import sys
+import time
+
+import serial
 
 from socs.agent import moxaSerial as mx
 

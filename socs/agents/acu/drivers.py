@@ -1,5 +1,6 @@
-import numpy as np
 import time
+
+import numpy as np
 
 
 def constant_velocity_scanpoints(azpts, el, azvel, acc, ntimes):

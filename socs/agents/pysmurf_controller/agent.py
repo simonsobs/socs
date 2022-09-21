@@ -1,28 +1,25 @@
-from twisted.internet import reactor, protocol, threads
-from twisted.python.failure import Failure
-from twisted.internet.defer import inlineCallbacks, Deferred
-from autobahn.twisted.util import sleep as dsleep
-from twisted.logger import Logger, FileLogObserver
-
 import matplotlib
+from autobahn.twisted.util import sleep as dsleep
+from twisted.internet import protocol, reactor, threads
+from twisted.internet.defer import Deferred, inlineCallbacks
+from twisted.logger import FileLogObserver, Logger
+from twisted.python.failure import Failure
+
 matplotlib.use('Agg')
-import sodetlib as sdl
-from sodetlib.operations import (
-    uxm_setup, uxm_relock, bias_steps, iv, bias_dets
-)
-from sodetlib.det_config import DetConfig
-import numpy as np
-
-import sys
-from typing import Optional
-import time
-import os
 import argparse
+import os
+import sys
+import time
+from typing import Optional
 
+import numpy as np
+import sodetlib as sdl
 from ocs import ocs_agent, site_config
 from ocs.ocs_agent import log_formatter
 from ocs.ocs_twisted import TimeoutLock
-
+from sodetlib.det_config import DetConfig
+from sodetlib.operations import (bias_dets, bias_steps, iv, uxm_relock,
+                                 uxm_setup)
 
 NBIASLINES = 12
 

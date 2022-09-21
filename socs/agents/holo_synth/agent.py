@@ -1,9 +1,9 @@
 import argparse
 import os
 import time
+
 import txaio
 import yaml
-
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 

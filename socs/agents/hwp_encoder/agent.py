@@ -51,15 +51,17 @@ HWPEncoder_full: separated feed for full-sample HWP encoder data,
 """
 
 import argparse
+import calendar
 import os
+import select
 import socket
 import struct
 import time
-import calendar
 from collections import deque
-import select
+
 import numpy as np
 import txaio
+
 txaio.use_twisted()
 
 # Required by OCS

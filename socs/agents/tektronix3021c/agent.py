@@ -1,10 +1,10 @@
 """Michael Randall
 mrandall@ucsd.edu"""
 
-import time
+import argparse
 import os
 import socket
-import argparse
+import time
 
 from socs.agents.tektronix3021c.drivers import TektronixInterface
 

@@ -4,9 +4,10 @@
 
 import argparse
 import socket
+import time
+
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
-import time
 
 BUFF_SIZE = 128
 ENQ = '\x05'

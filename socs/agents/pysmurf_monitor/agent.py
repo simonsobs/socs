@@ -1,13 +1,12 @@
-import json
-import time
-import queue
-import os
 import argparse
+import json
+import os
+import queue
+import time
 
-from twisted.internet.protocol import DatagramProtocol
+from ocs import ocs_agent, ocs_feed, site_config
 from twisted.internet import reactor
-
-from ocs import ocs_agent, site_config, ocs_feed
+from twisted.internet.protocol import DatagramProtocol
 
 from socs.db.suprsync import SupRsyncFilesManager, create_file
 

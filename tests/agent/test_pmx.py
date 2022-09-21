@@ -1,9 +1,9 @@
 import time
+
 import pytest
 
-from socs.agent.pmx import Command, PMX
+from socs.agent.pmx import PMX, Command
 from socs.testing.device_emulator import create_device_emulator
-
 
 tcp_emulator = create_device_emulator({'ping': 'pong\r',
                                        'SYST:REM': 'test'},

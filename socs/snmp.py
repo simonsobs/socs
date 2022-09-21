@@ -1,8 +1,9 @@
 import os
-import txaio
 
-from pysnmp.hlapi.twisted import getCmd, setCmd, SnmpEngine, CommunityData, UdpTransportTarget,\
-    ContextData, ObjectType, ObjectIdentity, UsmUserData
+import txaio
+from pysnmp.hlapi.twisted import (CommunityData, ContextData, ObjectIdentity,
+                                  ObjectType, SnmpEngine, UdpTransportTarget,
+                                  UsmUserData, getCmd, setCmd)
 
 from socs import mibs
 

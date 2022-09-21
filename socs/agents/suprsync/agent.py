@@ -1,12 +1,12 @@
 import argparse
 import os
-import time
 import subprocess
-import txaio
+import time
 
+import txaio
 from ocs import ocs_agent, site_config
 
-from socs.db.suprsync import (SupRsyncFilesManager, SupRsyncFileHandler)
+from socs.db.suprsync import SupRsyncFileHandler, SupRsyncFilesManager
 
 
 class SupRsync:

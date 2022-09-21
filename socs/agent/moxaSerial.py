@@ -4,8 +4,8 @@
 #  readbuf() dumps current buffer contents
 #  readpacket() has old broken behavior of read() - lowest level / fastest
 
-import time
 import socket
+import time
 
 MOXA_DEFAULT_TIMEOUT = 1.0
 
