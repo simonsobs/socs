@@ -771,8 +771,7 @@ class appMotionMotorsAgent:
                 elif params['motor'] == 2:
                     positions = self.motor2.get_position_in_inches()
                 else:
-                    positions = self.motor1.get_position_in_inches()
-                    positions = self.motor2.get_position_in_inches()
+                    positions = [self.motor1.get_position_in_inches(), self.motor2.get_position_in_inches()]
             else:
                 if params['motor'] == 1:
                     positions = self.motor1.get_position()
@@ -1090,7 +1089,7 @@ if __name__ == '__main__':
     agent.register_task('run_positions', m.run_positions)
     agent.register_task('start_rotation', m.start_rotation)
     agent.register_task('stop_rotation', m.stop_rotation)
-    agent.register_task('close_connecttion', m.close_connection)
+    agent.register_task('close_connection', m.close_connection)
     agent.register_task('reconnect_motor', m.reconnect_motor)
     agent.register_task('block_while_moving', m.block_while_moving)
     agent.register_task('kill_all_commands', m.kill_all_commands)
