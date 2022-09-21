@@ -1,9 +1,39 @@
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 import versioneer
 
 with open("README.rst", "r", encoding="utf-8") as fh:
     long_description = fh.read()
+
+# Optional Dependencies
+acu_deps = ['soaculib @ git+https://github.com/simonsobs/soaculib.git@master']
+holography_deps = [  # Note: supports python 3.8 only!
+    'casperfpga @ git+https://github.com/casper-astro/casperfpga.git@py38',
+    'holog_daq @ git+https://github.com/McMahonCosmologyGroup/holog_daq.git@main',
+]
+labjack_deps = [
+    'labjack-ljm',
+    'numexpr',
+    'scipy',
+]
+magpie_deps = [
+    'pandas',
+    'scipy',
+    'so3g',
+]
+pfeiffer_deps = ['pfeiffer-vacuum-protocol==0.4']
+pysmurf_deps = [
+    'matplotlib',
+    'sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master',
+]
+smurf_sim_deps = ['so3g']
+synacc_deps = ['requests']
+xy_stage_deps = [
+    'xy_stage_control @ git+https://github.com/kmharrington/xy_stage_control.git@main',
+]
+all_deps = acu_deps + labjack_deps + magpie_deps + pfeiffer_deps + \
+    pysmurf_deps + smurf_sim_deps + synacc_deps + xy_stage_deps
+all_deps = list(set(all_deps))
 
 setup(name='socs',
       long_description=long_description,
@@ -37,30 +67,26 @@ setup(name='socs',
       ],
       python_requires=">=3.7",
       install_requires=[
-          'ocs',
           'autobahn[serialization]',
-          'twisted',
-          'pyyaml',
-          'pyserial',
-          'sqlalchemy>=1.4',
-          'pysnmp',
-          'requests',
-          'pandas',
-          'numexpr',
-          'scipy',
-          'labjack-ljm',
-          'pfeiffer-vacuum-protocol==0.4',
-          'xy_stage_control @ git+https://github.com/kmharrington/xy_stage_control.git@main',
-          'soaculib @ git+https://github.com/simonsobs/soaculib.git@master',
-          'matplotlib',
           'numpy',
-          'sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master',
+          'ocs',
+          'pyserial',
+          'pysnmp',
+          'pysmi',
+          'pyyaml',
+          'sqlalchemy>=1.4',
+          'twisted',
       ],
       extras_require={
-          "so3g": ["so3g"],
-          "holography": [  # Note: supports python 3.8 only!
-              'casperfpga @ git+https://github.com/casper-astro/casperfpga.git@py38',
-              'holog_daq @ git+https://github.com/McMahonCosmologyGroup/holog_daq.git@main',
-          ],
+          'all': all_deps,
+          'acu': acu_deps,
+          'holography': holography_deps,
+          'labjack': labjack_deps,
+          'magpie': magpie_deps,
+          'pfeiffer': pfeiffer_deps,
+          'pysmurf': pysmurf_deps,
+          'smurf_sim': smurf_sim_deps,
+          'synacc': synacc_deps,
+          'xy_stage': xy_stage_deps,
       },
       )

@@ -7,9 +7,49 @@ Install and update with pip::
 
     $ pip install -U socs
 
-Optionally install so3g during installation::
+You may install optional dependencies by including one or more agent group
+names on installation, for example::
 
-    $ pip install -U socs[so3g]
+    $ pip3 install -U socs[labjack,pysmurf]
+
+The different groups, and the agents they provide dependencies for are:
+
+.. list-table::
+   :widths: 1 2
+   :header-rows: 1
+
+   * - Group
+     - Supporting Agents
+   * - ``all``
+     - All Agents (except ``holography``)
+   * - ``acu``
+     - ACU Agent
+   * - ``holography``
+     - Holography FPGA and Synthesizer Agents
+   * - ``labjack``
+     - Labjack Agent
+   * - ``magpie``
+     - Magpie Agent
+   * - ``pfeiffer``
+     - Pfeiffer TC 400 Agent
+   * - ``pysmurf``
+     - Pysmurf Controller Agent
+   * - ``smurf_sim``
+     - SMuRF File Emulator, SMuRF Stream Simulator
+   * - ``synacc``
+     - Synaccess Agent
+   * - ``xy_stage``
+     - LATRt XY Stage Agent
+
+If you would like to install all optional dependencies use the special varient
+"all"::
+
+    $ pip3 install -U socs[all]
+
+.. note::
+    Some Agents have additional dependencies that cannot be installed with pip.
+    See the Agent reference page for the particular agent you are trying to run
+    for more details.
 
 Installing from Source
 ----------------------
