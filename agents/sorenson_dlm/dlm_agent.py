@@ -97,24 +97,18 @@ class DLMAgent:
 
     """
 
-    def __init__(self, agent, ip_address, port, f_sample=2.5):
-        self.active = True  # not used elsewhere
+    def __init__(self, agent, ip_address, port=9221, f_sample=2.5):
         self.agent = agent
+        self.ip_address = ip_address
+        self.port = port
         self.log = agent.log
         self.lock = TimeoutLock()
         self.f_sample = f_sample
         self.take_data = False
         self.over_volt = 0.
         self.initialized = False
-        self._acq_proc_lock = TimeoutLock()  # is this necessary? only used in init_dlm
-        self._lock = TimeoutLock()  # is this necessary? only used in init_dlm
-
-        try:
-            self.dlm = DLM(ip_address, int(port))
-        except socket.timeout as e:
-            self.log.error("DLM power supply has timed out"
-                           + f"during connect with error {e}")
-            return False, "Timeout"
+        self._acq_proc_lock = TimeoutLock()
+        self._lock = TimeoutLock()
 
         agg_params = {'frame length': 60, }
         self.agent.register_feed('voltages',
@@ -142,9 +136,7 @@ class DLMAgent:
             pm = Pacemaker(f_sample, True)
         else:
             pm = Pacemaker(f_sample)
-        # job='init' is set here and in other acquire_timeout calls
-        # even though the job is not 'init'
-        with self.lock.acquire_timeout(timeout=0, job='init') as acquired:
+        with self.lock.acquire_timeout(timeout=0, job='acq') as acquired:
             # Locking mechanism stops code from proceeding if no lock acquired
             pm.sleep()
             if not acquired:
@@ -197,8 +189,7 @@ class DLMAgent:
 
         """
 
-        # job='init' set erroneously
-        with self.lock.acquire_timeout(timeout=3, job='init') as acquired:
+        with self.lock.acquire_timeout(timeout=3, job='set_voltage') as acquired:
             if acquired:
                 if self.over_volt == 0:
                     return False, 'Over voltage protection not set'
@@ -225,9 +216,7 @@ class DLMAgent:
                 client.set_over_volt(over_volt = 10.)
 
         """
-
-        # job='init' set erroneously
-        with self.lock.acquire_timeout(timeout=3, job='init') as acquired:
+        with self.lock.acquire_timeout(timeout=3, job='set_over_volt') as acquired:
             if acquired:
                 if not self.dlm.set_overv_prot(params['over_volt']):
                     return False, 'Failed to set overvoltage protection'
@@ -252,8 +241,7 @@ class DLMAgent:
 
         """
 
-        # job='init' set erroneously
-        with self.lock.acquire_timeout(timeout=3, job='init') as acquired:
+        with self.lock.acquire_timeout(timeout=3, job='set_current') as acquired:
             if acquired:
                 if self.over_volt == 0:
                     return False, 'Over voltage protection not set'
@@ -283,28 +271,23 @@ class DLMAgent:
             force (bool, optional): Force initialization, even if already
                 initialized. Defaults to False.
         """
-        if params is None:
-            params = {}
 
-        if self.initialized and not params.get('force', False):
+        if self.initialized and not params['force']:
             self.log.info("DLM already initialized Returning...")
             return True, "Already initialized"
 
-        # purpose of these locks when they are not used elsewhere?
-        with self._lock.acquire_timeout(job='init') as acquired1, \
-                self._acq_proc_lock.acquire_timeout(timeout=0., job='init') \
-                as acquired2:
-            if not acquired1:
+        with self._lock.acquire_timeout(timeout=3, job='init') as acquired:
+            if not acquired:
                 self.log.warn(f"Could not start init because "
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
-            if not acquired2:
-                self.log.warn(f"Could not start init because "
-                              f"{self._acq_proc_lock.job} is already running")
-                return False, "Could not acquire lock"
-            # no code is lock-protected here --- i.e., locks are acquired
-            # and then immediately freed
-        session.set_status('running')
+            session.set_status('running')
+            try:
+                self.dlm = DLM(self.ip_address, int(self.port))
+            except socket.timeout as e:
+                self.log.error("DLM power supply has timed out"
+                               + f"during connect with error {e}")
+                return False, "Timeout"
 
         # Start data acquisition if requested
         if params.get('auto_acquire', False):
@@ -337,7 +320,7 @@ def make_parser(parser=None):
     pgroup.add_argument('--port', type=int, help="Serial-to-ethernet "
                         + "converter port")
     pgroup.add_argument('--mode', default='acq',
-                        choices=['idel', 'acq', 'acq_reg'])
+                        choices=['idel', 'acq'])
     return parser
 
 
@@ -361,6 +344,6 @@ if __name__ == '__main__':
     agent.register_task('set_voltage', DLM_agent.set_voltage)
     agent.register_task('close', DLM_agent._stop_acq)
     agent.register_task('set_over_volt', DLM_agent.set_over_volt)
-    agent.register_task('init_dlm', DLM_agent.init_dlm, startup=True)
+    agent.register_task('init_dlm', DLM_agent.init_dlm, startup=init_params)
     agent.register_task('set_current', DLM_agent.set_current)
     runner.run(agent, auto_reconnect=True)
