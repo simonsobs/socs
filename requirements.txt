@@ -33,7 +33,9 @@ pfeiffer-vacuum-protocol==0.4
 
 # pysmurf controller
 matplotlib
+pysmurf @ git+https://github.com/slaclab/pysmurf.git@develop
 sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master
+sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master
 
 # synacc agent
 requests

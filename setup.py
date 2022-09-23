@@ -37,6 +37,7 @@ pysmurf_deps = [
     'matplotlib',
     'pysmurf @ git+https://github.com/slaclab/pysmurf.git@develop',
     'sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master',
+    'sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master',
 ]
 
 # SMuRF File Emulator, SMuRF Stream Simulator
