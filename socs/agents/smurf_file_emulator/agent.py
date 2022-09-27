@@ -652,10 +652,11 @@ def make_parser(parser=None):
     return parser
 
 
-def main():
+def main(args=None):
     parser = make_parser()
     args = site_config.parse_args(agent_class='SmurfFileEmulator',
-                                  parser=parser)
+                                  parser=parser,
+                                  args=args)
 
     txaio.start_logging(level=os.environ.get('LOGLEVEL', 'info'))
 

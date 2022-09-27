@@ -1095,11 +1095,12 @@ def make_parser(parser=None):
     return parser
 
 
-def main():
+def main(args=None):
     # Create an argument parser
     parser = make_parser()
-    args = site_config.parse_args(
-        agent_class='Lakeshore336Agent', parser=parser)
+    args = site_config.parse_args(agent_class='Lakeshore336Agent',
+                                  parser=parser,
+                                  args=args)
 
     # Automatically acquire data if requested
     init_params = False

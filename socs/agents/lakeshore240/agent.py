@@ -267,7 +267,7 @@ def make_parser(parser=None):
     return parser
 
 
-def main():
+def main(args=None):
     # Start logging
     txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
 
@@ -278,7 +278,9 @@ def main():
     parser.add_argument('--num-channels', help=argparse.SUPPRESS)
 
     # Interpret options in the context of site_config.
-    args = site_config.parse_args(agent_class='Lakeshore240Agent', parser=parser)
+    args = site_config.parse_args(agent_class='Lakeshore240Agent',
+                                  parser=parser,
+                                  args=args)
 
     if args.fake_data is not None:
         warnings.warn("WARNING: the --fake-data parameter is deprecated, please "

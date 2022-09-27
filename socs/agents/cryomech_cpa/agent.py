@@ -363,9 +363,11 @@ def make_parser(parser=None):
     return parser
 
 
-def main():
+def main(args=None):
     parser = make_parser()
-    args = site_config.parse_args(agent_class='CryomechCPAAgent', parser=parser)
+    args = site_config.parse_args(agent_class='CryomechCPAAgent',
+                                  parser=parser,
+                                  args=args)
     print('I am in charge of device with serial number: %s' % args.serial_number)
 
     # Automatically acquire data if requested (default)

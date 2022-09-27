@@ -526,13 +526,15 @@ def make_parser(parser=None):
     return parser
 
 
-def main():
+def main(args=None):
     # Start logging
     txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
 
     # Setup argument parser
     parser = make_parser()
-    args = site_config.parse_args(agent_class='BlueforsAgent', parser=parser)
+    args = site_config.parse_args(agent_class='BlueforsAgent',
+                                  parser=parser,
+                                  args=args)
     LOG.info('I am following logs located at : %s' % args.log_directory)
 
     agent, runner = ocs_agent.init_site_agent(args)

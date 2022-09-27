@@ -694,9 +694,11 @@ def make_parser(parser=None):
 
 
 # Portion of the code that runs
-def main():
+def main(args=None):
     parser = make_parser()
-    args = site_config.parse_args(agent_class='HWPBBBAgent', parser=parser)
+    args = site_config.parse_args(agent_class='HWPBBBAgent',
+                                  parser=parser,
+                                  args=args)
     agent, runner = ocs_agent.init_site_agent(args)
     hwp_bbb_agent = HWPBBBAgent(agent, port=args.port)
     agent.register_process('acq', hwp_bbb_agent.start_acq, hwp_bbb_agent.stop_acq, startup=True)

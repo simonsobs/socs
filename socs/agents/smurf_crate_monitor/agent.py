@@ -282,10 +282,11 @@ def make_parser(parser=None):
     return parser
 
 
-def main():
+def main(args=None):
     parser = make_parser()
     args = site_config.parse_args(agent_class='CrateAgent',
-                                  parser=parser)
+                                  parser=parser,
+                                  args=args)
     startup = True
     agent, runner = ocs_agent.init_site_agent(args)
     shm_addr = args.shm_addr

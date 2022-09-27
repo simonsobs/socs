@@ -1104,7 +1104,7 @@ def make_parser(parser=None):
     return parser
 
 
-def main():
+def main(args=None):
     # For logging
     txaio.use_twisted()
     txaio.make_logger()
@@ -1113,7 +1113,9 @@ def main():
     txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
 
     parser = make_parser()
-    args = site_config.parse_args(agent_class='Lakeshore372Agent', parser=parser)
+    args = site_config.parse_args(agent_class='Lakeshore372Agent',
+                                  parser=parser,
+                                  args=args)
 
     # Automatically acquire data if requested (default)
     init_params = False

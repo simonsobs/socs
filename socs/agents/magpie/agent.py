@@ -1016,11 +1016,13 @@ def make_parser(parser=None):
     return parser
 
 
-def main():
+def main(args=None):
     txaio.use_twisted()
     txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
     parser = make_parser()
-    args = site_config.parse_args(agent_class='MagpieAgent', parser=parser)
+    args = site_config.parse_args(agent_class='MagpieAgent',
+                                  parser=parser,
+                                  args=args)
 
     agent, runner = ocs_agent.init_site_agent(args)
     magpie = MagpieAgent(agent, args)

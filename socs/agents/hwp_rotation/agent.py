@@ -460,9 +460,11 @@ def make_parser(parser=None):
     return parser
 
 
-def main():
+def main(args=None):
     parser = make_parser()
-    args = site_config.parse_args(agent_class='RotationAgent', parser=parser)
+    args = site_config.parse_args(agent_class='RotationAgent',
+                                  parser=parser,
+                                  args=args)
 
     init_params = False
     if args.mode == 'init':

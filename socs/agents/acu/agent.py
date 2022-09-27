@@ -1032,9 +1032,11 @@ def add_agent_args(parser_in=None):
     return parser_in
 
 
-def main():
+def main(args=None):
     parser = add_agent_args()
-    args = site_config.parse_args(agent_class='ACUAgent', parser=parser)
+    args = site_config.parse_args(agent_class='ACUAgent',
+                                  parser=parser,
+                                  args=args)
 
     agent, runner = ocs_agent.init_site_agent(args)
     _ = ACUAgent(agent, args.acu_config)

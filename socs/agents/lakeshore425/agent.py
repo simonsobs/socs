@@ -239,12 +239,14 @@ def make_parser(parser=None):
     return parser
 
 
-def main():
+def main(args=None):
     # Start logging
     txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
 
     parser = make_parser()
-    args = site_config.parse_args(agent_class='Lakeshore425Agent', parser=parser)
+    args = site_config.parse_args(agent_class='Lakeshore425Agent',
+                                  parser=parser,
+                                  args=args)
 
     agent, runner = ocs_agent.init_site_agent(args)
 

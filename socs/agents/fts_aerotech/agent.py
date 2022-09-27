@@ -323,7 +323,7 @@ def make_parser(parser=None):
     return parser
 
 
-def main():
+def main(args=None):
     # For logging
     txaio.use_twisted()
     txaio.make_logger()
@@ -335,7 +335,8 @@ def main():
 
     # Interpret options in the context of site_config.
     args = site_config.parse_args(agent_class='FTSAerotechAgent',
-                                  parser=parser)
+                                  parser=parser,
+                                  args=args)
 
     agent, runner = ocs_agent.init_site_agent(args)
 

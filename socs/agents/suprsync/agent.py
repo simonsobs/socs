@@ -213,9 +213,11 @@ def make_parser(parser=None):
     return parser
 
 
-def main():
+def main(args=None):
     parser = make_parser()
-    args = site_config.parse_args('SupRsync', parser=parser)
+    args = site_config.parse_args('SupRsync',
+                                  parser=parser,
+                                  args=args)
     txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
 
     agent, runner = ocs_agent.init_site_agent(args)

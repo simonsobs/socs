@@ -496,12 +496,14 @@ def make_parser(parser=None):
     return parser
 
 
-def main():
+def main(args=None):
     # Start logging
     txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
 
     parser = make_parser()
-    args = site_config.parse_args(agent_class='LabJackAgent', parser=parser)
+    args = site_config.parse_args(agent_class='LabJackAgent',
+                                  parser=parser,
+                                  args=args)
 
     init_params = False
     if args.mode == 'acq':

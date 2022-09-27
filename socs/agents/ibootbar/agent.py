@@ -399,12 +399,14 @@ def add_agent_args(parser=None):
     return parser
 
 
-def main():
+def main(args=None):
     # Start logging
     txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
 
     parser = add_agent_args()
-    args = site_config.parse_args(agent_class='ibootbarAgent', parser=parser)
+    args = site_config.parse_args(agent_class='ibootbarAgent',
+                                  parser=parser,
+                                  args=args)
 
     agent, runner = ocs_agent.init_site_agent(args)
     p = ibootbarAgent(agent,
