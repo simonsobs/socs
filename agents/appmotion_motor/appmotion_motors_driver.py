@@ -683,7 +683,7 @@ class Motor:
         Close the connection to the serial controller for the
         specified motor.
         """
-        self.ser.close()
+        self.ser.sock.close()
         print("Connection to serial controller disconnected.")
 
     def reconnect_motor(self):
