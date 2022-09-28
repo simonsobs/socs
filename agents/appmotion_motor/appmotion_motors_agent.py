@@ -935,7 +935,6 @@ class appMotionMotorsAgent:
         """
         if params is None:
             params = {}
-
         pm = Pacemaker(params['f_sample'], quantize=True)
 
         if not self.initialized:

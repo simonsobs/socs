@@ -170,11 +170,11 @@ class Motor:
         """
         self.ser.flushInput()
         # Get the status of the motor and print if verbose = True
-        print(f'*************\n Driver: is_moving for motor: {self.motor}\n***********')
         msg = self.ser.writeread('RS\r')  # RS = Request Status
         self.ser.flushInput()
         if verbose:
             print(f'verbose; message: {msg}')
+            print(f'*************\n Driver: is_moving for motor{self.motor}\n***********')
             sys.stdout.flush()
         # If either motor is moving, immediately return True
         if (msg == 'RS=FMR'):
@@ -184,6 +184,7 @@ class Motor:
         elif (msg == 'RS=R'):
             if verbose:
                 print(f'Motor {self.mot_id} is not moving.')
+                return False
         elif (msg == 'RS=AR'):
             if verbose:
                 print(msg)
