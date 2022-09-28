@@ -154,7 +154,7 @@ class appMotionMotorsAgent:
                 self.log.warn(
                     f"Could not check because lock held by {self.lock.job}")
                 return False
-            self.move_status = movement_check(params)
+            self.move_status = self.movement_check(params)
 
         if self.move_status:
             return True, ("Motors are moving.", self.move_status)
