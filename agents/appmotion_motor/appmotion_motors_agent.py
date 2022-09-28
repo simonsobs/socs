@@ -970,22 +970,24 @@ class appMotionMotorsAgent:
                     if mot.mot_id is not None:
                         try:
                             self.log.debug(
-                                f"getting position/move status of motor{params['motor']}")
-                            move_status = mot.is_moving(params)
+                                f"getting position/move status of {mot.mot_id}")
+                            # convert move_status to int for C backend reasons...
+                            move_status = int(mot.is_moving(params))
                             pos = mot.get_position_in_inches()
                             e_pos = mot.retrieve_encoder_info()
-                            data['data'][f'motor{params["motor"]}_encoder'] = e_pos[0]
-                            data['data'][f'motor{params["motor"]}_stepper'] = pos[0]
-                            data['data'][f'motor{params["motor"]}_connection'] = 1
-                            data['data'][f'motor{params["motor"]}_move_status'] = move_status
+                            data['data'][f'{mot.mot_id}_encoder'] = e_pos[0]
+                            data['data'][f'{mot.mot_id}_stepper'] = pos[0]
+                            data['data'][f'{mot.mot_id}_connection'] = 1
+                            data['data'][f'{mot.mot_id}_move_status'] = move_status
 
                         except Exception as e:
                             self.log.error(f'error: {e}')
                             self.log.error(
                                 f"could not get position/move status of motor{params['motor']}")
-                            data['data'][f'motor{params["motor"]}_encoder'] = 0
-                            data['data'][f'motor{params["motor"]}_stepper'] = 0.0
-                            data['data'][f'motor{params["motor"]}_connection'] = 0
+                            data['data'][f'{mot.mot_id}_encoder'] = 0
+                            data['data'][f'{mot.mot_id}_stepper'] = 0.0
+                            data['data'][f'{mot.mot_id}_connection'] = 0
+                            data['data'][f'{mot.mot_id}_move_status'] = 0
 
                 self.agent.publish_to_feed('positions', data)
                 session.data = data
