@@ -285,6 +285,10 @@ class Motor:
 
     def seek_home_linear_stage(self):
         """
+        NOTE: Agent does NOT have this functionality.
+        ONLY KEEPING THIS CODE HERE IN CASE SOMEONE BUYS A "HOME" SWITCH.
+        This function will NOT work with LIMIT switches!!
+
         Move the linear stage to its home position using the home
         limit switch.
 

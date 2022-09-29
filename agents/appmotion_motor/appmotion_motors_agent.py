@@ -389,44 +389,6 @@ class appMotionMotorsAgent:
 
     @ocs_agent.param('motor', default=1, choices=[1, 2, 3], type=int)
     @ocs_agent.param('verbose', default=True, type=bool)
-    def seek_home_linear_stage(self, session, params):
-        """seek_home_linear_stage(motor=1)
-
-        **Task** - Move the linear stage to its home position (using the home
-        limit switch).
-
-        Parameters:
-            motor (int): Determines which motor, either 1 or 2, 3 is for all
-                motors. (default 1)
-            verbose (bool): Prints output from motor requests if True.
-                (default True)
-        """
-
-        with self.lock.acquire_timeout(timeout=1, job=f'seek_home_linear_stage_motor{params["motor"]}') as acquired:
-            self.move_status = self.movement_check(params)
-            if self.move_status:
-                return False, "Motors are already moving."
-            if not acquired:
-                self.log.warn(
-                    f"Could not seek_home_linear_stage because lock held by {self.lock.job}")
-                return False, "Could not acquire lock"
-            if params['motor'] == 1:
-                self.motor1.seek_home_linear_stage()
-            elif params['motor'] == 2:
-                self.motor2.seek_home_linear_stage()
-            else:
-                # move motor1 THEN motor2
-                self.motor1.seek_home_linear_stage()
-                self.move_status = self.motor1.is_moving(params['verbose'])
-                while self.move_status:
-                    time.sleep(1)
-                    self.move_status = self.motor1.is_moving(params['verbose'])
-                self.motor2.seek_home_linear_stage()
-
-        return True, "Moving motor {} to home".format(params['motor'])
-
-    @ocs_agent.param('motor', default=1, choices=[1, 2, 3], type=int)
-    @ocs_agent.param('verbose', default=True, type=bool)
     def set_zero(self, session, params):
         """set_zero(motor=1)
 
@@ -1085,7 +1047,6 @@ if __name__ == '__main__':
     agent.register_task('set_acceleration', m.set_acceleration)
     agent.register_task('start_jogging', m.start_jogging)
     agent.register_task('stop_jogging', m.stop_jogging)
-    agent.register_task('seek_home_linear_stage', m.seek_home_linear_stage)
     agent.register_task('set_zero', m.set_zero)
     agent.register_task('run_positions', m.run_positions)
     agent.register_task('start_rotation', m.start_rotation)
