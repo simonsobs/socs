@@ -192,9 +192,11 @@ class appMotionMotorsAgent:
         """
 
         with self.lock.acquire_timeout(1, job=f'move_axis_to_position_motor{params["motor"]}') as acquired:
-            self.move_status = self.movement_check(params)
-            if self.move_status:
-                return False, "Motors are already moving."
+            self.move_status = self.motor1.is_moving(params['verbose']) or self.motor2.is_moving(params['verbose'])
+            while self.move_status:
+                print('Motors are moving, waiting 5 seconds')
+                time.sleep(5)
+                self.move_status = self.motor1.is_moving(params['verbose']) or self.motor2.is_moving(params['verbose'])
             if not acquired:
                 self.log.warn(
                     f"Could not move motor{params['motor']} because lock held by {self.lock.job}")
@@ -244,9 +246,11 @@ class appMotionMotorsAgent:
         """
 
         with self.lock.acquire_timeout(1, job=f"move_axis_by_length_motor{params['motor']}") as acquired:
-            self.move_status = self.movement_check(params)
-            if self.move_status:
-                return False, "Motors are already moving."
+            self.move_status = self.motor1.is_moving(params['verbose']) or self.motor2.is_moving(params['verbose'])
+            while self.move_status:
+                print('Motors are moving, waiting 5 seconds')
+                time.sleep(5)
+                self.move_status = self.motor1.is_moving(params['verbose']) or self.motor2.is_moving(params['verbose'])
             if not acquired:
                 self.log.warn(
                     f"Could not move motor{params['motor']} because lock held by {self.lock.job}")
@@ -458,17 +462,17 @@ class appMotionMotorsAgent:
                     raise Exception(
                         "You specified that both axes would be moving, but didn't provide data for both.")
             if params['motor'] == 1:
-                self.motor1.run_positions(params['pos_data'], params['pos_is_inches'])
+                self.motor1.run_positions(params['pos_data'][0], params['pos_is_inches'])
             elif params['motor'] == 2:
-                self.motor2.run_positions(params['pos_data'], params['pos_is_inches'])
+                self.motor2.run_positions(params['pos_data'][0], params['pos_is_inches'])
             else:
                 # move motor1 THEN motor2
-                self.motor1.run_positions(params['pos_data[0]'], params['pos_is_inches'])
+                self.motor1.run_positions(params['pos_data'][0], params['pos_is_inches'])
                 self.move_status = self.motor1.is_moving(params['verbose'])
                 while self.move_status:
                     time.sleep(1)
                     self.move_status = self.motor1.is_moving(params['verbose'])
-                self.motor2.run_positions(params['pos_data[1]'], params['pos_is_inches'])
+                self.motor2.run_positions(params['pos_data'][1], params['pos_is_inches'])
 
         return True, "Moving stage to {}".format(params['pos_data'])
 
@@ -847,7 +851,7 @@ class appMotionMotorsAgent:
         """
 
         with self.lock.acquire_timeout(30, job=f"home_with_limits_motor{params['motor']}") as acquired:
-            self.move_status = self.is_moving(session, params)[1][1]
+            self.move_status = self.movement_check(params)
             if not acquired:
                 self.log.warn(
                     f"Could not move motor{params['motor']} to home because lock held by {self.lock.job}")
