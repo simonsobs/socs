@@ -15,7 +15,7 @@ txaio.use_twisted()
 # Mocks and fixures
 def mock_pysmurf(self, session=None, load_tune=False, **kwargs):
     """mock_pysmurf()
-    
+
     **Mock** - Mock a pysmurf instance. Used to patch _get_smurf_control() in the PysmurfController.
 
     Returns
@@ -50,7 +50,7 @@ def mock_pysmurf(self, session=None, load_tune=False, **kwargs):
     S.high_low_current_ratio = 6.08
     S.C.relay_address = 0x2
     S.get_cryo_card_relays.return_value = 80000
-    S._rtm_slow_dac_bit_to_volt = (2*10./(2**20))
+    S._rtm_slow_dac_bit_to_volt = (2 * 10. / (2**20))
     S.get_tes_bias_bipolar.return_value = 10.
     S.get_tes_bias_bipolar_array.return_value = np.full((12, ), 10.)
 
@@ -111,7 +111,7 @@ def mock_np_save():
 
 def mock_plt_savefig():
     """mock_plt_savefig()
-    
+
     **Mock** - Mock savefig() in matplotlib to avoid actually saving figures.
     """
     return mock.MagicMock()
@@ -119,7 +119,7 @@ def mock_plt_savefig():
 
 def mock_take_noise(S, cfg, acq_time, **kwargs):
     """mock_take_noise()
-    
+
     **Mock** - Mock take_noise() in sodetlib.
     """
     am = mock.MagicMock()
@@ -137,7 +137,7 @@ def mock_take_noise(S, cfg, acq_time, **kwargs):
 
 def mock_ivanalysis(S, cfg, run_kwargs, sid, start_times, stop_times):
     """mock_ivanalysis()
-    
+
     **Mock** - Mock IVAnalysis class in sodetlib.
     """
     iva = mock.MagicMock()
@@ -151,7 +151,7 @@ def mock_ivanalysis(S, cfg, run_kwargs, sid, start_times, stop_times):
 
 def mock_set_current_mode(S, bgs, mode, const_current=True):
     """mock_set_current_mode()
-    
+
     **Mock** - Mock set_current_mode() in sodetlib.
     """
     return mock.MagicMock()
@@ -159,7 +159,7 @@ def mock_set_current_mode(S, bgs, mode, const_current=True):
 
 def mock_biasstepanalysis(S, cfg, bgs, run_kwargs):
     """mock_biasstepanalysis()
-    
+
     **Mock** - Mock BiasStepAnalysis class in sodetlib.
     """
     bsa = mock.MagicMock()

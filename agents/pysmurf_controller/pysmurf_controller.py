@@ -321,7 +321,7 @@ class PysmurfController:
             time.sleep(params['poll_interval'])
 
             if params['test_mode']:
-                    break
+                break
 
         return True, "Finished checking state"
 
