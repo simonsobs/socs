@@ -14,7 +14,19 @@ txaio.use_twisted()
 
 # Mocks and fixures
 def mock_pysmurf(self, session=None, load_tune=False, **kwargs):
-    """Mock a pysmurf instance."""
+    """mock_pysmurf()
+    
+    **Mock** - Mock a pysmurf instance. Used to patch _get_smurf_control() in the PysmurfController.
+
+    Returns
+    -------
+    S : mock.MagicMock()
+        Mocked pysmurf instance with defined return values for attributes of S.
+    cfg : mock.MagicMock()
+        Mocked DetConfig of sodetlib with defined return values for attributes of cfg.
+    """
+
+    # Mock S and edit attributes
     S = mock.MagicMock()
     S.C.get_fw_version.side_effect = [[4, 1, 1]]
     S.C.read_ps_en.return_value = 3
@@ -41,8 +53,8 @@ def mock_pysmurf(self, session=None, load_tune=False, **kwargs):
     S._rtm_slow_dac_bit_to_volt = (2*10./(2**20))
     S.get_tes_bias_bipolar.return_value = 10.
     S.get_tes_bias_bipolar_array.return_value = np.full((12, ), 10.)
-    # S.log.return_value = mock.MagicMock()
 
+    # Mock cfg and edit attributes
     cfg = mock.MagicMock()
     exp_defaults = {
         # General stuff
@@ -89,27 +101,27 @@ def mock_pysmurf(self, session=None, load_tune=False, **kwargs):
     return S, cfg
 
 
-def mock_failed_connection():
-    """Mock an unhandled error during connection.
-    Typically a failed connection will raise a ConnectionError, but we want to
-    check unhandled exceptions in the tests too.
-    """
-    failed_con = mock.Mock(side_effect=RuntimeError('Unhandled error'))
-    return failed_con
-
-
 def mock_np_save():
-    """Mock save in numpy."""
+    """mock_np_save()
+
+    **Mock** - Mock save() in numpy to avoid actually saving files.
+    """
     return mock.MagicMock()
 
 
 def mock_plt_savefig():
-    """Mock savefig in matplotlib."""
+    """mock_plt_savefig()
+    
+    **Mock** - Mock savefig() in matplotlib to avoid actually saving figures.
+    """
     return mock.MagicMock()
 
 
 def mock_take_noise(S, cfg, acq_time, **kwargs):
-    """Mock take_noise in sodetlib."""
+    """mock_take_noise()
+    
+    **Mock** - Mock take_noise() in sodetlib.
+    """
     am = mock.MagicMock()
     outdict = {'noise_pars': 0,
                'bands': 0,
@@ -124,7 +136,10 @@ def mock_take_noise(S, cfg, acq_time, **kwargs):
 
 
 def mock_ivanalysis(S, cfg, run_kwargs, sid, start_times, stop_times):
-    """Mock IVAnalysis in sodetlib"""
+    """mock_ivanalysis()
+    
+    **Mock** - Mock IVAnalysis class in sodetlib.
+    """
     iva = mock.MagicMock()
     # iva.load.return_value = iva
     iva.R = np.full((2, 12), 1)
@@ -135,12 +150,18 @@ def mock_ivanalysis(S, cfg, run_kwargs, sid, start_times, stop_times):
 
 
 def mock_set_current_mode(S, bgs, mode, const_current=True):
-    """Mock set_current_mode in sodetlib"""
+    """mock_set_current_mode()
+    
+    **Mock** - Mock set_current_mode() in sodetlib.
+    """
     return mock.MagicMock()
 
 
 def mock_biasstepanalysis(S, cfg, bgs, run_kwargs):
-    """Mock BiasStepAnalysis in sodetlib"""
+    """mock_biasstepanalysis()
+    
+    **Mock** - Mock BiasStepAnalysis class in sodetlib.
+    """
     bsa = mock.MagicMock()
     bsa.sid = 0
     bsa.filepath = 'bias_step_analysis.npy'
@@ -180,6 +201,10 @@ def agent():
 @mock.patch('matplotlib.figure.Figure.savefig', mock_plt_savefig())
 @mock.patch('sodetlib.noise.take_noise', mock_take_noise)
 def test_uxm_setup(agent):
+    """test_uxm_setup()
+
+    **Test** - Tests uxm_setup task.
+    """
     session = create_session('uxm_setup')
     res = agent.uxm_setup(session, {'bands': [0], 'kwargs': None})
     assert res[0] is True
@@ -190,6 +215,10 @@ def test_uxm_setup(agent):
 @mock.patch('matplotlib.figure.Figure.savefig', mock_plt_savefig())
 @mock.patch('sodetlib.noise.take_noise', mock_take_noise)
 def test_uxm_relock(agent):
+    """test_uxm_relock()
+
+    **Test** - Tests uxm_relock task.
+    """
     session = create_session('uxm_relock')
     res = agent.uxm_relock(session, {'bands': [0], 'kwargs': None})
     assert res[0] is True
@@ -200,6 +229,10 @@ def test_uxm_relock(agent):
 @mock.patch('sodetlib.operations.bias_steps.BiasStepAnalysis', mock_biasstepanalysis)
 @mock.patch('matplotlib.figure.Figure.savefig', mock_plt_savefig())
 def test_take_bgmap(agent):
+    """test_take_bgmap()
+
+    **Test** - Tests take_bgmap task.
+    """
     session = create_session('take_bgmap')
     res = agent.take_bgmap(session, {'kwargs': {'high_current_mode': False}})
     assert res[0] is True
@@ -209,6 +242,10 @@ def test_take_bgmap(agent):
 @mock.patch('matplotlib.figure.Figure.savefig', mock_plt_savefig())
 @mock.patch('sodetlib.operations.iv.IVAnalysis', mock_ivanalysis)
 def test_take_iv(agent):
+    """test_take_iv()
+
+    **Test** - Tests take_iv task.
+    """
     session = create_session('take_iv')
     res = agent.take_iv(session, {'kwargs': {'run_analysis': False}})
     assert res[0] is True
@@ -218,6 +255,10 @@ def test_take_iv(agent):
 @mock.patch('sodetlib.set_current_mode', mock_set_current_mode)
 @mock.patch('sodetlib.operations.bias_steps.BiasStepAnalysis', mock_biasstepanalysis)
 def test_take_bias_steps(agent):
+    """test_take_bias_steps()
+
+    **Test** - Tests take_bias_steps task.
+    """
     session = create_session('take_bias_steps')
     res = agent.take_bias_steps(session, {'kwargs': None})
     assert res[0] is True
@@ -226,6 +267,10 @@ def test_take_bias_steps(agent):
 @mock.patch('pysmurf_controller.PysmurfController._get_smurf_control', mock_pysmurf)
 @mock.patch('sodetlib.noise.take_noise', mock_take_noise)
 def test_take_noise(agent):
+    """test_take_noise()
+
+    **Test** - Tests take_noise task.
+    """
     session = create_session('take_noise')
     res = agent.take_noise(session, {'duration': 30, 'kwargs': None})
     assert res[0] is True
@@ -234,6 +279,10 @@ def test_take_noise(agent):
 @mock.patch('pysmurf_controller.PysmurfController._get_smurf_control', mock_pysmurf)
 @mock.patch('sodetlib.set_current_mode', mock_set_current_mode)
 def test_bias_dets(agent):
+    """test_bias_dets()
+
+    **Test** - Tests bias_dets task.
+    """
     session = create_session('bias_dets')
     mm = mock.MagicMock()
     res = agent.bias_dets(session, {'rfrac': (0.3, 0.6),
@@ -244,6 +293,10 @@ def test_bias_dets(agent):
 
 @mock.patch('pysmurf_controller.PysmurfController._get_smurf_control', mock_pysmurf)
 def test_stream(agent):
+    """test_stream()
+
+    **Test** - Tests stream process.
+    """
     session = create_session('stream')
     res = agent.stream(session, {'duration': None, 'load_tune': False, 'kwargs': None, 'test_mode': True})
     assert res[0] is True
@@ -251,6 +304,10 @@ def test_stream(agent):
 
 @mock.patch('pysmurf_controller.PysmurfController._get_smurf_control', mock_pysmurf)
 def test_check_state(agent):
+    """test_check_state()
+
+    **Test** - Tests check_state process.
+    """
     session = create_session('check_state')
     res = agent.check_state(session, {'poll_interval': 10, 'test_mode': True})
     assert res[0] is True
