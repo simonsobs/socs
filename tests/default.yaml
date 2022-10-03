@@ -73,5 +73,9 @@ hosts:
                     ['--password', 'admin'],
                    ]
       },
+      {'agent-class': 'PysmurfController',
+       'instance-id': 'pysmurf-controller-s2',
+       'arguments': []
+      },
     ]
   }
