@@ -24,5 +24,6 @@ for n, f in [
         ('FPGAAgent', 'holo_fpga/roach_agent.py'),
         ('SynthAgent', 'holo_synth/synth_agent.py'),
         ('SupRsync', 'suprsync/suprsync.py'),
+        ('PGridMotorAgent', 'pol_grid/pgrid_motor_agent.py')
 ]:
     ocs.site_config.register_agent_class(n, os.path.join(root, f))
