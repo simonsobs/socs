@@ -19,6 +19,7 @@
 ##########################################################################
 
 import sys
+from tkinter.ttk import setup_master
 from socs.agent.moxaSerial import Serial_TCPServer
 from time import sleep
 import numpy as np
@@ -300,6 +301,24 @@ class Motor:
         msg = self.ser.writeread('JA\r')
         return msg[3:]
 
+    def rotate_by_degrees(self,deg):
+        """
+        Rotate the polarizer grid by a fixed amount relative to its current position
+
+        Parameters:
+            deg (float): The number of degrees to rotate the polarizer by.
+        """
+        # the number of turns of the motor per 1 turn of the grid?? i.e. 1 turn of the motor moves the grid by 60 deg i think
+        # deg * rev/deg * steps/rev = steps 
+
+        unit_pos = int(deg*self.s_p_rev/60.) # 60 is the degrees per revolution
+
+        # Move the motor
+        self.ser.write('DI%i\r' % (unit_pos))  # DI = Distance/Position
+        self.ser.write('FL\r')  # FL = Feed to Length
+        self.ser.flushInput()
+        print(unit_pos)
+    
     def reset_alarms(self):
         """
         Resets alarm codes present. Only advised if you have checked

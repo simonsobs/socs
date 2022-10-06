@@ -263,6 +263,26 @@ class PgridMotorAgent:
             
         return accel, "Rotational acceleration of pgrid_motor is {}".format(accel)
 
+    def rotate_by_degrees(self, session, params=None):
+        """rotate_by_degrees()
+
+        **Task** - Rotate the polarizer by some number of degrees
+
+        Returns:
+
+        
+        """
+
+        with self.lock.acquire_timeout(timeout=1, job='rotate_by_degrees_pgrid_motor') as acquired:
+            if not acquired:
+                self.log.warn(
+                    f"Could not get_rot_accel because lock held by {self.lock.job}")
+                return False, "Could not acquire lock"
+
+            accel = self.motor.rotate_by_degrees(params['deg'])
+
+        return True, "Moved polarizer by {}".format(params['deg'])
+    
     def close_connection(self, session, params=None):
         """close_connection()
 
@@ -477,6 +497,7 @@ if __name__ == '__main__':
     agent.register_task('get_rot_vel', m.get_rot_vel)
     agent.register_task('set_rot_accel', m.set_rot_accel)
     agent.register_task('get_rot_accel', m.get_rot_accel)
+    agent.register_task('rotate_by_degrees', m.rotate_by_degrees)
     agent.register_task('close_connect', m.close_connection)
     agent.register_task('reconnect_motor', m.reconnect_motor)
     agent.register_task('kill_all', m.kill_all_commands)
