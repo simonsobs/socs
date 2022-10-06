@@ -138,7 +138,9 @@ class Motor:
                 self.s_p_rev = float(ms_info)
                 ms_info = float(ms_info)
 
-        if (self.ser is not None) and (self.is_lin):
+        # Motor2 has broken limit switch, requires limits to be defined as normally open
+        # this if block makes sure Motor1 limits are normally closed
+        if mot_id == 'motor1':
             # DL1 = Define Limits for closed input (definition unclear in
             # manual, however)
             msg = self.ser.writeread('DL\r')
@@ -157,7 +159,32 @@ class Motor:
         else:
             if self.ser is not None:
                 self.ser.write('JE\r')  # JE = Jog Enable
-
+     
+    def define_limits(self, setting=1, verbose=True):
+        """
+        Set limits to open/closed
+        
+        Parameters:
+        -----------
+            setting (int): Changes limits to 
+                normally closed (1), opened (2), general purpose
+            verbose (bool) : Prints output from motor requests if True. 
+                (default False)
+        """
+        self.ser.flushInput()
+        if setting == 1:
+            msg = self.ser.writeread('DL1\r')  # define limits as closed
+        elif setting == 2:
+            msg = self.ser.writeread('DL2\r') # define limits as open
+        else:
+            msg = self.ser.writeread('DL3\r') # define limits as general purpose
+        self.ser.flushInput()
+        if verbose:
+            print(f'verbose; message: {msg}')
+            print(f'*************\n Driver: define_limits for motor{self.motor}\n***********')
+            sys.stdout.flush()
+        return True
+            
     def is_moving(self, verbose=True):
         """
         Returns True if either motor is moving, False if both motors
@@ -220,6 +247,11 @@ class Motor:
             self.move_axis_by_length(pos=-1, pos_is_inches=True)
             sleep(3)
             self.reset_alarms()
+        elif (msg == 'AL=0006'):
+            print('BOTH limit switches hit. Edit this driver code to move correct direction')
+            self.move_axis_by_length(pos=1, pos_is_inches=True)
+            sleep(3)
+            self.reset_alarms()
         else:
             print(f'Motor{self.mot_id} not on either switch')
 
@@ -250,20 +282,32 @@ class Motor:
                 self.ser.write('DI%i\r' % (pos))  # DI = Distance/Position
                 self.ser.write('FL\r')  # FL = Feed to Length
                 self.ser.flushInput()
+            
+            elif (msg == 'AL=0004'):
+                print(
+                    'Reached CW limit switch. Moving 1 inch away from limit switch')
+                pos = int(
+                    -1.0
+                    * AXIS_THREADS_PER_INCH_STAGE
+                    * self.s_p_rev
+                    / 2.0)
+                self.ser.write('DI%i\r' % (pos))  # DI = Distance/Position
+                self.ser.write('FL\r')  # FL = Feed to Length
+                self.ser.flushInput()
 
-                # Wait for motor to get off limit switch and reset alarms
-                sleep(3)
-                print('Resetting alarms')
-                self.reset_alarms()
+            # Wait for motor to get off limit switch and reset alarms
+            print(f'pos calculated by home_with_limts: {pos}')
+            sleep(3)
+            print('Resetting alarms')
+            self.reset_alarms()
 
-            if not self.is_moving():
-                # zero motor and encoder
-                print(f'Zeroing {self.mot_id}')
-                sleep(1)
-                self.set_zero()
-                self.set_encoder_value()
-                # move on to next stage
-                moving = False
+            # zero motor and encoder
+            print(f'Zeroing {self.mot_id}')
+            sleep(1)
+            self.set_zero()
+            self.set_encoder_value()
+            # move on to next stage
+            moving = False
         print('Stage zeroed using limit switch')
 
     def start_jogging(self):
@@ -598,6 +642,12 @@ class Motor:
             self.ser.write('MD\r')  # MD = Motor Disable
         self.ser.flushInput()
 
+    def motor_reset(self):
+        """Resets specified motor.
+        """
+        self.ser.write('RE\r')
+        self.ser.flushInput()
+        
     def retrieve_encoder_info(self):
         """
         Retrieve all motor step counts to verify movement.
