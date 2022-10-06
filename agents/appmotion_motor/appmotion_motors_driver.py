@@ -159,32 +159,32 @@ class Motor:
         else:
             if self.ser is not None:
                 self.ser.write('JE\r')  # JE = Jog Enable
-     
+
     def define_limits(self, setting=1, verbose=True):
         """
         Set limits to open/closed
-        
+
         Parameters:
         -----------
-            setting (int): Changes limits to 
+            setting (int): Changes limits to
                 normally closed (1), opened (2), general purpose
-            verbose (bool) : Prints output from motor requests if True. 
+            verbose (bool) : Prints output from motor requests if True.
                 (default False)
         """
         self.ser.flushInput()
         if setting == 1:
             msg = self.ser.writeread('DL1\r')  # define limits as closed
         elif setting == 2:
-            msg = self.ser.writeread('DL2\r') # define limits as open
+            msg = self.ser.writeread('DL2\r')  # define limits as open
         else:
-            msg = self.ser.writeread('DL3\r') # define limits as general purpose
+            msg = self.ser.writeread('DL3\r')  # define limits as general purpose
         self.ser.flushInput()
         if verbose:
             print(f'verbose; message: {msg}')
             print(f'*************\n Driver: define_limits for motor{self.motor}\n***********')
             sys.stdout.flush()
         return True
-            
+
     def is_moving(self, verbose=True):
         """
         Returns True if either motor is moving, False if both motors
@@ -282,7 +282,7 @@ class Motor:
                 self.ser.write('DI%i\r' % (pos))  # DI = Distance/Position
                 self.ser.write('FL\r')  # FL = Feed to Length
                 self.ser.flushInput()
-            
+
             elif (msg == 'AL=0004'):
                 print(
                     'Reached CW limit switch. Moving 1 inch away from limit switch')
@@ -647,7 +647,7 @@ class Motor:
         """
         self.ser.write('RE\r')
         self.ser.flushInput()
-        
+
     def retrieve_encoder_info(self):
         """
         Retrieve all motor step counts to verify movement.
