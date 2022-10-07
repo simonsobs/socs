@@ -55,24 +55,20 @@ This again is an example to run multiple agents::
     ports:
       - "8080:8080/udp"
     hostname: ocs-docker
+    environment:
+      - INSTANCE_ID=HBA0
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
-    command:
-      - "--instance-id=HBA0"
-      - "--site-hub=ws://crossbar:8001/ws"
-      - "--site-http=http://crossbar:8001/call"
 
   ocs-hwpbbb-agent-HBA1:
     image: simonsobs/socs:latest
     ports:
       - "8081:8081/udp"
     hostname: ocs-docker
+    environment:
+      - INSTANCE_ID=HBA1
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
-    command:
-      - "--instance-id=HBA1"
-      - "--site-hub=ws://crossbar:8001/ws"
-      - "--site-http=http://crossbar:8001/call"
 
 Description
 -----------

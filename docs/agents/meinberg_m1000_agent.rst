@@ -81,11 +81,10 @@ example docker-compose service configuration is shown here::
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
     environment:
-      - "LOGLEVEL=info"
-    command:
-      - "--instance-id=meinberg-m1000"
-      - "--site-hub=ws://10.10.10.2:8001/ws"
-      - "--site-http=http://10.10.10.2:8001/call"
+      - INSTANCE_ID=meinberg-m1000
+      - SITE_HUB=ws://10.10.10.2:8001/ws
+      - SITE_HTTP=http://10.10.10.2:8001/call
+      - LOGLEVEL=info
 
 
 The ``LOGLEVEL`` environment variable can be used to set the log level for

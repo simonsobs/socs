@@ -74,15 +74,15 @@ Docker Compose
 The Lakeshore 240 Agent can (and probably should) be configured to run in a
 Docker container. An example configuration is::
 
-  ocs-LSA24MA:
+  ocs-LSA22Z2:
     image: simonsobs/socs:latest
     devices:
-      - "/dev/LSA24MA:/dev/LSA24MA"
+      - "/dev/LSA22Z2:/dev/LSA22Z2"
     hostname: nuc-docker
+    environment:
+      - INSTANCE_ID=LSA22Z2
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
-    command:
-      - "--instance-id=LSA24MA"
 
 The serial number will need to be updated in your configuration. The hostname
 should also match your configured host in your OCS configuration file. The
@@ -104,7 +104,7 @@ client that sets Channel 1 of a 240 to read a diode::
 
     from ocs.matched_client import MatchedClient
 
-    ls_client = MatchedClient("LSA24MA")
+    ls_client = MatchedClient("LSA22Z2")
 
     diode_params = {
         'sensor': 1,

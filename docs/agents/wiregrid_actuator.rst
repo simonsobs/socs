@@ -53,10 +53,10 @@ An example docker-compose configuration::
         image: simonsobs/ocs-wgactuator-agent:latest
         hostname: ocs-docker
         network_mode: "host"
+        environment:
+          - INSTANCE_ID=wgactuator
         volumes:
           - ${OCS_CONFIG_DIR}:/config:ro
-        command:
-          - "--instance-id=wgactuator"
 
 - Since the agent within the container needs to communicate with hardware on the
   host network you must use ``network_mode: "host"`` in your compose file.

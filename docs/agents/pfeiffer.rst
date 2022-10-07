@@ -50,10 +50,10 @@ example of what to insest into your institution's docker-compose file. ::
     image: simonsobs/socs:latest
     hostname: ocs-docker
     network_mode: "host"
+    environment:
+      - INSTANCE_ID=pfeiffer
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
-    command:
-      - "--instance-id=pfeiffer"
 
 
 Example Client

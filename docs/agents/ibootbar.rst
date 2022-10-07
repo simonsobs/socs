@@ -50,12 +50,10 @@ example docker-compose service configuration is shown here::
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
     environment:
-      - "LOGLEVEL=info"
-    command:
-      - "--instance-id=ibootbar"
-      - "--site-hub=ws://127.0.0.1:8001/ws"
-      - "--site-http=http://127.0.0.1:8001/call"
-
+      - INSTANCE_ID=ibootbar
+      - SITE_HUB=ws://127.0.0.1:8001/ws
+      - SITE_HTTP=http://127.0.0.1:8001/call
+      - LOGLEVEL=info
 
 The ``LOGLEVEL`` environment variable can be used to set the log level for
 debugging. The default level is "info".

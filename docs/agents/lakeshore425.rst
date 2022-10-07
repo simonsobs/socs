@@ -42,15 +42,13 @@ example of what to insert into your institution's docker-compose file.::
 
   ocs-lakeshore425-agent:
     image: simonsobs/socs:latest
+    hostname: ocs-docker
+    environment:
+      - INSTANCE_ID=LS425
     device:
       - /dev/LS425:/dev/LS425
-    hostname: ocs-docker
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
-    command:
-      - "--instance-id=LS425"
-      - "--site-hub=ws://crossbar:8001/ws"
-      - "--site-http=http://crossbar:8001/call"
 
 Agent API
 ---------

@@ -61,13 +61,11 @@ example of what to insert into your institution's docker-compose file::
     image: ocs-hwp-picoscope-agent:latest
     hostname: ocs-docker
     privileged: true
+    environment:
+      - INSTANCE_ID=picoscope
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
       - /dev:/dev
-    command:
-      - "--instance-id=picoscope"
-      - "--site-hub=ws://crossbar:8001/ws"
-      - "--site-http=http://crossbar:8001/call"
 
 Agent API
 ---------

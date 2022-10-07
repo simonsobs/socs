@@ -52,13 +52,11 @@ An example docker-compose configuration::
       image: simonsobs/socs:latest
       hostname: ocs-docker
       network_mode: "host"
-      depends_on:
-        - "crossbar"
+      command:
+        - INSTANCE_ID=wgkikusui
       volumes:
         - ${OCS_CONFIG_DIR}:/config:ro
         - "<local directory to record log file>:/data/wg-data"
-      command:
-        - "--instance-id=wgkikusui"
 
 - Since the agent within the container needs to communicate with hardware on the
   host network you must use ``network_mode: "host"`` in your compose file.

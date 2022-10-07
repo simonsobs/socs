@@ -131,12 +131,10 @@ example docker-compose service configuration is shown here::
   ocs-vantage-pro2:
     image: simonsobs/socs:latest
     hostname: ocs-docker
+    command:
+      - INSTANCE_ID=vantagepro2agent
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
-    command:
-      - "--instance-id=vantagepro2agent"
-      - "--site-hub=ws://crossbar:8001/ws"
-      - "--site-http=http://crossbar:8001/call"
 
 Agent API
 ---------

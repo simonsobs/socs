@@ -75,13 +75,13 @@ have to modify the ``site-hub`` and ``site-http`` args accordingly::
         hostname: ocs-docker
         user: ocs:ocs
         network_mode: host
+        environment:
+            - INSTANCE_ID=magpie-crate1slot2
+            - SITE_HUB=ws://localhost:8001/ws
+            - SITE_HTTP=http://localhost:8001/call
         volumes:
             - ${OCS_CONFIG_DIR}:/config
             - /data:/data
-        command:
-            - "--site-hub=ws://localhost:8001/ws"
-            - "--site-http=http://localhost:8001/call"
-            - "--instance-id=magpie-crate1slot2"
 
 Lyrebird
 ------------

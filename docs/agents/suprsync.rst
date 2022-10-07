@@ -81,14 +81,14 @@ SuprSync docker::
        user: cryo:smurf
        network_mode: host
        container_name: ocs-timestream-sync
+       environment:
+           - INSTANCE_ID=timestream-sync
+           - SITE_HUB=ws://${CB_HOST}:8001/ws
+           - SITE_HTTP=http://${CB_HOST}:8001/call
        volumes:
            - ${OCS_CONFIG_DIR}:/config
            - /data:/data
            - /home/cryo/.ssh:/home/cryo/.ssh
-       command:
-           - '--instance-id=timestream-sync'
-           - "--site-hub=ws://${CB_HOST}:8001/ws"
-           - "--site-http=http://${CB_HOST}:8001/call"
 
   ocs-smurf-sync:
        image: simonsobs/socs:latest
@@ -96,14 +96,14 @@ SuprSync docker::
        user: cryo:smurf
        network_mode: host
        container_name: ocs-smurf-sync
+       environment:
+           - INSTANCE_ID=smurf-sync
+           - SITE_HUB=ws://${CB_HOST}:8001/ws
+           - SITE_HTTP=http://${CB_HOST}:8001/call
        volumes:
            - ${OCS_CONFIG_DIR}:/config
            - /data:/data
            - /home/cryo/.ssh:/home/cryo/.ssh
-       command:
-           - '--instance-id=smurf-sync'
-           - "--site-hub=ws://${CB_HOST}:8001/ws"
-           - "--site-http=http://${CB_HOST}:8001/call"
 
 .. note::
 

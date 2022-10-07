@@ -54,6 +54,8 @@ inclined an example config entry is::
   ocs-smurf-file-emulator:
     image: simonsobs/socs:latest
     hostname: ocs-docker
+    environment:
+      - INSTANCE_ID=smurf-file-emulator
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
       - /path/to/fake/data/dir:/data

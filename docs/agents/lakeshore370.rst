@@ -38,17 +38,15 @@ Docker Configuration
 The Lakeshore 370 Agent should be configured to run in a Docker container. An
 example configuration is::
 
-  ocs-LSA22YE:
+  ocs-LSA22YG:
     image: simonsobs/socs:latest
     hostname: ocs-docker
+    environment:
+      - INSTANCE_ID=LSA22YG
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
     devices:
       - "/dev/ttyUSB1:/dev/ttyUSB1"
-    command:
-      - "--instance-id=LSA22YE"
-      - "--site-hub=ws://crossbar:8001/ws"
-      - "--site-http=http://crossbar:8001/call"
 
 .. note::
     The serial numbers here will need to be updated for your device.

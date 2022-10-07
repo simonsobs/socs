@@ -109,10 +109,10 @@ example docker-compose service configuration is shown here::
     <<: *log-options
     hostname: ocs-docker
     network_mode: "host"
+    environment:
+      - INSTANCE_ID=labjack
     volumes:
       - ${OCS_CONFIG_DIR}:/config
-    command:
-      - "--instance-id=labjack"
 
 Since the agent within the container needs to communicate with hardware on the
 host network you must use ``network_mode: "host"`` in your compose file.

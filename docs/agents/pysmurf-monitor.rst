@@ -39,12 +39,13 @@ An example docker-compose entry might look like::
         user: cryo:smurf
         network_mode: host
         container_name: ocs-pysmurf-monitor
+        environment:
+            - INSTANCE_ID=pysmurf-monitor
+            - SITE_HUB=ws://${CB_HOST}:8001/ws
+            - SITE_HTTP=http://${CB_HOST}:8001/call
         volumes:
             - ${OCS_CONFIG_DIR}:/config
             - /data:/data
-        command:
-            - "--site-hub=ws://${CB_HOST}:8001/ws"
-            - "--site-http=http://${CB_HOST}:8001/call"
 
 Where SOCS_TAG and CB_HOST are set in the ``.env`` file in the same dir as the
 docker-compose file.

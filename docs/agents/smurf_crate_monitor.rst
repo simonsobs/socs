@@ -79,19 +79,18 @@ example docker-compose service configuration is shown here::
     image: simonsobs/socs:latest
     hostname: adaq1-docker
     network_mode: "host"
+    environment:
+      - INSTANCE_ID=crate1-monitor
+      - LOGLEVEL=debug
     volumes:
       - ${OCS_CONFIG_DIR}:/config
       - /home/ocs:/home/ocs
-    command:
-      - "--instance-id=crate1-monitor"
 
 An example of the 'ocs-base' anchor is shown here::
 
   x-ocs-base: &ocs-base
   hostname: adaq1-docker
   user: "9000"
-  environment:
-    LOGLEVEL: debug
   volumes:
     - ${OCS_CONFIG_DIR}:/config
 

@@ -39,12 +39,12 @@ An example docker-compose configuration::
     image: simonsobs/socs:latest
     hostname: ocs-docker
     network_mode: "host"
+    environment:
+      - INSTANCE_ID=rotator
+      - SITE_HUB=ws://127.0.0.1:8001/ws
+      - SITE_HTTP=http://127.0.0.1:8001/call
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
-    command:
-      - "--instance-id=rotator"
-      - "--site-hub=ws://127.0.0.1:8001/ws"
-      - "--site-http=http://127.0.0.1:8001/call"
 
 .. note::
     Since the Agent container needs ``network_mode: "host"``, it must be

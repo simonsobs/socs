@@ -50,10 +50,10 @@ An example docker-compose service configuration is shown here::
     image: simonsobs/socs:latest
     hostname: ocs-docker
     network_mode: "host"
+    environment:
+      - INSTANCE_ID=psuK
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
-    command:
-      - "--instance-id=psuK"
 
 Example Client
 --------------

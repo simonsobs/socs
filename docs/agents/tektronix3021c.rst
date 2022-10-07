@@ -48,10 +48,10 @@ An example docker-compose service configuration is shown here::
   ocs-psuK:
     image: simonsobs/socs:latest
     hostname: ocs-docker
+    environment:
+      - INSTANCE_ID=tektronix
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
-    command:
-      - "--instance-id=tektronix"
 
 Example Client
 --------------

@@ -53,10 +53,10 @@ An example docker-compose service configuration is shown here::
     image: simonsobs/socs:latest
     hostname: ocs-docker
     network_mode: "host"
+    environment:
+      - INSTANCE_ID=ptc1
     volumes:
       - ${OCS_CONFIG_DIR}:/config
-    command:
-      - "--instance-id=ptc1"
 
 Since the agent within the container needs to communicate with hardware on the
 host network you must use ``network_mode: "host"`` in your compose file.

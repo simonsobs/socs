@@ -55,11 +55,11 @@ An example docker-compose configuration::
       restart: always
       hostname: ocs-docker
       network_mode: "host"
+      environment:
+        - INSTANCE_ID=wgencoder
       volumes:
         - ${OCS_CONFIG_DIR}:/config:ro
         - "/data/wg-data:/data/wg-data"
-      command:
-        - "--instance-id=wgencoder"
       ports:
           - "localhost:50007:50007/udp"
 
