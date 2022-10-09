@@ -236,6 +236,9 @@ class ACUAgent:
         agent.register_task('preset_stop_clear',
                             self.preset_stop_clear,
                             blocking=False)
+        agent.register_task('clear_faults',
+                            self.clear_faults,
+                            blocking=False)
 
     # Operation management.  This agent has several Processes that
     # must be able to alone or simultaneously.  The state of each is
@@ -652,6 +655,7 @@ class ACUAgent:
     @ocs_agent.param('wait', default=1., type=float)
     @ocs_agent.param('end_stop', default=False, type=bool)
     @ocs_agent.param('rounding', default=1, type=int)
+    @ocs_agent.param('azonly', default=False, type=bool)
     @inlineCallbacks
     def go_to(self, session, params):
         """go_to(az=None, el=None, wait=1., end_stop=False, rounding=1)
@@ -674,6 +678,7 @@ class ACUAgent:
             return ok, msg
         az = params['az']
         el = params['el']
+        azonly = params['azonly']
         if az <= self.motion_limits['azimuth']['lower'] or az >= self.motion_limits['azimuth']['upper']:
             raise ocs_agent.ParamError("Azimuth out of range! Must be "
                                        + f"{self.motion_limits['azimuth']['lower']} <= az "
@@ -702,8 +707,15 @@ class ACUAgent:
         self.agent.publish_to_feed('acu_upload', acu_upload)
 
         # Check whether the telescope is already at the point
-        # self.log.info('Checking current position')
-        yield self.acu_control.mode('Preset')
+        self.log.info('Setting mode to Preset')
+        if azonly:
+            acu_msg = yield self.acu_control.azmode('Preset')
+        else:
+            acu_msg = yield self.acu_control.mode('Preset')
+        if acu_msg not in [b'OK, Command executed.', b'OK, Command send.']:
+            self.log.error(acu_msg)
+            self._set_job_done('control')
+            return False, 'Could not change mode'
         if round(current_az, round_int) == az and \
                 round(current_el, round_int) == el:
             yield self.acu_control.go_to(az, el, wait=0.1)
@@ -713,8 +725,13 @@ class ACUAgent:
         # yield self.acu.stop()
         # yield self.acu_control.mode('Stop')
         # self.log.info('Stopped')
-        # yield dsleep(0.5)
-        yield self.acu_control.go_to(az, el, wait=0.1)
+        yield dsleep(2)
+        self.log.info('Sending go_to command')
+        acu_msg = yield self.acu_control.go_to(az, el, wait=0.1)
+        if acu_msg not in [b'OK, Command executed.', b'OK, Command send.']:
+            self.log.error(acu_msg)
+            self._set_job_done('control')
+            return False, 'Could not send go_to command'
         yield dsleep(0.3)
         mdata = self.data['status']['summary']
         # Wait for telescope to start moving
@@ -872,6 +889,23 @@ class ACUAgent:
         self.log.info('Cleared stack (second attempt)')
         self._set_job_done('control')
         return True, 'Job completed'
+
+    @inlineCallbacks
+    def clear_faults(self, session, params):
+        """clear_faults()
+
+        **Task** - Clear any axis faults.
+
+        """
+        ok, msg = self._try_set_job('control')
+        if not ok:
+            self._set_job_done('control')
+            yield dsleep(0.1)
+            self._try_set_job('control')
+        self.log.info('_try_set_job ok')
+        yield self.acu_control.clear_faults()
+        self.set_job_done('control')
+        return True, 'Job completed.'
 
     @inlineCallbacks
     def stop_and_clear(self, session, params):
@@ -1138,6 +1172,8 @@ class ACUAgent:
                 'az_endpoint1', 'az_endpoint2', 'mid_inc' (start in the middle of
                 the scan and start with increasing azimuth), 'mid_dec' (start in
                 the middle of the scan and start with decreasing azimuth).
+            scan_upload_length (float): number of seconds for each set of uploaded
+                points. Default value is 10.0.
         """
         ok, msg = self._try_set_job('control')
         if not ok:
@@ -1149,6 +1185,7 @@ class ACUAgent:
         acc = params.get('acc')
         el_endpoint1 = params.get('el_endpoint1')
         azonly = params.get('azonly', True)
+        scan_upload_len = params.get('scan_upload_length', 2.0)
         scan_params = {k: params.get(k) for k in [
             'num_scans', 'num_batches', 'start_time',
             'wait_to_start', 'step_time', 'batch_size', 'ramp_up', 'az_start']
@@ -1157,8 +1194,14 @@ class ACUAgent:
         el_speed = params.get('el_speed', 0.0)
 
         print('Scan params are', scan_params)
+        if 'step_time' in scan_params:
+            step_time = scan_params['step_time']
+        else:
+            step_time = 1.0
+        scan_upload_len_pts = scan_upload_len / step_time
 
-   #     yield self.acu_control.stop()
+        yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
+                                            'Clear Stack')
         g = sh.generate_constant_velocity_scan(az_endpoint1=az_endpoint1,
                                                az_endpoint2=az_endpoint2,
                                                az_speed=az_speed, acc=acc,
@@ -1203,7 +1246,7 @@ class ACUAgent:
                 text = ''.join(upload_lines)
                 current_lines = current_lines[group_size:]
                 free_positions = self.data['status']['summary']['Free_upload_positions']
-                while free_positions < 5099:
+                while free_positions < 10000 - scan_upload_len_pts:
                     yield dsleep(0.1)
                     free_positions = self.data['status']['summary']['Free_upload_positions']
                 yield self.acu_control.http.UploadPtStack(text)
@@ -1223,8 +1266,8 @@ class ACUAgent:
         #yield self.acu_control.stop()
 
         # Clear the stack?
-        #yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
-        #                                    'Clear Stack')
+        yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
+                                            'Clear Stack')
 
        # self.data['uploads']['Start_Azimuth'] = 0.0
        # self.data['uploads']['Start_Elevation'] = 0.0
