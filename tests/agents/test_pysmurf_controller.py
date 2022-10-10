@@ -200,6 +200,7 @@ def agent():
 @mock.patch('numpy.save', mock_np_save())
 @mock.patch('matplotlib.figure.Figure.savefig', mock_plt_savefig())
 @mock.patch('sodetlib.noise.take_noise', mock_take_noise)
+@mock.patch('time.sleep', mock.MagicMock())
 def test_uxm_setup(agent):
     """test_uxm_setup()
 
@@ -214,6 +215,7 @@ def test_uxm_setup(agent):
 @mock.patch('numpy.save', mock_np_save())
 @mock.patch('matplotlib.figure.Figure.savefig', mock_plt_savefig())
 @mock.patch('sodetlib.noise.take_noise', mock_take_noise)
+@mock.patch('time.sleep', mock.MagicMock())
 def test_uxm_relock(agent):
     """test_uxm_relock()
 
@@ -228,6 +230,7 @@ def test_uxm_relock(agent):
 @mock.patch('sodetlib.set_current_mode', mock_set_current_mode)
 @mock.patch('sodetlib.operations.bias_steps.BiasStepAnalysis', mock_biasstepanalysis)
 @mock.patch('matplotlib.figure.Figure.savefig', mock_plt_savefig())
+@mock.patch('time.sleep', mock.MagicMock())
 def test_take_bgmap(agent):
     """test_take_bgmap()
 
@@ -241,6 +244,7 @@ def test_take_bgmap(agent):
 @mock.patch('pysmurf_controller.PysmurfController._get_smurf_control', mock_pysmurf)
 @mock.patch('matplotlib.figure.Figure.savefig', mock_plt_savefig())
 @mock.patch('sodetlib.operations.iv.IVAnalysis', mock_ivanalysis)
+@mock.patch('time.sleep', mock.MagicMock())
 def test_take_iv(agent):
     """test_take_iv()
 
@@ -254,6 +258,7 @@ def test_take_iv(agent):
 @mock.patch('pysmurf_controller.PysmurfController._get_smurf_control', mock_pysmurf)
 @mock.patch('sodetlib.set_current_mode', mock_set_current_mode)
 @mock.patch('sodetlib.operations.bias_steps.BiasStepAnalysis', mock_biasstepanalysis)
+@mock.patch('time.sleep', mock.MagicMock())
 def test_take_bias_steps(agent):
     """test_take_bias_steps()
 
@@ -266,6 +271,7 @@ def test_take_bias_steps(agent):
 
 @mock.patch('pysmurf_controller.PysmurfController._get_smurf_control', mock_pysmurf)
 @mock.patch('sodetlib.noise.take_noise', mock_take_noise)
+@mock.patch('time.sleep', mock.MagicMock())
 def test_take_noise(agent):
     """test_take_noise()
 
@@ -278,6 +284,7 @@ def test_take_noise(agent):
 
 @mock.patch('pysmurf_controller.PysmurfController._get_smurf_control', mock_pysmurf)
 @mock.patch('sodetlib.set_current_mode', mock_set_current_mode)
+@mock.patch('time.sleep', mock.MagicMock())
 def test_bias_dets(agent):
     """test_bias_dets()
 
@@ -292,6 +299,7 @@ def test_bias_dets(agent):
 
 
 @mock.patch('pysmurf_controller.PysmurfController._get_smurf_control', mock_pysmurf)
+@mock.patch('time.sleep', mock.MagicMock())
 def test_stream(agent):
     """test_stream()
 
@@ -303,6 +311,7 @@ def test_stream(agent):
 
 
 @mock.patch('pysmurf_controller.PysmurfController._get_smurf_control', mock_pysmurf)
+@mock.patch('time.sleep', mock.MagicMock())
 def test_check_state(agent):
     """test_check_state()
 
