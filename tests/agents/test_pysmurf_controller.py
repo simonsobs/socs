@@ -28,7 +28,7 @@ def mock_pysmurf(self, session=None, load_tune=False, **kwargs):
 
     # Mock S and edit attributes
     S = mock.MagicMock()
-    S.C.get_fw_version.side_effect = [[4, 1, 1]]
+    S.C.get_fw_version.return_value = [4, 1, 1]
     S.C.read_ps_en.return_value = 3
     S.C.list_of_c02_amps = ['50k', 'hemt']
     S.C.list_of_c04_amps = ['50k1', '50k2', 'hemt1', 'hemt2']
