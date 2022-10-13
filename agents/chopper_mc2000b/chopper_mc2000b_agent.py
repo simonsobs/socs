@@ -9,10 +9,10 @@ from autobahn.twisted.util import sleep as dsleep
 import argparse
 import txaio
 
-from MC2000B_COMMAND_LIB import *
-
-os.environ['OCS_CONFIG_DIR'] = "C:\\ocs-site-configs\\"
-os.add_dll_directory("C:\Program Files (x86)\Thorlabs\MC2000B\Sample\Thorlabs_MC2000B_PythonSDK")
+ON_RTD = os.environ.get("READTHEDOCS") == "True"
+if not ON_RTD:
+    from MC2000B_COMMAND_LIB import *
+    os.add_dll_directory("C:\Program Files (x86)\Thorlabs\MC2000B\Sample\Thorlabs_MC2000B_PythonSDK")
 
 # For logging
 txaio.use_twisted()
@@ -47,17 +47,16 @@ reference_high_prec_mode = {'internalouter': 0,
 
 
 class ControllerAgent:
-    """Agent to connect to the MC2000B ThorLabs Chopper Controller
+    """Agent to connect to the MC2000B Thorlabs chopper controller
     device.
 
     Parameters
     __________
 
     comport : str
-        COM port to connect to device
-        Ex: "COM3"
+        COM port to connect to device. Ex: "COM3"
     nbaud : int
-        baud rate of the device
+        baud rate of the device (115200)
     timeout : int
         the timeout time for the device; default is set to 3s
     """
@@ -95,12 +94,12 @@ class ControllerAgent:
         """init_chopper(auto_acquire=False)
 
         **Task** - Perform first time setup of MC2000B chopper controller
-            communication.
+        communication.
 
         Parameters
         __________
 
-        auto_acquire : (bool, optional)
+        auto_acquire : bool, optional
             Default is false. Starts data acquisition after
             initilialization if True.
         """
@@ -135,12 +134,12 @@ class ControllerAgent:
     def set_frequency(self, session, params):
         """set_frequency(freq=None)
 
-        **Task** - Set the frequency of the chopper blades.
+        **Task** - Set the frequency of the chopper.
 
         Parameters
         __________
         freq : int
-            Frequency desired for the chopper blades of the device.
+            Frequency of chopper blades.
         """
         with self.lock.acquire_timeout(timeout=3, job='set_frequency') as acquired:
             if not acquired:
@@ -158,15 +157,14 @@ class ControllerAgent:
     def set_bladetype(self, session, params):
         """set_bladetype(bladetype=None)
 
-        **Task** - Set the bladetype for the chopper controller. Bladetype
-            determines range of frequencies that can be set for the chopper.
-            Default set to MC1F2 to reach the range of 4-8Hz.
+        **Task** - Set the bladetype of the chopper. Selecting a bladetype
+        influences the range of frequencies permitted for the chopper.
 
         Parameters
         __________
-        blaetype : str
+        bladetype : str
             Name of bladetype assigned to chopper controller setup.
-            Ex: "MC1F6P10"
+            Default set to 'MC1F2' to reach the range of 4-8Hz.
         """
         with self.lock.acquire_timeout(timeout=3, job='set_bladetype') as acquired:
             if not acquired:
@@ -175,7 +173,7 @@ class ControllerAgent:
                 return False, "Could not acquire lock"
 
             session.set_status('running')
-   
+
             bladetype = bladetype_keys[params['bladetype']]
             MC2000BSetBladeType(self.hdl, bladetype)
 
@@ -186,7 +184,14 @@ class ControllerAgent:
         """set_reference_output_mode(output_mode=None)
 
         **Task** - Set the output reference mode to determine the setting of
-            frequency output/input. Default set to 'target'.
+        frequency output/input.
+
+        Parameters
+        __________
+        output_mode : str
+            Output reference mode of chopper frequency. Possible modes
+            are 'target' or 'actual'. Default set to 'target'.
+
         """
         with self.lock.acquire_timeout(timeout=3, job='set_reference_output_mode') as acquired:
             if not acquired:
@@ -206,8 +211,13 @@ class ControllerAgent:
     def set_blade_reference(self, session, params):
         """set_blade_reference(reference=None)
 
-        **Task** - Set the reference mode for the blade. Default set to
-            'internalinner'.
+        **Task** - Set the reference mode for the blade. This is the point on
+        the chopper blades for the controller to measure and set frequency.
+
+        Parameters
+        __________
+        reference : str
+            Reference mode of the blade. Default set to 'internalinner'.
         """
         with self.lock.acquire_timeout(timeout=3, job='set_blade_reference') as acquired:
             if not acquired:
@@ -267,13 +277,13 @@ class ControllerAgent:
 
                 # Publish data
                 input_data = {'block_name': 'input_freqs',
-                              'timestamp' : time.time(),
+                              'timestamp': time.time(),
                               'data': {'input_freqs': input_freq}
-                             }
+                              }
                 output_data = {'block_name': 'output_freqs',
                                'timestamp': time.time(),
                                'data': {'output_freqs': output_freq}
-                              }
+                               }
 
                 self.agent.publish_to_feed('input_freqs', input_data)
                 self.agent.publish_to_feed('output_freqs', output_data)
@@ -281,10 +291,11 @@ class ControllerAgent:
     def stop_acq(self):
         ok = False
         with self.lock:
-            if self.job =='acq':
+            if self.job == 'acq':
                 self.job = '!acq'
                 ok = True
             return (ok, {True: 'Requested process stop.', False: 'Faied to request process stop.'}[ok])
+
 
 def make_parser(parser=None):
     """Build argument parser for the Agent
@@ -298,6 +309,7 @@ def make_parser(parser=None):
     pgroup.add_argument('--mode', choices=['init', 'acq'])
 
     return parser
+
 
 if __name__ == '__main__':
     # For logging
@@ -327,4 +339,3 @@ if __name__ == '__main__':
     agent.register_process('acq', controller_agent.acq, controller_agent.stop_acq, startup=True)
 
     runner.run(agent, auto_reconnect=True)
-
