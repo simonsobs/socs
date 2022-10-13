@@ -12,7 +12,7 @@ import txaio
 ON_RTD = os.environ.get("READTHEDOCS") == "True"
 if not ON_RTD:
     from MC2000B_COMMAND_LIB import *
-    os.add_dll_directory("C:\Program Files (x86)\Thorlabs\MC2000B\Sample\Thorlabs_MC2000B_PythonSDK")
+    os.add_dll_directory("C:\\Program Files (x86)\\Thorlabs\\MC2000B\\Sample\\Thorlabs_MC2000B_PythonSDK")
 
 # For logging
 txaio.use_twisted()
@@ -60,6 +60,7 @@ class ControllerAgent:
     timeout : int
         the timeout time for the device; default is set to 3s
     """
+
     def __init__(self, agent, comport, nbaud=115200, timeout=3):
         self.agent = agent
         self.log = agent.log
@@ -117,7 +118,7 @@ class ControllerAgent:
             # Establish connection to the chopper controller
             self.hdl = MC2000BOpen(self.comport, self.nbaud, self.timeout)
 
-        if(self.hdl == 0):
+        if (self.hdl == 0):
             self.initialized = True
             self.log.info("Chopper connected")
         else:
