@@ -8,7 +8,7 @@ import txaio
 
 ON_RTD = os.environ.get("READTHEDOCS") == "True"
 if not ON_RTD:
-    from MC2000B_COMMAND_LIB import *
+    from MC2000B_COMMAND_LIB import *  # noqa: F403
     os.add_dll_directory("C:\\Program Files (x86)\\Thorlabs\\MC2000B\\Sample\\Thorlabs_MC2000B_PythonSDK")
 
 # For logging
