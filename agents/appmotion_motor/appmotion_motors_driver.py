@@ -22,14 +22,11 @@
 
 ##########################################################################
 #
-# Motor Control for UCSD Remy/Joe 11/15 Update!!
+# Motor Control for SAT1 P10R1 10/14/22 Update!!
 #
 #
 # This update modifies the FTS Control code to be 'more general' in regards to docstrings and variable
-# names. By this we aim to transition FTS/Polarizer instances to motor1/motor2/motorN instances instead.
-# Also, we plan to update functions to act smarter, specifically...
-#
-# NEED TO DOCUMENT HOW THE MOTOR CONTROLLERS SHOULD BE CONFIGURED.
+# names. By this we aim to transition FTS/Polarizer instances to motor1/motor2 instances instead.
 #
 # Commands for communicating with the motor controllers can be found here:
 # https://appliedmotion.s3.amazonaws.com/Host-Command-Reference_920-0002W_0.pdf
@@ -47,11 +44,6 @@ import numpy as np
 # power-on signature from the serial port
 DEFAULT_WAIT_START_TIME = 15.0  # seconds
 
-# Motor Names
-MOTOR1 = 1
-MOTOR2 = 2
-ALL = 3
-
 # Conversions for stages
 # Conversion for the FTS Linear Stage - Check for factor of two later
 AXIS_THREADS_PER_INCH_STAGE = 10.0
@@ -61,7 +53,7 @@ AXIS_THREADS_PER_INCH_XYZ = 10.0
 
 
 class Motor:
-    def __init__(self, ip, port, is_lin=True, mot_id=None, index=None, m_res=False):
+    def __init__(self, ip, port, is_lin=True, mot_id=None, index=None):
         self.ip = ip
         self.port = port
         self.is_lin = is_lin
@@ -71,24 +63,14 @@ class Motor:
 
         self.pos = 0  # Position in counts (should always be integer)
         self.real_pos = 0.0  # Position in inches
-        self.sock_status = 0
 
         if not (ip and port):
             print("Invalid Motor information. No Motor control.")
             self.ser = None
-        else:
-            print('establishing serial server with motor!')
-            self.ser
-            if m_res:
-                self.res = 'manual'
-                self.s_p_rev = 8000.0  # Steps per revolution (thread)
-            else:
-                self.res = 'default'  # Corresponds to mapping above
-                self.s_p_rev = 20000.0  # Steps per revolution (thread)
 
         if self.ser:
             # Check to make sure the device is in receive mode and reset if
-            # necessary
+            # necessary. If unknown alarm code, EXIT with code 1. 
             msg = self.ser.writeread('RS\r')  # RS = Request Status
             self.ser.flushInput()
             print(msg)
@@ -110,60 +92,37 @@ class Motor:
                     print('Irregular message received.')
                     sys.exit(1)
 
-        if m_res:
-            self.ser.write('EG8000\r')  # EG = Electronic Gearing
-            self.ser.write('SA\r')  # SA = Save Parameters
-            self.ser.flushInput()
-            sleep(0.1)
-            msg = self.ser.writeread('EG\r')
-            self.ser.flushInput()
-            if (len(msg) <= 4):    # Need at least MR=X + \r, which is 5 characters
-                print(
-                    "Couldn't get microstep resolution for %s.  Assuming 8,000." %
-                    (self.mot_id))
-            else:
-                print(msg)
-                ms_info = msg[3:]
-                self.s_p_rev = float(ms_info)
-        else:
-            msg = self.ser.writeread('EG\r')
-            self.ser.flushInput()
-            if (len(msg) <= 4):
-                print(
-                    "Couldn't get microstep resolution for %s. Disconnect and retry." %
-                    (self.mot_id))
-            else:
-                print(msg)
-                ms_info = msg[3:]
-                self.s_p_rev = float(ms_info)
-                ms_info = float(ms_info)
+        print("Grabbing steps per revolution via EG")
+        msg = self.ser.writeread('EG\r')
+        ms_info = msg[3:]
+        print(f"steps per revolution request: {msg}")
+        self.s_p_rev = float(ms_info)
+        self.ser.flushInput()
 
-        # Motor2 has broken limit switch, requires limits to be defined as normally open
-        # this if block makes sure Motor1 limits are normally closed
-        if mot_id == 'motor1':
-            # DL1 = Define Limits for closed input (definition unclear in
-            # manual, however)
-            msg = self.ser.writeread('DL\r')
-            print(f"msg: {msg}")
-            if msg != 'DL=2':
-                print("Limits not defined as normally open. Resetting...")
-                self.ser.write('DL2\r')  # DL2 = Define Limits for open input
-                sleep(0.1)
-                self.ser.flushInput()
-            msg = self.ser.writeread('CC\r')  # CC = Change Current
-            print(msg)
-            current = float(msg[3:])
-            if current < 1.5:
-                print("Operating current insufficient. Resetting...")
-                self.ser.write('CC1.5\r')
-        else:
-            if self.ser is not None:
-                self.ser.write('JE\r')  # JE = Jog Enable
+        # Grab limit switch definition(s)
+        # Limit switches act as current loops. Normally open means
+        # hitting the switch closes the current loop.
+        # Normally closed means hitting the switch opens the current loop.
+        # DL1 = Normally open
+        # DL2 = Normally closed
+        msg = self.ser.writeread('DL\r')
+        print(f"msg: {msg}")
+
+        msg = self.ser.writeread('CC\r')  # CC = Change Current
+        print(msg)
+        current = float(msg[3:])
+        if current < 1.5:
+            print("Operating current insufficient. Resetting...")
+            self.ser.write('CC1.5\r')
+        self.ser.flushInput()
 
     def define_limits(self, setting=1, verbose=True):
         """
-        Set limits to open/closed
-
+        Set limits to open/closed.
+        DL1 defines limits as normally open.
+        DL2 defines limits as normally closed.
+        DL3 defines limits as general purpose limits
+            - can't be used as end of travel limits. 
         Parameters:
         -----------
             setting (int): Changes limits to
@@ -172,16 +131,36 @@ class Motor:
                 (default False)
         """
         self.ser.flushInput()
-        if setting == 1:
-            msg = self.ser.writeread('DL1\r')  # define limits as closed
-        elif setting == 2:
-            msg = self.ser.writeread('DL2\r')  # define limits as open
-        else:
-            msg = self.ser.writeread('DL3\r')  # define limits as general purpose
+        command = f'DL{setting}\r'
+        msg = self.ser.writeread(command)
         self.ser.flushInput()
         if verbose:
             print(f'verbose; message: {msg}')
             print(f'*************\n Driver: define_limits for motor{self.motor}\n***********')
+            sys.stdout.flush()
+        return True
+    
+    def set_gearing(self, gearing=20000, verbose=True):
+        """
+        Set electronic gearing of motor. I.e number of electronic pulses
+        to move the motor one revolution.
+        
+        Parameters:
+        -----------
+            gearing (int): Gearing ratio for motors.
+                Range: [200,32000] (for servo)
+                Range: [200,51200] (for stepper)
+        """
+        self.ser.flushInput()
+        command = f'EG{gearing}\r'
+        msg = self.ser.writeread(command)
+        self.ser.flushInput()
+        self.ser.write('SA\r')  # SA = Save Parameters
+        self.s_p_rev = gearing
+        self.ser.flushInput()
+        if verbose:
+            print(f'verbose; message: {msg}')
+            print(f'*************\n Driver: set_gearing for motor{self.motor}\n***********')
             sys.stdout.flush()
         return True
 
@@ -217,6 +196,7 @@ class Motor:
                 print(msg)
             # Check what the alarm message is
             msg = self.ser.writeread('AL\r')
+            self.ser.flushInput()
             if (msg == 'AL=0002'):
                 print('CCW limit switch hit unexpectedly.')
                 return True
@@ -235,6 +215,7 @@ class Motor:
 
         """
         msg = self.ser.writeread('AL\r')
+        self.ser.flushInput()
         if (msg == 'AL=0002'):
             print(
                 'CCW limit switch hit unexpectedly. Moving one inch away from switch.')
@@ -362,14 +343,9 @@ class Motor:
         point.
 
         """
-        # Check if either motor is moving, and if yes exit function with an
-        # error message
-        move_status = self.is_moving()
-        if move_status:
-            print('Motors are still moving. Try again later.')
-            return
         self.pos = 0
         self.real_pos = 0.0
+        self.ser.write('EP0\r') # EP = Set encoder position
         self.ser.write('SP0\r')  # SP = Set Position
         self.ser.flushInput()
 
@@ -537,13 +513,6 @@ class Motor:
             velocity (float): Sets velocity of motor in revolutions per second
                 within range [0.25,50]. (default 1.0)
         """
-        # Check if either motor is moving, and if yes exit function with an
-        # error message
-        move_status = self.is_moving()
-        if move_status:
-            print('Motors are still moving. Try again later.')
-            return
-
         self.ser.write('VE%1.3f\r' % (velocity))  # VE = Velocity
         self.ser.flushInput()
 
@@ -617,12 +586,6 @@ class Motor:
             pos_is_inches (bool): True if pos was specified in inches, False if
                 in counts (default False)
         """
-        # Check if either motor is moving, and if yes exit function with an
-        # error message
-        move_status = self.is_moving()
-        if move_status:
-            print('Motors are still moving. Try again later.')
-            return
         self.move_axis_to_position(pos_data, pos_is_inches=pos_is_inches)
 
         print(f'Moving position to {pos_data}')
@@ -677,13 +640,6 @@ class Motor:
         Parameters:
             value (float): Sets encoder value. (default 0)
         """
-        # Check if either motor is moving, and if yes exit function with an
-        # error message
-        move_status = self.is_moving()
-        if move_status:
-            print('Motors are still moving. Try again later.')
-            return
-
         e_positions = []
         # Set the motor position
         self.ser.write('EP%i\r' % (value))  # EP = Encoder Position
@@ -751,7 +707,5 @@ class Motor:
             del self.ser
             self.ser = Serial_TCPServer((self.ip, self.port))
             print("Connection has been established.")
-            self.sock_status = 1
         except ConnectionError:
             print("Connection could not be reestablished.")
-            self.sock_status = 0
