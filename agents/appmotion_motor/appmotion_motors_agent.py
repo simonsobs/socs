@@ -26,7 +26,6 @@ class appMotionMotorsAgent:
         motor2_port (int) : the port address associated with Motor2
         motor2_is_lin (bool) : Boolean that determines if Motor2 is a linear motor.
         mode: 'acq' : Start data acquisition on initialize
-        m_res (bool) : True if manual resolution, False if default (res=8)
         samp : default sampling frequency in Hz
     """
 
@@ -39,7 +38,6 @@ class appMotionMotorsAgent:
             motor2_ip,
             motor2_port,
             motor2_is_lin,
-            m_res,
             mode=None,
             samp=2):
 
@@ -52,7 +50,6 @@ class appMotionMotorsAgent:
         self.motor2_ip = motor2_ip
         self.motor2_port = motor2_port
         self.motor2_is_lin = motor2_is_lin
-        self.m_res = m_res
         self.samp = float(samp)
         self.move_status = False
 
@@ -97,9 +94,9 @@ class appMotionMotorsAgent:
             self.log.debug("Lock Acquired Connecting to Stages")
 
             print('establishing serial server with motor1!')
-            self.motor1 = Motor(self.motor1_ip, self.motor1_port, self.motor1_is_lin, mot_id='motor1', index=1, m_res=self.m_res)
+            self.motor1 = Motor(self.motor1_ip, self.motor1_port, self.motor1_is_lin, mot_id='motor1', index=1)
             print('establishing serial server with motor2!')
-            self.motor2 = Motor(self.motor2_ip, self.motor2_port, self.motor2_is_lin, mot_id='motor2', index=2, m_res=self.m_res)
+            self.motor2 = Motor(self.motor2_ip, self.motor2_port, self.motor2_is_lin, mot_id='motor2', index=2)
 
         # This part is for the record and to allow future calls to proceed,
         # so does not require the lock
@@ -1145,7 +1142,6 @@ if __name__ == '__main__':
         args.motor2_ip,
         args.motor2_port,
         args.motor2_is_lin,
-        args.m_res,
         args.mode,
         args.samp)
 

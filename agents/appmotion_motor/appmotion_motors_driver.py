@@ -109,6 +109,7 @@ class Motor:
         print(f"msg: {msg}")
 
         msg = self.ser.writeread('CC\r')  # CC = Change Current
+        self.ser.flushInput()
         print(msg)
         current = float(msg[3:])
         if current < 1.5:
