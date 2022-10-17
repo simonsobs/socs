@@ -70,7 +70,7 @@ class Motor:
 
         if self.ser:
             # Check to make sure the device is in receive mode and reset if
-            # necessary. If unknown alarm code, EXIT with code 1. 
+            # necessary. If unknown alarm code, EXIT with code 1.
             msg = self.ser.writeread('RS\r')  # RS = Request Status
             self.ser.flushInput()
             print(msg)
@@ -123,7 +123,7 @@ class Motor:
         DL1 defines limits as normally open.
         DL2 defines limits as normally closed.
         DL3 defines limits as general purpose limits
-            - can't be used as end of travel limits. 
+            - can't be used as end of travel limits.
         Parameters:
         -----------
             setting (int): Changes limits to
@@ -140,12 +140,12 @@ class Motor:
             print(f'*************\n Driver: define_limits for motor{self.motor}\n***********')
             sys.stdout.flush()
         return True
-    
+
     def set_gearing(self, gearing=20000, verbose=True):
         """
         Set electronic gearing of motor. I.e number of electronic pulses
         to move the motor one revolution.
-        
+
         Parameters:
         -----------
             gearing (int): Gearing ratio for motors.
@@ -346,7 +346,7 @@ class Motor:
         """
         self.pos = 0
         self.real_pos = 0.0
-        self.ser.write('EP0\r') # EP = Set encoder position
+        self.ser.write('EP0\r')  # EP = Set encoder position
         self.ser.write('SP0\r')  # SP = Set Position
         self.ser.flushInput()
 

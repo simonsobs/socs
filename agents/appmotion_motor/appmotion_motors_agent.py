@@ -228,13 +228,13 @@ class appMotionMotorsAgent:
     @ocs_agent.param('verbose', default=True, type=bool)
     def set_gearing(self, session, params):
         """set_gearing(motor=1, gearing=20000)
-        
+
         **Tasks** - Sets electronic gearing of motor to {gearing} pules/revolution.
-        
+
         Parameters:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
                 motors. (default 1)
-            gearing (int): Sets pulse per revolution ratio. 
+            gearing (int): Sets pulse per revolution ratio.
                 Range: [200,32000]
             verbose (bool): Print message received from motor via driver
                 (Default True)
