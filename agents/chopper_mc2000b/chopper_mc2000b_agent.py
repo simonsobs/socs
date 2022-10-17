@@ -1,11 +1,8 @@
 import time
 import os
-from os import environ
 
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
-from twisted.internet.defer import inlineCallbacks
-from autobahn.twisted.util import sleep as dsleep
 import argparse
 import txaio
 
