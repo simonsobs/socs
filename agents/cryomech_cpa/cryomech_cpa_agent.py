@@ -242,6 +242,7 @@ class PTCAgent:
         if self.initialized:
             return True, "Already Initialized"
 
+
         with self.lock.acquire_timeout(0, job='init') as acquired:
             if not acquired:
                 self.log.warn("Could not start init because "
@@ -312,10 +313,20 @@ class PTCAgent:
 
             session.set_status('running')
 
+            last_release = time.time()
+
             self.take_data = True
 
-            # Publish data, waiting 1/f_sample seconds in between calls.
             while self.take_data:
+                # Relinquish sampling lock occasionally
+                if time.time() - last_release > 1.:
+                    last_release = time.time()
+                    if not self.lock.release_and_acquire(timeout=10):
+                        self.log.warn(f"Failed to re-acquire sampling lock, "
+                                      f"currently held by {self.lock.job}.")
+                        continue
+
+                # Publish data, waiting 1/f_sample seconds in between calls.
                 pub_data = {'timestamp': time.time(),
                             'block_name': 'ptc_status'}
                 data_flag, data = self.ptc.get_data()
