@@ -341,6 +341,7 @@ class ACUAgent:
         session.set_status('running')
         version = yield self.acu_read.http.Version()
         self.log.info(version)
+        session.data = {'platform': self.acu_config['platform']}
 
         # Numbering as per ICD.
         mode_key = {
@@ -410,17 +411,23 @@ class ACUAgent:
 
             query_t = time.time()
             if query_t > report_t + report_period:
+                resp_rate = n_ok / (query_t - report_t)
                 self.log.info('Responses ok at %.3f Hz'
-                              % (n_ok / (query_t - report_t)))
+#                              % (n_ok / (query_t - report_t)))
+                              % (resp_rate))
                 report_t = query_t
                 n_ok = 0
+                session.data = {'StatusResponseRate': resp_rate}
 
             try:
                 j = yield self.acu_read.http.Values(self.acu8100)
-                session.data = j
+#                session.data = {'status': j}
                 if self.acu3rdaxis:
                     j2 = yield self.acu_read.http.Values(self.acu3rdaxis)
-                    session.data.update(j2)
+                else:
+                    j2 = {}
+#                    session.data.update(j2)
+                session.data = {'StatusDetailed': j, 'Status3rdAxis': j2}
                 n_ok += 1
             except Exception as e:
                 # Need more error handling here...
@@ -434,17 +441,18 @@ class ACUAgent:
                 yield dsleep(1)
                 continue
 
-            for (key, value) in session.data.items():
-                for category in self.monitor_fields:
-                    if key in self.monitor_fields[category]:
-                        if isinstance(value, bool):
-                            self.data['status'][category][self.monitor_fields[category][key]] = int(value)
-                        elif isinstance(value, int) or isinstance(value, float):
-                            self.data['status'][category][self.monitor_fields[category][key]] = value
-                        elif value is None:
-                            self.data['status'][category][self.monitor_fields[category][key]] = float('nan')
-                        else:
-                            self.data['status'][category][self.monitor_fields[category][key]] = str(value)
+            for k, v in session.data.items():
+                for (key, value) in v.items():
+                    for category in self.monitor_fields:
+                        if key in self.monitor_fields[category]:
+                            if isinstance(value, bool):
+                                self.data['status'][category][self.monitor_fields[category][key]] = int(value)
+                            elif isinstance(value, int) or isinstance(value, float):
+                                self.data['status'][category][self.monitor_fields[category][key]] = value
+                            elif value is None:
+                                self.data['status'][category][self.monitor_fields[category][key]] = float('nan')
+                            else:
+                                self.data['status'][category][self.monitor_fields[category][key]] = str(value)
             self.data['status']['summary']['ctime'] =\
                 timecode(self.data['status']['summary']['Time'])
 
