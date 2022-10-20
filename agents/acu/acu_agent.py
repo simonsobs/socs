@@ -373,7 +373,7 @@ class ACUAgent:
             # are included in the output of Meta.  ElSync, at least,
             # is a known third axis mode for the LAT.
             'ElSync': 100,
-            'Unstow': 101,
+            'UnStow': 101,
             'MaintenanceStow': 102,
         }
 
@@ -674,6 +674,26 @@ class ACUAgent:
         self._set_job_done('broadcast')
         return True, 'Acquisition exited cleanly.'
 
+    @inlineCallbacks
+    def _check_daq_streams(self, stream):
+        if self.jobs[stream] != 'run':
+            self.log.warn("Process '%s' is not running" % stream)
+            job_check = False
+        else:
+            job_check = True
+
+        time_points = []
+        while len(time_points) < 2:
+            if stream == 'broadcast':
+                new_time = self.data['broadcast']['Time']
+            elif stream == 'monitor':
+                new_time = self.data['status']['summary']['ctime']
+            time_points.append(new_time)
+            yield dsleep(0.5)
+        if time_points[1] == time_points[0]:
+            self.log.warn('%s points may be stale, check stream.' % stream)
+        return job_check
+
     @ocs_agent.param('az', type=float)
     @ocs_agent.param('el', type=float)
     @ocs_agent.param('wait', default=1., type=float)
@@ -700,6 +720,13 @@ class ACUAgent:
         ok, msg = self._try_set_job('control')
         if not ok:
             return ok, msg
+
+        bcast_check = yield self._check_daq_streams('broadcast')
+        monitor_check = yield self._check_daq_streams('monitor')
+        if bcast_check == False or monitor_check==False:
+            self._set_job_done('control')
+            return False, 'Cannot complete go_to with process not running.'
+
         az = params['az']
         el = params['el']
         azonly = params['azonly']
@@ -850,6 +877,13 @@ class ACUAgent:
         ok, msg = self._try_set_job('control')
         if not ok:
             return ok, msg
+
+        monitor_check = yield self._check_daq_streams('monitor')
+        if monitor_check==False:
+            self._set_job_done('control')
+            return False, 'Cannot complete set_boresight with process not running.'
+
+
         bs_destination = params.get('b')
         if self.data['status']['platform_status']['Remote_mode'] == 0:
             self.log.warn('ACU in local mode, cannot perform motion with OCS.')
@@ -1039,6 +1073,12 @@ class ACUAgent:
             return ok, msg
         self.log.info('_try_set_job ok')
 
+        bcast_check = yield self._check_daq_streams('broadcast')
+        monitor_check = yield self._check_daq_streams('monitor')
+        if bcast_check == False or monitor_check==False:
+            self._set_job_done('control')
+            return False, 'Cannot complete scan with process not running.'
+
         if self.data['status']['platform_status']['Remote_mode'] == 0:
             self.log.warn('ACU in local mode, cannot perform motion with OCS.')
             self._set_job_done('control')
@@ -1219,6 +1259,13 @@ class ACUAgent:
         if not ok:
             return ok, msg
         self.log.info('_try_set_job ok')
+
+        bcast_check = yield self._check_daq_streams('broadcast')
+        monitor_check = yield self._check_daq_streams('monitor')
+        if bcast_check == False or monitor_check==False:
+            self._set_job_done('control')
+            return False, 'Cannot complete go_to with process not running.'
+
         az_endpoint1 = params.get('az_endpoint1')
         az_endpoint2 = params.get('az_endpoint2')
         az_speed = params.get('az_speed')
