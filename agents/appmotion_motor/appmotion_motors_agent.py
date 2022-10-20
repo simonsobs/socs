@@ -159,7 +159,7 @@ class appMotionMotorsAgent:
             return True, ("Motors are not moving.", self.move_status)
 
     @ocs_agent.param('motor', default=1, choices=[1, 2, 3], type=int)
-    @ocs_agent.param('verbose', defualt=True, type=bool)
+    @ocs_agent.param('verbose', default=True, type=bool)
     def motor_reset(self, session, params):
         """motor_reset(motor=1)
 
