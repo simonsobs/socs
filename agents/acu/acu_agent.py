@@ -714,6 +714,10 @@ class ACUAgent:
         end_stop = params['end_stop']
         wait_for_motion = params['wait']
         round_int = params['rounding']
+        if self.data['status']['platform_status']['Remote_mode'] == 0:
+            self.log.warn('ACU in local mode, cannot perform motion with OCS.')
+            self._set_job_done('control')
+            return False, 'ACU not in remote mode.'
         self.log.info('Azimuth commanded position: ' + str(az))
         self.log.info('Elevation commanded position: ' + str(el))
         current_az = round(self.data['broadcast']['Corrected_Azimuth'], 4)
@@ -791,6 +795,9 @@ class ACUAgent:
                           }
             self.agent.publish_to_feed('acu_upload', acu_upload)
             mdata = self.data['status']['summary']
+            remote = self.data['status']['platform_status']['Remote_mode']
+            if remote == 0:
+                self.log.warn('ACU no longer in remote mode!')
             if mdata['Azimuth_mode'] != 'Preset' or mdata['Elevation_mode'] != 'Preset':
                 #yield self.acu_control.stop()
                 self.log.info('Mode has changed from Preset, abort motion')
@@ -844,6 +851,10 @@ class ACUAgent:
         if not ok:
             return ok, msg
         bs_destination = params.get('b')
+        if self.data['status']['platform_status']['Remote_mode'] == 0:
+            self.log.warn('ACU in local mode, cannot perform motion with OCS.')
+            self._set_job_done('control')
+            return False, 'ACU not in remote mode.'
         # yield self.acu_control.stop()
         yield dsleep(5)
         self.data['uploads']['Start_Boresight'] = self.data['status']['summary']['Boresight_current_position']
@@ -1027,6 +1038,11 @@ class ACUAgent:
         if not ok:
             return ok, msg
         self.log.info('_try_set_job ok')
+
+        if self.data['status']['platform_status']['Remote_mode'] == 0:
+            self.log.warn('ACU in local mode, cannot perform motion with OCS.')
+            self._set_job_done('control')
+            return False, 'ACU not in remote mode.'
 
         UPLOAD_GROUP_SIZE = 120
         UPLOAD_THRESHOLD = FULL_STACK - 100
@@ -1217,6 +1233,11 @@ class ACUAgent:
         el_endpoint2 = params.get('el_endpoint2', el_endpoint1)
         el_speed = params.get('el_speed', 0.0)
 
+        if self.data['status']['platform_status']['Remote_mode'] == 0:
+            self.log.warn('ACU in local mode, cannot perform motion with OCS.')
+            self._set_job_done('control')
+            return False, 'ACU not in remote mode.'
+
         print('Scan params are', scan_params)
         if 'step_time' in scan_params:
             step_time = scan_params['step_time']
@@ -1241,8 +1262,11 @@ class ACUAgent:
         self.data['uploads']['Command_Type'] = 2
         yield dsleep(0.5)
         current_modes = {'Az': self.data['status']['summary']['Azimuth_mode'],
-                         'El': self.data['status']['summary']['Elevation_mode']}
+                         'El': self.data['status']['summary']['Elevation_mode'],
+                         'Remote': self.data['status']['platform_status']['Remote_mode']}
         while current_modes['Az']=='ProgramTrack':
+            if current_modes['Remote']==0:
+                self.log.warn('ACU no longer in remote mode')
             try:
                 lines = next(g)
             except StopIteration:
@@ -1252,7 +1276,8 @@ class ACUAgent:
             group_size = 250
             while len(current_lines):
                 current_modes = {'Az': self.data['status']['summary']['Azimuth_mode'],
-                                 'El': self.data['status']['summary']['Elevation_mode']}
+                                 'El': self.data['status']['summary']['Elevation_mode'],
+                                 'Remote': self.data['status']['platform_status']['Remote_mode']}
                 upload_lines = current_lines[:group_size]
        #         for u in range(len(upload_lines)):
        #             self.data['uploads']['PtStack_Time'] = upload_lines[u].split(';')[0]
