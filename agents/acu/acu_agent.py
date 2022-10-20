@@ -403,6 +403,11 @@ class ACUAgent:
         n_ok = 0
         min_query_period = 0.05   # Seconds
         query_t = 0
+        prev_checkdata = {'ctime': time.time(),
+                          'Azimuth_mode': None,
+                          'Elevation_mode': None,
+                          }
+
         while self.jobs['monitor'] == 'run':
             now = time.time()
 
@@ -455,6 +460,13 @@ class ACUAgent:
                                 self.data['status'][category][self.monitor_fields[category][key]] = str(value)
             self.data['status']['summary']['ctime'] =\
                 timecode(self.data['status']['summary']['Time'])
+            if self.data['status']['platform_status']['Remote_mode'] == 0:
+                self.log.warn('ACU in local mode!')
+            if self.data['status']['summary']['ctime'] == prev_checkdata['ctime']:
+                self.log.warn('ACU time has not changed from previous data point!')
+            for axis_mode in ['Azimuth_mode', 'Elevation_mode']:
+                if self.data['status']['summary'][axis_mode] != prev_checkdata[axis_mode]:
+                    self.log.info(axis_mode + ' has changed to ' + self.data['status']['summary'][axis_mode])
 
             # influx_status refers to all other self.data['status'] keys. Do not add
             # more keys to any self.data['status'] categories beyond this point
@@ -568,6 +580,10 @@ class ACUAgent:
                 self.agent.publish_to_feed('acu_status', block)
             self.agent.publish_to_feed('acu_status_influx', acustatus_influx, from_reactor=True)
 
+            prev_checkdata = {'ctime': self.data['status']['summary']['ctime'],
+                              'Azimuth_mode': self.data['status']['summary']['Azimuth_mode'],
+                              'Elevation_mode': self.data['status']['summary']['Elevation_mode'],
+                              }
         # self._set_job_stop('monitor')
         # yield dsleep(1)
         # self._set_job_done('monitor')
