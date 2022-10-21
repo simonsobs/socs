@@ -274,11 +274,11 @@ class ControllerAgent:
 
                 # Publish data
                 chopper_freqs = {'block_name': 'input_freqs',
-                              'block_name': 'output_freqs',
-                              'timestamp': time.time(),
-                              'data': {'input_freqs': input_freq,
-                                       'output_freqs': output_freq}
-                              }
+                                 'block_name': 'output_freqs',
+                                 'timestamp': time.time(),
+                                 'data': {'input_freqs': input_freq,
+                                          'output_freqs': output_freq}
+                                 }
 
                 self.agent.publish_to_feed('chopper_freqs', chopper_freqs)
 
