@@ -48,8 +48,7 @@ class ControllerAgent:
     device.
 
     Parameters
-    __________
-
+    ----------
     comport : str
         COM port to connect to device. Ex: "COM3"
     nbaud : int
@@ -66,7 +65,7 @@ class ControllerAgent:
         self.nbaud = nbaud
         self.timeout = timeout
 
-        self.hdl = MC2000BOpen(self.comport, self.nbaud, self.timeout)
+        self.hdl = None
 
         self.initialized = False
         self.take_data = False
@@ -95,8 +94,7 @@ class ControllerAgent:
         communication.
 
         Parameters
-        __________
-
+        ----------
         auto_acquire : bool, optional
             Default is false. Starts data acquisition after
             initilialization if True.
@@ -119,7 +117,8 @@ class ControllerAgent:
             self.initialized = True
             self.log.info("Chopper connected")
         else:
-            self.log.warn("Chopper not connected")
+            self.initialized = False
+            return False, "Chopper not connected"
 
         # Start data acquisition if requested
         if params['auto_acquire']:
@@ -135,7 +134,7 @@ class ControllerAgent:
         **Task** - Set the frequency of the chopper.
 
         Parameters
-        __________
+        ----------
         freq : int
             Frequency of chopper blades.
         """
@@ -159,7 +158,7 @@ class ControllerAgent:
         influences the range of frequencies permitted for the chopper.
 
         Parameters
-        __________
+        ----------
         bladetype : str
             Name of bladetype assigned to chopper controller setup.
             Default set to 'MC1F2' to reach the range of 4-8Hz.
@@ -185,7 +184,7 @@ class ControllerAgent:
         frequency output/input.
 
         Parameters
-        __________
+        ----------
         output_mode : str
             Output reference mode of chopper frequency. Possible modes
             are 'target' or 'actual'. Default set to 'target'.
@@ -213,7 +212,7 @@ class ControllerAgent:
         the chopper blades for the controller to measure and set frequency.
 
         Parameters
-        __________
+        ----------
         reference : str
             Reference mode of the blade. Default set to 'internalinner'.
         """
@@ -274,20 +273,19 @@ class ControllerAgent:
                 output_freq = freq_out[0]
 
                 # Publish data
-                input_data = {'block_name': 'input_freqs',
+                chopper_freqs = {'block_name': 'input_freqs',
+                              'block_name': 'output_freqs',
                               'timestamp': time.time(),
-                              'data': {'input_freqs': input_freq}
+                              'data': {'input_freqs': input_freq,
+                                       'output_freqs': output_freq}
                               }
-                output_data = {'block_name': 'output_freqs',
-                               'timestamp': time.time(),
-                               'data': {'output_freqs': output_freq}
-                               }
 
-                self.agent.publish_to_feed('input_freqs', input_data)
-                self.agent.publish_to_feed('output_freqs', output_data)
+                self.agent.publish_to_feed('chopper_freqs', chopper_freqs)
 
-    def stop_acq(self):
-        ok = False
+    def _stop_acq(self):
+        """
+        Stops acq process.
+        """
         with self.lock:
             if self.job == 'acq':
                 self.job = '!acq'
