@@ -301,7 +301,7 @@ def make_parser(parser=None):
         parser = argparse.ArgumentParser()
 
     pgroup = parser.add_argument_group('Agent Options')
-    pgroup.add_argument('--comport')
+    pgroup.add_argument('--com-port')
     pgroup.add_argument('--mode', choices=['init', 'acq'])
 
     return parser
@@ -325,13 +325,13 @@ if __name__ == '__main__':
         init_params = {'auto_acquire': True}
 
     agent, runner = ocs_agent.init_site_agent(args)
-    controller_agent = ControllerAgent(agent, args.comport)
+    controller_agent = ControllerAgent(agent, args.com_port)
 
     agent.register_task('init_chopper', controller_agent.init_chopper, startup=init_params)
     agent.register_task('set_frequency', controller_agent.set_frequency)
     agent.register_task('set_bladetype', controller_agent.set_bladetype)
     agent.register_task('set_reference_output_mode', controller_agent.set_reference_output_mode)
     agent.register_task('set_blade_reference', controller_agent.set_blade_reference)
-    agent.register_process('acq', controller_agent.acq, controller_agent.stop_acq, startup=True)
+    agent.register_process('acq', controller_agent.acq, controller_agent._stop_acq, startup=True)
 
     runner.run(agent, auto_reconnect=True)
