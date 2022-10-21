@@ -215,6 +215,8 @@ class ControllerAgent:
         ----------
         reference : str
             Reference mode of the blade. Default set to 'internalinner'.
+            Can be "internal", "external", "internalinner", "internalouter",
+            "externalinner", "externalouter"
         """
         with self.lock.acquire_timeout(timeout=3, job='set_blade_reference') as acquired:
             if not acquired:
