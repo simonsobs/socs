@@ -273,8 +273,7 @@ class ControllerAgent:
                 output_freq = freq_out[0]
 
                 # Publish data
-                chopper_freqs = {'block_name': 'input_freqs',
-                                 'block_name': 'output_freqs',
+                chopper_freqs = {'block_name': 'chopper_freqs',
                                  'timestamp': time.time(),
                                  'data': {'input_freqs': input_freq,
                                           'output_freqs': output_freq}
@@ -282,15 +281,16 @@ class ControllerAgent:
 
                 self.agent.publish_to_feed('chopper_freqs', chopper_freqs)
 
-    def _stop_acq(self):
+    def _stop_acq(self, session, params=None):
         """
         Stops acq process.
         """
-        with self.lock:
-            if self.job == 'acq':
-                self.job = '!acq'
-                ok = True
-            return (ok, {True: 'Requested process stop.', False: 'Faied to request process stop.'}[ok])
+        if self.take_data:
+            session.set_status('stopping')
+            self.take_data = False
+            return True, 'requested to stop taking data.'
+        else:
+            return False, 'acq is not currently running.'
 
 
 def make_parser(parser=None):
