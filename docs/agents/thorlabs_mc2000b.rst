@@ -48,7 +48,7 @@ available arguments::
       {'agent-class': 'ControllerAgent',
        'instance-id': 'chopper',
        'arguments': [['--mode', 'acq'],
-                     ['--comport', 'COM3']]},
+                     ['--com-port', 'COM3']]},
 
 Agent API
 ---------
