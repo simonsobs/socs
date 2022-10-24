@@ -50,6 +50,15 @@ available arguments::
        'arguments': [['--mode', 'acq'],
                      ['--com-port', 'COM3']]},
 
+Description
+-----------
+
+The Thorlabs MC2000B Agent takes in 15 bladetypes, the names of which can be found at the link below
+under Single and Dual Frequency Optical Chopper Blades and Harmonic Frequency Optical Chopper Blades
+as the item number:
+
+- `Bladetyes <https://www.thorlabs.com/newgrouppage9.cfm?objectgroup_id=287>`_
+
 Agent API
 ---------
 
