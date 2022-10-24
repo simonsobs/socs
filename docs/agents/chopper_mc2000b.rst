@@ -1,6 +1,6 @@
 .. highlight:: rst
 
-.. _chopper_mc2000b_agent:
+.. _thorlabs_mc2000b_agent:
 
 ========================
 Thorlabs MC2000B Agent
@@ -9,6 +9,15 @@ Thorlabs MC2000B Agent
 The Thorlabs MC2000B Agent is an OCS agent which helps monitor input and output
 frequencies of the Thorlabs chopper, and sends commands to set the frequency of the chopper,
 as well as other features such as the bladetype and reference modes of the device.
+
+This agent requires running on a Windows machine outside a Docker container. This requires
+manually setting the environment variable for $OCS_CONFIG_DIR to the ocs-site-configs path on
+your computer. Because we're outside a Docker container, the Thorlabs MC2000B agent will also
+need to run in the $OCS_CONFIG_DIR path. Instructions for setting an environment variable on 
+a Windows computer:
+
+- `Set Env Variable in Windows <https://docs.oracle.com/en/database/oracle/machine-learning/oml4r/1.5.1/oread/creating-and-modifying-environment-variables-on-windows.html#GUID-DD6F9982-60D5-48F6-8270-A27EC53807D0>`_
+
 
 Dependencies
 ------------
@@ -41,13 +50,8 @@ available arguments::
        'arguments': [['--mode', 'acq'],
                      ['--comport', 'COM3']]},
 
-Description
------------
-
-The ControllerAgent contains methods which control the chopper controller.
-
 Agent API
 ---------
 
-.. autoclass:: agents.chopper_mc2000b.chopper_mc2000b_agent.ControllerAgent
+.. autoclass:: agents.thorlabs_mc2000b.chopper_mc2000b_agent.ControllerAgent
     :members:
