@@ -127,7 +127,7 @@ class ControllerAgent:
 
         return True, "Chopper controller agent initialized"
 
-    @ocs_agent.param('freq', type=int)
+    @ocs_agent.param('freq', type=float)
     def set_frequency(self, session, params):
         """set_frequency(freq=None)
 
@@ -135,7 +135,7 @@ class ControllerAgent:
 
         Parameters
         ----------
-        freq : int
+        freq : float
             Frequency of chopper blades.
         """
         with self.lock.acquire_timeout(timeout=3, job='set_frequency') as acquired:
