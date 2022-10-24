@@ -6,8 +6,8 @@
 Thorlabs MC2000B Agent
 ========================
 
-The MC2000B Chopper Agent is an OCS agent which helps monitor input and output
-frequencies of the chopper, and sends commands to set the frequency of the chopper,
+The Thorlabs MC2000B Agent is an OCS agent which helps monitor input and output
+frequencies of the Thorlabs chopper, and sends commands to set the frequency of the chopper,
 as well as other features such as the bladetype and reference modes of the device.
 
 Dependencies
@@ -32,7 +32,7 @@ Below are configuration examples for the ocs config file.
 OCS Site Config
 ````````````````
 
-To configure the Holography FPGA Agent we need to add a FPGAAgent block to our
+To configure the Thorlabs MC2000B chopper Agent we need to add a ControllerAgent block to our
 ocs configuration file. Here is an example configuration block using all of the
 available arguments::
 
@@ -45,10 +45,6 @@ Description
 -----------
 
 The ControllerAgent contains methods which control the chopper controller.
-Before the chopper can take measurements, the user needs to
-initialize the chopper controller using the init_chopper() function. This will connect to the
-chopper controller via a COM port (user specified argument in the OCS site config file).
-
 
 Agent API
 ---------
