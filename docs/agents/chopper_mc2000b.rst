@@ -13,7 +13,8 @@ as well as other features such as the bladetype and reference modes of the devic
 Dependencies
 ------------
 
-Python Packages:
+Python Packages
+```````````````
 
 The MC2000B optical chopper is a Thorlabs device. To use the Agent, a software package must be installed
 from Thorlabs' website. The software package includes the Python software development kit for third-party
