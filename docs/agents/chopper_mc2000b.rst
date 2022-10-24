@@ -3,7 +3,7 @@
 .. _chopper_mc2000b_agent:
 
 ========================
-Chopper MC2000B Agent
+Thorlabs MC2000B Agent
 ========================
 
 The MC2000B Chopper Agent is an OCS agent which helps monitor input and output
@@ -38,7 +38,7 @@ available arguments::
 
       {'agent-class': 'ControllerAgent',
        'instance-id': 'chopper',
-       'arguments': [['--mode', 'init'],
+       'arguments': [['--mode', 'acq'],
                      ['--comport', 'COM3']]},
 
 Description
