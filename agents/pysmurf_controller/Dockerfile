@@ -1,4 +1,4 @@
-FROM simonsobs/sodetlib:v0.4.0
+FROM simonsobs/sodetlib:v0.4.1
 
 WORKDIR /app
 
