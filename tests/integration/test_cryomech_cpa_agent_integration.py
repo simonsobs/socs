@@ -95,7 +95,9 @@ def test_cryomech_cpa_acq(wait_for_crossbar, emulator, run_agent, client):
 def test_cryomech_cpa_release_reacquire(wait_for_crossbar, emulator, run_agent_acq,
                                         client, state, command):
     client.init.wait()
-    response = {command: command}
+    response = {command: command,
+                init_msg: init_msg,
+                init_res: init_res}
     emulator.define_responses(response)
 
     resp = client.power_ptc(state=state)
