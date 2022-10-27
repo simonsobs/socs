@@ -281,7 +281,7 @@ class PTCAgent:
             Desired power state of the PTC, either 'on', or 'off'.
 
         """
-        with self.lock.acquire_timeout(10, job='power_ptc') as acquired:
+        with self.lock.acquire_timeout(3, job='power_ptc') as acquired:
             if not acquired:
                 self.log.warn("Could not start task because {} is already "
                               "running".format(self.lock.job))
