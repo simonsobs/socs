@@ -34,7 +34,6 @@ pfeiffer_deps = ['pfeiffer-vacuum-protocol==0.4']
 
 # Pysmurf Controller Agent
 pysmurf_deps = [
-    'matplotlib',
     'pysmurf @ git+https://github.com/slaclab/pysmurf.git@main',
     'sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master',
     'sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master',
