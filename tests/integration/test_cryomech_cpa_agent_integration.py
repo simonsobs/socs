@@ -91,10 +91,14 @@ def test_cryomech_cpa_acq(wait_for_crossbar, emulator, run_agent, client):
 
 
 @pytest.mark.integtest
+@pytest.mark.parametrize("state,command", [('on', b'\t\x99\x00\x00\x00\x06\x01\x06\x00\x01\x00\x01')])
 def test_cryomech_cpa_release_reacquire(wait_for_crossbar, emulator, run_agent_acq,
-                                        client):
-    resp = client.init.wait()
-    resp = client.init.status()
+                                        client, state, command):
+    client.init.wait()
+    response = {command: command}
+    emulator.define_responses(response)
+
+    resp = client.power_ptc(state=state)
     print(resp)
     assert resp.status == ocs.OK
     print(resp.session)
