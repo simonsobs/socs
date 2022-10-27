@@ -19,4 +19,4 @@ exclude =
     docs/conf.py,
 per-file-ignores =
     # Windows only dependency
-    agents/chopper_mc2000b/chopper_mc2000b_agent.py:F405
+    agents/thorlabs_mc2000b/chopper_mc2000b_agent.py:F405
