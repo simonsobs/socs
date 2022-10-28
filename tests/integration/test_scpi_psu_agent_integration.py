@@ -1,3 +1,4 @@
+import time
 import pytest
 
 import ocs
@@ -71,6 +72,7 @@ def test_scpi_psu_set_voltage(wait_for_crossbar, gpib_emu, run_agent, client):
 @pytest.mark.integtest
 def test_scpi_psu_monitor_output(wait_for_crossbar, gpib_emu, run_agent, client):
     responses = {
+        "*idn?": "Keithley instruments, 2230G-30-1, 9203269, 1.16-1.04",
         "MEAS:VOLT? CH1": "3.14",
         "MEAS:CURR? CH1": "6.28",
         "MEAS:VOLT? CH2": "2.72",
@@ -83,4 +85,30 @@ def test_scpi_psu_monitor_output(wait_for_crossbar, gpib_emu, run_agent, client)
     client.init()
     resp = client.monitor_output.start(test_mode=True, wait=0)
     resp = client.monitor_output.wait()
+    check_resp_success(resp)
+
+
+@pytest.mark.integtest
+def test_scpi_psu_monitor_output_disconnect(
+    wait_for_crossbar, gpib_emu, run_agent, client
+):
+    responses = {
+        "*idn?": "Keithley instruments, 2230G-30-1, 9203269, 1.16-1.04",
+        "MEAS:VOLT? CH1": "3.14",
+        "MEAS:CURR? CH1": "6.28",
+        "MEAS:VOLT? CH2": "2.72",
+        "MEAS:CURR? CH2": "5.44",
+        "MEAS:VOLT? CH3": "1.23",
+        "MEAS:CURR? CH3": "2.46",
+    }
+    gpib_emu.define_responses(responses)
+
+    client.init()
+    resp = client.monitor_output.start(test_mode=False, wait=0)
+    time.sleep(5)
+    gpib_emu.disconnect_reconnect(timeout=3, port=1234)
+    time.sleep(5)
+    resp = client.monitor_output.stop()
+    time.sleep(1)
+    resp = client.monitor_output.status()
     check_resp_success(resp)

@@ -2,6 +2,8 @@
 
 import sys
 import socket
+import select
+import time
 import numpy as np
 
 # Lookup keys for command parameters.
@@ -215,6 +217,8 @@ class LS372:
         self.com = _establish_socket_connection(ip, timeout)
         self.num_channels = num_channels
 
+        self.reset = lambda: self.__init__(ip, timeout, num_channels)
+
         self.id = self.get_id()
         self.autoscan = self.get_autoscan()
         # Enable all channels
@@ -234,6 +238,55 @@ class LS372:
         self.sample_heater = Heater(self, 0)
         self.still_heater = Heater(self, 2)
 
+    def connection_check(self, op):
+        assert op in ['read', 'write'], "'op' must be 'read' or 'write'"
+        select_lists = ([self.com, ], [], []) if op == 'read' else ([], [self.com, ], [])
+        try:
+            ready_to_read, ready_to_write, in_error = \
+                select.select(*select_lists, 5)
+        except select.error as e:
+            # self.com.shutdown(2)
+            # self.com.close()
+            # print("Lakeshore372 connection error")
+            # self.disconnect_handler()
+            # self.connection_check(op)  # need to test on real hardware
+            # return
+            raise Exception("Triggered select.error block unexpectedly") from e
+        if op == 'read' and not ready_to_read:
+            self.disconnect_handler("No sockets ready for reading")
+        elif op == 'write' and not ready_to_write:
+            self.disconnect_handler("No sockets ready for writing")
+
+    def disconnect_handler(self, reset_reason):
+        max_attempts = 500
+        for i in range(max_attempts):
+            try:
+                self.reset()
+                break
+            except socket.error as e:
+                print(f"Reconnect attempt #{i} failed with: {e}")
+                if i == max_attempts - 1:
+                    assert False, "Could not reconnect"
+                time.sleep(1)
+        print(f"Successfully reconnected on attempt #{i}")
+        raise ConnectionResetError(reset_reason)  # should be caught by agent
+
+    def write(self, message):
+        self.connection_check('write')
+        msg_str = f'{message}\r\n'.encode()
+        try:
+            self.com.send(msg_str)
+        except socket.error as e:
+            self.disconnect_handler(f"Socket write failed (disconnect?): {e}")
+
+    def read(self):
+        self.connection_check('read')
+        data = self.com.recv(4096)
+        if not data:
+            self.disconnect_handler("Received no data from socket recv")
+        resp = str(data, 'utf-8').strip()
+        return resp
+
     def msg(self, message):
         """Send message to the Lakeshore 372 over ethernet.
 
@@ -252,14 +305,12 @@ class LS372:
             Response string from the Lakeshore, if any. Else, an empty string.
 
         """
-        msg_str = f'{message}\r\n'.encode()
-
         if '?' in message:
-            self.com.send(msg_str)
+            self.write(message)
             # Try once, if we timeout, try again. Usually gets around single event glitches.
             for attempt in range(2):
                 try:
-                    resp = str(self.com.recv(4096), 'utf-8').strip()
+                    resp = self.read()
                     break
                 except socket.timeout:
                     print("Warning: Caught timeout waiting for response to '%s', trying again "
@@ -267,8 +318,10 @@ class LS372:
                     if attempt == 1:
                         raise RuntimeError('Query response to Lakeshore timed out after two '
                                            'attempts. Check connection.')
+                except ConnectionResetError:
+                    raise
         else:
-            self.com.send(msg_str)
+            self.write(message)
             resp = ''
 
         return resp

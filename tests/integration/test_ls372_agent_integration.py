@@ -1,5 +1,6 @@
 import os
 import pytest
+import time
 
 import ocs
 from ocs.base import OpCode
@@ -17,7 +18,8 @@ os.environ['OCS_CONFIG_DIR'] = os.getcwd()
 
 run_agent = create_agent_runner_fixture(
     '../agents/lakeshore372/LS372_agent.py',
-    'ls372')
+    'ls372',
+    args=["--log-dir", "./logs/"])
 client = create_client_fixture('LSASIM')
 wait_for_crossbar = create_crossbar_fixture()
 
@@ -222,5 +224,23 @@ def test_ls372_set_still_output(wait_for_crossbar, emulator, run_agent, client):
 def test_ls372_get_still_output(wait_for_crossbar, emulator, run_agent, client):
     client.init_lakeshore()
     resp = client.get_still_output()
+    assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
+
+@pytest.mark.integtest
+def test_ls372_disconnect_reconnect(wait_for_crossbar, emulator, run_agent, client):
+    client.init_lakeshore()
+    resp = client.acq.start(sample_heater=False, run_once=False)
+    assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.STARTING.value
+
+    time.sleep(5)
+    emulator.disconnect_reconnect(timeout=3, port=7777)
+    time.sleep(5)
+
+    client.acq.stop()
+    time.sleep(1)
+    resp = client.acq.status()
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value

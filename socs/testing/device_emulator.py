@@ -192,6 +192,13 @@ class DeviceEmulator:
     def __del__(self):
         self.shutdown()
 
+    def disconnect_reconnect(self, timeout, port):
+        print(f"<<< Disconnecting tcp relay for {timeout} seconds >>>")
+        self.shutdown()
+        time.sleep(timeout)
+        print(f"<<< Re-creating tcp relay on port {port} >>>")
+        self.create_tcp_relay(port)
+
     def shutdown(self):
         """Shutdown communication on the configured relay. This will stop any
         attempt to read communication on the relay, as well as shutdown the relay
