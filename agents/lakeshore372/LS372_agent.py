@@ -800,10 +800,14 @@ class LS372_Agent:
 
         return True, f'Setpoint now set to {params["temperature"]} K'
 
+    @ocs_agent.param('channel', type=int)
     def enable_channel(self, session, params):
-        """
-        Enable a channel on the LS372.
-        :param params: dict with channel value
+        """enable_channel(channel=None)
+
+        **Task** - Enables a channel on the LS372
+        
+        Parameters:
+            channel (int): Channel number to enable 
         """
         with self._lock.acquire_timeout(job='enable_channel') as acquired:
             if not acquired:
@@ -819,9 +823,12 @@ class LS372_Agent:
         return True, f"Enabled channel {channel} with settings {ch_settings}"
 
     def disable_channel(self, session, params):
-        """
-        Disable a channel on the LS372.
-        :param params: dict with channel value
+        """disable_channel(channel=None)
+
+        **Task** - Disables a channel on the LS372
+        
+        Parameters:
+            channel (int): Channel number to disable 
         """
         with self._lock.acquire_timeout(job='disable_channel') as acquired:
             if not acquired:
