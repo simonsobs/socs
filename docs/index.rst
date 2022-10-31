@@ -42,7 +42,11 @@ API Reference        Full API documentation for core parts of the SOCS library.
     agents/chwp_encoder
     agents/cryomech_cpa
     agents/fts_agent
+    agents/hwp_picoscope
     agents/hwp_rotation_agent
+    agents/holo_fpga
+    agents/holo_synth
+    agents/ibootbar
     agents/labjack
     agents/lakeshore240
     agents/lakeshore336

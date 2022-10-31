@@ -40,7 +40,6 @@ transferred files after 7 days, or 604800 seconds::
            '--max-copy-attempts', '10',
            '--copy-timeout', '60',
            '--cmd-timeout', '5'
-           '--timeout-wait', '20'
            ]},
 
         {'agent-class': 'SupRsync',
@@ -55,7 +54,6 @@ transferred files after 7 days, or 604800 seconds::
            '--max-copy-attempts', '10',
            '--copy-timeout', '20',
            '--cmd-timeout', '5'
-           '--timeout-wait', '20'
            ]},
 
 .. note::

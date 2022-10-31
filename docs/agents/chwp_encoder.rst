@@ -73,3 +73,18 @@ This again is an example to run multiple agents::
       - "--instance-id=HBA1"
       - "--site-hub=ws://crossbar:8001/ws"
       - "--site-http=http://crossbar:8001/call"
+
+Description
+-----------
+
+session.data
+````````````
+The most recent data collected is stored in session.data in the following structure.
+The approx_hwp_freq is initialized by -1 and will be updated by non-negative rotation frequency
+if encoder agent is receiving encoder signal.
+If chwp is completely stopped, approx_hwp_freq will not be updated.::
+    >>> response.session['data']
+    {'approx_hwp_freq':      2.0,
+     'encoder_last_updated': 1659486962.3731978,
+     'irig_time':            1659486983,
+     'irig_last_updated':    1659486983.8985631}

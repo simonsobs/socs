@@ -14,8 +14,6 @@ exclude =
     agents/meinberg_m1000/mibs/MBG-SNMP-LTNG-MIB.py,
     agents/meinberg_m1000/mibs/SNMPv2-MIB.py,
     agents/meinberg_m1000/mibs/MBG-SNMP-ROOT-MIB.py,
+    agents/ibootbar/mibs/IBOOTPDU-MIB.py,
     versioneer.py,
     docs/conf.py,
-    # ignore while postfat_updates under review
-    agents/acu/acu_agent.py,
-    agents/acu/scan_helpers.py
