@@ -800,6 +800,7 @@ class LS372_Agent:
 
         return True, f'Setpoint now set to {params["temperature"]} K'
 
+    # TODO: turn enable/disable into 1 task
     @ocs_agent.param('channel', type=int)
     def enable_channel(self, session, params):
         """enable_channel(channel=None)
@@ -822,6 +823,7 @@ class LS372_Agent:
                                     
         return True, f"Enabled channel {channel} with settings {ch_settings}"
 
+    @ocs_agent.param('channel', type=int)
     def disable_channel(self, session, params):
         """disable_channel(channel=None)
 
@@ -842,11 +844,15 @@ class LS372_Agent:
             ch_settings = self.module.disable_channel(channel)
                                     
         return True, f"Disabled channel {channel} with settings {ch_settings}"
+    
+    @ocs_agent.param('channel', type=int)
+    def get_channel_settings(self, session, params):
+        """get_channel_settings(channel=None)
+        
+        **Task** - Gets settings for a particular channel on the LS372
 
-    def channel_settings(self, session, params):
-        """
-        Get settings for a particular channel on the LS372.
-        :param params: dict with channel value
+        Parameters:
+            channel (int): Channel number to get settings
         """
         with self._lock.acquire_timeout(job='channel_settings') as acquired:
             if not acquired:
