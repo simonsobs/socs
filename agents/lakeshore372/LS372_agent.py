@@ -14,6 +14,10 @@ from socs.Lakeshore.Lakeshore372 import LS372
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock, Pacemaker
 
+def still_power_to_perc(power, res, lead, max_volts):
+    cur = np.sqrt(power / res)
+    volt = (lead + res) * cur
+    return 100*volt/max_volts
 
 class YieldingLock:
     """A lock protected by a lock.  This braided arrangement guarantees
@@ -749,6 +753,8 @@ class LS372_Agent:
 
         Parameters:
             temperature (float): Temperature to servo to in units of Kelvin.
+                and optional control channel to change the channel used for
+                control (int)
 
         """
         with self._lock.acquire_timeout(job='servo_to_temperature') as acquired:
@@ -769,6 +775,13 @@ class LS372_Agent:
                 session.add_message('Autoscan is enabled, disabling for PID control on dedicated channel.')
                 self.module.disable_autoscan()
 
+            # Check the control thermometer if requested
+            control_ch = params.get('control_ch', False)
+            session.add_message(f'Control ch is {control_ch}')
+            if control_ch:
+                session.add_message(f'Setting heater control input channel to {control_ch}')
+                self.module.sample_heater.input = int(control_ch)
+
             # Check we're scanning same channel expected by heater for control.
             if self.module.get_active_channel().channel_num != int(self.module.sample_heater.input):
                 session.add_message('Changing active channel to expected heater control input')
@@ -786,6 +799,260 @@ class LS372_Agent:
             self.module.sample_heater.set_setpoint(params["temperature"])
 
         return True, f'Setpoint now set to {params["temperature"]} K'
+
+    def enable_channel(self, session, params):
+        """
+        Enable a channel on the LS372.
+        :param params: dict with channel value
+        """
+        with self._lock.acquire_timeout(job='enable_channel') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            session.set_status('running')
+            
+            channel = params['channel']
+            ch_settings = self.module.enable_channel(channel)
+                                    
+        return True, f"Enabled channel {channel} with settings {ch_settings}"
+
+    def disable_channel(self, session, params):
+        """
+        Disable a channel on the LS372.
+        :param params: dict with channel value
+        """
+        with self._lock.acquire_timeout(job='disable_channel') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            session.set_status('running')
+            
+            channel = params['channel']
+            ch_settings = self.module.disable_channel(channel)
+                                    
+        return True, f"Disabled channel {channel} with settings {ch_settings}"
+
+    def channel_settings(self, session, params):
+        """
+        Get settings for a particular channel on the LS372.
+        :param params: dict with channel value
+        """
+        with self._lock.acquire_timeout(job='channel_settings') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            session.set_status('running')
+            
+            channel = params['channel']
+            ch_settings = self.module.channel_settings(channel)
+            session.add_message(ch_settings)
+                                    
+        return True, f"Channel {channel} has settings {ch_settings}"
+
+    def set_calibration_curve(self, session, params):
+        """
+        Set the calibration curve number for a particular channel
+        :param params: dict with channel number and cal curve number
+        """
+        with self._lock.acquire_timeout(job='set_calibration_curve') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            session.set_status('running')
+            
+            channel = params['channel']
+            curve_number = params['curve_number']
+            
+            ch_settings = self.module.set_calibration_curve(channel, curve_number)
+                                    
+        return True, f"Assigned {channel} to curve number {curve_number}. Channel settings are {ch_settings}"
+
+    def get_input_setup(self, session, params):
+        """
+        Get measurement inputs for a particular channel on the LS372.
+        :param params: dict with channel value
+        :returns: [mode, excitation, auto range, range, cs_shunt, units].
+        """
+        with self._lock.acquire_timeout(job='get_input_setup') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            session.set_status('running')
+            
+            channel = params['channel']
+            input_setup = self.module.get_input_setup(channel)
+            session.add_message(input_setup)
+                                    
+        return True, f"Channel {channel} has measurement inputs {input_setup} = [mode," \
+                     "excitation, auto range, range, cs_shunt, units]"
+
+    def start_custom_pid(self, session, params):
+        """
+        PID the still or sample heater off of a channel on the LS372. 
+        Currently only P and I implemented.
+        :param params: dict with "setpoint", "channel"
+        :type params: dict
+        setpoint - Setpoint in Kelvin (float)
+        heater - 'still' or 'sample' (str)
+        channel - LS372 channel to PID off of (int)
+        P_val - Proportional value in Watts/Kelvin (float)
+        I_val - Integral value in Hz (float)
+        update_time - Time between PID updates (s)
+        sample_heater_range - sample heater range (A). Default=10e-3
+        still_heater_R - still heater resistance in ohms. Default=120
+        still_lead_R - still heater lead resistance in ohms. Default=14.679  
+        """
+        
+        with self._acq_proc_lock.acquire_timeout(timeout=0, job='custom_pid') \
+             as acq_acquired, \
+             self._lock.acquire_timeout(job='custom_pid') as acquired:
+            if not acq_acquired:
+                self.log.warn(f"Could not start Process because "
+                              f"{self._acq_proc_lock.job} is already running")
+                return False, "Could not acquire lock"
+            if not acquired:
+                self.log.warn(f"Could not start Process because "
+                              f"{self._lock.job} is holding the lock")
+                return False, "Could not acquire lock"
+
+            session.set_status('running')
+            session.data = {"fields": {}}
+            
+            setpoint = params['setpoint']
+            heater = params['heater']
+            ch = params['ch']
+            P_val = params['P_val']
+            I_val = params['I_val']
+            update_time = params['update_time']
+            sample_heater_range = params.get('sample_heater_range', 10e-3)
+            still_heater_R = params.get('still_heater_R', 120)
+            still_lead_R = params.get('still_lead_R', 14.679)
+            
+            #Constants
+            delta_t = 0.32 #rough intrinsic sampling period of the LS372 (s)
+            max_voltage = 10. # [V]
+
+            # Get heaters in the correct configuration
+            if heater == 'sample':
+                #Set heater range
+                if sample_heater_range == self.module.sample_heater.get_heater_range():
+                    print(f"Heater range already set to {sample_heater_range} amps")
+                else:
+                    self.module.sample_heater.set_heater_range(sample_heater_range)
+                
+                # Check we're in correct control mode for servo.
+                if self.module.sample_heater.mode != 'Open Loop':
+                    session.add_message(f'Changing control to Open Loop mode for still PID.')
+                    self.module.sample_heater.set_mode("Open Loop")
+            
+            if heater == 'still':
+                # Check we're in correct control mode for servo.
+                if self.module.still_heater.mode != 'Open Loop':
+                    session.add_message(f'Changing control to Open Loop mode for still PID.')
+                    self.module.still_heater.set_mode("Open Loop")
+
+            # Check we aren't autoscanning.
+            if self.module.get_autoscan() is True:
+                session.add_message(f'Autoscan is enabled, disabling for still PID control on dedicated channel.')
+                self.module.disable_autoscan()
+
+            # Check we're scanning same channel expected by heater for control.
+            if self.module.get_active_channel().channel_num != ch:
+                session.add_message(f'Changing active channel to {ch} for still PID')
+                self.module.set_active_channel(ch)
+
+            # Start the PID
+            self.custom_pid = True
+            active_channel = self.module.get_active_channel()
+            channel_str = active_channel.name.replace(' ', '_')
+            start_time = time.time()
+            last_pid = start_time
+            heater_I = 0
+            temps, resistances, times = [], [], []
+            self.log.info(f"Starting PID on heater {heater}, ch {ch} to setpoint {setpoint} K")
+            
+            while self.custom_pid:
+                
+                #Get a list of T and R at the maximum sample frequency
+                temps.append(self.module.get_temp(unit='kelvin', chan=ch))
+                resistances.append(self.module.get_temp(unit='ohms', chan=ch))
+                times.append(time.time())
+                
+                #Calculate and apply the PID based on the most recent temperature set
+                if times[-1]-last_pid > update_time:
+                    heater_P = P_val*(setpoint-np.mean(np.array(temps)))
+                    heater_I += P_val*I_val*(delta_t*np.sum(setpoint-np.array(temps)))
+                    heater_pow = max(0.0, heater_P + heater_I)
+                    if heater == 'still':
+                        heater_frac = still_power_to_perc(heater_pow, still_heater_R, still_lead_R, max_voltage)
+                        self.module.still_heater.set_heater_output(heater_frac)
+                    if heater == 'sample':
+                        self.module.sample_heater.set_heater_output(heater_pow)
+                    
+                    #Publish heater values
+                    if heater == 'still':
+                        heater_data = {
+                                'timestamp': last_pid,
+                                'block_name': 'still_heater_out',
+                                'data': {'still_heater_out': heater_frac}
+                                }
+                        session.app.publish_to_feed('temperatures', heater_data)
+                    
+                    if heater == 'sample':
+                        heater_data = {
+                                'timestamp': last_pid,
+                                'block_name': 'sample_heater_out',
+                                'data': {'sample_heater_out': heater_pow}
+                                }
+                        session.app.publish_to_feed('temperatures', heater_data)
+                    
+                    #Publish T and R values
+                    temp_data = {
+                        'timestamps': times,
+                        'block_name': active_channel.name,
+                        'data': {channel_str + '_T': temps,
+                                channel_str + '_R': resistances}
+                    }
+                    session.app.publish_to_feed('temperatures', temp_data)
+
+                    # For session.data
+                    field_dict = {channel_str: {"T": temps,
+                                                "R": resistances,
+                                                "timestamps": times}}
+                    session.data['fields'].update(field_dict)
+                    self.log.debug("{data}", data=session.data)
+                    
+                    #Reset for the next PID iteration
+                    temps, resistances, times = [], [], []
+                    last_pid = time.time()
+                
+                    # Relinquish sampling lock temporarily
+                    if not self._lock.release_and_acquire(timeout=10):
+                        self.log.warn(f"Failed to re-acquire sampling lock, "
+                                      f"currently held by {self._lock.job}.")
+                        continue     
+
+        return True, 'PID exited cleanly.'
+
+    def stop_custom_pid(self, session, params=None):
+        """
+        Stops acq process.
+        """
+        if self.custom_pid:
+            self.custom_pid = False
+            return True, 'Stopping the custom PID'
+        else:
+            return False, 'PID is not currently running'
 
     @ocs_agent.param('measurements', type=int)
     @ocs_agent.param('threshold', type=float)
@@ -1145,6 +1412,11 @@ if __name__ == '__main__':
     agent.register_task('get_resistance_range', lake_agent.get_resistance_range)
     agent.register_task('set_dwell', lake_agent.set_dwell)
     agent.register_task('get_dwell', lake_agent.get_dwell)
+    agent.register_task('enable_channel', lake_agent.enable_channel)
+    agent.register_task('disable_channel', lake_agent.disable_channel)
+    agent.register_task('channel_settings', lake_agent.channel_settings)
+    agent.register_task('get_input_setup', lake_agent.get_input_setup)
+    agent.register_task('set_calibration_curve', lake_agent.set_calibration_curve)
     agent.register_task('set_pid', lake_agent.set_pid)
     agent.register_task('set_autoscan', lake_agent.set_autoscan)
     agent.register_task('set_active_channel', lake_agent.set_active_channel)
@@ -1155,6 +1427,7 @@ if __name__ == '__main__':
     agent.register_task('set_still_output', lake_agent.set_still_output)
     agent.register_task('get_still_output', lake_agent.get_still_output)
     agent.register_process('acq', lake_agent.acq, lake_agent._stop_acq)
+    agent.register_process('custom_pid', lake_agent.start_custom_pid, lake_agent.stop_custom_pid)
     agent.register_task('enable_control_chan', lake_agent.enable_control_chan)
     agent.register_task('disable_control_chan', lake_agent.disable_control_chan)
     agent.register_task('input_configfile', lake_agent.input_configfile)
