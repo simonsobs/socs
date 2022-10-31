@@ -896,11 +896,14 @@ class LS372_Agent:
                                     
         return True, f"Assigned {channel} to curve number {curve_number}. Channel settings are {ch_settings}"
 
+    @ocs_agent.param('channel', type=int)
     def get_input_setup(self, session, params):
-        """
-        Get measurement inputs for a particular channel on the LS372.
-        :param params: dict with channel value
-        :returns: [mode, excitation, auto range, range, cs_shunt, units].
+        """get_input_setup(channel=None)
+
+        **Task** - Gets measurement inputs for a specific channel on the LS372
+        
+        Parameters:
+            channel (int): Channel number to get input setup
         """
         with self._lock.acquire_timeout(job='get_input_setup') as acquired:
             if not acquired:
@@ -917,6 +920,17 @@ class LS372_Agent:
         return True, f"Channel {channel} has measurement inputs {input_setup} = [mode," \
                      "excitation, auto range, range, cs_shunt, units]"
 
+    @ocs_agent.param('setpoint', type=float)
+    @ocs_agent.param('heater', type=str)
+    @ocs_agent.param('channel', type=int)
+    @ocs_agent.param('P', type=int)
+    @ocs_agent.param('I', type=int)
+    @ocs_agent.param('update_time', type=int)
+    @ocs_agent.param('sample_heater_range', type=float, default=10e-3)
+    @ocs_agent.param('still_heater_R', type=int, default=120)
+    @ocs_agent.param('still_lead_R', type=float, default=14.679)
+    @ocs_agent.param('delta_t', type=float, default=0.32)
+    @ocs_agent.param('max_voltage', type=float, default=10.)
     def start_custom_pid(self, session, params):
         """
         PID the still or sample heater off of a channel on the LS372. 
@@ -951,17 +965,17 @@ class LS372_Agent:
             
             setpoint = params['setpoint']
             heater = params['heater']
-            ch = params['ch']
-            P_val = params['P_val']
-            I_val = params['I_val']
+            ch = params['channel']
+            P_val = params['P']
+            I_val = params['I']
             update_time = params['update_time']
-            sample_heater_range = params.get('sample_heater_range', 10e-3)
-            still_heater_R = params.get('still_heater_R', 120)
-            still_lead_R = params.get('still_lead_R', 14.679)
+            sample_heater_range = params['sample_heater_range']
+            still_heater_R = params['still_heater_R']
+            still_lead_R = params['still_lead_R']
             
             #Constants
-            delta_t = 0.32 #rough intrinsic sampling period of the LS372 (s)
-            max_voltage = 10. # [V]
+            delta_t = params['delta_t'] #rough intrinsic sampling period of the LS372 (s)
+            max_voltage = params['max_voltage'] # [V]
 
             # Get heaters in the correct configuration
             if heater == 'sample':
@@ -973,7 +987,7 @@ class LS372_Agent:
                 
                 # Check we're in correct control mode for servo.
                 if self.module.sample_heater.mode != 'Open Loop':
-                    session.add_message(f'Changing control to Open Loop mode for still PID.')
+                    session.add_message(f'Changing control to Open Loop mode for sample PID.')
                     self.module.sample_heater.set_mode("Open Loop")
             
             if heater == 'still':
