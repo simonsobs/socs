@@ -133,13 +133,13 @@ def update_cache(get_result, timestamp):
             oid_cache[field_name] = {"status": oid_value}
             oid_cache[field_name]["description"] = oid_description
             oid_cache['ups_connection'] = {'last_attempt': time.time(),
-                                                'connected': True}
+                                           'connected': True}
             oid_cache['timestamp'] = timestamp
     # This is a TypeError due to nothing coming back from the yield,
     # so get_result is None here and can't be iterated.
     except TypeError:
         oid_cache['ups_connection'] = {'last_attempt': time.time(),
-                                            'connected': False}
+                                       'connected': False}
         raise ConnectionError('No SNMP response. Check your connection.')
 
     return oid_cache
@@ -203,13 +203,13 @@ class UPSAgent:
         structure::
 
             >>> response.session['data']
-            {'upsIdentManufacturer': 
+            {'upsIdentManufacturer':
                 {'description': 'Falcon'},
-            'upsIdentModel': 
+            'upsIdentModel':
                 {'description': 'SSG3KRM-2'},
             ...
-            'ups_connection': 
-                {'last_attempt': 1656085022.680916, 
+            'ups_connection':
+                {'last_attempt': 1656085022.680916,
                  'connected': True},
             'timestamp': 1656085022.680916}
         """
@@ -228,24 +228,24 @@ class UPSAgent:
             get_list = []
 
             # Create the list of OIDs to send get commands
-            oids = ['upsIdentManufacturer', 
-                    'upsIdentModel', 
-                    'upsBatteryStatus', 
-                    'upsSecondsOnBattery', 
-                    'upsEstimatedMinutesRemaining', 
-                    'upsEstimatedChargeRemaining', 
-                    'upsBatteryVoltage', 
-                    'upsBatteryCurrent', 
-                    'upsBatteryTemperature', 
+            oids = ['upsIdentManufacturer',
+                    'upsIdentModel',
+                    'upsBatteryStatus',
+                    'upsSecondsOnBattery',
+                    'upsEstimatedMinutesRemaining',
+                    'upsEstimatedChargeRemaining',
+                    'upsBatteryVoltage',
+                    'upsBatteryCurrent',
+                    'upsBatteryTemperature',
                     'upsOutputSource']
 
             for oid in oids:
                 get_list.append(('UPS-MIB', oid, 0))
 
             # Append output OIDs to GET list
-            output_oids = ['upsOutputVoltage', 
-                           'upsOutputCurrent', 
-                           'upsOutputPower', 
+            output_oids = ['upsOutputVoltage',
+                           'upsOutputCurrent',
+                           'upsOutputPower',
                            'upsOutputPercentLoad']
 
             # Use number of output lines used to append correct number of output OIDs
@@ -255,7 +255,7 @@ class UPSAgent:
                 outputs = num_res[0][1]._value
                 for i in range(outputs):
                     for oid in output_oids:
-                        get_list.append(('UPS-MIB', oid, i+1))
+                        get_list.append(('UPS-MIB', oid, i + 1))
 
             # Issue SNMP GET command
             get_result = yield self.snmp.get(get_list, self.version)
@@ -325,9 +325,9 @@ if __name__ == "__main__":
 
     agent, runner = ocs_agent.init_site_agent(args)
     p = UPSAgent(agent,
-                      address=args.address,
-                      port=int(args.port),
-                      version=int(args.snmp_version))
+                 address=args.address,
+                 port=int(args.port),
+                 version=int(args.snmp_version))
 
     agent.register_process("acq",
                            p.acq,
