@@ -2,15 +2,12 @@ import pytest
 from multiprocessing import Process
 import signal
 import os
-import time
 import subprocess
 from unittest.mock import patch
-from twisted.internet.defer import inlineCallbacks
 from snmpsim.commands import responder
 
 import ocs
 from ocs.base import OpCode
-from socs.snmp import SNMPTwister
 
 from ocs.testing import (
     create_agent_runner_fixture,
