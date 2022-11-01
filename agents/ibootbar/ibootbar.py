@@ -398,7 +398,7 @@ def add_agent_args(parser=None):
     pgroup.add_argument("--snmp-version", default='2', choices=['1', '2', '3'],
                         help="SNMP version for communication. Must match "
                              + "configuration on the ibootbar.")
-    pgroup.add_argument("--mode", choices=['default', 'test'])
+    pgroup.add_argument("--mode", choices=['acq', 'test'])
 
     return parser
 
