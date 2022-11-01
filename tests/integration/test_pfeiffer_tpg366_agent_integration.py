@@ -43,8 +43,6 @@ def check_resp_success(resp):
 
 @pytest.mark.integtest
 def test_pfeiffer_tpg366_acq(wait_for_crossbar, emu, run_agent, client):
-    time.sleep(3)
-    client.acq.stop()
-    time.sleep(1)
-    resp = client.acq.status()
+    resp = client.acq.start(test_mode=True)
+    resp = client.acq.wait()
     check_resp_success(resp)
