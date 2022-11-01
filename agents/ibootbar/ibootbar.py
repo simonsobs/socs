@@ -196,7 +196,7 @@ class ibootbarAgent:
                                  agg_params=agg_params,
                                  buffer_time=0)
 
-    @ocs_agent.param('_')
+    @ocs_agent.param('test_mode', default=False, type=bool)
     @inlineCallbacks
     def acq(self, session, params=None):
         """acq()
@@ -270,6 +270,9 @@ class ibootbarAgent:
                 self.log.error(f'{e}')
                 yield dsleep(1)
                 self.log.info('Trying to reconnect.')
+
+            if params['test_mode']:
+                break
 
         return True, "Finished Recording"
 
@@ -395,6 +398,7 @@ def add_agent_args(parser=None):
     pgroup.add_argument("--snmp-version", default='2', choices=['1', '2', '3'],
                         help="SNMP version for communication. Must match "
                              + "configuration on the ibootbar.")
+    pgroup.add_argument("--mode", choices=['default', 'test'])
 
     return parser
 
@@ -406,6 +410,10 @@ if __name__ == "__main__":
     parser = add_agent_args()
     args = site_config.parse_args(agent_class='ibootbarAgent', parser=parser)
 
+    init_params = args.auto_start
+    if args.mode == 'test':
+        init_params = {'test_mode': True}
+
     agent, runner = ocs_agent.init_site_agent(args)
     p = ibootbarAgent(agent,
                       address=args.address,
@@ -415,7 +423,7 @@ if __name__ == "__main__":
     agent.register_process("acq",
                            p.acq,
                            p._stop_acq,
-                           startup=bool(args.auto_start), blocking=False)
+                           startup=init_params, blocking=False)
 
     agent.register_task("set_outlet", p.set_outlet, blocking=False)
     agent.register_task("cycle_outlet", p.cycle_outlet, blocking=False)

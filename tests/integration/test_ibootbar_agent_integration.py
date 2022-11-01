@@ -24,7 +24,7 @@ pytest_plugins = "docker_compose"
 wait_for_crossbar = create_crossbar_fixture()
 run_agent = create_agent_runner_fixture(
     "../agents/ibootbar/ibootbar.py",
-    "ibootbar_agent",
+    "ibootbarAgent",
     args=["--log-dir", "./logs/"],
 )
 client = create_client_fixture("ibootbar")
@@ -64,10 +64,8 @@ def start_responder():
 
 @pytest.mark.integtest
 def test_ibootbar_acq(wait_for_crossbar, start_responder, run_agent, client):
-    time.sleep(5)
-    client.acq.stop()
-    time.sleep(1)
-    resp = client.acq.status()
+    resp = client.acq.start(test_mode=True)
+    resp = client.acq.wait()
     check_resp_success(resp)
 
 

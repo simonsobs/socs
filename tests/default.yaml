@@ -70,7 +70,7 @@ hosts:
        'instance-id': 'ibootbar',
        'arguments': [['--address', '127.0.0.1'],
                      ['--port', 1024],
-                     ['--auto-start', True],
+                     ['--mode', 'test'],
                      ['--snmp-version', 2]
                      ]
       },
