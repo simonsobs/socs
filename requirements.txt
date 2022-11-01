@@ -18,6 +18,11 @@ pysmi
 # suprsync agent and tests
 sqlalchemy
 
+# pysmurf controller
+pysmurf @ git+https://github.com/slaclab/pysmurf.git@main
+sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master
+sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master
+
 # Docs
 # see docs/requirements.txt
 

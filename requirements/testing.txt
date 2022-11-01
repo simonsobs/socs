@@ -6,5 +6,6 @@ pytest-order
 so3g
 thola-snmpsim
 pytest-twisted
+http-server-mock
 
 -r ../agents/pfeiffer_tc400/requirements.txt

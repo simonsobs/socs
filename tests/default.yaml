@@ -74,5 +74,16 @@ hosts:
                      ['--snmp-version', 2]
                      ]
       },
+      {'agent-class': 'SynaccessAgent',
+       'instance-id': 'synacc',
+       'arguments':[['--ip-address', '127.0.0.1:8000'],
+                    ['--username', 'admin'],
+                    ['--password', 'admin'],
+                   ]
+      },
+      {'agent-class': 'PysmurfController',
+       'instance-id': 'pysmurf-controller-s2',
+       'arguments': []
+      },
     ]
   }
