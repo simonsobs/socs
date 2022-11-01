@@ -1,5 +1,4 @@
 import pytest
-import time
 
 import ocs
 from ocs.base import OpCode
