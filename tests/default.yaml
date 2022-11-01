@@ -64,6 +64,7 @@ hosts:
        'instance-id': 'pfeiffer366',
        'arguments': [['--ip_address', '127.0.0.1'],
                      ['--port', '8000'],
+                     ['--mode', 'test'],
                     ]
       },
       {'agent-class': 'ibootbarAgent',
