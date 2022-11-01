@@ -174,7 +174,7 @@ def make_parser(parser=None):
     pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--ip_address')
     pgroup.add_argument('--port')
-    pgroup.add_argument("--mode", choices=['default', 'test'])
+    pgroup.add_argument("--mode", type=str, default='acq', choices=['acq', 'test'])
 
     return parser
 
