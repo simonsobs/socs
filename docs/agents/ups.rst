@@ -6,7 +6,7 @@
 UPS Agent
 ====================
 
-The UPS Agent is an OCS Agent which monitors various UPS models via SNMP. 
+The UPS Agent is an OCS Agent which monitors various UPS models via SNMP.
 
 .. argparse::
     :filename: ../agents/ups/ups.py
@@ -62,16 +62,16 @@ debugging. The default level is "info".
 Description
 -----------
 
-Various UPS models will be used to power various components on the SO site. 
-The UPS Agent allows the monitoring of a UPS model. It provides information 
-on the manufacturer and model of the UPS. It monitors the state of each 
-output, as well as several stats of the battery. The UPS has an Simple Network 
+Various UPS models will be used to power various components on the SO site.
+The UPS Agent allows the monitoring of a UPS model. It provides information
+on the manufacturer and model of the UPS. It monitors the state of each
+output, as well as several stats of the battery. The UPS has an Simple Network
 Management Protocol (SNMP) interface.
 
-The UPS Agent actively issues SNMP GET commands to request the status from 
-several Object Identifiers (OIDs) specified by the provided Management 
-Information Base (MIB). We sample only a subset of the OIDs defined by the MIB. 
-The MIB has been converted from the original .mib format to a .py format that 
+The UPS Agent actively issues SNMP GET commands to request the status from
+several Object Identifiers (OIDs) specified by the provided Management
+Information Base (MIB). We sample only a subset of the OIDs defined by the MIB.
+The MIB has been converted from the original .mib format to a .py format that
 is consumable via pysnmp and is provided by socs.
 
 Agent Fields
@@ -80,7 +80,7 @@ Agent Fields
 The fields returned by the Agent are built from the SNMP GET responses from the
 UPS. The field names consist of the OID name and the last value of the OID,
 which often serves as an index for duplicate pieces of hardware that share a
-OID string, i.e. outputs on the OID "upsOutputVoltage". This results in field 
+OID string, i.e. outputs on the OID "upsOutputVoltage". This results in field
 names such as "upsOutputVoltage_0" and "upsOutputVoltage_1".
 
 These queries mostly return integers which map to some state. These integers
