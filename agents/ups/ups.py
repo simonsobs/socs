@@ -275,7 +275,7 @@ class UPSAgent:
                 self.log.error(f'{e}')
                 yield dsleep(1)
                 self.log.info('Trying to reconnect.')
-            print("Looping")
+
             if params['test_mode']:
                 break
 
