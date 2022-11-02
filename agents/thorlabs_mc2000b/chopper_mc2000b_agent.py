@@ -74,13 +74,7 @@ class ControllerAgent:
                       'exclude_influx': False}
 
         # register the feeds
-        self.agent.register_feed('input_freqs',
-                                 record=True,
-                                 agg_params=agg_params,
-                                 buffer_time=1
-                                 )
-
-        self.agent.register_feed('output_freqs',
+        self.agent.register_feed('chopper_freqs',
                                  record=True,
                                  agg_params=agg_params,
                                  buffer_time=1
