@@ -2,7 +2,6 @@ import pytest
 from multiprocessing import Process
 import signal
 import os
-import time
 import subprocess
 from unittest.mock import patch
 from twisted.internet.defer import inlineCallbacks
