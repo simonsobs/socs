@@ -2,7 +2,6 @@ import pytest
 from multiprocessing import Process
 import signal
 import os
-import time
 import subprocess
 from unittest.mock import patch
 from twisted.internet.defer import inlineCallbacks
@@ -81,16 +80,15 @@ def test_ibootbar_set_outlet(wait_for_crossbar, start_responder, run_agent, clie
     outlet = [("IBOOTPDU-MIB", "outletStatus", outlet_number - 1)]
     yield snmp.set(oid_list=outlet, version=2, setvalue=1, community_name="public")
 
-    while not (resp := client.acq.status()).session["data"]:
-        time.sleep(0.1)
+    resp = client.acq.start(test_mode=True)
+    resp = client.acq.wait()
 
     assert resp.session["data"][f"outletStatus_{outlet_number - 1}"]["status"] == 1
 
 
 @pytest.mark.integtest
 def test_ibootbar_set_initial_state(
-    wait_for_crossbar, start_responder, run_agent, client
-):
+        wait_for_crossbar, start_responder, run_agent, client):
     resp = client.set_initial_state()
     check_resp_success(resp)
 

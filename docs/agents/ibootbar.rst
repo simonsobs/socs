@@ -31,7 +31,7 @@ using all of the available arguments::
        'instance-id': 'ibootbar',
        'arguments': [['--address', '10.10.10.50'],
                      ['--port', 161],
-                     ['--auto-start', True],
+                     ['--mode', 'acq'],
                      ['--snmp-version', 2]]},
 
 .. note::
