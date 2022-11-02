@@ -26,11 +26,6 @@ run_agent = create_agent_runner_fixture(
     "ibootbarAgent",
     args=["--log-dir", "./logs/"],
 )
-run_agent_acq = create_agent_runner_fixture(
-    "../agents/ibootbar/ibootbar.py",
-    "ibootbarAgent",
-    args=["--log-dir", "./logs/", "--mode", "test"],
-)
 client = create_client_fixture("ibootbar")
 
 subprocess.run(
