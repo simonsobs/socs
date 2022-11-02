@@ -41,11 +41,11 @@ Below are configuration examples for the ocs config file.
 OCS Site Config
 ````````````````
 
-To configure the Thorlabs MC2000B chopper Agent we need to add a ControllerAgent block to our
+To configure the Thorlabs MC2000B chopper Agent we need to add a ThorlabsMC2000BAgent block to our
 ocs configuration file. Here is an example configuration block using all of the
 available arguments::
 
-      {'agent-class': 'ControllerAgent',
+      {'agent-class': 'ThorlabsMC2000BAgent',
        'instance-id': 'chopper',
        'arguments': [['--mode', 'acq'],
                      ['--com-port', 'COM3']]},

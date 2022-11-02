@@ -43,7 +43,7 @@ reference_high_prec_mode = {'internalouter': 0,
                             'externalinner': 3}
 
 
-class ControllerAgent:
+class ThorlabsMC2000BAgent:
     """Agent to connect to the MC2000B Thorlabs chopper controller
     device.
 
@@ -312,7 +312,7 @@ if __name__ == '__main__':
     txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
 
     parser = make_parser()
-    args = site_config.parse_args(agent_class='ControllerAgent', parser=parser)
+    args = site_config.parse_args(agent_class='ThorlabsMC2000BAgent', parser=parser)
 
     init_params = False
     if args.mode == 'init':
@@ -321,7 +321,7 @@ if __name__ == '__main__':
         init_params = {'auto_acquire': True}
 
     agent, runner = ocs_agent.init_site_agent(args)
-    controller_agent = ControllerAgent(agent, args.com_port)
+    controller_agent = ThorlabsMC2000BAgent(agent, args.com_port)
 
     agent.register_task('init_chopper', controller_agent.init_chopper, startup=init_params)
     agent.register_task('set_frequency', controller_agent.set_frequency)
