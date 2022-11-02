@@ -298,9 +298,6 @@ def add_agent_args(parser=None):
         parser = argparse.ArgumentParser()
 
     pgroup = parser.add_argument_group("Agent Options")
-    pgroup.add_argument("--auto-start", default=True, type=bool,
-                        help="Automatically start polling for data at "
-                        + "Agent startup.")
     pgroup.add_argument("--address", help="Address to listen to.")
     pgroup.add_argument("--port", default=161,
                         help="Port to listen on.")
@@ -319,9 +316,10 @@ if __name__ == "__main__":
     parser = add_agent_args()
     args = site_config.parse_args(agent_class='UPSAgent', parser=parser)
 
-    init_params = args.auto_start
-    if args.mode == 'test':
-        init_params = {'test_mode': True}
+    if args.mode == 'acq':
+        init_params = True
+    elif args.mode == 'test':
+        init_params = False
 
     agent, runner = ocs_agent.init_site_agent(args)
     p = UPSAgent(agent,

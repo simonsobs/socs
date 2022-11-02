@@ -30,8 +30,8 @@ using all of the available arguments::
        'instance-id': 'ups',
        'arguments': [['--address', '10.10.10.50'],
                      ['--port', 161],
-                     ['--auto-start', True],
-                     ['--snmp-version', 3]]},
+                     ['--mode', 'acq'],
+                     ['--snmp-version', 1]]},
 
 .. note::
     The ``--address`` argument should be the address of the UPS on the network.
