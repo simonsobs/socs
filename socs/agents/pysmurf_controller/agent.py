@@ -666,6 +666,8 @@ class PysmurfController:
                 'channels': iva.channels.tolist(),
                 'bgmap': iva.bgmap.tolist(),
                 'R_n': iva.R_n.tolist(),
+                'v_bias': iva.v_bias.tolist(),
+                'R': iva.R.tolist(),
                 'filepath': iva.filepath,
             }
             return True, "Finished taking IV"
@@ -711,6 +713,38 @@ class PysmurfController:
             }
 
             return True, "Finished taking bias steps"
+
+
+    @ocs_agent.param('bgs', default=None)
+    @ocs_agent.param('kwargs', default=None)
+    def overbias_tes(self, session, params):
+        """overbias_tes(bgs=None, kwargs=None)
+
+        **Task** - Overbiases detectors using S.overbias_tes_all.
+
+        Args
+        -------
+        bgs : List[int]
+            List of bias groups to overbias. If this is set to None, it will
+            use all active bgs.
+        kwargs : dict
+            Additional kwargs to pass to the ``overbias_tes_all`` function.
+        """
+        if params['kwargs'] is None:
+            params['kwargs'] = {}
+
+        with self.lock.acquire_timeout(0, job='bias_steps') as acquired:
+            if not acquired:
+                return False, f"Operation failed: {self.lock.job} is running."
+
+            session.set_status('running')
+            S, cfg = self._get_smurf_control(session=session)
+            if params['bgs'] is None:
+                params['bgs'] = cfg.dev.exp['active_bgs']
+
+            S.overbias_tes_all(params['bgs'], **params['kwargs'])
+
+        return True, "Finished Overbiasing TES"
 
     @ocs_agent.param('rfrac', default=(0.3, 0.6))
     @ocs_agent.param('kwargs', default=None)
@@ -815,6 +849,7 @@ def main(args=None):
     agent.register_task('take_bgmap', controller.take_bgmap)
     agent.register_task('take_iv', controller.take_iv)
     agent.register_task('take_bias_steps', controller.take_bias_steps)
+    agent.register_task('overbias_tes', controller.overbias_tes)
     agent.register_task('take_noise', controller.take_noise)
     agent.register_task('bias_dets', controller.bias_dets)
 
