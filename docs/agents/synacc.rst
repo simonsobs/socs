@@ -9,9 +9,9 @@ The Synaccess Agent interfaces with the power strip over ethernet to control
 different outlets as well as get their status.
 
 .. argparse::
-    :filename: ../agents/synacc/synacc.py
+    :filename: ../socs/agents/synacc/agent.py
     :func: make_parser
-    :prog: python3 synacc.py
+    :prog: python3 agent.py
 
 
 Configuration File Examples
@@ -39,13 +39,13 @@ The Synaccess Agent should be configured to run in a Docker container.
 An example docker-compose service configuration is shown here::
 
   ocs-synacc:
-    image: simonsobs/ocs-synaccess-agent
+    image: simonsobs/socs:latest
     hostname: ocs-docker
     network_mode: "host"
+    environment:
+      - INSTANCE_ID=synacc
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
-    command:
-      - "--instance-id=synacc"
 
 Since the agent within the container needs to communicate with hardware on the
 host network you must use ``network_mode: "host"`` in your compose file.
@@ -78,5 +78,5 @@ Below is an example client to control outlets::
 Agent API
 ---------
 
-.. autoclass:: agents.synacc.synacc.SynaccessAgent
+.. autoclass:: socs.agents.synacc.agent.SynaccessAgent
     :members:

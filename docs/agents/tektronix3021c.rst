@@ -12,9 +12,9 @@ It connects to the function generator over ethernet, and allows
 users to set frequency, peak to peak voltage, and turn the AWG on/off.
 
 .. argparse::
-    :filename: ../agents/tektronix3021c/tektronix_agent.py
+    :filename: ../socs/agents/tektronix3021c/agent.py
     :func: make_parser
-    :prog: python3 tektronix_agent.py
+    :prog: python3 agent.py
 
 
 Configuration File Examples
@@ -46,12 +46,12 @@ The Tektronix AWG Agent should be configured to run in a Docker container.
 An example docker-compose service configuration is shown here::
 
   ocs-psuK:
-    image: simonsobs/ocs-tektronix-agent:latest
+    image: simonsobs/socs:latest
     hostname: ocs-docker
+    environment:
+      - INSTANCE_ID=tektronix
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
-    command:
-      - "--instance-id=tektronix"
 
 Example Client
 --------------
@@ -81,5 +81,5 @@ is running.::
 Agent API
 ---------
 
-.. autoclass:: agents.tektronix3021c.tektronix_agent.TektronixAWGAgent
+.. autoclass:: socs.agents.tektronix3021c.agent.TektronixAWGAgent
     :members: set_frequency, set_amplitude, set_output

@@ -1,3 +1,1 @@
-import sys
-sys.path.insert(0, '../agents/pysmurf_monitor/')
-from pysmurf_monitor import PysmurfMonitor  # noqa: F401
+from socs.agents.pysmurf_monitor.agent import PysmurfMonitor  # noqa: F401

@@ -13,9 +13,9 @@ users to set current, voltage, and turn channels on/off. It also allows for
 live monitoring of the PSU output.
 
 .. argparse::
-    :filename: ../agents/scpi_psu/scpi_psu_agent.py
+    :filename: ../socs/agents/scpi_psu/agent.py
     :func: make_parser
-    :prog: python3 scpi_psu_agent.py
+    :prog: python3 agent.py
 
 
 Configuration File Examples
@@ -47,13 +47,13 @@ The SCPI PSU Agent should be configured to run in a Docker container.
 An example docker-compose service configuration is shown here::
 
   ocs-psuK:
-    image: simonsobs/ocs-scpi-psu-agent:latest
+    image: simonsobs/socs:latest
     hostname: ocs-docker
     network_mode: "host"
+    environment:
+      - INSTANCE_ID=psuK
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
-    command:
-      - "--instance-id=psuK"
 
 Example Client
 --------------
@@ -92,5 +92,5 @@ is running.::
 Agent API
 ---------
 
-.. autoclass:: agents.scpi_psu.scpi_psu_agent.ScpiPsuAgent
+.. autoclass:: socs.agents.scpi_psu.agent.ScpiPsuAgent
     :members: monitor_output, set_voltage, set_current, set_output

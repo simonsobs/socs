@@ -15,15 +15,14 @@ their drivers are shared `here
 <https://github.com/kmharrington/xy_stage_control>`_.
 
 .. argparse::
-    :filename: ../agents/xy_stage/xy_latrt_agent.py
+    :filename: ../socs/agents/xy_stage/agent.py
     :func: make_parser
-    :prog: python3 xy_latrt_agent.py
+    :prog: python3 agent.py
 
 
 Configuration File Examples
 ---------------------------
-Below are configuration examples for the ocs config file and for running the
-Agent in a docker container.
+Below are configuration examples for the ocs config file.
 
 ocs-config
 ``````````
@@ -37,7 +36,7 @@ the available arguments::
           ['--ip-address', '192.168.10.15'],
           ['--port', 3010],
           ['--mode', 'acq'],
-          ['--sampling_freqency', 2'],
+          ['--sampling_freqency', '2'],
           ]},
 
 Example Client
@@ -68,5 +67,5 @@ is running.::
 Agent API
 ---------
 
-.. autoclass:: agents.xy_stage.xy_latrt_agent.LATRtXYStageAgent
+.. autoclass:: socs.agents.xy_stage.agent.LATRtXYStageAgent
     :members: init_xy_stage_task, move_x_cm, move_y_cm, set_position, start_acq, stop_acq

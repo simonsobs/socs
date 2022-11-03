@@ -14,6 +14,7 @@
 #
 import os
 import sys
+
 sys.path.insert(0, os.path.abspath('..'))
 from socs_version import get_versions
 
@@ -106,6 +107,7 @@ autodoc_mock_imports = ['spt3g',
                         'src.pid_controller',
                         ]
 from unittest import mock
+
 for m in autodoc_mock_imports:
     sys.modules[m] = mock.Mock()
 
@@ -114,6 +116,7 @@ def wrap(*args, **kw):
     return lambda f: f
 
 import ocs
+
 ocs.ocs_agent.param = wrap
 
 # -- Options for HTML output -------------------------------------------------

@@ -12,9 +12,9 @@ control an LS370 is provided by the
 ``socs.Lakeshore.Lakeshore370.py`` module.
 
 .. argparse::
-    :filename: ../agents/lakeshore370/LS370_agent.py
+    :filename: ../socs/agents/lakeshore370/agent.py
     :func: make_parser
-    :prog: python3 LS370_agent.py
+    :prog: python3 agent.py
 
 OCS Configuration
 -----------------
@@ -38,17 +38,15 @@ Docker Configuration
 The Lakeshore 370 Agent should be configured to run in a Docker container. An
 example configuration is::
 
-  ocs-LSA22YE:
-    image: simonsobs/ocs-lakeshore370-agent
+  ocs-LSA22YG:
+    image: simonsobs/socs:latest
     hostname: ocs-docker
+    environment:
+      - INSTANCE_ID=LSA22YG
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
     devices:
       - "/dev/ttyUSB1:/dev/ttyUSB1"
-    command:
-      - "--instance-id=LSA22YE"
-      - "--site-hub=ws://crossbar:8001/ws"
-      - "--site-http=http://crossbar:8001/call"
 
 .. note::
     The serial numbers here will need to be updated for your device.
@@ -80,7 +78,7 @@ please file a Github issue.
 Agent API
 ---------
 
-.. autoclass:: agents.lakeshore370.LS370_agent.LS370_Agent
+.. autoclass:: socs.agents.lakeshore370.agent.LS370_Agent
     :members: init_lakeshore_task, start_acq
 
 Supporting APIs

@@ -1,7 +1,6 @@
 [run]
 source =
     ../socs
-    ../agents/
 
 omit =
   # omit versioneer
@@ -10,3 +9,9 @@ omit =
   # omit lab only Agents for now
   */Lakeshore336.py
   */Lakeshore370.py
+
+  # omit mibs
+  */mibs/*.py
+
+[coverage:report]
+skip_empty = true

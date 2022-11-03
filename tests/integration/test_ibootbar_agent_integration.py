@@ -1,35 +1,31 @@
-import pytest
-from multiprocessing import Process
-import signal
 import os
+import signal
 import subprocess
+from multiprocessing import Process
 from unittest.mock import patch
-from twisted.internet.defer import inlineCallbacks
-from snmpsim.commands import responder
 
 import ocs
-from ocs.base import OpCode
-from socs.snmp import SNMPTwister
-
-from ocs.testing import (
-    create_agent_runner_fixture,
-    create_client_fixture,
-)
-
+import pytest
 from integration.util import create_crossbar_fixture
+from ocs.base import OpCode
+from ocs.testing import create_agent_runner_fixture, create_client_fixture
+from snmpsim.commands import responder
+from twisted.internet.defer import inlineCallbacks
+
+from socs.snmp import SNMPTwister
 
 pytest_plugins = "docker_compose"
 
 wait_for_crossbar = create_crossbar_fixture()
 run_agent = create_agent_runner_fixture(
-    "../agents/ibootbar/ibootbar.py",
+    "../socs/agents/ibootbar/agent.py",
     "ibootbarAgent",
     args=["--log-dir", "./logs/"],
 )
 client = create_client_fixture("ibootbar")
 
 subprocess.run(
-    "mkdir -p ~/.pysnmp/mibs && cp -r ../agents/ibootbar/mibs/. ~/.pysnmp/mibs",
+    "mkdir -p ~/.pysnmp/mibs && cp -r ../socs/mibs/. ~/.pysnmp/mibs",
     shell=True,
 )
 

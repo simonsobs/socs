@@ -10,9 +10,9 @@ The HWP picoscope agent interfaces with Picoscope 3403D MSO to operate the LC se
 This agent biases the LC sensors and measures the 4 channels of analog input and 8 channels of digital input.
 
 .. argparse::
-    :filename: ../agents/hwp_picoscope/pico_agent.py
+    :filename: ../socs/agents/hwp_picoscope/agent.py
     :func: make_parser
-    :prog: python3 pico_agent.py
+    :prog: python3 agent.py
 
 Dependencies
 ---------------------------
@@ -51,23 +51,24 @@ Docker
     that you instead run this Agent directly on the host via the Host Manager
     Agent.
 
+    If you want to run in a container you will need to build the image
+    yourself. A Dockerfile is provided in ``socs/docker/hwp_picoscope/``.
+
 The HWP picoscope agent can be run via a Docker container. The following is an
 example of what to insert into your institution's docker-compose file::
 
   picoscope:
-    image: simonsobs/ocs-hwp-picoscope-agent:latest
+    image: ocs-hwp-picoscope-agent:latest
     hostname: ocs-docker
     privileged: true
+    environment:
+      - INSTANCE_ID=picoscope
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
       - /dev:/dev
-    command:
-      - "--instance-id=picoscope"
-      - "--site-hub=ws://crossbar:8001/ws"
-      - "--site-http=http://crossbar:8001/call"
 
 Agent API
 ---------
 
-.. autoclass:: agents.hwp_picoscope.pico_agent.PicoAgent
+.. autoclass:: socs.agents.hwp_picoscope.agent.PicoAgent
     :members:

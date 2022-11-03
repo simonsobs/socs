@@ -2,9 +2,10 @@
 """
 Utility script for interacting with the suprsync db.
 """
-from socs.db.suprsync import SupRsyncFilesManager, SupRsyncFile
 import argparse
 import os
+
+from socs.db.suprsync import SupRsyncFile, SupRsyncFilesManager
 
 
 def check_func(args):

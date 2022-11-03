@@ -15,9 +15,9 @@ via ethernet UDP connection.
 This agent parses the received data to a readable data and records it.
 
 .. argparse::
-   :filename: ../agents/wiregrid_encoder/wiregrid_encoder.py
+   :filename: ../socs/agents/wiregrid_encoder/agent.py
    :func: make_parser
-   :prog: python3 wiregrid_encoder.py
+   :prog: python3 agent.py
 
 Dependencies
 ------------
@@ -51,15 +51,15 @@ Docker Compose
 An example docker-compose configuration::
 
     ocs-wgencoder-agent:
-      image: simonsobs/ocs-wgencoder-agent:latest
+      image: simonsobs/socs:latest
       restart: always
       hostname: ocs-docker
       network_mode: "host"
+      environment:
+        - INSTANCE_ID=wgencoder
       volumes:
         - ${OCS_CONFIG_DIR}:/config:ro
         - "/data/wg-data:/data/wg-data"
-      command:
-        - "--instance-id=wgencoder"
       ports:
           - "localhost:50007:50007/udp"
 
@@ -90,5 +90,5 @@ They also will rarely be changed.
 Agent API
 ---------
 
-.. autoclass:: agents.wiregrid_encoder.wiregrid_encoder.WiregridEncoderAgent
+.. autoclass:: socs.agents.wiregrid_encoder.agent.WiregridEncoderAgent
     :members:
