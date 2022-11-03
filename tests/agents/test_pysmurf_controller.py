@@ -1,13 +1,11 @@
-import sys
-
-sys.path.insert(0, '../agents/pysmurf_controller/')
 from unittest import mock
 
 import numpy as np
 import pytest
 import txaio
 from ocs.ocs_agent import OpSession
-from pysmurf_controller import PysmurfController, make_parser
+
+from socs.agents.pysmurf_controller.agent import PysmurfController, make_parser
 
 txaio.use_twisted()
 
