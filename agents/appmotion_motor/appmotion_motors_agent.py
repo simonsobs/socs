@@ -74,6 +74,10 @@ class appMotionMotorsAgent:
                                  record=True,
                                  agg_params=agg_params,
                                  buffer_time=0)
+        self.agent.register_feed('start_end_positions',
+                                 record=True,
+                                 agg_params=agg_params,
+                                 buffer_time=0)
 
     def init_motors(self, session, params=None):
         """init_motors()
@@ -267,7 +271,8 @@ class appMotionMotorsAgent:
         lin_stage=True)
 
         **Task** - Move the axis to the given absolute position in counts or
-        inches.
+        inches. Note: This is blocking. Won't exit task until motors have
+        stopped moving OR have been 'moving' for too long (50 sec).
 
         Parameters:
             motor (int): Determines which motor, either 1 or 2, 3 is for all
@@ -302,11 +307,6 @@ class appMotionMotorsAgent:
             else:
                 # move motor1 THEN motor2
                 self.motor1.move_axis_to_position(params['pos'], params['pos_is_inches'], params['lin_stage'])
-                # could probably use movement_check here
-                self.move_status = self.motor1.is_moving(params['verbose'])
-                while self.move_status:
-                    self.move_status = self.motor1.is_moving(params['verbose'])
-                    time.sleep(1)
                 self.motor2.move_axis_to_position(params['pos'], params['pos_is_inches'], params['lin_stage'])
 
         return True, "Moved motor {} to {}".format(params['motor'], params['pos'])
@@ -524,7 +524,8 @@ class appMotionMotorsAgent:
         """run_positions(pos_data=None, motor=1, pos_is_inches=False)
 
         **Task** - Takes (up to) two elements in a list, and runs each motor
-        to their respective position.
+        to their respective position. Note: Is blocking. Won't exit until
+        motors have finished moving.
         If motor==3, Motor1 moves to the first element,
         motor2 to the second element in the list. Can be different positions,
         thus differentiating this task from other movement tasks.
@@ -539,7 +540,6 @@ class appMotionMotorsAgent:
             verbose (bool): Prints output from motor requests if True.
                 (default True)
         """
-
         with self.lock.acquire_timeout(1, job=f"run_positions_motor{params['motor']}") as acquired:
             self.move_status = self.movement_check(params)
             if self.move_status:
@@ -553,6 +553,15 @@ class appMotionMotorsAgent:
                 if params['motor'] == 3 and len(params['pos_data']) < 2:
                     raise Exception(
                         "You specified that both axes would be moving, but didn't provide data for both.")
+            
+            feed_data = {
+                'timestamp':time.time(),
+                'block_name':'start_end_positions',
+                'data':{}
+            }
+            feed_data['data']['start_time'] = time.now()
+            feed_data['data']['motor1_s_pos'] = self.motor1.get_immediate_position(inches=False)[0]
+            feed_data['data']['motor2_s_pos'] = self.motor2.get_immediate_position(inches=False)[0]
             if params['motor'] == 1:
                 self.motor1.run_positions(params['pos_data'][0], params['pos_is_inches'])
             elif params['motor'] == 2:
@@ -560,12 +569,13 @@ class appMotionMotorsAgent:
             else:
                 # move motor1 THEN motor2
                 self.motor1.run_positions(params['pos_data'][0], params['pos_is_inches'])
-                self.move_status = self.motor1.is_moving(params['verbose'])
-                while self.move_status:
-                    time.sleep(1)
-                    self.move_status = self.motor1.is_moving(params['verbose'])
                 self.motor2.run_positions(params['pos_data'][1], params['pos_is_inches'])
-
+            feed_data['data']['end_time'] = time.now()
+            feed_data['data']['motor1_e_pos'] = self.motor1.get_immediate_position(inches=False)[0]
+            feed_data['data']['motor2_e_pos'] = self.motor2.get_immediate_position(inches=False)[0]
+            self.agent.publish_to_feed('start_end_positions', feed_data)
+            self.agent.feeds['start_end_positions'].flush_buffer()
+            
         return True, "Moving stages to {}".format(params['pos_data'])
 
     @ocs_agent.param('motor', default=1, choices=[1, 2, 3], type=int)
@@ -1042,7 +1052,7 @@ class appMotionMotorsAgent:
                             # convert move_status to int for C backend reasons...
                             move_status = int(mot.is_moving(params))
                             pos = mot.get_position_in_inches()
-                            e_pos = mot.retrieve_encoder_info()
+                            e_pos = mot.get_immediate_position(inches=False)
                             data['data'][f'{mot.mot_id}_encoder'] = e_pos[0]
                             data['data'][f'{mot.mot_id}_stepper'] = pos[0]
                             data['data'][f'{mot.mot_id}_connection'] = 1
