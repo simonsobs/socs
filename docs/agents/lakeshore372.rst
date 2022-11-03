@@ -6,17 +6,24 @@
 Lakeshore 372
 =============
 
-The Lakeshore 372 (LS372) units are used for 100 mK and 1K thermometer readout.
-Basic functionality to interface and control an LS372 is provided by the
-``socs.Lakeshore.Lakeshore372.py`` module.
+The Lakeshore 372 Agent interfaces with the Lakeshore 372 (LS372) hardware to
+perform 100 mK and 1K thermometer readout and control heater output. Basic
+functionality to interface and control an LS372 is provided by the
+:ref:`372_driver`.
 
 .. argparse::
-    :filename: ../agents/lakeshore372/LS372_agent.py
+    :filename: ../socs/agents/lakeshore372/agent.py
     :func: make_parser
-    :prog: python3 LS372_agent.py
+    :prog: python3 agent.py
 
-OCS Configuration
------------------
+Configuration File Examples
+---------------------------
+
+Below are configuration examples for the ocs config file and for running the
+Agent in a docker container.
+
+OCS Site Config
+````````````````
 
 To configure your Lakeshore 372 for use with OCS you need to add a
 Lakeshore372Agent block to your ocs configuration file. Here is an example
@@ -26,27 +33,103 @@ configuration block::
    'instance-id': 'LSA22YG',
    'arguments': [['--serial-number', 'LSA22YG'],
                  ['--ip-address', '10.10.10.2'],
-                 ['--dwell-time-delay', 0]]},
+                 ['--dwell-time-delay', 0],
+                 ['--mode', 'acq'],
+                 ['--sample-heater', False],
+                 ['--enable-control-chan'],
+                 ['--configfile', 'ls372_config.yaml']]},
+
 
 Each device requires configuration under 'agent-instances'. See the OCS site
 configs documentation for more details.
 
-Docker Configuration
---------------------
+Lakeshore 372 Config
+`````````````````````
+A Lakeshore 372 configuration file allows the user to define device and channel
+settings (autoscan, enable/disable, calibration curve, etc.) for each Lakeshore
+372 in use within one .yaml file. Here is an example for how to build a
+Lakeshore 372 configuration file::
+
+    LSA22YG:
+        device_settings:
+          autoscan: 'off'
+        channel:
+          1:
+             enable: 'on'
+             excitation_mode: 'voltage'
+             excitation_value: 2.0e-6
+             autorange: 'on'
+             dwell: 15 # seconds
+             pause: 10 # seconds
+             calibration_curve_num: 23
+             temperature_coeff: 'negative'
+          2:
+             enable: 'off'
+             excitation_mode: 'voltage'
+             excitation_value: 2.0e-6
+             autorange: 'off'
+             dwell: 10 # seconds
+             pause: 3 # seconds
+             calibruation_curve_num: 28
+             temperature_coeff: 'negative'
+    LSA2761:
+        device_settings:
+          autoscan: 'on'
+        channel:
+          1:
+             enable: 'on'
+             excitation_mode: 'voltage'
+             excitation_value: 2.0e-6
+             autorange: 'on'
+             dwell: 15 # seconds
+             pause: 10 # seconds
+             calibration_curve_num: 33
+             temperature_coeff: 'negative'
+          2:
+             enable: 'off'
+             excitation_mode: 'voltage'
+             excitation_value: 2.0e-6
+             autorange: 'off'
+             dwell: 10 # seconds
+             pause: 3 # seconds
+             calibruation_curve_num: 36
+             temperature_coeff: 'negative'
+          3:
+             enable: 'on'
+             excitation_mode: 'voltage'
+             excitation_value: 2.0e-6
+             autorange: 'on'
+             dwell: 15 # seconds
+             pause: 10 # seconds
+             calibration_curve_num: 34
+             temperature_coeff: 'negative'
+          4:
+             enable: 'on'
+             excitation_mode: 'voltage'
+             excitation_value: 2.0e-6
+             autorange: 'off'
+             dwell: 10 # seconds
+             pause: 3 # seconds
+             calibruation_curve_num: 35
+             temperature_coeff: 'negative'
+
+
+Docker Compose
+``````````````
 
 The Lakeshore 372 Agent should be configured to run in a Docker container. An
 example configuration is::
 
-  ocs-LSA22YE:
-    image: grumpy.physics.yale.edu/ocs-lakeshore372-agent:latest
+  ocs-LSA22YG:
+    image: simonsobs/socs:latest
     hostname: ocs-docker
     network_mode: "host"
+    environment:
+      - INSTANCE_ID=LSA22YG
+      - SITE_HUB=ws://127.0.0.1:8001/ws
+      - SITE_HTTP=http://127.0.0.1:8001/call
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
-    command:
-      - "--instance-id=LSA22YE"
-      - "--site-hub=ws://127.0.0.1:8001/ws"
-      - "--site-http=http://127.0.0.1:8001/call"
 
 .. note::
     Since the 372 Agent container needs ``network_mode: "host"``, it must be
@@ -54,29 +137,20 @@ example configuration is::
     system. In this example the crossbar server is running on localhost,
     ``127.0.0.1``, but on your network this may be different.
 
-To view the 372 temperatures data feed in the live monitor an accompanying
-data-feed server will need to be run. An example of this configuration is::
-
-  sisock-LSA22YE:
-    image: grumpy.physics.yale.edu/sisock-data-feed-server:latest
-    environment:
-        TARGET: LSA22YE # match to instance-id of agent to monitor, used for data feed subscription
-        NAME: 'LSA22YE' # will appear in sisock a front of field name
-        DESCRIPTION: "LS372 with two ROXes for calibration."
-        FEED: "temperatures"
-    logging:
-      options:
-        max-size: "20m"
-        max-file: "10"
-
-For additional configuration see the sisock data-feed-server documentation.
-
 .. note::
     The serial numbers here will need to be updated for your device.
 
+Description
+-----------
+
+The Lakeshore 372 provides several connection options for communicating
+remotely with the hardware. For the Lakeshore 372 Agent we have written the
+interface for communication via Ethernet cable. When extending the Agent it can
+often be useful to directly communicate with the 372 for testing. This is
+described in the following section.
 
 Direct Communication
---------------------
+````````````````````
 Direct communication with the Lakeshore can be achieved without OCS, using the
 ``Lakeshore372.py`` module in ``socs/socs/Lakeshore/``. From that directory,
 you can run a script like::
@@ -98,11 +172,13 @@ please file a Github issue.
 Agent API
 ---------
 
-.. autoclass:: agents.lakeshore372.LS372_agent.LS372_Agent
-    :members: init_lakeshore_task
+.. autoclass:: socs.agents.lakeshore372.agent.LS372_Agent
+    :members:
 
-Driver API
-----------
+.. _372_driver:
+
+Supporting APIs
+---------------
 
 For the API all methods should start with one of the following:
 

@@ -14,6 +14,7 @@
 #
 import os
 import sys
+
 sys.path.insert(0, os.path.abspath('..'))
 from socs_version import get_versions
 
@@ -42,8 +43,14 @@ extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.napoleon',
     'sphinx.ext.todo',
+    'sphinx.ext.viewcode',
 ]
 extensions += ['sphinxarg.ext']
+
+# Present auto-documented members in source order (rather than alphabetical).
+autodoc_default_options = {
+    'member-order': 'bysource',
+}
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -72,6 +79,45 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
 
+autodoc_mock_imports = ['spt3g',
+                        'so3g',
+                        'so3g.proj',
+                        'labjack',
+                        'labjack.ljm',
+                        'labjack.ljm.ljm',
+                        'ocs',
+                        'ocs.agent',
+                        'ocs.ocs_twisted',
+                        'ocs.ocs_agent',
+                        'ocs.ocs_client',
+                        'ocs.agent.aggregator',
+                        'xy_agent',
+                        'xy_agent.xy_connect',
+                        'soaculib',
+                        'scan_helpers',
+                        'soaculib.twisted_backend',
+                        'soaculib.status_keys',
+                        'pfeiffer_vacuum_protocol',
+                        'pfeiffer_vacuum_protocol.pfeiffer_vacuum_protocol',
+                        'pfeiffer_tc400_driver',
+                        'sodetlib',
+                        'sodetlib.operations',
+                        'sodetlib.det_config',
+                        'src',
+                        'src.pid_controller',
+                        ]
+from unittest import mock
+
+for m in autodoc_mock_imports:
+    sys.modules[m] = mock.Mock()
+
+# Mock the ocs_agent.param decorator to preserve docstrings
+def wrap(*args, **kw):
+    return lambda f: f
+
+import ocs
+
+ocs.ocs_agent.param = wrap
 
 # -- Options for HTML output -------------------------------------------------
 
@@ -91,12 +137,9 @@ html_theme = 'sphinx_rtd_theme'
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 
-html_context = {
-    'css_files': [
-        '_static/theme_overrides.css',  # override wide tables in RTD theme
-        ],
-     }
-
+html_css_files = [
+    'theme_overrides.css',  # override wide tables in RTD theme
+]
 
 # Custom sidebar templates, must be a dictionary that maps document names
 # to template names.
@@ -170,6 +213,3 @@ texinfo_documents = [
 
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = True
-
-
-

@@ -1,0 +1,2 @@
+casperfpga @ git+https://github.com/casper-astro/casperfpga.git@py38
+holog_daq @ git+https://github.com/McMahonCosmologyGroup/holog_daq.git@main

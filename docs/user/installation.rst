@@ -3,21 +3,73 @@
 Installation
 ============
 
-To checkout SOCS, clone the repository and run `setup.py`::
+Install and update with pip::
 
-  git clone https://github.com/simonsobs/socs.git
-  cd socs/
-  python3 setup.py install
+    $ pip install -U socs
+
+You may install optional dependencies by including one or more agent group
+names on installation, for example::
+
+    $ pip3 install -U socs[labjack,pysmurf]
+
+The different groups, and the agents they provide dependencies for are:
+
+.. list-table::
+   :widths: 1 2
+   :header-rows: 1
+
+   * - Group
+     - Supporting Agents
+   * - ``all``
+     - All Agents (except ``holography``)
+   * - ``acu``
+     - ACU Agent
+   * - ``holography``
+     - Holography FPGA and Synthesizer Agents
+   * - ``labjack``
+     - Labjack Agent
+   * - ``magpie``
+     - Magpie Agent
+   * - ``pfeiffer``
+     - Pfeiffer TC 400 Agent
+   * - ``pysmurf``
+     - Pysmurf Controller Agent
+   * - ``smurf_sim``
+     - SMuRF File Emulator, SMuRF Stream Simulator
+   * - ``synacc``
+     - Synaccess Agent
+   * - ``xy_stage``
+     - LATRt XY Stage Agent
+
+If you would like to install all optional dependencies use the special varient
+"all"::
+
+    $ pip3 install -U socs[all]
+
+.. note::
+    Some Agents have additional dependencies that cannot be installed with pip.
+    See the Agent reference page for the particular agent you are trying to run
+    for more details.
+
+Installing from Source
+----------------------
+
+To install from source, clone the respository and install with pip::
+
+    git clone https://github.com/simonsobs/socs.git
+    cd socs/
+    pip3 install -r requirements.txt
+    pip3 install .
 
 .. note::
     If you are expecting to develop socs code you should consider using
-    'develop' instead of 'install'.
+    the `-e` flag.
 
 .. note::
     If you would like to install for just the local user, throw the `--user`
     flag when running `setup.py`.
 
-The Agent scripts live in the ``agents/`` sub-directory of the
+The SOCS Agents are kept in the ``agents/`` sub-directory of the
 repository.  Take note of the full path to the ``agents`` directory,
 as you will need to add it to the OCS site configuration file.
 
@@ -28,21 +80,19 @@ installation script to assist with this, but ``cp -r`` will work.
 
 To make the Agent scripts usable within OCS, you must:
 
-- Ensure that the base ``ocs`` package is installed on the local
-  system.
-- Ensure that any additional package dependencies for Agent scripts
+- Ensure that any package dependencies for Agent scripts
   are satisfied.  Note that you only need to install the dependencies
   for the specific Agents that you intend to run on the local system.
 - Edit the local system's site config file to include the full path to
-  the SOCS agents directory (see ``Configuration``).
+  the SOCS agents directory.
 
 
 Site Config File
 ----------------
 
-A configured OCS host will contain a ``site config`` file, which
-describes how to connect to the crossbar server and (if HostMaster is
-in use) describes what Agent instances will run on the system.
+A configured OCS host will contain a site config file (SCF), which describes
+how to connect to the crossbar server as well as which Agents will run on the
+system.
 
 To tell OCS about the SOCS agents, update the ``agent-paths`` setting
 in the host configuration block for your host.  The ``agent-paths``
@@ -70,8 +120,8 @@ that ... is a place-holder for other configuration text.
 
       # List of paths to Agent plugin modules.
       'agent-paths': [
-	'/usr/shared/lib/ocs_agents',
-	'/usr/shared/lib/socs/agents',
+        '/usr/shared/lib/ocs_agents',
+        '/usr/shared/lib/socs/agents',
       ],
 
       ...
@@ -85,4 +135,3 @@ that ... is a place-holder for other configuration text.
       ]
       ...
     }
-

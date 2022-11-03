@@ -6,22 +6,16 @@ Created on Fri Feb 23 14:15:51 2018
 @author: jacoblashner
 """
 
-from serial import Serial
-from serial.serialutil import SerialException
-import time
-import sys
-import numpy as np
-from collections import OrderedDict
 import socket
+import sys
+import time
+from collections import OrderedDict
 from typing import List
 
+from serial import Serial
 
 BUFF_SIZE = 1024
 
-try:
-    from tqdm import *
-except ModuleNotFoundError:
-    tqdm = lambda x: x
 
 class Module:
     """
@@ -62,11 +56,11 @@ class Module:
         # after plugging in the LS240. Try three times, then give up.
         for i in range(3):
             try:
-                print('attempt %s'%i)
+                print('attempt %s' % i)
                 idn = self.msg("*IDN?")
                 break
             except TimeoutError:
-                print("Comms failed on attempt %s"%i)
+                print("Comms failed on attempt %s" % i)
 
         self.manufacturer, self.model, self.inst_sn, self.firmware_version = idn.split(',')
         num_channels = int(self.model[-2])
@@ -75,7 +69,7 @@ class Module:
 
         self.channels: List[Channel] = []
         for i in range(num_channels):
-            c = Channel(self, i+1)
+            c = Channel(self, i + 1)
             self.channels.append(c)
 
     def close(self):
@@ -91,7 +85,7 @@ class Module:
             Return response (within timeout) if message is a query.
         """
         if self.simulator:
-            message_string = "{};".format(msg)
+            message_string = "{}".format(msg)
             self.com.send(message_string.encode())
             resp = ''
             if '?' in msg:
@@ -100,7 +94,7 @@ class Module:
 
         else:
             # Writes message
-            message_string = "{}\r\n;".format(msg).encode()
+            message_string = "{}\r\n".format(msg).encode()
 
             # write(message_string)
             self.com.write(message_string)
@@ -132,7 +126,7 @@ class Module:
 # ==============================================================================
 
 # To convert from int representation to string
-sensorStrings = ["None","Diode", "PlatRTC", "NTCRTC"]
+sensorStrings = ["None", "Diode", "PlatRTC", "NTCRTC"]
 unitStrings = ["None", "Kelvin", "Celsius", "Sensor", "Fahrenheit"]
 
 # To convert from int representation to excitation or range
@@ -144,21 +138,20 @@ units_key = {1: 'K', 2: 'C', 3: 'S', 4: 'F'}
 
 
 class Channel:
-    """
-        Object for each channel of the lakeshore module
+    """Object for each channel of the lakeshore module
 
-        Properties
-        --------------
-        :channel_num: The number of the channel (1-8). This should not be changed once set
-        :name: Specifies name of channel
-        :sensor (int): 1 = Diode, 2 = PlatRTC, 3 = NTC RTD
-        :auto_range: Specifies if channel should use autorange (1,0).
-        :range: Specifies range if auto_range is false (0-8). Range is accoriding to Lakeshore docs.
-        :current_reversal: Specifies if current reversal should be used (0, 1). Should be 0 for diode.
-        :unit: 1 = K, 2 = C, 3 = Sensor, 4 = F
-        :enabled: Sets whether channel is enabled. (1,0)
+    Attributes:
+        channel_num (int): The number of the channel (1-8). This should not be changed once set
+        name (str): Specifies name of channel
+        sensor (int): 1 = Diode, 2 = PlatRTC, 3 = NTC RTD
+        auto_range (int): Specifies if channel should use autorange (1,0).
+        range (int): Specifies range if auto_range is false (0-8). Range is accoriding to Lakeshore docs.
+        current_reversal (int): Specifies if current reversal should be used (0, 1). Should be 0 for diode.
+        unit (int): 1 = K, 2 = C, 3 = Sensor, 4 = F
+        enabled (int): Sets whether channel is enabled. (1,0)
 
     """
+
     def __init__(self, ls, channel_num):
         self.ls = ls
         self.channel_num = channel_num
@@ -179,8 +172,70 @@ class Channel:
 
     def set_values(self, sensor=None, auto_range=None, range=None,
                    current_reversal=None, unit=None, enabled=None, name=None):
-        """
-            Sets Channel parameters after validation.
+        """Sets Channel parameters after validation.
+
+        Args:
+            channel (int):
+                Channel number to set. Valid choices are 1-8.
+            sensor (int, optional):
+                Specifies sensor type:
+
+                    +---+---------+
+                    | 1 | Diode   |
+                    +---+---------+
+                    | 2 | PlatRTC |
+                    +---+---------+
+                    | 3 | NTC RTD |
+                    +---+---------+
+
+            auto_range (int, optional):
+                Specifies if channel should use autorange. Must be 0 or 1.
+            range (int, optional):
+                Specifies range if auto_range is false. Only settable for NTC
+                RTD:
+
+                    +---+--------------------+
+                    | 0 | 10 Ohms (1 mA)     |
+                    +---+--------------------+
+                    | 1 | 30 Ohms (300 uA)   |
+                    +---+--------------------+
+                    | 2 | 100 Ohms (100 uA)  |
+                    +---+--------------------+
+                    | 3 | 300 Ohms (30 uA)   |
+                    +---+--------------------+
+                    | 4 | 1 kOhm (10 uA)     |
+                    +---+--------------------+
+                    | 5 | 3 kOhms (3 uA)     |
+                    +---+--------------------+
+                    | 6 | 10 kOhms (1 uA)    |
+                    +---+--------------------+
+                    | 7 | 30 kOhms (300 nA)  |
+                    +---+--------------------+
+                    | 8 | 100 kOhms (100 nA) |
+                    +---+--------------------+
+
+            current_reversal (int, optional):
+                Specifies if input current reversal is on or off.
+                Always 0 if input is a diode.
+            units (int, optional):
+                Specifies preferred units parameter, and sets the units for
+                alarm settings:
+
+                    +---+------------+
+                    | 1 | Kelvin     |
+                    +---+------------+
+                    | 2 | Celsius    |
+                    +---+------------+
+                    | 3 | Sensor     |
+                    +---+------------+
+                    | 4 | Fahrenheit |
+                    +---+------------+
+
+            enabled (int, optional):
+                Sets if channel is enabled.
+            name (str, optional):
+                Sets name of channel.
+
         """
         # Checks to see if values are valid
         if sensor is not None:
@@ -231,9 +286,9 @@ class Channel:
         self.ls.msg("INNAME {},{!s}".format(self.channel_num, self.name))
 
         input_type_message = "INTYPE "
-        input_type_message += ",".join(["{}".format(c) for c in [ self.channel_num, self._sensor, self._auto_range,
-                                                                    self._range, self._current_reversal, self._unit,
-                                                                    int(self._enabled)]])
+        input_type_message += ",".join(["{}".format(c) for c in [self.channel_num, self._sensor, self._auto_range,
+                                                                 self._range, self._current_reversal, self._unit,
+                                                                 int(self._enabled)]])
         self.ls.msg(input_type_message)
 
     def read_curve(self):
@@ -298,7 +353,7 @@ class Channel:
         hdr = self.curve.header
         keys = list(hdr)
 
-        #loads header
+        # loads header
         cmd = "CRVHDR {}".format(self.channel_num)
         for key in keys[:5]:
             cmd += ",{}".format(hdr[key])
@@ -308,12 +363,12 @@ class Channel:
         bps = self.curve.breakpoints
         assert len(bps) <= 200, "Curve must have 200 breakpoints or less"
 
-        print ("Loading Curve to {}".format(self.name))
+        print("Loading Curve to {}".format(self.name))
         for i in range(200):
             if i < len(bps):
-                self.load_curve_point(i+1, bps[i][0], bps[i][1])
+                self.load_curve_point(i + 1, bps[i][0], bps[i][1])
             else:
-                self.load_curve_point(i+1, 0, 0)
+                self.load_curve_point(i + 1, 0, 0)
         print("Curve loaded")
 
     def delete_curve(self):
@@ -324,14 +379,14 @@ class Channel:
     def __str__(self):
         string = "-" * 40 + "\n"
         string += "{} -- Channel {}: {}\n".format(self.ls.inst_sn, self.channel_num, self.name)
-        string += "-"*40 + "\n"
+        string += "-" * 40 + "\n"
 
         string += "{!s:<18} {!s:>13}\n".format("Enabled:", self._enabled)
         string += "{!s:<18} {!s:>13} ({})\n".format("Sensor:", self._sensor, sensorStrings[self._sensor])
         string += "{!s:<18} {!s:>13}\n".format("Auto Range:", self._auto_range)
 
         range_unit = "V" if self._sensor == 1 else "Ohm"
-        string += "{!s:<18} {!s:>13} ({} {})\n".format("Range:", self._range, ranges[self._sensor-1][self._range], range_unit)
+        string += "{!s:<18} {!s:>13} ({} {})\n".format("Range:", self._range, ranges[self._sensor - 1][self._range], range_unit)
         string += "{!s:<18} {!s:>13}\n".format("Current Reversal:", self._current_reversal)
         string += "{!s:<18} {!s:>13}\n".format("Units:", units_key[self._unit])
 
@@ -340,15 +395,17 @@ class Channel:
 
 class Curve:
     """
-    Header for calibration curve
-    ----------------
-    :Sensor Model:      Name of curve
-    :Serial Number:        Serial Number
-    :Data Format:    2 = V:K, 3 = Ohms:K, 4 = log(Ohms):K
-    :SetPoint Limit:     Temperature Limit (in K)
-    :Temperature Coefficient:     1 = negative, 2 = positive
-    :Number of Breakpoints:     Number of curve points
+    Header for calibration curve::
+
+        :Sensor Model:      Name of curve
+        :Serial Number:        Serial Number
+        :Data Format:    2 = V:K, 3 = Ohms:K, 4 = log(Ohms):K
+        :SetPoint Limit:     Temperature Limit (in K)
+        :Temperature Coefficient:     1 = negative, 2 = positive
+        :Number of Breakpoints:     Number of curve points
+
     """
+
     def __init__(self, filename=None, header=None, breakpoints=None):
 
         if filename is not None:
@@ -372,8 +429,8 @@ class Curve:
             file.write('No.\tUnits\tTemperature (K)\n')
             file.write('\n')
 
-            for i,bp in enumerate(self.breakpoints):
-                file.write('{}\t{:.4f} {:.4f}\n'.format(i+1, bp[0], bp[1]))
+            for i, bp in enumerate(self.breakpoints):
+                file.write('{}\t{:.4f} {:.4f}\n'.format(i + 1, bp[0], bp[1]))
 
     def load_from_file(self, filename):
         with open(filename, 'r') as file:
@@ -381,7 +438,7 @@ class Curve:
 
         self.header = OrderedDict({})
         for line in content:
-            if line.strip()=='':
+            if line.strip() == '':
                 break
             key, v = line.split(':')
             val = v.split('(')[0].strip()
@@ -395,9 +452,10 @@ class Curve:
     def __str__(self):
         string = ""
         for key, val in self.header.items():
-            string += "%-15s: %s\n"%(key, val)
+            string += "%-15s: %s\n" % (key, val)
         return string
+
 
 if __name__ == "__main__":
     ls = Module(port=sys.argv[1])
-    print (ls)
+    print(ls)
