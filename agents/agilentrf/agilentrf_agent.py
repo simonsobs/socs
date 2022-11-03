@@ -2,9 +2,9 @@
 """Michael Randall
 	mrandall@ucsd.edu"""
 
-import time
 import os
 import socket
+import time
 
 from agilentrf_driver import agilentRFInterface
 
@@ -12,6 +12,7 @@ on_rtd = os.environ.get('READTHEDOCS') == 'True'
 if not on_rtd:
     from ocs import ocs_agent, site_config
     from ocs.ocs_twisted import TimeoutLock
+
 
 class AgilentRFAgent:
     def __init__(self, agent, ip_address, gpib_slot):
@@ -25,7 +26,7 @@ class AgilentRFAgent:
         self.monitor = False
 
         self.rf = None
-        
+
         # Registers data feeds
         agg_params = {
             'frame_length': 60,
@@ -33,7 +34,6 @@ class AgilentRFAgent:
         self.agent.register_feed('AgilentRF',
                                  record=True,
                                  agg_params=agg_params)
-
 
     def init_awg(self, session, params=None):
         """ Task to connect to Agilent RF source """
@@ -52,26 +52,25 @@ class AgilentRFAgent:
 
         return True, 'Initialized RF source.'
 
-
     def set_cwFrequency(self, session, params=None):
         """
         Sets frequency of RF source:
 
         Args:
-            frequency (float): Frequency to set. 
+            frequency (float): Frequency to set.
         """
 
         with self.lock.acquire_timeout(1) as acquired:
             if acquired:
                 freq = params['frequency']
                 self.rf.set_cwFrequency(freq)
-                
+
                 data = {'timestamp': time.time(),
-                       'block_name': "cwFrequency",
+                        'block_name': "cwFrequency",
                         'data': {'cwFrequency': freq}
-                       }
+                        }
                 self.agent.publish_to_feed('AgilentRF', data)
-                
+
             else:
                 return False, "Could not acquire lock"
 
@@ -88,13 +87,13 @@ class AgilentRFAgent:
             if acquired:
                 power = params['power']
                 self.rf.set_power(power)
-                
+
                 data = {'timestamp': time.time(),
-                       'block_name': "outputPower",
+                        'block_name': "outputPower",
                         'data': {'outputPower': power}
-                       }
+                        }
                 self.agent.publish_to_feed('AgilentRF', data)
-                
+
             else:
                 return False, "Could not acquire lock"
 
@@ -111,17 +110,18 @@ class AgilentRFAgent:
             if acquired:
                 state = params['state']
                 self.rf.set_output(state)
-                
+
                 data = {'timestamp': time.time(),
-                       'block_name': "outputState",
+                        'block_name': "outputState",
                         'data': {'outputState': int(state)}
-                       }
+                        }
                 self.agent.publish_to_feed('AgilentRF', data)
-                
+
             else:
                 return False, "Could not acquire lock"
 
         return True, 'Initialized AgilentRF.'
+
 
 if __name__ == '__main__':
     parser = site_config.add_arguments()
@@ -146,4 +146,3 @@ if __name__ == '__main__':
     agent.register_task('set_output', p.set_output)
 
     runner.run(agent, auto_reconnect=True)
-

@@ -1,6 +1,8 @@
 import socket as socket
-#ip = '10.10.10.165' # '192.168.1.3', '192.168.1.8'
+
+# ip = '10.10.10.165' # '192.168.1.3', '192.168.1.8'
 #escapeString = 'xYzZyX'
+
 
 class prologixInterface:
 
@@ -9,18 +11,18 @@ class prologixInterface:
         self.gpibAddr = gpibAddr
         self.pro = None
         #self.escapeString = escapeString
-        #self.connSocket()
-        #self.configure()
+        # self.connSocket()
+        # self.configure()
 
     def connSocket(self):
         self.pro = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.pro.connect((self.ip,1234))
+        self.pro.connect((self.ip, 1234))
         self.pro.settimeout(10000)
-    
+
     def confGpib(self):
         self.pro.send(('++addr ' + str(self.gpibAddr) + '\n').encode())
-          
-    #def configure(self):
+
+    # def configure(self):
         #self.write('++mode 1\n')
         #self.write('++auto 1\n')
         ##self.write('++addr ' + str(self.gpibAddr))
@@ -29,9 +31,9 @@ class prologixInterface:
         self.confGpib()
         self.pro.send((msg + '\n').encode())
 
-    #def writeGpib(self, msg):
+    # def writeGpib(self, msg):
         #self.write('++addr ' + str(self.gpibAddr))
-        #self.write(msg)
+        # self.write(msg)
 
     def read(self):
         return self.pro.recv(128).decode().rstrip('\n').rstrip('\r')
