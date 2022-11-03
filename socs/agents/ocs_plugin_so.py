@@ -41,6 +41,7 @@ for n, f in [
         ('SynaccessAgent', 'synacc/agent.py'),
         ('SynthAgent', 'holo_synth/agent.py'),
         ('TektronixAWGAgent', 'tektronix3021c/agent.py'),
+        ('ThorlabsMC2000BAgent', 'thorlabs_mc2000b/agent.py'),
         ('VantagePro2Agent', 'vantagepro2/agent.py'),
         ('WiregridActuatorAgent', 'wiregrid_actuator/agent.py'),
         ('WiregridEncoderAgent', 'wiregrid_encoder/agent.py'),
