@@ -61,5 +61,5 @@ as the item number:
 Agent API
 ---------
 
-.. autoclass:: agents.thorlabs_mc2000b.chopper_mc2000b_agent.ControllerAgent
+.. autoclass:: agents.thorlabs_mc2000b.chopper_mc2000b_agent.ThorlabsMC2000BAgent
     :members:
