@@ -261,6 +261,7 @@ class PysmurfController:
         return True, "Aborting process"
 
     @ocs_agent.param('poll_interval', type=float, default=10)
+    @ocs_agent.param('test_mode', default=False, type=bool)
     def check_state(self, session, params=None):
         """check_state(poll_interval=10)
 
@@ -316,6 +317,9 @@ class PysmurfController:
 
             time.sleep(params['poll_interval'])
 
+            if params['test_mode']:
+                break
+
         return True, "Finished checking state"
 
     def _stop_check_state(self, session, params):
@@ -325,6 +329,7 @@ class PysmurfController:
     @ocs_agent.param("duration", default=None, type=float)
     @ocs_agent.param('kwargs', default=None)
     @ocs_agent.param('load_tune', default=True, type=bool)
+    @ocs_agent.param('test_mode', default=False, type=bool)
     def stream(self, session, params):
         """stream(duration=None)
 
@@ -376,6 +381,9 @@ class PysmurfController:
                     if time.time() > stop_time:
                         break
                 time.sleep(1)
+
+                if params['test_mode']:
+                    break
             sdl.stream_g3_off(S)
 
         return True, 'Finished streaming data'
@@ -651,7 +659,7 @@ class PysmurfController:
                 return False, f"Operation failed: {self.lock.job} is running."
 
             session.set_status('starting')
-            S, cfg = self._get_smurf_control()
+            S, cfg = self._get_smurf_control(session=session)
             iva = iv.take_iv(S, cfg, **params['kwargs'])
             session.data = {
                 'bands': iva.bands.tolist(),
@@ -753,7 +761,7 @@ class PysmurfController:
                     S, cfg, rfrac=params['rfrac'], **params['kwargs']
                 )
             else:
-                biases = bias_dets.bias_to_rfrac(
+                biases = bias_dets.bias_to_rfrac_range(
                     S, cfg, rfrac_range=params['rfrac'], **params['kwargs']
                 )
 
@@ -808,6 +816,7 @@ def main(args=None):
     agent.register_task('take_iv', controller.take_iv)
     agent.register_task('take_bias_steps', controller.take_bias_steps)
     agent.register_task('take_noise', controller.take_noise)
+    agent.register_task('bias_dets', controller.bias_dets)
 
     runner.run(agent, auto_reconnect=True)
 

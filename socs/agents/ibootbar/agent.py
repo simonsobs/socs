@@ -196,7 +196,7 @@ class ibootbarAgent:
                                  agg_params=agg_params,
                                  buffer_time=0)
 
-    @ocs_agent.param('_')
+    @ocs_agent.param('test_mode', default=False, type=bool)
     @inlineCallbacks
     def acq(self, session, params=None):
         """acq()
@@ -270,6 +270,9 @@ class ibootbarAgent:
                 self.log.error(f'{e}')
                 yield dsleep(1)
                 self.log.info('Trying to reconnect.')
+
+            if params['test_mode']:
+                break
 
         return True, "Finished Recording"
 
@@ -386,15 +389,13 @@ def add_agent_args(parser=None):
         parser = argparse.ArgumentParser()
 
     pgroup = parser.add_argument_group("Agent Options")
-    pgroup.add_argument("--auto-start", default=True, type=bool,
-                        help="Automatically start polling for data at "
-                        + "Agent startup.")
     pgroup.add_argument("--address", help="Address to listen to.")
     pgroup.add_argument("--port", default=161,
                         help="Port to listen on.")
     pgroup.add_argument("--snmp-version", default='2', choices=['1', '2', '3'],
                         help="SNMP version for communication. Must match "
                              + "configuration on the ibootbar.")
+    pgroup.add_argument("--mode", choices=['acq', 'test'])
 
     return parser
 
@@ -408,6 +409,11 @@ def main(args=None):
                                   parser=parser,
                                   args=args)
 
+    if args.mode == 'acq':
+        init_params = True
+    elif args.mode == 'test':
+        init_params = False
+
     agent, runner = ocs_agent.init_site_agent(args)
     p = ibootbarAgent(agent,
                       address=args.address,
@@ -417,7 +423,7 @@ def main(args=None):
     agent.register_process("acq",
                            p.acq,
                            p._stop_acq,
-                           startup=bool(args.auto_start), blocking=False)
+                           startup=init_params, blocking=False)
 
     agent.register_task("set_outlet", p.set_outlet, blocking=False)
     agent.register_task("cycle_outlet", p.cycle_outlet, blocking=False)

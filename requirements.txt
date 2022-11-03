@@ -42,6 +42,11 @@ requests
 # xy_stage
 xy_stage_control @ git+https://github.com/kmharrington/xy_stage_control.git@main
 
+# pysmurf controller
+pysmurf @ git+https://github.com/slaclab/pysmurf.git@main
+sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master
+sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master
+
 # Docs
 # see docs/requirements.txt
 
