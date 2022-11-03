@@ -457,7 +457,7 @@ class Motor:
         self.ser.write('DI%i\r' % (unit_pos))  # DI = Distance/Position
         self.ser.write('FP\r')  # FL = Feed to Position
         self.ser.flushInput()
-                
+
         count = 0
         moving = self.is_moving(verbose=False)
         while moving:
@@ -466,7 +466,7 @@ class Motor:
             if count > 100:
                 print('Took too long (50sec) to perform move. Might be on limit switch')
                 moving = False
-            count +=1
+            count += 1
 
     def move_axis_by_length(
             self,

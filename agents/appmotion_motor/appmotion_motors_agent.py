@@ -553,11 +553,11 @@ class appMotionMotorsAgent:
                 if params['motor'] == 3 and len(params['pos_data']) < 2:
                     raise Exception(
                         "You specified that both axes would be moving, but didn't provide data for both.")
-            
+
             feed_data = {
-                'timestamp':time.time(),
-                'block_name':'start_end_positions',
-                'data':{}
+                'timestamp': time.time(),
+                'block_name': 'start_end_positions',
+                'data': {}
             }
             feed_data['data']['start_time'] = time.now()
             feed_data['data']['motor1_s_pos'] = self.motor1.get_immediate_position(inches=False)[0]
@@ -575,7 +575,7 @@ class appMotionMotorsAgent:
             feed_data['data']['motor2_e_pos'] = self.motor2.get_immediate_position(inches=False)[0]
             self.agent.publish_to_feed('start_end_positions', feed_data)
             self.agent.feeds['start_end_positions'].flush_buffer()
-            
+
         return True, "Moving stages to {}".format(params['pos_data'])
 
     @ocs_agent.param('motor', default=1, choices=[1, 2, 3], type=int)
