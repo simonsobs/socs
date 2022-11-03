@@ -673,8 +673,6 @@ class PysmurfController:
                 'channels': iva.channels.tolist(),
                 'bgmap': iva.bgmap.tolist(),
                 'R_n': iva.R_n.tolist(),
-                'v_bias': iva.v_bias.tolist(),
-                'R': iva.R.tolist(),
                 'filepath': iva.filepath,
             }
             return True, "Finished taking IV"
@@ -732,7 +730,9 @@ class PysmurfController:
                 self.agent.publish_to_feed('responsivity_quantiles', data)
 
             session.data = {
-                'filepath': bsa.filepath
+                'filepath': bsa.filepath,
+                'R': bsa.R0.tolist(),
+                'Si': bsa.Si.tolist(),
             }
 
             return True, "Finished taking bias steps"
@@ -824,7 +824,7 @@ class PysmurfController:
 
             session.data['biases'] = biases.tolist()
 
-            return True, "Finished taking bias steps"
+            return True, "Finished biasing detectors"
 
 
 def make_parser(parser=None):
