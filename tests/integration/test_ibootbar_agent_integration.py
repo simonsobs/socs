@@ -18,14 +18,14 @@ pytest_plugins = "docker_compose"
 
 wait_for_crossbar = create_crossbar_fixture()
 run_agent = create_agent_runner_fixture(
-    "../agents/ibootbar/ibootbar.py",
+    "../socs/agents/ibootbar/agent.py",
     "ibootbarAgent",
     args=["--log-dir", "./logs/"],
 )
 client = create_client_fixture("ibootbar")
 
 subprocess.run(
-    "mkdir -p ~/.pysnmp/mibs && cp -r ../agents/ibootbar/mibs/. ~/.pysnmp/mibs",
+    "mkdir -p ~/.pysnmp/mibs && cp -r ../socs/mibs/. ~/.pysnmp/mibs",
     shell=True,
 )
 
