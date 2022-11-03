@@ -50,7 +50,7 @@ xy_stage_deps = [
     'xy_stage_control @ git+https://github.com/kmharrington/xy_stage_control.git@main',
 ]
 
-# Note: Note including the holograph deps, which are Python 3.8 only
+# Note: Not including the holograph deps, which are Python 3.8 only
 all_deps = acu_deps + labjack_deps + magpie_deps + pfeiffer_deps + \
     pysmurf_deps + smurf_sim_deps + synacc_deps + xy_stage_deps
 all_deps = list(set(all_deps))
