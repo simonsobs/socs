@@ -194,7 +194,7 @@ def agent():
     return agent
 
 
-@mock.patch('pysmurf_controller.PysmurfController._get_smurf_control', mock_pysmurf)
+@mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
 @mock.patch('numpy.save', mock_np_save())
 @mock.patch('matplotlib.figure.Figure.savefig', mock_plt_savefig())
 @mock.patch('sodetlib.noise.take_noise', mock_take_noise)
@@ -209,7 +209,7 @@ def test_uxm_setup(agent):
     assert res[0] is True
 
 
-@mock.patch('pysmurf_controller.PysmurfController._get_smurf_control', mock_pysmurf)
+@mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
 @mock.patch('numpy.save', mock_np_save())
 @mock.patch('matplotlib.figure.Figure.savefig', mock_plt_savefig())
 @mock.patch('sodetlib.noise.take_noise', mock_take_noise)
@@ -224,7 +224,7 @@ def test_uxm_relock(agent):
     assert res[0] is True
 
 
-@mock.patch('pysmurf_controller.PysmurfController._get_smurf_control', mock_pysmurf)
+@mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
 @mock.patch('sodetlib.set_current_mode', mock_set_current_mode)
 @mock.patch('sodetlib.operations.bias_steps.BiasStepAnalysis', mock_biasstepanalysis)
 @mock.patch('matplotlib.figure.Figure.savefig', mock_plt_savefig())
@@ -239,7 +239,7 @@ def test_take_bgmap(agent):
     assert res[0] is True
 
 
-@mock.patch('pysmurf_controller.PysmurfController._get_smurf_control', mock_pysmurf)
+@mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
 @mock.patch('matplotlib.figure.Figure.savefig', mock_plt_savefig())
 @mock.patch('sodetlib.operations.iv.IVAnalysis', mock_ivanalysis)
 @mock.patch('time.sleep', mock.MagicMock())
@@ -253,7 +253,7 @@ def test_take_iv(agent):
     assert res[0] is True
 
 
-@mock.patch('pysmurf_controller.PysmurfController._get_smurf_control', mock_pysmurf)
+@mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
 @mock.patch('sodetlib.set_current_mode', mock_set_current_mode)
 @mock.patch('sodetlib.operations.bias_steps.BiasStepAnalysis', mock_biasstepanalysis)
 @mock.patch('time.sleep', mock.MagicMock())
@@ -267,7 +267,7 @@ def test_take_bias_steps(agent):
     assert res[0] is True
 
 
-@mock.patch('pysmurf_controller.PysmurfController._get_smurf_control', mock_pysmurf)
+@mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
 @mock.patch('sodetlib.noise.take_noise', mock_take_noise)
 @mock.patch('time.sleep', mock.MagicMock())
 def test_take_noise(agent):
@@ -280,7 +280,7 @@ def test_take_noise(agent):
     assert res[0] is True
 
 
-@mock.patch('pysmurf_controller.PysmurfController._get_smurf_control', mock_pysmurf)
+@mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
 @mock.patch('sodetlib.set_current_mode', mock_set_current_mode)
 @mock.patch('time.sleep', mock.MagicMock())
 def test_bias_dets(agent):
@@ -296,7 +296,7 @@ def test_bias_dets(agent):
     assert res[0] is True
 
 
-@mock.patch('pysmurf_controller.PysmurfController._get_smurf_control', mock_pysmurf)
+@mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
 @mock.patch('time.sleep', mock.MagicMock())
 def test_stream(agent):
     """test_stream()
@@ -308,7 +308,7 @@ def test_stream(agent):
     assert res[0] is True
 
 
-@mock.patch('pysmurf_controller.PysmurfController._get_smurf_control', mock_pysmurf)
+@mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
 @mock.patch('time.sleep', mock.MagicMock())
 def test_check_state(agent):
     """test_check_state()
