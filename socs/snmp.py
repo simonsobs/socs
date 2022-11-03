@@ -145,7 +145,7 @@ class SNMPTwister:
 
         return datagram
 
-    def set(self, oid_list, version, setvalue):
+    def set(self, oid_list, version, setvalue, community_name='private'):
         """Issue a setCmd to set SNMP OID states.
         See `Modifying MIB variables`_ for more info on setting OID states.
 
@@ -175,9 +175,9 @@ class SNMPTwister:
         oid_list = [ObjectType(ObjectIdentity(*x), setvalue) if isinstance(x, tuple) else x for x in oid_list]
 
         if version == 1:
-            version_object = CommunityData('private', mpModel=0)  # SNMPv1
+            version_object = CommunityData(community_name, mpModel=0)  # SNMPv1
         elif version == 2:
-            version_object = CommunityData('private')  # SNMPv2c
+            version_object = CommunityData(community_name)  # SNMPv2c
         elif version == 3:
             version_object = UsmUserData('ocs')  # SNMPv3 (no auth, no privacy)
         else:

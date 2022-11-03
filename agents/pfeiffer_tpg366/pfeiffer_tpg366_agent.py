@@ -102,6 +102,7 @@ class PfeifferAgent:
                                  agg_params=agg_params,
                                  buffer_time=1)
 
+    @ocs_agent.param('test_mode', default=False, type=bool)
     def start_acq(self, session, params=None):
         """
         Get pressures from the Pfeiffer gauges, publishes them to the feed
@@ -144,6 +145,9 @@ class PfeifferAgent:
                 self.agent.publish_to_feed('pressures', data)
                 time.sleep(sleep_time)
 
+                if params['test_mode']:
+                    break
+
             self.agent.feeds['pressures'].flush_buffer()
         return True, 'Acquistion exited cleanly'
 
@@ -170,6 +174,7 @@ def make_parser(parser=None):
     pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--ip_address')
     pgroup.add_argument('--port')
+    pgroup.add_argument("--mode", type=str, default='acq', choices=['acq', 'test'])
 
     return parser
 
@@ -178,9 +183,13 @@ if __name__ == '__main__':
     parser = make_parser()
     args = site_config.parse_args(agent_class='PfeifferAgent', parser=parser)
 
+    init_params = True
+    if args.mode == 'test':
+        init_params = {'test_mode': True}
+
     agent, runner = ocs_agent.init_site_agent(args)
     pfeiffer_agent = PfeifferAgent(agent, args.ip_address, args.port)
     agent.register_process('acq', pfeiffer_agent.start_acq,
-                           pfeiffer_agent.stop_acq, startup=True)
+                           pfeiffer_agent.stop_acq, startup=init_params)
     agent.register_task('close', pfeiffer_agent.stop_acq)
     runner.run(agent, auto_reconnect=True)

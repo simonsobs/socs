@@ -88,3 +88,19 @@ def test_cryomech_cpa_acq(wait_for_crossbar, emulator, run_agent, client):
     # already stopped, but will set self.take_data = False
     resp = client.acq.stop()
     print(resp)
+
+
+@pytest.mark.integtest
+@pytest.mark.parametrize("state,command", [('on', b'\t\x99\x00\x00\x00\x06\x01\x06\x00\x01\x00\x01')])
+def test_cryomech_cpa_release_reacquire(wait_for_crossbar, emulator, run_agent_acq,
+                                        client, state, command):
+    client.init.wait()
+    response = {command: command,
+                init_msg: init_res}
+    emulator.define_responses(response)
+
+    resp = client.power_ptc(state=state)
+    print(resp)
+    assert resp.status == ocs.OK
+    print(resp.session)
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value

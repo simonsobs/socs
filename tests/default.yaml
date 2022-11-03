@@ -64,7 +64,16 @@ hosts:
        'instance-id': 'pfeiffer366',
        'arguments': [['--ip_address', '127.0.0.1'],
                      ['--port', '8000'],
+                     ['--mode', 'test'],
                     ]
+      },
+      {'agent-class': 'ibootbarAgent',
+       'instance-id': 'ibootbar',
+       'arguments': [['--address', '127.0.0.1'],
+                     ['--port', 1024],
+                     ['--mode', 'test'],
+                     ['--snmp-version', 2]
+                     ]
       },
       {'agent-class': 'SynaccessAgent',
        'instance-id': 'synacc',

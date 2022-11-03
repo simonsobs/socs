@@ -18,3 +18,6 @@ exclude =
     agents/ups/mibs/UPS-MIB.py,
     versioneer.py,
     docs/conf.py,
+per-file-ignores =
+    # Windows only dependency
+    agents/thorlabs_mc2000b/chopper_mc2000b_agent.py:F405
