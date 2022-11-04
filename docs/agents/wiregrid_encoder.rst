@@ -76,9 +76,11 @@ Description
 Hardware Configurations
 ```````````````````````
 
-The hardware-related variables are defined in ``wiregrid_encoder.py``.
+The hardware-related variables are defined in ``wiregrid_encoder.py``:
+
     - COUNTER_INFO_LENGTH = 100
     - COUNTS_ON_BELT = 52000
+
 These should be consistent with the script running in the BeagleBoneBlack,
 and these numbers will rarely be changed because they depend on the hardware.
 
