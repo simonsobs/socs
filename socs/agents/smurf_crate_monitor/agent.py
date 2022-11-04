@@ -1,5 +1,4 @@
 import argparse
-import os
 import subprocess
 import time
 
@@ -8,9 +7,7 @@ import txaio
 
 txaio.use_twisted()
 
-ON_RTD = os.environ.get('READTHEDOCS') == 'True'
-if not ON_RTD:
-    from ocs import ocs_agent, site_config
+from ocs import ocs_agent, site_config
 
 
 def get_sensors(shm_addr):
@@ -182,32 +179,37 @@ class SmurfCrateMonitor:
                                  agg_params=agg_params,
                                  buffer_time=0.)
 
-    def init_data_stream(self, shm_addr):
-        """
-        Wrapper for get_sensors and get_channel_names which generates
-        the list of sensors to use in datastreaming.
+    def _init_data_stream(self, shm_addr):
+        """Wrapper for get_sensors and get_channel_names which generates the
+        list of sensors to use in datastreaming.
+
         Args:
-            shm_addr (str):
-                Address used to connect to shelf manager ex. root@192.168.1.2
+            shm_addr (str): Address used to connect to shelf manager ex.
+                root@192.168.1.2
         Return:
-            ipmbs (str list):
-                List of Intelligent Platform Management Bus (IPMB) addresses.
-            sensids (str list):
-                List of sensor identification names, same length as ipmbs list.
-            chan_names (str list):
-                List of human readable names for each IPMB address.
+            ipmbs (str list): List of Intelligent Platform Management Bus
+                (IPMB) addresses.
+            sensids (str list): List of sensor identification names, same
+                length as ipmbs list.
+            chan_names (str list): List of human readable names for each IPMB
+                address.
         """
         ipmbs, sensids = get_sensors(shm_addr)
         chan_names = get_channel_names(ipmbs)
         return ipmbs, sensids, chan_names
 
     def init_crate(self, session, params=None):
-        """
-        Run at the startup of the docker to check that you can successfully
-        ssh to the crate and run a command. If it runs successfully then
-        you should see the home directory of the shelf manager printed to
-        the docker logs and the data acquisition process to start, if not
-        you will see an error in the logs and acquistion won't start.
+        """init_crate()
+
+        **Task** - Initialize connection to the SMuRF crate.
+
+        Run at the startup of the docker to check that you can
+        successfully ssh to the crate and run a command. If it runs
+        successfully then you should see the home directory of the shelf
+        manager printed to the docker logs and the data acquisition process to
+        start, if not you will see an error in the logs and acquistion won't
+        start.
+
         """
         self.log.info(self.shm_addr)
         cmd = ['ssh', f'{self.shm_addr}', 'pwd']
@@ -227,14 +229,18 @@ class SmurfCrateMonitor:
             self.agent.start('acq')
             return True, 'Crate Initialized'
 
-    def start_acq(self, session, params=None):
-        """
-        Starts acquiring data, hardcoded for one data point every 30
-        seconds because we intend for this to be very low rate data.
+    def acq(self, session, params=None):
+        """acq()
+
+        **Process** - Start acquiring data.
+
+        Hardcoded for one data point every 30 seconds because we intend for
+        this to be very low rate data.
+
         """
         self.log.info('Started acquisition')
         shm_addr = self.shm_addr
-        ipmbs, sensids, chan_names = self.init_data_stream(shm_addr=shm_addr)
+        ipmbs, sensids, chan_names = self._init_data_stream(shm_addr=shm_addr)
         self.log.info('Got sensor names')
         self.take_data = True
         while self.take_data:
@@ -255,7 +261,7 @@ class SmurfCrateMonitor:
             self.agent.publish_to_feed('smurf_sensors', data)
         return True, 'Acquisition exited cleanly'
 
-    def stop_acq(self, session, params=None):
+    def _stop_acq(self, session, params=None):
         """
         Stops acquiring data if the dpcler os stopped.
         """
@@ -296,8 +302,8 @@ def main(args=None):
 
     agent.register_task('init_crate', smurfcrate.init_crate,
                         startup=startup)
-    agent.register_process('acq', smurfcrate.start_acq,
-                           smurfcrate.stop_acq)
+    agent.register_process('acq', smurfcrate.acq,
+                           smurfcrate._stop_acq)
 
     runner.run(agent, auto_reconnect=True)
 

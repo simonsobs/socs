@@ -8,18 +8,7 @@ Smurf Crate Monitor Agent
 
 The SMuRF readout system uses Advanced Telecommunications Computing Architecture
 (ATCA) crates for powering and communicating between boards and the site networking
-and timing infrastructure. These crates have a small computer on board called a
-shelf manager which monitors all of the sensors in the crate including ammeters, and
-voltmeters for the power into the crates and into each front and rear module of each
-active slot used in the crate. There are also tachometers on each of the crate fans
-and various thermometers withing the crate and each of the boards plugged into the
-crate which the shelf manager monitors. There are multiple crate manufacturers
-but the shelf managers all share the same set of programming/communication called
-Pigeon Poing Communication so this agent should work across multiple crate
-manufacturers. This agent connects to a shell terminal of a crate shelf
-manager over ssh through the python subprocess package and then runs the
-command 'clia sensordata' and parses its output to identify all of the available
-sensors then stream and publish them.
+and timing infrastructure. This Agent monitors the sensors in these ATCA crates.
 
 .. argparse::
     :filename: ../socs/agents/smurf_crate_monitor/agent.py
@@ -28,11 +17,13 @@ sensors then stream and publish them.
 
 Configuration File Examples
 ---------------------------
+
 Below are configuration examples for the ocs config file and for running the
 Agent in a docker container.
 
-ocs-config
-``````````
+OCS Site Config
+```````````````
+
 To configure the SMuRF Crate Monitor Agent we need to add a CrateAgent entry
 to our site configuration file. Here is an example configuration block using
 all of the available arguments::
@@ -69,8 +60,9 @@ the ocs-user in your 'docker-compose' file, see below for an example.
 The second argument, 'crate-id', is just an identifier for your feed names
 to distinguish between identical sensors on different crates.
 
-Docker
-``````
+Docker Compose
+``````````````
+
 The SMuRF Crate Agent should be configured to run in a Docker container. An
 example docker-compose service configuration is shown here::
 
@@ -94,8 +86,25 @@ An example of the 'ocs-base' anchor is shown here::
   volumes:
     - ${OCS_CONFIG_DIR}:/config
 
+Description
+-----------
+
+The ATCA crates have a small computer on board called a shelf manager which
+monitors all of the sensors in the crate including ammeters, and voltmeters for
+the power into the crates and into each front and rear module of each active
+slot used in the crate. There are also tachometers on each of the crate fans
+and various thermometers withing the crate and each of the boards plugged into
+the crate which the shelf manager monitors.
+
+There are multiple crate manufacturers but the shelf managers all share the
+same set of programming/communication called Pigeon Poing Communication so this
+agent should work across multiple crate manufacturers. This agent connects to a
+shell terminal of a crate shelf manager over ssh through the python subprocess
+package and then runs the command ``clia sensordata`` and parses its output to
+identify all of the available sensors then stream and publish them.
+
 Agent API
 ---------
 
 .. autoclass:: socs.agents.smurf_crate_monitor.agent.SmurfCrateMonitor
-    :members: init_crate, start_acq
+    :members:
