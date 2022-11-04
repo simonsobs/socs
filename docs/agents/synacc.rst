@@ -19,8 +19,9 @@ Configuration File Examples
 Below are configuration examples for the ocs config file and for running the
 Agent in a docker container.
 
-ocs-config
-``````````
+OCS Site Config
+```````````````
+
 To configure the Synaccess Agent we need to add a Synaccess Agent block to our ocs
 configuration file. Here is an example configuration block using all of the
 available arguments::
@@ -33,8 +34,9 @@ available arguments::
           ['--password', 'admin'],
           ]}
 
-Docker
-``````
+Docker Compose
+``````````````
+
 The Synaccess Agent should be configured to run in a Docker container.
 An example docker-compose service configuration is shown here::
 
@@ -50,12 +52,18 @@ An example docker-compose service configuration is shown here::
 Since the agent within the container needs to communicate with hardware on the
 host network you must use ``network_mode: "host"`` in your compose file.
 
-Example Client
---------------
+Agent API
+---------
+
+.. autoclass:: socs.agents.synacc.agent.SynaccessAgent
+    :members:
+
+Example Clients
+---------------
 Below is an example client to control outlets::
 
-    from ocs import matched_client
-    synaccess = matched_client.MatchedClient('synacc', args=[])
+    from ocs import ocs_client
+    synaccess = ocs_client.OCSClient('synacc', args=[])
 
     #Get status of the strip
     synaccess.get_status.start()
@@ -73,10 +81,3 @@ Below is an example client to control outlets::
     #Turn on/off all outlets
     synaccess.set_all.start(on=True)
     synaccess.set_all.wait()
-
-
-Agent API
----------
-
-.. autoclass:: socs.agents.synacc.agent.SynaccessAgent
-    :members:
