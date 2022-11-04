@@ -882,43 +882,58 @@ class ACUAgent:
         if monitor_check==False:
             self._set_job_done('control')
             return False, 'Cannot complete set_boresight with process not running.'
+        else:
+            self.log.info('monitor_check completed')
 
+        if self.acu_config['platform'] == 'satp':
+            status_block = 'summary'
+            position_name = 'Boresight_current_position'
+        elif self.acu_config['platform'] == 'ccat':
+            status_block = 'third_axis'
+            position_name = 'Axis3_current_position' 
 
         bs_destination = params.get('b')
+        self.log.info('Boresight position will be set to ' + str(bs_destination))
         if self.data['status']['platform_status']['Remote_mode'] == 0:
             self.log.warn('ACU in local mode, cannot perform motion with OCS.')
             self._set_job_done('control')
             return False, 'ACU not in remote mode.'
+        else:
+            self.log.info('Verified ACU in remote mode')
         # yield self.acu_control.stop()
         yield dsleep(5)
-        self.data['uploads']['Start_Boresight'] = self.data['status']['summary']['Boresight_current_position']
-        self.data['uploads']['Command_Type'] = 1
-        self.data['uploads']['Preset_Boresight'] = bs_destination
-        acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
-                      'block_name': 'ACU_upload',
-                      'data': self.data['uploads']
-                      }
-        self.agent.publish_to_feed('acu_upload', acu_upload)
+#        self.data['uploads']['Start_Boresight'] = self.data['status'][status_block][position_name]
+#        self.data['uploads']['Command_Type'] = 1
+#        self.data['uploads']['Preset_Boresight'] = bs_destination
+#        acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
+#                      'block_name': 'ACU_upload',
+#                      'data': self.data['uploads']
+#                      }
+#        self.agent.publish_to_feed('acu_upload', acu_upload)
+        self.log.info('Starting boresight motion')
         yield self.acu_control.go_3rd_axis(bs_destination)
-        current_position = self.data['status']['summary']['Boresight_current_position']
+
+        current_position = self.data['status'][status_block][position_name]
+        print(current_position)
         while current_position != bs_destination:
             yield dsleep(1)
-            acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
-                          'block_name': 'ACU_upload',
-                          'data': self.data['uploads']
-                          }
-            self.agent.publish_to_feed('acu_upload', acu_upload)
-            current_position = self.data['status']['summary']['Boresight_current_position']
+#            acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
+#                          'block_name': 'ACU_upload',
+#                          'data': self.data['uploads']
+#                          }
+#            self.agent.publish_to_feed('acu_upload', acu_upload)
+            current_position = self.data['status'][status_block][position_name]
+            print(current_position)
         if params.get('end_stop'):
             yield self.acu_control.stop()
-        self.data['uploads']['Start_Boresight'] = 0.0
-        self.data['uploads']['Command_Type'] = 0
-        self.data['uploads']['Preset_Boresight'] = 0.0
-        acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
-                      'block_name': 'ACU_upload',
-                      'data': self.data['uploads']
-                      }
-        self.agent.publish_to_feed('acu_upload', acu_upload)
+#        self.data['uploads']['Start_Boresight'] = 0.0
+#        self.data['uploads']['Command_Type'] = 0
+#        self.data['uploads']['Preset_Boresight'] = 0.0
+#        acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
+#                      'block_name': 'ACU_upload',
+#                      'data': self.data['uploads']
+#                      }
+#        self.agent.publish_to_feed('acu_upload', acu_upload)
         self._set_job_done('control')
         return True, 'Moved to new 3rd axis position'
 
@@ -973,7 +988,7 @@ class ACUAgent:
             self._try_set_job('control')
         self.log.info('_try_set_job ok')
         yield self.acu_control.clear_faults()
-        self.set_job_done('control')
+        self._set_job_done('control')
         return True, 'Job completed.'
 
     @inlineCallbacks
