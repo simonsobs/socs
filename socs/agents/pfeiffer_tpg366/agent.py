@@ -103,20 +103,21 @@ class PfeifferAgent:
                                  agg_params=agg_params,
                                  buffer_time=1)
 
-    @ocs_agent.param('test_mode', default=False, type=bool)
-    def start_acq(self, session, params=None):
+    @ocs_agent.param('sampling_frequency', type=float, default=2.5)
+    @ocs_agent.param('test_mode', type=bool, default=False)
+    def acq(self, session, params=None):
+        """acq(sampling_frequency=2.5, test_mode=False)
+
+        **Process** - Get pressures from the Pfeiffer gauges.
+
+        Parameters:
+            sampling_frequency (float): Rate at which to get the pressures
+                [Hz]. Defaults to 2.5 Hz.
+            test_mode (bool): Run the Process loop only once. This is meant
+                only for testing. Defaults to False.
+
         """
-        Get pressures from the Pfeiffer gauges, publishes them to the feed
-
-
-        Args:
-            sampling_frequency- defaults to 2.5 Hz
-
-        """
-        if params is None:
-            params = {}
-
-        f_sample = params.get('sampling_frequency')
+        f_sample = params['sampling_frequency']
         if f_sample is None:
             f_sample = self.f_sample
 
@@ -152,7 +153,7 @@ class PfeifferAgent:
             self.agent.feeds['pressures'].flush_buffer()
         return True, 'Acquistion exited cleanly'
 
-    def stop_acq(self, session, params=None):
+    def _stop_acq(self, session, params=None):
         """
         End pressure data acquisition
         """
@@ -192,9 +193,9 @@ def main(args=None):
 
     agent, runner = ocs_agent.init_site_agent(args)
     pfeiffer_agent = PfeifferAgent(agent, args.ip_address, args.port)
-    agent.register_process('acq', pfeiffer_agent.start_acq,
-                           pfeiffer_agent.stop_acq, startup=init_params)
-    agent.register_task('close', pfeiffer_agent.stop_acq)
+    agent.register_process('acq', pfeiffer_agent.acq,
+                           pfeiffer_agent._stop_acq, startup=init_params)
+    agent.register_task('close', pfeiffer_agent._stop_acq)
     runner.run(agent, auto_reconnect=True)
 
 
