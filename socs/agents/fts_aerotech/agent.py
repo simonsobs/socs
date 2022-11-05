@@ -5,12 +5,9 @@ import time
 
 import txaio
 import yaml
+from ocs import ocs_agent, site_config
+from ocs.ocs_twisted import Pacemaker, TimeoutLock
 from twisted.internet import reactor
-
-ON_RTD = os.environ.get('READTHEDOCS') == 'True'
-if not ON_RTD:
-    from ocs import ocs_agent, site_config
-    from ocs.ocs_twisted import Pacemaker, TimeoutLock
 
 
 class FTSAerotechStage:
@@ -104,7 +101,7 @@ class FTSAerotechStage:
 
 class FTSAerotechAgent:
     """
-    Agent for connecting to the FTS mirror control
+    Agent for connecting to the FTS mirror control.
 
     Args:
         ip_addr: IP address of Motion Controller
@@ -169,18 +166,13 @@ class FTSAerotechAgent:
                     raise Exception("translate and limits must be included "
                                     "in the mirror configuration keys")
 
-    def init_stage_task(self, session, params=None):
-        """init_stage_task(params=None)
-        Perform first time setup for communication with FTS stage.
+    @ocs_agent.param('_')
+    def init_stage(self, session, params=None):
+        """init_stage()
 
-        Args:
-            params (dict): Parameters dictionary for passing parameters to
-                task.
+        **Task** - Perform first time setup for communication with FTS stage.
+
         """
-
-        if params is None:
-            params = {}
-
         if self.stage is not None and self.initialized:
             return True, 'Stages already Initialized'
 
@@ -208,8 +200,12 @@ class FTSAerotechAgent:
             self.agent.start('acq')
         return True, 'Stage Initialized.'
 
-    def home_task(self, session, params=None):
-        """ Home the stage to its negative limit
+    @ocs_agent.param('_')
+    def home(self, session, params=None):
+        """home()
+
+        **Task** - Home the stage to its negative limit.
+
         """
 
         with self.lock.acquire_timeout(timeout=3, job='home') as acquired:
@@ -224,16 +220,16 @@ class FTSAerotechAgent:
                 return False, "Homing Failed"
         return True, "Homing Complete"
 
+    @ocs_agent.param('position', type=float, check=lambda x: -74.8 <= x <= 74.8)
     def move_to(self, session, params=None):
-        """Move to absolute position relative to stage center (in mm)
+        """move_to(position)
 
-        params: {'position':float between -74.8 and 74.8}
+        **Task** - Move to absolute position relative to stage center (in mm).
+
+        Parameters:
+            position (float): Position in mm, must be between -74.8 and 74.8.
+
         """
-        if params is None:
-            return False, "No Position Given"
-        if 'position' not in params:
-            return False, "No Position Given"
-
         with self.lock.acquire_timeout(timeout=3, job='move') as acquired:
             if not acquired:
                 self.log.warn("Could not start move because lock held by"
@@ -243,17 +239,21 @@ class FTSAerotechAgent:
 
         return False, "Move did not complete correctly?"
 
-    def start_acq(self, session, params=None):
-        """
-        params:
-            dict: {'sampling_frequency': float, sampling rate in Hz}
+    @ocs_agent.param('sampling_frequency', type=float, default=2)
+    def acq(self, session, params=None):
+        """acq(sampling_frequency=2)
 
-        The most recent position data is stored in session.data in the format::
-            {"position":{"pos" : mirror position  }
-        """
-        if params is None:
-            params = {}
+        Parameters:
+            sampling_frequency (float): Sampling rate in Hz. Defaults to 2 Hz.
 
+        Notes:
+            The most recent position data is stored in session.data in the
+            format::
+
+                >>> response.session['data']
+                {"position": {"pos" : mirror position}}
+
+        """
         f_sample = params.get('sampling_frequency', self.sampling_frequency)
         pm = Pacemaker(f_sample, quantize=True)
 
@@ -294,7 +294,7 @@ class FTSAerotechAgent:
 
         return True, 'Acquisition exited cleanly.'
 
-    def stop_acq(self, session, params=None):
+    def _stop_acq(self, session, params=None):
         """
         params:
             dict: {}
@@ -344,11 +344,11 @@ def main(args=None):
                                  args.config_file, args.mode,
                                  args.sampling_frequency)
 
-    agent.register_task('init_stage', fts_agent.init_stage_task)
+    agent.register_task('init_stage', fts_agent.init_stage)
     agent.register_task('move_to', fts_agent.move_to)
-    agent.register_task('home', fts_agent.home_task)
+    agent.register_task('home', fts_agent.home)
 
-    agent.register_process('acq', fts_agent.start_acq, fts_agent.stop_acq)
+    agent.register_process('acq', fts_agent.acq, fts_agent._stop_acq)
 
     runner.run(agent, auto_reconnect=True)
 
