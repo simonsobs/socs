@@ -150,7 +150,7 @@ class LS372_Agent:
     @ocs_agent.param('force', default=False, type=bool)
     @ocs_agent.param('configfile', type=str, default=None)
     def init_lakeshore(self, session, params=None):
-        """init_lakeshore(auto_acquire=False, acq_params=None, force=False,
+        """init_lakeshore(auto_acquire=False, acq_params=None, force=False, \
                           configfile=None)
 
         **Task** - Perform first time setup of the Lakeshore 372 communication.
@@ -222,7 +222,7 @@ class LS372_Agent:
     @ocs_agent.param('sample_heater', default=False, type=bool)
     @ocs_agent.param('run_once', default=False, type=bool)
     def acq(self, session, params=None):
-        """acq(sample_heater=False)
+        """acq(sample_heater=False, run_once=False)
 
         **Process** - Acquire data from the Lakeshore 372.
 
@@ -415,9 +415,9 @@ class LS372_Agent:
 
     @ocs_agent.param('heater', type=str)
     @ocs_agent.param('range')
-    @ocs_agent.param('wait', type=float)
+    @ocs_agent.param('wait', type=float, default=0)
     def set_heater_range(self, session, params):
-        """set_heater_range(heater=None, range=None, wait=0)
+        """set_heater_range(heater, range, wait=0)
 
         **Task** - Adjust the heater range for servoing cryostat. Wait for a
         specified amount of time after the change.
@@ -459,7 +459,7 @@ class LS372_Agent:
     @ocs_agent.param('channel', type=int, check=lambda x: 1 <= x <= 16)
     @ocs_agent.param('mode', type=str, choices=['current', 'voltage'])
     def set_excitation_mode(self, session, params):
-        """set_excitation_mode(channel=None, mode=None)
+        """set_excitation_mode(channel, mode)
 
         **Task** - Set the excitation mode of a specified channel.
 
@@ -487,7 +487,7 @@ class LS372_Agent:
     @ocs_agent.param('channel', type=int, check=lambda x: 1 <= x <= 16)
     @ocs_agent.param('value', type=float)
     def set_excitation(self, session, params):
-        """set_excitation(channel=None, value=None)
+        """set_excitation(channel, value)
 
         **Task** - Set the excitation voltage/current value of a specified
         channel.
@@ -496,7 +496,7 @@ class LS372_Agent:
             channel (int): Channel to set the excitation for. Valid values
                 are 1-16.
             value (float): Excitation value in volts or amps depending on set
-            excitation mode. See
+                excitation mode. See
                 :func:`socs.Lakeshore.Lakeshore372.Channel.set_excitation`
 
         """
@@ -522,7 +522,7 @@ class LS372_Agent:
 
     @ocs_agent.param('channel', type=int, check=lambda x: 1 <= x <= 16)
     def get_excitation(self, session, params):
-        """get_excitation(channel=None)
+        """get_excitation(channel)
 
         **Task** - Get the excitation voltage/current value of a specified
         channel.
@@ -550,7 +550,7 @@ class LS372_Agent:
     @ocs_agent.param('channel', type=int, check=lambda x: 1 <= x <= 16)
     @ocs_agent.param('resistance_range', type=float)
     def set_resistance_range(self, session, params):
-        """set_resistance_range(channel=None,resistance_range=None)
+        """set_resistance_range(channel, resistance_range)
 
         **Task** - Set the resistance range for a specified channel.
 
@@ -586,7 +586,7 @@ class LS372_Agent:
 
     @ocs_agent.param('channel', type=int, check=lambda x: 1 <= x <= 16)
     def get_resistance_range(self, session, params):
-        """get_resistance_range(channel=None)
+        """get_resistance_range(channel)
 
         **Task** - Get the resistance range for a specified channel.
 
@@ -611,7 +611,7 @@ class LS372_Agent:
     @ocs_agent.param('channel', type=int, check=lambda x: 1 <= x <= 16)
     @ocs_agent.param('dwell', type=int, check=lambda x: 1 <= x <= 200)
     def set_dwell(self, session, params):
-        """set_dwell(channel=None, dwell=None)
+        """set_dwell(channel, dwell)
 
         **Task** - Set the autoscanning dwell time for a particular channel.
 
@@ -636,7 +636,7 @@ class LS372_Agent:
 
     @ocs_agent.param('channel', type=int, check=lambda x: 1 <= x <= 16)
     def get_dwell(self, session, params):
-        """get_dwell(channel=None, dwell=None)
+        """get_dwell(channel)
 
         **Task** - Get the autoscanning dwell time for a particular channel.
 
@@ -662,7 +662,7 @@ class LS372_Agent:
     @ocs_agent.param('I', type=int)
     @ocs_agent.param('D', type=int)
     def set_pid(self, session, params):
-        """set_pid(P=None, I=None, D=None)
+        """set_pid(P, I, D)
 
         **Task** - Set the PID parameters for servo control of fridge.
 
@@ -691,7 +691,7 @@ class LS372_Agent:
 
     @ocs_agent.param('channel', type=int)
     def set_active_channel(self, session, params):
-        """set_active_channel(channel=None)
+        """set_active_channel(channel)
 
         **Task** - Set the active channel on the LS372.
 
@@ -715,7 +715,7 @@ class LS372_Agent:
 
     @ocs_agent.param('autoscan', type=bool)
     def set_autoscan(self, session, params):
-        """set_autoscan(autoscan=None)
+        """set_autoscan(autoscan)
 
         **Task** - Sets autoscan on the LS372.
 
@@ -742,7 +742,7 @@ class LS372_Agent:
 
     @ocs_agent.param('temperature', type=float, check=lambda x: x < 1)
     def servo_to_temperature(self, session, params):
-        """servo_to_temperature(temperature=None)
+        """servo_to_temperature(temperature)
 
         **Task** - Servo to a given temperature using a closed loop PID on a
         fixed channel. This will automatically disable autoscan if enabled.
@@ -790,7 +790,7 @@ class LS372_Agent:
     @ocs_agent.param('measurements', type=int)
     @ocs_agent.param('threshold', type=float)
     def check_temperature_stability(self, session, params):
-        """check_temperature_stability(measurements=None, threshold=None)
+        """check_temperature_stability(measurements, threshold)
 
         Check servo temperature stability is within threshold.
 
@@ -840,7 +840,7 @@ class LS372_Agent:
     @ocs_agent.param('heater', type=str, choices=['sample', 'still'])
     @ocs_agent.param('mode', type=str, choices=['Off', 'Monitor Out', 'Open Loop', 'Zone', 'Still', 'Closed Loop', 'Warm up'])
     def set_output_mode(self, session, params=None):
-        """set_output_mode(heater=None, mode=None)
+        """set_output_mode(heater, mode)
 
         **Task** - Set output mode of the heater.
 
@@ -871,14 +871,13 @@ class LS372_Agent:
     @ocs_agent.param('output', type=float)
     @ocs_agent.param('display', type=str, choices=['current', 'power'], default=None)
     def set_heater_output(self, session, params=None):
-        """set_heater_output(heater=None, output=None, display=None)
+        """set_heater_output(heater, output, display=None)
 
         **Task** - Set display type and output of the heater.
 
         Parameters:
             heater (str): Name of heater to set range for, either 'sample' or
                 'still'.
-                "Open Loop", "Zone", "Still", "Closed Loop", or "Warm up"
             output (float): Specifies heater output value. For possible values see
                 :func:`socs.Lakeshore.Lakeshore372.Heater.set_heater_output`
             display (str, optional): Specifies heater display type. Can be
@@ -923,7 +922,7 @@ class LS372_Agent:
 
     @ocs_agent.param('output', type=float, check=lambda x: 0 <= x <= 100)
     def set_still_output(self, session, params=None):
-        """set_still_output(output=None)
+        """set_still_output(output)
 
         **Task** - Set the still output on the still heater. This is different
         than the manual output on the still heater. Use
@@ -987,7 +986,7 @@ class LS372_Agent:
 
     @ocs_agent.param('configfile', type=str)
     def input_configfile(self, session, params=None):
-        """input_configfile(configfile=None)
+        """input_configfile(configfile)
 
         **Task** - Upload 372 configuration file to initialize channel/device
         settings.
