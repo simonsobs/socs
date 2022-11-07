@@ -14,13 +14,13 @@ if not ON_RTD:
 
 class LATRtXYStageAgent:
     """
-    Agent for connecting to the LATRt XY Stages
+    Agent for connecting to the LATRt XY Stages.
 
     Args:
-        ip_addr: IP address where RPi server is running
-        port: Port the RPi Server is listening on
-        mode: 'acq': Start data acquisition on initialize
-        samp: default sampling frequency in Hz
+        ip_addr: IP address where RPi server is running.
+        port: Port the RPi Server is listening on.
+        mode: 'acq': Start data acquisition on initialize.
+        samp: Default sampling frequency in Hz.
     """
 
     def __init__(self, agent, ip_addr, port, mode=None, samp=2):
@@ -53,17 +53,13 @@ class LATRtXYStageAgent:
                                  agg_params=agg_params,
                                  buffer_time=0)
 
-    def init_xy_stage_task(self, session, params=None):
-        """init_xy_stage_task(params=None)
-        Perform first time setup for communivation with XY stages.
+    @ocs_agent.param('_')
+    def init_xy_stage(self, session, params=None):
+        """init_xy_stage()
 
-        Args:
-            params (dict): Parameters dictionary for passing parameters to
-                task.
+        **Task** - Perform first time setup for communication with XY stages.
+
         """
-
-        if params is None:
-            params = {}
 
         self.log.debug("Trying to acquire lock")
         with self.lock.acquire_timeout(timeout=0, job='init') as acquired:
@@ -85,10 +81,17 @@ class LATRtXYStageAgent:
             self.agent.start('acq')
         return True, 'XY Stages Initialized.'
 
+    @ocs_agent.param('distance', type=float)
+    @ocs_agent.param('velocity', type=float, check=lambda x: 0 <= x < 1.2)
     def move_x_cm(self, session, params):
-        """
-        params:
-            dict: { 'distance': float, 'velocity':float < 1.2}
+        """move_x_cm(distance, velocity)
+
+        **Task** - Move the X axis.
+
+        Parameters:
+            distance (float): Distance to move in cm.
+            velocity (float): Velocity to move at. Must be less than 1.2.
+
         """
 
         with self.lock.acquire_timeout(timeout=3, job='move_x_cm') as acquired:
@@ -111,10 +114,17 @@ class LATRtXYStageAgent:
                 break
         return True, "X Move Complete"
 
+    @ocs_agent.param('distance', type=float)
+    @ocs_agent.param('velocity', type=float, check=lambda x: 0 <= x < 1.2)
     def move_y_cm(self, session, params):
-        """
-        params:
-            dict: { 'distance': float, 'velocity':float < 1.2}
+        """move_y_cm(distance, velocity)
+
+        **Task** - Move the Y axis.
+
+        Parameters:
+            distance (float): Distance to move in cm.
+            velocity (float): Velocity to move at. Must be less than 1.2.
+
         """
 
         with self.lock.acquire_timeout(timeout=3, job='move_y_cm') as acquired:
@@ -136,10 +146,15 @@ class LATRtXYStageAgent:
                 break
         return True, "Y Move Complete"
 
+    @ocs_agent.param('position', type=tuple)
     def set_position(self, session, params):
-        """
-        params:
-            dict: {'position': (float, float)}
+        """set_position(position)
+
+        **Task** - Set position of the XY stage.
+
+        Parameters:
+            position (tuple): (X, Y) position.
+
         """
         with self.lock.acquire_timeout(timeout=3, job='set_position') as acquired:
             if not acquired:
@@ -149,18 +164,26 @@ class LATRtXYStageAgent:
             self.xy_stage.position = params['position']
         return True, "Position Updated"
 
-    def start_acq(self, session, params=None):
-        """
-        params:
-            dict: {'sampling_frequency': float, sampling rate in Hz}
+    @ocs_agent.param('sampling_frequency', type=float)
+    def acq(self, session, params=None):
+        """acq(sampling_frequency=2)
 
-        The most recent positions are stored in the session.data object in the
-        format::
+        **Process** - Run data acquisition.
 
-            {"positions":
-                {"x": x position in cm,
-                 "y": y position in cm}
-            }
+        Parameters:
+            sampling_frequency (float): Sampling rate to acquire data at.
+                Defaults to value set in site config file (or 2 Hz if
+                unspecified.)
+
+        Notes:
+            The most recent positions are stored in the session.data object in the
+            format::
+
+                >>> response.session['data']
+                {"positions":
+                    {"x": x position in cm,
+                     "y": y position in cm}
+                }
 
         """
         if params is None:
@@ -201,7 +224,7 @@ class LATRtXYStageAgent:
                 session.data.update(data['data'])
         return True, 'Acquisition exited cleanly.'
 
-    def stop_acq(self, session, params=None):
+    def _stop_acq(self, session, params=None):
         """
         params:
             dict: {}
@@ -248,12 +271,12 @@ def main(args=None):
 
     xy_agent = LATRtXYStageAgent(agent, args.ip_address, args.port, args.mode, args.sampling_frequency)
 
-    agent.register_task('init_xy_stage', xy_agent.init_xy_stage_task)
+    agent.register_task('init_xy_stage', xy_agent.init_xy_stage)
     agent.register_task('move_x_cm', xy_agent.move_x_cm)
     agent.register_task('move_y_cm', xy_agent.move_y_cm)
     agent.register_task('set_position', xy_agent.set_position)
 
-    agent.register_process('acq', xy_agent.start_acq, xy_agent.stop_acq)
+    agent.register_process('acq', xy_agent.acq, xy_agent._stop_acq)
 
     runner.run(agent, auto_reconnect=True)
 
