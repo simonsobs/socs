@@ -10,9 +10,9 @@ The Pysmurf Controller OCS agent provides an interface to run pysmurf and
 sodetlib control scripts on the smurf-server through an OCS client.
 
 .. argparse::
-    :filename: ../agents/pysmurf_controller/pysmurf_controller.py
+    :filename: ../socs/agents/pysmurf_controller/agent.py
     :func: make_parser
-    :prog: python3 pysmurf_controller.py
+    :prog: python3 agent.py
 
 Configuration File Examples
 -----------------------------------
@@ -50,6 +50,9 @@ named ``ocs-pysmurf-monitor`` might look something like::
         security_opt:
             - "aparmor=docker-smurf"
         environment:
+            INSTANCE_ID=pysmurf-controller-s2
+            SITE_HUB=ws://${CB_HOST}:8001/ws
+            SITE_HTTP=ws://${CB_HOST}:8001/call
             SMURFPUB_BACKEND: udp
             SMURFPUB_ID: crate1slot2
             SMURFPUB_UDP_HOST: ocs-pysmurf-monitor
@@ -63,10 +66,6 @@ named ``ocs-pysmurf-monitor`` might look something like::
             - /data:/data
             - /home/cryo/repos/pysmurf/client:/usr/local/src/pysmurf/python/pysmurf/client
             - /home/cryo/repos/sodetlib:/sodetlib
-        command:
-            - "--site-hub=ws://${CB_HOST}:8001/ws"
-            - "--site-http=ws://${CB_HOST}:8001/call"
-            - "--instance-id=pysmurf-controller-s2"
 
 where ``CB_HOST`` and ``SOCS_TAG`` are set as environment variables or in the
 ``.env`` file.
@@ -187,11 +186,11 @@ This prints the dictionary::
 
 Agent API
 ---------------
-.. autoclass:: agents.pysmurf_controller.pysmurf_controller.PysmurfController
+.. autoclass:: socs.agents.pysmurf_controller.agent.PysmurfController
     :members:
 
 Supporting APIs
 ---------------
 
-.. autoclass:: agents.pysmurf_controller.pysmurf_controller.PysmurfScriptProtocol
+.. autoclass:: socs.agents.pysmurf_controller.agent.PysmurfScriptProtocol
     :members:

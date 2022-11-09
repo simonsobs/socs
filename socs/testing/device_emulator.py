@@ -1,10 +1,11 @@
-import serial
-import socket
-import time
-import subprocess
 import shutil
-import pytest
+import socket
+import subprocess
 import threading
+import time
+
+import pytest
+import serial
 
 
 def create_device_emulator(responses, relay_type, port=9001, encoding='utf-8'):

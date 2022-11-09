@@ -2,19 +2,17 @@
 # Rename fields to valid names in recorded .g3 files. Also translate from HK v0
 # to HK v1. This is heavily based on the so3g.hk.translator.
 
-import os
 import hashlib
 import logging
+import os
 import sqlite3
-
 from pathlib import Path
-from tqdm import tqdm
 
 import so3g
+from ocs.ocs_feed import Feed
 from so3g.hk.translator import HKTranslator
 from spt3g import core
-
-from ocs.ocs_feed import Feed
+from tqdm import tqdm
 
 
 class RenamerRecord:

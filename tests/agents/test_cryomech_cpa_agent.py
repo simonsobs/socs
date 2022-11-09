@@ -1,3 +1,1 @@
-import sys
-sys.path.insert(0, '../agents/cryomech_cpa/')
-from cryomech_cpa_agent import PTCAgent  # noqa: F401
+from socs.agents.cryomech_cpa.agent import PTCAgent  # noqa: F401
