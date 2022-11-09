@@ -1,14 +1,11 @@
 import argparse
-import os
 import socket
 import time
 
-from socs.agents.scpi_psu.drivers import PsuInterface
+from ocs import ocs_agent, site_config
+from ocs.ocs_twisted import TimeoutLock
 
-on_rtd = os.environ.get('READTHEDOCS') == 'True'
-if not on_rtd:
-    from ocs import ocs_agent, site_config
-    from ocs.ocs_twisted import TimeoutLock
+from socs.agents.scpi_psu.drivers import PsuInterface
 
 
 class ScpiPsuAgent:
@@ -33,9 +30,13 @@ class ScpiPsuAgent:
                                  agg_params=agg_params,
                                  buffer_time=0)
 
-    def init_psu(self, session, params=None):
-        """ Task to connect to power supply """
+    @ocs_agent.param('_')
+    def init(self, session, params=None):
+        """init()
 
+        **Task** - Initialize connection to the power supply.
+
+        """
         with self.lock.acquire_timeout(0) as acquired:
             if not acquired:
                 return False, "Could not acquire lock"
@@ -50,24 +51,23 @@ class ScpiPsuAgent:
 
         return True, 'Initialized PSU.'
 
+    @ocs_agent.param('wait', type=float, default=1)
+    @ocs_agent.param('channels', type=list, default=[1, 2, 3])
+    @ocs_agent.param('test_mode', type=bool, default=False)
     def monitor_output(self, session, params=None):
+        """monitor_output(wait=1, channels=[1, 2, 3], test_mode=False)
+
+        **Process** - Continuously monitor PSU output current and voltage.
+
+        Parameters:
+            wait (float, optional): Time to wait between measurements
+                [seconds].
+            channels (list[int], optional): Channels to monitor. [1, 2, 3] by
+                default.
+            test_mode (bool, optional): Exit process after single loop if True.
+                Defaults to False.
+
         """
-            Process to continuously monitor PSU output current and voltage and
-            send info to aggregator.
-
-            Args:
-                wait (float, optional):
-                    time to wait between measurements [seconds].
-                channels (list[int], optional):
-                    channels to monitor. [1, 2, 3] by default.
-        """
-        if params is None:
-            params = {}
-
-        wait_time = params.get('wait', 1)
-        channels = params.get('channels', [1, 2, 3])
-        test_mode = params.get('test_mode', False)
-
         session.set_status('running')
         self.monitor = True
 
@@ -80,7 +80,7 @@ class ScpiPsuAgent:
                         'data': {}
                     }
 
-                    for chan in channels:
+                    for chan in params['channels']:
                         data['data']["Voltage_{}".format(chan)] = self.psu.get_volt(chan)
                         data['data']["Current_{}".format(chan)] = self.psu.get_curr(chan)
 
@@ -94,9 +94,9 @@ class ScpiPsuAgent:
                 else:
                     self.log.warn("Could not acquire in monitor_current")
 
-            time.sleep(wait_time)
+            time.sleep(params['wait'])
 
-            if test_mode:
+            if params['test_mode']:
                 break
 
         return True, "Finished monitoring current"
@@ -105,13 +105,17 @@ class ScpiPsuAgent:
         self.monitor = False
         return True, "Stopping current monitor"
 
+    @ocs_agent.param('channel', type=int, choices=[1, 2, 3])
+    @ocs_agent.param('volts', type=float, check=lambda x: 0 <= x <= 30)
     def set_voltage(self, session, params=None):
-        """
-        Sets voltage of power supply:
+        """set_voltage(channel, volts)
 
-        Args:
-            channel (int): Channel number (1, 2, or 3)
+        **Task** - Set the voltage of the power supply.
+
+        Parameters:
+            channel (int): Channel number (1, 2, or 3).
             volts (float): Voltage to set. Must be between 0 and 30.
+
         """
 
         with self.lock.acquire_timeout(1) as acquired:
@@ -122,13 +126,17 @@ class ScpiPsuAgent:
 
         return True, 'Set channel {} voltage to {}'.format(params['channel'], params['volts'])
 
+    @ocs_agent.param('channel', type=int, choices=[1, 2, 3])
+    @ocs_agent.param('current', type=float)
     def set_current(self, session, params=None):
-        """
-        Sets current of power supply:
+        """set_current(channel, current)
 
-        Args:
-            channel (int): Channel number (1, 2, or 3)
-            "current" (float): Curent to set. Must be between x and y.
+        **Task** - Set the current of the power supply.
+
+        Parameters:
+            channel (int): Channel number (1, 2, or 3).
+            current (float): Current to set.
+
         """
         with self.lock.acquire_timeout(1) as acquired:
             if acquired:
@@ -138,13 +146,17 @@ class ScpiPsuAgent:
 
         return True, 'Set channel {} current to {}'.format(params['channel'], params['current'])
 
+    @ocs_agent.param('channel', type=int, choices=[1, 2, 3])
+    @ocs_agent.param('state', type=bool)
     def set_output(self, session, params=None):
-        """
-        Task to turn channel on or off.
+        """set_output(channel, state)
 
-        Args:
-            channel (int): Channel number (1, 2, or 3)
-            state (bool): True for on, False for off
+        **Task** - Turn a channel on or off.
+
+        Parameters:
+            channel (int): Channel number (1, 2, or 3).
+            state (bool): True for on, False for off.
+
         """
         with self.lock.acquire_timeout(1) as acquired:
             if acquired:
@@ -181,7 +193,7 @@ def main(args=None):
 
     p = ScpiPsuAgent(agent, args.ip_address, int(args.gpib_slot))
 
-    agent.register_task('init', p.init_psu)
+    agent.register_task('init', p.init)
     agent.register_task('set_voltage', p.set_voltage)
     agent.register_task('set_current', p.set_current)
     agent.register_task('set_output', p.set_output)

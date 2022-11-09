@@ -7,13 +7,10 @@ from contextlib import contextmanager
 
 import numpy as np
 import txaio
+from ocs import ocs_agent, site_config
+from ocs.ocs_twisted import TimeoutLock
 
 from socs.Lakeshore.Lakeshore370 import LS370
-
-ON_RTD = os.environ.get('READTHEDOCS') == 'True'
-if not ON_RTD:
-    from ocs import ocs_agent, site_config
-    from ocs.ocs_twisted import TimeoutLock
 
 
 class YieldingLock:
@@ -122,14 +119,12 @@ class LS370_Agent:
                                  agg_params=agg_params,
                                  buffer_time=1)
 
-    def init_lakeshore_task(self, session, params=None):
-        """init_lakeshore_task(params=None)
+    @ocs_agent.param('auto_acquire', default=False, type=bool)
+    @ocs_agent.param('force', default=False, type=bool)
+    def init_lakeshore(self, session, params=None):
+        """init_lakeshore(auto_acquire=False, force=False)
 
-        Perform first time setup of the Lakeshore 370 communication.
-
-        Args:
-            params (dict): Parameters dictionary for passing parameters to
-                task.
+        **Task** - Perform first time setup of the Lakeshore 370 communication.
 
         Parameters:
             auto_acquire (bool, optional): Default is False. Starts data
@@ -138,10 +133,7 @@ class LS370_Agent:
 
         """
 
-        if params is None:
-            params = {}
-
-        if self.initialized and not params.get('force', False):
+        if self.initialized and not params['force']:
             self.log.info("Lakeshore already initialized. Returning...")
             return True, "Already initialized"
 
@@ -173,15 +165,16 @@ class LS370_Agent:
             self.initialized = True
 
         # Start data acquisition if requested
-        if params.get('auto_acquire', False):
+        if params['auto_acquire']:
             self.agent.start('acq')
 
         return True, 'Lakeshore module initialized.'
 
-    def start_acq(self, session, params=None):
-        """acq(params=None)
+    @ocs_agent.param('_')
+    def acq(self, session, params=None):
+        """acq()
 
-        Method to start data acquisition process.
+        **Process** - Run data acquisition.
 
         """
 
@@ -288,7 +281,7 @@ class LS370_Agent:
 
         return True, 'Acquisition exited cleanly.'
 
-    def stop_acq(self, session, params=None):
+    def _stop_acq(self, session, params=None):
         """
         Stops acq process.
         """
@@ -298,19 +291,23 @@ class LS370_Agent:
         else:
             return False, 'acq is not currently running'
 
+    @ocs_agent.param('heater', type=str)
+    @ocs_agent.param('range')
+    @ocs_agent.param('wait', type=float, default=0)
     def set_heater_range(self, session, params):
-        """
-        Adjust the heater range for servoing cryostat. Wait for a specified
-        amount of time after the change.
+        """set_heater_range(range, heater='sample', wait=0)
 
-        :param params: dict with 'heater', 'range', 'wait' keys
-        :type params: dict
+        **Task** - Adjust the heater range for servoing cryostat. Wait for a
+        specified amount of time after the change.
 
-        heater - which heater to set range for, 'sample' by default (and the only implemented one)
-        range - the heater range value to change to
-        wait - time in seconds after changing the heater value to wait, allows
-               the servo to adjust to the new heater range, typical value of
-               ~600 seconds
+        Parameters:
+            heater (str): Name of heater to set range for, 'sample' by default
+                (and the only implemented option.)
+            range (str, float): see arguments in
+                :func:`socs.Lakeshore.Lakeshore370.Heater.set_heater_range`
+            wait (float, optional): Amount of time to wait after setting the
+                heater range. This allows the servo time to adjust to the new range.
+
         """
         with self._lock.acquire_timeout(job='set_heater_range') as acquired:
             if not acquired:
@@ -337,14 +334,20 @@ class LS370_Agent:
 
         return True, f'Set {heater_string} heater range to {params["range"]}'
 
+    @ocs_agent.param('channel', type=int, check=lambda x: 1 <= x <= 16)
+    @ocs_agent.param('mode', type=str, choices=['current', 'voltage'])
     def set_excitation_mode(self, session, params):
-        """
-        Set the excitation mode of a specified channel.
+        """set_excitation_mode(channel, mode)
 
-        :param params: dict with "channel" and "mode" keys for Channel.set_excitation_mode()
-        :type params: dict
-        """
+        **Task** - Set the excitation mode of a specified channel.
 
+        Parameters:
+            channel (int): Channel to set the excitation mode for. Valid values
+                are 1-16.
+            mode (str): Excitation mode. Possible modes are 'current' or
+                'voltage'.
+
+        """
         with self._lock.acquire_timeout(job='set_excitation_mode') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
@@ -359,12 +362,21 @@ class LS370_Agent:
 
         return True, f'return text for Set channel {params["channel"]} excitation mode to {params["mode"]}'
 
+    @ocs_agent.param('channel', type=int, check=lambda x: 1 <= x <= 16)
+    @ocs_agent.param('value', type=float)
     def set_excitation(self, session, params):
-        """
-        Set the excitation voltage/current value of a specified channel.
+        """set_excitation(channel, value)
 
-        :param params: dict with "channel" and "value" keys for Channel.set_excitation()
-        :type params: dict
+        **Task** - Set the excitation voltage/current value of a specified
+        channel.
+
+        Parameters:
+            channel (int): Channel to set the excitation for. Valid values
+                are 1-16.
+            value (float): Excitation value in volts or amps depending on set
+                excitation mode. See
+                :func:`socs.Lakeshore.Lakeshore370.Channel.set_excitation`
+
         """
         with self._lock.acquire_timeout(job='set_excitation') as acquired:
             if not acquired:
@@ -385,12 +397,22 @@ class LS370_Agent:
 
         return True, f'Set channel {params["channel"]} excitation to {params["value"]}'
 
+    @ocs_agent.param('P', type=int)
+    @ocs_agent.param('I', type=int)
+    @ocs_agent.param('D', type=int)
     def set_pid(self, session, params):
-        """
-        Set the PID parameters for servo control of fridge.
+        """set_pid(P, I, D)
 
-        :param params: dict with "P", "I", and "D" keys for Heater.set_pid()
-        :type params: dict
+        **Task** - Set the PID parameters for servo control of fridge.
+
+        Parameters:
+            P (int): Proportional term for PID loop
+            I (int): Integral term for the PID loop
+            D (int): Derivative term for the PID loop
+
+        Notes:
+            Makes a call to :func:`socs.Lakeshore.Lakeshore370.Heater.set_pid`.
+
         """
         with self._lock.acquire_timeout(job='set_pid') as acquired:
             if not acquired:
@@ -406,12 +428,15 @@ class LS370_Agent:
 
         return True, f'return text for Set PID to {params["P"]}, {params["I"]}, {params["D"]}'
 
+    @ocs_agent.param('channel', type=int)
     def set_active_channel(self, session, params):
-        """
-        Set the active channel on the LS370.
+        """set_active_channel(channel)
 
-        :param params: dict with "channel" number
-        :type params: dict
+        **Task** - Set the active channel on the LS370.
+
+        Parameters:
+            channel (int): Channel to switch readout to. Valid values are 1-16.
+
         """
         with self._lock.acquire_timeout(job='set_active_channel') as acquired:
             if not acquired:
@@ -427,10 +452,15 @@ class LS370_Agent:
 
         return True, f'return text for set channel to {params["channel"]}'
 
+    @ocs_agent.param('autoscan', type=bool)
     def set_autoscan(self, session, params):
-        """
-        Sets autoscan on the LS370.
-        :param params: dict with "autoscan" value
+        """set_autoscan(autoscan)
+
+        **Task** - Sets autoscan on the LS370.
+
+        Parameters:
+            autoscan (bool): True to enable autoscan, False to disable.
+
         """
         with self._lock.acquire_timeout(job='set_autoscan') as acquired:
             if not acquired:
@@ -449,12 +479,18 @@ class LS370_Agent:
 
         return True, 'Set autoscan to {}'.format(params['autoscan'])
 
+    @ocs_agent.param('temperature', type=float, check=lambda x: x < 1)
+    @ocs_agent.param('channel', type=float, default=None)
     def servo_to_temperature(self, session, params):
-        """Servo to temperature passed into params.
+        """servo_to_temperature(temperature, channel=None)
 
-        :param params: dict with "temperature" Heater.set_setpoint() in units of K, and
-            "channel" as an integer (optional)
-        :type params: dict
+        **Task** - Servo to a given temperature using a closed loop PID on a
+        fixed channel. This will automatically disable autoscan if enabled.
+
+        Parameters:
+            temperature (float): Temperature to servo to in units of Kelvin.
+            channel (int, optional): Channel to servo off of.
+
         """
         with self._lock.acquire_timeout(job='servo_to_temperature') as acquired:
             if not acquired:
@@ -475,7 +511,7 @@ class LS370_Agent:
                 self.module.disable_autoscan()
 
             # Check to see if we passed an input channel, and if so change to it
-            if params.get("channel", False) is not False:
+            if params.get("channel", None) is not None:
                 session.add_message(f'Changing heater input channel to {params.get("channel")}')
                 self.module.sample_heater.set_input_channel(params.get("channel"))
 
@@ -497,14 +533,19 @@ class LS370_Agent:
 
         return True, f'Setpoint now set to {params["temperature"]} K'
 
+    @ocs_agent.param('measurements', type=int)
+    @ocs_agent.param('threshold', type=float)
     def check_temperature_stability(self, session, params):
-        """Check servo temperature stability is within threshold.
+        """check_temperature_stability(measurements, threshold)
 
-        :param params: dict with "measurements" and "threshold" parameters
-        :type params: dict
+        Check servo temperature stability is within threshold.
 
-        measurements - number of measurements to average for stability check
-        threshold - amount within which the average needs to be to the setpoint for stability
+        Parameters:
+            measurements (int): number of measurements to average for stability
+                check
+            threshold (float): amount within which the average needs to be to
+                the setpoint for stability
+
         """
         with self._lock.acquire_timeout(job='check_temp_stability') as acquired:
             if not acquired:
@@ -542,18 +583,20 @@ class LS370_Agent:
 
         return False, f"Temperature not stable within {params['threshold']}."
 
+    @ocs_agent.param('heater', type=str, choices=['sample', 'still'])
+    @ocs_agent.param('mode', type=str, choices=['Off', 'Monitor Out', 'Open Loop', 'Zone', 'Still', 'Closed Loop', 'Warm up'])
     def set_output_mode(self, session, params=None):
+        """set_output_mode(heater, mode)
+
+        **Task** - Set output mode of the heater.
+
+        Parameters:
+            heater (str): Name of heater to set range for, either 'sample' or
+                'still'.
+            mode (str): Specifies mode of heater. Can be "Off", "Monitor Out",
+                "Open Loop", "Zone", "Still", "Closed Loop", or "Warm up"
+
         """
-        Set output mode of the heater.
-
-        :param params: dict with "heater" and "mode" parameters
-        :type params: dict
-
-        heater - Specifies which heater to control. Either 'sample' or 'still'
-        mode - Specifies mode of heater. Can be "Off", "Monitor Out", "Open Loop",
-                    "Zone", "Still", "Closed Loop", or "Warm up"
-        """
-
         with self._lock.acquire_timeout(job='set_output_mode') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
@@ -571,20 +614,22 @@ class LS370_Agent:
 
         return True, "Set {} output mode to {}".format(params['heater'], params['mode'])
 
+    @ocs_agent.param('heater', type=str, choices=['sample', 'still'])
+    @ocs_agent.param('output', type=float)
+    @ocs_agent.param('display', type=str, choices=['current', 'power'], default=None)
     def set_heater_output(self, session, params=None):
-        """
-        Set display type and output of the heater.
+        """set_heater_output(heater, output, display=None)
 
-        :param params: dict with "heater", "display", and "output" parameters
-        :type params: dict
+        **Task** - Set display type and output of the heater.
 
-        heater - Specifies which heater to control. Either 'sample' or 'still'
-        output - Specifies heater output value.
-                    If display is set to "Current" or heater is "still", can be any number between 0 and 100.
-                    If display is set to "Power", can be any number between 0 and the maximum allowed power.
-
-        display (opt)- Specifies heater display type. Can be "Current" or "Power".
-                        If None, heater display is not reset before setting output.
+        Parameters:
+            heater (str): Name of heater to set range for, either 'sample' or
+                'still'.
+            output (float): Specifies heater output value. For possible values see
+                :func:`socs.Lakeshore.Lakeshore370.Heater.set_heater_output`
+            display (str, optional): Specifies heater display type. Can be
+                "current" or "power". If None, heater display is not reset
+                before setting output.
 
         """
 
@@ -618,32 +663,37 @@ class LS370_Agent:
 
         return True, "Set {} display to {}, output to {}".format(heater, display, output)
 
+    @ocs_agent.param('attribute', type=str)
+    @ocs_agent.param('channel', type=int, default=1)
     def get_channel_attribute(self, session, params):
-        """Gets an arbitrary channel attribute, stored in the session.data dict
+        """get_channel_attribute(attribute, channel=1)
 
-        Parameters
-        ----------
-        params : dict
-            Contains parameters 'attribute' (not optional), 'channel' (optional, default '1').
+        **Task** - Gets an arbitrary channel attribute, stored in the session.data dict.
 
-        Channel attributes stored in the session.data object are in the structure::
+        Parameters:
+            attribute (str, optional): Attribute to get from the 370.
+            channel (int, optional): Channel to get the attribute for.
 
-            >>> session.data
-            {"calibration_curve": 21,
-             "dwell": 3,
-             "excitation": 6.32e-6,
-             "excitation_mode": "voltage",
-             "excitation_power": 2.0e-15,
-             "kelvin_reading": 100.0e-3,
-             "pause": 3,
-             "reading_status": ["T.UNDER"]
-             "resistance_range": 2.0e-3,
-             "resistance_reading": 10.0e3,
-             "temperature_coefficient": "negative",
-            }
+        Notes:
+            Channel attributes stored in the session.data object are in the
+            structure::
 
-        Note: Only attribute called with this method will be populated for the
-        given channel. This example shows all available attributes.
+                >>> response.session['data']
+                {"calibration_curve": 21,
+                 "dwell": 3,
+                 "excitation": 6.32e-6,
+                 "excitation_mode": "voltage",
+                 "excitation_power": 2.0e-15,
+                 "kelvin_reading": 100.0e-3,
+                 "pause": 3,
+                 "reading_status": ["T.UNDER"]
+                 "resistance_range": 2.0e-3,
+                 "resistance_reading": 10.0e3,
+                 "temperature_coefficient": "negative",
+                }
+
+            Only attribute called with this method will be populated for the
+            given channel. This example shows all available attributes.
 
         """
         with self._lock.acquire_timeout(job=f"get_{params['attribute']}", timeout=3) as acquired:
@@ -669,30 +719,32 @@ class LS370_Agent:
 
         return True, f"Retrieved {channel.name} {params['attribute']}"
 
+    @ocs_agent.param('attribute', type=str)
     def get_heater_attribute(self, session, params):
-        """Gets an arbitrary heater attribute, stored in the session.data dict
+        """get_heater_attribute(attribute)
 
-        Parameters
-        ----------
-        params : dict
-            Contains parameters 'attribute'.
+        **Task** - Gets an arbitrary heater attribute, stored in the session.data dict.
 
-        Heater attributes stored in the session.data object are in the structure::
+        Parameters:
+            attribute (str): Heater attribute to get.
 
-            >>> session.data
-            {"heater_range": 1e-3,
-             "heater_setup": ["current", 1e-3, 120],
-             "input_channel": 6,
-             "manual_out": 0.0,
-             "mode": "Closed Loop",
-             "pid": (80, 10, 0),
-             "setpoint": 100e-3,
-             "still_output", 10.607,
-             "units": "kelvin",
-            }
+        Notes:
+            Heater attributes stored in the session.data object are in the structure::
 
-        Note: Only the attribute called with this method will be populated,
-        this example just shows all available attributes.
+                >>> response.session['data']
+                {"heater_range": 1e-3,
+                 "heater_setup": ["current", 1e-3, 120],
+                 "input_channel": 6,
+                 "manual_out": 0.0,
+                 "mode": "Closed Loop",
+                 "pid": (80, 10, 0),
+                 "setpoint": 100e-3,
+                 "still_output", 10.607,
+                 "units": "kelvin",
+                }
+
+            Only the attribute called with this method will be populated,
+            this example just shows all available attributes.
 
         """
         with self._lock.acquire_timeout(job=f"get_{params['attribute']}", timeout=3) as acquired:
@@ -774,7 +826,7 @@ def main(args=None):
                              fake_data=args.fake_data,
                              dwell_time_delay=args.dwell_time_delay)
 
-    agent.register_task('init_lakeshore', lake_agent.init_lakeshore_task,
+    agent.register_task('init_lakeshore', lake_agent.init_lakeshore,
                         startup=init_params)
     agent.register_task('set_heater_range', lake_agent.set_heater_range)
     agent.register_task('set_excitation_mode', lake_agent.set_excitation_mode)
@@ -788,7 +840,7 @@ def main(args=None):
     agent.register_task('set_heater_output', lake_agent.set_heater_output)
     agent.register_task('get_channel_attribute', lake_agent.get_channel_attribute)
     agent.register_task('get_heater_attribute', lake_agent.get_heater_attribute)
-    agent.register_process('acq', lake_agent.start_acq, lake_agent.stop_acq)
+    agent.register_process('acq', lake_agent.acq, lake_agent._stop_acq)
 
     runner.run(agent, auto_reconnect=True)
 

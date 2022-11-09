@@ -52,7 +52,6 @@ HWPEncoder_full: separated feed for full-sample HWP encoder data,
 
 import argparse
 import calendar
-import os
 import select
 import socket
 import struct
@@ -64,11 +63,8 @@ import txaio
 
 txaio.use_twisted()
 
-# Required by OCS
-ON_RTD = os.environ.get('READTHEDOCS') == 'True'
-if not ON_RTD:
-    from ocs import ocs_agent, site_config
-    from ocs.ocs_twisted import TimeoutLock
+from ocs import ocs_agent, site_config
+from ocs.ocs_twisted import TimeoutLock
 
 # These three values (COUNTER_INFO_LENGTH, COUNTER_PACKET_SIZE, IRIG_PACKET_SIZE)
 # should be consistent with the software on beaglebone.
@@ -510,10 +506,12 @@ class HWPBBBAgent:
                                  agg_params=agg_params)
         self.parser = EncoderParser(beaglebone_port=self.port)
 
-    def start_acq(self, session, params):
-        """Starts acquiring data.
-        """
+    def acq(self, session, params):
+        """acq()
 
+        **Process** - Start acquiring data.
+
+        """
         time_encoder_published = 0
         counter_list = []
         counter_index_list = []
@@ -671,7 +669,7 @@ class HWPBBBAgent:
         self.agent.feeds['HWPEncoder'].flush_buffer()
         return True, 'Acquisition exited cleanly.'
 
-    def stop_acq(self, session, params=None):
+    def _stop_acq(self, session, params=None):
         """
         Stops the data acquisiton.
         """
@@ -701,7 +699,7 @@ def main(args=None):
                                   args=args)
     agent, runner = ocs_agent.init_site_agent(args)
     hwp_bbb_agent = HWPBBBAgent(agent, port=args.port)
-    agent.register_process('acq', hwp_bbb_agent.start_acq, hwp_bbb_agent.stop_acq, startup=True)
+    agent.register_process('acq', hwp_bbb_agent.acq, hwp_bbb_agent._stop_acq, startup=True)
 
     runner.run(agent, auto_reconnect=True)
 

@@ -16,8 +16,11 @@ control an LS370 is provided by the
     :func: make_parser
     :prog: python3 agent.py
 
-OCS Configuration
------------------
+Configuration File Examples
+---------------------------
+
+OCS Site Config
+```````````````
 
 To configure your Lakeshore 370 for use with OCS you need to add a
 Lakeshore370Agent block to your ocs configuration file. Here is an example
@@ -32,8 +35,8 @@ configuration block::
 Each device requires configuration under 'agent-instances'. See the OCS site
 configs documentation for more details.
 
-Docker Configuration
---------------------
+Docker Compose
+``````````````
 
 The Lakeshore 370 Agent should be configured to run in a Docker container. An
 example configuration is::
@@ -55,8 +58,11 @@ example configuration is::
     The device path may differ on your machine, and if only using the ttyUSB
     value as shown here, is not guaranteed to be static.
 
+Description
+-----------
+
 Direct Communication
---------------------
+````````````````````
 Direct communication with the Lakeshore can be achieved without OCS, using the
 ``Lakeshore370.py`` module in ``socs/socs/Lakeshore/``. From that directory,
 you can run a script like::
@@ -79,7 +85,7 @@ Agent API
 ---------
 
 .. autoclass:: socs.agents.lakeshore370.agent.LS370_Agent
-    :members: init_lakeshore_task, start_acq
+    :members:
 
 Supporting APIs
 ---------------

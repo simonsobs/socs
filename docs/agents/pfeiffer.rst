@@ -21,9 +21,10 @@ Configuration File Examples
 Below are useful configurations examples for the relevent OCS files and for
 running the agent in a docker container.
 
-ocs-config
-``````````
-To configure the Cryomech CPA Agent we need to add a CryomechCPAAgent
+OCS Site Config
+```````````````
+
+To configure the Pfeiffer TPG 366 Agent we need to add a PfeifferAgent
 block to our ocs configuration file. Here is an example configuration block
 using all of the available arguments::
 
@@ -39,9 +40,9 @@ You should assign a static IP address to Pfeiffer device, and record it here.
 In general, the Pfeiffer device will assign port 8000 by default. This should
 not need to be changed unless you you specificy the port otherwise.
 
+Docker Compose
+``````````````
 
-Docker
-``````
 The Pfeiffer Agent can be run via a Docker container. The following is an
 example of what to insest into your institution's docker-compose file. ::
 
@@ -55,16 +56,19 @@ example of what to insest into your institution's docker-compose file. ::
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
 
+Agent API
+---------
 
-Example Client
---------------
-Below is an example client to start data acquisition
+.. autoclass:: socs.agents.pfeiffer_tpg366.agent.PfeifferAgent
+    :members:
 
-::
+Example Clients
+---------------
+Below is an example client to start data acquisition::
 
-    from ocs.matched_client import MatchedClienti
+    from ocs.ocs_client import OCSClienti
     import time
-    pfeiffer = MatchedClient("pfeiffer", args=[])
+    pfeiffer = OCSClient("pfeiffer", args=[])
     params = {'auto_acquire': True}
     pfeiffer.acq.start(**params)
     pfeiffer.acq.wait()

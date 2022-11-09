@@ -21,8 +21,9 @@ Configuration File Examples
 Below are useful configurations examples for the relevant OCS files and for
 running the agent in a docker container.
 
-ocs-config
-``````````
+OCS Site Config
+```````````````
+
 To configure the CHWP encoder BBB agent we need to add a HWPBBBAgent
 block to our ocs configuration file. Here is an example configuration block
 using all of the available arguments::
@@ -44,8 +45,9 @@ Multiple BBBs on the same network are distinguished by port numbers.
 You should assign a port for each BBB, which should be consistent with
 the setting on the BBB side.
 
-Docker
-``````
+Docker Compose
+``````````````
+
 The CHWP BBB agent can be run via a Docker container. The following is an
 example of what to insert into your institution's docker-compose file.
 This again is an example to run multiple agents::
@@ -85,3 +87,9 @@ If chwp is completely stopped, approx_hwp_freq will not be updated.::
      'encoder_last_updated': 1659486962.3731978,
      'irig_time':            1659486983,
      'irig_last_updated':    1659486983.8985631}
+
+Agent API
+---------
+
+.. autoclass:: socs.agents.hwp_encoder.agent.HWPBBBAgent
+    :members:

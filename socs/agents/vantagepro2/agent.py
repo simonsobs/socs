@@ -1,16 +1,12 @@
-
 import argparse
 import os
 import time
 from typing import Optional
 
-from socs.agents.vantagepro2.drivers import VantagePro2
+from ocs import ocs_agent, site_config
+from ocs.ocs_twisted import Pacemaker, TimeoutLock
 
-# from LS240_agent
-on_rtd = os.environ.get('READTHEDOCS') == 'True'
-if not on_rtd:
-    from ocs import ocs_agent, site_config
-    from ocs.ocs_twisted import Pacemaker, TimeoutLock
+from socs.agents.vantagepro2.drivers import VantagePro2
 
 
 class VantagePro2Agent:
@@ -52,21 +48,17 @@ class VantagePro2Agent:
                                  record=True,
                                  agg_params=agg_params)
 
-    # Task functions.
-    def init_VantagePro2_task(self, session, params=None):
+    @ocs_agent.param('auto_acquire', default=False, type=bool)
+    def init(self, session, params=None):
+        """init(auto_acquire=False)
+
+        **Task** - Perform first time setup of the Weather Monitor Module.
+
+        Parameters:
+            auto_acquire (bool): Automatically start acq process after
+                initialization if True. Defaults to False.
+
         """
-        Perform first time setup of the Weather Monitor Module.
-
-        Args:
-            params (dict): Parameters dictionary for passing parameters to
-                task.
-
-        """
-        if params is None:
-            params = {}
-
-        auto_acquire = params.get('auto_acquire', False)
-
         if self.initialized:
             return True, "Already Initialized Module"
 
@@ -85,27 +77,26 @@ class VantagePro2Agent:
         self.initialized = True
 
         # Start data acquisition if requested
-        if auto_acquire:
+        if params['auto_acquire']:
             self.agent.start('acq')
 
         time.sleep(2)
 
         return True, 'Vantage Pro2 module initialized.'
 
-    def start_acq(self, session, params=None):
+    @ocs_agent.param('sample_freq', default=0.5, type=float)
+    def acq(self, session, params=None):
+        """acq(sample_freq=0.5)
+
+        **Process** - Start data acquisition.
+
+        Parameters:
+            sample_freq (float):
+                Frequency at which weather data is sampled. Defaults to 0.5
+                Hz.
+
         """
-        Method to start data acquisition process.
-
-        Args:
-            sample_freq (double):
-                Frequency at which weather data is sampled.
-                Defaults to 0.5 Hz.
-
-        """
-        if params is None:
-            params = {}
-
-        sample_freq = params.get('sample_freq')
+        sample_freq = params['sample_freq']
         # If loops is None, use value passed to Agent init
         if sample_freq is None:
             sample_freq = self.sample_freq
@@ -142,7 +133,7 @@ class VantagePro2Agent:
 
         return True, 'Acquisition exited cleanly.'
 
-    def stop_acq(self, session, params=None):
+    def _stop_acq(self, session, params=None):
         """
         Stops acq process.
         """
@@ -207,9 +198,9 @@ def main(args=None):
     agent, runner = ocs_agent.init_site_agent(args)
 
     vPro2 = VantagePro2Agent(agent, device_port, args.sample_freq)
-    agent.register_task('init', vPro2.init_VantagePro2_task,
+    agent.register_task('init', vPro2.init,
                         startup=init_params)
-    agent.register_process('acq', vPro2.start_acq, vPro2.stop_acq,
+    agent.register_process('acq', vPro2.acq, vPro2._stop_acq,
                            blocking=True)
 
     runner.run(agent, auto_reconnect=True)

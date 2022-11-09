@@ -8,15 +8,16 @@ from ocs.ocs_twisted import TimeoutLock
 
 
 class SynaccessAgent:
-    def __init__(self, agent, ip_address, username, password):
-        """
-        Initializes the class variables
+    """
+    Agent to control and monitor Synaccess Networks PDUs.
 
-        Args:
-            ip_address(str): IP Address for the agent.
-            username(str): username credential to login to strip
-            password(str): password credential to login to strip
-        """
+    Args:
+        ip_address(str): IP address for the device.
+        username(str): Username credential to login to device.
+        password(str): Password credential to login to device.
+    """
+
+    def __init__(self, agent, ip_address, username, password):
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
@@ -35,7 +36,13 @@ class SynaccessAgent:
         resp = r.content.decode()[:-6:-1]  # get last 5 elements, in reverse
         return resp
 
+    @ocs_agent.param('_')
     def get_status(self, session, params=None):
+        """get_status()
+
+        **Task** - Get the status of all outlets.
+
+        """
         with self.lock.acquire_timeout(3, job='get_status') as acquired:
             if acquired:
                 resp = self.__get_status()
@@ -49,7 +56,16 @@ class SynaccessAgent:
             else:
                 return False, "Could not acquire lock"
 
+    @ocs_agent.param('outlet', type=int)
     def reboot(self, session, params=None):
+        """reboot(outlet)
+
+        **Task** - Reboot a given outlet.
+
+        Parameters:
+            outlet (int): The outlet that we are changing the state of.
+
+        """
         with self.lock.acquire_timeout(3, job='reboot') as acquired:
             if acquired:
                 req = "http://" + self.user + ":" + \
@@ -60,13 +76,17 @@ class SynaccessAgent:
             else:
                 return False, "Could not acquire lock"
 
+    @ocs_agent.param('outlet', type=int)
+    @ocs_agent.param('on', type=bool)
     def set_outlet(self, session, params=None):
-        """
-        Sets a particular outlet to on/off
+        """set_outlet(outlet, on)
 
-        Args:
-            outlet (int): the outlet that we are changing the state of
-            on (bool): the new state
+        **Task** - Set a particular outlet on/off.
+
+        Parameters:
+            outlet (int): The outlet that we are changing the state of.
+            on (bool): The new state. True for on, False for off.
+
         """
         with self.lock.acquire_timeout(3, job='set_outlet') as acquired:
             if acquired:
@@ -83,13 +103,14 @@ class SynaccessAgent:
             else:
                 return False, "Could not acquire lock"
 
+    @ocs_agent.param('on', type=bool)
     def set_all(self, session, params=None):
-        """
+        """set_all(on)
 
-        Sets all outlets to on/off
+        **Task** - Set all outlets on/off.
 
-        Args:
-            on (bool): the new state
+        Parameters:
+            on (bool): The new state. True for on, False for off.
 
         """
         with self.lock.acquire_timeout(3, job='set_all') as acquired:
@@ -104,10 +125,11 @@ class SynaccessAgent:
             else:
                 return False, "Could not acquire lock"
 
+    @ocs_agent.param('_')
     def status_acq(self, session, params=None):
         """status_acq()
 
-        **Process** - Method to start data acquisition process.
+        **Process** - Start data acquisition.
 
         Notes:
             The most recent data collected is stored in session.data in the
@@ -192,9 +214,9 @@ def make_parser(parser=None):
 
     # Add options specific to this agent.
     pgroup = parser.add_argument_group('Agent Options')
-    pgroup.add_argument('--ip-address')
-    pgroup.add_argument('--username')
-    pgroup.add_argument('--password')
+    pgroup.add_argument('--ip-address', help='IP address for the device.')
+    pgroup.add_argument('--username', help='Username credential to login to device.')
+    pgroup.add_argument('--password', help='Password credential to login to device.')
     return parser
 
 
