@@ -118,7 +118,7 @@ class PysmurfController:
                 'observatory.{}.feeds.pysmurf_session_data'.format(args.monitor_id),
             )
 
-        self.agent.register_feed('responsivity_quantiles', record=True)
+        self.agent.register_feed('bias_step_quantiles', record=True)
 
     def _on_session_data(self, _data):
         data, feed = _data
@@ -678,6 +678,7 @@ class PysmurfController:
             return True, "Finished taking IV"
 
     @ocs_agent.param('kwargs', default=None)
+    @ocs_agent.param('rfrac_range', default=(0.2, 0.9))
     def take_bias_steps(self, session, params):
         """take_bias_steps(kwargs=None)
 
@@ -714,26 +715,50 @@ class PysmurfController:
                 S, cfg, **params['kwargs']
             )
 
-            if not np.isnan(bsa.Si).all():
-                quantiles = np.array([15, 25, 50, 75, 85])
-                labels = [f'responsivity_q{q}' for q in quantiles]
-                block = {
-                    k: np.nanquantile(bsa.Si, q / 1000)
-                    for k, q in zip(labels, quantiles)
-                }
-                block['responsivity_count'] = np.sum(~np.isnan(bsa.Si))
-                data = {
-                    'timestamp': time.time(),
-                    'block_name': 'repsonsivity_quantile',
-                    'data': block
-                }
-                self.agent.publish_to_feed('responsivity_quantiles', data)
-
+            biased = np.logical_and.reduce([
+                params['rfrac_range'][0] < bsa.Rfrac,
+                params['rfrac_range'][1] > bsa.Rfrac
+            ])
             session.data = {
                 'filepath': bsa.filepath,
-                'R': bsa.R0.tolist(),
-                'Si': bsa.Si.tolist(),
+                'biased_total': int(np.sum(biased)),
+                'biased_per_bg': [
+                    int(np.sum(biased[bsa.bgmap == bg])) for bg in range(12)
+                ],
             }
+            quantiles = np.array([15, 25, 50, 75, 85])
+
+            def publish_quantile_block(arr, name):
+                if np.isnan(arr).all():
+                    return None
+                labels = [f'{name}_q{q}' for q in quantiles]
+                qs = [float(np.nanquantile(arr, q / 100)) for q in quantiles]
+                block = {
+                    k: q
+                    for k, q in zip(labels, qs)
+                }
+                count = int(np.sum(~np.isnan(arr)))
+                block[f'{name}_count'] = count
+
+                session.data[f'{name}_quantiles'] = {
+                    name: qs,
+                    'quantiles': labels,
+                    'count': count,
+                }
+
+                d =  {
+                    'timestamp': time.time(),
+                    'block_name': f'{name}_quantile',
+                    'data': block
+                }
+
+                self.agent.publish_to_feed('bias_step_quantiles', d)
+                return d
+
+            # Resistance quantiles
+            d = publish_quantile_block(bsa.R0, 'Rtes')
+            d = publish_quantile_block(bsa.Si, 'resposnivity')
+            d = publish_quantile_block(bsa.Rfrac, 'Rfrac')
 
             return True, "Finished taking bias steps"
 
@@ -753,19 +778,17 @@ class PysmurfController:
         kwargs : dict
             Additional kwargs to pass to the ``overbias_tes_all`` function.
         """
+        kw = {'bias_groups': params['bgs']}
         if params['kwargs'] is None:
-            params['kwargs'] = {}
+            kw.update(params['kwargs'])
 
-        with self.lock.acquire_timeout(0, job='bias_steps') as acquired:
+        with self.lock.acquire_timeout(0, job='overbias_tes') as acquired:
             if not acquired:
                 return False, f"Operation failed: {self.lock.job} is running."
 
             session.set_status('running')
             S, cfg = self._get_smurf_control(session=session)
-            if params['bgs'] is None:
-                params['bgs'] = cfg.dev.exp['active_bgs']
-
-            S.overbias_tes_all(params['bgs'], **params['kwargs'])
+            sdl.overbias_dets(S, cfg, **kw)
 
         return True, "Finished Overbiasing TES"
 
