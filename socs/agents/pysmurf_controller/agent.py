@@ -849,6 +849,36 @@ class PysmurfController:
 
             return True, "Finished biasing detectors"
 
+    @ocs_agent.param('disable_amps', default=True, type=bool)
+    @ocs_agent.param('disable_tones', default=True, type=bool)
+    def all_off(self, session, params):
+        """all_off(disable_amps=True, disable_tones=True)
+
+        **Task** - Turns off tones, flux-ramp voltage and amplifier biases
+
+        Args
+        -------
+        disable_amps: bool
+            If True, will disable amplifier biases
+        disable_tones: bool
+            If True, will turn off RF tones and flux-ramp signal
+        """
+        if params['kwargs'] is None:
+            params['kwargs'] = {}
+
+        with self.lock.acquire_timeout(0, job='all_off') as acquired:
+            if not acquired:
+                return False, f"Operation failed: {self.lock.job} is running."
+
+            session.set_status('running')
+            S, cfg = self._get_smurf_control(session=session)
+            if params['disable_tones']:
+                S.all_off()
+            if params['disable_amps']:
+                S.C.write_ps_en(0)
+
+            return True, "Everything off"
+
 
 def make_parser(parser=None):
     """
@@ -899,6 +929,7 @@ def main(args=None):
     agent.register_task('overbias_tes', controller.overbias_tes)
     agent.register_task('take_noise', controller.take_noise)
     agent.register_task('bias_dets', controller.bias_dets)
+    agent.register_task('all_off', controller.all_off)
 
     runner.run(agent, auto_reconnect=True)
 
