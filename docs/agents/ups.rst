@@ -9,9 +9,9 @@ UPS Agent
 The UPS Agent is an OCS Agent which monitors various UPS models via SNMP.
 
 .. argparse::
-    :filename: ../agents/ups/ups.py
+    :filename: ../socs/agents/ups/agent.py
     :func: add_agent_args
-    :prog: python3 ups.py
+    :prog: python3 agent.py
 
 Configuration File Examples
 ---------------------------
@@ -43,17 +43,16 @@ The iBootbar Agent should be configured to run in a Docker container. An
 example docker-compose service configuration is shown here::
 
   ocs-ups:
-    image: simonsobs/ocs-ups
+    image: simonsobs/socs:latest
     hostname: ocs-docker
     network_mode: "host"
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
     environment:
-      - "LOGLEVEL=info"
-    command:
-      - "--instance-id=ups"
-      - "--site-hub=ws://127.0.0.1:8001/ws"
-      - "--site-http=http://127.0.0.1:8001/call"
+      - INSTANCE_ID=ups
+      - SITE_HUB=ws://127.0.0.1:8001/ws
+      - SITE_HTTP=http://127.0.0.1:8001/call
+      - LOGLEVEL=info
 
 
 The ``LOGLEVEL`` environment variable can be used to set the log level for
@@ -92,12 +91,12 @@ values, refer to the MIB file.
 Agent API
 ---------
 
-.. autoclass:: agents.ups.ups.UPSAgent
+.. autoclass:: socs.agents.ups.agent.UPSAgent
     :members:
 
 Supporting APIs
 ---------------
 
-.. autoclass:: agents.ibootbar.ibootbar.update_cache
+.. autoclass:: socs.agents.ibootbar.agent.update_cache
     :members:
     :noindex:

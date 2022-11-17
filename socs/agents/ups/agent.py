@@ -1,12 +1,12 @@
-import time
-import os
-
-from twisted.internet.defer import inlineCallbacks
-from autobahn.twisted.util import sleep as dsleep
 import argparse
+import os
+import time
+
 import txaio
+from autobahn.twisted.util import sleep as dsleep
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
+from twisted.internet.defer import inlineCallbacks
 
 from socs.snmp import SNMPTwister
 
@@ -309,12 +309,14 @@ def add_agent_args(parser=None):
     return parser
 
 
-if __name__ == "__main__":
+def main(args=None):
     # Start logging
     txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
 
     parser = add_agent_args()
-    args = site_config.parse_args(agent_class='UPSAgent', parser=parser)
+    args = site_config.parse_args(agent_class='UPSAgent',
+                                  parser=parser,
+                                  args=args)
 
     if args.mode == 'acq':
         init_params = True
@@ -333,3 +335,7 @@ if __name__ == "__main__":
                            startup=init_params, blocking=False)
 
     runner.run(agent, auto_reconnect=True)
+
+
+if __name__ == "__main__":
+    main()

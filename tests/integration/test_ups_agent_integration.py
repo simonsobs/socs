@@ -1,33 +1,28 @@
-import pytest
-from multiprocessing import Process
-import signal
 import os
+import signal
 import subprocess
+from multiprocessing import Process
 from unittest.mock import patch
-from snmpsim.commands import responder
 
 import ocs
-from ocs.base import OpCode
-
-from ocs.testing import (
-    create_agent_runner_fixture,
-    create_client_fixture,
-)
-
+import pytest
 from integration.util import create_crossbar_fixture
+from ocs.base import OpCode
+from ocs.testing import create_agent_runner_fixture, create_client_fixture
+from snmpsim.commands import responder
 
 pytest_plugins = "docker_compose"
 
 wait_for_crossbar = create_crossbar_fixture()
 run_agent = create_agent_runner_fixture(
-    "../agents/ups/ups.py",
+    "../socs/agents/ups/agent.py",
     "UPSAgent",
     args=["--log-dir", "./logs/"],
 )
 client = create_client_fixture("ups")
 
 subprocess.run(
-    "mkdir -p ~/.pysnmp/mibs && cp -r ../agents/ups/mibs/. ~/.pysnmp/mibs",
+    "mkdir -p ~/.pysnmp/mibs && cp -r ../socs/mibs/. ~/.pysnmp/mibs",
     shell=True,
 )
 
