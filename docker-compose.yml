@@ -1,7 +1,7 @@
 version: '3.2'
 services:
   # --------------------------------------------------------------------------
-  # The socs library.
+  # SOCS Base Image
   # --------------------------------------------------------------------------
   socs:
     image: "socs"
@@ -10,256 +10,25 @@ services:
   # --------------------------------------------------------------------------
   # SOCS Agents
   # --------------------------------------------------------------------------
-
-  # --------------------------------------------------------------------------
-  # The Lakeshore 372 Agent
-  # --------------------------------------------------------------------------
-  ocs-lakeshore372-agent:
-    image: "ocs-lakeshore372-agent"
-    build: ./agents/lakeshore372/
-    depends_on:
-      - "socs"
-
-  # --------------------------------------------------------------------------
-  # The Lakeshore 370 Agent
-  # --------------------------------------------------------------------------
-  ocs-lakeshore370-agent:
-    image: "ocs-lakeshore370-agent"
-    build: ./agents/lakeshore370/
-    depends_on:
-      - "socs"
-
-  # --------------------------------------------------------------------------
-  # The Lakeshore 240 Agent
-  # --------------------------------------------------------------------------
-  ocs-lakeshore240-agent:
-    image: "ocs-lakeshore240-agent"
-    build: ./agents/lakeshore240/
-    depends_on:
-      - "socs"
-
-  # --------------------------------------------------------------------------
-  # The Lakeshore 336 Agent
-  # --------------------------------------------------------------------------
-  ocs-lakeshore336-agent:
-    image: "ocs-lakeshore336-agent"
-    build: ./agents/lakeshore336/
-    depends_on:
-      - "socs"
-
-  # --------------------------------------------------------------------------
-  # The Lakeshore 425 Agent
-  # --------------------------------------------------------------------------
-  ocs-lakeshore425-agent:
-    image: "ocs-lakeshore425-agent"
-    build: ./agents/lakeshore425/
-
-  # --------------------------------------------------------------------------
-  # The Pysmurf Controller Agent
-  # --------------------------------------------------------------------------
   ocs-pysmurf-agent:
     image: "ocs-pysmurf-agent"
-    build: ./agents/pysmurf_controller/
+    build: ./docker/pysmurf_controller/
 
-  # --------------------------------------------------------------------------
-  # The Pysmurf Monitor Agent
-  # --------------------------------------------------------------------------
-  ocs-pysmurf-monitor-agent:
-    image: "ocs-pysmurf-monitor-agent"
-    build: ./agents/pysmurf_monitor/
-    depends_on:
-      - "socs"
-
-  # --------------------------------------------------------------------------
-  # Smurf stream simulator agent
-  # --------------------------------------------------------------------------
-  ocs-smurf-stream-sim-agent:
-    image: "ocs-smurf-stream-sim"
-    build: ./agents/smurf_stream_simulator/
-    depends_on:
-      - "socs"
-
-  # --------------------------------------------------------------------------
-  # The Bluefors log tracking Agent
-  # --------------------------------------------------------------------------
-  ocs-bluefors-agent:
-    image: "ocs-bluefors-agent"
-    build: ./agents/bluefors/
-    depends_on:
-      - "socs"
-
-  # --------------------------------------------------------------------------
-  # Power Supply control Agent
-  # --------------------------------------------------------------------------
-  ocs-scpi-psu-agent:
-    image: "ocs-scpi-psu-agent"
-    build: ./agents/scpi_psu/
-    depends_on:
-      - "socs"
-
-  # --------------------------------------------------------------------------
-  # Cryomech CPA compressor log agent
-  # --------------------------------------------------------------------------
-  ocs-cryomech-cpa-agent:
-    image: "ocs-cryomech-cpa-agent"
-    build: ./agents/cryomech_cpa/
-    depends_on:
-      - "socs"
-
-  # --------------------------------------------------------------------------
-  # LabJack Agent
-  # --------------------------------------------------------------------------
-  ocs-labjack-agent:
-    image: "ocs-labjack-agent"
-    build: ./agents/labjack/
-    depends_on:
-      - "socs"
-
-  # --------------------------------------------------------------------------
-  # Pfeiffer tpg366 agent
-  # --------------------------------------------------------------------------
-  ocs-pfeiffer-tpg366-agent:
-    image: "ocs-pfeiffer-tpg366-agent"
-    build: ./agents/pfeiffer_tpg366/
-    depends_on:
-      - "socs"
-
-  # --------------------------------------------------------------------------
-  # Synaccess power strip agent
-  # --------------------------------------------------------------------------
-  ocs-synaccess-agent:
-    image: "ocs-synaccess-agent"
-    build: ./agents/synacc/
-    depends_on:
-      - "socs"
-
-  # --------------------------------------------------------------------------
-  # Meinberg M1000
-  # --------------------------------------------------------------------------
-  ocs-meinberg-m1000-agent:
-    image: "ocs-meinberg-m1000-agent"
-    build: ./agents/meinberg_m1000/
-    depends_on:
-      - "socs"
-
-  # -------------------------------------------------------------------------
-  # SMuRF Crate Monitor
-  # -------------------------------------------------------------------------
-  ocs-smurf-crate-monitor:
-    image: "ocs-smurf-crate-monitor"
-    build: ./agents/smurf_crate_monitor/
-    depends_on:
-      - "socs"
-
-  # --------------------------------------------------------------------------
-  # Tektronix3021c
-  # --------------------------------------------------------------------------
-  ocs-tektronix3021c-agent:
-    image: "ocs-tektronix3021c-agent"
-    build: ./agents/tektronix3021c/
-    depends_on:
-      - "socs"
-
-  # --------------------------------------------------------------------------
-  # Pfeiffer Turbo Controller
-  # --------------------------------------------------------------------------
-  ocs-pfeiffer-tc400-agent:
-    image: "ocs-pfeiffer-tc400-agent"
-    build: ./agents/pfeiffer_tc400/
-    depends_on:
-      - "socs"
-
-  # --------------------------------------------------------------------------
-  # CHWP Encoder BBB agent
-  # --------------------------------------------------------------------------
-  ocs-hwpbbb-agent:
-    image: "ocs-hwpbbb-agent"
-    build: ./agents/chwp/
-    depends_on:
-      - "socs"
-
-  # --------------------------------------------------------------------------
-  # CHWP picoscope agent
-  # --------------------------------------------------------------------------
-  ocs-hwp-picoscope-agent:
-    image: "ocs-hwp-picoscope-agent"
-    build: ./agents/hwp_picoscope/
-    depends_on:
-      - "socs"
-
-  # --------------------------------------------------------------------------
-  # HWP Rotation Agent
-  # --------------------------------------------------------------------------
-  ocs-hwp-rotation-agent:
-    image: "ocs-hwp-rotation-agent"
-    build: ./agents/hwp_rotation/
-    depends_on:
-      - "socs"
-
-  # --------------------------------------------------------------------------
-  # Smurf file emulator agent
-  # --------------------------------------------------------------------------
-  ocs-smurf-file-emulator-agent:
-    image: "ocs-smurf-file-emulator-agent"
-    build: ./agents/smurf_file_emulator/
-
-  ocs-suprsync-agent:
-    image: 'ocs-suprsync-agent'
-    build: ./agents/suprsync/
-    depends_on:
-      - "socs"
-
-  # --------------------------------------------------------------------------
-  # Magpie agent
-  # --------------------------------------------------------------------------
-  ocs-magpie-agent:
-    image: "ocs-magpie-agent"
-    build: ./agents/magpie
-    depends_on:
-      - "socs"
-
-  # --------------------------------------------------------------------------
-  # Wiregrid KIKUSUI power supply agent
-  # --------------------------------------------------------------------------
-  ocs-wgkikusui-agent:
-    image: "ocs-wgkikusui-agent"
-    build: ./agents/wiregrid_kikusui/
-    depends_on:
-      - "socs"
-
-  # --------------------------------------------------------------------------
-  # Wiregrid actuator agent
-  # --------------------------------------------------------------------------
   ocs-wgactuator-agent:
     image: "ocs-wgactuator-agent"
-    build: ./agents/wiregrid_actuator/
+    build: ./docker/wiregrid_actuator/
     depends_on:
       - "socs"
 
-  # --------------------------------------------------------------------------
-  # Wiregrid encoder agent
-  # --------------------------------------------------------------------------
-  ocs-wgencoder-agent:
-    image: "ocs-wgencoder-agent"
-    build: ./agents/wiregrid_encoder/
-    depends_on:
-      - "socs"
-
-  # --------------------------------------------------------------------------
-  # iBootbar agent
-  # --------------------------------------------------------------------------
-  ocs-ibootbar-agent:
-    image: "ocs-ibootbar-agent"
-    build: ./agents/ibootbar/
-    depends_on:
-      - "socs"
+  # Only works with --privileged, will insist users build image themselves
+  # ocs-hwp-picoscope-agent:
+  #   image: "ocs-hwp-picoscope-agent"
+  #   build: ./docker/hwp_picoscope/
+  #   depends_on:
+  #     - "socs"
 
   # --------------------------------------------------------------------------
   # SOCS Simulators
-  # --------------------------------------------------------------------------
-
-  # --------------------------------------------------------------------------
-  # Lakeshore240 Simulator
   # --------------------------------------------------------------------------
   ocs-lakeshore240-simulator:
     image: "ocs-lakeshore240-simulator"

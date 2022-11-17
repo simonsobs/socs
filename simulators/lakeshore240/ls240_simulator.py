@@ -1,7 +1,8 @@
-import socket
 import argparse
-import numpy as np
 import logging
+import socket
+
+import numpy as np
 
 BUFF_SIZE = 1024
 
