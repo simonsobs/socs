@@ -45,11 +45,11 @@ Example docker-compose configuration::
     hostname: ocs-docker
     network_mode: "host"
     environment:
-      INSTANCE_ID: bluefors
-      LOGLEVEL: info
-      FRAME_LENGTH: 600
-      STALE_TIME: 2
-      MODE: follow
+      - INSTANCE_ID=bluefors
+      - LOGLEVEL=info
+      - FRAME_LENGTH=600
+      - STALE_TIME=2
+      - MODE=follow
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
       - /home/simonsobs/bluefors/logs/:/logs:ro

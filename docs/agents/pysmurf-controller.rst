@@ -50,17 +50,17 @@ named ``ocs-pysmurf-monitor`` might look something like::
         security_opt:
             - "aparmor=docker-smurf"
         environment:
-            INSTANCE_ID=pysmurf-controller-s2
-            SITE_HUB=ws://${CB_HOST}:8001/ws
-            SITE_HTTP=ws://${CB_HOST}:8001/call
-            SMURFPUB_BACKEND: udp
-            SMURFPUB_ID: crate1slot2
-            SMURFPUB_UDP_HOST: ocs-pysmurf-monitor
-            DISPLAY: $DISPLAY
-            OCS_CONFIG_DIR: /config
-            EPICS_CA_ADDR_LIST: 127.255.255.255
-            EPICS_CA_MAX_ARRAY_BYTES: 80000000
-            SLOT: 2
+            - INSTANCE_ID=pysmurf-controller-s2
+            - SITE_HUB=ws://${CB_HOST}:8001/ws
+            - SITE_HTTP=ws://${CB_HOST}:8001/call
+            - SMURFPUB_BACKEND=udp
+            - SMURFPUB_ID=crate1slot2
+            - SMURFPUB_UDP_HOST=ocs-pysmurf-monitor
+            - DISPLAY
+            - OCS_CONFIG_DIR=/config
+            - EPICS_CA_ADDR_LIST=127.255.255.255
+            - EPICS_CA_MAX_ARRAY_BYTES=80000000
+            - SLOT=2
         volumes:
             - ${OCS_CONFIG_DIR}:/config
             - /data:/data
