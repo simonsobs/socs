@@ -11,10 +11,28 @@ analog and digital inputs and outputs. They are then commanded and queried over
 Ethernet.
 
 .. argparse::
-    :filename: ../agents/labjack/labjack_agent.py
+    :filename: ../socs/agents/labjack/agent.py
     :func: make_parser
-    :prog: python3 labjack_agent.py
+    :prog: python3 agent.py
 
+Dependencies
+------------
+
+* `labjack-ljm <https://pypi.org/project/labjack-ljm/>`_ - LabJack LJM Library
+
+While there is the above PyPI package for the LJM library, it does not provide
+the ``libLabJackM.so`` shared object file that is needed. This can be obtained
+by running the LJM installer provided on the `LabJack website
+<https://labjack.com/support/software/api/ljm>`_. You can do so by running::
+
+    $ wget https://labjack.com/sites/default/files/software/labjack_ljm_minimal_2020_03_30_x86_64_beta.tar.gz
+    $ tar zxf ./labjack_ljm_minimal_2020_03_30_x86_64_beta.tar.gz
+    $ ./labjack_ljm_minimal_2020_03_30_x86_64/labjack_ljm_installer.run -- --no-restart-device-rules
+
+.. note::
+    This library is bundled in to the socs base Docker image. If you are running
+    this Agent in Docker you do *not* also need to install the library on the
+    host system.
 
 Configuration File Examples
 ---------------------------
@@ -87,21 +105,21 @@ The LabJack Agent should be configured to run in a Docker container. An
 example docker-compose service configuration is shown here::
 
   ocs-labjack:
-    image: simonsobs/ocs-labjack-agent:latest
+    image: simonsobs/socs:latest
     <<: *log-options
     hostname: ocs-docker
     network_mode: "host"
+    environment:
+      - INSTANCE_ID=labjack
     volumes:
       - ${OCS_CONFIG_DIR}:/config
-    command:
-      - "--instance-id=labjack"
 
 Since the agent within the container needs to communicate with hardware on the
 host network you must use ``network_mode: "host"`` in your compose file.
 
 Custom Register Readout
 -----------------------
-Labjack has many other registers available to access besides just the voltages
+LabJack has many other registers available to access besides just the voltages
 on AIN# which we use in the `mode=acq` option of this agent to readout directly
 or convert to useful units using the functions module. These extra registers
 however cannot be streamed out using the `ljstream` module which is the
@@ -173,11 +191,11 @@ shows the basic acquisition functionality:
 Agent API
 ---------
 
-.. autoclass:: agents.labjack.labjack_agent.LabJackAgent
+.. autoclass:: socs.agents.labjack.agent.LabJackAgent
     :members:
 
 Supporting APIs
 ---------------
 
-.. autoclass:: agents.labjack.labjack_agent.LabJackFunctions
+.. autoclass:: socs.agents.labjack.agent.LabJackFunctions
     :members:

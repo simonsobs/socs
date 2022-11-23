@@ -64,7 +64,27 @@ hosts:
        'instance-id': 'pfeiffer366',
        'arguments': [['--ip_address', '127.0.0.1'],
                      ['--port', '8000'],
+                     ['--mode', 'test'],
                     ]
+      },
+      {'agent-class': 'ibootbarAgent',
+       'instance-id': 'ibootbar',
+       'arguments': [['--address', '127.0.0.1'],
+                     ['--port', 1024],
+                     ['--mode', 'test'],
+                     ['--snmp-version', 2]
+                     ]
+      },
+      {'agent-class': 'SynaccessAgent',
+       'instance-id': 'synacc',
+       'arguments':[['--ip-address', '127.0.0.1:8000'],
+                    ['--username', 'admin'],
+                    ['--password', 'admin'],
+                   ]
+      },
+      {'agent-class': 'PysmurfController',
+       'instance-id': 'pysmurf-controller-s2',
+       'arguments': []
       },
     ]
   }

@@ -41,9 +41,19 @@ Install and update with pip::
 
     $ pip3 install -U socs
 
-If you need to install the optional so3g module you can do so via::
+You may install optional dependencies by including one or more agent group
+names on installation, for example::
 
-    $ pip3 install -U socs[so3g]
+    $ pip3 install -U socs[labjack,pysmurf]
+
+For a complete list of agent groups see the `Installation Documentation`_.
+
+If you would like to install all optional dependencies use the special varient
+"all"::
+
+    $ pip3 install -U socs[all]
+
+.. _`Installation Documentation`: https://socs.readthedocs.io/en/develop/user/installation.html
 
 Installing from Source
 ``````````````````````

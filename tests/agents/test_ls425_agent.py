@@ -1,3 +1,1 @@
-import sys
-sys.path.insert(0, '../agents/lakeshore425/')
-from LS425_agent import LS425Agent  # noqa: F401
+from socs.agents.lakeshore425.agent import LS425Agent  # noqa: F401
