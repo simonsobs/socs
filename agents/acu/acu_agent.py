@@ -1,20 +1,22 @@
-import time
-import struct
-import datetime
-import calendar
-import numpy as np
-import soaculib as aculib
-import scan_helpers as sh
-from soaculib.twisted_backend import TwistedHttpBackend
 import argparse
+import calendar
+import datetime
+import struct
+import time
+
+import numpy as np
+
+import soaculib as aculib
 import soaculib.status_keys as status_keys
-from twisted.internet import reactor, protocol
-from twisted.internet.defer import inlineCallbacks
 import twisted.web.client as tclient
 from autobahn.twisted.util import sleep as dsleep
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
+from soaculib.twisted_backend import TwistedHttpBackend
+from twisted.internet import protocol, reactor
+from twisted.internet.defer import inlineCallbacks
 
+import scan_helpers as sh
 
 #: The number of free ProgramTrack positions, when stack is empty.
 FULL_STACK = 10000
@@ -1407,11 +1409,17 @@ def add_agent_args(parser_in=None):
     return parser_in
 
 
-if __name__ == '__main__':
+def main(args=None):
     parser = add_agent_args()
-    args = site_config.parse_args(agent_class='ACUAgent', parser=parser)
+    args = site_config.parse_args(agent_class='ACUAgent',
+                                  parser=parser,
+                                  args=args)
 
     agent, runner = ocs_agent.init_site_agent(args)
-    acu_agent = ACUAgent(agent, args.acu_config)
+    _ = ACUAgent(agent, args.acu_config)
 
     runner.run(agent, auto_reconnect=True)
+
+
+if __name__ == '__main__':
+    main()
