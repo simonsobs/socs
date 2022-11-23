@@ -1218,7 +1218,7 @@ class ACUAgent:
       #                'block_name': 'ACU_upload',
       #                'data': self.data['uploads']
       #                }
-        self.agent.publish_to_feed('acu_upload', acu_upload)
+      #  self.agent.publish_to_feed('acu_upload', acu_upload)
         self._set_job_done('control')
         return True
 
