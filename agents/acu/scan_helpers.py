@@ -287,6 +287,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
         nonlocal num_scans
         if num_scans is not None:
             num_scans -= 1
+
     def check_num_scans():
         return num_scans is None or num_scans > 0
 
