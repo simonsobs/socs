@@ -7,13 +7,13 @@ with open("README.rst", "r", encoding="utf-8") as fh:
 
 # Optional Dependencies
 # ACU Agent
-acu_deps = ['soaculib @ git+https://github.com/simonsobs/soaculib.git@master']
+# acu_deps = ['soaculib @ git+https://github.com/simonsobs/soaculib.git@master']
 
 # Holography FPGA and Synthesizer Agents
-holography_deps = [  # Note: supports python 3.8 only!
-    'casperfpga @ git+https://github.com/casper-astro/casperfpga.git@py38',
-    'holog_daq @ git+https://github.com/McMahonCosmologyGroup/holog_daq.git@main',
-]
+# holography_deps = [  # Note: supports python 3.8 only!
+#     'casperfpga @ git+https://github.com/casper-astro/casperfpga.git@py38',
+#     'holog_daq @ git+https://github.com/McMahonCosmologyGroup/holog_daq.git@main',
+# ]
 
 # Labjack Agent
 labjack_deps = [
@@ -33,11 +33,11 @@ magpie_deps = [
 pfeiffer_deps = ['pfeiffer-vacuum-protocol==0.4']
 
 # Pysmurf Controller Agent
-pysmurf_deps = [
-    'pysmurf @ git+https://github.com/slaclab/pysmurf.git@main',
-    'sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master',
-    'sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master',
-]
+# pysmurf_deps = [
+#     'pysmurf @ git+https://github.com/slaclab/pysmurf.git@main',
+#     'sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master',
+#     'sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master',
+# ]
 
 # SMuRF File Emulator, SMuRF Stream Simulator
 smurf_sim_deps = ['so3g']
@@ -46,13 +46,15 @@ smurf_sim_deps = ['so3g']
 synacc_deps = ['requests']
 
 # LATRt XY Stage Agent
-xy_stage_deps = [
-    'xy_stage_control @ git+https://github.com/kmharrington/xy_stage_control.git@main',
-]
+# xy_stage_deps = [
+#     'xy_stage_control @ git+https://github.com/kmharrington/xy_stage_control.git@main',
+# ]
 
 # Note: Not including the holograph deps, which are Python 3.8 only
-all_deps = acu_deps + labjack_deps + magpie_deps + pfeiffer_deps + \
-    pysmurf_deps + smurf_sim_deps + synacc_deps + xy_stage_deps
+# all_deps = acu_deps + labjack_deps + magpie_deps + pfeiffer_deps + \
+#    pysmurf_deps + smurf_sim_deps + synacc_deps + xy_stage_deps
+all_deps = labjack_deps + magpie_deps + pfeiffer_deps + \
+    smurf_sim_deps + synacc_deps
 all_deps = list(set(all_deps))
 
 setup(
@@ -100,14 +102,14 @@ setup(
     ],
     extras_require={
         'all': all_deps,
-        'acu': acu_deps,
-        'holography': holography_deps,
+        # 'acu': acu_deps,
+        # 'holography': holography_deps,
         'labjack': labjack_deps,
         'magpie': magpie_deps,
         'pfeiffer': pfeiffer_deps,
-        'pysmurf': pysmurf_deps,
+        # 'pysmurf': pysmurf_deps,
         'smurf_sim': smurf_sim_deps,
         'synacc': synacc_deps,
-        'xy_stage': xy_stage_deps,
+        # 'xy_stage': xy_stage_deps,
     },
 )

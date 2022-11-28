@@ -19,6 +19,18 @@ their drivers are shared `here
     :func: make_parser
     :prog: python3 agent.py
 
+.. _latrt_xy_stage_deps:
+
+Dependencies
+------------
+
+The LATRt XY Stage agent requires the `xy_stage_control
+<https://github.com/kmharrington/xy_stage_control>`_ module. This can be
+installed via pip:
+
+.. code-block:: bash
+
+    $ python -m pip install 'xy_stage_control @ git+https://github.com/kmharrington/xy_stage_control.git@main'
 
 Configuration File Examples
 ---------------------------
