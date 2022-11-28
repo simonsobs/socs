@@ -44,7 +44,7 @@ Install and update with pip::
 You may install optional dependencies by including one or more agent group
 names on installation, for example::
 
-    $ pip3 install -U socs[labjack,pysmurf]
+    $ pip3 install -U socs[labjack,synacc]
 
 For a complete list of agent groups see the `Installation Documentation`_.
 
@@ -52,6 +52,9 @@ If you would like to install all optional dependencies use the special varient
 "all"::
 
     $ pip3 install -U socs[all]
+
+**Note:** Not all optional dependencies can be installed this way. See the
+`Installation Documentation`_ for more info on specific agent dependencies.
 
 .. _`Installation Documentation`: https://socs.readthedocs.io/en/develop/user/installation.html
 

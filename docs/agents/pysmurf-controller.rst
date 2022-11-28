@@ -14,6 +14,25 @@ sodetlib control scripts on the smurf-server through an OCS client.
     :func: make_parser
     :prog: python3 agent.py
 
+.. _pysmurf_controller_deps:
+
+Dependencies
+------------
+
+The pysmurf controller requires the following packages:
+
+    - `pysmurf <https://github.com/slaclab/pysmurf>`_
+    - `sodetlib <https://github.com/simonsobs/sodetlib>`_
+    - `sotodlib <https://github.com/simonsobs/sotodlib>`_
+
+These can be installed via pip:
+
+.. code-block:: bash
+
+    $ python -m pip install 'pysmurf @ git+https://github.com/slaclab/pysmurf.git@main'
+    $ python -m pip install 'sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master'
+    $ python -m pip install 'sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master'
+
 Configuration File Examples
 -----------------------------------
 
