@@ -407,6 +407,7 @@ class ACUAgent:
         prev_checkdata = {'ctime': time.time(),
                           'Azimuth_mode': None,
                           'Elevation_mode': None,
+                          'Boresight_mode': None,
                           }
 
         while self.jobs['monitor'] == 'run':
@@ -464,7 +465,7 @@ class ACUAgent:
                 self.log.warn('ACU in local mode!')
             if self.data['status']['summary']['ctime'] == prev_checkdata['ctime']:
                 self.log.warn('ACU time has not changed from previous data point!')
-            for axis_mode in ['Azimuth_mode', 'Elevation_mode']:
+            for axis_mode in ['Azimuth_mode', 'Elevation_mode', 'Boresight_mode']:
                 if self.data['status']['summary'][axis_mode] != prev_checkdata[axis_mode]:
                     self.log.info(axis_mode + ' has changed to ' + self.data['status']['summary'][axis_mode])
 
@@ -583,6 +584,7 @@ class ACUAgent:
             prev_checkdata = {'ctime': self.data['status']['summary']['ctime'],
                               'Azimuth_mode': self.data['status']['summary']['Azimuth_mode'],
                               'Elevation_mode': self.data['status']['summary']['Elevation_mode'],
+                              'Boresight_mode': self.data['status']['summary']['Boresight_mode'],
                               }
         # self._set_job_stop('monitor')
         # yield dsleep(1)
@@ -1002,7 +1004,8 @@ class ACUAgent:
             self._try_set_job('control')
         self.log.info('_try_set_job ok')
         # yield self.acu.stop()
-        yield self.acu_control.mode('Stop')
+#        yield self.acu_control.mode('Stop')
+        yield self.acu_control.stop()
         self.log.info('Stop called')
         yield dsleep(5)
         yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
