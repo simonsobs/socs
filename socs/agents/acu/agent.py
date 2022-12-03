@@ -1299,7 +1299,7 @@ class ACUAgent:
             self._set_job_done('control')
             return False, 'ACU not in remote mode.'
 
-        self.log.info('Scan params are', scan_params)
+        self.log.info('Scan params are' + str(scan_params))
         if 'step_time' in scan_params:
             step_time = scan_params['step_time']
         else:
