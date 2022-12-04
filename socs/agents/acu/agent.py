@@ -247,47 +247,32 @@ class ACUAgent:
     # probably not necessary as long as we don't thread).  Any logic
     # to assess conflicts should probably be in _try_set_job.
 
-    def _try_set_job(self, job_name):
-        """
-        Set a job status to 'run'.
-
-        Parameters:
-            job_name (str): Name of the task/process you are trying to start.
-        """
-        with self.lock.acquire_timeout(timeout=1.0, job=job_name) as acquired:
-            if not acquired:
-                self.log.warn("Lock could not be acquired because it is held"
-                              f" by {self.lock.job}")
-                return False
-            # Set running.
-            self.jobs[job_name] = 'run'
-            return (True, 'ok')
-
-    def _set_job_stop(self, job_name):
-        """
-        Set a job status to 'stop'.
-
-        Parameters:
-            job_name (str): Name of the process you are trying to stop.
-        """
-        print('try to acquire stop')
-        # return (False, 'Could not stop')
-        with self.lock.acquire_timeout(timeout=1.0, job=job_name) as acquired:
-            if not acquired:
-                self.log.warn("Lock could not be acquired because it is"
-                              f" held by {self.lock.job}")
-                return False
-            try:
-                self.jobs[job_name] = 'stop'
-            # state = self.jobs.get(job_name, 'idle')
-            # if state == 'idle':
-            #     return False, 'Job not running.'
-            # if state == 'stop':
-            #     return False, 'Stop already requested.'
-            # self.jobs[job_name] = 'stop'
-                return True, 'Requested Process stop.'
-            except Exception as e:
-                print(str(e))
+    def _set_job_stop(self, session):
+#        """
+#        Set a job status to 'stop'.
+#
+#        Parameters:
+#            job_name (str): Name of the process you are trying to stop.
+#        """
+        session.set_status('stopping')
+#        print('try to acquire stop')
+#        # return (False, 'Could not stop')
+#        with self.lock.acquire_timeout(timeout=1.0, job=job_name) as acquired:
+#            if not acquired:
+#                self.log.warn("Lock could not be acquired because it is"
+#                              f" held by {self.lock.job}")
+#                return False
+#            try:
+#                self.jobs[job_name] = 'stop'
+#            # state = self.jobs.get(job_name, 'idle')
+#            # if state == 'idle':
+#            #     return False, 'Job not running.'
+#            # if state == 'stop':
+#            #     return False, 'Stop already requested.'
+#            # self.jobs[job_name] = 'stop'
+#                return True, 'Requested Process stop.'
+#            except Exception as e:
+#                print(str(e))
 
     def _set_job_done(self, job_name):
         """
@@ -309,9 +294,6 @@ class ACUAgent:
 
     @inlineCallbacks
     def restart_idle(self, session, params):
-        ok, msg = self._try_set_job('restart_idle')
-        if not ok:
-            return ok, msg
         session.set_status('running')
         while True:
             resp = yield self.acu_control.http.Command('DataSets.CmdModeTransfer',
@@ -335,11 +317,10 @@ class ACUAgent:
         Elevation velocity, Boresight mode, and Boresight position.
 
         """
-        ok, msg = self._try_set_job('monitor')
-        if not ok:
-            return ok, msg
 
+        self.jobs['monitor'] = 'run'
         session.set_status('running')
+        print(self.jobs['monitor'])
         version = yield self.acu_read.http.Version()
         self.log.info(version)
         session.data = {'platform': self.acu_config['platform']}
@@ -599,9 +580,7 @@ class ACUAgent:
         decode it, and publish to an HK feed.
 
         """
-        ok, msg = self._try_set_job('broadcast')
-        if not ok:
-            return ok, msg
+        self.jobs['broadcast'] = 'run'
         session.set_status('running')
         FMT = self.udp_schema['format']
         FMT_LEN = struct.calcsize(FMT)
@@ -719,9 +698,6 @@ class ACUAgent:
             rounding (int): number of decimal places to round to
 
         """
-        ok, msg = self._try_set_job('control')
-        if not ok:
-            return ok, msg
 
         bcast_check = yield self._check_daq_streams('broadcast')
         monitor_check = yield self._check_daq_streams('monitor')
@@ -875,9 +851,6 @@ class ACUAgent:
             end_stop (bool): put axes in Stop mode after motion
 
         """
-        ok, msg = self._try_set_job('control')
-        if not ok:
-            return ok, msg
 
         monitor_check = yield self._check_daq_streams('monitor')
         if not monitor_check:
@@ -939,12 +912,6 @@ class ACUAgent:
 
     @inlineCallbacks
     def preset_stop_clear(self, session, params):
-        ok, msg = self._try_set_job('control')
-        if not ok:
-            self._set_job_done('control')
-            yield dsleep(0.1)
-            self._try_set_job('control')
-        self.log.info('_try_set_job ok')
         current_data = self.data['status']['summary']
         current_vel = current_data['Azimuth_current_velocity']
         current_pos = {'Az': current_data['Azimuth_current_position'],
@@ -979,12 +946,6 @@ class ACUAgent:
         **Task** - Clear any axis faults.
 
         """
-        ok, msg = self._try_set_job('control')
-        if not ok:
-            self._set_job_done('control')
-            yield dsleep(0.1)
-            self._try_set_job('control')
-        self.log.info('_try_set_job ok')
         yield self.acu_control.clear_faults()
         self._set_job_done('control')
         return True, 'Job completed.'
@@ -997,14 +958,6 @@ class ACUAgent:
         points uploaded to the stack.
 
         """
-        ok, msg = self._try_set_job('control')
-        if not ok:
-            self._set_job_done('control')
-            yield dsleep(0.1)
-            self._try_set_job('control')
-        self.log.info('_try_set_job ok')
-        # yield self.acu.stop()
-#        yield self.acu_control.mode('Stop')
         yield self.acu_control.stop()
         self.log.info('Stop called')
         yield dsleep(5)
@@ -1082,10 +1035,6 @@ class ACUAgent:
 
     @inlineCallbacks
     def _run_specified_scan(self, session, times, azs, els, vas, ves, azflags, elflags, azonly, simulator):
-        ok, msg = self._try_set_job('control')
-        if not ok:
-            return ok, msg
-        self.log.info('_try_set_job ok')
 
         bcast_check = yield self._check_daq_streams('broadcast')
         monitor_check = yield self._check_daq_streams('monitor')
@@ -1269,10 +1218,6 @@ class ACUAgent:
             scan_upload_length (float): number of seconds for each set of uploaded
                 points. Default value is 10.0.
         """
-        ok, msg = self._try_set_job('control')
-        if not ok:
-            return ok, msg
-        self.log.info('_try_set_job ok')
 
         bcast_check = yield self._check_daq_streams('broadcast')
         monitor_check = yield self._check_daq_streams('monitor')
