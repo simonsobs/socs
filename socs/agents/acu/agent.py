@@ -747,8 +747,8 @@ class ACUAgent:
             return False, 'ACU not in remote mode.'
         self.log.info('Azimuth commanded position: ' + str(az))
         self.log.info('Elevation commanded position: ' + str(el))
-        current_az = round(self.data['status']['summary']['Azimuth_current_position'], 2)#round(self.data['broadcast']['Corrected_Azimuth'], 4)
-        current_el = round(self.data['status']['summary']['Elevation_current_position'], 2)#round(self.data['broadcast']['Corrected_Elevation'], 4)
+        current_az = round(self.data['status']['summary']['Azimuth_current_position'], 2)  # round(self.data['broadcast']['Corrected_Azimuth'], 4)
+        current_el = round(self.data['status']['summary']['Elevation_current_position'], 2)  # round(self.data['broadcast']['Corrected_Elevation'], 4)
         self.data['uploads']['Start_Azimuth'] = current_az
         self.data['uploads']['Start_Elevation'] = current_el
         self.data['uploads']['Command_Type'] = 1
@@ -815,11 +815,11 @@ class ACUAgent:
             mdata = self.data['status']['summary']
         moving = True
         while moving:
-      #      acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
-      #                    'block_name': 'ACU_upload',
-      #                    'data': self.data['uploads']
-      #                    }
-      #      self.agent.publish_to_feed('acu_upload', acu_upload)
+          #      acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
+          #                    'block_name': 'ACU_upload',
+          #                    'data': self.data['uploads']
+          #                    }
+          #      self.agent.publish_to_feed('acu_upload', acu_upload)
             mdata = self.data['status']['summary']
             remote = self.data['status']['platform_status']['Remote_mode']
             if remote == 0:
@@ -914,7 +914,7 @@ class ACUAgent:
 
         current_position = self.data['status'][status_block][position_name]
         print(current_position)
-        while round(current_position-bs_destination, 2) != 0:
+        while round(current_position - bs_destination, 2) != 0:
             yield dsleep(1)
 #            acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
 #                          'block_name': 'ACU_upload',
