@@ -1244,6 +1244,24 @@ class ACUAgent:
             self._set_job_done('control')
             return False, 'ACU not in remote mode.'
 
+        if 'az_start' in scan_params:
+            if scan_params['az_start'] in ('mid_inc', 'mid_dec'):
+                init = 'mid'
+            else:
+                init = 'end'
+        throw = abs(az_endpoint2 - az_endpoint1)
+        if az_endpoint2 >= az_endpoint1:
+            v_az_sign = 1
+        else:
+            v_az_sign = -1
+
+        plan, info = sh.plan_scan(az_end1=az_endpoint1, el=el_endpoint1,
+                                  throw=throw, v_az=az_speed*v_az_sign,
+                                  a_az=acc, init=init)
+
+        self.log.info('Plan is '+str(plan))
+        self.log.info('Info is '+str(info))
+
         self.log.info('Scan params are' + str(scan_params))
         if 'step_time' in scan_params:
             step_time = scan_params['step_time']
@@ -1253,6 +1271,10 @@ class ACUAgent:
 
         yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
                                             'Clear Stack')
+
+        
+
+
         g = sh.generate_constant_velocity_scan(az_endpoint1=az_endpoint1,
                                                az_endpoint2=az_endpoint2,
                                                az_speed=az_speed, acc=acc,
