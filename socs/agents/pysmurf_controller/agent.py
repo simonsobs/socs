@@ -691,6 +691,9 @@ class PysmurfController:
         ----
         kwargs : dict
             Additional kwargs to pass to ``take_bais_steps`` function.
+        rfrac_range : tuple
+            Range of valid rfracs to check against when determining the number
+            of good detectors.
 
         Notes
         ------
