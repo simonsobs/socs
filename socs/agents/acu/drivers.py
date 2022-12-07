@@ -1,5 +1,5 @@
 import time
-
+import math
 import numpy as np
 
 
@@ -377,7 +377,53 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                    point_block[3], point_block[4], point_block[5],
                    point_block[6])
 
+def plan_scan(az_end1, el, throw, v_az=1, a_az=1, init='end', num_scans=1):
+    """
+    Calculate how far in advance you need to ramp into a scan.
+    """
+    plan = {
+        'az_endpoint1': az_end1,
+        'el': el,
+        'throw': throw,
+        'v_az': v_az,
+        'a_az': a_az,
+        'init': init,
+        'az_startpoint': az_end1,
+        'num_scans': num_scans,
+    }
 
+    info = {}
+
+    # point separation
+    dt = 2 * abs(throw/v_az) / 10
+    dt = min(max(dt, 0.1), 1.0)
+    assert(2 * abs(throw/v_az) / dt >= 5)
+    plan['step_time'] = dt
+    az_prep = 5 * dt * v_az
+    a_max = 1.
+    az_rampup = v_az**2 / a_max
+    info['az_prep'] = az_prep
+    info['az_ramp_dist'] = az_rampup
+    if init == 'mid':
+        ramp_up = max(az_prep + az_rampup - abs(throw), 0)
+    elif init == 'end':
+        ramp_up = max(az_prep + az_rampup - 2 * abs(throw), 0)
+    else:
+        raise
+    plan['ramp_up'] = ramp_up
+    pre_time = v_az / a_max
+    plan['wait_to_start'] = max(5, pre_time * 1.2)
+    info['pre_time'] = pre_time
+
+    plan['az_startpoint'] = az_end1 - math.copysign(ramp_up, throw)
+    if init == 'end':
+        plan['az_startpoint'] -= throw
+
+    info['total_time'] = (num_scans * (2 * abs(throw) / v_az + 2*v_az/a_az)
+        + ramp_up / v_az * 2
+        + plan['wait_to_start'])
+
+    return plan, info
 # if __name__ == "__main__":
 #    print(time.time())
 #    times, azs, els, vas, ves, azf, elf = linear_turnaround_scanpoints((120., 130.), 55., 1., 4, 2000)
