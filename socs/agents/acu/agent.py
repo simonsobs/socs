@@ -1375,10 +1375,12 @@ class ACUAgent:
             self.log.info(f'There are {FULL_STACK - free_positions} track points remaining.')
             # todo: Should also watch for mode change, here, to exit cleanly...
 
+        self.log.info('The track should now be completed.')
         # Go to Stop mode?
         # yield self.acu_control.stop()
 
-        # Clear the stack?
+        # Clear the stack, but wait a bit or it can cause a fault.
+        yield dsleep(1)
         yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
                                             'Clear Stack')
 
