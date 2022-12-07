@@ -747,19 +747,19 @@ class ACUAgent:
             return False, 'ACU not in remote mode.'
         self.log.info('Azimuth commanded position: ' + str(az))
         self.log.info('Elevation commanded position: ' + str(el))
-        current_az = round(self.data['broadcast']['Corrected_Azimuth'], 4)
-        current_el = round(self.data['broadcast']['Corrected_Elevation'], 4)
+        current_az = round(self.data['status']['summary']['Azimuth_current_position'], 2)#round(self.data['broadcast']['Corrected_Azimuth'], 4)
+        current_el = round(self.data['status']['summary']['Elevation_current_position'], 2)#round(self.data['broadcast']['Corrected_Elevation'], 4)
         self.data['uploads']['Start_Azimuth'] = current_az
         self.data['uploads']['Start_Elevation'] = current_el
         self.data['uploads']['Command_Type'] = 1
         self.data['uploads']['Preset_Azimuth'] = az
         self.data['uploads']['Preset_Elevation'] = el
 
-        acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
-                      'block_name': 'ACU_upload',
-                      'data': self.data['uploads']
-                      }
-        self.agent.publish_to_feed('acu_upload', acu_upload)
+     #   acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
+     #                 'block_name': 'ACU_upload',
+     #                 'data': self.data['uploads']
+     #                 }
+     #   self.agent.publish_to_feed('acu_upload', acu_upload)
 
         # Check whether the telescope is already at the point
         self.log.info('Setting mode to Preset')
@@ -815,11 +815,11 @@ class ACUAgent:
             mdata = self.data['status']['summary']
         moving = True
         while moving:
-            acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
-                          'block_name': 'ACU_upload',
-                          'data': self.data['uploads']
-                          }
-            self.agent.publish_to_feed('acu_upload', acu_upload)
+      #      acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
+      #                    'block_name': 'ACU_upload',
+      #                    'data': self.data['uploads']
+      #                    }
+      #      self.agent.publish_to_feed('acu_upload', acu_upload)
             mdata = self.data['status']['summary']
             remote = self.data['status']['platform_status']['Remote_mode']
             if remote == 0:
@@ -854,11 +854,11 @@ class ACUAgent:
         self.data['uploads']['Command_Type'] = 0
         self.data['uploads']['Preset_Azimuth'] = 0.0
         self.data['uploads']['Preset_Elevation'] = 0.0
-        acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
-                      'block_name': 'ACU_upload',
-                      'data': self.data['uploads']
-                      }
-        self.agent.publish_to_feed('acu_upload', acu_upload, from_reactor=True)
+       # acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
+       #               'block_name': 'ACU_upload',
+       #               'data': self.data['uploads']
+       #               }
+       # self.agent.publish_to_feed('acu_upload', acu_upload, from_reactor=True)
         self._set_job_done('control')
         return True, 'Pointing completed'
 
@@ -914,7 +914,7 @@ class ACUAgent:
 
         current_position = self.data['status'][status_block][position_name]
         print(current_position)
-        while current_position != bs_destination:
+        while round(current_position-bs_destination, 2) != 0:
             yield dsleep(1)
 #            acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
 #                          'block_name': 'ACU_upload',
@@ -1186,20 +1186,23 @@ class ACUAgent:
                     return False, 'Fault triggered (not ProgramTrack)!'
             free_positions = self.data['status']['summary']['Free_upload_positions']
         self.log.info('No more points in the queue')
-        current_az = self.data['broadcast']['Corrected_Azimuth']
-        current_el = self.data['broadcast']['Corrected_Elevation']
+#        current_az = self.data['broadcast']['Corrected_Azimuth']
+#        current_el = self.data['broadcast']['Corrected_Elevation']
+        current_az = self.data['status']['summary']['Azimuth_current_position']
+        current_el = self.data['status']['summary']['Elevation_current_position']
         while round(current_az - end_az, 1) != 0.:
             print('still rounding az')
             self.log.info('Waiting to settle at azimuth position')
             yield dsleep(0.1)
-            current_az = self.data['broadcast']['Corrected_Azimuth']
+            current_az = self.data['status']['summary']['Azimuth_current_position']
+           # current_az = self.data['broadcast']['Corrected_Azimuth']
         if not azonly:
             while round(current_el - end_el, 1) != 0.:
                 print('still rounding el')
                 self.log.info('Waiting to settle at elevation position')
                 yield dsleep(0.1)
-                current_el = self.data['broadcast']['Corrected_Elevation']
-        print('rounding completed')
+                current_el = self.data['status']['summary']['Elevation_current_position']
+               # current_el = self.data['broadcast']['Corrected_Elevation']
         yield dsleep(self.sleeptime)
         yield self.acu_control.stop()
         # self.data['uploads']['Start_Azimuth'] = 0.0
@@ -1412,7 +1415,8 @@ def main(args=None):
     args = site_config.parse_args(agent_class='ACUAgent',
                                   parser=parser,
                                   args=args)
-
+    print(args)
+#    print('args.acu_config = '+str(args.acu_config))
     agent, runner = ocs_agent.init_site_agent(args)
     _ = ACUAgent(agent, args.acu_config)
 
