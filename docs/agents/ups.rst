@@ -39,7 +39,7 @@ using all of the available arguments::
 Docker Compose
 ``````````````
 
-The iBootbar Agent should be configured to run in a Docker container. An
+The UPS Agent should be configured to run in a Docker container. An
 example docker-compose service configuration is shown here::
 
   ocs-ups:
@@ -65,7 +65,9 @@ Various UPS models will be used to power various components on the SO site.
 The UPS Agent allows the monitoring of a UPS model. It provides information
 on the manufacturer and model of the UPS. It monitors the state of each
 output, as well as several stats of the battery. The UPS has an Simple Network
-Management Protocol (SNMP) interface.
+Management Protocol (SNMP) interface. The agent has been tested on the
+following Falcon models: SSG3K-2T, SSG3KRM-2. These models require a SNMP
+interface add-on card to be installed.
 
 The UPS Agent actively issues SNMP GET commands to request the status from
 several Object Identifiers (OIDs) specified by the provided Management
@@ -97,6 +99,6 @@ Agent API
 Supporting APIs
 ---------------
 
-.. autoclass:: socs.agents.ibootbar.agent.update_cache
+.. autoclass:: socs.agents.ups.agent.update_cache
     :members:
     :noindex:
