@@ -106,9 +106,9 @@ def update_cache(get_result, timestamp):
     The cache consists of a dictionary, with the unique OIDs as keys, and
     another dictionary as the value. Each of these nested dictionaries contains the
     OID values, name, and description (decoded string). An example for a single OID::
-        {"upsIdentModel":
-            {"status": 0,
-                "description": "on"}}
+        {"upsBatteryStatus":
+            {"status": 2,
+                "description": "batteryNormal"}}
     Additionally there is connection status and timestamp information under::
         {"ups_connection":
             {"last_attempt": 1598543359.6326838,
@@ -197,6 +197,12 @@ class UPSAgent:
 
         **Process** - Fetch values from the UPS via SNMP.
 
+        Parameters
+        ----------
+        test_mode : bool, optional
+            Run the Process loop only once. Meant only for testing.
+            Default is False.
+
         Notes
         -----
         The most recent data collected is stored in session.data in the
@@ -207,14 +213,77 @@ class UPSAgent:
                 {'description': 'Falcon'},
             'upsIdentModel':
                 {'description': 'SSG3KRM-2'},
-            ...
+            'upsBatteryStatus':
+                {'status': 2,
+                 'description': 'batteryNormal'},
+            'upsSecondsOnBattery':
+                {'status': 0,
+                 'description': 0},
+            'upsEstimatedMinutesRemaining':
+                {'status': 60,
+                 'description': 60},
+            'upsEstimatedChargeRemaining':
+                {'status': 100,
+                 'description': 100},
+            'upsBatteryVoltage':
+                {'status': 120,
+                 'description': 120},
+            'upsBatteryCurrent':
+                {'status': 10,
+                 'description': 10},
+            'upsBatteryTemperature':
+                {'status': 30,
+                 'description': 30},
+            'upsOutputSource':
+                {'status': 3,
+                 'description': normal},
+            'upsOutputVoltage':
+                {'status': 120,
+                 'description': 120},
+            'upsOutputCurrent':
+                {'status': 10,
+                 'description': 10},
+            'upsOutputPower':
+                {'status': 120,
+                 'description': 120},
+            'upsOutputPercentLoad':
+                {'status': 25,
+                 'description': 25}
             'ups_connection':
                 {'last_attempt': 1656085022.680916,
                  'connected': True},
             'timestamp': 1656085022.680916}
+
+        Some relevant options and units for the above OIDs::
+
+            upsBatteryStatus::
+                Options:: unknown(1),
+                          batteryNormal(2),
+                          batteryLow(3),
+                          batteryDepleted(4)
+            upsEstimatedChargeRemaining::
+                Units:: percentage
+            upsBatteryVoltage::
+                Units:: 0.1 Volt DC
+            upsBatteryCurrent::
+                Units:: 0.1 Amp DC
+            upsBatteryTemperature::
+                Units:: degrees Centigrade
+            upsOutputSource::
+                Options:: other(1),
+                          none(2),
+                          normal(3),
+                          bypass(4),
+                          battery(5),
+                          booster(6),
+                          reducer(7)
+            upsOutputVoltage::
+                Units:: RMS Volts
+            upsOutputCurrent::
+                Units:: 0.1 RMS Amp
+            upsOutput Power::
+                Units:: Watts
         """
-        if params is None:
-            params = {}
 
         self.is_streaming = True
         while self.is_streaming:
