@@ -922,7 +922,6 @@ class ACUAgent:
 #                          }
 #            self.agent.publish_to_feed('acu_upload', acu_upload)
             current_position = self.data['status'][status_block][position_name]
-            print(current_position)
         if params.get('end_stop'):
             yield self.acu_control.stop()
 #        self.data['uploads']['Start_Boresight'] = 0.0
@@ -950,8 +949,6 @@ class ACUAgent:
                        'El': current_data['Elevation_current_position']}
         new_pos = {'Az': current_pos['Az'] + np.sign(current_vel) * current_vel,
                    'El': current_pos['El']}
-        print(current_pos)
-        print(new_pos)
         self.log.info('Changed to Preset')
         yield self.acu_control.go_to(new_pos['Az'], new_pos['El'])
         while round(current_pos['Az'] - new_pos['Az'], 1) != 0.:
@@ -1191,18 +1188,15 @@ class ACUAgent:
         current_az = self.data['status']['summary']['Azimuth_current_position']
         current_el = self.data['status']['summary']['Elevation_current_position']
         while round(current_az - end_az, 1) != 0.:
-            print('still rounding az')
             self.log.info('Waiting to settle at azimuth position')
             yield dsleep(0.1)
             current_az = self.data['status']['summary']['Azimuth_current_position']
            # current_az = self.data['broadcast']['Corrected_Azimuth']
         if not azonly:
             while round(current_el - end_el, 1) != 0.:
-                print('still rounding el')
                 self.log.info('Waiting to settle at elevation position')
                 yield dsleep(0.1)
-                current_el = self.data['status']['summary']['Elevation_current_position']
-               # current_el = self.data['broadcast']['Corrected_Elevation']
+                current_el = self.data['broadcast']['Corrected_Elevation']
         yield dsleep(self.sleeptime)
         yield self.acu_control.stop()
         # self.data['uploads']['Start_Azimuth'] = 0.0
@@ -1302,7 +1296,7 @@ class ACUAgent:
             self._set_job_done('control')
             return False, 'ACU not in remote mode.'
 
-        print('Scan params are', scan_params)
+        self.log.info('Scan params are', scan_params)
         if 'step_time' in scan_params:
             step_time = scan_params['step_time']
         else:
