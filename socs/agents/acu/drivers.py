@@ -404,20 +404,21 @@ def plan_scan(az_end1, el, throw, v_az=1, a_az=1, init='end', num_scans=1):
     az_rampup = v_az**2 / a_max
     info['az_prep'] = az_prep
     info['az_ramp_dist'] = az_rampup
-    if init == 'mid':
-        ramp_up = max(az_prep + az_rampup - abs(throw), 0)
-    elif init == 'end':
-        ramp_up = max(az_prep + az_rampup - 2 * abs(throw), 0)
-    else:
-        raise
+#    if init == 'mid':
+    ramp_up = max(az_prep + az_rampup - abs(throw), 0)
+#    elif init == 'end':
+#        ramp_up = max(az_prep + az_rampup - 2 * abs(throw), 0)
+ #   else:
+ #       raise
     plan['ramp_up'] = ramp_up
     pre_time = v_az / a_max
     plan['wait_to_start'] = max(5, pre_time * 1.2)
     info['pre_time'] = pre_time
 
     plan['az_startpoint'] = az_end1 - math.copysign(ramp_up, throw)
-    if init == 'end':
-        plan['az_startpoint'] -= throw
+#    if init == 'end':
+#        if throw <= 5:
+#            plan['az_startpoint'] -= throw
 
     info['total_time'] = (num_scans * (2 * abs(throw) / v_az + 2*v_az/a_az)
         + ramp_up / v_az * 2

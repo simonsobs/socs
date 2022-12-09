@@ -1259,8 +1259,8 @@ class ACUAgent:
                                   throw=throw, v_az=az_speed*v_az_sign,
                                   a_az=acc, init=init)
 
-        self.log.info('Plan is '+str(plan))
-        self.log.info('Info is '+str(info))
+        self.log.info(plan)
+        self.log.info(info)
 
         self.log.info('Scan params are' + str(scan_params))
         if 'step_time' in scan_params:
@@ -1269,18 +1269,26 @@ class ACUAgent:
             step_time = 1.0
         scan_upload_len_pts = scan_upload_len / step_time
 
+        go_to_params = {'az': plan['az_startpoint'],
+                        'el': plan['el'],
+                        'azonly': False,
+                        'end_stop': False,
+                        'wait': 1,
+                        'rounding': 2}
+
         yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
                                             'Clear Stack')
 
-        
-
+        self.log.info('Running go_to in generate_scan')
+        yield self.go_to(session=session, params=go_to_params)
+        self.log.info('Finished go_to, generating scan points')
 
         g = sh.generate_constant_velocity_scan(az_endpoint1=az_endpoint1,
                                                az_endpoint2=az_endpoint2,
                                                az_speed=az_speed, acc=acc,
                                                el_endpoint1=el_endpoint1,
                                                el_endpoint2=el_endpoint2,
-                                               el_speed=el_speed,
+                                               el_speed=el_speed, ramp_up=plan['ramp_up'],
                                                **scan_params)
         if azonly:
             yield self.acu_control.azmode('ProgramTrack')
@@ -1326,6 +1334,7 @@ class ACUAgent:
                 while free_positions < 10000 - scan_upload_len_pts:
                     yield dsleep(0.1)
                     free_positions = self.data['status']['summary']['Free_upload_positions']
+                print(text)
                 yield self.acu_control.http.UploadPtStack(text)
 
         self.log.info('All points uploaded, waiting for stack to clear.')
