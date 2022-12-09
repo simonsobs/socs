@@ -1249,20 +1249,16 @@ class ACUAgent:
                 init = 'mid'
             else:
                 init = 'end'
-        throw = abs(az_endpoint2 - az_endpoint1)
-        if az_endpoint2 >= az_endpoint1:
-            v_az_sign = 1
-        else:
-            v_az_sign = -1
+        throw = az_endpoint2 - az_endpoint1
 
         plan, info = sh.plan_scan(az_end1=az_endpoint1, el=el_endpoint1,
-                                  throw=throw, v_az=az_speed*v_az_sign,
+                                  throw=throw, v_az=az_speed,
                                   a_az=acc, init=init)
 
-        self.log.info(plan)
-        self.log.info(info)
+        print(plan)
+        print(info)
 
-        self.log.info('Scan params are' + str(scan_params))
+    #    self.log.info('Scan params are' + str(scan_params))
         if 'step_time' in scan_params:
             step_time = scan_params['step_time']
         else:

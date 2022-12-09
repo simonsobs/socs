@@ -259,10 +259,11 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
 
     # Bias the starting point for the first leg?
     if ramp_up is not None:
-        if increasing:
-            az -= ramp_up
-        else:
-            az += ramp_up
+#        if increasing:
+#            az -= ramp_up
+#        else:
+#            az += ramp_up
+        az -= ramp_up
 
     if start_time is None:
         t0 = time.time() + wait_to_start
@@ -405,7 +406,8 @@ def plan_scan(az_end1, el, throw, v_az=1, a_az=1, init='end', num_scans=1):
     info['az_prep'] = az_prep
     info['az_ramp_dist'] = az_rampup
 #    if init == 'mid':
-    ramp_up = max(az_prep + az_rampup - abs(throw), 0)
+    ramp_val = az_prep + az_rampup - abs(throw)
+    ramp_up = np.sign(throw) * max(abs(ramp_val), 0)
 #    elif init == 'end':
 #        ramp_up = max(az_prep + az_rampup - 2 * abs(throw), 0)
  #   else:
