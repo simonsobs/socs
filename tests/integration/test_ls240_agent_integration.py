@@ -1,17 +1,10 @@
 import time
-import pytest
 
 import ocs
+import pytest
+from integration.util import create_crossbar_fixture
 from ocs.base import OpCode
-
-from ocs.testing import (
-    create_agent_runner_fixture,
-    create_client_fixture,
-)
-
-from integration.util import (
-    create_crossbar_fixture
-)
+from ocs.testing import create_agent_runner_fixture, create_client_fixture
 
 from socs.testing.device_emulator import create_device_emulator
 
@@ -19,7 +12,7 @@ pytest_plugins = ("docker_compose")
 
 wait_for_crossbar = create_crossbar_fixture()
 run_agent = create_agent_runner_fixture(
-    '../agents/lakeshore240/LS240_agent.py', 'ls240_agent')
+    '../socs/agents/lakeshore240/agent.py', 'ls240_agent')
 client = create_client_fixture('LSA240S')
 
 initial_responses = {'*IDN?': 'LSCI,MODEL240,LSA240S,1.3',

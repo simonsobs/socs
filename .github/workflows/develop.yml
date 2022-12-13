@@ -79,9 +79,9 @@ jobs:
       run: |
         python3 -m pip install dist/socs*.whl
 
-    - name: install testing requirements
+    - name: install requirements for testing
       run: |
-        pip3 install -r requirements/testing.txt
+        pip3 install -r requirements.txt
 
     - name: Run unit tests
       working-directory: ./tests

@@ -2,19 +2,19 @@
 
 .. _pfeiffer_tc400_agent:
 
-==============
-Pfeiffer TC400
-==============
+=====================
+Pfeiffer TC 400 Agent
+=====================
 
-The Pfeiffer TC400 agent is an OCS Agent which controls the
-Pfeiffer TC400 electronic drive unit, which control the turbos used
+The Pfeiffer TC 400 Agent is an OCS Agent which controls the
+Pfeiffer TC 400 electronic drive unit, which control the turbos used
 for the bluefors DR. The communcation is done over serial, and should be
 integrated into OCS using a serial-to-ethernet converter.
 
 .. argparse::
-    :filename: ../agents/pfeiffer_tc400/pfeiffer_tc400_agent.py
+    :filename: ../socs/agents/pfeiffer_tc400/agent.py
     :func: make_parser
-    :prog: python3 pfeiffer_tc400_agent.py
+    :prog: python3 agent.py
 
 Description
 -----------
@@ -38,7 +38,7 @@ Agent in a docker container.
 
 OCS Site Config
 ```````````````
-To configure the Pfeiffer TC400 Agent we need to add a PfeifferTC400Agent
+To configure the Pfeiffer TC 400 Agent we need to add a PfeifferTC400Agent
 block to our ocs configuration file. The IP address and port
 number are from the serial-to-ethernet converter. The turbo address is
 visible on the power supply front panel. Here is an example configuration
@@ -57,14 +57,14 @@ The agent should be configured to run in a Docker container. An
 example docker-compose service configuration is shown here::
 
   ocs-pfeiffer-turboA:
-    image: simonsobs/ocs-pfeiffer-tc400-agent
+    image: simonsobs/socs:latest
     <<: *log-options
     hostname: manny-docker
     network_mode: "host"
+    environment:
+      - INSTANCE_ID=pfeifferturboA
     volumes:
       - ${OCS_CONFIG_DIR}:/config
-    command:
-      - "--instance-id=pfeifferturboA"
 
 Since the agent within the container needs to communicate with hardware on the
 host network you must use ``network_mode: "host"`` in your compose file.
@@ -72,7 +72,7 @@ host network you must use ``network_mode: "host"`` in your compose file.
 Agent API
 ---------
 
-.. autoclass:: agents.pfeiffer_tc400.pfeiffer_tc400_agent.PfeifferTC400Agent
+.. autoclass:: socs.agents.pfeiffer_tc400.agent.PfeifferTC400Agent
     :members:
 
 Example Clients
@@ -104,5 +104,5 @@ example client shows all of this functionality::
 Driver API
 ----------
 
-.. autoclass:: agents.pfeiffer_tc400.pfeiffer_tc400_driver.PfeifferTC400
+.. autoclass:: socs.agents.pfeiffer_tc400.drivers.PfeifferTC400
     :members:

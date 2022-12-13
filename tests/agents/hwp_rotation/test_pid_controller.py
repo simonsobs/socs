@@ -1,7 +1,4 @@
-import sys
-sys.path.insert(0, '../agents/hwp_rotation/')
-from src.pid_controller import PID
-
+from socs.agents.hwp_rotation.drivers.pid_controller import PID
 from socs.testing.device_emulator import create_device_emulator
 
 pid_emu = create_device_emulator(

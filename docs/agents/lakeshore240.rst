@@ -10,9 +10,9 @@ The Lakeshore 240 is a 4-lead meausrement device used for readout of ROXes and
 Diodes at 1K and above.
 
 .. argparse::
-    :filename: ../agents/lakeshore240/LS240_agent.py
+    :filename: ../socs/agents/lakeshore240/agent.py
     :func: make_parser
-    :prog: python3 LS240_agent.py
+    :prog: python3 agent.py
 
 Dependencies
 ------------
@@ -74,17 +74,15 @@ Docker Compose
 The Lakeshore 240 Agent can (and probably should) be configured to run in a
 Docker container. An example configuration is::
 
-  ocs-LSA24MA:
-    image: simonsobs/ocs-lakeshore240-agent:latest
+  ocs-LSA22Z2:
+    image: simonsobs/socs:latest
     devices:
-      - "/dev/LSA24MA:/dev/LSA24MA"
+      - "/dev/LSA22Z2:/dev/LSA22Z2"
     hostname: nuc-docker
+    environment:
+      - INSTANCE_ID=LSA22Z2
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
-    command:
-      - "--instance-id=LSA24MA"
-      - "--site-hub=ws://crossbar:8001/ws"
-      - "--site-http=http://crossbar:8001/call"
 
 The serial number will need to be updated in your configuration. The hostname
 should also match your configured host in your OCS configuration file. The
@@ -106,7 +104,7 @@ client that sets Channel 1 of a 240 to read a diode::
 
     from ocs.matched_client import MatchedClient
 
-    ls_client = MatchedClient("LSA24MA")
+    ls_client = MatchedClient("LSA22Z2")
 
     diode_params = {
         'sensor': 1,
@@ -121,7 +119,7 @@ client that sets Channel 1 of a 240 to read a diode::
 Agent API
 ---------
 
-.. autoclass:: agents.lakeshore240.LS240_agent.LS240_Agent
+.. autoclass:: socs.agents.lakeshore240.agent.LS240_Agent
     :members:
 
 Supporting APIs

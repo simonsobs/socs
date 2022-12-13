@@ -1,11 +1,10 @@
 import os
-import pytest
 
 import ocs
+import pytest
+from integration.util import create_crossbar_fixture
 from ocs.base import OpCode
 from ocs.testing import create_agent_runner_fixture, create_client_fixture
-
-from integration.util import create_crossbar_fixture
 
 from socs.testing.device_emulator import create_device_emulator
 
@@ -16,7 +15,7 @@ os.environ['OCS_CONFIG_DIR'] = os.getcwd()
 
 
 run_agent = create_agent_runner_fixture(
-    '../agents/lakeshore372/LS372_agent.py',
+    '../socs/agents/lakeshore372/agent.py',
     'ls372')
 client = create_client_fixture('LSASIM')
 wait_for_crossbar = create_crossbar_fixture()

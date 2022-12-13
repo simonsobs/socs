@@ -12,9 +12,9 @@ by checking the md5sum and deleting the local files after a specified amount
 of time if the local and remote checksums match.
 
 .. argparse::
-    :filename: ../agents/suprsync/suprsync.py
+    :filename: ../socs/agents/suprsync/agent.py
     :func: make_parser
-    :prog: python3 suprsync.py
+    :prog: python3 agent.py
 
 Configuration File Examples
 ---------------------------
@@ -76,34 +76,34 @@ only possible because the ``cryo:smurf`` user is already built into the
 SuprSync docker::
 
   ocs-timestream-sync:
-       image: simonsobs/ocs-suprsync-agent:latest
+       image: simonsobs/socs:latest
        hostname: ocs-docker
        user: cryo:smurf
        network_mode: host
        container_name: ocs-timestream-sync
+       environment:
+           - INSTANCE_ID=timestream-sync
+           - SITE_HUB=ws://${CB_HOST}:8001/ws
+           - SITE_HTTP=http://${CB_HOST}:8001/call
        volumes:
            - ${OCS_CONFIG_DIR}:/config
            - /data:/data
            - /home/cryo/.ssh:/home/cryo/.ssh
-       command:
-           - '--instance-id=timestream-sync'
-           - "--site-hub=ws://${CB_HOST}:8001/ws"
-           - "--site-http=http://${CB_HOST}:8001/call"
 
   ocs-smurf-sync:
-       image: simonsobs/ocs-suprsync-agent:latest
+       image: simonsobs/socs:latest
        hostname: ocs-docker
        user: cryo:smurf
        network_mode: host
        container_name: ocs-smurf-sync
+       environment:
+           - INSTANCE_ID=smurf-sync
+           - SITE_HUB=ws://${CB_HOST}:8001/ws
+           - SITE_HTTP=http://${CB_HOST}:8001/call
        volumes:
            - ${OCS_CONFIG_DIR}:/config
            - /data:/data
            - /home/cryo/.ssh:/home/cryo/.ssh
-       command:
-           - '--instance-id=smurf-sync'
-           - "--site-hub=ws://${CB_HOST}:8001/ws"
-           - "--site-http=http://${CB_HOST}:8001/call"
 
 .. note::
 
@@ -173,7 +173,7 @@ we'll be running one SupRsync agent for each of these two archives.
 Agent API
 ---------
 
-.. autoclass:: agents.suprsync.suprsync.SupRsync
+.. autoclass:: socs.agents.suprsync.agent.SupRsync
     :members:
 
 Supporting APIs

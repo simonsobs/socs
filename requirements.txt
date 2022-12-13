@@ -1,22 +1,51 @@
-ocs
+# core dependencies
 autobahn[serialization]
+ocs
+sqlalchemy>=1.4
 twisted
 
-# Lakeshore240
+# hardware communication
 pyserial
-
-# LabJack Agent
-pymodbus
-numexpr
-pyyaml
-scipy
-
-# Meinberg M1000
 pysnmp
 pysmi
 
-# suprsync agent and tests
-sqlalchemy
+# common dependencies - used by multiple agents
+numpy
+pyyaml
+
+# acu agent
+soaculib @ git+https://github.com/simonsobs/soaculib.git@master
+
+# holography agent - python 3.8 only!
+# -r requirements/holography.txt
+
+# LabJack Agent
+numexpr
+scipy
+labjack-ljm
+
+# magpie agent
+scipy
+pandas
+
+# pfeiffer tc 400
+pfeiffer-vacuum-protocol==0.4
+
+# pysmurf controller
+pysmurf @ git+https://github.com/slaclab/pysmurf.git@main
+sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master
+sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master
+
+# synacc agent
+requests
+
+# xy_stage
+xy_stage_control @ git+https://github.com/kmharrington/xy_stage_control.git@main
+
+# pysmurf controller
+pysmurf @ git+https://github.com/slaclab/pysmurf.git@main
+sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master
+sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master
 
 # Docs
 # see docs/requirements.txt

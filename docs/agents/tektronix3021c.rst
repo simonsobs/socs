@@ -12,9 +12,9 @@ It connects to the function generator over ethernet, and allows
 users to set frequency, peak to peak voltage, and turn the AWG on/off.
 
 .. argparse::
-    :filename: ../agents/tektronix3021c/tektronix_agent.py
+    :filename: ../socs/agents/tektronix3021c/agent.py
     :func: make_parser
-    :prog: python3 tektronix_agent.py
+    :prog: python3 agent.py
 
 
 Configuration File Examples
@@ -22,8 +22,9 @@ Configuration File Examples
 Below are configuration examples for the ocs config file and for running the
 Agent in a docker container.
 
-ocs-config
-``````````
+OCS Site Config
+```````````````
+
 To configure the Tektronix AWG Agent we need to add a block to our ocs
 configuration file. Here is an example configuration block using all of
 the available arguments::
@@ -40,46 +41,47 @@ have GPIB ports rather than ethernet ports. Therefore a GPIB-to-ethernet
 converter is required, and the gpib slot must be specified in the ocs
 configuration file. The IP address is then associated with the converter.
 
-Docker
-``````
+Docker Compose
+``````````````
+
 The Tektronix AWG Agent should be configured to run in a Docker container.
 An example docker-compose service configuration is shown here::
 
   ocs-psuK:
-    image: simonsobs/ocs-tektronix-agent:latest
+    image: simonsobs/socs:latest
     hostname: ocs-docker
+    environment:
+      - INSTANCE_ID=tektronix
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
-    command:
-      - "--instance-id=tektronix"
-
-Example Client
---------------
-Below is an example client demonstrating full agent functionality.
-Note that all tasks can be run even while the data acquisition process
-is running.::
-
-    from ocs.matched_client import MatchedClient
-
-    #Initialize the power supply
-    tek = MatchedClient('tektronix', args=[])
-    tek.init.start()
-    tek.init.wait()
-
-    #Set AWG frequency
-    psuK.set_frequency.start(frequency=200)
-    psuK.set_frequency.wait()
-
-    #Set AWG peak to peak voltage
-    psuK.set_amplitude.start(amplitude=5)
-    psuK.set_amplitude.wait()
-
-    #Set AWG on/off
-    psuK.set_output.start(state=True)
-    psuK.set_output.wait()
 
 Agent API
 ---------
 
-.. autoclass:: agents.tektronix3021c.tektronix_agent.TektronixAWGAgent
-    :members: set_frequency, set_amplitude, set_output
+.. autoclass:: socs.agents.tektronix3021c.agent.TektronixAWGAgent
+    :members:
+
+Example Clients
+---------------
+Below is an example client demonstrating full agent functionality.
+Note that all tasks can be run even while the data acquisition process
+is running.::
+
+    from ocs.ocs_client import OCSClient
+
+    # Initialize the power supply
+    tek = OCSClient('tektronix', args=[])
+    tek.init.start()
+    tek.init.wait()
+
+    # Set AWG frequency
+    psuK.set_frequency.start(frequency=200)
+    psuK.set_frequency.wait()
+
+    # Set AWG peak to peak voltage
+    psuK.set_amplitude.start(amplitude=5)
+    psuK.set_amplitude.wait()
+
+    # Set AWG on/off
+    psuK.set_output.start(state=True)
+    psuK.set_output.wait()

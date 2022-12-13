@@ -1,5 +1,6 @@
-import serial
 import time
+
+import serial
 
 operational_status_key = [
     'No probe',
