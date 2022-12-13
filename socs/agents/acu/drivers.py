@@ -1,5 +1,6 @@
-import time
 import math
+import time
+
 import numpy as np
 
 
@@ -259,10 +260,10 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
 
     # Bias the starting point for the first leg?
     if ramp_up is not None:
-#        if increasing:
-#            az -= ramp_up
-#        else:
-#            az += ramp_up
+        #        if increasing:
+        #            az -= ramp_up
+        #        else:
+        #            az += ramp_up
         az -= ramp_up
 
     if start_time is None:
@@ -378,6 +379,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                    point_block[3], point_block[4], point_block[5],
                    point_block[6])
 
+
 def plan_scan(az_end1, el, throw, v_az=1, a_az=1, init='end', num_scans=1):
     """
     Calculate how far in advance you need to ramp into a scan.
@@ -396,9 +398,9 @@ def plan_scan(az_end1, el, throw, v_az=1, a_az=1, init='end', num_scans=1):
     info = {}
 
     # point separation
-    dt = 2 * abs(throw/v_az) / 10
+    dt = 2 * abs(throw / v_az) / 10
     dt = min(max(dt, 0.1), 1.0)
-    assert(2 * abs(throw/v_az) / dt >= 5)
+    assert (2 * abs(throw / v_az) / dt >= 5)
     plan['step_time'] = dt
     az_prep = 5 * dt * v_az
     a_max = 1.
@@ -422,9 +424,9 @@ def plan_scan(az_end1, el, throw, v_az=1, a_az=1, init='end', num_scans=1):
 #        if throw <= 5:
 #            plan['az_startpoint'] -= throw
 
-    info['total_time'] = (num_scans * (2 * abs(throw) / v_az + 2*v_az/a_az)
-        + ramp_up / v_az * 2
-        + plan['wait_to_start'])
+    info['total_time'] = (num_scans * (2 * abs(throw) / v_az + 2 * v_az / a_az)
+                          + ramp_up / v_az * 2
+                          + plan['wait_to_start'])
 
     return plan, info
 # if __name__ == "__main__":

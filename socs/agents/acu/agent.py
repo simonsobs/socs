@@ -248,12 +248,12 @@ class ACUAgent:
     # to assess conflicts should probably be in _try_set_job.
 
     def _set_job_stop(self, session):
-#        """
-#        Set a job status to 'stop'.
-#
-#        Parameters:
-#            job_name (str): Name of the process you are trying to stop.
-#        """
+        #        """
+        #        Set a job status to 'stop'.
+        #
+        #        Parameters:
+        #            job_name (str): Name of the process you are trying to stop.
+        #        """
         session.set_status('stopping')
 #        print('try to acquire stop')
 #        # return (False, 'Could not stop')
