@@ -149,29 +149,7 @@ class LATRtXYStageAgent:
 
             self.xy_stage.position = params['position']
         return True, "Position Updated"
-    
-    def set_enabled(self, session, params=None):
-        """Tell the controller to hold stages enabled
-        """
-        with self.lock.acquire_timeout(timeout=3, job='set_enabled') as acquired:
-            if not acquired:
-                self.log.warn(f"Could not set position because lock held by {self.lock.job}")
-                return False, "Could not acquire lock"
-                        
-            self.xy_stage.enable()
-        return True, "Enabled"
 
-    def set_disabled(self, session, params=None):
-        """Tell the controller to hold stages enabled
-        """
-        with self.lock.acquire_timeout(timeout=3, job='set_disabled') as acquired:
-            if not acquired:
-                self.log.warn(f"Could not set position because lock held by {self.lock.job}")
-                return False, "Could not acquire lock"
-                        
-            self.xy_stage.disable()
-        return True, "Disabled"
-    
     def start_acq(self, session, params=None):
         """
         params:
@@ -273,9 +251,7 @@ if __name__ == '__main__':
     agent.register_task('move_x_cm', xy_agent.move_x_cm)
     agent.register_task('move_y_cm', xy_agent.move_y_cm)
     agent.register_task('set_position', xy_agent.set_position)
-    agent.register_task('set_enabled', xy_agent.set_enabled)
-    agent.register_task('set_disabled', xy_agent.set_disabled)
-    
+
     agent.register_process('acq', xy_agent.start_acq, xy_agent.stop_acq)
 
     runner.run(agent, auto_reconnect=True)
