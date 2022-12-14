@@ -245,11 +245,17 @@ def test_uxm_relock(agent):
     assert res[0] is True
 
 
+def mock_take_bgmap(S, cfg, **kwargs):
+    """Mock a typical valid response from bias_steps.take_bgmap."""
+    bsa = mock.MagicMock()
+    bsa.sid = 0
+    bsa.filepath = 'bias_step_analysis.npy'
+    bsa.bgmap = np.zeros((12, 2))
+    return bsa
+
+
 @mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
-@mock.patch('sodetlib.set_current_mode', mock_set_current_mode)
-@mock.patch('sodetlib.operations.bias_steps.BiasStepAnalysis', mock_biasstepanalysis)
-@mock.patch('matplotlib.figure.Figure.savefig', mock_plt_savefig())
-@mock.patch('time.sleep', mock.MagicMock())
+@mock.patch('sodetlib.operations.bias_steps.take_bgmap', mock_take_bgmap)
 def test_take_bgmap(agent):
     """test_take_bgmap()
 
@@ -258,6 +264,8 @@ def test_take_bgmap(agent):
     session = create_session('take_bgmap')
     res = agent.take_bgmap(session, {'kwargs': {'high_current_mode': False}})
     assert res[0] is True
+    assert session.data['nchans_per_bg'] == [24, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    assert session.data['filepath'] == 'bias_step_analysis.npy'
 
 
 @mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
