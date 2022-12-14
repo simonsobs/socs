@@ -749,7 +749,7 @@ class PysmurfController:
                     'count': count,
                 }
 
-                d =  {
+                d = {
                     'timestamp': time.time(),
                     'block_name': f'{name}_quantile',
                     'data': block
@@ -764,7 +764,6 @@ class PysmurfController:
             d = publish_quantile_block(bsa.Rfrac, 'Rfrac')
 
             return True, "Finished taking bias steps"
-
 
     @ocs_agent.param('bgs', default=None)
     @ocs_agent.param('kwargs', default=None)
