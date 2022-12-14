@@ -133,10 +133,10 @@ def mock_take_noise(S, cfg, acq_time, **kwargs):
     return am, outdict
 
 
-def mock_ivanalysis(S, cfg, run_kwargs, sid, start_times, stop_times):
-    """mock_ivanalysis()
+def mock_ivanalysis(**kwargs):
+    """Mock an IVAnalysis (iva) object typically returned by sodetlib
+    operations.
 
-    **Mock** - Mock IVAnalysis class in sodetlib.
     """
     iva = mock.MagicMock()
     # iva.load.return_value = iva
@@ -265,10 +265,18 @@ def test_take_bgmap(agent):
     assert session.data['filepath'] == 'bias_step_analysis.npy'
 
 
+def mock_take_iv(S, cfg, **kwargs):
+    """Mock a typical valid response from iv.take_iv."""
+    iva = mock_ivanalysis()
+    iva.bands = np.array([1, 2, 3])  # not realistic
+    iva.channels = np.array([4, 5, 6])  # not realistic
+    iva.bgmap = np.zeros((12, 2))
+    iva.filepath = 'test_file.npy'
+    return iva
+
+
 @mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
-@mock.patch('matplotlib.figure.Figure.savefig', mock_plt_savefig())
-@mock.patch('sodetlib.operations.iv.IVAnalysis', mock_ivanalysis)
-@mock.patch('time.sleep', mock.MagicMock())
+@mock.patch('sodetlib.operations.iv.take_iv', mock_take_iv)
 def test_take_iv(agent):
     """test_take_iv()
 
@@ -277,6 +285,22 @@ def test_take_iv(agent):
     session = create_session('take_iv')
     res = agent.take_iv(session, {'kwargs': {'run_analysis': False}})
     assert res[0] is True
+    assert session.data['bands'] == [1, 2, 3]
+    assert session.data['channels'] == [4, 5, 6]
+    assert session.data['bgmap'] == [[0.0, 0.0],
+                                     [0.0, 0.0],
+                                     [0.0, 0.0],
+                                     [0.0, 0.0],
+                                     [0.0, 0.0],
+                                     [0.0, 0.0],
+                                     [0.0, 0.0],
+                                     [0.0, 0.0],
+                                     [0.0, 0.0],
+                                     [0.0, 0.0],
+                                     [0.0, 0.0],
+                                     [0.0, 0.0]]
+    assert session.data['R_n'] == [2, 2]
+    assert session.data['filepath'] == 'test_file.npy'
 
 
 def mock_take_bias_steps(S, cfg, **kwargs):
