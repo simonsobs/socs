@@ -335,9 +335,13 @@ def test_take_noise(agent):
     assert res[0] is True
 
 
+def mock_bias_to_rfrac_range(*args, **kwargs):
+    biases = np.full((12,), 10.)
+    return biases
+
+
 @mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
-@mock.patch('sodetlib.set_current_mode', mock_set_current_mode)
-@mock.patch('time.sleep', mock.MagicMock())
+@mock.patch('sodetlib.operations.bias_dets.bias_to_rfrac_range', mock_bias_to_rfrac_range)
 def test_bias_dets(agent):
     """test_bias_dets()
 
@@ -349,6 +353,7 @@ def test_bias_dets(agent):
                                     'kwargs': {'iva': mock_ivanalysis(S=mm, cfg=mm, run_kwargs=mm,
                                                                       sid=mm, start_times=mm, stop_times=mm)}})
     assert res[0] is True
+    assert session.data['biases'] == np.full((12,), 10.).tolist()
 
 
 @mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
