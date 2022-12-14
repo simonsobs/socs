@@ -155,10 +155,10 @@ def mock_set_current_mode(S, bgs, mode, const_current=True):
     return mock.MagicMock()
 
 
-def mock_biasstepanalysis(S, cfg, bgs, run_kwargs):
-    """mock_biasstepanalysis()
+def mock_biasstepanalysis():
+    """Mock Bias Step Analysis (bsa) object typically returned by sodetlib
+    operations.
 
-    **Mock** - Mock BiasStepAnalysis class in sodetlib.
     """
     bsa = mock.MagicMock()
     bsa.sid = 0
@@ -247,10 +247,7 @@ def test_uxm_relock(agent):
 
 def mock_take_bgmap(S, cfg, **kwargs):
     """Mock a typical valid response from bias_steps.take_bgmap."""
-    bsa = mock.MagicMock()
-    bsa.sid = 0
-    bsa.filepath = 'bias_step_analysis.npy'
-    bsa.bgmap = np.zeros((12, 2))
+    bsa = mock_biasstepanalysis()
     return bsa
 
 
@@ -282,10 +279,14 @@ def test_take_iv(agent):
     assert res[0] is True
 
 
+def mock_take_bias_steps(S, cfg, **kwargs):
+    """Mock a typical valid response from bias_steps.take_bias_steps."""
+    bsa = mock_biasstepanalysis()
+    return bsa
+
+
 @mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
-@mock.patch('sodetlib.set_current_mode', mock_set_current_mode)
-@mock.patch('sodetlib.operations.bias_steps.BiasStepAnalysis', mock_biasstepanalysis)
-@mock.patch('time.sleep', mock.MagicMock())
+@mock.patch('sodetlib.operations.bias_steps.take_bias_steps', mock_take_bias_steps)
 def test_take_bias_steps(agent):
     """test_take_bias_steps()
 
@@ -294,6 +295,7 @@ def test_take_bias_steps(agent):
     session = create_session('take_bias_steps')
     res = agent.take_bias_steps(session, {'kwargs': None})
     assert res[0] is True
+    assert session.data['filepath'] == 'bias_step_analysis.npy'
 
 
 @mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
