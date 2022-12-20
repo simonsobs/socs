@@ -9,6 +9,9 @@ from socs.agents.pysmurf_controller.agent import PysmurfController, make_parser
 
 txaio.use_twisted()
 
+# Number of channels in mock pysmurf system
+NCHANS = 1000
+
 
 # Mocks and fixures
 def mock_pysmurf(self, session=None, load_tune=False, **kwargs):
@@ -141,8 +144,8 @@ def mock_ivanalysis(**kwargs):
     iva = mock.MagicMock()
     # iva.load.return_value = iva
     iva.R = np.full((2, 12), 1)
-    iva.R_n = np.full((2, ), 2)
-    iva.bgmap = np.zeros((12, 2))
+    iva.R_n = np.full(NCHANS, 7e-3)
+    iva.bgmap = np.zeros(NCHANS)
     iva.v_bias = np.full((12, ), 2)
     return iva
 
@@ -163,7 +166,7 @@ def mock_biasstepanalysis():
     bsa = mock.MagicMock()
     bsa.sid = 0
     bsa.filepath = 'bias_step_analysis.npy'
-    bsa.bgmap = np.zeros((12, 2))
+    bsa.bgmap = np.zeros(NCHANS)
     return bsa
 
 
@@ -261,16 +264,16 @@ def test_take_bgmap(agent):
     session = create_session('take_bgmap')
     res = agent.take_bgmap(session, {'kwargs': {'high_current_mode': False}})
     assert res[0] is True
-    assert session.data['nchans_per_bg'] == [24, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    assert session.data['nchans_per_bg'] == [NCHANS, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     assert session.data['filepath'] == 'bias_step_analysis.npy'
 
 
 def mock_take_iv(S, cfg, **kwargs):
     """Mock a typical valid response from iv.take_iv."""
     iva = mock_ivanalysis()
-    iva.bands = np.array([1, 2, 3])  # not realistic
-    iva.channels = np.array([4, 5, 6])  # not realistic
-    iva.bgmap = np.zeros((12, 2))
+    iva.bands = np.zeros(NCHANS)
+    iva.channels = np.arange(NCHANS)
+    iva.bgmap = np.zeros(NCHANS)
     iva.filepath = 'test_file.npy'
     return iva
 
@@ -285,21 +288,10 @@ def test_take_iv(agent):
     session = create_session('take_iv')
     res = agent.take_iv(session, {'kwargs': {'run_analysis': False}})
     assert res[0] is True
-    assert session.data['bands'] == [1, 2, 3]
-    assert session.data['channels'] == [4, 5, 6]
-    assert session.data['bgmap'] == [[0.0, 0.0],
-                                     [0.0, 0.0],
-                                     [0.0, 0.0],
-                                     [0.0, 0.0],
-                                     [0.0, 0.0],
-                                     [0.0, 0.0],
-                                     [0.0, 0.0],
-                                     [0.0, 0.0],
-                                     [0.0, 0.0],
-                                     [0.0, 0.0],
-                                     [0.0, 0.0],
-                                     [0.0, 0.0]]
-    assert session.data['R_n'] == [2, 2]
+    assert session.data['bands'] == np.zeros(NCHANS).tolist()
+    assert session.data['channels'] == np.arange(NCHANS).tolist()
+    assert session.data['bgmap'] == np.zeros(NCHANS).tolist()
+    assert session.data['R_n'] == np.full(NCHANS, 7e-3).tolist()
     assert session.data['filepath'] == 'test_file.npy'
 
 
