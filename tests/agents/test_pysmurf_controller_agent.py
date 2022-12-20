@@ -9,6 +9,9 @@ from socs.agents.pysmurf_controller.agent import PysmurfController, make_parser
 
 txaio.use_twisted()
 
+# Number of channels in mock pysmurf system
+NCHANS = 1000
+
 
 # Mocks and fixures
 def mock_pysmurf(self, session=None, load_tune=False, **kwargs):
@@ -133,16 +136,16 @@ def mock_take_noise(S, cfg, acq_time, **kwargs):
     return am, outdict
 
 
-def mock_ivanalysis(S, cfg, run_kwargs, sid, start_times, stop_times):
-    """mock_ivanalysis()
+def mock_ivanalysis(**kwargs):
+    """Mock an IVAnalysis (iva) object typically returned by sodetlib
+    operations.
 
-    **Mock** - Mock IVAnalysis class in sodetlib.
     """
     iva = mock.MagicMock()
     # iva.load.return_value = iva
     iva.R = np.full((2, 12), 1)
-    iva.R_n = np.full((2, ), 2)
-    iva.bgmap = np.zeros((12, 2))
+    iva.R_n = np.full(NCHANS, 7e-3)
+    iva.bgmap = np.zeros(NCHANS)
     iva.v_bias = np.full((12, ), 2)
     return iva
 
@@ -155,15 +158,15 @@ def mock_set_current_mode(S, bgs, mode, const_current=True):
     return mock.MagicMock()
 
 
-def mock_biasstepanalysis(S, cfg, bgs, run_kwargs):
-    """mock_biasstepanalysis()
+def mock_biasstepanalysis():
+    """Mock Bias Step Analysis (bsa) object typically returned by sodetlib
+    operations.
 
-    **Mock** - Mock BiasStepAnalysis class in sodetlib.
     """
     bsa = mock.MagicMock()
     bsa.sid = 0
     bsa.filepath = 'bias_step_analysis.npy'
-    bsa.bgmap = np.zeros((12, 2))
+    bsa.bgmap = np.zeros(NCHANS)
     return bsa
 
 
@@ -209,11 +212,32 @@ def test_uxm_setup(agent):
     assert res[0] is True
 
 
+def mock_uxm_relock(S, cfg, bands, **kwargs):
+    """Mock a typical valid response from uxm_relock."""
+    summary = {'timestamps': [('setup_amps', 1671048272.6197276),
+                              ('load_tune', 1671048272.6274314),
+                              ('tracking_setup', 1671048272.6286802),
+                              ('noise', 1671048272.7402556),
+                              ('end', 1671048272.7404766)],
+               'amps': {'success': True},
+               'reload_tune': None,
+               'tracking_setup_results': mock.MagicMock(),
+               'noise': {'noise_pars': 0,
+                         'bands': 0,
+                         'channels': 0,
+                         'band_medians': 0,
+                         'f': 0,
+                         'axx': 0,
+                         'bincenters': 0,
+                         'lowfn': 0,
+                         'low_f_10mHz': 0,
+                         'am': mock.MagicMock()}}
+
+    return True, summary
+
+
 @mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
-@mock.patch('numpy.save', mock_np_save())
-@mock.patch('matplotlib.figure.Figure.savefig', mock_plt_savefig())
-@mock.patch('sodetlib.noise.take_noise', mock_take_noise)
-@mock.patch('time.sleep', mock.MagicMock())
+@mock.patch('sodetlib.operations.uxm_relock.uxm_relock', mock_uxm_relock)
 def test_uxm_relock(agent):
     """test_uxm_relock()
 
@@ -224,11 +248,14 @@ def test_uxm_relock(agent):
     assert res[0] is True
 
 
+def mock_take_bgmap(S, cfg, **kwargs):
+    """Mock a typical valid response from bias_steps.take_bgmap."""
+    bsa = mock_biasstepanalysis()
+    return bsa
+
+
 @mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
-@mock.patch('sodetlib.set_current_mode', mock_set_current_mode)
-@mock.patch('sodetlib.operations.bias_steps.BiasStepAnalysis', mock_biasstepanalysis)
-@mock.patch('matplotlib.figure.Figure.savefig', mock_plt_savefig())
-@mock.patch('time.sleep', mock.MagicMock())
+@mock.patch('sodetlib.operations.bias_steps.take_bgmap', mock_take_bgmap)
 def test_take_bgmap(agent):
     """test_take_bgmap()
 
@@ -237,12 +264,22 @@ def test_take_bgmap(agent):
     session = create_session('take_bgmap')
     res = agent.take_bgmap(session, {'kwargs': {'high_current_mode': False}})
     assert res[0] is True
+    assert session.data['nchans_per_bg'] == [NCHANS, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    assert session.data['filepath'] == 'bias_step_analysis.npy'
+
+
+def mock_take_iv(S, cfg, **kwargs):
+    """Mock a typical valid response from iv.take_iv."""
+    iva = mock_ivanalysis()
+    iva.bands = np.zeros(NCHANS)
+    iva.channels = np.arange(NCHANS)
+    iva.bgmap = np.zeros(NCHANS)
+    iva.filepath = 'test_file.npy'
+    return iva
 
 
 @mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
-@mock.patch('matplotlib.figure.Figure.savefig', mock_plt_savefig())
-@mock.patch('sodetlib.operations.iv.IVAnalysis', mock_ivanalysis)
-@mock.patch('time.sleep', mock.MagicMock())
+@mock.patch('sodetlib.operations.iv.take_iv', mock_take_iv)
 def test_take_iv(agent):
     """test_take_iv()
 
@@ -251,12 +288,21 @@ def test_take_iv(agent):
     session = create_session('take_iv')
     res = agent.take_iv(session, {'kwargs': {'run_analysis': False}})
     assert res[0] is True
+    assert session.data['bands'] == np.zeros(NCHANS).tolist()
+    assert session.data['channels'] == np.arange(NCHANS).tolist()
+    assert session.data['bgmap'] == np.zeros(NCHANS).tolist()
+    assert session.data['R_n'] == np.full(NCHANS, 7e-3).tolist()
+    assert session.data['filepath'] == 'test_file.npy'
+
+
+def mock_take_bias_steps(S, cfg, **kwargs):
+    """Mock a typical valid response from bias_steps.take_bias_steps."""
+    bsa = mock_biasstepanalysis()
+    return bsa
 
 
 @mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
-@mock.patch('sodetlib.set_current_mode', mock_set_current_mode)
-@mock.patch('sodetlib.operations.bias_steps.BiasStepAnalysis', mock_biasstepanalysis)
-@mock.patch('time.sleep', mock.MagicMock())
+@mock.patch('sodetlib.operations.bias_steps.take_bias_steps', mock_take_bias_steps)
 def test_take_bias_steps(agent):
     """test_take_bias_steps()
 
@@ -265,6 +311,7 @@ def test_take_bias_steps(agent):
     session = create_session('take_bias_steps')
     res = agent.take_bias_steps(session, {'kwargs': None})
     assert res[0] is True
+    assert session.data['filepath'] == 'bias_step_analysis.npy'
 
 
 @mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
@@ -280,9 +327,13 @@ def test_take_noise(agent):
     assert res[0] is True
 
 
+def mock_bias_to_rfrac_range(*args, **kwargs):
+    biases = np.full((12,), 10.)
+    return biases
+
+
 @mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
-@mock.patch('sodetlib.set_current_mode', mock_set_current_mode)
-@mock.patch('time.sleep', mock.MagicMock())
+@mock.patch('sodetlib.operations.bias_dets.bias_to_rfrac_range', mock_bias_to_rfrac_range)
 def test_bias_dets(agent):
     """test_bias_dets()
 
@@ -294,6 +345,7 @@ def test_bias_dets(agent):
                                     'kwargs': {'iva': mock_ivanalysis(S=mm, cfg=mm, run_kwargs=mm,
                                                                       sid=mm, start_times=mm, stop_times=mm)}})
     assert res[0] is True
+    assert session.data['biases'] == np.full((12,), 10.).tolist()
 
 
 @mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
