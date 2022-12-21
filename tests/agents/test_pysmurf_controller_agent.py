@@ -167,6 +167,7 @@ def mock_biasstepanalysis():
     bsa.sid = 0
     bsa.filepath = 'bias_step_analysis.npy'
     bsa.bgmap = np.zeros(NCHANS)
+    bsa.Rfrac = np.full(NCHANS, 0.5)
     return bsa
 
 
@@ -309,7 +310,7 @@ def test_take_bias_steps(agent):
     **Test** - Tests take_bias_steps task.
     """
     session = create_session('take_bias_steps')
-    res = agent.take_bias_steps(session, {'kwargs': None})
+    res = agent.take_bias_steps(session, {'kwargs': None, 'rfrac_range': (0.3, 0.9)})
     assert res[0] is True
     assert session.data['filepath'] == 'bias_step_analysis.npy'
 
@@ -369,4 +370,33 @@ def test_check_state(agent):
     """
     session = create_session('check_state')
     res = agent.check_state(session, {'poll_interval': 10, 'test_mode': True})
+    assert res[0] is True
+
+
+def mock_overbias_dets(S, cfg, **kwargs):
+    return
+
+@mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
+@mock.patch('sodetlib.overbias_dets', mock_overbias_dets)
+def test_overbias_tes(agent):
+    """test_overbias_tes()
+
+    **Test** - Tests overbias_tes task.
+    """
+    session = create_session('overbias_tes')
+    res = agent.overbias_tes(session, {'bgs': [0, 1, 2], 'kwargs': None})
+    assert res[0] is True
+
+
+def mock_overbias_dets(S, cfg, **kwargs):
+    return
+
+@mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
+def test_all_off(agent):
+    """test_all_off()
+
+    **Test** - Tests the all_off task.
+    """
+    session = create_session('overbias_tes')
+    res = agent.all_off(session, {'disable_amps': True, 'disable_tones': True})
     assert res[0] is True
