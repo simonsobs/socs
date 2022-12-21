@@ -376,6 +376,7 @@ def test_check_state(agent):
 def mock_overbias_dets(S, cfg, **kwargs):
     return
 
+
 @mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
 @mock.patch('sodetlib.overbias_dets', mock_overbias_dets)
 def test_overbias_tes(agent):
@@ -390,6 +391,7 @@ def test_overbias_tes(agent):
 
 def mock_overbias_dets(S, cfg, **kwargs):
     return
+
 
 @mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
 def test_all_off(agent):
