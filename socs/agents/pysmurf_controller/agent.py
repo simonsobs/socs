@@ -769,9 +769,9 @@ class PysmurfController:
                 return d
 
             # Resistance quantiles
-            d = publish_quantile_block(bsa.R0, 'Rtes')
-            d = publish_quantile_block(bsa.Si, 'resposnivity')
-            d = publish_quantile_block(bsa.Rfrac, 'Rfrac')
+            publish_quantile_block(bsa.R0, 'Rtes')
+            publish_quantile_block(bsa.Si, 'resposnivity')
+            publish_quantile_block(bsa.Rfrac, 'Rfrac')
 
             return True, "Finished taking bias steps"
 
