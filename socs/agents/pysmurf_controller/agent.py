@@ -680,7 +680,7 @@ class PysmurfController:
     @ocs_agent.param('kwargs', default=None)
     @ocs_agent.param('rfrac_range', default=(0.2, 0.9))
     def take_bias_steps(self, session, params):
-        """take_bias_steps(kwargs=None)
+        """take_bias_steps(kwargs=None, rfrac_range=(0.2, 0.9))
 
         **Task** - Takes bias_steps and saves the output filepath to the
         session data object. See the `sodetlib bias step docs page
@@ -702,6 +702,16 @@ class PysmurfController:
             >> response.session['data']
             {
                 'filepath': Filepath of saved BiasStepAnalysis object
+                'biased_total': Total number of detectors biased into rfrac_range
+                'biased_per_bg': List containing number of biased detectors on each bias line
+                'Rtes_quantiles': {
+                    'Rtes': List of 15%, 25%, 50%, 75%, 85% Rtes quantiles,
+                    'quantiles': List of quantile labels
+                    'count': Total count of the distribution
+                }
+                'responsivity_quantiles': Same as above for responsivity
+                'Rfrac_quantiles': Same as above for Rfrac
+
             }
         """
 
@@ -781,7 +791,7 @@ class PysmurfController:
             Additional kwargs to pass to the ``overbias_tes_all`` function.
         """
         kw = {'bias_groups': params['bgs']}
-        if params['kwargs'] is None:
+        if params['kwargs'] is not None:
             kw.update(params['kwargs'])
 
         with self.lock.acquire_timeout(0, job='overbias_tes') as acquired:
@@ -865,9 +875,6 @@ class PysmurfController:
         disable_tones: bool
             If True, will turn off RF tones and flux-ramp signal
         """
-        if params['kwargs'] is None:
-            params['kwargs'] = {}
-
         with self.lock.acquire_timeout(0, job='all_off') as acquired:
             if not acquired:
                 return False, f"Operation failed: {self.lock.job} is running."
