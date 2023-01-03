@@ -389,10 +389,6 @@ def test_overbias_tes(agent):
     assert res[0] is True
 
 
-def mock_overbias_dets(S, cfg, **kwargs):
-    return
-
-
 @mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
 def test_all_off(agent):
     """test_all_off()
