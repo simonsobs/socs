@@ -800,17 +800,19 @@ class LS372_Agent:
 
         return True, f'Setpoint now set to {params["temperature"]} K'
 
-    # TODO: turn enable/disable into 1 task
+    # TODO: change name from power_channel()?
     @ocs_agent.param('channel', type=int)
-    def enable_channel(self, session, params):
-        """enable_channel(channel=None)
+    @ocs_agent.param('state', type=str, choices=['on', 'off'])
+    def power_channel(self, session, params):
+        """power_channel(channel=None)
 
-        **Task** - Enables a channel on the LS372
+        **Task** - Enables/disables a channel on the LS372
         
         Parameters:
-            channel (int): Channel number to enable 
+            channel (int): Channel number to enable
+            state (str): Desired power state of channel; 'on' or 'off'
         """
-        with self._lock.acquire_timeout(job='enable_channel') as acquired:
+        with self._lock.acquire_timeout(job='power_channel') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
                               f"{self._lock.job} is already running")
@@ -819,32 +821,14 @@ class LS372_Agent:
             session.set_status('running')
             
             channel = params['channel']
-            ch_settings = self.module.enable_channel(channel)
+            state = params['state']
+            if state == 'on': 
+                ch_settings = self.module.enable_channel(channel)
+            else:
+                ch_settings = self.module.disable_channel(channel)
                                     
-        return True, f"Enabled channel {channel} with settings {ch_settings}"
+        return True, "Channel {} powered {} with settings {}".format(channel, state, ch_settings)
 
-    @ocs_agent.param('channel', type=int)
-    def disable_channel(self, session, params):
-        """disable_channel(channel=None)
-
-        **Task** - Disables a channel on the LS372
-        
-        Parameters:
-            channel (int): Channel number to disable 
-        """
-        with self._lock.acquire_timeout(job='disable_channel') as acquired:
-            if not acquired:
-                self.log.warn(f"Could not start Task because "
-                              f"{self._lock.job} is already running")
-                return False, "Could not acquire lock"
-
-            session.set_status('running')
-            
-            channel = params['channel']
-            ch_settings = self.module.disable_channel(channel)
-                                    
-        return True, f"Disabled channel {channel} with settings {ch_settings}"
-    
     @ocs_agent.param('channel', type=int)
     def get_channel_settings(self, session, params):
         """get_channel_settings(channel=None)
@@ -1447,8 +1431,7 @@ if __name__ == '__main__':
     agent.register_task('get_resistance_range', lake_agent.get_resistance_range)
     agent.register_task('set_dwell', lake_agent.set_dwell)
     agent.register_task('get_dwell', lake_agent.get_dwell)
-    agent.register_task('enable_channel', lake_agent.enable_channel)
-    agent.register_task('disable_channel', lake_agent.disable_channel)
+    agent.register_task('power_channel', lake_agent.power_channel)
     agent.register_task('channel_settings', lake_agent.channel_settings)
     agent.register_task('get_input_setup', lake_agent.get_input_setup)
     agent.register_task('set_calibration_curve', lake_agent.set_calibration_curve)
