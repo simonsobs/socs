@@ -911,23 +911,24 @@ class LS372_Agent:
     @ocs_agent.param('I', type=int)
     @ocs_agent.param('update_time', type=int)
     @ocs_agent.param('sample_heater_range', type=float, default=10e-3)
-    @ocs_agent.param('still_heater_R', type=int, default=120)
-    @ocs_agent.param('still_lead_R', type=float, default=14.679)
-    @ocs_agent.param('delta_t', type=float, default=0.32)
-    @ocs_agent.param('max_voltage', type=float, default=10.)
+    # TODO: maybe add still_heater_R and still_lead_R & delta t and max_voltage?
     def start_custom_pid(self, session, params):
-        """
-        PID the still or sample heater off of a channel on the LS372. 
-        Currently only P and I implemented.
-        :param params: dict with "setpoint", "channel"
-        :type params: dict
-        setpoint - Setpoint in Kelvin (float)
-        heater - 'still' or 'sample' (str)
-        channel - LS372 channel to PID off of (int)
-        P_val - Proportional value in Watts/Kelvin (float)
-        I_val - Integral value in Hz (float)
-        update_time - Time between PID updates (s)
-        sample_heater_range - sample heater range (A). Default=10e-3
+        """start_custom_pid(setpoint=None, heater=None, channel=None, P=None,
+                            I=None, update_time=None, sample_heater_range=None)
+
+        **Task** - Set custom software PID parameters for servo control of fridge
+        using still or sample heater. Currently only P and I implemented.
+
+        Parameters:
+            setpoint (float): Setpoint in Kelvin 
+            heater (str): 'still' or 'sample'
+            channel (int): LS372 Channel to PID off of
+            P (int): Proportional value in Watts/Kelvin
+            I (int): Integral Value in Hz
+            update_time (int): Time between PID updates in seconds
+            sample_heater_range (float): Range for sample heater in Amps.
+                                         Default is 10e-3.
+        # TODO: FIX below
         still_heater_R - still heater resistance in ohms. Default=120
         still_lead_R - still heater lead resistance in ohms. Default=14.679  
         """
@@ -954,12 +955,12 @@ class LS372_Agent:
             I_val = params['I']
             update_time = params['update_time']
             sample_heater_range = params['sample_heater_range']
-            still_heater_R = params['still_heater_R']
-            still_lead_R = params['still_lead_R']
             
-            #Constants
-            delta_t = params['delta_t'] #rough intrinsic sampling period of the LS372 (s)
-            max_voltage = params['max_voltage'] # [V]
+            # Constants
+            still_heater_R = 120 # [ohms]
+            still_lead_R = 14.679 # [ohms]
+            delta_t = 0.32 # rough intrinsic sampling period of the LS372 (s)
+            max_voltage = 10 # [V]
 
             # Get heaters in the correct configuration
             if heater == 'sample':
@@ -1002,12 +1003,12 @@ class LS372_Agent:
             
             while self.custom_pid:
                 
-                #Get a list of T and R at the maximum sample frequency
+                # Get a list of T and R at the maximum sample frequency
                 temps.append(self.module.get_temp(unit='kelvin', chan=ch))
                 resistances.append(self.module.get_temp(unit='ohms', chan=ch))
                 times.append(time.time())
                 
-                #Calculate and apply the PID based on the most recent temperature set
+                # Calculate and apply the PID based on the most recent temperature set
                 if times[-1]-last_pid > update_time:
                     heater_P = P_val*(setpoint-np.mean(np.array(temps)))
                     heater_I += P_val*I_val*(delta_t*np.sum(setpoint-np.array(temps)))
@@ -1018,7 +1019,17 @@ class LS372_Agent:
                     if heater == 'sample':
                         self.module.sample_heater.set_heater_output(heater_pow)
                     
-                    #Publish heater values
+                    # Publish P, I values
+                    # TODO: and whenever it changes.
+                    PID_data = {
+                            'timestamp': last_pid, # TODO: time.time()? 
+                            'block_name': 'PID',
+                            'data' : {'P_val': P_val,
+                                      'I_val': I_val}
+                            }
+                                
+
+                    # Publish heater values
                     if heater == 'still':
                         heater_data = {
                                 'timestamp': last_pid,
@@ -1035,7 +1046,7 @@ class LS372_Agent:
                                 }
                         session.app.publish_to_feed('temperatures', heater_data)
                     
-                    #Publish T and R values
+                    # Publish T and R values
                     temp_data = {
                         'timestamps': times,
                         'block_name': active_channel.name,
@@ -1051,7 +1062,7 @@ class LS372_Agent:
                     session.data['fields'].update(field_dict)
                     self.log.debug("{data}", data=session.data)
                     
-                    #Reset for the next PID iteration
+                    # Reset for the next PID iteration
                     temps, resistances, times = [], [], []
                     last_pid = time.time()
                 
