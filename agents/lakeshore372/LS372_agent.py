@@ -800,11 +800,10 @@ class LS372_Agent:
 
         return True, f'Setpoint now set to {params["temperature"]} K'
 
-    # TODO: change name from power_channel()?
     @ocs_agent.param('channel', type=int)
     @ocs_agent.param('state', type=str, choices=['on', 'off'])
-    def power_channel(self, session, params):
-        """power_channel(channel=None)
+    def toggle_channel(self, session, params):
+        """toggle_channel(channel=None)
 
         **Task** - Enables/disables a channel on the LS372
         
@@ -812,7 +811,7 @@ class LS372_Agent:
             channel (int): Channel number to enable
             state (str): Desired power state of channel; 'on' or 'off'
         """
-        with self._lock.acquire_timeout(job='power_channel') as acquired:
+        with self._lock.acquire_timeout(job='toggle_channel') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
                               f"{self._lock.job} is already running")
@@ -1442,7 +1441,7 @@ if __name__ == '__main__':
     agent.register_task('get_resistance_range', lake_agent.get_resistance_range)
     agent.register_task('set_dwell', lake_agent.set_dwell)
     agent.register_task('get_dwell', lake_agent.get_dwell)
-    agent.register_task('power_channel', lake_agent.power_channel)
+    agent.register_task('toggle_channel', lake_agent.toggle_channel)
     agent.register_task('channel_settings', lake_agent.channel_settings)
     agent.register_task('get_input_setup', lake_agent.get_input_setup)
     agent.register_task('set_calibration_curve', lake_agent.set_calibration_curve)
