@@ -1,6 +1,6 @@
 import time
 import os
-from asyncio.timeouts import timeout
+#from asyncio.timeouts import timeout
 import txaio
 import argparse
 
@@ -135,10 +135,10 @@ class PgridMotorAgent:
         else:
             return False, ("Motor is not moving.", self.move_status)
 
-    @ocs_agent.param('rot_vel', default=DFLT_VEL, type=float, check=lambda x: MIN_VEL <= x <= MAX_VEL)
-    @ocs_agent.param('rot_accel', default=DFLT_ACC, type=float, check=lambda x: MIN_ACC <= x <= MAX_ACC)
+    #@ocs_agent.param('rot_vel', default=DFLT_VEL, type=float, check=lambda x: MIN_VEL <= x <= MAX_VEL)
+    #@ocs_agent.param('rot_accel', default=DFLT_ACC, type=float, check=lambda x: MIN_ACC <= x <= MAX_ACC)
     def start_rotation(self, session, params):
-        """start_rotation(rot_vel=12.0, rot_accel=1.0)
+        """start_rotation(rot_vel=5.0, rot_accel=1.0)
 
         **Task** - Start rotating motor of polarizer.
 
@@ -155,11 +155,11 @@ class PgridMotorAgent:
                     f"Could not start_rotation because lock held by {self.lock.job}")
                 return False, "Could not acquire lock"
 
-            self.motor.start_rotation(params['rot_vel'], params['rot_accel'])
+            #self.motor.start_rotation(params['rot_vel'], params['rot_accel'])
+            self.motor.start_rotation()
 
-        return True, "Started rotating motor at velocity {} and acceleration {}".format(
-            params['rot_vel'], params['rot_accel'])
-
+        return True, "Started rotating motor."
+    
     def stop_rotation(self, session, params=None):
         """stop_rotation()
 
@@ -176,11 +176,12 @@ class PgridMotorAgent:
 
         return True, "Stopped rotating motor"
 
+    @ocs_agent.param('verbose', default=True, type=bool)
     @ocs_agent.param('rot_vel', default=DFLT_VEL, type=float, check=lambda x: MIN_VEL <= x <= MAX_VEL)
     def set_rot_vel(self, session, params):
         """set_rot_vel(rot_vel=0.25)
 
-        **Task** - Set rotational velocity of polarizing grid motor while already in motion
+        **Task** - Set rotational velocity of polarizing grid motor.
 
         Parameters:
             rot_vel (float): Sets rotational velocity of motor in revolutions per second
@@ -189,8 +190,8 @@ class PgridMotorAgent:
 
         with self.lock.acquire_timeout(timeout=1, job='set_rot_vel_pgrid_motor') as acquired:
             self.move_status = self.movement_check(params)
-            if not self.move_status:
-                return False, "Motor is not moving."
+            if self.move_status:
+                return False, "Motor is already moving."
             if not acquired:
                 self.log.warn(
                     f"Could not set_rot_vel because lock held by {self.lock.job}")
@@ -219,6 +220,7 @@ class PgridMotorAgent:
             
         return rot_vel, "Rotational velocity of pgrid_motor is {}".format(rot_vel)
 
+    @ocs_agent.param('verbose', default=True, type=bool)
     @ocs_agent.param('rot_accel', default=DFLT_ACC, type=float, check=lambda x: MIN_ACC <= x <= MAX_ACC)
     def set_rot_accel(self, session, params):
         """set_rot_accel(rot_accel=1)
@@ -232,8 +234,8 @@ class PgridMotorAgent:
 
         with self.lock.acquire_timeout(timeout=1, job='set_rot_vel_pgrid_motor') as acquired:
             self.move_status = self.movement_check(params)
-            if not self.move_status:
-                return False, "Motor is not moving."
+            if self.move_status:
+                return False, "Motor is already moving."
             if not acquired:
                 self.log.warn(
                     f"Could not set_rot_accel because lock held by {self.lock.job}")
@@ -263,6 +265,8 @@ class PgridMotorAgent:
             
         return accel, "Rotational acceleration of pgrid_motor is {}".format(accel)
 
+    @ocs_agent.param('verbose', default=True, type=bool)
+    @ocs_agent.param('deg', default=0, type=int)
     def rotate_by_degrees(self, session, params=None):
         """rotate_by_degrees()
 
@@ -274,6 +278,9 @@ class PgridMotorAgent:
         """
 
         with self.lock.acquire_timeout(timeout=1, job='rotate_by_degrees_pgrid_motor') as acquired:
+            self.move_status = self.movement_check(params)
+            if self.move_status:
+                return False, "Motor is already moving."
             if not acquired:
                 self.log.warn(
                     f"Could not get_rot_accel because lock held by {self.lock.job}")
@@ -343,7 +350,41 @@ class PgridMotorAgent:
             self.motor.reset_alarms()
 
         return True, "Alarms reset for pgrid_motor"
-
+    
+    @ocs_agent.param('pos_is_rads', default=False, type=bool)
+    def get_positions(self, session, params):
+        """get_position()
+        
+        **Task** - Gets position of motor relative to zero in either counts or
+        radians.
+        """
+        with self.lock.acquire_timeout(1, job="get_position_of_motor_in_counts") as acquired:
+            if not acquired:
+                self.log.warn(
+                    f"Could not reset_alarms because lock held by {self.lock.job}")
+                return False
+            positions = self.motor.get_position()  
+        
+        return True, "Current motor positions: {}".format(positions)"
+    
+    @ocs_agent.param('verbose', default=True, type=bool)
+    def set_zero(self, session, params):
+        """set_zero()
+        
+        **Task** - Sets zero, or home, position of pol grid.
+        """
+        with self.lock.acquire_timeout(1, job="set_zero_of_pol_grid") as acquired:
+            self.move_status = self.movement_check(params)
+            if self.move_status:
+                return False, "Motors are already moving."
+            if not acquired:
+                self.log.warn(
+                    f"Could not reset_alarms because lock held by {self.lock.job}")
+                return False
+            self.motor.set_zero()
+            
+        return True, "Zeroing pol grid position."
+        
     @ocs_agent.param('verbose', default=True, type=bool)
     @ocs_agent.param('f_sample', default=2, type=float)
     def acq(self, session, params):
@@ -448,7 +489,7 @@ def make_parser(parser=None):
     if parser is None:
         parser = argparse.ArgumentParser()
     pgroup = parser.add_argument_group('Agent Options')
-    pgroup.add_argument('--ip_address', help="MOXA IP address", type=str)
+    pgroup.add_argument('--ip-address', help="MOXA IP address", type=str)
     pgroup.add_argument(
         '--port',
         help="MOXA port number for pgrid_motor",
@@ -460,7 +501,7 @@ def make_parser(parser=None):
     pgroup.add_argument(
         '--samp',
         help="Frequency to sample at for data acq",
-        type=float)
+        type=str)
     pgroup.add_argument(
         '--mode',
         help="puts mode into auto acquisition or not...",

@@ -19,7 +19,7 @@
 ##########################################################################
 
 import sys
-from tkinter.ttk import setup_master
+#from tkinter.ttk import setup_master
 from socs.agent.moxaSerial import Serial_TCPServer
 from time import sleep
 import numpy as np
@@ -49,6 +49,9 @@ NO_MV_ALM = 'AL=8000'       # no move alarm
 
 class Motor:
     def __init__(self, ip, port, mot_id=None):
+        print(ip)
+        print(port)
+
         self.ip = ip
         self.port = port
         self.mot_id = mot_id
@@ -56,6 +59,8 @@ class Motor:
         self.ser = Serial_TCPServer((ip, port))
 
         self.sock_status = 0
+        
+        self.pos = 0 #position in counts, should be integer
 
         # Connect to motor over MOXA serial server
         if not (ip and port):
@@ -68,6 +73,8 @@ class Motor:
         # Verify motor is in ready state and reset if necessary
         if self.ser:
             msg = self.ser.writeread('RS\r')  # RS = Request Status
+            self.ser.flushInput()
+            print(msg)
             if (msg == 'RS=R'): # R = Ready
                 print("%s in ready state." % (self.mot_id))
             elif (msg != 'RS=R'):
@@ -78,7 +85,8 @@ class Motor:
                 self.kill_all_commands()
                 # TODO: Reset motor
 
-                if ('A' in msg[3:]): # A = Alarm
+                #if ('A' in msg[3:]): # A = Alarm
+                if (msg == 'RS=AR'):
                     amsg = self.ser.writeread('AL\r')  # AL = Alarm Code
                     self.alarm_handler(amsg)
                     print("Alarm was found. Resetting.")
@@ -234,7 +242,7 @@ class Motor:
         else:
             self.ser.write('MD\r')  # MD = Motor Disable
         
-    def start_rotation(self, rot_vel=12.0, rot_accel=1.0):
+    def start_rotation(self):
         """
         Starts jogging specifically for the rotation of the output
         polarizer in the FTS.
@@ -246,13 +254,13 @@ class Motor:
                 second within range [1,3000].  (default 1.0)
         """
         # Set the jog parameters
-        self.ser.flushInput()
-        self.ser.write('JS%1.3f\r' % (rot_vel))  # JS = Jog Speed
-        self.ser.write('JA%i\r' % (rot_accel))  # JA = Jog Acceleration
-        self.ser.write('JL%i\r' % (rot_accel))  # JL = Jog Decel
-
+        #self.ser.write('JS%1.3f\r' % (rot_vel))  # JS = Jog Speed
+        #self.ser.write('JA%i\r' % (rot_accel))  # JA = Jog Acceleration
+        #self.ser.write('JL%i\r' % (rot_accel))  # JL = Jog Decel
+        
         # Start rotation
         self.ser.write('CJ\r')  # CJ = Commence Jogging
+        self.ser.flushInput()
 
     def stop_rotation(self):
         """
@@ -261,15 +269,17 @@ class Motor:
         self.ser.flushInput()
         self.ser.write('SJ\r')  # SJ = Stop Jogging
 
-    def set_rot_vel(self, rot_vel=12.0):
+    def set_rot_vel(self, rot_vel=5.0):
         """
         Set the rotational velocity of the motor while jogging already in progress.
 
         Parameters:
             rot_vel (float): The rotational velocity in revolutions per second.
         """
+        
+        #self.ser.write('CS%1.3f\r' % (rot_vel))
+        self.ser.write('JS%1.3f\r' % (rot_vel))
         self.ser.flushInput()
-        self.ser.write('CS%1.3f\r' % (rot_vel))
 
     def get_rot_vel(self):
         """
@@ -286,9 +296,9 @@ class Motor:
             acceleration (float): The acceleration in revolutions per second per
                 second within range [1,3000].
         """
-        self.ser.flushInput()
         self.ser.write('JA%1.3f\r' % (rot_accel))
         self.ser.write('JL%1.3f\r' % (rot_accel))
+        self.ser.flushInput()
 
     def get_rot_accel(self,rot_accel=1.0):
         """
@@ -332,7 +342,7 @@ class Motor:
         Close the connection to the serial controller for the
         specified motor.
         """
-        self.ser.close()
+        self.ser.sock.close()
         print("Connection to serial controller disconnected.")
 
     def reconnect_motor(self):
@@ -350,3 +360,32 @@ class Motor:
         except ConnectionError:
             print("Connection could not be reestablished.")
             self.sock_status = 0
+
+    def get_position(self, pos_is_rads=False):
+        """
+        Get relative pol grid position in counts.
+        """
+        positions = []
+        if msg == 'IF=H':
+            # Output is coming out in hexadecimal, switching to decimal
+            print('Changing output to decimal')
+            self.ser.writeread('IFD\r')
+            
+        i_pos = self.ser.writeread('IP\r')
+        sleep(0.1)
+        self.ser.flushInput()
+        i_pos = int(i_pos.rstrip('\r')[3:])
+        if pos_is_rads:
+            i_pos = ()
+            
+        positions.append(i_pos)
+        
+        return positions
+        
+    def set_zero(self):
+        """
+        Set home position of pol grid.
+        """
+        self.pos = 0
+        self.ser.write('SP0\r')  # SP = Set Position
+        self.ser.flushInput()
