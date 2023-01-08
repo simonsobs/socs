@@ -802,8 +802,8 @@ class LS372_Agent:
 
     @ocs_agent.param('channel', type=int)
     @ocs_agent.param('state', type=str, choices=['on', 'off'])
-    def toggle_channel(self, session, params):
-        """toggle_channel(channel=None)
+    def engage_channel(self, session, params):
+        """engage_channel(channel=None)
 
         **Task** - Enables/disables a channel on the LS372
         
@@ -811,7 +811,7 @@ class LS372_Agent:
             channel (int): Channel number to enable
             state (str): Desired power state of channel; 'on' or 'off'
         """
-        with self._lock.acquire_timeout(job='toggle_channel') as acquired:
+        with self._lock.acquire_timeout(job='engage_channel') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
                               f"{self._lock.job} is already running")
@@ -910,7 +910,6 @@ class LS372_Agent:
     @ocs_agent.param('I', type=int)
     @ocs_agent.param('update_time', type=int)
     @ocs_agent.param('sample_heater_range', type=float, default=10e-3)
-    # TODO: maybe add still_heater_R and still_lead_R & delta t and max_voltage?
     def start_custom_pid(self, session, params):
         """start_custom_pid(setpoint=None, heater=None, channel=None, P=None,
                             I=None, update_time=None, sample_heater_range=None)
@@ -927,9 +926,6 @@ class LS372_Agent:
             update_time (int): Time between PID updates in seconds
             sample_heater_range (float): Range for sample heater in Amps.
                                          Default is 10e-3.
-        # TODO: FIX below
-        still_heater_R - still heater resistance in ohms. Default=120
-        still_lead_R - still heater lead resistance in ohms. Default=14.679  
         """
         
         with self._acq_proc_lock.acquire_timeout(timeout=0, job='custom_pid') \
@@ -994,14 +990,12 @@ class LS372_Agent:
             self.custom_pid = True
             active_channel = self.module.get_active_channel()
             channel_str = active_channel.name.replace(' ', '_')
-            start_time = time.time()
-            last_pid = start_time
+            last_pid = time.time()
             heater_I = 0
             temps, resistances, times = [], [], []
             self.log.info(f"Starting PID on heater {heater}, ch {ch} to setpoint {setpoint} K")
             
             while self.custom_pid:
-                
                 # Get a list of T and R at the maximum sample frequency
                 temps.append(self.module.get_temp(unit='kelvin', chan=ch))
                 resistances.append(self.module.get_temp(unit='ohms', chan=ch))
@@ -1019,13 +1013,13 @@ class LS372_Agent:
                         self.module.sample_heater.set_heater_output(heater_pow)
                     
                     # Publish P, I values
-                    # TODO: and whenever it changes.
                     PID_data = {
-                            'timestamp': last_pid, # TODO: time.time()? 
+                            'timestamp': last_pid, 
                             'block_name': 'PID',
                             'data' : {'P_val': P_val,
                                       'I_val': I_val}
                             }
+                    session.app.publish_to_feed('temperatures', PID_data)
                                 
 
                     # Publish heater values
@@ -1441,7 +1435,7 @@ if __name__ == '__main__':
     agent.register_task('get_resistance_range', lake_agent.get_resistance_range)
     agent.register_task('set_dwell', lake_agent.set_dwell)
     agent.register_task('get_dwell', lake_agent.get_dwell)
-    agent.register_task('toggle_channel', lake_agent.toggle_channel)
+    agent.register_task('engage_channel', lake_agent.engage_channel)
     agent.register_task('channel_settings', lake_agent.channel_settings)
     agent.register_task('get_input_setup', lake_agent.get_input_setup)
     agent.register_task('set_calibration_curve', lake_agent.set_calibration_curve)
