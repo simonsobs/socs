@@ -218,7 +218,7 @@ class PgridMotorAgent:
 
             rot_vel = self.motor.get_rot_vel()
             
-        return rot_vel, "Rotational velocity of pgrid_motor is {}".format(rot_vel)
+        return True, "Rotational velocity of pgrid_motor is {}".format(rot_vel)
 
     @ocs_agent.param('verbose', default=True, type=bool)
     @ocs_agent.param('rot_accel', default=DFLT_ACC, type=float, check=lambda x: MIN_ACC <= x <= MAX_ACC)
@@ -263,7 +263,7 @@ class PgridMotorAgent:
 
             accel = self.motor.get_rot_accel()
             
-        return accel, "Rotational acceleration of pgrid_motor is {}".format(accel)
+        return True, "Rotational acceleration of pgrid_motor is {}".format(accel)
 
     @ocs_agent.param('verbose', default=True, type=bool)
     @ocs_agent.param('deg', default=0, type=int)
@@ -351,21 +351,26 @@ class PgridMotorAgent:
 
         return True, "Alarms reset for pgrid_motor"
     
-    @ocs_agent.param('pos_is_rads', default=False, type=bool)
+    @ocs_agent.param('pos_type', default='steps', choices=['steps', 'deg' , 'wrap_deg'], type=str)
     def get_positions(self, session, params):
         """get_position()
         
         **Task** - Gets position of motor relative to zero in either counts or
         radians.
+        
+        Parameters:
+            'pos_type'(int): You have 3 choices for the type of position. 1 returns
+                positions in raw steps. 2 returns positions in raw degrees. 3 
+                returns positions in wrapped degrees.
         """
         with self.lock.acquire_timeout(1, job="get_position_of_motor_in_counts") as acquired:
             if not acquired:
                 self.log.warn(
                     f"Could not reset_alarms because lock held by {self.lock.job}")
                 return False
-            positions = self.motor.get_position()  
+            positions = self.motor.get_position(params['pos_type'])  
         
-        return True, "Current motor positions: {}".format(positions)"
+        return True, "Current motor positions: {}".format(positions)
     
     @ocs_agent.param('verbose', default=True, type=bool)
     def set_zero(self, session, params):
@@ -447,19 +452,26 @@ class PgridMotorAgent:
                 if self.motor.mot_id is not None:
                     try:
                         self.log.debug(
-                            f"getting rot_vel/move status of pgrid_motor")
+                            f"getting rot_vel, move status, and position of pgrid_motor")
                         move_status = self.motor.is_moving(params)
-                        rot_vel = self.motor.get_rot_vel(params)
-                        data['data']['grid_motor_rot_vel'] = rot_vel
-                        data['data']['pgrid_motor_connection'] = 1
-                        data['data']['pgrid_motor_move_status'] = move_status
+                        pos_deg = self.motor.get_position(pos_type = 'deg')
+                        pos_wrap = self.motor.get_position(pos_type = 'wrap_deg')
+                        pos_steps = self.motor.get_position(pos_type = 'steps')
+                        data['data']['grid_position_in_deg'] = pos_deg[0]
+                        data['data']['grid_position_in_steps'] = pos_steps[0]
+                        data['data']['grid_position_in_wrapped_deg'] = pos_wrap[0]
+                        data['data']['grid_motor_connection'] = 1
+                        data['data']['grid_motor_move_status'] = move_status
 
                     except Exception as e:
                         self.log.error(f'error: {e}')
                         self.log.error(
-                            f"could not get rot_vel/move status of pgrid_motor")
-                        data['data']['pgrid_motor_rot_vel'] = 0.0
-                        data['data']['pgrid_motor_connection'] = 0
+                            f"could not get rot_vel, move status, or position of pgrid_motor")
+                        data['data']['grid_motor_connection'] = 0
+                        data['data']['grid_position_in_deg'] = 0
+                        data['data']['grid_position_in_steps'] = 0
+                        data['data']['grid_position_in_wrapped_deg'] = 0
+                        data['data']['grid_motor_move_status'] = False
 
                 self.agent.publish_to_feed('positions', data)
                 session.data = data
@@ -544,6 +556,8 @@ if __name__ == '__main__':
     agent.register_task('kill_all', m.kill_all_commands)
     agent.register_task('is_moving', m.is_moving)
     agent.register_task('reset_alarm', m.reset_alarms)
+    agent.register_task('get_positions', m.get_positions)
+    agent.register_task('set_zero', m.set_zero)
 
     agent.register_process('acq', m.acq, m._stop_acq)
 

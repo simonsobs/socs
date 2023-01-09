@@ -59,8 +59,6 @@ class Motor:
         self.ser = Serial_TCPServer((ip, port))
 
         self.sock_status = 0
-        
-        self.pos = 0 #position in counts, should be integer
 
         # Connect to motor over MOXA serial server
         if not (ip and port):
@@ -286,7 +284,8 @@ class Motor:
         Returns the rotational velocity of the motor in revolutions per second.
         """
         msg = self.ser.writeread('JS\r')
-        return msg[3:]
+        velocities = msg[3:]
+        return velocities
         
     def set_rot_accel(self,rot_accel=1.0):
         """
@@ -300,7 +299,7 @@ class Motor:
         self.ser.write('JL%1.3f\r' % (rot_accel))
         self.ser.flushInput()
 
-    def get_rot_accel(self,rot_accel=1.0):
+    def get_rot_accel(self):
         """
         Set the rotational acceleration of the motor
 
@@ -308,8 +307,10 @@ class Motor:
             rot_accel (float): the rotational acceleration of polarizing grid motor 
                 in revolutions per second per second
         """
+        accel = []
         msg = self.ser.writeread('JA\r')
-        return msg[3:]
+        accel.append(int(msg[3:]))
+        return accel
 
     def rotate_by_degrees(self,deg):
         """
@@ -361,11 +362,15 @@ class Motor:
             print("Connection could not be reestablished.")
             self.sock_status = 0
 
-    def get_position(self, pos_is_rads=False):
+    def get_position(self, pos_type='steps'):
         """
-        Get relative pol grid position in counts.
+        Get relative pol grid position in counts or radians.
         """
         positions = []
+        #s_p_rev (steps per revolution) is equal to 60 degrees. Conversion of steps to radians is below.
+        #steps * rev/steps * deg/rev = deg
+        steps_to_deg = (1/self.s_p_rev*60)
+        msg = self.ser.writeread('IF\r')
         if msg == 'IF=H':
             # Output is coming out in hexadecimal, switching to decimal
             print('Changing output to decimal')
@@ -375,8 +380,12 @@ class Motor:
         sleep(0.1)
         self.ser.flushInput()
         i_pos = int(i_pos.rstrip('\r')[3:])
-        if pos_is_rads:
-            i_pos = ()
+        if pos_type == 'steps':
+            i_pos = i_pos
+        elif pos_type == 'deg':
+            i_pos = i_pos*steps_to_deg
+        elif pos_type == 'wrap_deg':
+            i_pos = (i_pos*steps_to_deg) % 360
             
         positions.append(i_pos)
         
@@ -386,6 +395,6 @@ class Motor:
         """
         Set home position of pol grid.
         """
-        self.pos = 0
+        
         self.ser.write('SP0\r')  # SP = Set Position
         self.ser.flushInput()
