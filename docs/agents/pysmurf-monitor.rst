@@ -12,9 +12,9 @@ to the pysmurf_files database, and send session info to pysmurf-controller
 agents through an OCS Feed.
 
 .. argparse::
-    :filename: ../agents/pysmurf_monitor/pysmurf_monitor.py
+    :filename: ../socs/agents/pysmurf_monitor/agent.py
     :func: make_parser
-    :prog: python3 pysmurf_monitor.py
+    :prog: python3 agent.py
 
 Configuration File Examples
 ---------------------------
@@ -34,17 +34,18 @@ Docker Compose
 An example docker-compose entry might look like::
 
     ocs-pysmurf-monitor:
-        image: simonsobs/ocs-pysmurf-monitor-agent:${SOCS_TAG}
+        image: simonsobs/socs:latest
         hostname: ocs-docker
         user: cryo:smurf
         network_mode: host
         container_name: ocs-pysmurf-monitor
+        environment:
+            - INSTANCE_ID=pysmurf-monitor
+            - SITE_HUB=ws://${CB_HOST}:8001/ws
+            - SITE_HTTP=http://${CB_HOST}:8001/call
         volumes:
             - ${OCS_CONFIG_DIR}:/config
             - /data:/data
-        command:
-            - "--site-hub=ws://${CB_HOST}:8001/ws"
-            - "--site-http=http://${CB_HOST}:8001/call"
 
 Where SOCS_TAG and CB_HOST are set in the ``.env`` file in the same dir as the
 docker-compose file.
@@ -76,12 +77,12 @@ what files to copy over to a daq node or simons1.
 Agent API
 ---------
 
-.. autoclass:: agents.pysmurf_monitor.pysmurf_monitor.PysmurfMonitor
+.. autoclass:: socs.agents.pysmurf_monitor.agent.PysmurfMonitor
     :members:
     :exclude-members: datagramReceived
 
 Supporting APIs
 ---------------
-.. automethod:: agents.pysmurf_monitor.pysmurf_monitor.create_remote_path
+.. automethod:: socs.agents.pysmurf_monitor.agent.create_remote_path
 
-.. automethod:: agents.pysmurf_monitor.pysmurf_monitor.PysmurfMonitor.datagramReceived
+.. automethod:: socs.agents.pysmurf_monitor.agent.PysmurfMonitor.datagramReceived

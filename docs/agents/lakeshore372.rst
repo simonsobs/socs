@@ -12,9 +12,9 @@ functionality to interface and control an LS372 is provided by the
 :ref:`372_driver`.
 
 .. argparse::
-    :filename: ../agents/lakeshore372/LS372_agent.py
+    :filename: ../socs/agents/lakeshore372/agent.py
     :func: make_parser
-    :prog: python3 LS372_agent.py
+    :prog: python3 agent.py
 
 Configuration File Examples
 ---------------------------
@@ -120,16 +120,16 @@ Docker Compose
 The Lakeshore 372 Agent should be configured to run in a Docker container. An
 example configuration is::
 
-  ocs-LSA22YE:
-    image: simonsobs/ocs-lakeshore372-agent:latest
+  ocs-LSA22YG:
+    image: simonsobs/socs:latest
     hostname: ocs-docker
     network_mode: "host"
+    environment:
+      - INSTANCE_ID=LSA22YG
+      - SITE_HUB=ws://127.0.0.1:8001/ws
+      - SITE_HTTP=http://127.0.0.1:8001/call
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
-    command:
-      - "--instance-id=LSA22YE"
-      - "--site-hub=ws://127.0.0.1:8001/ws"
-      - "--site-http=http://127.0.0.1:8001/call"
 
 .. note::
     Since the 372 Agent container needs ``network_mode: "host"``, it must be
@@ -172,7 +172,7 @@ please file a Github issue.
 Agent API
 ---------
 
-.. autoclass:: agents.lakeshore372.LS372_agent.LS372_Agent
+.. autoclass:: socs.agents.lakeshore372.agent.LS372_Agent
     :members:
 
 .. _372_driver:

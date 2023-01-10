@@ -15,9 +15,9 @@ a small bit of pre-processing and downsampling that is done whenever a new
 frame is received.
 
 .. argparse::
-   :filename: ../agents/magpie/magpie_agent.py
+   :filename: ../socs/agents/magpie/agent.py
    :func: make_parser
-   :prog: python3 magpie_agent.py
+   :prog: python3 agent.py
 
 Configuration File Examples
 ------------------------------
@@ -71,17 +71,17 @@ crate-id 1 and slot 2. If crossbar is being run on a different server, you'll
 have to modify the ``site-hub`` and ``site-http`` args accordingly::
 
     ocs-magpie-crate1slot2:
-        image: simonsobs/ocs-magpie:${SOCS_TAG}
+        image: simonsobs/socs:latest
         hostname: ocs-docker
         user: ocs:ocs
         network_mode: host
+        environment:
+            - INSTANCE_ID=magpie-crate1slot2
+            - SITE_HUB=ws://localhost:8001/ws
+            - SITE_HTTP=http://localhost:8001/call
         volumes:
             - ${OCS_CONFIG_DIR}:/config
             - /data:/data
-        command:
-            - "--site-hub=ws://localhost:8001/ws"
-            - "--site-http=http://localhost:8001/call"
-            - "--instance-id=magpie-crate1slot2"
 
 Lyrebird
 ------------
@@ -329,22 +329,22 @@ to generate a focal-plane layout.
 Agent API
 ------------------
 
-.. autoclass:: agents.magpie.magpie_agent.MagpieAgent
+.. autoclass:: socs.agents.magpie.agent.MagpieAgent
    :members:
 
 Supporting APIs
 ------------------
-.. autoclass:: agents.magpie.magpie_agent.FIRFilter
+.. autoclass:: socs.agents.magpie.agent.FIRFilter
   :members:
 
-.. autoclass:: agents.magpie.magpie_agent.Demodulator
+.. autoclass:: socs.agents.magpie.agent.Demodulator
   :members:
 
-.. autoclass:: agents.magpie.magpie_agent.WhiteNoiseCalculator
+.. autoclass:: socs.agents.magpie.agent.WhiteNoiseCalculator
   :members:
 
-.. autoclass:: agents.magpie.magpie_agent.VisElem
+.. autoclass:: socs.agents.magpie.agent.VisElem
   :members:
 
-.. autoclass:: agents.magpie.magpie_agent.FocalplaneConfig
+.. autoclass:: socs.agents.magpie.agent.FocalplaneConfig
   :members:

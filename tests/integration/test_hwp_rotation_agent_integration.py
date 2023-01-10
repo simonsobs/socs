@@ -1,16 +1,8 @@
-import pytest
-
 import ocs
+import pytest
+from integration.util import create_crossbar_fixture
 from ocs.base import OpCode
-
-from ocs.testing import (
-    create_agent_runner_fixture,
-    create_client_fixture,
-)
-
-from integration.util import (
-    create_crossbar_fixture
-)
+from ocs.testing import create_agent_runner_fixture, create_client_fixture
 
 from socs.testing.device_emulator import create_device_emulator
 
@@ -18,9 +10,9 @@ pytest_plugins = ("docker_compose")
 
 wait_for_crossbar = create_crossbar_fixture()
 run_agent = create_agent_runner_fixture(
-    '../agents/hwp_rotation/rotation_agent.py', 'hwp_rotation_agent', args=['--log-dir', './logs/'])
+    '../socs/agents/hwp_rotation/agent.py', 'hwp_rotation_agent', args=['--log-dir', './logs/'])
 run_agent_idle = create_agent_runner_fixture(
-    '../agents/hwp_rotation/rotation_agent.py', 'hwp_rotation_agent', args=['--mode', 'idle', '--log-dir', './logs/'])
+    '../socs/agents/hwp_rotation/agent.py', 'hwp_rotation_agent', args=['--mode', 'idle', '--log-dir', './logs/'])
 client = create_client_fixture('rotator')
 kikusui_emu = create_device_emulator(
     {'SYST:REM': ''}, relay_type='tcp', port=2000)

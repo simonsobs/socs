@@ -2,19 +2,22 @@
 """
 Utility script for interacting with the suprsync db.
 """
-from socs.db.suprsync import SupRsyncFilesManager, SupRsyncFile
 import argparse
+import os
+
+from socs.db.suprsync import SupRsyncFile, SupRsyncFilesManager
 
 
 def check_func(args):
     srfm = SupRsyncFilesManager(args.db, create_all=False)
     session = srfm.Session()
-    file = session.query(SupRsyncFile).filter(
+    files = session.query(SupRsyncFile).filter(
         SupRsyncFile.local_path == args.file
-    ).one()
-    print('-' * 80)
-    print(file)
-    print('-' * 80)
+    ).all()
+    for file in files:
+        print('-' * 80)
+        print(file)
+        print('-' * 80)
 
 
 def next_func(args):
@@ -67,6 +70,9 @@ if __name__ == '__main__':
     list_parser.add_argument('--db', default=default_db)
 
     args = parser.parse_args()
+    if not os.path.exists(args.db):
+        raise Exception(f"Could not find file {args.db}")
+
     if hasattr(args, 'func'):
         args.func(args)
     else:
