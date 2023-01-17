@@ -2,8 +2,12 @@
 
 import socket
 import sys
+import time
+import logging
 
 import numpy as np
+
+logging.basicConfig(level=logging.INFO, format='%(levelname)s - %(message)s')
 
 # Lookup keys for command parameters.
 autorange_key = {'0': 'off',
@@ -1316,11 +1320,13 @@ class Curve:
         self._set_header(header[:-1])  # ignore num of breakpoints
 
         for point in values:
-            print("uploading %s" % point)
+            logging.info("uploading %s" % point)
             self._set_data_point(point[0], point[1], point[2])
+            time.sleep(0.065)
 
         # refresh curve attributes
         self.get_header()
+        logging.info("checking that all points uploaded successfully...")
         self._check_curve(_file)
 
     def _check_curve(self, _file):
@@ -1347,9 +1353,8 @@ class Curve:
                 point = values[j - 1]
                 units = float(resp[0])
                 temperature = float(resp[1])
-                assert units == float(point[1]), "Point number %s not uploaded" % point[0]
-                assert temperature == float(point[2]), "Point number %s not uploaded" % point[0]
-                print("Successfully uploaded %s, %s" % (units, temperature))
+                assert units == float(point[1]), "Point number %s not uploaded. Reuploading points." % point[0]
+                assert temperature == float(point[2]), "Point number %s not uploaded. Reuploading points." % point[0]
             # if AssertionError, tell 372 to re-upload points
             except AssertionError:
                 if units != float(point[1]):
