@@ -708,11 +708,11 @@ class ACUAgent:
         az = params['az']
         el = params['el']
         azonly = params['azonly']
-        if az <= self.motion_limits['azimuth']['lower'] or az >= self.motion_limits['azimuth']['upper']:
+        if az < self.motion_limits['azimuth']['lower'] or az > self.motion_limits['azimuth']['upper']:
             raise ocs_agent.ParamError("Azimuth out of range! Must be "
                                        + f"{self.motion_limits['azimuth']['lower']} < az "
                                        + f"< {self.motion_limits['azimuth']['upper']}")
-        if el <= self.motion_limits['elevation']['lower'] or el >= self.motion_limits['elevation']['upper']:
+        if el < self.motion_limits['elevation']['lower'] or el > self.motion_limits['elevation']['upper']:
             raise ocs_agent.ParamError("Elevation out of range! Must be "
                                        + f"{self.motion_limits['elevation']['lower']} < el "
                                        + f"< {self.motion_limits['elevation']['upper']}")
@@ -867,6 +867,13 @@ class ACUAgent:
             position_name = 'Axis3_current_position'
 
         bs_destination = params.get('b')
+        lower_limit = self.motion_limits['boresight']['lower']
+        upper_limit = self.motion_limits['boresight']['upper']
+        if bs_destination < lower_limit or bs_destination > upper_limit:
+            self.log.warn('Commanded boresight position out of range!')
+            self._set_job.done('control')
+            return False, 'Commanded boresight position out of range.'
+
         self.log.info('Boresight position will be set to ' + str(bs_destination))
         if self.data['status']['platform_status']['Remote_mode'] == 0:
             self.log.warn('ACU in local mode, cannot perform motion with OCS.')
