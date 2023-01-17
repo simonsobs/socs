@@ -11,14 +11,20 @@ It is used for readout of encoder measurements and control of telescope
 platforms.
 
 .. argparse::
-    :filename: ../agents/acu/acu_agent.py
+    :filename: ../socs/agents/acu/agent.py
     :func: add_agent_args
-    :prog: python3 acu_agent.py
+    :prog: python3 agent.py
+
+.. _acu_deps:
 
 Dependencies
 ------------
 The `soaculib <https://github.com/simonsobs/soaculib>`_ package must be
-installed to use this Agent.
+installed to use this Agent. This can be installed via:
+
+.. code-block:: bash
+
+    $ pip install 'soaculib @ git+https://github.com/simonsobs/soaculib.git@master'
 
 Configuration File Examples
 ---------------------------
@@ -85,7 +91,7 @@ example configuration block is below::
 Agent API
 ---------
 
-.. autoclass:: agents.acu.acu_agent.ACUAgent
+.. autoclass:: socs.agents.acu.agent.ACUAgent
     :members:
 
 Example Clients
@@ -109,5 +115,5 @@ acquisition processes are running::
 Supporting APIs
 ---------------
 
-.. automodule:: agents.acu.scan_helpers
+.. automodule:: socs.agents.acu.drivers
     :members:

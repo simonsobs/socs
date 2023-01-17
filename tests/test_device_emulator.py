@@ -1,9 +1,9 @@
-import time
 import socket
+import time
+
 import pytest
 
 from socs.testing import device_emulator
-
 
 tcp_emulator = device_emulator.create_device_emulator({'ping': 'pong'},
                                                       'tcp', 9001)

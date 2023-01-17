@@ -2,11 +2,11 @@
 # contributors: zatkins, bkoopman, sbhimani, zhuber
 
 import math
-import numpy as np
 import socket
-
-import time
 import sys
+import time
+
+import numpy as np
 
 # helper dicts
 sensor_key = {

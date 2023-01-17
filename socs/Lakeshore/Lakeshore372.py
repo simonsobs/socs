@@ -1,7 +1,8 @@
 # Lakeshore372.py
 
-import sys
 import socket
+import sys
+
 import numpy as np
 
 # Lookup keys for command parameters.

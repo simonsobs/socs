@@ -29,7 +29,12 @@ Releases
 
     **Note:** Releases will be issued by core maintainers of SOCS.
 
-If you are trying to issue a release of SOCS you should follow these steps:
+Before making an official release, test the release properly builds and
+publishes with a pre-release. You can do so by pushing a tag matching
+``v0.*.*a*``, ``v0.*.*b*``, or ``v0.*.*rc*``.
+
+Once the release looks good, publish the official release by following these
+steps:
 
 1. Open a Pull Request, comparing ``develop`` to the ``master`` base branch.
    Describe the features added for this release.

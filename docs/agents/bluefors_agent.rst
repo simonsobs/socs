@@ -11,9 +11,9 @@ logs and passes them to the live monitor and to the OCS housekeeping data
 aggregator.
 
 .. argparse::
-   :module: agents.bluefors.bluefors_log_tracker
+   :module: socs.agents.bluefors.agent
    :func: make_parser
-   :prog: bluefors_log_tracker.py
+   :prog: agent.py
 
 Configuration File Examples
 ---------------------------
@@ -41,19 +41,18 @@ Docker Compose
 Example docker-compose configuration::
 
   ocs-bluefors:
-    image: simonsobs/ocs-bluefors-agent:latest
+    image: simonsobs/socs:latest
     hostname: ocs-docker
     network_mode: "host"
+    environment:
+      - INSTANCE_ID=bluefors
+      - LOGLEVEL=info
+      - FRAME_LENGTH=600
+      - STALE_TIME=2
+      - MODE=follow
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
       - /home/simonsobs/bluefors/logs/:/logs:ro
-    environment:
-      LOGLEVEL: "info"
-      FRAME_LENGTH: 600
-      STALE_TIME: 2
-      MODE: "follow"
-    command:
-      - "--instance-id=bluefors"
 
 Depending on how you are running your containers it might be easier to hard
 code the `OCS_CONFIG_DIR` environment variable.
@@ -189,14 +188,14 @@ minutes old. This defaults to two minutes, but can be set with the
 Agent API
 ---------
 
-.. autoclass:: agents.bluefors.bluefors_log_tracker.BlueforsAgent
+.. autoclass:: socs.agents.bluefors.agent.BlueforsAgent
     :members:
 
 Supporting API
 --------------
 
-.. autoclass:: agents.bluefors.bluefors_log_tracker.LogTracker
+.. autoclass:: socs.agents.bluefors.agent.LogTracker
     :members:
 
-.. autoclass:: agents.bluefors.bluefors_log_tracker.LogParser
+.. autoclass:: socs.agents.bluefors.agent.LogParser
     :members:

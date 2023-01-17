@@ -12,12 +12,13 @@
 # ls.msg('SCAN?'), ls.msg('INTYPE? 1'), ls.msg('OUTMODE? 0')
 
 
+import argparse
+import logging
 import os
 import socket
-import argparse
-import numpy as np
-import logging
 import time
+
+import numpy as np
 
 BUFF_SIZE = 4096
 

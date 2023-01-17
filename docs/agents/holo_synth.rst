@@ -14,17 +14,38 @@ initialize the LO's, set the frequency of each and pass the frequency to the
 OCS feed.
 
 .. argparse::
-   :module: agents.holo_synth.synth_agent
+   :module: socs.agents.holo_synth.agent
    :func: make_parser
-   :prog: synth_agent.py
+   :prog: python3 agent.py
+
+.. _holo_synth_deps:
 
 Dependencies
 ------------
 
-Python Packages:
+.. note::
+    These dependencies are not automatically installed when you install
+    ``socs``. You can manually install them, or follow the instructions below.
+
+    Also note that since this agent is tightly coupled with the
+    :ref:`holo_fpga_agent`, the instructions below will pull dependencies
+    related to that agent as well.
 
 - `holo_daq <https://github.com/McMahonCosmologyGroup/holog_daq>`_
 
+You can install these by first checking you are running Python 3.8::
+
+    $ python --version
+    Python 3.8.13
+
+Then by either installing via pip::
+
+    $ python -m pip install 'holog_daq @ git+https://github.com/McMahonCosmologyGroup/holog_daq.git@main'
+
+Or by cloning the socs repository and using the provided requirements file::
+
+    $ git clone https://github.com/simonsobs/socs.git
+    $ python -m pip install -r socs/requirements/holography.txt
 
 Configuration File Examples
 ---------------------------
@@ -71,5 +92,5 @@ output of BOTH synthesizers.  The user-specified frequency should be in GHz.
 Agent API
 ---------
 
-.. autoclass:: agents.holo_synth.synth_agent.SynthAgent
+.. autoclass:: socs.agents.holo_synth.agent.SynthAgent
     :members:

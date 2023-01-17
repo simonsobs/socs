@@ -1,5 +1,4 @@
 import pytest
-
 from ocs.testing import check_crossbar_connection
 
 

@@ -2,9 +2,10 @@
 # Lakeshore370.py
 
 import sys
-import serial
 import time
+
 import numpy as np
+import serial
 
 # Lookup keys for command parameters.
 autorange_key = {'0': 'off',
