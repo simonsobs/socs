@@ -1,9 +1,9 @@
 # Lakeshore372.py
 
+import logging
 import socket
 import sys
 import time
-import logging
 
 import numpy as np
 
