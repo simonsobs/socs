@@ -862,9 +862,11 @@ class ACUAgent:
         if self.acu_config['platform'] == 'satp':
             status_block = 'summary'
             position_name = 'Boresight_current_position'
+            mode_name = 'Boresight_mode'
         elif self.acu_config['platform'] == 'ccat':
             status_block = 'third_axis'
             position_name = 'Axis3_current_position'
+            mode_name = 'Axis3_mode'
 
         bs_destination = params.get('b')
         lower_limit = self.motion_limits['boresight']['lower']
@@ -895,15 +897,21 @@ class ACUAgent:
         yield self.acu_control.go_3rd_axis(bs_destination)
 
         current_position = self.data['status'][status_block][position_name]
-        print(current_position)
+        bs_mode = self.data['status'][status_block][mode_name]
         while round(current_position - bs_destination, 2) != 0:
-            yield dsleep(1)
-#            acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
-#                          'block_name': 'ACU_upload',
-#                          'data': self.data['uploads']
-#                          }
-#            self.agent.publish_to_feed('acu_upload', acu_upload)
-            current_position = self.data['status'][status_block][position_name]
+            if bs_mode == 'Preset':
+                yield dsleep(1)
+#                acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
+#                              'block_name': 'ACU_upload',
+#                              'data': self.data['uploads']
+#                              }
+#                self.agent.publish_to_feed('acu_upload', acu_upload)
+                current_position = self.data['status'][status_block][position_name]
+                bs_mode = self.data['status'][status_block][mode_name]
+            else:
+                self.log.warn('Boresight mode has changed from Preset!')
+                self._set_job_done('control')
+                return False, '3rd axis mode changed from Preset, check errors/faults.'
         if params.get('end_stop'):
             yield self.acu_control.stop()
 #        self.data['uploads']['Start_Boresight'] = 0.0
