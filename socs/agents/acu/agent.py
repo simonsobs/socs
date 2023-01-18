@@ -825,7 +825,8 @@ class ACUAgent:
                     self.log.warn('Stopped before reaching commanded point!')
                     return False, 'Something went wrong!'
         if end_stop:
-            yield self.acu_control.stop()
+#            yield self.acu_control.stop()
+            yield self.acu_control.mode('Stop')
             self.log.info('Stop mode activated')
         self.data['uploads']['Start_Azimuth'] = 0.0
         self.data['uploads']['Start_Elevation'] = 0.0
@@ -897,8 +898,8 @@ class ACUAgent:
         yield self.acu_control.go_3rd_axis(bs_destination)
 
         current_position = self.data['status'][status_block][position_name]
-        bs_mode = self.data['status'][status_block][mode_name]
         while round(current_position - bs_destination, 2) != 0:
+            bs_mode = self.data['status'][status_block][mode_name]
             if bs_mode == 'Preset':
                 yield dsleep(1)
 #                acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
@@ -907,13 +908,12 @@ class ACUAgent:
 #                              }
 #                self.agent.publish_to_feed('acu_upload', acu_upload)
                 current_position = self.data['status'][status_block][position_name]
-                bs_mode = self.data['status'][status_block][mode_name]
             else:
                 self.log.warn('Boresight mode has changed from Preset!')
                 self._set_job_done('control')
                 return False, '3rd axis mode changed from Preset, check errors/faults.'
         if params.get('end_stop'):
-            yield self.acu_control.stop()
+            yield self.acu_control.http.Command('DataSets.CmdModeTransfer', 'Set3rdAxisMode', 'Stop')
 #        self.data['uploads']['Start_Boresight'] = 0.0
 #        self.data['uploads']['Command_Type'] = 0
 #        self.data['uploads']['Preset_Boresight'] = 0.0
