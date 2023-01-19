@@ -1438,7 +1438,7 @@ def main(args=None):
     agent.register_task('set_dwell', lake_agent.set_dwell)
     agent.register_task('get_dwell', lake_agent.get_dwell)
     agent.register_task('engage_channel', lake_agent.engage_channel)
-    agent.register_task('channel_settings', lake_agent.channel_settings)
+    agent.register_task('get_channel_settings', lake_agent.get_channel_settings)
     agent.register_task('get_input_setup', lake_agent.get_input_setup)
     agent.register_task('set_calibration_curve', lake_agent.set_calibration_curve)
     agent.register_task('set_pid', lake_agent.set_pid)
