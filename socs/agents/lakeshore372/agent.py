@@ -14,8 +14,6 @@ from twisted.internet import reactor
 
 from socs.Lakeshore.Lakeshore372 import LS372
 
-from ocs import ocs_agent, site_config
-from ocs.ocs_twisted import TimeoutLock, Pacemaker
 
 def still_power_to_perc(power, res, lead, max_volts):
     cur = np.sqrt(power / res)
