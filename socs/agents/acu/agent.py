@@ -998,7 +998,9 @@ class ACUAgent:
         elif self.acu_config['platform'] in ['ccat', 'lat']:
             modes.append(self.data['status']['third_axis']['Axis3_mode'])
         if modes != ['Stop', 'Stop', 'Stop']:
-            self.log.warn('Axes could not be set to Stop!')
+            self.log.error('Axes could not be set to Stop!')
+            self._set_job_done('control')
+            return False, 'Could not set axes to Stop mode'
         j = 0
         while j < 5:
             free_stack = self.data['status']['summary']['Free_upload_positions']
@@ -1014,6 +1016,8 @@ class ACUAgent:
         free_stack = self.data['status']['summary']['Free_upload_positions']
         if free_stack < FULL_STACK:
             self.log.warn('Stack not fully cleared!')
+            self._set_job_done('control')
+            return False, 'Could not clear stack'
 #        self.log.info('Cleared stack.')
         self._set_job_done('control')
         return True, 'Job completed'
