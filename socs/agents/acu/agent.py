@@ -877,6 +877,7 @@ class ACUAgent:
             self._set_job.done('control')
             return False, 'Commanded boresight position out of range.'
 
+#        self.log.info('Boresight current position is ' + str(self.data['status']['summary']['Boresight_current_position']))
         self.log.info('Boresight position will be set to ' + str(bs_destination))
         if self.data['status']['platform_status']['Remote_mode'] == 0:
             self.log.warn('ACU in local mode, cannot perform motion with OCS.')
@@ -885,7 +886,7 @@ class ACUAgent:
         else:
             self.log.info('Verified ACU in remote mode')
         # yield self.acu_control.stop()
-        yield dsleep(5)
+        yield dsleep(0.5)
 #        self.data['uploads']['Start_Boresight'] = self.data['status'][status_block][position_name]
 #        self.data['uploads']['Command_Type'] = 1
 #        self.data['uploads']['Preset_Boresight'] = bs_destination
@@ -896,18 +897,19 @@ class ACUAgent:
 #        self.agent.publish_to_feed('acu_upload', acu_upload)
         self.log.info('Starting boresight motion')
         yield self.acu_control.go_3rd_axis(bs_destination)
-
+        yield dsleep(0.2)
         current_position = self.data['status'][status_block][position_name]
         while round(current_position - bs_destination, 2) != 0:
             bs_mode = self.data['status'][status_block][mode_name]
             if bs_mode == 'Preset':
-                yield dsleep(1)
+                yield dsleep(0.1)
 #                acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
 #                              'block_name': 'ACU_upload',
 #                              'data': self.data['uploads']
 #                              }
 #                self.agent.publish_to_feed('acu_upload', acu_upload)
                 current_position = self.data['status'][status_block][position_name]
+                print(current_position)
             else:
                 self.log.warn('Boresight mode has changed from Preset!')
                 self._set_job_done('control')
