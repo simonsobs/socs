@@ -874,7 +874,7 @@ class ACUAgent:
         upper_limit = self.motion_limits['boresight']['upper']
         if bs_destination < lower_limit or bs_destination > upper_limit:
             self.log.warn('Commanded boresight position out of range!')
-            self._set_job.done('control')
+            self._set_job_done('control')
             return False, 'Commanded boresight position out of range.'
 
 #        self.log.info('Boresight current position is ' + str(self.data['status']['summary']['Boresight_current_position']))
