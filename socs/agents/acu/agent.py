@@ -973,13 +973,48 @@ class ACUAgent:
         points uploaded to the stack.
 
         """
-        yield self.acu_control.stop()
-        self.log.info('Stop called')
-        yield dsleep(5)
-        yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
-                                            'Clear Stack')
-        yield dsleep(0.1)
-        self.log.info('Cleared stack.')
+        i = 0
+        while i < 5:
+            modes = [self.data['status']['summary']['Azimuth_mode'],
+                     self.data['status']['summary']['Elevation_mode'],
+                     ]
+            if self.acu_config['platform'] == 'satp':
+                modes.append(self.data['status']['summary']['Boresight_mode'])
+            elif self.acu_config['platform'] in ['ccat', 'lat']:
+                modes.append(self.data['status']['third_axis']['Axis3_mode'])
+            if modes != ['Stop', 'Stop', 'Stop']:
+                yield self.acu_control.stop()
+                self.log.info('Stop called (iteration %i)' %(i+1))
+                yield dsleep(0.1)
+                i += 1
+            else:
+                self.log.info('All axes in Stop mode')
+                i = 5
+        modes = [self.data['status']['summary']['Azimuth_mode'],
+                 self.data['status']['summary']['Elevation_mode'],
+                 ]
+        if self.acu_config['platform'] == 'satp':
+            modes.append(self.data['status']['summary']['Boresight_mode'])
+        elif self.acu_config['platform'] in ['ccat', 'lat']:
+            modes.append(self.data['status']['third_axis']['Axis3_mode'])
+        if modes != ['Stop', 'Stop', 'Stop']:
+            self.log.warn('Axes could not be set to Stop!')
+        j = 0
+        while j < 5:
+            free_stack = self.data['status']['summary']['Free_upload_positions']
+            if free_stack < FULL_STACK:
+                yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
+                                                    'Clear Stack')
+                self.log.info('Clear Stack called (iteration %i)' %(j+1))
+                yield dsleep(0.1)
+                j += 1
+            else:
+                self.log.info('Stack cleared')
+                j = 5
+        free_stack = self.data['status']['summary']['Free_upload_positions']
+        if free_stack < FULL_STACK:
+            self.log.warn('Stack not fully cleared!')
+#        self.log.info('Cleared stack.')
         self._set_job_done('control')
         return True, 'Job completed'
 
