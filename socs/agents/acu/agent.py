@@ -1296,7 +1296,7 @@ class ACUAgent:
         acc = params.get('acc')
         el_endpoint1 = params.get('el_endpoint1')
         azonly = params.get('azonly', True)
-        scan_upload_len = params.get('scan_upload_length', 2.0)
+        scan_upload_len = params.get('scan_upload_length', 10.0)
         scan_params = {k: params.get(k) for k in [
             'num_scans', 'num_batches', 'start_time',
             'wait_to_start', 'step_time', 'batch_size', 'ramp_up', 'az_start']
@@ -1329,6 +1329,7 @@ class ACUAgent:
         else:
             step_time = 1.0
         scan_upload_len_pts = scan_upload_len / step_time
+        print(scan_upload_len_pts)
 
         go_to_params = {'az': plan['az_startpoint'],
                         'el': plan['el'],
@@ -1370,7 +1371,7 @@ class ACUAgent:
                 break
 
             current_lines = lines
-            group_size = 250
+            group_size = int(scan_upload_len_pts)
             while len(current_lines):
                 current_modes = {'Az': self.data['status']['summary']['Azimuth_mode'],
                                  'El': self.data['status']['summary']['Elevation_mode'],
@@ -1392,7 +1393,7 @@ class ACUAgent:
                 text = ''.join(upload_lines)
                 current_lines = current_lines[group_size:]
                 free_positions = self.data['status']['summary']['Free_upload_positions']
-                while free_positions < 10000 - scan_upload_len_pts:
+                while free_positions < 10000 - 10:# - scan_upload_len_pts:
                     yield dsleep(0.1)
                     free_positions = self.data['status']['summary']['Free_upload_positions']
                 print(text)
