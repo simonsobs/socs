@@ -699,6 +699,7 @@ class ACUAgent:
 
         """
 
+        session.set_status('running')
         bcast_check = yield self._check_daq_streams('broadcast')
         monitor_check = yield self._check_daq_streams('monitor')
         if not bcast_check or not monitor_check:
@@ -853,6 +854,7 @@ class ACUAgent:
 
         """
 
+        session.set_status('running')
         monitor_check = yield self._check_daq_streams('monitor')
         if not monitor_check:
             self._set_job_done('control')
@@ -929,6 +931,8 @@ class ACUAgent:
 
     @inlineCallbacks
     def preset_stop_clear(self, session, params):
+
+        session.set_status('running')
         current_data = self.data['status']['summary']
         current_vel = current_data['Azimuth_current_velocity']
         current_pos = {'Az': current_data['Azimuth_current_position'],
@@ -963,6 +967,8 @@ class ACUAgent:
         **Task** - Clear any axis faults.
 
         """
+
+        session.set_status('running')
         yield self.acu_control.clear_faults()
         self._set_job_done('control')
         return True, 'Job completed.'
@@ -975,6 +981,8 @@ class ACUAgent:
         points uploaded to the stack.
 
         """
+
+        session.set_status('running')
         i = 0
         while i < 5:
             modes = [self.data['status']['summary']['Azimuth_mode'],
@@ -1092,6 +1100,7 @@ class ACUAgent:
     @inlineCallbacks
     def _run_specified_scan(self, session, times, azs, els, vas, ves, azflags, elflags, azonly, simulator):
 
+        session.set_status('running')
         bcast_check = yield self._check_daq_streams('broadcast')
         monitor_check = yield self._check_daq_streams('monitor')
         if not bcast_check or not monitor_check:
@@ -1274,7 +1283,7 @@ class ACUAgent:
             scan_upload_length (float): number of seconds for each set of uploaded
                 points. Default value is 10.0.
         """
-
+        session.set_status('running')
         bcast_check = yield self._check_daq_streams('broadcast')
         monitor_check = yield self._check_daq_streams('monitor')
         if not bcast_check or not monitor_check:
