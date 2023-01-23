@@ -830,29 +830,6 @@ class LS372_Agent:
         return True, "Channel {} powered {}".format(channel, state)
 
     @ocs_agent.param('channel', type=int)
-    def get_channel_settings(self, session, params):
-        """get_channel_settings(channel=None)
-        
-        **Task** - Gets settings for a particular channel on the LS372
-
-        Parameters:
-            channel (int): Channel number to get settings
-        """
-        with self._lock.acquire_timeout(job='channel_settings') as acquired:
-            if not acquired:
-                self.log.warn(f"Could not start Task because "
-                              f"{self._lock.job} is already running")
-                return False, "Could not acquire lock"
-
-            session.set_status('running')
-            
-            channel = params['channel']
-            ch_settings = self.module.channel_settings(channel)
-            session.add_message(ch_settings)
-                                    
-        return True, f"Channel {channel} has settings {ch_settings}"
-
-    @ocs_agent.param('channel', type=int)
     @ocs_agent.param('curve_number', type=int)
     def set_calibration_curve(self, session, params):
         """set_calibration_curve(channel=None, curve_number=None)
@@ -1438,7 +1415,6 @@ def main(args=None):
     agent.register_task('set_dwell', lake_agent.set_dwell)
     agent.register_task('get_dwell', lake_agent.get_dwell)
     agent.register_task('engage_channel', lake_agent.engage_channel)
-    agent.register_task('get_channel_settings', lake_agent.get_channel_settings)
     agent.register_task('get_input_setup', lake_agent.get_input_setup)
     agent.register_task('set_calibration_curve', lake_agent.set_calibration_curve)
     agent.register_task('set_pid', lake_agent.set_pid)
