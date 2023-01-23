@@ -823,11 +823,11 @@ class LS372_Agent:
             channel = params['channel']
             state = params['state']
             if state == 'on': 
-                ch_settings = self.module.enable_channel(channel)
+                ch_settings = self.module.channels[channel].enable_channel()
             else:
-                ch_settings = self.module.disable_channel(channel)
+                ch_settings = self.module.channels[channel].disable_channel()
                                     
-        return True, "Channel {} powered {} with settings {}".format(channel, state, ch_settings)
+        return True, "Channel {} powered {}".format(channel, state)
 
     @ocs_agent.param('channel', type=int)
     def get_channel_settings(self, session, params):
