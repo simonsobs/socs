@@ -391,6 +391,17 @@ class ACUAgent:
                           'Boresight_mode': None,
                           }
 
+#        session.data = {'StatusResponseRate': n_ok / (query_t - report_t)}
+        j = yield self.acu_read.http.Values(self.acu8100)
+#        session.data = {'status': j}
+        if self.acu3rdaxis:
+            j2 = yield self.acu_read.http.Values(self.acu3rdaxis)
+        else:
+            j2 = {}
+        session.data = {'StatusDetailed': j,
+                        'Status3rdAxis': j2,
+                        'StatusResponseRate': n_ok / (query_t - report_t)}
+
         while self.jobs['monitor'] == 'run':
             now = time.time()
 
@@ -404,7 +415,7 @@ class ACUAgent:
                               % (resp_rate))
                 report_t = query_t
                 n_ok = 0
-                session.data = {'StatusResponseRate': resp_rate}
+                session.data.update({'StatusResponseRate': resp_rate})
 
             try:
                 j = yield self.acu_read.http.Values(self.acu8100)
@@ -414,8 +425,9 @@ class ACUAgent:
                 else:
                     j2 = {}
 #                    session.data.update(j2)
-                session.data = {'StatusDetailed': j, 'Status3rdAxis': j2}
+                session.data.update({'StatusDetailed': j, 'Status3rdAxis': j2})
                 n_ok += 1
+               # print(session.data)
             except Exception as e:
                 # Need more error handling here...
                 errormsg = {'aculib_error_message': str(e)}
@@ -427,19 +439,19 @@ class ACUAgent:
                 self.agent.publish_to_feed('acu_error', acu_error)
                 yield dsleep(1)
                 continue
-
             for k, v in session.data.items():
-                for (key, value) in v.items():
-                    for category in self.monitor_fields:
-                        if key in self.monitor_fields[category]:
-                            if isinstance(value, bool):
-                                self.data['status'][category][self.monitor_fields[category][key]] = int(value)
-                            elif isinstance(value, int) or isinstance(value, float):
-                                self.data['status'][category][self.monitor_fields[category][key]] = value
-                            elif value is None:
-                                self.data['status'][category][self.monitor_fields[category][key]] = float('nan')
-                            else:
-                                self.data['status'][category][self.monitor_fields[category][key]] = str(value)
+                if type(v) != float:
+                    for (key, value) in v.items():
+                        for category in self.monitor_fields:
+                            if key in self.monitor_fields[category]:
+                                if isinstance(value, bool):
+                                    self.data['status'][category][self.monitor_fields[category][key]] = int(value)
+                                elif isinstance(value, int) or isinstance(value, float):
+                                    self.data['status'][category][self.monitor_fields[category][key]] = value
+                                elif value is None:
+                                    self.data['status'][category][self.monitor_fields[category][key]] = float('nan')
+                                else:
+                                    self.data['status'][category][self.monitor_fields[category][key]] = str(value)
             self.data['status']['summary']['ctime'] =\
                 timecode(self.data['status']['summary']['Time'])
             if self.data['status']['platform_status']['Remote_mode'] == 0:
