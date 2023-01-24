@@ -227,19 +227,24 @@ class ACUAgent:
                             blocking=False)
         agent.register_task('fromfile_scan',
                             self.fromfile_scan,
-                            blocking=False)
+                            blocking=False,
+                            aborter=self._abort_motion_op)
         agent.register_task('set_boresight',
                             self.set_boresight,
-                            blocking=False)
+                            blocking=False,
+                            aborter=self._abort_motion_op)
         agent.register_task('stop_and_clear',
                             self.stop_and_clear,
-                            blocking=False)
+                            blocking=False,
+                            aborter=self._abort_motion_op)
         agent.register_task('preset_stop_clear',
                             self.preset_stop_clear,
-                            blocking=False)
+                            blocking=False,
+                            aborter=self._abort_motion_op)
         agent.register_task('clear_faults',
                             self.clear_faults,
-                            blocking=False)
+                            blocking=False,
+                            aborter=self._abort_motion_op)
 
     # Operation management.  This agent has several Processes that
     # must be able to alone or simultaneously.  The state of each is
@@ -287,6 +292,12 @@ class ACUAgent:
                               f" by {self.lock.job}")
                 return False
             self.jobs[job_name] = 'idle'
+
+    def _abort_motion_op(self, session, params):
+        if session.status == 'running':
+            session.set_status('stopping')
+        yield self.stop_and_clear(session, params)
+        yield
 
     #
     # The Operations
@@ -582,6 +593,7 @@ class ACUAgent:
         # self._set_job_stop('monitor')
         # yield dsleep(1)
         # self._set_job_done('monitor')
+        session.set_status('stopping')
         return True, 'Acquisition exited cleanly.'
 
     @inlineCallbacks
@@ -665,6 +677,7 @@ class ACUAgent:
 
         handler.stopListening()
         self._set_job_done('broadcast')
+        session.set_status('stopping')
         return True, 'Acquisition exited cleanly.'
 
     @inlineCallbacks
@@ -871,6 +884,7 @@ class ACUAgent:
        #               }
        # self.agent.publish_to_feed('acu_upload', acu_upload, from_reactor=True)
         self._set_job_done('control')
+        session.set_status('stopping')
         return True, 'Pointing completed'
 
     @inlineCallbacks
@@ -958,6 +972,7 @@ class ACUAgent:
 #                      }
 #        self.agent.publish_to_feed('acu_upload', acu_upload)
         self._set_job_done('control')
+        session.set_status('stopping')
         return True, 'Moved to new 3rd axis position'
 
     @inlineCallbacks
@@ -1002,6 +1017,7 @@ class ACUAgent:
         session.set_status('running')
         yield self.acu_control.clear_faults()
         self._set_job_done('control')
+        session.set_status('stopping')
         return True, 'Job completed.'
 
     @inlineCallbacks
@@ -1061,6 +1077,7 @@ class ACUAgent:
             return False, 'Could not clear stack'
 #        self.log.info('Cleared stack.')
         self._set_job_done('control')
+        session.set_status('stopping')
         return True, 'Job completed'
 
     @inlineCallbacks
@@ -1118,6 +1135,7 @@ class ACUAgent:
         ntimes = params['ntimes']
         azonly = params['azonly']
         simulator = params['simulator']
+        session.set_status('running')
         if abs(acc) > self.motion_limits['acc']:
             raise ocs_agent.ParamError('Acceleration too great!')
         if min(azpts) <= self.motion_limits['azimuth']['lower'] or max(azpts) >= self.motion_limits['azimuth']['upper']:
@@ -1126,12 +1144,13 @@ class ACUAgent:
             raise ocs_agent.ParamError('Elevation location out of range!')
         times, azs, els, vas, ves, azflags, elflags = sh.constant_velocity_scanpoints(azpts, el, azvel, acc, ntimes)
         yield self._run_specified_scan(session, times, azs, els, vas, ves, azflags, elflags, azonly, simulator)
+        session.set_status('stopping')
         return True, 'Track completed.'
 
     @inlineCallbacks
     def _run_specified_scan(self, session, times, azs, els, vas, ves, azflags, elflags, azonly, simulator):
 
-        session.set_status('running')
+#        session.set_status('running')
         bcast_check = yield self._check_daq_streams('broadcast')
         monitor_check = yield self._check_daq_streams('monitor')
         if not bcast_check or not monitor_check:
@@ -1467,6 +1486,7 @@ class ACUAgent:
         #               }
         # self.agent.publish_to_feed('acu_upload', acu_upload)
         self._set_job_done('control')
+        session.set_status('stopping')
         return True, 'Track ended cleanly'
 
 
