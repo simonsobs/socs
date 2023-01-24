@@ -815,22 +815,41 @@ class ACUAgent:
             remote = self.data['status']['platform_status']['Remote_mode']
             if remote == 0:
                 self.log.warn('ACU no longer in remote mode!')
-            if mdata['Azimuth_mode'] != 'Preset' or mdata['Elevation_mode'] != 'Preset':
-                # yield self.acu_control.stop()
-                self.log.info('Mode has changed from Preset, abort motion')
-                return False, 'Motion aborted'
-            ve = round(mdata['Elevation_current_velocity'], 2)
-            va = round(mdata['Azimuth_current_velocity'], 2)
-            if (ve != 0.0) or (va != 0.0):
-                moving = True
-                yield dsleep(wait_for_motion)
+            if azonly:
+                if mdata['Azimuth_mode'] != 'Preset':
+                    self.log.info('Mode has changed from Preset, abort motion')
+                    return False, 'Motion aborted'
             else:
-                moving = False
-                mdata = self.data['status']['summary']
                 if mdata['Azimuth_mode'] != 'Preset' or mdata['Elevation_mode'] != 'Preset':
                     # yield self.acu_control.stop()
                     self.log.info('Mode has changed from Preset, abort motion')
                     return False, 'Motion aborted'
+            ve = round(mdata['Elevation_current_velocity'], 2)
+            va = round(mdata['Azimuth_current_velocity'], 2)
+            if (ve != 0.0) or (va != 0.0):
+                moving = True
+                mdata = self.data['status']['summary']
+                if azonly:
+                    if mdata['Azimuth_mode'] != 'Preset':
+                        self.log.info('Mode has changed from Preset, abort motion')
+                        return False, 'Motion aborted'
+                else:
+                    if mdata['Azimuth_mode'] != 'Preset' or mdata['Elevation_mode'] != 'Preset':
+                        self.log.info('Mode has changed from Preset, abort motion')
+                        return False, 'Motion aborted'
+                yield dsleep(wait_for_motion)
+            else:
+                moving = False
+                mdata = self.data['status']['summary']
+                if azonly:
+                    if mdata['Azimuth_mode'] != 'Preset':
+                        self.log.info('Mode has changed from Preset, abort motion')
+                        return False, 'Motion aborted'
+                else:
+                    if mdata['Azimuth_mode'] != 'Preset' or mdata['Elevation_mode'] != 'Preset':
+                        # yield self.acu_control.stop()
+                        self.log.info('Mode has changed from Preset, abort motion')
+                        return False, 'Motion aborted'
                 pe = round(mdata['Elevation_current_position'], round_int)
                 pa = round(mdata['Azimuth_current_position'], round_int)
                 if pe != el or pa != az:
