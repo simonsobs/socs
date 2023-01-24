@@ -1,6 +1,8 @@
-FROM simonsobs/sodetlib:v0.5.0
+FROM simonsobs/sodetlib:v0.5.0-2-g0f91202
 
 ENV OCS_CONFIG_DIR /config
+
+ENV PYTHONUNBUFFERED=1
 
 # SOCS installation
 RUN python3 -m pip install git+https://github.com/simonsobs/socs.git@develop
