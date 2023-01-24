@@ -197,12 +197,30 @@ def agent():
 
     return agent
 
+def mock_uxm_setup(S, cfg, bands, **kwargs):
+    """Mock a typical valid response from uxm_relock."""
+    summary = {'timestamps': [('setup_amps', 1671048272.6197276),
+                              ('load_tune', 1671048272.6274314),
+                              ('tracking_setup', 1671048272.6286802),
+                              ('noise', 1671048272.7402556),
+                              ('end', 1671048272.7404766)],
+               'amps': {'success': True},
+               'reload_tune': None,
+               'tracking_setup_results': mock.MagicMock(),
+               'noise': {'noise_pars': 0,
+                         'bands': 0,
+                         'channels': 0,
+                         'band_medians': 0,
+                         'f': 0,
+                         'axx': 0,
+                         'bincenters': 0,
+                         'lowfn': 0,
+                         'low_f_10mHz': 0,
+                         'am': mock.MagicMock()}}
+    return True, summary
 
 @mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
-@mock.patch('numpy.save', mock_np_save())
-@mock.patch('matplotlib.figure.Figure.savefig', mock_plt_savefig())
-@mock.patch('sodetlib.noise.take_noise', mock_take_noise)
-@mock.patch('time.sleep', mock.MagicMock())
+@mock.patch('sodetlib.operations.uxm_setup.uxm_setup', mock_uxm_setup)
 def test_uxm_setup(agent):
     """test_uxm_setup()
 
