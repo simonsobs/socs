@@ -7,4 +7,6 @@ RUN python3 -m pip install git+https://github.com/simonsobs/socs.git@develop
 
 RUN pip3 install dumb-init
 
+ENV PYTHONUNBUFFERED=1
+
 ENTRYPOINT ["dumb-init", "ocs-agent-cli"]
