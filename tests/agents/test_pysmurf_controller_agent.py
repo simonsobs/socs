@@ -197,6 +197,7 @@ def agent():
 
     return agent
 
+
 def mock_uxm_setup(S, cfg, bands, **kwargs):
     """Mock a typical valid response from uxm_relock."""
     summary = {'timestamps': [('setup_amps', 1671048272.6197276),
@@ -218,6 +219,7 @@ def mock_uxm_setup(S, cfg, bands, **kwargs):
                          'low_f_10mHz': 0,
                          'am': mock.MagicMock()}}
     return True, summary
+
 
 @mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
 @mock.patch('sodetlib.operations.uxm_setup.uxm_setup', mock_uxm_setup)
