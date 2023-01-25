@@ -419,6 +419,7 @@ def test_all_off(agent):
     res = agent.all_off(session, {'disable_amps': True, 'disable_tones': True})
     assert res[0] is True
 
+
 @mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
 def test_bias_to_volt_arr(agent):
     """test_all_off()
