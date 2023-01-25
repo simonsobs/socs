@@ -863,7 +863,7 @@ class PysmurfController:
 
 
     @ocs_agent.param('biases')
-    @ocs_agent.params('kwargs', default=None)
+    @ocs_agent.param('kwargs', default=None)
     def bias_to_volt_arr(self, session, params):
         """bias_to_volt_arr(biases, kwargs=None)
 
@@ -891,7 +891,7 @@ class PysmurfController:
             session.set_status('running')
             S, cfg = self._get_smurf_control(session=session)
 
-            bias_dets.bias_to_volt_arr(S, cfg, biases, **params['kwargs'])
+            bias_dets.bias_to_volt_arr(S, cfg, params['biases'], **params['kwargs'])
 
             biases = S.get_tes_bias_bipolar_array()
             session.data['biases'] = biases.tolist()

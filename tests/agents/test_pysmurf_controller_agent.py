@@ -418,3 +418,20 @@ def test_all_off(agent):
     session = create_session('overbias_tes')
     res = agent.all_off(session, {'disable_amps': True, 'disable_tones': True})
     assert res[0] is True
+
+@mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
+def test_bias_to_volt_arr(agent):
+    """test_all_off()
+
+    **Test** - Tests the all_off task.
+    """
+    session = create_session('bias_to_volt_arr')
+    params = {
+        'biases': np.zeros(12).tolist(),
+        'kwargs': {
+            'overbias': False,
+            'bias_groups': np.arange(12).tolist()
+        }
+    }
+    res = agent.bias_to_volt_arr(session, params)
+    assert res[0] is True
