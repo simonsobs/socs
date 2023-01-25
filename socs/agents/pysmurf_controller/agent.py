@@ -861,6 +861,43 @@ class PysmurfController:
 
             return True, "Finished biasing detectors"
 
+
+    @ocs_agent.param('biases')
+    @ocs_agent.params('kwargs', default=None)
+    def bias_to_volt_arr(self, session, params):
+        """bias_to_volt_arr(biases, kwargs=None)
+
+        **Task** - Sets the TES bias voltage array. This will by default
+        start by overbiasing detectors. To disable this, run with the kwarg
+        ``overbias=False``.
+
+        Args
+        -------
+        biases : list
+            This must be an array of length 12, with the ith element being the
+            voltage bias of bias group i. Note that the bias of any bias group
+            that is not active, or not specified in the ``bias_groups`` parameter
+            will be ignored.
+        kwargs: dict
+            Additional kwargs to pass to the bias_to_volt_arr function.
+        """
+        if params['kwargs'] is None:
+            params['kwargs'] = {}
+
+        with self.lock.acquire_timeout(0, job='set_bias_volt_array') as acquired:
+            if not acquired:
+                return False, f"Operation failed: {self.lock.job} is running."
+
+            session.set_status('running')
+            S, cfg = self._get_smurf_control(session=session)
+
+            bias_dets.bias_to_volt_arr(S, cfg, biases, **params['kwargs'])
+
+            biases = S.get_tes_bias_bipolar_array()
+            session.data['biases'] = biases.tolist()
+
+            return True, "Finished biasing detectors"
+
     @ocs_agent.param('disable_amps', default=True, type=bool)
     @ocs_agent.param('disable_tones', default=True, type=bool)
     def all_off(self, session, params):
@@ -932,12 +969,12 @@ def main(args=None):
     agent.register_task('uxm_setup', controller.uxm_setup)
     agent.register_task('uxm_relock', controller.uxm_relock)
     agent.register_task('take_bgmap', controller.take_bgmap)
-    agent.register_task('bias_dets', controller.bias_dets)
     agent.register_task('take_iv', controller.take_iv)
     agent.register_task('take_bias_steps', controller.take_bias_steps)
     agent.register_task('overbias_tes', controller.overbias_tes)
     agent.register_task('take_noise', controller.take_noise)
     agent.register_task('bias_dets', controller.bias_dets)
+    agent.register_task('bias_to_volt_arr', controller.bias_to_volt_arr)
     agent.register_task('all_off', controller.all_off)
 
     runner.run(agent, auto_reconnect=True)
