@@ -852,7 +852,7 @@ class LS372_Agent:
             
             channel = params['channel']
             curve_number = params['curve_number']
-            self.module.channels[i].set_calibratio(curve_number)
+            self.module.channels[channel].set_calibratio(curve_number)
                                     
         return True, f"Assigned {channel} to curve number {curve_number}."
 
