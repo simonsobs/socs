@@ -861,7 +861,6 @@ class PysmurfController:
 
             return True, "Finished biasing detectors"
 
-
     @ocs_agent.param('biases')
     @ocs_agent.params('kwargs', default=None)
     def bias_to_volt_arr(self, session, params):
