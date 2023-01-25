@@ -854,7 +854,7 @@ class LS372_Agent:
             curve_number = params['curve_number']
             self.module.channels[channel].set_calibration_curve(curve_number)
                                     
-        return True, f"Assigned {channel} to curve number {curve_number}."
+        return True, f"Assigned channel {channel} to curve number {curve_number}."
 
     @ocs_agent.param('channel', type=int)
     def get_input_setup(self, session, params):
