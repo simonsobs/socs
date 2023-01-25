@@ -874,7 +874,7 @@ class LS372_Agent:
             session.set_status('running')
             
             channel = params['channel']
-            input_setup = self.module.get_input_setup(channel)
+            input_setup = self.module.channels[channel].get_input_setup()
             session.add_message(input_setup)
                                     
         return True, f"Channel {channel} has measurement inputs {input_setup} = [mode," \
