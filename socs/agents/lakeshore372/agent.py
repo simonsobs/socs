@@ -900,8 +900,8 @@ class LS372_Agent:
         """
 
         with self._acq_proc_lock.acquire_timeout(timeout=0, job='custom_pid') \
-             as acq_acquired, \
-             self._lock.acquire_timeout(job='custom_pid') as acquired:
+                as acq_acquired, \
+                self._lock.acquire_timeout(job='custom_pid') as acquired:
             if not acq_acquired:
                 self.log.warn(f"Could not start Process because "
                               f"{self._acq_proc_lock.job} is already running")
@@ -973,7 +973,7 @@ class LS372_Agent:
                 times.append(time.time())
 
                 # Calculate and apply the PID based on the most recent temperature set
-                if times[-1]-last_pid > update_time:
+                if times[-1] - last_pid > update_time:
                     heater_P = P_val * (setpoint - np.mean(np.array(temps)))
                     heater_I += P_val * I_val * (delta_t * np.sum(setpoint - np.array(temps)))
                     heater_pow = max(0.0, heater_P + heater_I)
@@ -986,18 +986,18 @@ class LS372_Agent:
                     # Publish heater values
                     if heater == 'still':
                         heater_data = {
-                                'timestamp': last_pid,
-                                'block_name': 'still_heater_out',
-                                'data': {'still_heater_out': heater_frac}
-                                }
+                            'timestamp': last_pid,
+                            'block_name': 'still_heater_out',
+                            'data': {'still_heater_out': heater_frac}
+                        }
                         session.app.publish_to_feed('temperatures', heater_data)
 
                     if heater == 'sample':
                         heater_data = {
-                                'timestamp': last_pid,
-                                'block_name': 'sample_heater_out',
-                                'data': {'sample_heater_out': heater_pow}
-                                }
+                            'timestamp': last_pid,
+                            'block_name': 'sample_heater_out',
+                            'data': {'sample_heater_out': heater_pow}
+                        }
                         session.app.publish_to_feed('temperatures', heater_data)
 
                     # Publish T and R values
@@ -1005,7 +1005,7 @@ class LS372_Agent:
                         'timestamps': times,
                         'block_name': active_channel.name,
                         'data': {channel_str + '_T': temps,
-                                channel_str + '_R': resistances}
+                                 channel_str + '_R': resistances}
                     }
                     session.app.publish_to_feed('temperatures', temp_data)
 
