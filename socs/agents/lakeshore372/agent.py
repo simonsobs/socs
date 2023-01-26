@@ -776,13 +776,6 @@ class LS372_Agent:
                 session.add_message('Autoscan is enabled, disabling for PID control on dedicated channel.')
                 self.module.disable_autoscan()
 
-            # Check the control thermometer if requested
-            control_ch = params.get('control_ch', False)
-            session.add_message(f'Control ch is {control_ch}')
-            if control_ch:
-                session.add_message(f'Setting heater control input channel to {control_ch}')
-                self.module.sample_heater.input = int(control_ch)
-
             # Check we're scanning same channel expected by heater for control.
             if self.module.get_active_channel().channel_num != int(self.module.sample_heater.input):
                 session.add_message('Changing active channel to expected heater control input')
