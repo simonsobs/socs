@@ -801,7 +801,7 @@ class LS372_Agent:
         """engage_channel(channel=None)
 
         **Task** - Enables/disables a channel on the LS372
- 
+
         Parameters:
             channel (int): Channel number to enable
             state (str): Desired power state of channel; 'on' or 'off'
@@ -813,14 +813,14 @@ class LS372_Agent:
                 return False, "Could not acquire lock"
 
             session.set_status('running')
- 
+
             channel = params['channel']
             state = params['state']
             if state == 'on':
-                ch_settings = self.module.channels[channel].enable_channel()
+                self.module.channels[channel].enable_channel()
             else:
-                ch_settings = self.module.channels[channel].disable_channel()
-                                    
+                self.module.channels[channel].disable_channel()
+
         return True, "Channel {} powered {}".format(channel, state)
 
     @ocs_agent.param('channel', type=int)
@@ -843,11 +843,11 @@ class LS372_Agent:
                 return False, "Could not acquire lock"
 
             session.set_status('running')
-            
+
             channel = params['channel']
             curve_number = params['curve_number']
             self.module.channels[channel].set_calibration_curve(curve_number)
-                                    
+
         return True, f"Assigned channel {channel} to curve number {curve_number}."
 
     @ocs_agent.param('channel', type=int)
@@ -855,7 +855,7 @@ class LS372_Agent:
         """get_input_setup(channel=None)
 
         **Task** - Gets measurement inputs for a specific channel on the LS372
-        
+
         Parameters:
             channel (int): Channel number to get input setup
         """
@@ -866,11 +866,11 @@ class LS372_Agent:
                 return False, "Could not acquire lock"
 
             session.set_status('running')
-            
+
             channel = params['channel']
             input_setup = self.module.channels[channel].get_input_setup()
             session.add_message(input_setup)
-                                    
+
         return True, f"Channel {channel} has measurement inputs {input_setup} = [mode," \
                      "excitation, auto range, range, cs_shunt, units]"
 
@@ -889,7 +889,7 @@ class LS372_Agent:
         using still or sample heater. Currently only P and I implemented.
 
         Parameters:
-            setpoint (float): Setpoint in Kelvin 
+            setpoint (float): Setpoint in Kelvin
             heater (str): 'still' or 'sample'
             channel (int): LS372 Channel to PID off of
             P (int): Proportional value in Watts/Kelvin
@@ -898,7 +898,7 @@ class LS372_Agent:
             sample_heater_range (float): Range for sample heater in Amps.
                                          Default is 10e-3.
         """
-        
+
         with self._acq_proc_lock.acquire_timeout(timeout=0, job='custom_pid') \
              as acq_acquired, \
              self._lock.acquire_timeout(job='custom_pid') as acquired:
@@ -913,7 +913,7 @@ class LS372_Agent:
 
             session.set_status('running')
             session.data = {"fields": {}}
-            
+
             setpoint = params['setpoint']
             heater = params['heater']
             ch = params['channel']
@@ -921,12 +921,12 @@ class LS372_Agent:
             I_val = params['I']
             update_time = params['update_time']
             sample_heater_range = params['sample_heater_range']
-            
+
             # Constants
-            still_heater_R = 120 # [ohms]
-            still_lead_R = 14.679 # [ohms]
-            delta_t = 0.32 # rough intrinsic sampling period of the LS372 (s)
-            max_voltage = 10 # [V]
+            still_heater_R = 120  # [ohms]
+            still_lead_R = 14.679  # [ohms]
+            delta_t = 0.32  # rough intrinsic sampling period of the LS372 (s)
+            max_voltage = 10  # [V]
 
             # Get heaters in the correct configuration
             if heater == 'sample':
@@ -935,21 +935,21 @@ class LS372_Agent:
                     print(f"Heater range already set to {sample_heater_range} amps")
                 else:
                     self.module.sample_heater.set_heater_range(sample_heater_range)
-                
+
                 # Check we're in correct control mode for servo.
                 if self.module.sample_heater.mode != 'Open Loop':
                     session.add_message('Changing control to Open Loop mode for sample PID.')
                     self.module.sample_heater.set_mode("Open Loop")
-            
+
             if heater == 'still':
                 # Check we're in correct control mode for servo.
                 if self.module.still_heater.mode != 'Open Loop':
-                    session.add_message(f'Changing control to Open Loop mode for still PID.')
+                    session.add_message('Changing control to Open Loop mode for still PID.')
                     self.module.still_heater.set_mode("Open Loop")
 
             # Check we aren't autoscanning.
             if self.module.get_autoscan() is True:
-                session.add_message(f'Autoscan is enabled, disabling for still PID control on dedicated channel.')
+                session.add_message('Autoscan is enabled, disabling for still PID control on dedicated channel.')
                 self.module.disable_autoscan()
 
             # Check we're scanning same channel expected by heater for control.
@@ -965,24 +965,24 @@ class LS372_Agent:
             heater_I = 0
             temps, resistances, times = [], [], []
             self.log.info(f"Starting PID on heater {heater}, ch {ch} to setpoint {setpoint} K")
-            
+
             while self.custom_pid:
                 # Get a list of T and R at the maximum sample frequency
                 temps.append(self.module.get_temp(unit='kelvin', chan=ch))
                 resistances.append(self.module.get_temp(unit='ohms', chan=ch))
                 times.append(time.time())
-                
+
                 # Calculate and apply the PID based on the most recent temperature set
                 if times[-1]-last_pid > update_time:
-                    heater_P = P_val*(setpoint-np.mean(np.array(temps)))
-                    heater_I += P_val*I_val*(delta_t*np.sum(setpoint-np.array(temps)))
+                    heater_P = P_val * (setpoint - np.mean(np.array(temps)))
+                    heater_I += P_val * I_val * (delta_t * np.sum(setpoint - np.array(temps)))
                     heater_pow = max(0.0, heater_P + heater_I)
                     if heater == 'still':
                         heater_frac = still_power_to_perc(heater_pow, still_heater_R, still_lead_R, max_voltage)
                         self.module.still_heater.set_heater_output(heater_frac)
                     if heater == 'sample':
                         self.module.sample_heater.set_heater_output(heater_pow)
-                    
+
                     # Publish P, I values
                     #PID_data = {
                     #        'timestamp': last_pid, 
