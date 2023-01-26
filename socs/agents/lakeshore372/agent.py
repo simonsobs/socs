@@ -991,7 +991,7 @@ class LS372_Agent:
                                 'data': {'still_heater_out': heater_frac}
                                 }
                         session.app.publish_to_feed('temperatures', heater_data)
-                    
+
                     if heater == 'sample':
                         heater_data = {
                                 'timestamp': last_pid,
@@ -999,7 +999,7 @@ class LS372_Agent:
                                 'data': {'sample_heater_out': heater_pow}
                                 }
                         session.app.publish_to_feed('temperatures', heater_data)
-                    
+
                     # Publish T and R values
                     temp_data = {
                         'timestamps': times,
@@ -1015,16 +1015,16 @@ class LS372_Agent:
                                                 "timestamps": times}}
                     session.data['fields'].update(field_dict)
                     self.log.debug("{data}", data=session.data)
-                    
+
                     # Reset for the next PID iteration
                     temps, resistances, times = [], [], []
                     last_pid = time.time()
-                
+
                     # Relinquish sampling lock temporarily
                     if not self._lock.release_and_acquire(timeout=10):
                         self.log.warn(f"Failed to re-acquire sampling lock, "
                                       f"currently held by {self._lock.job}.")
-                        continue     
+                        continue
 
         return True, 'PID exited cleanly.'
 
