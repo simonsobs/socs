@@ -983,16 +983,6 @@ class LS372_Agent:
                     if heater == 'sample':
                         self.module.sample_heater.set_heater_output(heater_pow)
 
-                    # Publish P, I values
-                    #PID_data = {
-                    #        'timestamp': last_pid, 
-                    #        'block_name': 'PID',
-                    #        'data' : {'P_val': P_val,
-                    #                  'I_val': I_val}
-                    #        }
-                    #session.app.publish_to_feed('temperatures', PID_data)
-                                
-
                     # Publish heater values
                     if heater == 'still':
                         heater_data = {
