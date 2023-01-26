@@ -18,7 +18,8 @@ from socs.Lakeshore.Lakeshore372 import LS372
 def still_power_to_perc(power, res, lead, max_volts):
     cur = np.sqrt(power / res)
     volt = (lead + res) * cur
-    return 100*volt/max_volts
+    return 100 * volt / max_volts
+
 
 class YieldingLock:
     """A lock protected by a lock.  This braided arrangement guarantees
@@ -800,7 +801,7 @@ class LS372_Agent:
         """engage_channel(channel=None)
 
         **Task** - Enables/disables a channel on the LS372
-        
+ 
         Parameters:
             channel (int): Channel number to enable
             state (str): Desired power state of channel; 'on' or 'off'
@@ -812,10 +813,10 @@ class LS372_Agent:
                 return False, "Could not acquire lock"
 
             session.set_status('running')
-            
+ 
             channel = params['channel']
             state = params['state']
-            if state == 'on': 
+            if state == 'on':
                 ch_settings = self.module.channels[channel].enable_channel()
             else:
                 ch_settings = self.module.channels[channel].disable_channel()
