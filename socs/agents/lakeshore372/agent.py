@@ -828,8 +828,7 @@ class LS372_Agent:
     def set_calibration_curve(self, session, params):
         """set_calibration_curve(channel=None, curve_number=None)
 
-        **Task** - Sets the calibration curve number for a particular
-                   channel.
+        **Task** - Sets the calibration curve number for a particular channel.
 
         Parameters:
             channel (int): Channel number to set calibration curve to
@@ -882,7 +881,7 @@ class LS372_Agent:
     @ocs_agent.param('update_time', type=int)
     @ocs_agent.param('sample_heater_range', type=float, default=10e-3)
     def start_custom_pid(self, session, params):
-        """start_custom_pid(setpoint=None, heater=None, channel=None, P=None,
+        """start_custom_pid(setpoint=None, heater=None, channel=None, P=None, \
                             I=None, update_time=None, sample_heater_range=None)
 
         **Task** - Set custom software PID parameters for servo control of fridge
