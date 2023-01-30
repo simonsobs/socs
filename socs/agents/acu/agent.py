@@ -296,7 +296,7 @@ class ACUAgent:
 
     def _abort_motion_op(self, session, params):
         if session.status == 'running':
-            session.set_status('stopping')
+            session.set_status('aborting')
         yield self.stop_and_clear(session, params)
         yield
 
@@ -724,139 +724,125 @@ class ACUAgent:
             rounding (int): number of decimal places to round to
 
         """
+        with self.lock.acquire_timeout(0, job='control') as acquired:
+            if not acquired:
+                return False, f"Operation failed: {self.lock.job} is running."
+            session.set_status('running')
+            while session.status == 'running':
+                bcast_check = yield self._check_daq_streams('broadcast')
+                monitor_check = yield self._check_daq_streams('monitor')
+                if not bcast_check or not monitor_check:
+                    self._set_job_done('control')
+                    session.set_status('stopping')
+                    return False, 'Cannot complete go_to with process not running.'
 
-        session.set_status('running')
-        while session.status == 'running':
-            bcast_check = yield self._check_daq_streams('broadcast')
-            monitor_check = yield self._check_daq_streams('monitor')
-            if not bcast_check or not monitor_check:
-                self._set_job_done('control')
-                session.set_status('stopping')
-                return False, 'Cannot complete go_to with process not running.'
+                az = params['az']
+                el = params['el']
+                azonly = params['azonly']
+                if az < self.motion_limits['azimuth']['lower'] or az > self.motion_limits['azimuth']['upper']:
+                    raise ocs_agent.ParamError("Azimuth out of range! Must be "
+                                               + f"{self.motion_limits['azimuth']['lower']} < az "
+                                               + f"< {self.motion_limits['azimuth']['upper']}")
+                if el < self.motion_limits['elevation']['lower'] or el > self.motion_limits['elevation']['upper']:
+                    raise ocs_agent.ParamError("Elevation out of range! Must be "
+                                               + f"{self.motion_limits['elevation']['lower']} < el "
+                                               + f"< {self.motion_limits['elevation']['upper']}")
+                end_stop = params['end_stop']
+                wait_for_motion = params['wait']
+                round_int = params['rounding']
+                if self.data['status']['platform_status']['Remote_mode'] == 0:
+                    self.log.warn('ACU in local mode, cannot perform motion with OCS.')
+                    self._set_job_done('control')
+                    session.set_status('stopping')
+                    return False, 'ACU not in remote mode.'
+                self.log.info('Azimuth commanded position: ' + str(az))
+                self.log.info('Elevation commanded position: ' + str(el))
+                current_az = round(self.data['status']['summary']['Azimuth_current_position'], 2)  # round(self.data['broadcast']['Corrected_Azimuth'], 4)
+                current_el = round(self.data['status']['summary']['Elevation_current_position'], 2)  # round(self.data['broadcast']['Corrected_Elevation'], 4)
+                self.data['uploads']['Start_Azimuth'] = current_az
+                self.data['uploads']['Start_Elevation'] = current_el
+                self.data['uploads']['Command_Type'] = 1
+                self.data['uploads']['Preset_Azimuth'] = az
+                self.data['uploads']['Preset_Elevation'] = el
 
-            az = params['az']
-            el = params['el']
-            azonly = params['azonly']
-            if az < self.motion_limits['azimuth']['lower'] or az > self.motion_limits['azimuth']['upper']:
-                raise ocs_agent.ParamError("Azimuth out of range! Must be "
-                                           + f"{self.motion_limits['azimuth']['lower']} < az "
-                                           + f"< {self.motion_limits['azimuth']['upper']}")
-            if el < self.motion_limits['elevation']['lower'] or el > self.motion_limits['elevation']['upper']:
-                raise ocs_agent.ParamError("Elevation out of range! Must be "
-                                           + f"{self.motion_limits['elevation']['lower']} < el "
-                                           + f"< {self.motion_limits['elevation']['upper']}")
-            end_stop = params['end_stop']
-            wait_for_motion = params['wait']
-            round_int = params['rounding']
-            if self.data['status']['platform_status']['Remote_mode'] == 0:
-                self.log.warn('ACU in local mode, cannot perform motion with OCS.')
-                self._set_job_done('control')
-                session.set_status('stopping')
-                return False, 'ACU not in remote mode.'
-            self.log.info('Azimuth commanded position: ' + str(az))
-            self.log.info('Elevation commanded position: ' + str(el))
-            current_az = round(self.data['status']['summary']['Azimuth_current_position'], 2)  # round(self.data['broadcast']['Corrected_Azimuth'], 4)
-            current_el = round(self.data['status']['summary']['Elevation_current_position'], 2)  # round(self.data['broadcast']['Corrected_Elevation'], 4)
-            self.data['uploads']['Start_Azimuth'] = current_az
-            self.data['uploads']['Start_Elevation'] = current_el
-            self.data['uploads']['Command_Type'] = 1
-            self.data['uploads']['Preset_Azimuth'] = az
-            self.data['uploads']['Preset_Elevation'] = el
+         #       acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
+         #                     'block_name': 'ACU_upload',
+         #                     'data': self.data['uploads']
+         #                     }
+         #       self.agent.publish_to_feed('acu_upload', acu_upload)
 
-         #   acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
-         #                 'block_name': 'ACU_upload',
-         #                 'data': self.data['uploads']
-         #                 }
-         #   self.agent.publish_to_feed('acu_upload', acu_upload)
-
-            # Check whether the telescope is already at the point
-            self.log.info('Setting mode to Preset')
-            if azonly:
-                acu_msg = yield self.acu_control.azmode('Preset')
-            else:
-                acu_msg = yield self.acu_control.mode('Preset')
-            if acu_msg not in [b'OK, Command executed.', b'OK, Command send.']:
-                self.log.error(acu_msg)
-                self._set_job_done('control')
-                session.set_status('stopping')
-                return False, 'Could not change mode'
-            if round(current_az, round_int) == az and \
-                    round(current_el, round_int) == el:
-                yield self.acu_control.go_to(az, el, wait=0.1)
-                self.log.info('Already at commanded position.')
-                self._set_job_done('control')
-                session.set_status('stopping')
-                return True, 'Preset at commanded position'
+                # Check whether the telescope is already at the point
+                self.log.info('Setting mode to Preset')
+                if azonly:
+                    acu_msg = yield self.acu_control.azmode('Preset')
+                else:
+                    acu_msg = yield self.acu_control.mode('Preset')
+                if acu_msg not in [b'OK, Command executed.', b'OK, Command send.']:
+                    self.log.error(acu_msg)
+                    self._set_job_done('control')
+                    session.set_status('stopping')
+                    return False, 'Could not change mode'
+                if round(current_az, round_int) == az and \
+                        round(current_el, round_int) == el:
+                    yield self.acu_control.go_to(az, el, wait=0.1)
+                    self.log.info('Already at commanded position.')
+                    self._set_job_done('control')
+                    session.set_status('stopping')
+                    return True, 'Preset at commanded position'
             # yield self.acu.stop()
             # yield self.acu_control.mode('Stop')
             # self.log.info('Stopped')
-            yield dsleep(2)
-            if session.status != 'running':
-                return False, 'Aborted before sending go_to command'
-            self.log.info('Sending go_to command')
-            acu_msg = yield self.acu_control.go_to(az, el, wait=0.1)
-            if acu_msg not in [b'OK, Command executed.', b'OK, Command send.']:
-                self.log.error(acu_msg)
-                self._set_job_done('control')
-                session.set_status('stopping')
-                return False, 'Could not send go_to command'
-            yield dsleep(0.3)
-            mdata = self.data['status']['summary']
-            # Wait for telescope to start moving
-            self.log.info('Moving to commanded position')
-            wait_for_motion_start = time.time()
-            elapsed_wait_for_motion = 0.0
-            while mdata['Azimuth_current_velocity'] == 0.0 and\
-                    mdata['Elevation_current_velocity'] == 0.0:
-                if elapsed_wait_for_motion < 30.:
-                    yield dsleep(wait_for_motion)
-                    elapsed_wait_for_motion = time.time() - wait_for_motion_start
-                    mdata = self.data['status']['summary']
-                else:
-                    if round(mdata['Azimuth_current_position'] - az, round_int) == 0. and \
-                             round(mdata['Elevation_current_position'] - el, round_int) == 0.:
-                        if end_stop:
-                            yield self.acu_control.stop()
-                            self.log.info('Az and el in Stop mode')
-                        self._set_job_done('control')
-                        session.set_status('stopping')
-                        return True, 'Pointing completed'
-                    else:
-                        yield self.acu_control.stop()
-                        self._set_job_done('control')
-                        session.set_status('stopping')
-                        return False, 'Motion never occurred! Stop activated'
-                yield dsleep(wait_for_motion)
+                yield dsleep(2)
+                if session.status != 'running':
+                    return False, 'Aborted before sending go_to command'
+                self.log.info('Sending go_to command')
+                acu_msg = yield self.acu_control.go_to(az, el, wait=0.1)
+                if acu_msg not in [b'OK, Command executed.', b'OK, Command send.']:
+                    self.log.error(acu_msg)
+                    self._set_job_done('control')
+                    session.set_status('stopping')
+                    return False, 'Could not send go_to command'
+                yield dsleep(0.3)
                 mdata = self.data['status']['summary']
-            moving = True
-            while moving:
+                # Wait for telescope to start moving
+                self.log.info('Moving to commanded position')
+                wait_for_motion_start = time.time()
+                elapsed_wait_for_motion = 0.0
+                while mdata['Azimuth_current_velocity'] == 0.0 and\
+                        mdata['Elevation_current_velocity'] == 0.0:
+                    if elapsed_wait_for_motion < 30.:
+                        yield dsleep(wait_for_motion)
+                        elapsed_wait_for_motion = time.time() - wait_for_motion_start
+                        mdata = self.data['status']['summary']
+                    else:
+                        if round(mdata['Azimuth_current_position'] - az, round_int) == 0. and \
+                                 round(mdata['Elevation_current_position'] - el, round_int) == 0.:
+                            if end_stop:
+                                yield self.acu_control.stop()
+                                self.log.info('Az and el in Stop mode')
+                            self._set_job_done('control')
+                            session.set_status('stopping')
+                            return True, 'Pointing completed'
+                        else:
+                            yield self.acu_control.stop()
+                            self._set_job_done('control')
+                            session.set_status('stopping')
+                            return False, 'Motion never occurred! Stop activated'
+                    yield dsleep(wait_for_motion)
+                    mdata = self.data['status']['summary']
+                moving = True
+                while moving:
               #      acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
               #                    'block_name': 'ACU_upload',
               #                    'data': self.data['uploads']
               #                    }
               #      self.agent.publish_to_feed('acu_upload', acu_upload)
-                if session.status != 'running':
-                    return False, 'Aborted!'
-                mdata = self.data['status']['summary']
-                remote = self.data['status']['platform_status']['Remote_mode']
-                if remote == 0:
-                    self.log.warn('ACU no longer in remote mode!')
-                if azonly:
-                    if mdata['Azimuth_mode'] != 'Preset':
-                        self.log.info('Mode has changed from Preset, abort motion')
-                        session.set_status('stopping')
-                        return False, 'Motion aborted'
-                else:
-                    if mdata['Azimuth_mode'] != 'Preset' or mdata['Elevation_mode'] != 'Preset':
-                        # yield self.acu_control.stop()
-                        self.log.info('Mode has changed from Preset, abort motion')
-                        session.set_status('stopping')
-                        return False, 'Motion aborted'
-                ve = round(mdata['Elevation_current_velocity'], 2)
-                va = round(mdata['Azimuth_current_velocity'], 2)
-                if (ve != 0.0) or (va != 0.0):
-                    moving = True
+                    if session.status != 'running':
+                        return False, 'Aborted!'
                     mdata = self.data['status']['summary']
+                    remote = self.data['status']['platform_status']['Remote_mode']
+                    if remote == 0:
+                        self.log.warn('ACU no longer in remote mode!')
                     if azonly:
                         if mdata['Azimuth_mode'] != 'Preset':
                             self.log.info('Mode has changed from Preset, abort motion')
@@ -864,42 +850,62 @@ class ACUAgent:
                             return False, 'Motion aborted'
                     else:
                         if mdata['Azimuth_mode'] != 'Preset' or mdata['Elevation_mode'] != 'Preset':
-                            self.log.info('Mode has changed from Preset, abort motion')
-                            return False, 'Motion aborted'
-                    yield dsleep(wait_for_motion)
-                else:
-                    moving = False
-                    mdata = self.data['status']['summary']
-                    if azonly:
-                        if mdata['Azimuth_mode'] != 'Preset':
-                            self.log.info('Mode has changed from Preset, abort motion')
-                            return False, 'Motion aborted'
-                    else:
-                        if mdata['Azimuth_mode'] != 'Preset' or mdata['Elevation_mode'] != 'Preset':
                             # yield self.acu_control.stop()
                             self.log.info('Mode has changed from Preset, abort motion')
+                            session.set_status('stopping')
                             return False, 'Motion aborted'
-                    pe = round(mdata['Elevation_current_position'], round_int)
-                    pa = round(mdata['Azimuth_current_position'], round_int)
-                    if pe != el or pa != az:
-                        yield self.acu_control.stop()
-                        self.log.warn('Stopped before reaching commanded point!')
-                        return False, 'Something went wrong!'
-            if end_stop:
-#                yield self.acu_control.stop()
-                yield self.acu_control.mode('Stop')
-                self.log.info('Stop mode activated')
-            self.data['uploads']['Start_Azimuth'] = 0.0
-            self.data['uploads']['Start_Elevation'] = 0.0
-            self.data['uploads']['Command_Type'] = 0
-            self.data['uploads']['Preset_Azimuth'] = 0.0
-            self.data['uploads']['Preset_Elevation'] = 0.0
-       #     acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
-           #               'block_name': 'ACU_upload',
-           #               'data': self.data['uploads']
-       #                   }
-           # self.agent.publish_to_feed('acu_upload', acu_upload, from_reactor=True)
-        self._set_job_done('control')
+                    ve = round(mdata['Elevation_current_velocity'], 2)
+                    va = round(mdata['Azimuth_current_velocity'], 2)
+                    if (ve != 0.0) or (va != 0.0):
+                        moving = True
+                        mdata = self.data['status']['summary']
+                        if azonly:
+                            if mdata['Azimuth_mode'] != 'Preset':
+                                self.log.info('Mode has changed from Preset, abort motion')
+                                session.set_status('stopping')
+                                return False, 'Motion aborted'
+                        else:
+                            if mdata['Azimuth_mode'] != 'Preset' or mdata['Elevation_mode'] != 'Preset':
+                                self.log.info('Mode has changed from Preset, abort motion')
+                                return False, 'Motion aborted'
+                        yield dsleep(wait_for_motion)
+                    else:
+                        moving = False
+                        mdata = self.data['status']['summary']
+                        if azonly:
+                            if mdata['Azimuth_mode'] != 'Preset':
+                                self.log.info('Mode has changed from Preset, abort motion')
+                                return False, 'Motion aborted'
+                        else:
+                            if mdata['Azimuth_mode'] != 'Preset' or mdata['Elevation_mode'] != 'Preset':
+                                # yield self.acu_control.stop()
+                                self.log.info('Mode has changed from Preset, abort motion')
+                                return False, 'Motion aborted'
+                        pe = round(mdata['Elevation_current_position'], round_int)
+                        pa = round(mdata['Azimuth_current_position'], round_int)
+                        if pe != el or pa != az:
+                            yield self.acu_control.stop()
+                            self.log.warn('Stopped before reaching commanded point!')
+                            return False, 'Something went wrong!'
+                if end_stop:
+#                    yield self.acu_control.stop()
+                    yield self.acu_control.mode('Stop')
+                    self.log.info('Stop mode activated')
+                self.data['uploads']['Start_Azimuth'] = 0.0
+                self.data['uploads']['Start_Elevation'] = 0.0
+                self.data['uploads']['Command_Type'] = 0
+                self.data['uploads']['Preset_Azimuth'] = 0.0
+                self.data['uploads']['Preset_Elevation'] = 0.0
+       #         acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
+           #                   'block_name': 'ACU_upload',
+           #                   'data': self.data['uploads']
+       #                       }
+           #     self.agent.publish_to_feed('acu_upload', acu_upload, from_reactor=True)
+            if session.status == 'aborting':
+            yield self.acu_control.mode('Stop')
+            self.log.warn('go_to aborted by user!')
+
+            self._set_job_done('control')
         session.set_status('stopping')
         return True, 'Pointing completed'
 
@@ -1357,141 +1363,144 @@ class ACUAgent:
             scan_upload_length (float): number of seconds for each set of uploaded
                 points. Default value is 10.0.
         """
-        session.set_status('running')
-        bcast_check = yield self._check_daq_streams('broadcast')
-        monitor_check = yield self._check_daq_streams('monitor')
-        if not bcast_check or not monitor_check:
-            self._set_job_done('control')
-            return False, 'Cannot complete go_to with process not running.'
+        with self.lock.acquire_timeout(0, job='control') as acquired:
+            if not acquired:
+                return False, f"Operation failed: {self.lock.job} is running."
+            session.set_status('running')
+            bcast_check = yield self._check_daq_streams('broadcast')
+            monitor_check = yield self._check_daq_streams('monitor')
+            if not bcast_check or not monitor_check:
+                self._set_job_done('control')
+                return False, 'Cannot complete go_to with process not running.'
 
-        az_endpoint1 = params.get('az_endpoint1')
-        az_endpoint2 = params.get('az_endpoint2')
-        az_speed = params.get('az_speed')
-        acc = params.get('acc')
-        el_endpoint1 = params.get('el_endpoint1')
-        azonly = params.get('azonly', True)
-        scan_upload_len = params.get('scan_upload_length', 10.0)
-        scan_params = {k: params.get(k) for k in [
-            'num_scans', 'num_batches', 'start_time',
-            'wait_to_start', 'step_time', 'batch_size', 'ramp_up', 'az_start']
-            if params.get(k) is not None}
-        el_endpoint2 = params.get('el_endpoint2', el_endpoint1)
-        el_speed = params.get('el_speed', 0.0)
+            az_endpoint1 = params.get('az_endpoint1')
+            az_endpoint2 = params.get('az_endpoint2')
+            az_speed = params.get('az_speed')
+            acc = params.get('acc')
+            el_endpoint1 = params.get('el_endpoint1')
+            azonly = params.get('azonly', True)
+            scan_upload_len = params.get('scan_upload_length', 10.0)
+            scan_params = {k: params.get(k) for k in [
+                'num_scans', 'num_batches', 'start_time',
+                'wait_to_start', 'step_time', 'batch_size', 'ramp_up', 'az_start']
+                if params.get(k) is not None}
+            el_endpoint2 = params.get('el_endpoint2', el_endpoint1)
+            el_speed = params.get('el_speed', 0.0)
 
-        if self.data['status']['platform_status']['Remote_mode'] == 0:
-            self.log.warn('ACU in local mode, cannot perform motion with OCS.')
-            self._set_job_done('control')
-            return False, 'ACU not in remote mode.'
+            if self.data['status']['platform_status']['Remote_mode'] == 0:
+                self.log.warn('ACU in local mode, cannot perform motion with OCS.')
+                self._set_job_done('control')
+                return False, 'ACU not in remote mode.'
 
-        if 'az_start' in scan_params:
-            if scan_params['az_start'] in ('mid_inc', 'mid_dec'):
-                init = 'mid'
-            else:
-                init = 'end'
-        throw = az_endpoint2 - az_endpoint1
+            if 'az_start' in scan_params:
+                if scan_params['az_start'] in ('mid_inc', 'mid_dec'):
+                    init = 'mid'
+                else:
+                    init = 'end'
+            throw = az_endpoint2 - az_endpoint1
+    
+            plan, info = sh.plan_scan(az_end1=az_endpoint1, el=el_endpoint1,
+                                      throw=throw, v_az=az_speed,
+                                      a_az=acc, init=init)
 
-        plan, info = sh.plan_scan(az_end1=az_endpoint1, el=el_endpoint1,
-                                  throw=throw, v_az=az_speed,
-                                  a_az=acc, init=init)
-
-        print(plan)
-        print(info)
+        #    print(plan)
+        #    print(info)
 
     #    self.log.info('Scan params are' + str(scan_params))
-        if 'step_time' in scan_params:
-            step_time = scan_params['step_time']
-        else:
-            step_time = 1.0
-        scan_upload_len_pts = scan_upload_len / step_time
-        print(scan_upload_len_pts)
+            if 'step_time' in scan_params:
+                step_time = scan_params['step_time']
+            else:
+                step_time = 1.0
+            scan_upload_len_pts = scan_upload_len / step_time
+            print(scan_upload_len_pts)
 
-        go_to_params = {'az': plan['az_startpoint'],
-                        'el': plan['el'],
-                        'azonly': False,
-                        'end_stop': False,
-                        'wait': 1,
-                        'rounding': 2}
+            go_to_params = {'az': plan['az_startpoint'],
+                            'el': plan['el'],
+                            'azonly': False,
+                            'end_stop': False,
+                            'wait': 1,
+                            'rounding': 2}
 
-        yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
-                                            'Clear Stack')
+            yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
+                                                'Clear Stack')
 
-        self.log.info('Running go_to in generate_scan')
-        yield self.go_to(session=session, params=go_to_params)
-        self.log.info('Finished go_to, generating scan points')
+            self.log.info('Running go_to in generate_scan')
+            yield self.go_to(session=session, params=go_to_params)
+            self.log.info('Finished go_to, generating scan points')
 
-        g = sh.generate_constant_velocity_scan(az_endpoint1=az_endpoint1,
-                                               az_endpoint2=az_endpoint2,
-                                               az_speed=az_speed, acc=acc,
-                                               el_endpoint1=el_endpoint1,
-                                               el_endpoint2=el_endpoint2,
-                                               el_speed=el_speed, ramp_up=plan['ramp_up'],
-                                               **scan_params)
-        if azonly:
-            yield self.acu_control.azmode('ProgramTrack')
-        else:
-            yield self.acu_control.mode('ProgramTrack')
+            g = sh.generate_constant_velocity_scan(az_endpoint1=az_endpoint1,
+                                                   az_endpoint2=az_endpoint2,
+                                                   az_speed=az_speed, acc=acc,
+                                                   el_endpoint1=el_endpoint1,
+                                                   el_endpoint2=el_endpoint2,
+                                                   el_speed=el_speed, ramp_up=plan['ramp_up'],
+                                                   **scan_params)
+            if azonly:
+                yield self.acu_control.azmode('ProgramTrack')
+            else:
+                yield self.acu_control.mode('ProgramTrack')
 
-        self.data['uploads']['Command_Type'] = 2
-        yield dsleep(0.5)
-        current_modes = {'Az': self.data['status']['summary']['Azimuth_mode'],
-                         'El': self.data['status']['summary']['Elevation_mode'],
-                         'Remote': self.data['status']['platform_status']['Remote_mode']}
-        while current_modes['Az'] == 'ProgramTrack':
-            if current_modes['Remote'] == 0:
-                self.log.warn('ACU no longer in remote mode')
-            try:
-                lines = next(g)
-            except StopIteration:
-                break
+            self.data['uploads']['Command_Type'] = 2
+            yield dsleep(0.5)
+            current_modes = {'Az': self.data['status']['summary']['Azimuth_mode'],
+                             'El': self.data['status']['summary']['Elevation_mode'],
+                             'Remote': self.data['status']['platform_status']['Remote_mode']}
+            while current_modes['Az'] == 'ProgramTrack':
+                if current_modes['Remote'] == 0:
+                    self.log.warn('ACU no longer in remote mode')
+                try:
+                    lines = next(g)
+                except StopIteration:
+                    break
 
-            current_lines = lines
-            group_size = int(scan_upload_len_pts)
-            while len(current_lines):
-                current_modes = {'Az': self.data['status']['summary']['Azimuth_mode'],
-                                 'El': self.data['status']['summary']['Elevation_mode'],
-                                 'Remote': self.data['status']['platform_status']['Remote_mode']}
-                upload_lines = current_lines[:group_size]
-                # for u in range(len(upload_lines)):
-                #     self.data['uploads']['PtStack_Time'] = upload_lines[u].split(';')[0]
-                #     self.data['uploads']['PtStack_Azimuth'] = float(upload_lines[u].split(';')[1])
-                #     self.data['uploads']['PtStack_Elevation'] = float(upload_lines[u].split(';')[2])
-                #     self.data['uploads']['PtStack_AzVelocity'] = float(upload_lines[u].split(';')[3])
-                #     self.data['uploads']['PtStack_ElVelocity'] = float(upload_lines[u].split(';')[4])
-                #     self.data['uploads']['PtStack_AzFlag'] = int(upload_lines[u].split(';')[5])
-                #     self.data['uploads']['PtStack_ElFlag'] = int(upload_lines[u].split(';')[6].strip())
-                #     self.data['uploads']['PtStack_ctime'] = uploadtime_to_ctime(self.data['uploads']['PtStack_Time'], int(self.data['status']['summary']['Year']))
-                #     acu_upload = {'timestamp': self.data['uploads']['PtStack_ctime'],
-                #                   'block_name': 'ACU_upload',
-                #                   'data': self.data['uploads']}
-                #     self.agent.publish_to_feed('acu_upload', acu_upload, from_reactor=True)
-                text = ''.join(upload_lines)
-                current_lines = current_lines[group_size:]
-                free_positions = self.data['status']['summary']['Free_upload_positions']
-                while free_positions < 10000 - 10:# - scan_upload_len_pts:
-                    yield dsleep(0.1)
+                current_lines = lines
+                group_size = int(scan_upload_len_pts)
+                while len(current_lines):
+                    current_modes = {'Az': self.data['status']['summary']['Azimuth_mode'],
+                                     'El': self.data['status']['summary']['Elevation_mode'],
+                                     'Remote': self.data['status']['platform_status']['Remote_mode']}
+                    upload_lines = current_lines[:group_size]
+                    # for u in range(len(upload_lines)):
+                    #     self.data['uploads']['PtStack_Time'] = upload_lines[u].split(';')[0]
+                    #     self.data['uploads']['PtStack_Azimuth'] = float(upload_lines[u].split(';')[1])
+                    #     self.data['uploads']['PtStack_Elevation'] = float(upload_lines[u].split(';')[2])
+                #         self.data['uploads']['PtStack_AzVelocity'] = float(upload_lines[u].split(';')[3])
+                #         self.data['uploads']['PtStack_ElVelocity'] = float(upload_lines[u].split(';')[4])
+                #         self.data['uploads']['PtStack_AzFlag'] = int(upload_lines[u].split(';')[5])
+                #         self.data['uploads']['PtStack_ElFlag'] = int(upload_lines[u].split(';')[6].strip())
+                #         self.data['uploads']['PtStack_ctime'] = uploadtime_to_ctime(self.data['uploads']['PtStack_Time'], int(self.data['status']['summary']['Year']))
+                #         acu_upload = {'timestamp': self.data['uploads']['PtStack_ctime'],
+                #                       'block_name': 'ACU_upload',
+                #                       'data': self.data['uploads']}
+                #         self.agent.publish_to_feed('acu_upload', acu_upload, from_reactor=True)
+                    text = ''.join(upload_lines)
+                    current_lines = current_lines[group_size:]
                     free_positions = self.data['status']['summary']['Free_upload_positions']
-                print(text)
-                yield self.acu_control.http.UploadPtStack(text)
+                    while free_positions < 10000 - 10:# - scan_upload_len_pts:
+                        yield dsleep(0.1)
+                        free_positions = self.data['status']['summary']['Free_upload_positions']
+    #                print(text)
+                    yield self.acu_control.http.UploadPtStack(text)
 
-        self.log.info('All points uploaded, waiting for stack to clear.')
+            self.log.info('All points uploaded, waiting for stack to clear.')
 
-        # Wait at least 1 second before reading the free positions, to
-        # make sure its updated.
-        free_positions = 0
-        while free_positions < FULL_STACK - 1:
-            yield dsleep(1)
-            free_positions = self.data['status']['summary']['Free_upload_positions']
-            self.log.info(f'There are {FULL_STACK - free_positions} track points remaining.')
-            # todo: Should also watch for mode change, here, to exit cleanly...
+            # Wait at least 1 second before reading the free positions, to
+            # make sure its updated.
+            free_positions = 0
+            while free_positions < FULL_STACK - 1:
+                yield dsleep(1)
+                free_positions = self.data['status']['summary']['Free_upload_positions']
+                self.log.info(f'There are {FULL_STACK - free_positions} track points remaining.')
+                # todo: Should also watch for mode change, here, to exit cleanly...
 
-        self.log.info('The track should now be completed.')
+            self.log.info('The track should now be completed.')
         # Go to Stop mode?
         # yield self.acu_control.stop()
 
         # Clear the stack, but wait a bit or it can cause a fault.
-        yield dsleep(1)
-        yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
-                                            'Clear Stack')
+            yield dsleep(1)
+            yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
+                                                'Clear Stack')
 
         # self.data['uploads']['Start_Azimuth'] = 0.0
         # self.data['uploads']['Start_Elevation'] = 0.0
@@ -1509,7 +1518,7 @@ class ACUAgent:
         #               'data': self.data['uploads']
         #               }
         # self.agent.publish_to_feed('acu_upload', acu_upload)
-        self._set_job_done('control')
+            self._set_job_done('control')
         session.set_status('stopping')
         return True, 'Track ended cleanly'
 
