@@ -1,2 +1,0 @@
-mysql-connector>=2.1.6
-dumb-init

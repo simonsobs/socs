@@ -1,10 +1,10 @@
+# iPython Notebooks
+*.ipynb
+
 # Crossbar stuff
 */dot_crossbar/key.priv
 */dot_crossbar/key.pub
 */dot_crossbar/node.pid
-
-# site_config
-default.yaml
 
 ## github's .gitignore
 
@@ -123,6 +123,10 @@ ENV/
 # mypy
 .mypy_cache/
 
+# vscode
+*.code-workspace
+.vscode
+
 # Custom
 .crossbar/
 ocs/Lakeshore/ls.cfg
@@ -131,3 +135,5 @@ agents/aggregator/data/*
 agents/aggregator/data2/*
 key.*
 node.pid
+
+.DS_Store

@@ -1,8 +1,8 @@
 # Lakeshore372.py
 
-import sys
 import socket
-import time
+import sys
+
 import numpy as np
 
 # Lookup keys for command parameters.
@@ -49,8 +49,8 @@ current_excitation_key = {1: 1.0e-12,
                           18: 316.0e-6,
                           19: 1.0e-3,
                           20: 3.16e-3,
-                          21: 10.0-3,
-                          22: 31.6-3}
+                          21: 10.0e-3,
+                          22: 31.6e-3}
 
 voltage_excitation_lock = {2.0e-6: 1,
                            6.32e-6: 2,
@@ -85,8 +85,8 @@ current_excitation_lock = {1.0e-12: 1,
                            316.0e-6: 18,
                            1.0e-3: 19,
                            3.16e-3: 20,
-                           10.0-3: 21,
-                           31.6-3: 22}
+                           10.0e-3: 21,
+                           31.6e-3: 22}
 
 range_key = {1: 2.0e-3,
              2: 6.32e-3,
@@ -160,16 +160,17 @@ format_lock = {"Ohm/K (linear)": '3',
 heater_range_key = {"0": "Off", "1": 31.6e-6, "2": 100e-6, "3": 316e-6,
                     "4": 1e-3, "5": 3.16e-3, "6": 10e-3, "7": 31.6e-3,
                     "8": 100e-3}
-heater_range_lock = {v:k for k, v in heater_range_key.items()}
+heater_range_lock = {v: k for k, v in heater_range_key.items()}
 heater_range_lock["On"] = "1"
 
 output_modes = {'0': 'Off', '1': 'Monitor Out', '2': 'Open Loop', '3': 'Zone', '4': 'Still',
                 '5': 'Closed Loop', '6': 'Warm up'}
-output_modes_lock = {v.lower():k for k, v in output_modes.items()}
+output_modes_lock = {v.lower(): k for k, v in output_modes.items()}
 
-heater_display_key = { '1': 'current',
-                '2': 'power'}
-heater_display_lock = {v: k for k,v in heater_display_key.items()}
+heater_display_key = {'1': 'current',
+                      '2': 'power'}
+heater_display_lock = {v: k for k, v in heater_display_key.items()}
+
 
 def _establish_socket_connection(ip, timeout, port=7777):
     """Establish socket connection to the LS372.
@@ -210,6 +211,7 @@ class LS372:
         channels - list of channels, index corresponds to channel number with
                    index 0 corresponding to the control channel, 'A'
     """
+
     def __init__(self, ip, timeout=10, num_channels=16):
         self.com = _establish_socket_connection(ip, timeout)
         self.num_channels = num_channels
@@ -258,23 +260,18 @@ class LS372:
             # Try once, if we timeout, try again. Usually gets around single event glitches.
             for attempt in range(2):
                 try:
-                    time.sleep(0.061)
                     resp = str(self.com.recv(4096), 'utf-8').strip()
                     break
                 except socket.timeout:
-                    print("Warning: Caught timeout waiting for response to '%s', trying again " \
-                          "before giving up"%message)
+                    print("Warning: Caught timeout waiting for response to '%s', trying again "
+                          "before giving up" % message)
                     if attempt == 1:
-                        raise RuntimeError('Query response to Lakeshore timed out after two ' \
+                        raise RuntimeError('Query response to Lakeshore timed out after two '
                                            'attempts. Check connection.')
         else:
             self.com.send(msg_str)
             resp = ''
 
-        if 'RDG' in message:
-            time.sleep(0.1)  # Instrument sampling rate of 10 readings/s max (pg 34)
-        else:
-            time.sleep(0.061)  # No comms for 61ms after sending message after trial & error (manual says50ms)
         return resp
 
     def get_id(self):
@@ -400,6 +397,7 @@ class Channel:
                         type)
     :type channel_num: int
     """
+
     def __init__(self, ls, channel_num):
         self.ls = ls
         self.channel_num = channel_num
@@ -651,7 +649,7 @@ class Channel:
             elif _mode == 'current':
                 excitation_lock = current_excitation_lock
 
-        closest_value = min(excitation_lock, key=lambda x: abs(x-excitation_value))
+        closest_value = min(excitation_lock, key=lambda x: abs(x - excitation_value))
 
         resp = self.get_input_setup()
         resp[1] = str(excitation_lock[closest_value])
@@ -691,7 +689,7 @@ class Channel:
                       6.32, 20.0, 63.2, 200, 632, 2e3, 6.32e3, 20.0e3, 63.2e3,
                       200e3, 632e3, 2e6, 6.32e6, 20.0e6, 63.2e6]
 
-            return min(ranges, key=lambda x: abs(x-num))
+            return min(ranges, key=lambda x: abs(x - num))
 
         _range = get_closest_resistance_range(resistance_range)
 
@@ -1025,6 +1023,7 @@ class Channel:
 
 class Curve:
     """Calibration Curve class for the LS372."""
+
     def __init__(self, ls, curve_num):
         self.ls = ls
         self.curve_num = curve_num
@@ -1284,7 +1283,7 @@ class Curve:
                 f.write('No.\tUnits\tTemperature (K)\r\n')
                 f.write('\r\n')
                 for idx, point in enumerate(self.breakpoints):
-                    f.write('%s\t%s %s\r\n' % (idx+1, '%0.4f' % point['units'], '%0.4f' % point['temperature']))
+                    f.write('%s\t%s %s\r\n' % (idx + 1, '%0.4f' % point['units'], '%0.4f' % point['temperature']))
 
         return self.breakpoints
 
@@ -1317,7 +1316,7 @@ class Curve:
         self._set_header(header[:-1])  # ignore num of breakpoints
 
         for point in values:
-            print("uploading %s"%point)
+            print("uploading %s" % point)
             self._set_data_point(point[0], point[1], point[2])
 
         # refresh curve attributes
@@ -1337,21 +1336,21 @@ class Curve:
         with open(_file) as f:
             content = f.readlines()
 
-        #skipping header info
+        # skipping header info
         values = []
         for i in range(9, len(content)):
-            values.append(content[i].strip().split()) #data points that should have been uploaded
-    
-        for j in range(1, len(values)+1):
+            values.append(content[i].strip().split())  # data points that should have been uploaded
+
+        for j in range(1, len(values) + 1):
             try:
-                resp = self.get_data_point(j) #response from the 372
-                point = values[j-1]
+                resp = self.get_data_point(j)  # response from the 372
+                point = values[j - 1]
                 units = float(resp[0])
                 temperature = float(resp[1])
-                assert units == float(point[1]), "Point number %s not uploaded"%point[0]
-                assert temperature == float(point[2]), "Point number %s not uploaded"%point[0]
-                print("Successfully uploaded %s, %s" %(units,temperature))
-            #if AssertionError, tell 372 to re-upload points
+                assert units == float(point[1]), "Point number %s not uploaded" % point[0]
+                assert temperature == float(point[2]), "Point number %s not uploaded" % point[0]
+                print("Successfully uploaded %s, %s" % (units, temperature))
+            # if AssertionError, tell 372 to re-upload points
             except AssertionError:
                 if units != float(point[1]):
                     self.set_curve(_file)
@@ -1387,6 +1386,7 @@ class Heater:
                    1 = warm-up, 2 = still
     :type output: int
     """
+
     def __init__(self, ls, output):
         self.ls = ls
         self.output = output
@@ -1466,7 +1466,7 @@ class Heater:
         :param params:
         :return:
         """
-        assert self.output in [0,1]
+        assert self.output in [0, 1]
 
         assert len(params) == 4
 
@@ -1505,7 +1505,6 @@ class Heater:
     def get_manual_out(self):
         resp = self.ls.msg("MOUT? {}".format(self.output))
         return float(resp)
-
 
     def get_input_channel(self):
         """Get the control channel with the OUTMODE? command.
@@ -1583,7 +1582,6 @@ class Heater:
         # assert delay in range(1, 256), f"{delay} not a valid delay parameter"
         #
         pass
-
 
     def set_heater_display(self, display):
         """
@@ -1693,8 +1691,8 @@ class Heater:
 
         return resp
 
-
     # RAMP, RAMP? - in heater class
+
     def set_ramp_rate(self, rate):
         pass
 
@@ -1715,8 +1713,9 @@ class Heater:
     def set_heater_range(self, _range):
         """Set heater range with RANGE command.
 
-        :param _range: heater range
-        :type _range: float or str (for "On" "Off")
+        :param _range: heater range in amps. Valid values are: "off", "on",
+            31.6e-6, 100e-6, 316e-6, 1e-3, 3.16e-3, 10e-3, 31.6e-3, 100e-3
+        :type _range: float or str
 
         :returns: heater range in amps
         :rtype: float
@@ -1729,11 +1728,11 @@ class Heater:
             _range = "On"
 
         if self.output == 0:
-            resp = self.ls.msg(f"RANGE {self.output} {heater_range_lock[_range]}").strip()
+            self.ls.msg(f"RANGE {self.output} {heater_range_lock[_range]}").strip()
         else:
             on_off_key = {"0": "Off", "1": "On"}
-            on_off_lock = {v:k for k, v in on_off_key.items()}
-            resp = self.ls.msg(f"RANGE {self.output} {on_off_lock[_range]}").strip()
+            on_off_lock = {v: k for k, v in on_off_key.items()}
+            self.ls.msg(f"RANGE {self.output} {on_off_lock[_range]}").strip()
 
         # refresh self.heater value with RANGE? query
         self.get_heater_range()
@@ -1769,7 +1768,7 @@ class Heater:
 
     # STILL? - heater_class?
     def get_still_output(self):
-        resp = self.ls.msg(f"STILL?")
+        resp = self.ls.msg("STILL?")
         return resp
 
     # ANALOG, ANALOG?, AOUT?
@@ -1781,31 +1780,31 @@ class Heater:
         pass
 
     # PID
-    def set_pid(self, P, I, D):
+    def set_pid(self, p, i, d):
         """Set PID parameters for closed loop control.
 
-        :params P: proportional term in PID loop
-        :type P: float
-        :params I: integral term in PID loop
-        :type I: float
-        :params D: derivative term in PID loop
-        :type D: float
+        :params p: proportional term in PID loop
+        :type p: float
+        :params i: integral term in PID loop
+        :type i: float
+        :params d: derivative term in PID loop
+        :type d: float
 
         :returns: response from PID command
         :rtype: str
         """
-        assert float(P) <= 1000 and float(P) >= 0
-        assert float(I) <= 10000 and float(I) >= 0
-        assert float(D) <= 2500 and float(D) >= 0
+        assert float(p) <= 1000 and float(p) >= 0
+        assert float(i) <= 10000 and float(i) >= 0
+        assert float(d) <= 2500 and float(d) >= 0
 
-        resp = self.ls.msg(f"PID {self.output},{P},{I},{D}")
+        resp = self.ls.msg(f"PID {self.output},{p},{i},{d}")
         return resp
 
     # PID?
     def get_pid(self):
         """Get PID parameters with PID? command.
 
-        :returns: P, I, D
+        :returns: p, i, d
         :rtype: float, float, float
         """
         resp = self.ls.msg("PID?").split(',')
