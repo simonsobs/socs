@@ -46,6 +46,7 @@ a detmap csv file, with a target sample rate of 20 Hz::
          # Detmap CSV file
          '--det-map', '/home/jlashner/lyrebird_demo/detmap.csv',
          '--offset', 0, 0,
+         '--rotation', 0,
          '--demod-freq', 8,
          '--demod-bandwidth', 0.5
        ]},
