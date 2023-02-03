@@ -624,15 +624,16 @@ class ACUAgent:
                     offset += FMT_LEN
         handler = reactor.listenUDP(int(UDP_PORT), MonitorUDP())
         influx_data = {}
+        influx_data['Time_bcast_influx'] = []
         for i in range(2, len(fields)):
             influx_data[fields[i].replace(' ', '_')+'_bcast_influx'] = []
-        print(influx_data)
+        #print(influx_data)
         while self.jobs['broadcast'] == 'run':
 #            influx_data = {}
 #            for i in range(len(fields)):
 #                influx_data[fields[i].replace(' ', '_')+'_bcast_influx'] = []
 #            print(influx_data)
-            if udp_data:
+            if len(udp_data) >= 200:
                 process_data = udp_data[:200]
                 udp_data = udp_data[200:]
                 year = datetime.datetime.now().year
@@ -643,16 +644,16 @@ class ACUAgent:
                                    + process_data[-1][1] - process_data[0][1]))
                 else:
                     sample_rate = 0.0
-                latest_az = process_data[2]
-                latest_el = process_data[3]
-                latest_az_raw = process_data[4]
-                latest_el_raw = process_data[5]
-                session.data = {'sample_rate': sample_rate,
-                                'latest_az': latest_az,
-                                'latest_el': latest_el,
-                                'latest_az_raw': latest_az_raw,
-                                'latest_el_raw': latest_el_raw
-                                }
+#                latest_az = process_data[2]
+#                latest_el = process_data[3]
+#                latest_az_raw = process_data[4]
+#                latest_el_raw = process_data[5]
+#                session.data = {'sample_rate': sample_rate,
+#                                'latest_az': latest_az,
+#                                'latest_el': latest_el,
+#                                'latest_az_raw': latest_az_raw,
+#                                'latest_el_raw': latest_el_raw
+#                                }
 #                bcast_first = {}
 #                pd0 = process_data[0]
 #                pd0_gday = (pd0[0] - 1) * 86400
@@ -666,6 +667,7 @@ class ACUAgent:
 #                                        'data': bcast_first,
 #                                        }
 #                self.agent.publish_to_feed('acu_broadcast_influx', acu_broadcast_influx, from_reactor=True)
+#                print('process_data length ' + str(len(process_data)))
                 for d in process_data:
                     gday = (d[0] - 1) * 86400
                     sec = d[1]
@@ -683,7 +685,8 @@ class ACUAgent:
                     # print(acu_udp_stream)
                     self.agent.publish_to_feed('acu_udp_stream',
                                                acu_udp_stream, from_reactor=True)
-                
+#                print(len(influx_data['Time_bcast_influx'])) 
+               
                 influx_means = {}
                 for key in influx_data.keys():
                     influx_means[key] = np.mean(influx_data[key])
