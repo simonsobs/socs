@@ -623,7 +623,15 @@ class ACUAgent:
                     udp_data.append(d)
                     offset += FMT_LEN
         handler = reactor.listenUDP(int(UDP_PORT), MonitorUDP())
+        influx_data = {}
+        for i in range(2, len(fields)):
+            influx_data[fields[i].replace(' ', '_')+'_bcast_influx'] = []
+        print(influx_data)
         while self.jobs['broadcast'] == 'run':
+#            influx_data = {}
+#            for i in range(len(fields)):
+#                influx_data[fields[i].replace(' ', '_')+'_bcast_influx'] = []
+#            print(influx_data)
             if udp_data:
                 process_data = udp_data[:200]
                 udp_data = udp_data[200:]
@@ -645,26 +653,29 @@ class ACUAgent:
                                 'latest_az_raw': latest_az_raw,
                                 'latest_el_raw': latest_el_raw
                                 }
-                bcast_first = {}
-                pd0 = process_data[0]
-                pd0_gday = (pd0[0] - 1) * 86400
-                pd0_sec = pd0[1]
-                pd0_data_ctime = gyear + pd0_gday + pd0_sec
-                bcast_first['Time_bcast_influx'] = pd0_data_ctime
-                for i in range(2, len(pd0)):
-                    bcast_first[fields[i].replace(' ', '_') + '_bcast_influx'] = pd0[i]
-                acu_broadcast_influx = {'timestamp': bcast_first['Time_bcast_influx'],
-                                        'block_name': 'ACU_position_bcast_influx',
-                                        'data': bcast_first,
-                                        }
-                self.agent.publish_to_feed('acu_broadcast_influx', acu_broadcast_influx, from_reactor=True)
+#                bcast_first = {}
+#                pd0 = process_data[0]
+#                pd0_gday = (pd0[0] - 1) * 86400
+#                pd0_sec = pd0[1]
+#                pd0_data_ctime = gyear + pd0_gday + pd0_sec
+#                bcast_first['Time_bcast_influx'] = pd0_data_ctime
+#                for i in range(2, len(pd0)):
+#                    bcast_first[fields[i].replace(' ', '_') + '_bcast_influx'] = pd0[i]
+#                acu_broadcast_influx = {'timestamp': bcast_first['Time_bcast_influx'],
+#                                        'block_name': 'ACU_position_bcast_influx',
+#                                        'data': bcast_first,
+#                                        }
+#                self.agent.publish_to_feed('acu_broadcast_influx', acu_broadcast_influx, from_reactor=True)
                 for d in process_data:
                     gday = (d[0] - 1) * 86400
                     sec = d[1]
                     data_ctime = gyear + gday + sec
                     self.data['broadcast']['Time'] = data_ctime
+#                    print(data_ctime)
+                    influx_data['Time_bcast_influx'].append(data_ctime)
                     for i in range(2, len(d)):
                         self.data['broadcast'][fields[i].replace(' ', '_')] = d[i]
+                        influx_data[fields[i].replace(' ', '_')+'_bcast_influx'].append(d[i])
                     acu_udp_stream = {'timestamp': self.data['broadcast']['Time'],
                                       'block_name': 'ACU_broadcast',
                                       'data': self.data['broadcast']
@@ -672,6 +683,32 @@ class ACUAgent:
                     # print(acu_udp_stream)
                     self.agent.publish_to_feed('acu_udp_stream',
                                                acu_udp_stream, from_reactor=True)
+                
+                influx_means = {}
+                for key in influx_data.keys():
+                    influx_means[key] = np.mean(influx_data[key])
+                    influx_data[key] = []
+#                print(influx_means)
+#                print(influx_means['Time_bcast_influx'])
+#                    while len(influx_data['Time_bcast_influx']) < 10:
+#                        for ix, key in enumerate(influx_data):
+#                            if key == 'Time_bcast_influx':
+#                                influx_data['Time_bcast_influx'].append(data_ctime)
+#                            else:
+#                                influx_data[key].append(d[ix])
+#                if len(influx_data['Time_bcast_influx']) == 10:
+#                    influx_means = {}
+#                    for key in influx_data:
+#                        influx_means[key] = np.mean(influx_data[key])
+#                        influx_data[key] = []
+                acu_broadcast_influx = {'timestamp': influx_means['Time_bcast_influx'],
+                                        'block_name': 'ACU_bcast_influx',
+                                        'data': influx_means,
+                                        }
+                self.agent.publish_to_feed('acu_broadcast_influx', acu_broadcast_influx, from_reactor=True)
+            #        print(acu_broadcast_influx['timestamp'])
+            #        for key in influx_data:
+            #            influx_data[key] = []
             else:
                 yield dsleep(1)
             yield dsleep(0.005)
@@ -902,8 +939,8 @@ class ACUAgent:
        #                       }
            #     self.agent.publish_to_feed('acu_upload', acu_upload, from_reactor=True)
             if session.status == 'aborting':
-            yield self.acu_control.mode('Stop')
-            self.log.warn('go_to aborted by user!')
+                yield self.acu_control.mode('Stop')
+                self.log.warn('go_to aborted by user!')
 
             self._set_job_done('control')
         session.set_status('stopping')
