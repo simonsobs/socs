@@ -224,7 +224,8 @@ class ACUAgent:
         agent.register_task('go_to',
                             self.go_to,
                             blocking=False,
-                            aborter=self._abort_motion_op)
+                            aborter=self._abort_motion_op)#,
+        #                    stopper_blocking=True)
         agent.register_task('constant_velocity_scan',
                             self.constant_velocity_scan,
                             blocking=False,
@@ -232,11 +233,13 @@ class ACUAgent:
         agent.register_task('fromfile_scan',
                             self.fromfile_scan,
                             blocking=False,
-                            aborter=self._abort_motion_op)
+                            aborter=self._abort_motion_op)#,
+        #                    stopper_blocking=True)
         agent.register_task('set_boresight',
                             self.set_boresight,
                             blocking=False,
-                            aborter=self._abort_motion_op)
+                            aborter=self._abort_motion_op)#,
+        #                    stopper_blocking=True)
         agent.register_task('stop_and_clear',
                             self.stop_and_clear,
                             blocking=False)
@@ -297,7 +300,7 @@ class ACUAgent:
     def _abort_motion_op(self, session, params):
         if session.status == 'running':
             session.set_status('aborting')
-        yield self.stop_and_clear(session, params)
+        #yield self.stop_and_clear(session, params)
         yield
 
     #
@@ -764,11 +767,13 @@ class ACUAgent:
             rounding (int): number of decimal places to round to
 
         """
-        with self.lock.acquire_timeout(0, job='control') as acquired:
-            if not acquired:
-                return False, f"Operation failed: {self.lock.job} is running."
-            session.set_status('running')
-            while session.status == 'running':
+        session.set_status('running')
+        while session.status == 'running':
+            with self.lock.acquire_timeout(0, job='control') as acquired:
+                if not acquired:
+                    return False, f"Operation failed: {self.lock.job} is running."
+     #       session.set_status('running')
+     #       while session.status == 'running':
                 bcast_check = yield self._check_daq_streams('broadcast')
                 monitor_check = yield self._check_daq_streams('monitor')
                 if not bcast_check or not monitor_check:
@@ -928,9 +933,10 @@ class ACUAgent:
                             self.log.warn('Stopped before reaching commanded point!')
                             return False, 'Something went wrong!'
                 if end_stop:
-#                    yield self.acu_control.stop()
-                    yield self.acu_control.mode('Stop')
+                    yield self.acu_control.stop()
+#                    yield self.acu_control.mode('Stop')
                     self.log.info('Stop mode activated')
+                session.set_status('stopping')
                 self.data['uploads']['Start_Azimuth'] = 0.0
                 self.data['uploads']['Start_Elevation'] = 0.0
                 self.data['uploads']['Command_Type'] = 0
@@ -946,7 +952,7 @@ class ACUAgent:
                 self.log.warn('go_to aborted by user!')
 
             self._set_job_done('control')
-        session.set_status('stopping')
+            session.set_status('stopping')
         return True, 'Pointing completed'
 
     @inlineCallbacks
