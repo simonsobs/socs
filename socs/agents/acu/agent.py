@@ -225,7 +225,7 @@ class ACUAgent:
                             self.go_to,
                             blocking=False,
                             aborter=self._abort_motion_op,
-                            aborter_blocking=True)
+                            aborter_blocking=False)
         agent.register_task('constant_velocity_scan',
                             self.constant_velocity_scan,
                             blocking=False,
@@ -297,12 +297,16 @@ class ACUAgent:
                 return False
             self.jobs[job_name] = 'idle'
 
+    @inlineCallbacks
     def _abort_motion_op(self, session, params):
         if session.status == 'running':
-            session.set_status('aborting')
+            session.set_status('stopping')
+            yield dsleep(0.1)
             print(session.status)
-        yield self.stop_and_clear(session, params)
-        print('yielded stop_and_clear (theoretically)')
+#        yield self.stop_and_clear(session, params)
+        self.agent.start('stop_and_clear', params)
+#        print('did stop_and_clear (theoretically)')
+#        print('print statement here')
         yield
 
     #
@@ -949,9 +953,9 @@ class ACUAgent:
            #                   'data': self.data['uploads']
        #                       }
            #     self.agent.publish_to_feed('acu_upload', acu_upload, from_reactor=True)
-            if session.status == 'aborting':
-                yield self.acu_control.mode('Stop')
-                self.log.warn('go_to aborted by user!')
+        #    if session.status == 'aborting':
+        #        yield self.acu_control.mode('Stop')
+        #        self.log.warn('go_to aborted by user!')
 
             self._set_job_done('control')
             session.set_status('stopping')
