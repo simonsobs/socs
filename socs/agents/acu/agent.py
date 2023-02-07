@@ -283,19 +283,19 @@ class ACUAgent:
 #            except Exception as e:
 #                print(str(e))
 
-    def _set_job_done(self, job_name):
-        """
-        Set a job status to 'idle'.
-
-        Parameters:
-            job_name (str): Name of the task/process you are trying to idle.
-        """
-        with self.lock.acquire_timeout(timeout=1.0, job=job_name) as acquired:
-            if not acquired:
-                self.log.warn("Lock could not be acquried because it is held"
-                              f" by {self.lock.job}")
-                return False
-            self.jobs[job_name] = 'idle'
+#    def _set_job_done(self, job_name):
+#        """
+#        Set a job status to 'idle'.
+#
+#        Parameters:
+#            job_name (str): Name of the task/process you are trying to idle.
+#        """
+#        with self.lock.acquire_timeout(timeout=1.0, job=job_name) as acquired:
+#            if not acquired:
+#                self.log.warn("Lock could not be acquried because it is held"
+#                              f" by {self.lock.job}")
+#                return False
+#            self.jobs[job_name] = 'idle'
 
     @inlineCallbacks
     def _abort_motion_op(self, session, params):
@@ -322,7 +322,7 @@ class ACUAgent:
             self.log.info('Sent RestartIdleTime')
             self.log.info(resp)
             yield dsleep(1. * 60.)
-        self._set_job_done('restart_idle')
+        self.jobs['restart_idle'] = 'idle' #self._set_job_done('restart_idle')
         self.log.info('Process "restart_idle" ended.')
         return True, 'Process "restart_idle" exited cleanly.'
 
@@ -726,7 +726,7 @@ class ACUAgent:
             yield dsleep(0.005)
 
         handler.stopListening()
-        self._set_job_done('broadcast')
+        self.jobs['broadcast'] = 'idle' #self._set_job_done('broadcast')
         session.set_status('stopping')
         return True, 'Acquisition exited cleanly.'
 
@@ -783,7 +783,7 @@ class ACUAgent:
                 bcast_check = yield self._check_daq_streams('broadcast')
                 monitor_check = yield self._check_daq_streams('monitor')
                 if not bcast_check or not monitor_check:
-                    self._set_job_done('control')
+                    self.jobs['control'] = 'idle' #self._set_job_done('control')
                     session.set_status('stopping')
                     return False, 'Cannot complete go_to with process not running.'
 
@@ -803,7 +803,7 @@ class ACUAgent:
                 round_int = params['rounding']
                 if self.data['status']['platform_status']['Remote_mode'] == 0:
                     self.log.warn('ACU in local mode, cannot perform motion with OCS.')
-                    self._set_job_done('control')
+                    self.jobs['control'] = 'idle' #self._set_job_done('control')
                     session.set_status('stopping')
                     return False, 'ACU not in remote mode.'
                 self.log.info('Azimuth commanded position: ' + str(az))
@@ -830,14 +830,14 @@ class ACUAgent:
                     acu_msg = yield self.acu_control.mode('Preset')
                 if acu_msg not in [b'OK, Command executed.', b'OK, Command send.']:
                     self.log.error(acu_msg)
-                    self._set_job_done('control')
+                    self.jobs['control'] = 'idle' #self._set_job_done('control')
                     session.set_status('stopping')
                     return False, 'Could not change mode'
                 if round(current_az, round_int) == az and \
                         round(current_el, round_int) == el:
                     yield self.acu_control.go_to(az, el, wait=0.1)
                     self.log.info('Already at commanded position.')
-                    self._set_job_done('control')
+                    self.jobs['control'] = 'idle' #self._set_job_done('control')
                     session.set_status('stopping')
                     return True, 'Preset at commanded position'
             # yield self.acu.stop()
@@ -850,7 +850,7 @@ class ACUAgent:
                 acu_msg = yield self.acu_control.go_to(az, el, wait=0.1)
                 if acu_msg not in [b'OK, Command executed.', b'OK, Command send.']:
                     self.log.error(acu_msg)
-                    self._set_job_done('control')
+                    self.jobs['control'] = 'idle' #self._set_job_done('control')
                     session.set_status('stopping')
                     return False, 'Could not send go_to command'
                 yield dsleep(0.3)
@@ -871,12 +871,12 @@ class ACUAgent:
                             if end_stop:
                                 yield self.acu_control.stop()
                                 self.log.info('Az and el in Stop mode')
-                            self._set_job_done('control')
+                            self.jobs['control'] = 'idle' #self._set_job_done('control')
                             session.set_status('stopping')
                             return True, 'Pointing completed'
                         else:
                             yield self.acu_control.stop()
-                            self._set_job_done('control')
+                            self.jobs['control'] = 'idle' #self._set_job_done('control')
                             session.set_status('stopping')
                             return False, 'Motion never occurred! Stop activated'
                     yield dsleep(wait_for_motion)
@@ -957,7 +957,7 @@ class ACUAgent:
         #        yield self.acu_control.mode('Stop')
         #        self.log.warn('go_to aborted by user!')
 
-            self._set_job_done('control')
+            self.jobs['control'] = 'idle' #self._set_job_done('control')
             session.set_status('stopping')
         return True, 'Pointing completed'
 
@@ -977,7 +977,7 @@ class ACUAgent:
         while session.status == 'running':
             monitor_check = yield self._check_daq_streams('monitor')
             if not monitor_check:
-                self._set_job_done('control')
+                self.jobs['control'] = 'idle' #self._set_job_done('control')
                 session.set_status('stopping')
                 return False, 'Cannot complete set_boresight with process not running.'
             else:
@@ -997,7 +997,7 @@ class ACUAgent:
             upper_limit = self.motion_limits['boresight']['upper']
             if bs_destination < lower_limit or bs_destination > upper_limit:
                 self.log.warn('Commanded boresight position out of range!')
-                self._set_job_done('control')
+                self.jobs['control'] = 'idle' #self._set_job_done('control')
                 session.set_status('stopping')
                 return False, 'Commanded boresight position out of range.'
 
@@ -1005,7 +1005,7 @@ class ACUAgent:
             self.log.info('Boresight position will be set to ' + str(bs_destination))
             if self.data['status']['platform_status']['Remote_mode'] == 0:
                 self.log.warn('ACU in local mode, cannot perform motion with OCS.')
-                self._set_job_done('control')
+                self.jobs['control'] = 'idle' #self._set_job_done('control')
                 session.set_status('stopping')
                 return False, 'ACU not in remote mode.'
             else:
@@ -1037,7 +1037,7 @@ class ACUAgent:
                     print(current_position)
                 else:
                     self.log.warn('Boresight mode has changed from Preset!')
-                    self._set_job_done('control')
+                    self.jobs['control'] = 'idle' #self._set_job_done('control')
                     session.set_status('stopping')
                     return False, '3rd axis mode changed from Preset, check errors/faults.'
             if params.get('end_stop'):
@@ -1050,7 +1050,7 @@ class ACUAgent:
 #                          'data': self.data['uploads']
 #                          }
 #            self.agent.publish_to_feed('acu_upload', acu_upload)
-            self._set_job_done('control')
+            self.jobs['control'] = 'idle' #self._set_job_done('control')
             session.set_status('stopping')
         return True, 'Moved to new 3rd axis position'
 
@@ -1082,7 +1082,7 @@ class ACUAgent:
         yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
                                             'Clear Stack')
         self.log.info('Cleared stack (second attempt)')
-        self._set_job_done('control')
+        self.jobs['control'] = 'idle' #self._set_job_done('control')
         return True, 'Job completed'
 
     @inlineCallbacks
@@ -1095,7 +1095,7 @@ class ACUAgent:
 
         session.set_status('running')
         yield self.acu_control.clear_faults()
-        self._set_job_done('control')
+        self.jobs['control'] = 'idle' #self._set_job_done('control')
         session.set_status('stopping')
         return True, 'Job completed.'
 
@@ -1135,7 +1135,7 @@ class ACUAgent:
             modes.append(self.data['status']['third_axis']['Axis3_mode'])
         if modes != ['Stop', 'Stop', 'Stop']:
             self.log.error('Axes could not be set to Stop!')
-            self._set_job_done('control')
+            self.jobs['control'] = 'idle' #self._set_job_done('control')
             return False, 'Could not set axes to Stop mode'
         j = 0
         while j < 5:
@@ -1152,10 +1152,10 @@ class ACUAgent:
         free_stack = self.data['status']['summary']['Free_upload_positions']
         if free_stack < FULL_STACK:
             self.log.warn('Stack not fully cleared!')
-            self._set_job_done('control')
+            self.jobs['control'] = 'idle' #self._set_job_done('control')
             return False, 'Could not clear stack'
 #        self.log.info('Cleared stack.')
-        self._set_job_done('control')
+        self.jobs['control'] = 'idle' #self._set_job_done('control')
         session.set_status('stopping')
         return True, 'Job completed'
 
@@ -1235,13 +1235,13 @@ class ACUAgent:
             bcast_check = yield self._check_daq_streams('broadcast')
             monitor_check = yield self._check_daq_streams('monitor')
             if not bcast_check or not monitor_check:
-                self._set_job_done('control')
+                self.jobs['control'] = 'idle' #self._set_job_done('control')
                 session.set_status('stopping')
                 return False, 'Cannot complete scan with process not running.'
 
         if self.data['status']['platform_status']['Remote_mode'] == 0:
             self.log.warn('ACU in local mode, cannot perform motion with OCS.')
-            self._set_job_done('control')
+            self.jobs['control'] = 'idle' #self._set_job_done('control')
             return False, 'ACU not in remote mode.'
 
         UPLOAD_GROUP_SIZE = 120
@@ -1364,7 +1364,7 @@ class ACUAgent:
         #               'data': self.data['uploads']
         #               }
         # self.agent.publish_to_feed('acu_upload', acu_upload)
-        self._set_job_done('control')
+        self.jobs['control'] = 'idle' #self._set_job_done('control')
         return True
 
     @inlineCallbacks
@@ -1422,7 +1422,7 @@ class ACUAgent:
             bcast_check = yield self._check_daq_streams('broadcast')
             monitor_check = yield self._check_daq_streams('monitor')
             if not bcast_check or not monitor_check:
-                self._set_job_done('control')
+                self.jobs['control'] = 'idle' #self._set_job_done('control')
                 return False, 'Cannot complete go_to with process not running.'
 
             az_endpoint1 = params.get('az_endpoint1')
@@ -1441,7 +1441,7 @@ class ACUAgent:
 
             if self.data['status']['platform_status']['Remote_mode'] == 0:
                 self.log.warn('ACU in local mode, cannot perform motion with OCS.')
-                self._set_job_done('control')
+                self.jobs['control'] = 'idle' # self._set_job_done('control')
                 return False, 'ACU not in remote mode.'
 
             if 'az_start' in scan_params:
@@ -1570,7 +1570,7 @@ class ACUAgent:
         #               'data': self.data['uploads']
         #               }
         # self.agent.publish_to_feed('acu_upload', acu_upload)
-            self._set_job_done('control')
+            self.jobs['control'] = 'idle' #self._set_job_done('control')
         session.set_status('stopping')
         return True, 'Track ended cleanly'
 
