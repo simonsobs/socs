@@ -224,8 +224,8 @@ class ACUAgent:
         agent.register_task('go_to',
                             self.go_to,
                             blocking=False,
-                            aborter=self._abort_motion_op)#,
-        #                    stopper_blocking=True)
+                            aborter=self._abort_motion_op,
+                            aborter_blocking=True)
         agent.register_task('constant_velocity_scan',
                             self.constant_velocity_scan,
                             blocking=False,
@@ -300,7 +300,9 @@ class ACUAgent:
     def _abort_motion_op(self, session, params):
         if session.status == 'running':
             session.set_status('aborting')
-        #yield self.stop_and_clear(session, params)
+            print(session.status)
+        yield self.stop_and_clear(session, params)
+        print('yielded stop_and_clear (theoretically)')
         yield
 
     #
@@ -933,8 +935,8 @@ class ACUAgent:
                             self.log.warn('Stopped before reaching commanded point!')
                             return False, 'Something went wrong!'
                 if end_stop:
-                    yield self.acu_control.stop()
-#                    yield self.acu_control.mode('Stop')
+#                    yield self.acu_control.stop()
+                    yield self.acu_control.mode('Stop')
                     self.log.info('Stop mode activated')
                 session.set_status('stopping')
                 self.data['uploads']['Start_Azimuth'] = 0.0
