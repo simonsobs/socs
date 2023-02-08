@@ -576,7 +576,7 @@ class ACUAgent:
         UDP_PORT = self.udp['port']
         udp_data = []
         fields = self.udp_schema['fields']
-
+        session.data = {}
         class MonitorUDP(protocol.DatagramProtocol):
 
             def datagramReceived(self, data, src_addr):
@@ -627,6 +627,11 @@ class ACUAgent:
                                         'data': influx_means,
                                         }
                 self.agent.publish_to_feed('acu_broadcast_influx', acu_broadcast_influx, from_reactor=True)
+                sd = {}
+                for ky in influx_means:
+                    sd[ky.strip('_bcast_influx')] = influx_means[ky]
+                session.data.update(sd)
+                print(session.data)
             else:
                 yield dsleep(1)
             yield dsleep(0.005)
