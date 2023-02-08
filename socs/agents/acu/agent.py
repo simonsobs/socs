@@ -149,7 +149,6 @@ class ACUAgent:
 
         self.take_data = False
 
-        # self.web_agent = tclient.Agent(reactor)
         tclient._HTTP11ClientFactory.noisy = False
 
         self.acu_control = aculib.AcuControl(
@@ -233,13 +232,11 @@ class ACUAgent:
         agent.register_task('fromfile_scan',
                             self.fromfile_scan,
                             blocking=False,
-                            aborter=self._abort_motion_op)#,
-        #                    stopper_blocking=True)
+                            aborter=self._abort_motion_op)
         agent.register_task('set_boresight',
                             self.set_boresight,
                             blocking=False,
-                            aborter=self._abort_motion_op)#,
-        #                    stopper_blocking=True)
+                            aborter=self._abort_motion_op)
         agent.register_task('stop_and_clear',
                             self.stop_and_clear,
                             blocking=False)
@@ -264,38 +261,10 @@ class ACUAgent:
         #            job_name (str): Name of the process you are trying to stop.
         #        """
         session.set_status('stopping')
-#        print('try to acquire stop')
-#        # return (False, 'Could not stop')
-#        with self.lock.acquire_timeout(timeout=1.0, job=job_name) as acquired:
-#            if not acquired:
-#                self.log.warn("Lock could not be acquired because it is"
-#                              f" held by {self.lock.job}")
-#                return False
-#            try:
-#                self.jobs[job_name] = 'stop'
-#            # state = self.jobs.get(job_name, 'idle')
-#            # if state == 'idle':
-#            #     return False, 'Job not running.'
-#            # if state == 'stop':
-#            #     return False, 'Stop already requested.'
-#            # self.jobs[job_name] = 'stop'
-#                return True, 'Requested Process stop.'
-#            except Exception as e:
-#                print(str(e))
 
-#    def _set_job_done(self, job_name):
-#        """
-#        Set a job status to 'idle'.
-#
-#        Parameters:
-#            job_name (str): Name of the task/process you are trying to idle.
-#        """
-#        with self.lock.acquire_timeout(timeout=1.0, job=job_name) as acquired:
-#            if not acquired:
-#                self.log.warn("Lock could not be acquried because it is held"
-#                              f" by {self.lock.job}")
-#                return False
-#            self.jobs[job_name] = 'idle'
+    #
+    # The Operations
+    #
 
     @inlineCallbacks
     def _abort_motion_op(self, session, params):
@@ -303,15 +272,8 @@ class ACUAgent:
             session.set_status('stopping')
             yield dsleep(0.1)
             print(session.status)
-#        yield self.stop_and_clear(session, params)
         self.agent.start('stop_and_clear', params)
-#        print('did stop_and_clear (theoretically)')
-#        print('print statement here')
         yield
-
-    #
-    # The Operations
-    #
 
     @inlineCallbacks
     def restart_idle(self, session, params):
@@ -322,8 +284,9 @@ class ACUAgent:
             self.log.info('Sent RestartIdleTime')
             self.log.info(resp)
             yield dsleep(1. * 60.)
-        self.jobs['restart_idle'] = 'idle' #self._set_job_done('restart_idle')
+        self.jobs['restart_idle'] = 'idle'
         self.log.info('Process "restart_idle" ended.')
+        self._set_job_stop()
         return True, 'Process "restart_idle" exited cleanly.'
 
     @inlineCallbacks
@@ -412,9 +375,7 @@ class ACUAgent:
                           'Boresight_mode': None,
                           }
 
-#        session.data = {'StatusResponseRate': n_ok / (query_t - report_t)}
         j = yield self.acu_read.http.Values(self.acu8100)
-#        session.data = {'status': j}
         if self.acu3rdaxis:
             j2 = yield self.acu_read.http.Values(self.acu3rdaxis)
         else:
@@ -440,15 +401,12 @@ class ACUAgent:
 
             try:
                 j = yield self.acu_read.http.Values(self.acu8100)
-#                session.data = {'status': j}
                 if self.acu3rdaxis:
                     j2 = yield self.acu_read.http.Values(self.acu3rdaxis)
                 else:
                     j2 = {}
-#                    session.data.update(j2)
                 session.data.update({'StatusDetailed': j, 'Status3rdAxis': j2})
                 n_ok += 1
-               # print(session.data)
             except Exception as e:
                 # Need more error handling here...
                 errormsg = {'aculib_error_message': str(e)}
@@ -600,9 +558,6 @@ class ACUAgent:
                               'Elevation_mode': self.data['status']['summary']['Elevation_mode'],
                               'Boresight_mode': self.data['status']['summary']['Boresight_mode'],
                               }
-        # self._set_job_stop('monitor')
-        # yield dsleep(1)
-        # self._set_job_done('monitor')
         session.set_status('stopping')
         return True, 'Acquisition exited cleanly.'
 
@@ -636,12 +591,7 @@ class ACUAgent:
         influx_data['Time_bcast_influx'] = []
         for i in range(2, len(fields)):
             influx_data[fields[i].replace(' ', '_')+'_bcast_influx'] = []
-        #print(influx_data)
         while self.jobs['broadcast'] == 'run':
-#            influx_data = {}
-#            for i in range(len(fields)):
-#                influx_data[fields[i].replace(' ', '_')+'_bcast_influx'] = []
-#            print(influx_data)
             if len(udp_data) >= 200:
                 process_data = udp_data[:200]
                 udp_data = udp_data[200:]
@@ -653,36 +603,11 @@ class ACUAgent:
                                    + process_data[-1][1] - process_data[0][1]))
                 else:
                     sample_rate = 0.0
-#                latest_az = process_data[2]
-#                latest_el = process_data[3]
-#                latest_az_raw = process_data[4]
-#                latest_el_raw = process_data[5]
-#                session.data = {'sample_rate': sample_rate,
-#                                'latest_az': latest_az,
-#                                'latest_el': latest_el,
-#                                'latest_az_raw': latest_az_raw,
-#                                'latest_el_raw': latest_el_raw
-#                                }
-#                bcast_first = {}
-#                pd0 = process_data[0]
-#                pd0_gday = (pd0[0] - 1) * 86400
-#                pd0_sec = pd0[1]
-#                pd0_data_ctime = gyear + pd0_gday + pd0_sec
-#                bcast_first['Time_bcast_influx'] = pd0_data_ctime
-#                for i in range(2, len(pd0)):
-#                    bcast_first[fields[i].replace(' ', '_') + '_bcast_influx'] = pd0[i]
-#                acu_broadcast_influx = {'timestamp': bcast_first['Time_bcast_influx'],
-#                                        'block_name': 'ACU_position_bcast_influx',
-#                                        'data': bcast_first,
-#                                        }
-#                self.agent.publish_to_feed('acu_broadcast_influx', acu_broadcast_influx, from_reactor=True)
-#                print('process_data length ' + str(len(process_data)))
                 for d in process_data:
                     gday = (d[0] - 1) * 86400
                     sec = d[1]
                     data_ctime = gyear + gday + sec
                     self.data['broadcast']['Time'] = data_ctime
-#                    print(data_ctime)
                     influx_data['Time_bcast_influx'].append(data_ctime)
                     for i in range(2, len(d)):
                         self.data['broadcast'][fields[i].replace(' ', '_')] = d[i]
@@ -691,42 +616,24 @@ class ACUAgent:
                                       'block_name': 'ACU_broadcast',
                                       'data': self.data['broadcast']
                                       }
-                    # print(acu_udp_stream)
                     self.agent.publish_to_feed('acu_udp_stream',
                                                acu_udp_stream, from_reactor=True)
-#                print(len(influx_data['Time_bcast_influx'])) 
                
                 influx_means = {}
                 for key in influx_data.keys():
                     influx_means[key] = np.mean(influx_data[key])
                     influx_data[key] = []
-#                print(influx_means)
-#                print(influx_means['Time_bcast_influx'])
-#                    while len(influx_data['Time_bcast_influx']) < 10:
-#                        for ix, key in enumerate(influx_data):
-#                            if key == 'Time_bcast_influx':
-#                                influx_data['Time_bcast_influx'].append(data_ctime)
-#                            else:
-#                                influx_data[key].append(d[ix])
-#                if len(influx_data['Time_bcast_influx']) == 10:
-#                    influx_means = {}
-#                    for key in influx_data:
-#                        influx_means[key] = np.mean(influx_data[key])
-#                        influx_data[key] = []
                 acu_broadcast_influx = {'timestamp': influx_means['Time_bcast_influx'],
                                         'block_name': 'ACU_bcast_influx',
                                         'data': influx_means,
                                         }
                 self.agent.publish_to_feed('acu_broadcast_influx', acu_broadcast_influx, from_reactor=True)
-            #        print(acu_broadcast_influx['timestamp'])
-            #        for key in influx_data:
-            #            influx_data[key] = []
             else:
                 yield dsleep(1)
             yield dsleep(0.005)
 
         handler.stopListening()
-        self.jobs['broadcast'] = 'idle' #self._set_job_done('broadcast')
+        self.jobs['broadcast'] = 'idle'
         session.set_status('stopping')
         return True, 'Acquisition exited cleanly.'
 
@@ -778,12 +685,10 @@ class ACUAgent:
             with self.lock.acquire_timeout(0, job='control') as acquired:
                 if not acquired:
                     return False, f"Operation failed: {self.lock.job} is running."
-     #       session.set_status('running')
-     #       while session.status == 'running':
                 bcast_check = yield self._check_daq_streams('broadcast')
                 monitor_check = yield self._check_daq_streams('monitor')
                 if not bcast_check or not monitor_check:
-                    self.jobs['control'] = 'idle' #self._set_job_done('control')
+                    self.jobs['control'] = 'idle'
                     session.set_status('stopping')
                     return False, 'Cannot complete go_to with process not running.'
 
@@ -803,13 +708,13 @@ class ACUAgent:
                 round_int = params['rounding']
                 if self.data['status']['platform_status']['Remote_mode'] == 0:
                     self.log.warn('ACU in local mode, cannot perform motion with OCS.')
-                    self.jobs['control'] = 'idle' #self._set_job_done('control')
+                    self.jobs['control'] = 'idle'
                     session.set_status('stopping')
                     return False, 'ACU not in remote mode.'
                 self.log.info('Azimuth commanded position: ' + str(az))
                 self.log.info('Elevation commanded position: ' + str(el))
-                current_az = round(self.data['status']['summary']['Azimuth_current_position'], 2)  # round(self.data['broadcast']['Corrected_Azimuth'], 4)
-                current_el = round(self.data['status']['summary']['Elevation_current_position'], 2)  # round(self.data['broadcast']['Corrected_Elevation'], 4)
+                current_az = round(self.data['status']['summary']['Azimuth_current_position'], 2)
+                current_el = round(self.data['status']['summary']['Elevation_current_position'], 2)
                 self.data['uploads']['Start_Azimuth'] = current_az
                 self.data['uploads']['Start_Elevation'] = current_el
                 self.data['uploads']['Command_Type'] = 1
@@ -1034,7 +939,6 @@ class ACUAgent:
 #                                  }
 #                    self.agent.publish_to_feed('acu_upload', acu_upload)
                     current_position = self.data['status'][status_block][position_name]
-                    print(current_position)
                 else:
                     self.log.warn('Boresight mode has changed from Preset!')
                     self.jobs['control'] = 'idle' #self._set_job_done('control')
@@ -1455,8 +1359,8 @@ class ACUAgent:
                                       throw=throw, v_az=az_speed,
                                       a_az=acc, init=init)
 
-        #    print(plan)
-        #    print(info)
+            print(plan)
+            print(info)
 
     #    self.log.info('Scan params are' + str(scan_params))
             if 'step_time' in scan_params:
