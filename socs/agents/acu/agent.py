@@ -629,9 +629,8 @@ class ACUAgent:
                 self.agent.publish_to_feed('acu_broadcast_influx', acu_broadcast_influx, from_reactor=True)
                 sd = {}
                 for ky in influx_means:
-                    sd[ky.strip('_bcast_influx')] = influx_means[ky]
+                    sd[ky.split('_bcast_influx')[0]] = influx_means[ky]
                 session.data.update(sd)
-                print(session.data)
             else:
                 yield dsleep(1)
             yield dsleep(0.005)
