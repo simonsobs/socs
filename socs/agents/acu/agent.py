@@ -272,7 +272,7 @@ class ACUAgent:
             session.set_status('stopping')
             yield dsleep(0.1)
             print(session.status)
-        self.agent.start('stop_and_clear', params)
+        self.agent.start('preset_stop_clear', params)
         yield
 
     @inlineCallbacks
@@ -964,10 +964,18 @@ class ACUAgent:
         session.set_status('running')
         current_data = self.data['status']['summary']
         current_vel = current_data['Azimuth_current_velocity']
+        print(current_vel)
         current_pos = {'Az': current_data['Azimuth_current_position'],
                        'El': current_data['Elevation_current_position']}
-        new_pos = {'Az': current_pos['Az'] + np.sign(current_vel) * current_vel,
+        print(current_pos)
+        new_az = current_pos['Az'] + (5 * np.sign(current_vel) * current_vel)
+        if new_az >= self.motion_limits['azimuth']['upper']:
+            new_az = self.motion_limits['azimuth']['upper']
+        if new_az <= self.motion_limits['azimuth']['lower']:
+            new_az = self.motion_limits['azimuth']['lower']
+        new_pos = {'Az': new_az,
                    'El': current_pos['El']}
+        print(new_pos)
         self.log.info('Changed to Preset')
         yield self.acu_control.go_to(new_pos['Az'], new_pos['El'])
         while round(current_pos['Az'] - new_pos['Az'], 1) != 0.:
