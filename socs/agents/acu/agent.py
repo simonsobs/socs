@@ -590,7 +590,7 @@ class ACUAgent:
         influx_data = {}
         influx_data['Time_bcast_influx'] = []
         for i in range(2, len(fields)):
-            influx_data[fields[i].replace(' ', '_')+'_bcast_influx'] = []
+            influx_data[fields[i].replace(' ', '_') + '_bcast_influx'] = []
         while self.jobs['broadcast'] == 'run':
             if len(udp_data) >= 200:
                 process_data = udp_data[:200]
