@@ -981,7 +981,7 @@ class ACUAgent:
         current_vel = {'Az': current_data['Azimuth_current_velocity'],
                        'El': current_data['Elevation_current_velocity']}
         print(current_vel)
-        
+
         current_pos = {'Az': current_data['Azimuth_current_position'],
                        'El': current_data['Elevation_current_position']}
         print(current_pos)
@@ -1022,15 +1022,15 @@ class ACUAgent:
             axis = 'Axis3'
         current_data = self.data['status']['summary']
 
-        current_pos = current_data[axis+'_current_position']
+        current_pos = current_data[axis + '_current_position']
         new_pos = current_pos
         self.log.info('Boresight now set to ' + str(new_pos))
-        self.log.info(axis+' changed to Preset')
+        self.log.info(axis + ' changed to Preset')
         yield self.acu_control.go_3rd_axis(new_pos)
-        current_pos = self.data['status']['summary'][axis+'_current_position']
+        current_pos = self.data['status']['summary'][axis + '_current_position']
         while round(current_pos - new_pos, 1) != 0.:
             yield dsleep(0.5)
-            current_pos = self.data['status']['summary'][axis+'_current_position']
+            current_pos = self.data['status']['summary'][axis + '_current_position']
         yield dsleep(2)  # give the platform time to settle in position
         yield self.acu_control.http.Command('DataSets.CmdModeTransfer', 'Set3rdAxisMode', 'Stop')
         yield dsleep(2)
