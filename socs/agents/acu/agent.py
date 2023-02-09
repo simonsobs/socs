@@ -588,6 +588,7 @@ class ACUAgent:
         udp_data = []
         fields = self.udp_schema['fields']
         session.data = {}
+
         class MonitorUDP(protocol.DatagramProtocol):
 
             def datagramReceived(self, data, src_addr):
