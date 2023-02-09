@@ -1130,14 +1130,19 @@ class ACUAgent:
                 list(elevations)]).  Times begin from 0.0.
             simulator (bool): toggle for using the ACU simulator.
         """
+        session.set_status('running')
         filename = params.get('filename')
         simulator = params.get('simulator')
         times, azs, els, vas, ves, azflags, elflags = sh.from_file(filename)
         if min(azs) <= self.motion_limits['azimuth']['lower'] or max(azs) >= self.motion_limits['azimuth']['upper']:
+            session.set_status('stopping')
             return False, 'Azimuth location out of range!'
         if min(els) <= self.motion_limits['elevation']['lower'] or max(els) >= self.motion_limits['elevation']['upper']:
+            session.set_status('stopping')
             return False, 'Elevation location out of range!'
-        yield self._run_specified_scan(session, times, azs, els, vas, ves, azflags, elflags, azonly=False, simulator=simulator)
+        while session.status == 'running':
+            yield self._run_specified_scan(session, times, azs, els, vas, ves, azflags, elflags, azonly=False, simulator=simulator)
+        session.set_status('stopping')
         yield True, 'Track completed'
 
 #    @ocs_agent.param('azpts', type=tuple)
