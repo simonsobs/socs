@@ -5,7 +5,7 @@ ENV OCS_CONFIG_DIR /config
 ENV PYTHONUNBUFFERED=1
 
 # SOCS installation
-RUN python3 -m pip install git+https://github.com/simonsobs/socs.git@develop
+RUN python3 -m pip install git+https://github.com/simonsobs/socs.git@main
 
 RUN pip3 install dumb-init
 
