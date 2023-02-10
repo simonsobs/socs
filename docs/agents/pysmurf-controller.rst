@@ -14,6 +14,25 @@ sodetlib control scripts on the smurf-server through an OCS client.
     :func: make_parser
     :prog: python3 agent.py
 
+.. _pysmurf_controller_deps:
+
+Dependencies
+------------
+
+The pysmurf controller requires the following packages:
+
+    - `pysmurf <https://github.com/slaclab/pysmurf>`_
+    - `sodetlib <https://github.com/simonsobs/sodetlib>`_
+    - `sotodlib <https://github.com/simonsobs/sotodlib>`_
+
+These can be installed via pip:
+
+.. code-block:: bash
+
+    $ python -m pip install 'pysmurf @ git+https://github.com/slaclab/pysmurf.git@main'
+    $ python -m pip install 'sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master'
+    $ python -m pip install 'sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master'
+
 Configuration File Examples
 -----------------------------------
 
@@ -50,17 +69,17 @@ named ``ocs-pysmurf-monitor`` might look something like::
         security_opt:
             - "aparmor=docker-smurf"
         environment:
-            INSTANCE_ID=pysmurf-controller-s2
-            SITE_HUB=ws://${CB_HOST}:8001/ws
-            SITE_HTTP=ws://${CB_HOST}:8001/call
-            SMURFPUB_BACKEND: udp
-            SMURFPUB_ID: crate1slot2
-            SMURFPUB_UDP_HOST: ocs-pysmurf-monitor
-            DISPLAY: $DISPLAY
-            OCS_CONFIG_DIR: /config
-            EPICS_CA_ADDR_LIST: 127.255.255.255
-            EPICS_CA_MAX_ARRAY_BYTES: 80000000
-            SLOT: 2
+            - INSTANCE_ID=pysmurf-controller-s2
+            - SITE_HUB=ws://${CB_HOST}:8001/ws
+            - SITE_HTTP=ws://${CB_HOST}:8001/call
+            - SMURFPUB_BACKEND=udp
+            - SMURFPUB_ID=crate1slot2
+            - SMURFPUB_UDP_HOST=ocs-pysmurf-monitor
+            - DISPLAY
+            - OCS_CONFIG_DIR=/config
+            - EPICS_CA_ADDR_LIST=127.255.255.255
+            - EPICS_CA_MAX_ARRAY_BYTES=80000000
+            - SLOT=2
         volumes:
             - ${OCS_CONFIG_DIR}:/config
             - /data:/data

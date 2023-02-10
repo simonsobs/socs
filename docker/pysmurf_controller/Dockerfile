@@ -1,11 +1,11 @@
-FROM simonsobs/sodetlib:v0.4.1
-
-WORKDIR /app
+FROM simonsobs/sodetlib:v0.5.0-2-g0f91202
 
 ENV OCS_CONFIG_DIR /config
 
+ENV PYTHONUNBUFFERED=1
+
 # SOCS installation
-RUN python3 -m pip install --src=/app/ -e git+https://github.com/simonsobs/socs.git@py36#egg=socs
+RUN python3 -m pip install git+https://github.com/simonsobs/socs.git@develop
 
 RUN pip3 install dumb-init
 
