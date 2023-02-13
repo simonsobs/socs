@@ -12,7 +12,7 @@ pytest_plugins = "docker_compose"
 
 wait_for_crossbar = create_crossbar_fixture()
 run_agent = create_agent_runner_fixture(
-    "../agents/pysmurf_monitor/pysmurf_monitor.py",
+    "../socs/agents/pysmurf_monitor/agent.py",
     "pysmurf_monitor",
     args=["--log-dir", "./logs/"],
 )
