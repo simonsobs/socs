@@ -153,7 +153,7 @@ class PysmurfMonitor(DatagramProtocol):
 
     @ocs_agent.param('test_mode', default=False, type=bool)
     def run(self, session, params=None):
-        """run()
+        """run(test_mode=False)
 
         **Process** - Main process for the pysmurf monitor agent. Processes
         files that have been added to the queue, adding them to the suprsync
