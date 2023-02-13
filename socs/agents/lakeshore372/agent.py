@@ -1024,7 +1024,7 @@ class LS372_Agent:
 
         return True, 'PID exited cleanly.'
 
-    def stop_custom_pid(self, session, params=None):
+    def _stop_custom_pid(self, session, params=None):
         """
         Stops acq process.
         """
@@ -1406,7 +1406,7 @@ def main(args=None):
     agent.register_task('set_still_output', lake_agent.set_still_output)
     agent.register_task('get_still_output', lake_agent.get_still_output)
     agent.register_process('acq', lake_agent.acq, lake_agent._stop_acq)
-    agent.register_process('custom_pid', lake_agent.start_custom_pid, lake_agent.stop_custom_pid)
+    agent.register_process('custom_pid', lake_agent.start_custom_pid, lake_agent._stop_custom_pid)
     agent.register_task('enable_control_chan', lake_agent.enable_control_chan)
     agent.register_task('disable_control_chan', lake_agent.disable_control_chan)
     agent.register_task('input_configfile', lake_agent.input_configfile)
