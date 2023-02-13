@@ -38,6 +38,7 @@ API Reference        Full API documentation for core parts of the SOCS library.
     :maxdepth: 2
 
     agents/acu_agent
+    agents/appmotion_motor
     agents/bluefors_agent
     agents/cryomech_cpa
     agents/fts_agent

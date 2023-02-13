@@ -103,6 +103,7 @@ autodoc_mock_imports = ['spt3g',
                         'sodetlib',
                         'sodetlib.operations',
                         'sodetlib.det_config',
+                        'appmotion_motors_driver',
                         'src',
                         'src.pid_controller',
                         ]
