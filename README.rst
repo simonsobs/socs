@@ -128,17 +128,17 @@ The tests for SOCS are run using pytest, and should be run from the
 
 For more details see `tests/README.rst <tests_>`_.
 
-.. _tests: https://github.com/simonsobs/socs/blob/master/tests/README.rst
+.. _tests: https://github.com/simonsobs/socs/blob/main/tests/README.rst
 
 Contributing
 ------------
 For guidelines on how to contribute to OCS see `CONTRIBUTING.rst`_.
 
-.. _CONTRIBUTING.rst: https://github.com/simonsobs/socs/blob/master/CONTRIBUTING.rst
+.. _CONTRIBUTING.rst: https://github.com/simonsobs/socs/blob/main/CONTRIBUTING.rst
 
 License
 --------
 This project is licensed under the BSD 2-Clause License - see the
 `LICENSE.txt`_ file for details.
 
-.. _LICENSE.txt: https://github.com/simonsobs/socs/blob/master/LICENSE.txt
+.. _LICENSE.txt: https://github.com/simonsobs/socs/blob/main/LICENSE.txt
