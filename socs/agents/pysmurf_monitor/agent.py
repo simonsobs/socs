@@ -236,10 +236,9 @@ def make_parser(parser=None):
     pgroup.add_argument('--db-path', type=str, default='/data/so/databases/suprsync.db',
                         help="Path to suprsync sqlite database")
     pgroup.add_argument('--echo-sql', action='store_true')
-    pgroup.add_argument("--test-mode", type=bool,
+    pgroup.add_argument("--test-mode", action='store_true',
                         help="Specifies whether agent should run in test mode, "
-                        "meaning it shuts down after processing any file(s).",
-                        default=False)
+                        "meaning it shuts down after processing any file(s).")
     return parser
 
 

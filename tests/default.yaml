@@ -99,7 +99,7 @@ hosts:
        'arguments': [['--udp-port', 8200],
                      ['--create-table', True],
                      ['--echo-sql'],
-                     ['--test-mode', True]
+                     ['--test-mode']
                     ]
       },
     ]
