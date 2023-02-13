@@ -928,7 +928,7 @@ class LS372_Agent:
             if heater == 'sample':
                 # Set heater range
                 if sample_heater_range == self.module.sample_heater.get_heater_range():
-                    print(f"Heater range already set to {sample_heater_range} amps")
+                    self.log.info(f"Heater range already set to {sample_heater_range} amps")
                 else:
                     self.module.sample_heater.set_heater_range(sample_heater_range)
 
