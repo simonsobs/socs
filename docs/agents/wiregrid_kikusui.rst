@@ -14,9 +14,9 @@ via RS-232 (D-sub 9pin cable).
 The agent communicates with the converter via Ethernet.
 
 .. argparse::
-   :filename: ../agents/wiregrid_kikusui/kikusui_agent.py
+   :filename: ../socs/agents/wiregrid_kikusui/agent.py
    :func: make_parser
-   :prog: python3 kikusui_agent.py
+   :prog: python3 agent.py
 
 Configuration File Examples
 ---------------------------
@@ -49,17 +49,14 @@ Docker Compose
 An example docker-compose configuration::
 
     ocs-wgkikusui-agent:
-      image: simonsobs/ocs-wgkikusui-agent:latest
-      restart: always
+      image: simonsobs/socs:latest
       hostname: ocs-docker
       network_mode: "host"
-      depends_on:
-        - "crossbar"
+      command:
+        - INSTANCE_ID=wgkikusui
       volumes:
         - ${OCS_CONFIG_DIR}:/config:ro
         - "<local directory to record log file>:/data/wg-data"
-      command:
-        - "--instance-id=wgkikusui"
 
 - Since the agent within the container needs to communicate with hardware on the
   host network you must use ``network_mode: "host"`` in your compose file.
@@ -107,7 +104,7 @@ However, if you want to rotate the wire-grid continuousely, you can use the foll
 Agent API
 ---------
 
-.. autoclass:: agents.wiregrid_kikusui.kikusui_agent.WiregridKikusuiAgent
+.. autoclass:: socs.agents.wiregrid_kikusui.agent.WiregridKikusuiAgent
     :members:
 
 

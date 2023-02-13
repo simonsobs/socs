@@ -13,9 +13,9 @@ It also reads ON/OFF of the limit-switches on the ends of the actuators
 and lock/unlock the stoppers to lock/unlock the actuators.
 
 .. argparse::
-   :filename: ../agents/wiregrid_actuator/wiregrid_actuator.py
+   :filename: ../socs/agents/wiregrid_actuator/agent.py
    :func: make_parser
-   :prog: python3 wiregrid_actuator.py
+   :prog: python3 agent.py
 
 Dependencies
 ------------
@@ -53,10 +53,10 @@ An example docker-compose configuration::
         image: simonsobs/ocs-wgactuator-agent:latest
         hostname: ocs-docker
         network_mode: "host"
+        environment:
+          - INSTANCE_ID=wgactuator
         volumes:
           - ${OCS_CONFIG_DIR}:/config:ro
-        command:
-          - "--instance-id=wgactuator"
 
 - Since the agent within the container needs to communicate with hardware on the
   host network you must use ``network_mode: "host"`` in your compose file.
@@ -111,7 +111,7 @@ These list are configured in ``limitswitch_config.py`` and ``stopper_config.py``
 Agent API
 ---------
 
-.. autoclass:: agents.wiregrid_actuator.wiregrid_actuator.WiregridActuatorAgent
+.. autoclass:: socs.agents.wiregrid_actuator.agent.WiregridActuatorAgent
     :members:
 
 Example Clients
@@ -131,8 +131,8 @@ Below is an example client to insert and eject the actuator::
 Supporting APIs
 ---------------
 
-.. autoclass:: agents.wiregrid_actuator.src.Actuator.Actuator
+.. autoclass:: socs.agents.wiregrid_actuator.drivers.Actuator.Actuator
     :members:
 
-.. autoclass:: agents.wiregrid_actuator.src.DigitalIO.DigitalIO
+.. autoclass:: socs.agents.wiregrid_actuator.drivers.DigitalIO.DigitalIO
     :members:

@@ -17,7 +17,7 @@ jobs:
 
     steps:
     - name: Cancel Previous Runs
-      uses: styfle/cancel-workflow-action@0.10.0
+      uses: styfle/cancel-workflow-action@0.11.0
       with:
         access_token: ${{ github.token }}
 
@@ -65,7 +65,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         mv ./tests/.coverage.* ./
-        pip install coveralls
+        pip install -U coveralls
         coverage combine
         coverage report
         coveralls --service=github

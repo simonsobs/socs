@@ -1,15 +1,8 @@
-import pytest
-import time
-
 import ocs
-from ocs.base import OpCode
-
-from ocs.testing import (
-    create_agent_runner_fixture,
-    create_client_fixture,
-)
-
+import pytest
 from integration.util import create_crossbar_fixture
+from ocs.base import OpCode
+from ocs.testing import create_agent_runner_fixture, create_client_fixture
 
 from socs.testing.device_emulator import create_device_emulator
 
@@ -17,7 +10,7 @@ pytest_plugins = "docker_compose"
 
 wait_for_crossbar = create_crossbar_fixture()
 run_agent = create_agent_runner_fixture(
-    "../agents/pfeiffer_tpg366/pfeiffer_tpg366_agent.py",
+    "../socs/agents/pfeiffer_tpg366/agent.py",
     "pfeiffer_tpg366_agent",
     args=["--log-dir", "./logs/"],
 )
@@ -43,8 +36,6 @@ def check_resp_success(resp):
 
 @pytest.mark.integtest
 def test_pfeiffer_tpg366_acq(wait_for_crossbar, emu, run_agent, client):
-    time.sleep(3)
-    client.acq.stop()
-    time.sleep(1)
-    resp = client.acq.status()
+    resp = client.acq.start(test_mode=True)
+    resp = client.acq.wait()
     check_resp_success(resp)

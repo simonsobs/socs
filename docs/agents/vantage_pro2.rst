@@ -12,11 +12,62 @@ the laboratory computer via usb cable and data is sent though that connection.
 Here is the `VantagePro2 Operations manual`_.
 
 .. argparse::
-    :filename: ../agents/vantagePro2_agent/vantage_pro2_agent.py
+    :filename: ../socs/agents/vantagepro2/agent.py
     :func: make_parser
-    :prog: python3 vantage_pro2_agent.py
+    :prog: python3 agent.py
 
 .. _`VantagePro2 Operations manual`: https://www.davisinstruments.com/support/weather/download/VantageSerialProtocolDocs_v261.pdf
+
+Configuration File Examples
+---------------------------
+Below are configuration examples for the ocs config file and for running the
+Agent in a docker container.
+
+OCS Site Config
+```````````````
+
+To configure the Vantage Pro2 Agent we need to add a VantagePro2Agent block to
+our ocs configuration file. Here is an example configuration block,
+where we do not specify the port.
+Note: One should first add the serial number of the VantagePro 2 device
+to the udev file and create SYMLINK.
+The Vendor ID is "10c4" and the Prodcut ID is "ea60" for the Vantage Pro2.
+Here, we associate the vendor and product ID's with the SYMLINK 'VP2'.
+So, we're setting the serial number argument as 'VP2'::
+
+     {'agent-class': 'VantagePro2Agent',
+       'instance-id': 'vantagepro2agent',
+       'arguments': [['--mode', 'acq'],
+                     ['--serial-number', 'VP2'],
+                     ['--sample-freq', '0.5']]},
+
+An example block of the udev rules file for the VantagePro 2 follows::
+
+        SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60",
+                SYMLINK="VP2"
+
+
+The agent will attempt to find the port that the Vantage Pro2 is connected to
+based on the serial number.
+
+Note the '--freq' argument specifies the sample frequency that the Vantage Pro2
+Monitor collects weather data. The Vantage Pro2 and weather station can
+sample weathervdata at a maximum sample frequency of 0.5 Hz.
+The user can define slower sample frequencies if they so desire.
+
+Docker Compose
+``````````````
+
+The Vantage Pro2 Agent should be configured to run in a Docker container. An
+example docker-compose service configuration is shown here::
+
+  ocs-vantage-pro2:
+    image: simonsobs/socs:latest
+    hostname: ocs-docker
+    command:
+      - INSTANCE_ID=vantagepro2agent
+    volumes:
+      - ${OCS_CONFIG_DIR}:/config:ro
 
 Description
 -----------
@@ -87,59 +138,8 @@ types of weather data:
 - Time of Sunrise: Time is stored as hour x 100 + min
 - Time of Sunset: Time is stored as hour x 100 + min
 
-Configuration File Examples
----------------------------
-Below are configuration examples for the ocs config file and for running the
-Agent in a docker container.
-
-ocs-config
-``````````
-To configure the Vantage Pro2 Agent we need to add a VantagePro2Agent block to
-our ocs configuration file. Here is an example configuration block,
-where we do not specify the port.
-Note: One should first add the serial number of the VantagePro 2 device
-to the udev file and create SYMLINK.
-The Vendor ID is "10c4" and the Prodcut ID is "ea60" for the Vantage Pro2.
-Here, we associate the vendor and product ID's with the SYMLINK 'VP2'.
-So, we're setting the serial number argument as 'VP2'::
-
-     {'agent-class': 'VantagePro2Agent',
-       'instance-id': 'vantagepro2agent',
-       'arguments': [['--mode', 'acq'],
-                     ['--serial-number', 'VP2'],
-                     ['--sample-freq', '0.5']]},
-
-An example block of the udev rules file for the VantagePro 2 follows::
-
-        SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60",
-                SYMLINK="VP2"
-
-
-The agent will attempt to find the port that the Vantage Pro2 is connected to
-based on the serial number.
-
-Note the '--freq' argument specifies the sample frequency that the Vantage Pro2
-Monitor collects weather data. The Vantage Pro2 and weather station can
-sample weathervdata at a maximum sample frequency of 0.5 Hz.
-The user can define slower sample frequencies if they so desire.
-
-Docker
-``````
-The Vantage Pro2 Agent should be configured to run in a Docker container. An
-example docker-compose service configuration is shown here::
-
-  ocs-vantage-pro2:
-    build: /socs/agents/vantagePro2_agent
-
-    volumes:
-      - ${OCS_CONFIG_DIR}:/config:ro
-    command:
-      - "--instance-id=vantagepro2agent"
-      - "--site-hub=ws://crossbar:8001/ws"
-      - "--site-http=http://crossbar:8001/call"
-
 Agent API
 ---------
 
-.. autoclass:: agents.vantagePro2_agent.vantage_pro2_agent.VantagePro2Agent
-    :members: init_VantagePro2_task, start_acq
+.. autoclass:: socs.agents.vantagepro2.agent.VantagePro2Agent
+    :members:

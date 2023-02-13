@@ -13,9 +13,9 @@ Basic functionality to interface with and control an LS336 is provided by
 the :ref:`336_driver`.
 
 .. argparse::
-    :filename: ../agents/lakeshore336/LS336_agent.py
+    :filename: ../socs/agents/lakeshore336/agent.py
     :func: make_parser
-    :prog: python3 LS336_agent.py
+    :prog: python3 agent.py
 
 Configuration File Examples
 ---------------------------
@@ -33,7 +33,7 @@ configuration block::
   {'agent-class': 'Lakeshore336Agent',
    'instance-id': 'LSA2833',
    'arguments': [['--serial-number', 'LSA2833'],
-                 ['--ip-address', '10.10.10.2],
+                 ['--ip-address', '10.10.10.2'],
                  ['--f-sample', 0.1],
                  ['--threshold', 0.05],
                  ['--window', 600],
@@ -49,15 +49,15 @@ The Lakeshore 336 agent should be configured to run in a Docker container.
 An example configuration is::
 
   ocs-LSA2833:
-    image: simonsobs/ocs-lakeshore336-agent:latest
+    image: simonsobs/socs:latest
     hostname: ocs-docker
     network_mode: "host"
+    environment:
+      - INSTANCE_ID=LSA2833
+      - SITE_HUB=ws://127.0.0.1:8001/ws
+      - SITE_HTTP=http://127.0.0.1:8001/call
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
-    command:
-      - "--instance-id=LSA2833"
-      - "--site-hub=ws://127.0.0.1:8001/ws"
-      - "--site-http=http://127.0.0.1:8001/call"
 
 .. note::
     Since the 336 Agent container needs ``network_mode: "host"``, it must be
@@ -80,7 +80,7 @@ Lakeshore336.py script.
 Agent API
 ---------
 
-.. autoclass:: agents.lakeshore336.LS336_agent.LS336_Agent
+.. autoclass:: socs.agents.lakeshore336.agent.LS336_Agent
     :members:
 
 .. _336_driver:

@@ -1,10 +1,18 @@
-import txaio
+import os
 
-from pysnmp.hlapi.twisted import getCmd, setCmd, SnmpEngine, CommunityData, UdpTransportTarget,\
-    ContextData, ObjectType, ObjectIdentity, UsmUserData
+import txaio
+from pysnmp.hlapi.twisted import (CommunityData, ContextData, ObjectIdentity,
+                                  ObjectType, SnmpEngine, UdpTransportTarget,
+                                  UsmUserData, getCmd, setCmd)
+
+from socs import mibs
 
 # For logging
 txaio.use_twisted()
+
+
+# https://pysnmp.readthedocs.io/en/latest/faq/pass-custom-mib-to-manager.html
+MIB_SOURCE = f"{os.path.dirname(mibs.__file__)}"
 
 
 class SNMPTwister:
@@ -124,7 +132,11 @@ class SNMPTwister:
             instances representing MIB variables returned in SNMP response.
 
         """
-        oid_list = [ObjectType(ObjectIdentity(*x)) if isinstance(x, tuple) else x for x in oid_list]
+        oid_list = [ObjectType(ObjectIdentity(*x).addMibSource(MIB_SOURCE))
+                    if isinstance(x, tuple)
+                    else x
+                    for x
+                    in oid_list]
 
         if version == 1:
             version_object = CommunityData('public', mpModel=0)  # SNMPv1
@@ -145,7 +157,7 @@ class SNMPTwister:
 
         return datagram
 
-    def set(self, oid_list, version, setvalue):
+    def set(self, oid_list, version, setvalue, community_name='private'):
         """Issue a setCmd to set SNMP OID states.
         See `Modifying MIB variables`_ for more info on setting OID states.
 
@@ -172,12 +184,16 @@ class SNMPTwister:
             instances representing MIB variables returned in SNMP response.
 
         """
-        oid_list = [ObjectType(ObjectIdentity(*x), setvalue) if isinstance(x, tuple) else x for x in oid_list]
+        oid_list = [ObjectType(ObjectIdentity(*x).addMibSource(MIB_SOURCE), setvalue)
+                    if isinstance(x, tuple)
+                    else x
+                    for x
+                    in oid_list]
 
         if version == 1:
-            version_object = CommunityData('private', mpModel=0)  # SNMPv1
+            version_object = CommunityData(community_name, mpModel=0)  # SNMPv1
         elif version == 2:
-            version_object = CommunityData('private')  # SNMPv2c
+            version_object = CommunityData(community_name)  # SNMPv2c
         elif version == 3:
             version_object = UsmUserData('ocs')  # SNMPv3 (no auth, no privacy)
         else:

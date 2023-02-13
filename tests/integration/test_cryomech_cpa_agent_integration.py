@@ -1,17 +1,10 @@
 import os
-import pytest
 
 import ocs
+import pytest
+from integration.util import create_crossbar_fixture
 from ocs.base import OpCode
-
-from ocs.testing import (
-    create_agent_runner_fixture,
-    create_client_fixture,
-)
-
-from integration.util import (
-    create_crossbar_fixture
-)
+from ocs.testing import create_agent_runner_fixture, create_client_fixture
 
 from socs.testing.device_emulator import create_device_emulator
 
@@ -26,9 +19,9 @@ init_res = b'\t\x99\x00\x00\x00m\x01\x04j\x00\x00\x00\x00\x00\x00\x80\x00\x00\x0
 
 wait_for_crossbar = create_crossbar_fixture()
 run_agent = create_agent_runner_fixture(
-    '../agents/cryomech_cpa/cryomech_cpa_agent.py', 'cryomech_cpa_agent')
+    '../socs/agents/cryomech_cpa/agent.py', 'cryomech_cpa_agent')
 run_agent_acq = create_agent_runner_fixture(
-    '../agents/cryomech_cpa/cryomech_cpa_agent.py', 'cryomech_cpa_agent', args=['--mode', 'acq'])
+    '../socs/agents/cryomech_cpa/agent.py', 'cryomech_cpa_agent', args=['--mode', 'acq'])
 client = create_client_fixture('cryomech')
 emulator = create_device_emulator({init_msg: init_res}, relay_type='tcp', port=5502, encoding=None)
 
@@ -88,3 +81,19 @@ def test_cryomech_cpa_acq(wait_for_crossbar, emulator, run_agent, client):
     # already stopped, but will set self.take_data = False
     resp = client.acq.stop()
     print(resp)
+
+
+@pytest.mark.integtest
+@pytest.mark.parametrize("state,command", [('on', b'\t\x99\x00\x00\x00\x06\x01\x06\x00\x01\x00\x01')])
+def test_cryomech_cpa_release_reacquire(wait_for_crossbar, emulator, run_agent_acq,
+                                        client, state, command):
+    client.init.wait()
+    response = {command: command,
+                init_msg: init_res}
+    emulator.define_responses(response)
+
+    resp = client.power_ptc(state=state)
+    print(resp)
+    assert resp.status == ocs.OK
+    print(resp.session)
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
