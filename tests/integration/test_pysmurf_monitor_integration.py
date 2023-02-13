@@ -1,4 +1,6 @@
 import json
+import os
+import shutil
 import socket
 import time
 
@@ -10,13 +12,24 @@ from ocs.testing import create_agent_runner_fixture, create_client_fixture
 
 pytest_plugins = "docker_compose"
 
+TMPFILE = '/tmp/pytest-socs/suprsync.db'
+
 wait_for_crossbar = create_crossbar_fixture()
 run_agent = create_agent_runner_fixture(
     "../socs/agents/pysmurf_monitor/agent.py",
     "pysmurf_monitor",
-    args=["--log-dir", "./logs/"],
+    args=["--log-dir", "./logs/",
+          "--db-path", TMPFILE],
 )
 client = create_client_fixture("pysmurf-monitor")
+
+
+@pytest.fixture
+def cleanup():
+    """Clean up temp database file."""
+    yield
+    dir_ = os.path.dirname(TMPFILE)
+    shutil.rmtree(dir_)
 
 
 @pytest.fixture
@@ -62,7 +75,7 @@ def check_resp(resp, opcode=OpCode.SUCCEEDED):
 
 
 @pytest.mark.integtest
-def test_pysmurf_monitor_run(wait_for_crossbar, publisher, run_agent, client):
+def test_pysmurf_monitor_run(wait_for_crossbar, publisher, run_agent, client, cleanup):
     file_data = {
         "path": "./integration/pysmurf_monitor_data/test_data.txt",
         "type": "testing",
