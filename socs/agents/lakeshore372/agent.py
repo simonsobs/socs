@@ -755,9 +755,6 @@ class LS372_Agent:
 
         Parameters:
             temperature (float): Temperature to servo to in units of Kelvin.
-                and optional control channel to change the channel used for
-                control (int)
-
         """
         with self._lock.acquire_timeout(job='servo_to_temperature') as acquired:
             if not acquired:
@@ -798,7 +795,7 @@ class LS372_Agent:
     @ocs_agent.param('channel', type=int)
     @ocs_agent.param('state', type=str, choices=['on', 'off'])
     def engage_channel(self, session, params):
-        """engage_channel(channel=None)
+        """engage_channel(channel, state)
 
         **Task** - Enables/disables a channel on the LS372
 
@@ -826,7 +823,7 @@ class LS372_Agent:
     @ocs_agent.param('channel', type=int)
     @ocs_agent.param('curve_number', type=int)
     def set_calibration_curve(self, session, params):
-        """set_calibration_curve(channel=None, curve_number=None)
+        """set_calibration_curve(channel, curve_number)
 
         **Task** - Sets the calibration curve number for a particular channel.
 
@@ -851,7 +848,7 @@ class LS372_Agent:
 
     @ocs_agent.param('channel', type=int)
     def get_input_setup(self, session, params):
-        """get_input_setup(channel=None)
+        """get_input_setup(channel)
 
         **Task** - Gets measurement inputs for a specific channel on the LS372
 
@@ -881,8 +878,8 @@ class LS372_Agent:
     @ocs_agent.param('update_time', type=int)
     @ocs_agent.param('sample_heater_range', type=float, default=10e-3)
     def start_custom_pid(self, session, params):
-        """start_custom_pid(setpoint=None, heater=None, channel=None, P=None, \
-                            I=None, update_time=None, sample_heater_range=None)
+        """start_custom_pid(setpoint, heater, channel, P, \
+                            I, update_time, sample_heater_range=10e-3)
 
         **Task** - Set custom software PID parameters for servo control of fridge
         using still or sample heater. Currently only P and I implemented.
