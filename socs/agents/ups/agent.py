@@ -249,6 +249,15 @@ class UPSAgent:
             'upsOutputPercentLoad':
                 {'status': 25,
                  'description': 25}
+            'upsInputVoltage':
+                {'status': 120,
+                 'description': 120},
+            'upsInputCurrent':
+                {'status': 10,
+                 'description': 10},
+            'upsInputTruePower':
+                {'status': 120,
+                 'description': 120},
             'ups_connection':
                 {'last_attempt': 1656085022.680916,
                  'connected': True},
@@ -261,6 +270,9 @@ class UPSAgent:
                           batteryNormal(2),
                           batteryLow(3),
                           batteryDepleted(4)
+            upsSecondsOnBattery::
+                Note:: Zero shall be returned if the unit is not on
+                       battery power.
             upsEstimatedChargeRemaining::
                 Units:: percentage
             upsBatteryVoltage::
@@ -281,7 +293,13 @@ class UPSAgent:
                 Units:: RMS Volts
             upsOutputCurrent::
                 Units:: 0.1 RMS Amp
-            upsOutput Power::
+            upsOutputPower::
+                Units:: Watts
+            upsInputVoltage::
+                Units:: RMS Volts
+            upsInputCurrent::
+                Units:: 0.1 RMS Amp
+            upsInputTruePower::
                 Units:: Watts
         """
 
@@ -310,6 +328,20 @@ class UPSAgent:
 
             for oid in oids:
                 get_list.append(('UPS-MIB', oid, 0))
+
+            # Append input OIDs to GET list
+            input_oids = ['upsInputVoltage',
+                          'upsInputCurrent',
+                          'upsInputTruePower']
+
+            # Use number of input lines used to append correct number of input OIDs
+            num_lines = [('UPS-MIB', 'upsInputNumLines', 0)]
+            num_res = yield self.snmp.get(num_lines, self.version)
+            if num_res is not None:
+                inputs = num_res[0][1]._value
+                for i in range(inputs):
+                    for oid in input_oids:
+                        get_list.append(('UPS-MIB', oid, i + 1))
 
             # Append output OIDs to GET list
             output_oids = ['upsOutputVoltage',
