@@ -74,10 +74,22 @@ def check_resp(resp, opcode=OpCode.SUCCEEDED):
     assert resp.session["op_code"] == opcode.value
 
 
+def write_test_file(path):
+    full_path = os.path.join(path, 'test_data.txt')
+
+    # Could be made more realistic if needed
+    with open(full_path, 'w', encoding='utf-8') as f:
+        f.write("3.1415\n")
+
+    return full_path
+
+
 @pytest.mark.integtest
-def test_pysmurf_monitor_run_data_file(wait_for_crossbar, publisher, run_agent, client, cleanup):
+def test_pysmurf_monitor_run_data_file(wait_for_crossbar, publisher, run_agent, client,
+                                       cleanup, tmp_path):
+    test_file = write_test_file(tmp_path)
     file_data = {
-        "path": "./integration/pysmurf_monitor_data/test_data.txt",
+        "path": test_file,
         "type": "testing",
         "format": "txt",
         "timestamp": None,
@@ -102,9 +114,11 @@ def test_pysmurf_monitor_run_session_log(wait_for_crossbar, publisher, run_agent
 
 
 @pytest.mark.integtest
-def test_pysmurf_monitor_run_metadata(wait_for_crossbar, publisher, run_agent, client, cleanup):
+def test_pysmurf_monitor_run_metadata(wait_for_crossbar, publisher, run_agent, client,
+                                      cleanup, tmp_path):
+    test_file = write_test_file(tmp_path)
     file_data = {
-        "path": "./integration/pysmurf_monitor_data/test_data.txt",
+        "path": test_file,
         "value": 1,
         "type": "testing",
     }
