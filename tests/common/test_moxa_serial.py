@@ -6,7 +6,7 @@ from socs.common import moxa_serial
 from socs.testing.device_emulator import create_device_emulator
 
 tcp_emulator = create_device_emulator({'ping': 'pong\r'},
-                                      'tcp', 9001)
+                                      'tcp', 19001)
 
 
 # Tried this as a fixture, but connections weren't cleaning up properly.
@@ -14,7 +14,7 @@ def create_tcpserver():
     # Connection might not work on first attempt
     for i in range(5):
         try:
-            ser = moxa_serial.Serial_TCPServer(('127.0.0.1', 9001), 0.1)
+            ser = moxa_serial.Serial_TCPServer(('127.0.0.1', 19001), 0.1)
             break
         except ConnectionRefusedError:
             print("Could not connect, waiting and trying again.")
