@@ -75,7 +75,7 @@ def check_resp(resp, opcode=OpCode.SUCCEEDED):
 
 
 @pytest.mark.integtest
-def test_pysmurf_monitor_run(wait_for_crossbar, publisher, run_agent, client, cleanup):
+def test_pysmurf_monitor_run_data_file(wait_for_crossbar, publisher, run_agent, client, cleanup):
     file_data = {
         "path": "./integration/pysmurf_monitor_data/test_data.txt",
         "type": "testing",
@@ -87,6 +87,15 @@ def test_pysmurf_monitor_run(wait_for_crossbar, publisher, run_agent, client, cl
         "pysmurf_version": None,
     }
     publisher(file_data, "data_file")
+    client.run.start(test_mode=True)
+    client.run.wait()
+    check_resp(client.run.status())
+
+
+@pytest.mark.integtest
+def test_pysmurf_monitor_run_session_log(wait_for_crossbar, publisher, run_agent, client, cleanup):
+    log_message = "This is a test log message"
+    publisher(log_message, "session_log")
     client.run.start(test_mode=True)
     client.run.wait()
     check_resp(client.run.status())
