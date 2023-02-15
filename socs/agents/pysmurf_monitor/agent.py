@@ -210,8 +210,8 @@ class PysmurfMonitor(DatagramProtocol):
                 with srfm.Session.begin() as session:
                     session.add_all(files)
 
-                if params['test_mode']:
-                    break
+            if params['test_mode']:
+                break
 
             time.sleep(1)
 
