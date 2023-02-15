@@ -99,3 +99,16 @@ def test_pysmurf_monitor_run_session_log(wait_for_crossbar, publisher, run_agent
     client.run.start(test_mode=True)
     client.run.wait()
     check_resp(client.run.status())
+
+
+@pytest.mark.integtest
+def test_pysmurf_monitor_run_metadata(wait_for_crossbar, publisher, run_agent, client, cleanup):
+    file_data = {
+        "path": "./integration/pysmurf_monitor_data/test_data.txt",
+        "value": 1,
+        "type": "testing",
+    }
+    publisher(file_data, "metadata")
+    client.run.start(test_mode=True)
+    client.run.wait()
+    check_resp(client.run.status())
