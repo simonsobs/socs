@@ -87,5 +87,6 @@ def test_pysmurf_monitor_run(wait_for_crossbar, publisher, run_agent, client, cl
         "pysmurf_version": None,
     }
     publisher(file_data, "data_file")
+    client.run.start(test_mode=True)
     client.run.wait()
     check_resp(client.run.status())

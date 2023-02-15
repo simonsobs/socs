@@ -251,8 +251,13 @@ def main(args=None):
     agent, runner = ocs_agent.init_site_agent(args)
     monitor = PysmurfMonitor(agent, args)
 
+    # do not run at startup if in 'test-mode'
+    run_startup = True
+    if args.test_mode:
+        run_startup = False
+
     agent.register_process('run', monitor.run, monitor._stop,
-                           startup={"test_mode": args.test_mode})
+                           startup=run_startup)
 
     reactor.listenUDP(args.udp_port, monitor)
 
