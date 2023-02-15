@@ -7,7 +7,7 @@ from socs.testing.device_emulator import create_device_emulator
 
 tcp_emulator = create_device_emulator({'ping': 'pong\r',
                                        'SYST:REM': 'test'},
-                                      'tcp', 9001)
+                                      'tcp', 19002)
 
 
 # Tried this as a fixture, but connections weren't cleaning up properly.
@@ -15,7 +15,7 @@ def create_command():
     # Connection might not work on first attempt
     for i in range(5):
         try:
-            pmx = PMX(tcp_ip='127.0.0.1', tcp_port=9001, timeout=0.1)
+            pmx = PMX(tcp_ip='127.0.0.1', tcp_port=19002, timeout=0.1)
             cmd = Command(pmx)
             break
         except ConnectionRefusedError:
