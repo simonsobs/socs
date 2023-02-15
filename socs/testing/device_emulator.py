@@ -225,7 +225,13 @@ class DeviceEmulator:
 
         # Listen for connections
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._sock.bind(('127.0.0.1', port))
+        while not self._sock_bound:
+            try:
+                self._sock.bind(('127.0.0.1', port))
+                self._sock_bound = True
+            except OSError:
+                print(f"Failed to bind to port {port}, trying again...")
+                time.sleep(1)
         self._sock.listen(1)
         print("Device emulator waiting for tcp client connection")
         self._conn, client_address = self._sock.accept()
@@ -274,12 +280,23 @@ class DeviceEmulator:
         Args:
             port (int): Port for the TCP relay to listen for connections on.
 
+        Notes:
+            This will not return until the socket is properly bound to the
+            given port. If this setup is not working it is likely another
+            device emulator instance is not yet finished or has not been
+            properly shutdown.
+
         """
         self._type = 'tcp'
+        self._sock_bound = False
         bkg_read = threading.Thread(name='background',
                                     target=self._read_socket,
                                     kwargs={'port': port})
         bkg_read.start()
+
+        # wait for socket to bind properly before returning
+        while not self._sock_bound:
+            time.sleep(0.1)
 
     def define_responses(self, responses, default_response=None):
         """Define what responses are available to reply with on the configured
