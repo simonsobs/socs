@@ -458,7 +458,7 @@ class SupRsyncFileHandler:
                         )
                 else:
                     self.log.warn(
-                        "File {file.local_path} no longer exists! "
+                        f"File {file.local_path} no longer exists! "
                         "Updating remove time to be 0"
                     )
                     file.removed = 0
