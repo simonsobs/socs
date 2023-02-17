@@ -820,17 +820,18 @@ class LS372_Agent:
 
         return True, "Channel {} powered {}".format(channel, state)
 
-    @ocs_agent.param('channel', type=int)
-    @ocs_agent.param('curve_number', type=int)
+    @ocs_agent.param('channel', type=int, check=lambda x: 1 <= x <= 16)
+    @ocs_agent.param('curve_number', type=int, check=lambda x: 21 <= x <= 59)
     def set_calibration_curve(self, session, params):
         """set_calibration_curve(channel, curve_number)
 
         **Task** - Sets the calibration curve number for a particular channel.
 
         Parameters:
-            channel (int): Channel number to set calibration curve to
+            channel (int): Channel number to set calibration curve to. Channel
+                ranges are 1 to 16.
             curve_number (int): Curve number of calibration curve uploaded to
-                the LS372
+                the LS372. Curve number ranges are 21 to 59.
         """
         with self._lock.acquire_timeout(job='set_calibration_curve') as acquired:
             if not acquired:
