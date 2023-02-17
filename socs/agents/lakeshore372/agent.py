@@ -875,7 +875,7 @@ class LS372_Agent:
     @ocs_agent.param('heater', type=str)
     @ocs_agent.param('channel', type=int)
     @ocs_agent.param('P', type=int)
-    @ocs_agent.param('I', type=int)
+    @ocs_agent.param('I', type=float)
     @ocs_agent.param('update_time', type=int)
     @ocs_agent.param('sample_heater_range', type=float, default=10e-3)
     def start_custom_pid(self, session, params):
