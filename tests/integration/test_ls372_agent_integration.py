@@ -223,3 +223,25 @@ def test_ls372_get_still_output(wait_for_crossbar, emulator, run_agent, client):
     resp = client.get_still_output()
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
+@pytest.mark.integtest
+def test_ls372_engage_channel(wait_for_crossbar, emulator, run_agent, client):
+    client.init_lakeshore()
+    resp = client.engage_channel(channel=2, state='on')
+    assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
+@pytest.mark.integtest
+def test_ls372_set_calibration_curve(wait_for_crossbar, emulator, run_agent, client):
+    client.init_lakeshore()
+    resp = client.set_calibration_curve(channel=4, curve_number=28)
+    assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
+@pytest.mark.integtest
+def test_ls372_get_input_setup(wait_for_crossbar, emulator, run_agent, client):
+    client.init_lakeshore()
+    resp = client.get_input_setup(channel=4)
+    assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
