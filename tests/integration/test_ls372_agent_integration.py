@@ -247,3 +247,16 @@ def test_ls372_get_input_setup(wait_for_crossbar, emulator, run_agent, client):
     resp = client.get_input_setup(channel=4)
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
+@pytest.mark.integtest
+def test_ls372_custom_pid(wait_for_crossbar, emulator, run_agent, client):
+    client.init_lakeshore()
+    resp = client.custom_pid.start(setpoint=0.102, heater='sample', channel=2, P=2500, I=1/20, update_time=1)
+    assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.STARTING.value
+
+    client.custom_pid.wait()
+    resp = client.custom_pid.status()
+    assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
