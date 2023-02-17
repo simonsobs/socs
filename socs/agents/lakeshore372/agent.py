@@ -894,6 +894,14 @@ class LS372_Agent:
             update_time (int): Time between PID updates in seconds
             sample_heater_range (float): Range for sample heater in Amps.
                                          Default is 10e-3.
+
+        Notes:
+            The most recent data collected is stored in session data in the structure::
+        >>> response.session['data']
+                {"fields":
+                    {"Channel_02": {"T": 293.644, "R": 33.752, "timestamp": 1601924482.722671}
+                    }
+                }
         """
 
         with self._acq_proc_lock.acquire_timeout(timeout=0, job='custom_pid') \
