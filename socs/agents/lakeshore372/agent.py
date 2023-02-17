@@ -866,7 +866,7 @@ class LS372_Agent:
 
             channel = params['channel']
             input_setup = self.module.channels[channel].get_input_setup()
-            session.data = {"[mode, excitation, auto range, range, cs_shunt, units]" : input_setup}
+            session.data = {"[mode, excitation, auto range, range, cs_shunt, units]": input_setup}
 
         return True, f"Channel {channel} has measurement inputs {input_setup} = [mode," \
                      "excitation, auto range, range, cs_shunt, units]"
