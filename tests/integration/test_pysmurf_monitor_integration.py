@@ -92,11 +92,11 @@ def test_pysmurf_monitor_run_data_file(wait_for_crossbar, publisher, run_agent, 
         "path": test_file,
         "type": "testing",
         "format": "txt",
-        "timestamp": None,
+        "timestamp": time.time(),
         "action": None,
         "action_ts": None,
         "plot": False,
-        "pysmurf_version": None,
+        "pysmurf_version": "v0.7.0",
     }
     publisher(file_data, "data_file")
     client.run.start(test_mode=True)
