@@ -94,5 +94,13 @@ hosts:
                      ['--snmp-version', 1],
                     ]
       },
+      {'agent-class': 'PysmurfMonitor',
+       'instance-id': 'pysmurf-monitor',
+       'arguments': [['--udp-port', 8200],
+                     ['--create-table', True],
+                     ['--echo-sql'],
+                     ['--test-mode']
+                    ]
+      },
     ]
   }
