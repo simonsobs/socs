@@ -1,73 +1,64 @@
 class JXC831:
     """
     JXC831 object is for reading and writing addresses on the
-    JXC actuator controller and inherits a PLC object, which is used
+    JXC actuator controller and inherits a BBB object, which is used
     to actually control the pin voltages.
 
     Args:
-    PLC (src.C000DRD): inherited PLC object
+    BBB (src.BBB): inherited BBB object
     """
-    def __init__(self, PLC):
-        if PLC is None:
+    def __init__(self, BBB):
+        if BBB is None:
             raise Exception(
-                'JXC831 Exception: SMC controller requires a PLC interface '
+                'JXC831 Exception: SMC controller requires a BBB interface '
                 'to be passed to JXC831() constructor')
-        self.PLC = PLC
+        self.BBB = BBB
 
         # Number of attempts for each read/write command,
         # because sometimes they fail for no obvious reason...
         self.num_attempts = 5
 
-        # Assign SMC controller pins to PLC pins. Also listed are the I/O
-        # cable wire colors for the connections
+        # Assign SMC controller pins to BBB pins. Also listed are the I/O
         # Read/write -- controllable by the user
-        self.IN0 = self.PLC.Y001
-        self.IN1 = self.PLC.Y002
-        self.IN2 = self.PLC.Y003
-        self.IN3 = self.PLC.Y004
-        self.IN4 = self.PLC.Y005
+        self.IN0 = self.BBB.GPIO_22
+        self.IN1 = self.BBB.GPIO_23
+        self.IN2 = self.BBB.GPIO_26
+        self.IN3 = self.BBB.GPIO_27
+        self.IN4 = self.BBB.GPIO_34
 
-        self.SETUP = self.PLC.Y006
-        self.HOLD = self.PLC.Y101
-        self.DRIVE = self.PLC.Y102
-        self.RESET = self.PLC.Y103
-        self.SVON = self.PLC.Y104
+        self.SETUP = self.BBB.GPIO_35
+        self.HOLD = self.BBB.GPIO_38
+        self.DRIVE = self.BBB.GPIO_39
+        self.RESET = self.BBB.GPIO_46
+        self.SVON = self.BBB.GPIO_47
 
-        self.BRAKE1 = self.PLC.Y106
-        self.BRAKE2 = self.PLC.Y107
-        self.BRAKE3 = self.PLC.Y108
+        self.BRAKE1 = self.BBB.GPIO_65
+        self.BRAKE2 = self.BBB.GPIO_67
+        self.BRAKE3 = self.BBB.GPIO_69
+
+        self.EMG1 = self.BBB.GPIO_61
+        self.EMG2 = self.BBB.GPIO_66
+        self.EMG3 = self.BBB.GPIO_68
 
         # Read only -- not controllable by the user
-        self.OUT0 = self.PLC.X001
-        self.OUT1 = self.PLC.X002
-        self.OUT2 = self.PLC.X003
-        self.OUT3 = self.PLC.X004
-        self.OUT4 = self.PLC.X005
+        self.OUT0 = self.BBB.GPIO_2
+        self.OUT1 = self.BBB.GPIO_3
+        self.OUT2 = self.BBB.GPIO_4
+        self.OUT3 = self.BBB.GPIO_5
+        self.OUT4 = self.BBB.GPIO_15
 
-        self.BUSY = self.PLC.X006
-        self.AREA = self.PLC.X007
-        self.SETON = self.PLC.X008
+        self.BUSY = self.BBB.GPIO_50
+        self.AREA = self.BBB.GPIO_51
+        self.SETON = self.BBB.GPIO_60
 
-        self.INP = self.PLC.X201
-        self.SVRE = self.PLC.X202
-        self.ESTOP = self.PLC.X203
-        self.ALARM = self.PLC.X204
+        self.INP = self.BBB.GPIO_30
+        self.SVRE = self.BBB.GPIO_31
+        self.ESTOP = self.BBB.GPIO_48
+        self.ALARM = self.BBB.GPIO_49
 
-        self.BUSY1 = self.PLC.X205
-        self.BUSY2 = self.PLC.X206
-        self.BUSY3 = self.PLC.X207
-
-        self.AREA1 = self.PLC.X208
-        self.AREA2 = self.PLC.X209
-        self.AREA3 = self.PLC.X210
-
-        self.INP1 = self.PLC.X211
-        self.INP2 = self.PLC.X212
-        self.INP3 = self.PLC.X213
-
-        self.ALARM1 = self.PLC.X214
-        self.ALARM2 = self.PLC.X215
-        self.ALARM3 = self.PLC.X216
+        self.ACT1 = self.BBB.GPIO_20
+        self.ACT2 = self.BBB.GPIO_117
+        self.ACT3 = self.BBB.GPIO_14
 
     # ***** Public Methods *****
     def read(self, addr):
@@ -79,7 +70,7 @@ class JXC831:
         """
         for n in range(self.num_attempts):
             try:
-                return self.PLC.read_pin(addr)
+                return self.BBB.read_pin(addr)
             except:
                 continue
         raise Exception(
@@ -94,7 +85,7 @@ class JXC831:
         """
         for n in range(self.num_attempts):
             try:
-                return self.PLC.set_pin_on(addr)
+                return self.BBB.set_pin_on(addr)
             except:
                 continue
         return Exception(
@@ -109,23 +100,9 @@ class JXC831:
         """
         for n in range(self.num_attempts):
             try:
-                return self.PLC.set_pin_off(addr)
+                return self.BBB.set_pin_off(addr)
             except:
                 continue
         return Exception(
             'JXC831 Exception: Cannot write to pin at address', addr)
 
-    def toggle(self, addr):
-        """
-        Toggle JXC address value
-
-        Args:
-        addr (int): address to be toggled
-        """
-        for n in range(self.num_attempts):
-            try:
-                return self.PLC.toggle_pin(addr)
-            except:
-                continue
-        return Exception(
-            'JXC831 Exception: Cannot read/write to pin at address', addr)
