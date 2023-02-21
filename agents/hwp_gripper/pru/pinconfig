@@ -1,0 +1,59 @@
+#!/bin/bash
+
+# P8
+# GPIO
+config-pin P8_03 gpio # BB_HOLD
+config-pin P8_04 gpio # BB_DRIVE
+config-pin P8_05 gpio # BB_IN4
+config-pin P8_06 gpio # BB_SETUP
+config-pin P8_07 gpio # BB_EMG_2
+config-pin P8_08 gpio # BB_LKRLS2
+config-pin P8_09 gpio # BB_LKRLS3
+config-pin P8_10 gpio # BB_EMG_3
+config-pin P8_13 gpio # BB_IN1
+config-pin P8_14 gpio # BB_IN2
+config-pin P8_15 gpio # BB_SVON
+config-pin P8_16 gpio # BB_RESET
+config-pin P8_17 gpio # BB_IN3
+config-pin P8_18 gpio # BB_LKRLS1
+config-pin P8_19 gpio # BB_IN0
+config-pin P8_26 gpio # BB_EMG_1
+
+# PRU
+config-pin P8_20 pruin # 3_W_LIMIT
+config-pin P8_21 pruin # 3_C_LIMIT
+config-pin P8_27 pruin # 1_C_LIMIT
+config-pin P8_28 pruin # 2_C_LIMIT
+config-pin P8_29 pruin # 1_W_LIMIT
+config-pin P8_30 pruin # 2_W_LIMIT
+
+
+# P9
+# GPIO
+config-pin P9_11 gpio # INP_BB
+config-pin P9_12 gpio # SETON_BB
+config-pin P9_13 gpio # SVRE_BB
+config-pin P9_14 gpio # BUSY
+config-pin P9_15 gpio # ESTOP_BB
+config-pin P9_16 gpio # AREA
+config-pin P9_17 gpio # OUT3_BB
+config-pin P9_18 gpio # OUT2_BB
+config-pin P9_21 gpio # OUT1_BB
+config-pin P9_22 gpio # OUT0_BB
+config-pin P9_23 gpio # ALARM_BB
+config-pin P9_24 gpio # OUT4_BB
+config-pin P9_25 gpio # BB_ACTUATOR_2
+config-pin P9_26 gpio # BB_ACTUATOR_3
+config-pin P9_41 gpio # BB_ACTUATOR_1
+config-pin P9_42 gpio # Needs to be set to input
+
+# PRU
+config-pin P9_25 gpio # BB_ACTUATOR_2
+config-pin P9_26 gpio # BB_ACTUATOR_3
+config-pin P9_27 pruin # ACTUATOR_3_ENC_B
+config-pin P9_28 pruin # ACTUATOR_2_ENC_B
+config-pin P9_29 pruin # ACTUATOR_1_ENC_B
+config-pin P9_30 pruin # ACTUATOR_2_ENC_A
+config-pin P9_31 pruin # ACTUATOR_1_ENC_A
+config-pin P9_92 pruin # ACTUATOR_3_ENC_A
+
