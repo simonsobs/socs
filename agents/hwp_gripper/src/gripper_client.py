@@ -1,7 +1,8 @@
+import select
 import socket
 import sys
 import time
-import select
+
 
 class GripperClient(object):
     def __init__(self, mcu_ip, port):
@@ -13,8 +14,7 @@ class GripperClient(object):
 
     def send_data(self, data):
         self._s.sendto(bytes(data, 'utf-8'), (self.ip, self.port))
-        #self._s.recv(1024).decode(encoding = 'UTF-8')
+        # self._s.recv(1024).decode(encoding = 'UTF-8')
 
     def __exit__(self):
         self._s.close()
-
