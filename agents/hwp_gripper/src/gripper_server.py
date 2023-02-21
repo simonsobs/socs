@@ -1,17 +1,18 @@
-import socket
-import os 
-import sys
-import select
 import errno
+import os
+import select
+import socket
+import sys
 
 this_dir = os.path.dirname(__file__)
 sys.path.append(this_dir)
 
 import BBB as bb
-import JXC831 as jx
+import command_gripper as cg
 import control as ct
 import gripper as gp
-import command_gripper as cg
+import JXC831 as jx
+
 
 class GripperServer(object):
     def __init__(self, port):
@@ -23,7 +24,7 @@ class GripperServer(object):
         self.CTL = ct.Control(self.JXC)
         self.GPR = gp.Gripper(self.CTL)
         self.CMD = cg.Command(self.GPR)
-        
+
         self._s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self._s.setblocking(False)
@@ -43,11 +44,12 @@ class GripperServer(object):
                     pass
 
             if len(self.data) > 0:
-                self.CMD.CMD(self.data.decode(encoding = 'UTF-8'))
+                self.CMD.CMD(self.data.decode(encoding='UTF-8'))
                 self.data = b''
 
     def __exit__(self):
         self._s.close()
+
 
 server = GripperServer(8041)
 server.listen()

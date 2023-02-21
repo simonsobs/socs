@@ -1,7 +1,8 @@
 # Built-in python modules
-import time as tm
-import sys
 import os
+import sys
+import time as tm
+
 
 class Control:
     """
@@ -13,6 +14,7 @@ class Control:
     Attributes:
     log (src.Logging): logging object
     """
+
     def __init__(self, JXC):
         if JXC is None:
             raise Exception(
@@ -119,14 +121,14 @@ class Control:
             print("SVON turned on in Control.ON()")
 
         # Turn off the brakes
-        if (not self._JXC.read(self._JXC.BRAKE1) or
-           not self._JXC.read(self._JXC.BRAKE2) or
-           not self._JXC.read(self._JXC.BRAKE3)):
+        if (not self._JXC.read(self._JXC.BRAKE1)
+           or not self._JXC.read(self._JXC.BRAKE2)
+           or not self._JXC.read(self._JXC.BRAKE3)):
             self.BRAKE(False)
         self._sleep()
-        if (not self._JXC.read(self._JXC.BRAKE1) or
-           not self._JXC.read(self._JXC.BRAKE2) or
-           not self._JXC.read(self._JXC.BRAKE3)):
+        if (not self._JXC.read(self._JXC.BRAKE1)
+           or not self._JXC.read(self._JXC.BRAKE2)
+           or not self._JXC.read(self._JXC.BRAKE3)):
             print("Failed to disengage brakes in Control.ON()")
             return False
         else:
@@ -137,14 +139,14 @@ class Control:
     def OFF(self):
         """ Turn the controller off """
         # Turn on the brakes
-        if (self._JXC.read(self._JXC.BRAKE1) or
-           self._JXC.read(self._JXC.BRAKE2) or
-           self._JXC.read(self._JXC.BRAKE3)):
+        if (self._JXC.read(self._JXC.BRAKE1)
+           or self._JXC.read(self._JXC.BRAKE2)
+           or self._JXC.read(self._JXC.BRAKE3)):
             self.BRAKE(True)
         self._sleep()
-        if (self._JXC.read(self._JXC.BRAKE1) or
-           self._JXC.read(self._JXC.BRAKE2) or
-           self._JXC.read(self._JXC.BRAKE3)):
+        if (self._JXC.read(self._JXC.BRAKE1)
+           or self._JXC.read(self._JXC.BRAKE2)
+           or self._JXC.read(self._JXC.BRAKE3)):
             print("Failed to engage brakes in Control.OFF()")
             return False
         else:
@@ -333,7 +335,7 @@ class Control:
         if axis is None:
             axes = range(3)
         else:
-            if type(axis) is int and int(axis) > 0 and int(axis) < 4:
+            if isinstance(axis, int) and int(axis) > 0 and int(axis) < 4:
                 axes = [axis - 1]
             else:
                 print(
@@ -389,7 +391,7 @@ class Control:
         if axis is None:
             axes = range(3)
         else:
-            if type(axis) is int and int(axis) > 0 and int(axis) < 4:
+            if isinstance(axis, int) and int(axis) > 0 and int(axis) < 4:
                 axes = [axis - 1]
             else:
                 print(
@@ -410,7 +412,7 @@ class Control:
                     "Turned off EMG for axis %d in Control.EMG()"
                     % (int(ax + 1)))
         self._sleep()
-        
+
         ret = True
         for ax in axes:
             read_out = self._JXC.read(emg_stop[ax])
@@ -530,7 +532,7 @@ class Control:
         print("EMG3 = %d" % (self._JXC.read(self._JXC.EMG3)))
         print("\n")
         return True
-    
+
     def ALARM(self):
         """ Print the alarm status """
         print("ALARM = %d" % (self._JXC.read(self._JXC.ALARM)))
@@ -614,4 +616,3 @@ class Control:
             else:
                 return True
         return False
-

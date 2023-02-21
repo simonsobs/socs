@@ -1,27 +1,28 @@
 #!/usr/bin/env python3
 
-import sys
-import os
 import argparse
-import time
-import subprocess
-import numpy as np
-import signal
 import ctypes
 import multiprocessing
+import os
+import signal
+import subprocess
+import sys
+import time
+
+import numpy as np
 
 this_dir = os.path.dirname(__file__)
 sys.path.append(
-        os.path.join(this_dir, 'src'))
+    os.path.join(this_dir, 'src'))
 sys.path.append(
-        os.path.join(this_dir, 'pru'))
+    os.path.join(this_dir, 'pru'))
 
 import gripper_client as gclient
-import GripperCollector as gc
 import GripperBuilder as gb
-
+import GripperCollector as gc
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TImeoutLock
+
 
 class GripperAgent:
     def __init__(self, agent, mcu_ip, pru_port, control_port):
@@ -39,17 +40,17 @@ class GripperAgent:
         self.last_limit = 0
         self.last_limit_time = 0
         self.is_forced = False
-        
+
         self.encoder_names = ['Actuator 1 A', 'Actuator 1 B', 'Actuator 2 A',
                               'Actuator 2 B', 'Actuator 3 A', 'Actuator 3 B']
-        self.encoder_pru = [0,1,2,3,4,5]
-        self.encoder_edges = multiprocessing.Array(ctypes.c_int, (0,0,0,0,0,0))
-        self.encoder_direction = multiprocessing.Array(ctypes.c_int, (1,1,1,1,1,1))
+        self.encoder_pru = [0, 1, 2, 3, 4, 5]
+        self.encoder_edges = multiprocessing.Array(ctypes.c_int, (0, 0, 0, 0, 0, 0))
+        self.encoder_direction = multiprocessing.Array(ctypes.c_int, (1, 1, 1, 1, 1, 1))
 
         self.limit_names = ['Actuator 1 Cold', 'Actuator 1 Warm', 'Actuator 2 Cold',
                             'Actuator 2 Warm', 'Actuator 3 Cold', 'Actuator 3 Warm']
-        self.limit_pru = [8,9,10,11,12,13]
-        self.limit_state = [0,0,0,0,0,0]
+        self.limit_pru = [8, 9, 10, 11, 12, 13]
+        self.limit_state = [0, 0, 0, 0, 0, 0]
 
         self.command = multiprocessing.Array('c', b'                ')
 
@@ -59,13 +60,13 @@ class GripperAgent:
         self.force = multiprocessing.Value(ctypes.c_bool, False)
 
         self._process = multiprocessing.Process(
-                    target = self.process_data,
-                    args = (self._should_stop, self._stopped))
+            target=self.process_data,
+            args=(self._should_stop, self._stopped))
         self._process.start()
         signal.signal(signal.SIGINT, self.sigint_handler_parent)
 
         agg_params = {'frame_length': 60}
-        self.agent.register_feed('hwpgripper', record = True, agg_params = agg_params)
+        self.agent.register_feed('hwpgripper', record=True, agg_params=agg_params)
 
     def process_data(self, should_stop, stopped):
         signal.signal(signal.SIGINT, self.sigint_handler_child)
@@ -86,13 +87,12 @@ class GripperAgent:
                     with self.encoder_direction.get_lock():
                         for index, pru in enumerate(self.encoder_pru):
                             self.encoder_edges[index] += \
-                                    self.encoder_direction[index]*np.sum((edges >> pru) & 1)
+                                self.encoder_direction[index] * np.sum((edges >> pru) & 1)
 
                 self.last_encoder = encoder_data['state'][-1]
 
-
             clock, state = self.builder.limit_state[0], int(self.builder.limit_state[1])
-    
+
             for index, pru in enumerate(self.limit_pru):
                 self.limit_state[index] = ((state & (1 << pru)) >> pru)
 
@@ -113,7 +113,7 @@ class GripperAgent:
                         self.client.send_data('EMG OFF 2')
                     else:
                         self.client.send_data('EMG ON 2')
-                
+
                     if (self.limit_state[5] and not self.mode.value) or self.limit_state[4]:
                         self.client.send_data('EMG OFF 3')
                     else:
@@ -128,12 +128,12 @@ class GripperAgent:
                     if self.last_limit != 0:
                         self.client.send_data('EMG ON')
                         self.last_limit = 0
-        
+
             if self.command.value != b'                ':
                 with self.command.get_lock():
-                    command_raw = self.command.value.decode(encoding = 'UTF-8')
+                    command_raw = self.command.value.decode(encoding='UTF-8')
                     self.client.send_data(command_raw)
-                    self.command.value = b'                ' 
+                    self.command.value = b'                '
 
         with stopped.get_lock():
             stopped.value = True
@@ -155,8 +155,8 @@ class GripperAgent:
         self._process.terminate()
         self._process.join()
 
-    def grip_on(self, session, params = None):
-        with self.lock.aquire_timeout(0, job = 'grip_on') as aquired:
+    def grip_on(self, session, params=None):
+        with self.lock.aquire_timeout(0, job='grip_on') as aquired:
             if not aquired:
                 self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
                 return False, 'Could not aquire lock'
@@ -166,21 +166,21 @@ class GripperAgent:
 
         return True, 'Power on'
 
-    def grip_off(self, session, params = None):
-        with self.lock.aquire_timeout(0, job = 'grip_off') as aquired:
+    def grip_off(self, session, params=None):
+        with self.lock.aquire_timeout(0, job='grip_off') as aquired:
             if not aquired:
                 self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
                 return False, 'Could not aquire lock'
-            
+
             with self.command.get_lock():
                 self.command.value = b'OFF'
-    
+
         return True, 'Power off'
 
-    @ocs_agent.param('state', default = 'ON', type = str)
-    @ocs_agent.param('actuator', default = 0, type = int, check = lambda x: 0 <= x <= 3)
-    def grip_brake(self, session, params = None):
-        with self.lock.aquire_timeout(0, job = 'grip_brake') as aquired:
+    @ocs_agent.param('state', default='ON', type=str)
+    @ocs_agent.param('actuator', default=0, type=int, check=lambda x: 0 <= x <= 3)
+    def grip_brake(self, session, params=None):
+        with self.lock.aquire_timeout(0, job='grip_brake') as aquired:
             if not aquired:
                 self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
                 return False, 'Could not aquire lock'
@@ -193,17 +193,16 @@ class GripperAgent:
 
         return True, 'Changed brake state'
 
-    
-    @ocs_agent.param('mode', default = 'PUSH', type = str)
-    @ocs_agent.param('actuator', default = 1, type = int, check = lambda x: 1 <= x <= 3)
-    @ocs_agent.param('distance', default = 0, type = float, check = lambda x: -10. <= x <= 10.)
-    def grip_move(self, session, params = None):
-        with self.lock.aquire_timeout(0, job = 'grip_move') as aquired:
+    @ocs_agent.param('mode', default='PUSH', type=str)
+    @ocs_agent.param('actuator', default=1, type=int, check=lambda x: 1 <= x <= 3)
+    @ocs_agent.param('distance', default=0, type=float, check=lambda x: -10. <= x <= 10.)
+    def grip_move(self, session, params=None):
+        with self.lock.aquire_timeout(0, job='grip_move') as aquired:
             if not aquired:
                 self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
                 return False, 'Could not aquire lock'
 
-            pru_chains = [2*params['actuator'] - 2, 2*params['actuator'] - 1]
+            pru_chains = [2 * params['actuator'] - 2, 2 * params['actuator'] - 1]
             with self.encoder_direction.get_lock():
                 for chain in pru_chains:
                     if params['distance'] >= 0:
@@ -212,20 +211,19 @@ class GripperAgent:
                         self.encoder_direction[chain] = -1
 
             with self.command.get_lock():
-                self.command.value = bytes('MOVE ' + params['mode'] + ' ' + str(params['actuator']) + \
-                                            ' ' + str(params['distance']), 'utf-8')
+                self.command.value = bytes('MOVE ' + params['mode'] + ' ' + str(params['actuator'])
+                                           + ' ' + str(params['distance']), 'utf-8')
 
         return True, 'Moved actuators'
 
-    def grip_home(self, session, params = None):
-        with self.lock.aquire_timeout(0, job = 'grip_home') as aquired:
+    def grip_home(self, session, params=None):
+        with self.lock.aquire_timeout(0, job='grip_home') as aquired:
             if not aquired:
                 self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
                 return False, 'Could not aquire lock'
 
             with self.command.get_lock():
                 self.command.value = b'HOME'
-        
 
             with self.encoder_edges.get_lock():
                 for index, _ in enumerate(self.encoder_edges):
@@ -233,8 +231,8 @@ class GripperAgent:
 
         return True, 'Homed actuators'
 
-    def grip_inp(self, session, params = None):
-        with self.lock.aquire_timeout(0, job = 'grip_inp') as aquired:
+    def grip_inp(self, session, params=None):
+        with self.lock.aquire_timeout(0, job='grip_inp') as aquired:
             if not aquired:
                 self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
                 return False, 'Could not aquire lock'
@@ -244,8 +242,8 @@ class GripperAgent:
 
         return True, 'Queried are actuators in known state'
 
-    def grip_alarm(self, session, params = None):
-        with self.lock.aquire_timeout(0, job = 'grip_alarm') as aquired:
+    def grip_alarm(self, session, params=None):
+        with self.lock.aquire_timeout(0, job='grip_alarm') as aquired:
             if not aquired:
                 self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
                 return False, 'Could not aquire lock'
@@ -255,8 +253,8 @@ class GripperAgent:
 
         return True, 'Queried alarm state'
 
-    def grip_reset(self, session, params = None):
-        with self.lock.aquire_timeout(0, job = 'grip_reset') as aquired:
+    def grip_reset(self, session, params=None):
+        with self.lock.aquire_timeout(0, job='grip_reset') as aquired:
             if not aquired:
                 self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
                 return False, 'Could not aquire lock'
@@ -266,9 +264,9 @@ class GripperAgent:
 
         return True, 'Reset alarm state'
 
-    @ocs_agent.param('actuator', default = 1, type = int, check = lambda x: 1 <= x <= 3)
-    def grip_act(self, session, params = None):
-        with self.lock.aquire_timeout(0, job = 'grip_act') as aquired:
+    @ocs_agent.param('actuator', default=1, type=int, check=lambda x: 1 <= x <= 3)
+    def grip_act(self, session, params=None):
+        with self.lock.aquire_timeout(0, job='grip_act') as aquired:
             if not aquired:
                 self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
                 return False, 'Could not aquire lock'
@@ -278,9 +276,9 @@ class GripperAgent:
 
         return True, 'Queried actuator connection'
 
-    @ocs_agent.param('value', default = False, type = bool)
-    def grip_mode(self, session, params = None):
-        with self.lock.aquire_timeout(0, job = 'grip_mode') as aquired:
+    @ocs_agent.param('value', default=False, type=bool)
+    def grip_mode(self, session, params=None):
+        with self.lock.aquire_timeout(0, job='grip_mode') as aquired:
             if not aquired:
                 self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
                 return False, 'Could not aquire lock'
@@ -290,9 +288,9 @@ class GripperAgent:
 
         return True, 'Changed temperature mode'
 
-    @ocs_agent.param('value', default = False, type = bool)
+    @ocs_agent.param('value', default=False, type=bool)
     def grip_force(self, value):
-        with self.lock.aquire_timeout(0, job = 'grip_force') as aquired:
+        with self.lock.aquire_timeout(0, job='grip_force') as aquired:
             if not aquired:
                 self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
                 return False, 'Could not aquire lock'
@@ -316,17 +314,19 @@ class GripperAgent:
     # Not completed
     def _get_pos(self):
         slope = 1
-        return [rising_edges*slope for rising_edges in self.encoder_edges]
+        return [rising_edges * slope for rising_edges in self.encoder_edges]
 
-def make_parser(parser = None):
+
+def make_parser(parser=None):
     if parser is None:
         parser = argparse.ArgumentParser()
-    
+
     pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--mcu_ip')
     pgroup.add_argument('--pru_port')
     pgroup.add_argument('--control_port')
     return parser
+
 
 if __name__ == '__main__':
     site_parser = site.config.add_arguments()
@@ -336,9 +336,9 @@ if __name__ == '__main__':
 
     site_config.reparse_args(args, 'GripperAgent')
     agent, runner = ocs_agent.init_site_agent(args)
-    gripper_agent = GripperAgent(agent, mcu_ip = args.mcu_ip
-                                        pru_port = args.pru_port
-                                        control_port = args.control_port)
+    gripper_agent = GripperAgent(agent, mcu_ip=args.mcu_ip
+                                 pru_port=args.pru_port
+                                 control_port=args.control_port)
     agent.register_task('grip_on', gripper_agent.grip_on)
     agent.register_task('grip_off', gripper_agent.grip_off)
     agent.register_task('grip_brake', gripper_agent.grip_brake)
@@ -351,4 +351,4 @@ if __name__ == '__main__':
     agent.register_task('grip_mode', gripper_agent.grip_mode)
     agent.register_task('grip_force', gripper_agent.grip_force)
 
-    runner.run(agent, auto_reconnect = True)
+    runner.run(agent, auto_reconnect=True)
