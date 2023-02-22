@@ -1517,8 +1517,9 @@ class ACUAgent:
             # Go to Stop mode?
             # yield self.acu_control.stop()
 
-        # Clear the stack, but wait a bit or it can cause a fault.
-            yield dsleep(1)
+            # Clear the stack, but wait a bit or it can cause a fault.
+            # Yes, sometimes you have to wait a very long time ...
+            yield dsleep(10)
             yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
                                                 'Clear Stack')
 
