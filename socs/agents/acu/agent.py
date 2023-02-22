@@ -779,8 +779,8 @@ class ACUAgent:
                 self.log.info('Moving to commanded position')
                 wait_for_motion_start = time.time()
                 elapsed_wait_for_motion = 0.0
-                while mdata['Azimuth_current_velocity'] == 0.0 and\
-                        mdata['Elevation_current_velocity'] == 0.0:
+                while mdata['Azimuth_current_velocity'] <= 0.2 and \
+                        mdata['Elevation_current_velocity'] <= 0.2:
                     if elapsed_wait_for_motion < 30.:
                         yield dsleep(wait_for_motion)
                         elapsed_wait_for_motion = time.time() - wait_for_motion_start
