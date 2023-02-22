@@ -395,6 +395,8 @@ class ACUAgent:
                         'Status3rdAxis': j2,
                         'StatusResponseRate': n_ok / (query_t - report_t)}
 
+        was_remote = False
+
         while self.jobs['monitor'] == 'run':
             now = time.time()
 
@@ -445,7 +447,12 @@ class ACUAgent:
             self.data['status']['summary']['ctime'] =\
                 timecode(self.data['status']['summary']['Time'])
             if self.data['status']['platform_status']['Remote_mode'] == 0:
-                self.log.warn('ACU in local mode!')
+                if was_remote:
+                    was_remote = False
+                    self.log.warn('ACU in local mode!')
+            elif not was_remote:
+                was_remote = True
+                self.log.warn('ACU now in remote mode.')
             if self.data['status']['summary']['ctime'] == prev_checkdata['ctime']:
                 self.log.warn('ACU time has not changed from previous data point!')
             for axis_mode in ['Azimuth_mode', 'Elevation_mode', 'Boresight_mode']:
