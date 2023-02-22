@@ -16,7 +16,8 @@ os.environ['OCS_CONFIG_DIR'] = os.getcwd()
 
 run_agent = create_agent_runner_fixture(
     '../socs/agents/lakeshore372/agent.py',
-    'ls372')
+    'ls372',
+    args=["--log-dir", "./logs/"])
 client = create_client_fixture('LSASIM')
 wait_for_crossbar = create_crossbar_fixture()
 
