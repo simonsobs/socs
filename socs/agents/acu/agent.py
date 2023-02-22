@@ -674,23 +674,22 @@ class ACUAgent:
 
     @inlineCallbacks
     def _check_daq_streams(self, stream):
+        yield
         if self.jobs[stream] != 'run':
             self.log.warn("Process '%s' is not running" % stream)
-            job_check = False
+            return False
+        if stream == 'broadcast':
+            timestamp = self.data['broadcast'].get('Time')
         else:
-            job_check = True
-
-        time_points = []
-        while len(time_points) < 2:
-            if stream == 'broadcast':
-                new_time = self.data['broadcast']['Time']
-            elif stream == 'monitor':
-                new_time = self.data['status']['summary']['ctime']
-            time_points.append(new_time)
-            yield dsleep(0.5)
-        if time_points[1] == time_points[0]:
-            self.log.warn('%s points may be stale, check stream.' % stream)
-        return job_check
+            timestamp = self.data['status']['summary'].get('ctime')
+        if timestamp is None:
+            self.log.warn('%s daq stream has no data yet.' % stream)
+            return False
+        delta = time.time() - timestamp
+        if delta > 2:
+            self.log.warn(f'{stream} daq stream has old data ({delta} seconds)')
+            return False
+        return True
 
     @ocs_agent.param('az', type=float)
     @ocs_agent.param('el', type=float)
