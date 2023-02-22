@@ -820,7 +820,7 @@ class LS372_Agent:
 
         return True, "Channel {} powered {}".format(channel, state)
 
-    @ocs_agent.param('channel', type=int, check=lambda x: 1 <= x <= 16)
+    @ocs_agent.param('channel', type=int, check=lambda x: 0 <= x <= 16)
     @ocs_agent.param('curve_number', type=int, check=lambda x: 21 <= x <= 59)
     def set_calibration_curve(self, session, params):
         """set_calibration_curve(channel, curve_number)
@@ -829,7 +829,7 @@ class LS372_Agent:
 
         Parameters:
             channel (int): Channel number to set calibration curve to. Channel
-                ranges are 1 to 16.
+                ranges are 1 to 16, and 0 for control channel A.
             curve_number (int): Curve number of calibration curve uploaded to
                 the LS372. Curve number ranges are 21 to 59.
         """
