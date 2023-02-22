@@ -898,7 +898,7 @@ class LS372_Agent:
 
         Notes:
             The most recent data collected is stored in session data in the structure::
-              
+
                 >>> response.session['data']
                 {"fields":
                     {"Channel_02": {"T": 293.644, "R": 33.752, "timestamps": 1601924482.722671}}
