@@ -86,5 +86,21 @@ hosts:
        'instance-id': 'pysmurf-controller-s2',
        'arguments': []
       },
+      {'agent-class': 'UPSAgent',
+       'instance-id': 'ups',
+       'arguments': [['--address', '127.0.0.1'],
+                     ['--port', 1024],
+                     ['--mode', 'test'],
+                     ['--snmp-version', 1],
+                    ]
+      },
+      {'agent-class': 'PysmurfMonitor',
+       'instance-id': 'pysmurf-monitor',
+       'arguments': [['--udp-port', 8200],
+                     ['--create-table', True],
+                     ['--echo-sql'],
+                     ['--test-mode']
+                    ]
+      },
     ]
   }

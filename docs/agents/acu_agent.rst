@@ -15,10 +15,16 @@ platforms.
     :func: add_agent_args
     :prog: python3 agent.py
 
+.. _acu_deps:
+
 Dependencies
 ------------
 The `soaculib <https://github.com/simonsobs/soaculib>`_ package must be
-installed to use this Agent.
+installed to use this Agent. This can be installed via:
+
+.. code-block:: bash
+
+    $ pip install 'soaculib @ git+https://github.com/simonsobs/soaculib.git@master'
 
 Configuration File Examples
 ---------------------------

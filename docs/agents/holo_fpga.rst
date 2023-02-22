@@ -15,6 +15,8 @@ ROACH via an ethernet port, take data, and pass it to the OCS feed.
    :func: make_parser
    :prog: python3 agent.py
 
+.. _holo_fpga_deps:
+
 Dependencies
 ------------
 
@@ -31,9 +33,10 @@ You can install these by first checking you are running Python 3.8::
     $ python --version
     Python 3.8.13
 
-Then by either installing via the optional dependency "holography"::
+Then by either installing via pip::
 
-    $ python -m pip install socs[holography]
+    $ python -m pip install 'casperfpga @ git+https://github.com/casper-astro/casperfpga.git@py38'
+    $ python -m pip install 'holog_daq @ git+https://github.com/McMahonCosmologyGroup/holog_daq.git@main'
 
 Or by cloning the socs repository and using the provided requirements file::
 

@@ -10,7 +10,7 @@ Install and update with pip::
 You may install optional dependencies by including one or more agent group
 names on installation, for example::
 
-    $ pip3 install -U socs[labjack,pysmurf]
+    $ pip3 install -U socs[labjack,synacc]
 
 The different groups, and the agents they provide dependencies for are:
 
@@ -21,25 +21,17 @@ The different groups, and the agents they provide dependencies for are:
    * - Group
      - Supporting Agents
    * - ``all``
-     - All Agents (except ``holography``)
-   * - ``acu``
-     - ACU Agent
-   * - ``holography``
-     - Holography FPGA and Synthesizer Agents
+     - All Agents
    * - ``labjack``
      - Labjack Agent
    * - ``magpie``
      - Magpie Agent
    * - ``pfeiffer``
      - Pfeiffer TC 400 Agent
-   * - ``pysmurf``
-     - Pysmurf Controller Agent
    * - ``smurf_sim``
      - SMuRF File Emulator, SMuRF Stream Simulator
    * - ``synacc``
      - Synaccess Agent
-   * - ``xy_stage``
-     - LATRt XY Stage Agent
 
 If you would like to install all optional dependencies use the special varient
 "all"::
@@ -48,8 +40,15 @@ If you would like to install all optional dependencies use the special varient
 
 .. note::
     Some Agents have additional dependencies that cannot be installed with pip.
-    See the Agent reference page for the particular agent you are trying to run
-    for more details.
+    Agents that have dependencies not supported by pip install of socs are
+    listed below. See the Agent reference page for the particular agent you are
+    trying to run for more details.
+
+        - :ref:`ACU Agent<acu_deps>`
+        - :ref:`Holography FPGA Agent<holo_fpga_deps>`
+        - :ref:`Holography Synthesizer Agent<holo_synth_deps>`
+        - :ref:`Pysmurf Controller Agent<pysmurf_controller_deps>`
+        - :ref:`LATRt XY Stage Agent<latrt_xy_stage_deps>`
 
 Installing from Source
 ----------------------
