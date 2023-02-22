@@ -597,7 +597,6 @@ class ACUAgent:
         session.data = {}
 
         class MonitorUDP(protocol.DatagramProtocol):
-
             def datagramReceived(self, data, src_addr):
                 host, port = src_addr
                 offset = 0
@@ -605,13 +604,24 @@ class ACUAgent:
                     d = struct.unpack(FMT, data[offset:offset + FMT_LEN])
                     udp_data.append(d)
                     offset += FMT_LEN
+
         handler = reactor.listenUDP(int(UDP_PORT), MonitorUDP())
         influx_data = {}
         influx_data['Time_bcast_influx'] = []
         for i in range(2, len(fields)):
             influx_data[fields[i].replace(' ', '_') + '_bcast_influx'] = []
+
+        active = True
+        last_packet_time = time.time()
+
         while self.jobs['broadcast'] == 'run':
+            now = time.time()
             if len(udp_data) >= 200:
+                if not active:
+                    self.log.info('UDP packets are being received.')
+                    active = True
+                last_packet_time = now
+
                 process_data = udp_data[:200]
                 udp_data = udp_data[200:]
                 year = datetime.datetime.now().year
@@ -651,6 +661,9 @@ class ACUAgent:
                     sd[ky.split('_bcast_influx')[0]] = influx_means[ky]
                 session.data.update(sd)
             else:
+                if active and now - last_packet_time > 3:
+                    self.log.info('No UDP packets are being received.')
+                    active = False
                 yield dsleep(1)
             yield dsleep(0.005)
 
