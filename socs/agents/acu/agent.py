@@ -609,12 +609,12 @@ class ACUAgent:
                 udp_data = udp_data[200:]
                 year = datetime.datetime.now().year
                 gyear = calendar.timegm(time.strptime(str(year), '%Y'))
-                if len(process_data):
-                    sample_rate = (len(process_data)
-                                   / ((process_data[-1][0] - process_data[0][0]) * 86400
-                                   + process_data[-1][1] - process_data[0][1]))
-                else:
-                    sample_rate = 0.0
+                # if len(process_data):
+                #     sample_rate = (len(process_data)
+                #                    / ((process_data[-1][0] - process_data[0][0]) * 86400
+                #                    + process_data[-1][1] - process_data[0][1]))
+                # else:
+                #     sample_rate = 0.0
                 for d in process_data:
                     gday = (d[0] - 1) * 86400
                     sec = d[1]
@@ -736,11 +736,11 @@ class ACUAgent:
                 self.data['uploads']['Preset_Azimuth'] = az
                 self.data['uploads']['Preset_Elevation'] = el
 
-         #       acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
-         #                     'block_name': 'ACU_upload',
-         #                     'data': self.data['uploads']
-         #                     }
-         #       self.agent.publish_to_feed('acu_upload', acu_upload)
+                # acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
+                #               'block_name': 'ACU_upload',
+                #               'data': self.data['uploads']
+                # }
+                # self.agent.publish_to_feed('acu_upload', acu_upload)
 
                 # Check whether the telescope is already at the point
                 self.log.info('Setting mode to Preset')
@@ -803,11 +803,11 @@ class ACUAgent:
                     mdata = self.data['status']['summary']
                 moving = True
                 while moving:
-                  #      acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
-                  #                    'block_name': 'ACU_upload',
-                  #                    'data': self.data['uploads']
-                  #                    }
-                  #      self.agent.publish_to_feed('acu_upload', acu_upload)
+                    # acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
+                    #               'block_name': 'ACU_upload',
+                    #               'data': self.data['uploads']
+                    #               }
+                    # self.agent.publish_to_feed('acu_upload', acu_upload)
                     if session.status != 'running':
                         return False, 'Aborted!'
                     mdata = self.data['status']['summary']
@@ -868,14 +868,14 @@ class ACUAgent:
                 self.data['uploads']['Command_Type'] = 0
                 self.data['uploads']['Preset_Azimuth'] = 0.0
                 self.data['uploads']['Preset_Elevation'] = 0.0
-       #         acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
-           #                   'block_name': 'ACU_upload',
-           #                   'data': self.data['uploads']
-       #                       }
-           #     self.agent.publish_to_feed('acu_upload', acu_upload, from_reactor=True)
-        #    if session.status == 'aborting':
-        #        yield self.acu_control.mode('Stop')
-        #        self.log.warn('go_to aborted by user!')
+                # acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
+                #               'block_name': 'ACU_upload',
+                #               'data': self.data['uploads']
+                # }
+                # self.agent.publish_to_feed('acu_upload', acu_upload, from_reactor=True)
+            # if session.status == 'aborting':
+            #    yield self.acu_control.mode('Stop')
+            #    self.log.warn('go_to aborted by user!')
 
             self.jobs['control'] = 'idle'  # self._set_job_done('control')
             session.set_status('stopping')
@@ -1294,15 +1294,15 @@ class ACUAgent:
                     return False, 'Fault triggered (not ProgramTrack)!'
             free_positions = self.data['status']['summary']['Free_upload_positions']
         self.log.info('No more points in the queue')
-#        current_az = self.data['broadcast']['Corrected_Azimuth']
-#        current_el = self.data['broadcast']['Corrected_Elevation']
+        # current_az = self.data['broadcast']['Corrected_Azimuth']
+        # current_el = self.data['broadcast']['Corrected_Elevation']
         current_az = self.data['status']['summary']['Azimuth_current_position']
         current_el = self.data['status']['summary']['Elevation_current_position']
         while round(current_az - end_az, 1) != 0.:
             self.log.info('Waiting to settle at azimuth position')
             yield dsleep(0.1)
             current_az = self.data['status']['summary']['Azimuth_current_position']
-           # current_az = self.data['broadcast']['Corrected_Azimuth']
+            # current_az = self.data['broadcast']['Corrected_Azimuth']
         if not azonly:
             while round(current_el - end_el, 1) != 0.:
                 self.log.info('Waiting to settle at elevation position')

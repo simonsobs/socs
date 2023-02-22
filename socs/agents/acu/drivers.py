@@ -412,8 +412,8 @@ def plan_scan(az_end1, el, throw, v_az=1, a_az=1, init='end', num_scans=1):
     ramp_up = np.sign(throw) * max(abs(ramp_val), 0)
 #    elif init == 'end':
 #        ramp_up = max(az_prep + az_rampup - 2 * abs(throw), 0)
- #   else:
- #       raise
+#    else:
+#        raise
     plan['ramp_up'] = ramp_up
     pre_time = v_az / a_max
     plan['wait_to_start'] = max(5, pre_time * 1.2)
