@@ -878,6 +878,7 @@ class LS372_Agent:
     @ocs_agent.param('I', type=float)
     @ocs_agent.param('update_time', type=int)
     @ocs_agent.param('sample_heater_range', type=float, default=10e-3)
+    @ocs_agent.param('test_mode', type=bool, default=False)
     def start_custom_pid(self, session, params):
         """start_custom_pid(setpoint, heater, channel, P, \
                             I, update_time, sample_heater_range=10e-3)
@@ -1030,6 +1031,9 @@ class LS372_Agent:
                         self.log.warn(f"Failed to re-acquire sampling lock, "
                                       f"currently held by {self._lock.job}.")
                         continue
+
+                if params['test_mode']:
+                    break
 
         return True, 'PID exited cleanly.'
 
