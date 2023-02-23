@@ -1425,49 +1425,47 @@ class ACUAgent:
             self.jobs['control'] = 'idle'  # self._set_job_done('control')
             return False, 'ACU not in remote mode.'
 
-        if 'az_start' in scan_params:
-            if scan_params['az_start'] in ('mid_inc', 'mid_dec'):
-                init = 'mid'
-            else:
-                init = 'end'
-        throw = az_endpoint2 - az_endpoint1
+        # if 'az_start' in scan_params:
+        #     if scan_params['az_start'] in ('mid_inc', 'mid_dec'):
+        #         init = 'mid'
+        #     else:
+        #         init = 'end'
+        # throw = az_endpoint2 - az_endpoint1
 
-        plan, info = sh.plan_scan(az_end1=az_endpoint1, el=el_endpoint1,
-                                  throw=throw, v_az=az_speed,
-                                  a_az=acc, init=init)
+        # plan, info = sh.plan_scan(az_end1=az_endpoint1, el=el_endpoint1,
+        #                          throw=throw, v_az=az_speed,
+        #                          a_az=acc, init=init)
+        # print(plan)
+        # print(info)
 
-        print(plan)
-        print(info)
-
-    #    self.log.info('Scan params are' + str(scan_params))
         if 'step_time' in scan_params:
             step_time = scan_params['step_time']
         else:
             step_time = 1.0
         scan_upload_len_pts = scan_upload_len / step_time
-        print(scan_upload_len_pts)
 
-        go_to_params = {'az': plan['az_startpoint'],
-                        'el': plan['el'],
-                        'azonly': False,
-                        'end_stop': False,
-                        'wait': 1,
-                        'rounding': 2}
+        # go_to_params = {'az': plan['az_startpoint'],
+        #                'el': plan['el'],
+        #                'azonly': False,
+        #                'end_stop': False,
+        #                'wait': 1,
+        #                'rounding': 2}
 
         yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
                                             'Clear Stack')
 
-        self.log.info('Running go_to in generate_scan')
-#        yield self.go_to(session=session, params=go_to_params)
-        self.agent.start('go_to', go_to_params)
-        self.log.info('Finished go_to, generating scan points')
+        # self.log.info('Running go_to in generate_scan')
+        # yield self.go_to(session=session, params=go_to_params)
+        # self.agent.start('go_to', go_to_params)
+        # self.log.info('Finished go_to, generating scan points')
 
         g = sh.generate_constant_velocity_scan(az_endpoint1=az_endpoint1,
                                                az_endpoint2=az_endpoint2,
                                                az_speed=az_speed, acc=acc,
                                                el_endpoint1=el_endpoint1,
                                                el_endpoint2=el_endpoint2,
-                                               el_speed=el_speed, ramp_up=plan['ramp_up'],
+                                               el_speed=el_speed,
+                                               # ramp_up=plan['ramp_up'],
                                                **scan_params)
         with self.lock.acquire_timeout(0, job='control') as acquired:
             if not acquired:
