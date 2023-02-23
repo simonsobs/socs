@@ -259,7 +259,9 @@ def test_ls372_sample_custom_pid(wait_for_crossbar, emulator, run_agent, client)
                 'SRDG? 2': '15.00E+03',
                 'HTRSET? 0': '50,8,+0003.00,1'}
     emulator.define_responses(response)
-    resp = client.custom_pid.start(setpoint=0.102, heater='sample', channel=2, P=2500, I=1 / 20, update_time=0, sample_heater_range=3.16e-3, test_mode=True)
+    resp = client.custom_pid.start(setpoint=0.102, heater='sample', channel=2,
+                                   P=2500, I=1 / 20, update_time=0, sample_heater_range=3.16e-3,
+                                   test_mode=True)
     print('resp:', resp)
     print('resp.status', resp.status)
     assert resp.status == ocs.OK
@@ -281,7 +283,8 @@ def test_ls372_still_custom_pid(wait_for_crossbar, emulator, run_agent, client):
                 'OUTMODE? 2': '4,5,1,0,0,001',
                 'HTRSET? 2': '+1020.000,8,+0000.00,1'}
     emulator.define_responses(response)
-    resp = client.custom_pid.start(setpoint=0.95, heater='still', channel=5, P=0, I=1. / 7, update_time=0, test_mode=True)
+    resp = client.custom_pid.start(setpoint=0.95, heater='still', channel=5,
+                                   P=0, I=1. / 7, update_time=0, test_mode=True)
     print('resp:', resp)
     print('resp.status', resp.status)
     assert resp.status == ocs.OK
