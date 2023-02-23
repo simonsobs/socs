@@ -3,6 +3,7 @@ import calendar
 import datetime
 import struct
 import time
+from enum import Enum
 
 import numpy as np
 import soaculib as aculib
@@ -222,7 +223,7 @@ class ACUAgent:
         agent.register_task('go_to',
                             self.go_to,
                             blocking=False,
-                            aborter=self._abort_motion_op_azel,
+                            aborter=self._abort_go_to,
                             aborter_blocking=False)
         agent.register_task('constant_velocity_scan',
                             self.constant_velocity_scan,
@@ -267,6 +268,10 @@ class ACUAgent:
     #
     # The Operations
     #
+
+    @inlineCallbacks
+    def _abort_go_to(self, session, params):
+        yield session.set_status('stopping')
 
     @inlineCallbacks
     def _abort_motion_op_azel(self, session, params):
@@ -693,13 +698,11 @@ class ACUAgent:
 
     @ocs_agent.param('az', type=float)
     @ocs_agent.param('el', type=float)
-    @ocs_agent.param('wait', default=1., type=float)
+    @ocs_agent.param('wait', type=float)  # temporary for ocs-web
     @ocs_agent.param('end_stop', default=False, type=bool)
-    @ocs_agent.param('rounding', default=1, type=int)
-    @ocs_agent.param('azonly', default=False, type=bool)
     @inlineCallbacks
     def go_to(self, session, params):
-        """go_to(az=None, el=None, wait=1., end_stop=False, rounding=1)
+        """go_to(az=None, el=None, end_stop=False)
 
         **Task** - Move the telescope to a particular point (azimuth,
         elevation) in Preset mode. When motion has ended and the telescope
@@ -708,197 +711,175 @@ class ACUAgent:
         Parameters:
             az (float): destination angle for the azimuthal axis
             el (float): destination angle for the elevation axis
-            wait (float): amount of time to wait for motion to end
             end_stop (bool): put the telescope in Stop mode at the end of
                 the motion
-            rounding (int): number of decimal places to round to
 
         """
-        session.set_status('running')
-        while session.status == 'running':
-            with self.lock.acquire_timeout(0, job='control') as acquired:
-                if not acquired:
-                    return False, f"Operation failed: {self.lock.job} is running."
-                bcast_check = yield self._check_daq_streams('broadcast')
-                monitor_check = yield self._check_daq_streams('monitor')
-                if not bcast_check or not monitor_check:
-                    self.jobs['control'] = 'idle'
-                    session.set_status('stopping')
-                    return False, 'Cannot complete go_to with process not running.'
+        # Step time in event loop.
+        TICK_TIME = 0.1
 
-                az = params['az']
-                el = params['el']
-                azonly = params['azonly']
-                if az < self.motion_limits['azimuth']['lower'] or az > self.motion_limits['azimuth']['upper']:
-                    raise ocs_agent.ParamError("Azimuth out of range! Must be "
-                                               + f"{self.motion_limits['azimuth']['lower']} < az "
-                                               + f"< {self.motion_limits['azimuth']['upper']}")
-                if el < self.motion_limits['elevation']['lower'] or el > self.motion_limits['elevation']['upper']:
-                    raise ocs_agent.ParamError("Elevation out of range! Must be "
-                                               + f"{self.motion_limits['elevation']['lower']} < el "
-                                               + f"< {self.motion_limits['elevation']['upper']}")
-                end_stop = params['end_stop']
-                wait_for_motion = params['wait']
-                round_int = params['rounding']
-                if self.data['status']['platform_status']['Remote_mode'] == 0:
-                    self.log.warn('ACU in local mode, cannot perform motion with OCS.')
-                    self.jobs['control'] = 'idle'
-                    session.set_status('stopping')
-                    return False, 'ACU not in remote mode.'
-                self.log.info('Azimuth commanded position: ' + str(az))
-                self.log.info('Elevation commanded position: ' + str(el))
-                current_az = round(self.data['status']['summary']['Azimuth_current_position'], 2)
-                current_el = round(self.data['status']['summary']['Elevation_current_position'], 2)
-                self.data['uploads']['Start_Azimuth'] = current_az
-                self.data['uploads']['Start_Elevation'] = current_el
-                self.data['uploads']['Command_Type'] = 1
-                self.data['uploads']['Preset_Azimuth'] = az
-                self.data['uploads']['Preset_Elevation'] = el
+        # When aborting, how many seconds to use to project a good
+        # stopping position (d = v*t)
+        ABORT_TIME = 2.
 
-                # acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
-                #               'block_name': 'ACU_upload',
-                #               'data': self.data['uploads']
-                # }
-                # self.agent.publish_to_feed('acu_upload', acu_upload)
+        # Threshold (deg) for declaring that we've reached
+        # destination.
+        THERE_YET = 0.01
 
-                # Check whether the telescope is already at the point
-                self.log.info('Setting mode to Preset')
-                if azonly:
-                    acu_msg = yield self.acu_control.azmode('Preset')
-                else:
-                    acu_msg = yield self.acu_control.mode('Preset')
-                if acu_msg not in [b'OK, Command executed.', b'OK, Command send.']:
-                    self.log.error(acu_msg)
-                    self.jobs['control'] = 'idle'  # self._set_job_done('control')
-                    session.set_status('stopping')
-                    return False, 'Could not change mode'
-                if round(current_az, round_int) == az and \
-                        round(current_el, round_int) == el:
-                    yield self.acu_control.go_to(az, el)
-                    self.log.info('Already at commanded position.')
-                    self.jobs['control'] = 'idle'  # self._set_job_done('control')
-                    session.set_status('stopping')
-                    return True, 'Preset at commanded position'
-            # yield self.acu.stop()
-            # yield self.acu_control.mode('Stop')
-            # self.log.info('Stopped')
-                yield dsleep(2)
-                if session.status != 'running':
-                    return False, 'Aborted before sending go_to command'
-                self.log.info('Sending go_to command')
-                acu_msg = yield self.acu_control.go_to(az, el)
-                if acu_msg not in [b'OK, Command executed.', b'OK, Command send.']:
-                    self.log.error(acu_msg)
-                    self.jobs['control'] = 'idle'  # self._set_job_done('control')
-                    session.set_status('stopping')
-                    return False, 'Could not send go_to command'
-                yield dsleep(0.3)
-                mdata = self.data['status']['summary']
-                # Wait for telescope to start moving
-                self.log.info('Moving to commanded position')
-                wait_for_motion_start = time.time()
-                elapsed_wait_for_motion = 0.0
-                while mdata['Azimuth_current_velocity'] <= 0.2 and \
-                        mdata['Elevation_current_velocity'] <= 0.2:
-                    if elapsed_wait_for_motion < 30.:
-                        yield dsleep(wait_for_motion)
-                        elapsed_wait_for_motion = time.time() - wait_for_motion_start
-                        mdata = self.data['status']['summary']
-                    else:
-                        if round(mdata['Azimuth_current_position'] - az, round_int) == 0. and \
-                                round(mdata['Elevation_current_position'] - el, round_int) == 0.:
-                            if end_stop:
-                                yield self.acu_control.stop()
-                                self.log.info('Az and el in Stop mode')
-                            self.jobs['control'] = 'idle'  # self._set_job_done('control')
-                            session.set_status('stopping')
-                            return True, 'Pointing completed'
-                        else:
-                            yield self.acu_control.stop()
-                            self.jobs['control'] = 'idle'  # self._set_job_done('control')
-                            session.set_status('stopping')
-                            return False, 'Motion never occurred! Stop activated'
-                    yield dsleep(wait_for_motion)
-                    mdata = self.data['status']['summary']
-                moving = True
-                while moving:
-                    # acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
-                    #               'block_name': 'ACU_upload',
-                    #               'data': self.data['uploads']
-                    #               }
-                    # self.agent.publish_to_feed('acu_upload', acu_upload)
-                    if session.status != 'running':
-                        return False, 'Aborted!'
-                    mdata = self.data['status']['summary']
-                    remote = self.data['status']['platform_status']['Remote_mode']
-                    if remote == 0:
-                        self.log.warn('ACU no longer in remote mode!')
-                    if azonly:
-                        if mdata['Azimuth_mode'] != 'Preset':
-                            self.log.info('Mode has changed from Preset, abort motion')
-                            session.set_status('stopping')
-                            return False, 'Motion aborted'
-                    else:
-                        if mdata['Azimuth_mode'] != 'Preset' or mdata['Elevation_mode'] != 'Preset':
-                            # yield self.acu_control.stop()
-                            self.log.info('Mode has changed from Preset, abort motion')
-                            session.set_status('stopping')
-                            return False, 'Motion aborted'
-                    ve = round(mdata['Elevation_current_velocity'], 2)
-                    va = round(mdata['Azimuth_current_velocity'], 2)
-                    if (ve != 0.0) or (va != 0.0):
-                        moving = True
-                        mdata = self.data['status']['summary']
-                        if azonly:
-                            if mdata['Azimuth_mode'] != 'Preset':
-                                self.log.info('Mode has changed from Preset, abort motion')
-                                session.set_status('stopping')
-                                return False, 'Motion aborted'
-                        else:
-                            if mdata['Azimuth_mode'] != 'Preset' or mdata['Elevation_mode'] != 'Preset':
-                                self.log.info('Mode has changed from Preset, abort motion')
-                                return False, 'Motion aborted'
-                        yield dsleep(wait_for_motion)
-                    else:
-                        moving = False
-                        mdata = self.data['status']['summary']
-                        if azonly:
-                            if mdata['Azimuth_mode'] != 'Preset':
-                                self.log.info('Mode has changed from Preset, abort motion')
-                                return False, 'Motion aborted'
-                        else:
-                            if mdata['Azimuth_mode'] != 'Preset' or mdata['Elevation_mode'] != 'Preset':
-                                # yield self.acu_control.stop()
-                                self.log.info('Mode has changed from Preset, abort motion')
-                                return False, 'Motion aborted'
-                        pe = round(mdata['Elevation_current_position'], round_int)
-                        pa = round(mdata['Azimuth_current_position'], round_int)
-                        if pe != el or pa != az:
-                            yield self.acu_control.stop()
-                            self.log.warn('Stopped before reaching commanded point!')
-                            return False, 'Something went wrong!'
-                if end_stop:
-                    #                    yield self.acu_control.stop()
-                    yield self.acu_control.mode('Stop')
-                    self.log.info('Stop mode activated')
+        # Positive acknowledgment of AcuControl.go_to
+        OK_RESPONSE = b'OK, Command executed.'
+
+        # Enum for the motion states
+        State = Enum('State', ['INIT', 'WAIT_MOVE', 'MOVE', 'SETTLE', 'FAIL', 'DONE'])
+
+        # History of recent distances from target.
+        history = []
+
+        def get_history(t):
+            # Returns (ok, hist) where hist is roughly the past t
+            # seconds of position data and ok is whether or not
+            # that much history was actually available.
+            n = int(t // TICK_TIME) + 1
+            return (n <= len(history)), history[-n:]
+
+        with self.lock.acquire_timeout(0, job='control') as acquired:
+            if not acquired:
+                return False, f"Operation failed: {self.lock.job} is running."
+
+            bcast_check = yield self._check_daq_streams('broadcast')
+            monitor_check = yield self._check_daq_streams('monitor')
+            if not bcast_check or not monitor_check:
+                self.jobs['control'] = 'idle'
                 session.set_status('stopping')
-                self.data['uploads']['Start_Azimuth'] = 0.0
-                self.data['uploads']['Start_Elevation'] = 0.0
-                self.data['uploads']['Command_Type'] = 0
-                self.data['uploads']['Preset_Azimuth'] = 0.0
-                self.data['uploads']['Preset_Elevation'] = 0.0
-                # acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
-                #               'block_name': 'ACU_upload',
-                #               'data': self.data['uploads']
-                # }
-                # self.agent.publish_to_feed('acu_upload', acu_upload, from_reactor=True)
-            # if session.status == 'aborting':
-            #    yield self.acu_control.mode('Stop')
-            #    self.log.warn('go_to aborted by user!')
+                return False, 'Cannot complete go_to with process not running.'
 
-            self.jobs['control'] = 'idle'  # self._set_job_done('control')
-            session.set_status('stopping')
-        return True, 'Pointing completed'
+            target_az = params['az']
+            target_el = params['el']
+
+            def limit(val, lims):
+                return max(min(val, lims['upper']), lims['lower'])
+
+            for axis, target in {'azimuth': target_az, 'elevation': target_el}.items():
+                lims = self.motion_limits[axis]
+                if target != limit(target, lims):
+                    raise ocs_agent.ParamError(
+                        f'{axis}={target} not in accepted range, '
+                        f'[{lims["lower"]}, {lims["upper"]}].')
+            end_stop = params['end_stop']
+
+            if self.data['status']['platform_status']['Remote_mode'] == 0:
+                self.log.warn('ACU in local mode, cannot perform motion with OCS.')
+                self.jobs['control'] = 'idle'
+                return False, 'ACU not in remote mode.'
+
+            self.log.info(f'Commanded position: az={target_az}, el={target_el}')
+
+            session.set_status('running')
+
+            last_state = None
+            state = State.INIT
+            motion_aborted = False
+            assumption_fail = False
+            motion_completed = False
+
+            while session.status in ['starting', 'running', 'stopping']:
+                if state != last_state:
+                    self.log.info(f'state={state}')
+                    last_state = state
+
+                current_az, v_az, current_el, v_el = [
+                    self.data['status']['summary'][k]
+                    for k in ['Azimuth_current_position', 'Azimuth_current_velocity',
+                              'Elevation_current_position', 'Elevation_current_velocity']]
+                distance = abs(target_az - current_az) + abs(target_el - current_el)
+                history.append(distance)
+
+                # Compute some things about the motion ...
+                ok, _d = get_history(3.)
+                still = ok and (np.std(_d) < 0.1)
+                moving = ok and (np.std(_d) >= 0.1)
+
+                near_destination = distance < THERE_YET
+                modes_ok = all([
+                    self.data['status']['summary'][k] == 'Preset'
+                    for k in ['Azimuth_mode', 'Elevation_mode']])
+
+                if session.status == 'stopping' and not motion_aborted:
+                    # Figure out a reasonable stopping place ...
+                    target_az = limit(current_az + v_az * ABORT_TIME,
+                                      self.motion_limits['azimuth'])
+                    target_el = limit(current_el + v_el * ABORT_TIME,
+                                      self.motion_limits['elevation'])
+                    state = State.INIT
+                    motion_aborted = True
+
+                if state == State.INIT:
+                    # Set target position and change mode to Preset.
+                    result = yield self.acu_control.go_to(target_az, target_el)
+                    if result == OK_RESPONSE:
+                        state = State.WAIT_MOVE
+                    else:
+                        state = State.FAIL
+                        self.log.error(f'ACU rejected go_to with message: {result}')
+
+                elif state == State.WAIT_MOVE:
+                    # After setting position/mode, expect to start moving.
+                    if not modes_ok:
+                        state = State.FAIL
+                    elif still:
+                        if near_destination:
+                            state = State.SETTLE
+                        else:
+                            state = State.FAIL
+                    elif moving:
+                        state = State.MOVE
+
+                elif state == State.MOVE:
+                    # Once moving, watch to stop moving.
+                    if not modes_ok:
+                        state = State.FAIL
+                    elif still:
+                        state = State.SETTLE
+
+                elif state == State.SETTLE:
+                    # Having finished the move, check position.
+                    if not modes_ok:
+                        state = State.FAIL
+                    if still:
+                        if near_destination:
+                            state = State.DONE
+                        else:
+                            state = State.FAIL
+
+                elif state == State.FAIL:
+                    # Move did not complete as planned.
+                    assumption_fail = True
+                    break
+
+                elif state == State.DONE:
+                    # We seem to have arrived at destination.
+                    motion_completed = True
+                    break
+
+                # Keep only ~20 seconds of history ...
+                _, history = get_history(20.)
+
+                yield dsleep(TICK_TIME)
+
+        self.jobs['control'] = 'idle'  # self._set_job_done('control')
+
+        success = motion_completed and not (motion_aborted or assumption_fail)
+
+        if success and end_stop:
+            yield self.acu_control.mode('Stop')
+
+        if success:
+            msg = 'Move complete.'
+        elif motion_aborted:
+            msg = 'Move aborted!'
+        else:
+            msg = 'Irregularity during motion!'
+        return success, msg
 
     @inlineCallbacks
     def set_boresight(self, session, params):
