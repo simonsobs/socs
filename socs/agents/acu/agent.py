@@ -1531,6 +1531,7 @@ class ACUAgent:
                     # todo: Should also watch for mode change, here, to exit cleanly...
 
                 self.log.info('The track should now be completed.')
+                break  # so why am I in a loop?
             # Go to Stop mode?
             # yield self.acu_control.stop()
 
