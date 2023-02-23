@@ -881,7 +881,8 @@ class LS372_Agent:
     @ocs_agent.param('test_mode', type=bool, default=False)
     def start_custom_pid(self, session, params):
         """start_custom_pid(setpoint, heater, channel, P, \
-                            I, update_time, sample_heater_range=10e-3)
+                            I, update_time, sample_heater_range=10e-3, \
+                            test_mode=False)
 
         **Task** - Set custom software PID parameters for servo control of fridge
         using still or sample heater. Currently only P and I implemented.
