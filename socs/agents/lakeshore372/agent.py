@@ -898,7 +898,9 @@ class LS372_Agent:
                                          Default is 10e-3.
 
         Notes:
-            The most recent data collected is stored in session data in the structure::
+            The most recent data collected is stored in session data in the structure.
+            The channel number noted below depends upon which channel is being used
+            to servo::
 
                 >>> response.session['data']
                 {"fields":
