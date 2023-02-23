@@ -774,7 +774,7 @@ class ACUAgent:
                     return False, 'Could not change mode'
                 if round(current_az, round_int) == az and \
                         round(current_el, round_int) == el:
-                    yield self.acu_control.go_to(az, el, wait=0.1)
+                    yield self.acu_control.go_to(az, el)
                     self.log.info('Already at commanded position.')
                     self.jobs['control'] = 'idle'  # self._set_job_done('control')
                     session.set_status('stopping')
@@ -786,7 +786,7 @@ class ACUAgent:
                 if session.status != 'running':
                     return False, 'Aborted before sending go_to command'
                 self.log.info('Sending go_to command')
-                acu_msg = yield self.acu_control.go_to(az, el, wait=0.1)
+                acu_msg = yield self.acu_control.go_to(az, el)
                 if acu_msg not in [b'OK, Command executed.', b'OK, Command send.']:
                     self.log.error(acu_msg)
                     self.jobs['control'] = 'idle'  # self._set_job_done('control')
