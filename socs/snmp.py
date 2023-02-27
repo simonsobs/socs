@@ -12,7 +12,7 @@ txaio.use_twisted()
 
 
 # https://pysnmp.readthedocs.io/en/latest/faq/pass-custom-mib-to-manager.html
-MIB_SOURCE = f"file://{os.path.dirname(mibs.__file__)}"
+MIB_SOURCE = f"{os.path.dirname(mibs.__file__)}"
 
 
 class SNMPTwister:
@@ -132,7 +132,7 @@ class SNMPTwister:
             instances representing MIB variables returned in SNMP response.
 
         """
-        oid_list = [ObjectType(ObjectIdentity(*x).addAsn1MibSource(MIB_SOURCE))
+        oid_list = [ObjectType(ObjectIdentity(*x).addMibSource(MIB_SOURCE))
                     if isinstance(x, tuple)
                     else x
                     for x
@@ -184,7 +184,7 @@ class SNMPTwister:
             instances representing MIB variables returned in SNMP response.
 
         """
-        oid_list = [ObjectType(ObjectIdentity(*x).addAsn1MibSource(MIB_SOURCE), setvalue)
+        oid_list = [ObjectType(ObjectIdentity(*x).addMibSource(MIB_SOURCE), setvalue)
                     if isinstance(x, tuple)
                     else x
                     for x

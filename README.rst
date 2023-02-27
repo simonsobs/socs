@@ -2,7 +2,7 @@
 SOCS - Simons Observatory Control System
 ========================================
 
-.. image:: https://img.shields.io/github/workflow/status/simonsobs/socs/Build%20Develop%20Images
+.. image:: https://img.shields.io/github/actions/workflow/status/simonsobs/socs/develop.yml?branch=develop
     :target: https://github.com/simonsobs/socs/actions?query=workflow%3A%22Build+Develop+Images%22
     :alt: GitHub Workflow Status
 
