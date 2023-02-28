@@ -78,7 +78,7 @@ class LATRtXYStageAgent:
         # so does not require the lock
         self.initialized = True
         if self.auto_acq:
-            self.agent.start('acq', params={'sampling_frequency':self.sampling_frequency})
+            self.agent.start('acq', params={'sampling_frequency': self.sampling_frequency})
         return True, 'XY Stages Initialized.'
 
     @ocs_agent.param('distance', type=float)
@@ -189,7 +189,7 @@ class LATRtXYStageAgent:
 
             self.xy_stage.disable()
         return True, "Disabled"
-    
+
     @ocs_agent.param('sampling_frequency', default=None, type=float)
     def acq(self, session, params=None):
         """acq(sampling_frequency=2)
