@@ -698,7 +698,7 @@ class ACUAgent:
 
     @ocs_agent.param('az', type=float)
     @ocs_agent.param('el', type=float)
-    @ocs_agent.param('wait', type=float)  # temporary for ocs-web
+    @ocs_agent.param('wait', default=None, type=float)  # temporary for ocs-web
     @ocs_agent.param('end_stop', default=False, type=bool)
     @inlineCallbacks
     def go_to(self, session, params):
@@ -718,6 +718,10 @@ class ACUAgent:
         # Step time in event loop.
         TICK_TIME = 0.1
 
+        # Time for which to sample distance for "still" and "moving"
+        # conditions.
+        PROFILE_TIME = 1.
+
         # When aborting, how many seconds to use to project a good
         # stopping position (d = v*t)
         ABORT_TIME = 2.
@@ -726,11 +730,21 @@ class ACUAgent:
         # destination.
         THERE_YET = 0.01
 
+        # How long to wait after initiation for signs of motion,
+        # before giving up.  This is normally within 2 or 3 seconds
+        # (SATP), but in "cold" cases where siren needs to sound, this
+        # can be as long as 12 seconds.
+        MAX_STARTUP_TIME = 13.
+
+        # Velocity to assume when computing maximum time a move should take (to bail
+        # out in unforeseen circumstances).
+        UNREASONABLE_VEL = 0.5
+
         # Positive acknowledgment of AcuControl.go_to
         OK_RESPONSE = b'OK, Command executed.'
 
         # Enum for the motion states
-        State = Enum('State', ['INIT', 'WAIT_MOVE', 'MOVE', 'SETTLE', 'FAIL', 'DONE'])
+        State = Enum('State', ['INIT', 'WAIT_MOVING', 'WAIT_STILL', 'FAIL', 'DONE'])
 
         # History of recent distances from target.
         history = []
@@ -778,32 +792,47 @@ class ACUAgent:
 
             last_state = None
             state = State.INIT
+            start_time = None
             motion_aborted = False
             assumption_fail = False
             motion_completed = False
+            give_up_time = None
 
             while session.status in ['starting', 'running', 'stopping']:
-                if state != last_state:
-                    self.log.info(f'state={state}')
-                    last_state = state
+                # Time ...
+                now = time.time()
+                if start_time is None:
+                    start_time = now
+                time_since_start = now - start_time
+                motion_expected = time_since_start > MAX_STARTUP_TIME
 
+                # Space ...
                 current_az, v_az, current_el, v_el = [
                     self.data['status']['summary'][k]
                     for k in ['Azimuth_current_position', 'Azimuth_current_velocity',
                               'Elevation_current_position', 'Elevation_current_velocity']]
                 distance = abs(target_az - current_az) + abs(target_el - current_el)
                 history.append(distance)
+                if give_up_time is None:
+                    give_up_time = now + distance / UNREASONABLE_VEL \
+                        + MAX_STARTUP_TIME + 2 * PROFILE_TIME
 
-                # Compute some things about the motion ...
-                ok, _d = get_history(3.)
-                still = ok and (np.std(_d) < 0.1)
-                moving = ok and (np.std(_d) >= 0.1)
+                # Do we seem to be moving / not moving?
+                ok, _d = get_history(PROFILE_TIME)
+                still = ok and (np.std(_d) < 0.01)
+                # moving = ok and (np.std(_d) >= 0.01)
 
                 near_destination = distance < THERE_YET
                 modes_ok = all([
                     self.data['status']['summary'][k] == 'Preset'
                     for k in ['Azimuth_mode', 'Elevation_mode']])
 
+                # Log only on state changes
+                if state != last_state:
+                    self.log.info(f'state={state:<17} dt={now-start_time:+.3f} dist={distance:+.3f}')
+                    last_state = state
+
+                # Handle task abort
                 if session.status == 'stopping' and not motion_aborted:
                     # Figure out a reasonable stopping place ...
                     target_az = limit(current_az + v_az * ABORT_TIME,
@@ -813,42 +842,44 @@ class ACUAgent:
                     state = State.INIT
                     motion_aborted = True
 
+                # Turn "too long" into an immediate exit.
+                if now > give_up_time:
+                    self.log.error('Motion did not complete in a timely fashion; exiting.')
+                    assumption_fail = True
+                    break
+
+                # Main state machine
                 if state == State.INIT:
                     # Set target position and change mode to Preset.
                     result = yield self.acu_control.go_to(target_az, target_el)
                     if result == OK_RESPONSE:
-                        state = State.WAIT_MOVE
+                        state = State.WAIT_MOVING
                     else:
-                        state = State.FAIL
                         self.log.error(f'ACU rejected go_to with message: {result}')
+                        state = State.FAIL
+                    # Reset the clock for tracking "still" / "moving".
+                    history = []
+                    start_time = time.time()
 
-                elif state == State.WAIT_MOVE:
-                    # After setting position/mode, expect to start moving.
+                elif state == State.WAIT_MOVING:
+                    # Position and mode change requested, now wait for
+                    # either mode change or clear failure of motion.
+                    if modes_ok:
+                        state = state.WAIT_STILL
+                    elif still and motion_expected:
+                        self.log.error(f'Motion did not start within {MAX_STARTUP_TIME:.1f} s.')
+                        state = state.FAIL
+
+                elif state == State.WAIT_STILL:
+                    # Once moving, watch for end of motion.
                     if not modes_ok:
+                        self.log.error('Unexpected axis mode transition; exiting.')
                         state = State.FAIL
                     elif still:
-                        if near_destination:
-                            state = State.SETTLE
-                        else:
-                            state = State.FAIL
-                    elif moving:
-                        state = State.MOVE
-
-                elif state == State.MOVE:
-                    # Once moving, watch to stop moving.
-                    if not modes_ok:
-                        state = State.FAIL
-                    elif still:
-                        state = State.SETTLE
-
-                elif state == State.SETTLE:
-                    # Having finished the move, check position.
-                    if not modes_ok:
-                        state = State.FAIL
-                    if still:
                         if near_destination:
                             state = State.DONE
-                        else:
+                        elif motion_expected:
+                            self.log.error(f'Motion did not start within {MAX_STARTUP_TIME:.1f} s.')
                             state = State.FAIL
 
                 elif state == State.FAIL:
