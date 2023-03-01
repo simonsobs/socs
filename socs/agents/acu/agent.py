@@ -367,18 +367,21 @@ class ACUAgent:
                         'StatusResponseRate': n_ok / (query_t - report_t)}
 
         was_remote = False
+        last_resp_rate = None
 
         while session.status in ['running']:
-            now = time.time()
 
+            now = time.time()
             if now - query_t < min_query_period:
                 yield dsleep(min_query_period - (now - query_t))
 
             query_t = time.time()
             if query_t > report_t + report_period:
                 resp_rate = n_ok / (query_t - report_t)
-                self.log.info('Responses ok at %.3f Hz'
-                              % (resp_rate))
+                if last_resp_rate is None or (abs(resp_rate - last_resp_rate)
+                                              > max(0.1, last_resp_rate * .01)):
+                    self.log.info('Data rate for "monitor" stream is now %.3f Hz' % (resp_rate))
+                    last_resp_rate = resp_rate
                 report_t = query_t
                 n_ok = 0
                 session.data.update({'StatusResponseRate': resp_rate})
