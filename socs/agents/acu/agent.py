@@ -271,15 +271,12 @@ class ACUAgent:
     @inlineCallbacks
     def restart_idle(self, session, params):
         session.set_status('running')
-        while True:
+        while session.status in ['running']:
             resp = yield self.acu_control.http.Command('DataSets.CmdModeTransfer',
                                                        'RestartIdleTime')
             self.log.info('Sent RestartIdleTime')
             self.log.info(resp)
             yield dsleep(1. * 60.)
-        self.jobs['restart_idle'] = 'idle'
-        self.log.info('Process "restart_idle" ended.')
-        self._set_job_stop()
         return True, 'Process "restart_idle" exited cleanly.'
 
     @inlineCallbacks
@@ -379,7 +376,7 @@ class ACUAgent:
 
         was_remote = False
 
-        while self.jobs['monitor'] == 'run':
+        while session.status in ['running']:
             now = time.time()
 
             if now - query_t < min_query_period:
@@ -558,7 +555,6 @@ class ACUAgent:
                               'Elevation_mode': self.data['status']['summary']['Elevation_mode'],
                               'Boresight_mode': self.data['status']['summary']['Boresight_mode'],
                               }
-        session.set_status('stopping')
         return True, 'Acquisition exited cleanly.'
 
     @inlineCallbacks
@@ -596,7 +592,7 @@ class ACUAgent:
         active = True
         last_packet_time = time.time()
 
-        while self.jobs['broadcast'] == 'run':
+        while session.status in ['running']:
             now = time.time()
             if len(udp_data) >= 200:
                 if not active:
@@ -651,7 +647,6 @@ class ACUAgent:
 
         handler.stopListening()
         self.jobs['broadcast'] = 'idle'
-        session.set_status('stopping')
         return True, 'Acquisition exited cleanly.'
 
     @inlineCallbacks
