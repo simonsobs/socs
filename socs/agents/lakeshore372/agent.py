@@ -855,6 +855,20 @@ class LS372_Agent:
 
         Parameters:
             channel (int): Channel number to get input setup
+
+        Notes:
+            The most recent data collected is stored in session data in the
+            structure::
+
+                >>> response.session['data']
+                {"mode": 'voltage',
+                 "excitation": 6.32e-05,
+                 "excitation_units": 'volts',
+                 "autorange": 'on',
+                 "range": 2000.0,
+                 "csshunt": 'on',
+                 "units": 'kelvin'}
+
         """
         with self._lock.acquire_timeout(job='get_input_setup') as acquired:
             if not acquired:
@@ -865,8 +879,17 @@ class LS372_Agent:
             session.set_status('running')
 
             channel = params['channel']
-            input_setup = self.module.channels[channel].get_input_setup()
-            session.data = {"[mode, excitation, auto range, range, cs_shunt, units]": input_setup}
+
+            ls_chann_setting = self.module.channels[channel]
+            input_setup = ls_chann_setting.get_input_setup()
+
+            session.data = {"mode": ls_chann_setting.mode,
+                            "excitation": ls_chann_setting.excitation,
+                            "excitation_units": ls_chann_setting.excitation_units,
+                            "autorange": ls_chann_setting.autorange,
+                            "range": ls_chann_setting.range,
+                            "csshunt": ls_chann_setting.csshunt,
+                            "units": ls_chann_setting.units}
 
         return True, f"Channel {channel} has measurement inputs {input_setup} = [mode," \
                      "excitation, auto range, range, cs_shunt, units]"
