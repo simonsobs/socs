@@ -158,7 +158,7 @@ class ACUAgent:
 
         agent.register_process('monitor',
                                self.monitor,
-                               lambda session, params: self._set_job_stop('monitor'),
+                               self._simple_process_stop,
                                blocking=False,
                                startup=True)
 #        agent.register_process('monitor_spem',
@@ -166,17 +166,17 @@ class ACUAgent:
 #                               lambda
         agent.register_process('broadcast',
                                self.broadcast,
-                               lambda session, params: self._set_job_stop('broadcast'),
+                               self._simple_process_stop,
                                blocking=False,
                                startup=True)
         agent.register_process('generate_scan',
                                self.generate_scan,
-                               lambda session, params: self._set_job_stop('control'),
+                               self._simple_process_stop,
                                blocking=False,
                                startup=False)
         agent.register_process('restart_idle',
                                self.restart_idle,
-                               lambda session, params: self._set_job_stop('restart_idle'),
+                               self._simple_process_stop,
                                blocking=False,
                                startup=False)
         basic_agg_params = {'frame_length': 60}
@@ -249,27 +249,14 @@ class ACUAgent:
                             self.clear_faults,
                             blocking=False)
 
-    # Operation management.  This agent has several Processes that
-    # must be able to alone or simultaneously.  The state of each is
-    # registered in self.jobs, protected by self.lock (though this is
-    # probably not necessary as long as we don't thread).  Any logic
-    # to assess conflicts should probably be in _try_set_job.
-
-    def _set_job_stop(self, session):
-        #        """
-        #        Set a job status to 'stop'.
-        #
-        #        Parameters:
-        #            job_name (str): Name of the process you are trying to stop.
-        #        """
-        session.set_status('stopping')
-
-    #
-    # The Operations
-    #
-
     @inlineCallbacks
     def _simple_task_abort(self, session, params):
+        # Trigger a task abort by updating state to "stopping"
+        yield session.set_status('stopping')
+
+    @inlineCallbacks
+    def _simple_process_stop(self, session, params):
+        # Trigger a process stop by updating state to "stopping"
         yield session.set_status('stopping')
 
     @inlineCallbacks
@@ -279,15 +266,6 @@ class ACUAgent:
             yield dsleep(0.1)
             print(session.status)
         self.agent.start('preset_stop_clear_azel', params)
-        yield
-
-    @inlineCallbacks
-    def _abort_motion_op_boresight(self, session, params):
-        if session.status == 'running':
-            session.set_status('stopping')
-            yield dsleep(0.1)
-            print(session.status)
-        self.agent.start('preset_stop_clear_boresight', params)
         yield
 
     @inlineCallbacks
