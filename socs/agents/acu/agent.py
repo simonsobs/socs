@@ -223,8 +223,7 @@ class ACUAgent:
         agent.register_task('go_to',
                             self.go_to,
                             blocking=False,
-                            aborter=self._abort_go_to,
-                            aborter_blocking=False)
+                            aborter=self._simple_task_abort)
         agent.register_task('constant_velocity_scan',
                             self.constant_velocity_scan,
                             blocking=False,
@@ -236,7 +235,7 @@ class ACUAgent:
         agent.register_task('set_boresight',
                             self.set_boresight,
                             blocking=False,
-                            aborter=self._abort_motion_op_boresight)
+                            aborter=self._simple_task_abort)
         agent.register_task('stop_and_clear',
                             self.stop_and_clear,
                             blocking=False)
@@ -270,7 +269,7 @@ class ACUAgent:
     #
 
     @inlineCallbacks
-    def _abort_go_to(self, session, params):
+    def _simple_task_abort(self, session, params):
         yield session.set_status('stopping')
 
     @inlineCallbacks
@@ -996,6 +995,8 @@ class ACUAgent:
 
         return all_ok, msg
 
+    @ocs_agent.param('b', type=float)
+    @ocs_agent.param('end_stop', default=False, type=bool)
     @inlineCallbacks
     def set_boresight(self, session, params):
         """set_boresight(b=None, end_stop=False)
@@ -1007,86 +1008,39 @@ class ACUAgent:
             end_stop (bool): put axes in Stop mode after motion
 
         """
+        with self.lock.acquire_timeout(0, job='control') as acquired:
+            if not acquired:
+                return False, f"Operation failed: {self.lock.job} is running."
 
-        session.set_status('running')
-        while session.status == 'running':
-            monitor_check = yield self._check_daq_streams('monitor')
-            if not monitor_check:
-                self.jobs['control'] = 'idle'  # self._set_job_done('control')
-                session.set_status('stopping')
-                return False, 'Cannot complete set_boresight with process not running.'
-            else:
-                self.log.info('monitor_check completed')
+            ok, msg = yield self._check_ready_motion(session)
+            if not ok:
+                return False, msg
 
-            if self.acu_config['platform'] == 'satp':
-                status_block = 'summary'
-                position_name = 'Boresight_current_position'
-                mode_name = 'Boresight_mode'
-            elif self.acu_config['platform'] == 'ccat':
-                status_block = 'third_axis'
-                position_name = 'Axis3_current_position'
-                mode_name = 'Axis3_mode'
+            target = params['b']
+            end_stop = params['end_stop']
 
-            bs_destination = params.get('b')
-            lower_limit = self.motion_limits['boresight']['lower']
-            upper_limit = self.motion_limits['boresight']['upper']
-            if bs_destination < lower_limit or bs_destination > upper_limit:
-                self.log.warn('Commanded boresight position out of range!')
-                self.jobs['control'] = 'idle'  # self._set_job_done('control')
-                session.set_status('stopping')
-                return False, 'Commanded boresight position out of range.'
+            def limit(val, lims):
+                return max(min(val, lims['upper']), lims['lower'])
 
-#            self.log.info('Boresight current position is ' + str(self.data['status']['summary']['Boresight_current_position']))
-            self.log.info('Boresight position will be set to ' + str(bs_destination))
-            if self.data['status']['platform_status']['Remote_mode'] == 0:
-                self.log.warn('ACU in local mode, cannot perform motion with OCS.')
-                self.jobs['control'] = 'idle'  # self._set_job_done('control')
-                session.set_status('stopping')
-                return False, 'ACU not in remote mode.'
-            else:
-                self.log.info('Verified ACU in remote mode')
-            # yield self.acu_control.stop()
-            yield dsleep(0.5)
-#        self.data['uploads']['Start_Boresight'] = self.data['status'][status_block][position_name]
-#        self.data['uploads']['Command_Type'] = 1
-#        self.data['uploads']['Preset_Boresight'] = bs_destination
-#        acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
-#                      'block_name': 'ACU_upload',
-#                      'data': self.data['uploads']
-#                      }
-#        self.agent.publish_to_feed('acu_upload', acu_upload)
-            self.log.info('Starting boresight motion')
-            yield self.acu_control.go_3rd_axis(bs_destination)
-            yield dsleep(0.2)
-            current_position = self.data['status'][status_block][position_name]
-            while round(current_position - bs_destination, 2) != 0:
-                bs_mode = self.data['status'][status_block][mode_name]
-                if bs_mode == 'Preset':
-                    yield dsleep(0.1)
-#                    acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
-#                                  'block_name': 'ACU_upload',
-#                                  'data': self.data['uploads']
-#                                  }
-#                    self.agent.publish_to_feed('acu_upload', acu_upload)
-                    current_position = self.data['status'][status_block][position_name]
-                else:
-                    self.log.warn('Boresight mode has changed from Preset!')
-                    self.jobs['control'] = 'idle'  # self._set_job_done('control')
-                    session.set_status('stopping')
-                    return False, '3rd axis mode changed from Preset, check errors/faults.'
-            if params.get('end_stop'):
-                yield self.acu_control.http.Command('DataSets.CmdModeTransfer', 'Set3rdAxisMode', 'Stop')
-#            self.data['uploads']['Start_Boresight'] = 0.0
-#            self.data['uploads']['Command_Type'] = 0
-#            self.data['uploads']['Preset_Boresight'] = 0.0
-#            acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
-#                          'block_name': 'ACU_upload',
-#                          'data': self.data['uploads']
-#                          }
-#            self.agent.publish_to_feed('acu_upload', acu_upload)
+            for axis, target in {'boresight': target}.items():
+                lims = self.motion_limits[axis]
+                if target != limit(target, lims):
+                    raise ocs_agent.ParamError(
+                        f'{axis}={target} not in accepted range, '
+                        f'[{lims["lower"]}, {lims["upper"]}].')
+
+            self.log.info(f'Commanded position: boresight={target}')
+            session.set_status('running')
+
+            ok, msg = yield self._go_to_axis(session, 'Boresight', target)
+
+            if ok and end_stop:
+                yield self.acu_control.http.Command('DataSets.CmdModeTransfer',
+                                                    'Set3rdAxisMode', 'Stop')
+
             self.jobs['control'] = 'idle'  # self._set_job_done('control')
-            session.set_status('stopping')
-        return True, 'Moved to new 3rd axis position'
+
+        return ok, msg
 
     @inlineCallbacks
     def preset_stop_clear_azel(self, session, params):
