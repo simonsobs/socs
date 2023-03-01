@@ -709,6 +709,19 @@ class ACUAgent:
 
         return True, 'Agent state ok for motion.'
 
+    def _get_limit_func(self, axis):
+        """Construct a function limit(x) that will enforce that x is within
+        the configured limits for axis.  Returns the funcion and the
+        tuple of limits (lower, upper).
+
+        """
+        limits = self.motion_limits[axis.lower()]
+        limits = limits['lower'], limits['upper']
+
+        def limit_func(target):
+            return max(min(target, limits[1]), limits[0])
+        return limit_func, limits
+
     @inlineCallbacks
     def _go_to_axis(self, session, axis, target):
         """Execute a movement, using "Preset" mode, on a specific axis.
@@ -767,11 +780,6 @@ class ACUAgent:
             def get_mode():
                 return self.data['status']['summary'][f'{axis}_mode']
 
-            _lims = self.motion_limits[axis.lower()]
-
-            def limit(target):
-                return max(min(target, _lims['upper']), _lims['lower'])
-
             if axis == 'Azimuth':
                 @inlineCallbacks
                 def goto(target):
@@ -793,17 +801,14 @@ class ACUAgent:
             def get_mode():
                 return self.data['status']['summary'][f'{axis}_mode']
 
-            _lims = self.motion_limits[axis.lower()]
-
-            def limit(target):
-                return max(min(target, _lims['upper']), _lims['lower'])
-
             @inlineCallbacks
             def goto(target):
                 result = yield self.acu_control.go_3rd_axis(target)
                 return result
         else:
             return False, f"No configuration for axis={axis}"
+
+        limit_func, _ = self._get_limit_func(axis)
 
         # History of recent distances from target.
         history = []
@@ -822,6 +827,7 @@ class ACUAgent:
         assumption_fail = False
         motion_completed = False
         give_up_time = None
+        has_never_moved = True
 
         while session.status in ['starting', 'running', 'stopping']:
             # Time ...
@@ -842,7 +848,8 @@ class ACUAgent:
             # Do we seem to be moving / not moving?
             ok, _d = get_history(PROFILE_TIME)
             still = ok and (np.std(_d) < 0.01)
-            # moving = ok and (np.std(_d) >= 0.01)
+            moving = ok and (np.std(_d) >= 0.01)
+            has_never_moved = (has_never_moved and not moving)
 
             near_destination = distance < THERE_YET
             mode_ok = (get_mode() == 'Preset')
@@ -856,7 +863,7 @@ class ACUAgent:
 
             # Handle task abort
             if session.status == 'stopping' and not motion_aborted:
-                target = limit(current_pos + current_vel * ABORT_TIME)
+                target = limit_func(current_pos + current_vel * ABORT_TIME)
                 state = State.INIT
                 motion_aborted = True
 
@@ -896,7 +903,10 @@ class ACUAgent:
                 elif still:
                     if near_destination:
                         state = State.DONE
-                    elif motion_expected:
+                    elif has_never_moved and motion_expected:
+                        # The settling time, near a soft limit, can be
+                        # a bit long ... so only timeout on
+                        # motion_expected if we've never moved at all.
                         self.log.error(f'Motion did not start within {MAX_STARTUP_TIME:.1f} s.')
                         state = State.FAIL
 
@@ -955,19 +965,14 @@ class ACUAgent:
             target_az = params['az']
             target_el = params['el']
 
-            def limit(val, lims):
-                return max(min(val, lims['upper']), lims['lower'])
-
             for axis, target in {'azimuth': target_az, 'elevation': target_el}.items():
-                lims = self.motion_limits[axis]
-                if target != limit(target, lims):
+                limit_func, limits = self._get_limit_func(axis)
+                if target != limit_func(target):
                     raise ocs_agent.ParamError(
                         f'{axis}={target} not in accepted range, '
-                        f'[{lims["lower"]}, {lims["upper"]}].')
-            end_stop = params['end_stop']
+                        f'[{limits[0]}, {limits[1]}].')
 
             self.log.info(f'Commanded position: az={target_az}, el={target_el}')
-
             session.set_status('running')
 
             moves = yield DeferredList([
@@ -988,7 +993,7 @@ class ACUAgent:
             else:
                 msg = f'az: {msgs[0]} el: {msgs[1]}'
 
-            if all_ok and end_stop:
+            if all_ok and params['end_stop']:
                 yield self.acu_control.mode('Stop')
 
             self.jobs['control'] = 'idle'  # self._set_job_done('control')
@@ -1017,24 +1022,20 @@ class ACUAgent:
                 return False, msg
 
             target = params['b']
-            end_stop = params['end_stop']
-
-            def limit(val, lims):
-                return max(min(val, lims['upper']), lims['lower'])
 
             for axis, target in {'boresight': target}.items():
-                lims = self.motion_limits[axis]
-                if target != limit(target, lims):
+                limit_func, limits = self._get_limit_func(axis)
+                if target != limit_func(target):
                     raise ocs_agent.ParamError(
                         f'{axis}={target} not in accepted range, '
-                        f'[{lims["lower"]}, {lims["upper"]}].')
+                        f'[{limits[0]}, {limits[1]}].')
 
             self.log.info(f'Commanded position: boresight={target}')
             session.set_status('running')
 
             ok, msg = yield self._go_to_axis(session, 'Boresight', target)
 
-            if ok and end_stop:
+            if ok and params['end_stop']:
                 yield self.acu_control.http.Command('DataSets.CmdModeTransfer',
                                                     'Set3rdAxisMode', 'Stop')
 
