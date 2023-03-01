@@ -14,7 +14,7 @@ from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 from soaculib.twisted_backend import TwistedHttpBackend
 from twisted.internet import protocol, reactor
-from twisted.internet.defer import inlineCallbacks
+from twisted.internet.defer import DeferredList, inlineCallbacks
 
 import socs.agents.acu.drivers as sh
 
@@ -710,23 +710,19 @@ class ACUAgent:
 
         return True, 'Agent state ok for motion.'
 
-    @ocs_agent.param('az', type=float)
-    @ocs_agent.param('el', type=float)
-    @ocs_agent.param('wait', default=None, type=float)  # temporary for ocs-web
-    @ocs_agent.param('end_stop', default=False, type=bool)
     @inlineCallbacks
-    def go_to(self, session, params):
-        """go_to(az=None, el=None, end_stop=False)
+    def _go_to_axis(self, session, axis, target):
+        """Execute a movement, using "Preset" mode, on a specific axis.
 
-        **Task** - Move the telescope to a particular point (azimuth,
-        elevation) in Preset mode. When motion has ended and the telescope
-        reaches the preset point, it returns to Stop mode and ends.
+        Args:
+          session: session object variable of the parent operation.
+          axis (str): one of 'Azimuth', 'Elevation', 'Boresight'.
+          target (float): target position.
 
-        Parameters:
-            az (float): destination angle for the azimuthal axis
-            el (float): destination angle for the elevation axis
-            end_stop (bool): put the telescope in Stop mode at the end of
-                the motion
+        Returns:
+          ok (bool): True if the motion completed successfully and
+            arrived at target position.
+          msg (str): success/error message.
 
         """
         # Step time in event loop.
@@ -758,7 +754,57 @@ class ACUAgent:
         OK_RESPONSE = b'OK, Command executed.'
 
         # Enum for the motion states
-        State = Enum('State', ['INIT', 'WAIT_MOVING', 'WAIT_STILL', 'FAIL', 'DONE'])
+        State = Enum(f'{axis}State',
+                     ['INIT', 'WAIT_MOVING', 'WAIT_STILL', 'FAIL', 'DONE'])
+
+        # Specialization for different axis types.
+        if axis in ['Azimuth', 'Elevation']:
+            def get_pos():
+                return self.data['status']['summary'][f'{axis}_current_position']
+
+            def get_vel():
+                return self.data['status']['summary'][f'{axis}_current_velocity']
+
+            def get_mode():
+                return self.data['status']['summary'][f'{axis}_mode']
+
+            _lims = self.motion_limits[axis.lower()]
+
+            def limit(target):
+                return max(min(target, _lims['upper']), _lims['lower'])
+
+            if axis == 'Azimuth':
+                @inlineCallbacks
+                def goto(target):
+                    result = yield self.acu_control.go_to(az=target)
+                    return result
+            else:
+                @inlineCallbacks
+                def goto(target):
+                    result = yield self.acu_control.go_to(el=target)
+                    return result
+
+        elif axis in ['Boresight']:
+            def get_pos():
+                return self.data['status']['summary'][f'{axis}_current_position']
+
+            def get_vel():
+                return 0.
+
+            def get_mode():
+                return self.data['status']['summary'][f'{axis}_mode']
+
+            _lims = self.motion_limits[axis.lower()]
+
+            def limit(target):
+                return max(min(target, _lims['upper']), _lims['lower'])
+
+            @inlineCallbacks
+            def goto(target):
+                result = yield self.acu_control.go_3rd_axis(target)
+                return result
+        else:
+            return False, f"No configuration for axis={axis}"
 
         # History of recent distances from target.
         history = []
@@ -770,6 +816,135 @@ class ACUAgent:
             n = int(t // TICK_TIME) + 1
             return (n <= len(history)), history[-n:]
 
+        last_state = None
+        state = State.INIT
+        start_time = None
+        motion_aborted = False
+        assumption_fail = False
+        motion_completed = False
+        give_up_time = None
+
+        while session.status in ['starting', 'running', 'stopping']:
+            # Time ...
+            now = time.time()
+            if start_time is None:
+                start_time = now
+            time_since_start = now - start_time
+            motion_expected = time_since_start > MAX_STARTUP_TIME
+
+            # Space ...
+            current_pos, current_vel = get_pos(), get_vel()
+            distance = abs(target - current_pos)
+            history.append(distance)
+            if give_up_time is None:
+                give_up_time = now + distance / UNREASONABLE_VEL \
+                    + MAX_STARTUP_TIME + 2 * PROFILE_TIME
+
+            # Do we seem to be moving / not moving?
+            ok, _d = get_history(PROFILE_TIME)
+            still = ok and (np.std(_d) < 0.01)
+            # moving = ok and (np.std(_d) >= 0.01)
+
+            near_destination = distance < THERE_YET
+            mode_ok = (get_mode() == 'Preset')
+
+            # Log only on state changes
+            if state != last_state:
+                self.log.info(f'{axis}.state={state.name:<11} '
+                              f'dt={now-start_time:.3f} '
+                              f'dist={distance:.3f}')
+                last_state = state
+
+            # Handle task abort
+            if session.status == 'stopping' and not motion_aborted:
+                target = limit(current_pos + current_vel * ABORT_TIME)
+                state = State.INIT
+                motion_aborted = True
+
+            # Turn "too long" into an immediate exit.
+            if now > give_up_time:
+                self.log.error('Motion did not complete in a timely fashion; exiting.')
+                assumption_fail = True
+                break
+
+            # Main state machine
+            if state == State.INIT:
+                # Set target position and change mode to Preset.
+                result = yield goto(target)
+                if result == OK_RESPONSE:
+                    state = State.WAIT_MOVING
+                else:
+                    self.log.error(f'ACU rejected go_to with message: {result}')
+                    state = State.FAIL
+                # Reset the clock for tracking "still" / "moving".
+                history = []
+                start_time = time.time()
+
+            elif state == State.WAIT_MOVING:
+                # Position and mode change requested, now wait for
+                # either mode change or clear failure of motion.
+                if mode_ok:
+                    state = state.WAIT_STILL
+                elif still and motion_expected:
+                    self.log.error(f'Motion did not start within {MAX_STARTUP_TIME:.1f} s.')
+                    state = state.FAIL
+
+            elif state == State.WAIT_STILL:
+                # Once moving, watch for end of motion.
+                if not mode_ok:
+                    self.log.error('Unexpected axis mode transition; exiting.')
+                    state = State.FAIL
+                elif still:
+                    if near_destination:
+                        state = State.DONE
+                    elif motion_expected:
+                        self.log.error(f'Motion did not start within {MAX_STARTUP_TIME:.1f} s.')
+                        state = State.FAIL
+
+            elif state == State.FAIL:
+                # Move did not complete as planned.
+                assumption_fail = True
+                break
+
+            elif state == State.DONE:
+                # We seem to have arrived at destination.
+                motion_completed = True
+                break
+
+            # Keep only ~20 seconds of history ...
+            _, history = get_history(20.)
+
+            yield dsleep(TICK_TIME)
+
+        success = motion_completed and not (motion_aborted or assumption_fail)
+
+        if success:
+            msg = 'Move complete.'
+        elif motion_aborted:
+            msg = 'Move aborted!'
+        else:
+            msg = 'Irregularity during motion!'
+        return success, msg
+
+    @ocs_agent.param('az', type=float)
+    @ocs_agent.param('el', type=float)
+    @ocs_agent.param('wait', default=None, type=float)  # temporary for ocs-web
+    @ocs_agent.param('end_stop', default=False, type=bool)
+    @inlineCallbacks
+    def go_to(self, session, params):
+        """go_to(az=None, el=None, end_stop=False)
+
+        **Task** - Move the telescope to a particular point (azimuth,
+        elevation) in Preset mode. When motion has ended and the telescope
+        reaches the preset point, it returns to Stop mode and ends.
+
+        Parameters:
+            az (float): destination angle for the azimuthal axis
+            el (float): destination angle for the elevation axis
+            end_stop (bool): put the telescope in Stop mode at the end of
+                the motion
+
+        """
         with self.lock.acquire_timeout(0, job='control') as acquired:
             if not acquired:
                 return False, f"Operation failed: {self.lock.job} is running."
@@ -796,127 +971,30 @@ class ACUAgent:
 
             session.set_status('running')
 
-            last_state = None
-            state = State.INIT
-            start_time = None
-            motion_aborted = False
-            assumption_fail = False
-            motion_completed = False
-            give_up_time = None
+            moves = yield DeferredList([
+                self._go_to_axis(session, 'Azimuth', target_az),
+                self._go_to_axis(session, 'Elevation', target_el),
+            ])
+            all_ok, msgs = True, []
+            for _ok, result in moves:
+                if _ok:
+                    all_ok = all_ok and result[0]
+                    msgs.append(result[1])
+                else:
+                    all_ok = False
+                    msgs.append(f'Crash! {result}')
 
-            while session.status in ['starting', 'running', 'stopping']:
-                # Time ...
-                now = time.time()
-                if start_time is None:
-                    start_time = now
-                time_since_start = now - start_time
-                motion_expected = time_since_start > MAX_STARTUP_TIME
+            if all_ok:
+                msg = msgs[0]
+            else:
+                msg = f'az: {msgs[0]} el: {msgs[1]}'
 
-                # Space ...
-                current_az, v_az, current_el, v_el = [
-                    self.data['status']['summary'][k]
-                    for k in ['Azimuth_current_position', 'Azimuth_current_velocity',
-                              'Elevation_current_position', 'Elevation_current_velocity']]
-                distance = abs(target_az - current_az) + abs(target_el - current_el)
-                history.append(distance)
-                if give_up_time is None:
-                    give_up_time = now + distance / UNREASONABLE_VEL \
-                        + MAX_STARTUP_TIME + 2 * PROFILE_TIME
+            if all_ok and end_stop:
+                yield self.acu_control.mode('Stop')
 
-                # Do we seem to be moving / not moving?
-                ok, _d = get_history(PROFILE_TIME)
-                still = ok and (np.std(_d) < 0.01)
-                # moving = ok and (np.std(_d) >= 0.01)
+            self.jobs['control'] = 'idle'  # self._set_job_done('control')
 
-                near_destination = distance < THERE_YET
-                modes_ok = all([
-                    self.data['status']['summary'][k] == 'Preset'
-                    for k in ['Azimuth_mode', 'Elevation_mode']])
-
-                # Log only on state changes
-                if state != last_state:
-                    self.log.info(f'state={state:<17} dt={now-start_time:+.3f} dist={distance:+.3f}')
-                    last_state = state
-
-                # Handle task abort
-                if session.status == 'stopping' and not motion_aborted:
-                    # Figure out a reasonable stopping place ...
-                    target_az = limit(current_az + v_az * ABORT_TIME,
-                                      self.motion_limits['azimuth'])
-                    target_el = limit(current_el + v_el * ABORT_TIME,
-                                      self.motion_limits['elevation'])
-                    state = State.INIT
-                    motion_aborted = True
-
-                # Turn "too long" into an immediate exit.
-                if now > give_up_time:
-                    self.log.error('Motion did not complete in a timely fashion; exiting.')
-                    assumption_fail = True
-                    break
-
-                # Main state machine
-                if state == State.INIT:
-                    # Set target position and change mode to Preset.
-                    result = yield self.acu_control.go_to(target_az, target_el)
-                    if result == OK_RESPONSE:
-                        state = State.WAIT_MOVING
-                    else:
-                        self.log.error(f'ACU rejected go_to with message: {result}')
-                        state = State.FAIL
-                    # Reset the clock for tracking "still" / "moving".
-                    history = []
-                    start_time = time.time()
-
-                elif state == State.WAIT_MOVING:
-                    # Position and mode change requested, now wait for
-                    # either mode change or clear failure of motion.
-                    if modes_ok:
-                        state = state.WAIT_STILL
-                    elif still and motion_expected:
-                        self.log.error(f'Motion did not start within {MAX_STARTUP_TIME:.1f} s.')
-                        state = state.FAIL
-
-                elif state == State.WAIT_STILL:
-                    # Once moving, watch for end of motion.
-                    if not modes_ok:
-                        self.log.error('Unexpected axis mode transition; exiting.')
-                        state = State.FAIL
-                    elif still:
-                        if near_destination:
-                            state = State.DONE
-                        elif motion_expected:
-                            self.log.error(f'Motion did not start within {MAX_STARTUP_TIME:.1f} s.')
-                            state = State.FAIL
-
-                elif state == State.FAIL:
-                    # Move did not complete as planned.
-                    assumption_fail = True
-                    break
-
-                elif state == State.DONE:
-                    # We seem to have arrived at destination.
-                    motion_completed = True
-                    break
-
-                # Keep only ~20 seconds of history ...
-                _, history = get_history(20.)
-
-                yield dsleep(TICK_TIME)
-
-        self.jobs['control'] = 'idle'  # self._set_job_done('control')
-
-        success = motion_completed and not (motion_aborted or assumption_fail)
-
-        if success and end_stop:
-            yield self.acu_control.mode('Stop')
-
-        if success:
-            msg = 'Move complete.'
-        elif motion_aborted:
-            msg = 'Move aborted!'
-        else:
-            msg = 'Irregularity during motion!'
-        return success, msg
+        return all_ok, msg
 
     @inlineCallbacks
     def set_boresight(self, session, params):
