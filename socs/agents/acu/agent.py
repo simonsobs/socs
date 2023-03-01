@@ -82,7 +82,10 @@ class ACUAgent:
     """
 
     def __init__(self, agent, acu_config='guess'):
-        self.lock = TimeoutLock()
+        # Separate locks for exclusive access to az/el, and boresight motions.
+        self.azel_lock = TimeoutLock()
+        self.boresight_lock = TimeoutLock()
+
         self.jobs = {
             'monitor': 'idle',
             'monitorspem': 'idle',
@@ -927,9 +930,9 @@ class ACUAgent:
                 the motion
 
         """
-        with self.lock.acquire_timeout(0, job='control') as acquired:
+        with self.azel_lock.acquire_timeout(0, job='go_to') as acquired:
             if not acquired:
-                return False, f"Operation failed: {self.lock.job} is running."
+                return False, f"Operation failed: {self.azel_lock.job} is running."
 
             ok, msg = yield self._check_ready_motion(session)
             if not ok:
@@ -986,9 +989,9 @@ class ACUAgent:
             end_stop (bool): put axes in Stop mode after motion
 
         """
-        with self.lock.acquire_timeout(0, job='control') as acquired:
+        with self.boresight_lock.acquire_timeout(0, job='set_boresight') as acquired:
             if not acquired:
-                return False, f"Operation failed: {self.lock.job} is running."
+                return False, f"Operation failed: {self.boresight_lock.job} is running."
 
             ok, msg = yield self._check_ready_motion(session)
             if not ok:
@@ -1420,10 +1423,6 @@ class ACUAgent:
             scan_upload_length (float): number of seconds for each set of uploaded
                 points. Default value is 10.0.
         """
-#        with self.lock.acquire_timeout(0, job='control') as acquired:
-#            if not acquired:
-#                return False, f"Operation failed: {self.lock.job} is running."
-#            session.set_status('running')
         bcast_check = yield self._check_daq_streams('broadcast')
         monitor_check = yield self._check_daq_streams('monitor')
         if not bcast_check or not monitor_check:
@@ -1491,9 +1490,9 @@ class ACUAgent:
                                                el_speed=el_speed,
                                                # ramp_up=plan['ramp_up'],
                                                **scan_params)
-        with self.lock.acquire_timeout(0, job='control') as acquired:
+        with self.azel_lock.acquire_timeout(0, job='generate_scan') as acquired:
             if not acquired:
-                return False, f"Operation failed: {self.lock.job} is running."
+                return False, f"Operation failed: {self.azel_lock.job} is running."
             session.set_status('running')
             while session.status == 'running':
                 if azonly:
