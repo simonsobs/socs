@@ -696,6 +696,20 @@ class ACUAgent:
             return False
         return True
 
+    @inlineCallbacks
+    def _check_ready_motion(self, session):
+        bcast_check = yield self._check_daq_streams('broadcast')
+        monitor_check = yield self._check_daq_streams('monitor')
+        if not bcast_check or not monitor_check:
+            self.log.warn('"broadcast" or "monitor" process not running.')
+            return False, 'Cannot complete go_to with process not running.'
+
+        if self.data['status']['platform_status']['Remote_mode'] == 0:
+            self.log.warn('ACU in local mode, cannot perform motion with OCS.')
+            return False, 'ACU not in remote mode.'
+
+        return True, 'Agent state ok for motion.'
+
     @ocs_agent.param('az', type=float)
     @ocs_agent.param('el', type=float)
     @ocs_agent.param('wait', default=None, type=float)  # temporary for ocs-web
@@ -760,12 +774,9 @@ class ACUAgent:
             if not acquired:
                 return False, f"Operation failed: {self.lock.job} is running."
 
-            bcast_check = yield self._check_daq_streams('broadcast')
-            monitor_check = yield self._check_daq_streams('monitor')
-            if not bcast_check or not monitor_check:
-                self.jobs['control'] = 'idle'
-                session.set_status('stopping')
-                return False, 'Cannot complete go_to with process not running.'
+            ok, msg = yield self._check_ready_motion(session)
+            if not ok:
+                return False, msg
 
             target_az = params['az']
             target_el = params['el']
@@ -780,11 +791,6 @@ class ACUAgent:
                         f'{axis}={target} not in accepted range, '
                         f'[{lims["lower"]}, {lims["upper"]}].')
             end_stop = params['end_stop']
-
-            if self.data['status']['platform_status']['Remote_mode'] == 0:
-                self.log.warn('ACU in local mode, cannot perform motion with OCS.')
-                self.jobs['control'] = 'idle'
-                return False, 'ACU not in remote mode.'
 
             self.log.info(f'Commanded position: az={target_az}, el={target_el}')
 
