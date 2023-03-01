@@ -919,6 +919,9 @@ class LS372_Agent:
             update_time (int): Time between PID updates in seconds
             sample_heater_range (float): Range for sample heater in Amps.
                                          Default is 10e-3.
+            test_mode (bool, optional): Run the Process loop only once.
+                                        This is meant only for testing.
+                                        Default is False.
 
         Notes:
             The most recent data collected is stored in session data in the structure.
