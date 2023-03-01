@@ -655,7 +655,8 @@ class ACUAgent:
     @inlineCallbacks
     def _check_daq_streams(self, stream):
         yield
-        if self.jobs[stream] != 'run':
+        session = self.agent.sessions[stream]
+        if session.status != 'running':
             self.log.warn("Process '%s' is not running" % stream)
             return False
         if stream == 'broadcast':
@@ -676,8 +677,7 @@ class ACUAgent:
         bcast_check = yield self._check_daq_streams('broadcast')
         monitor_check = yield self._check_daq_streams('monitor')
         if not bcast_check or not monitor_check:
-            self.log.warn('"broadcast" or "monitor" process not running.')
-            return False, 'Cannot complete go_to with process not running.'
+            return False, 'Cannot complete motion because of problem with data acq processes.'
 
         if self.data['status']['platform_status']['Remote_mode'] == 0:
             self.log.warn('ACU in local mode, cannot perform motion with OCS.')
