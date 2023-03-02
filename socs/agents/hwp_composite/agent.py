@@ -1,12 +1,14 @@
 
 import argparse
 import time
+
 from ocs import ocs_agent, site_config
 
-from socs.agents.hwp_rotation.agent import RotationAgent
 from socs.agents.hwp_encoder.agent import HWPBBBAgent
-from socs.agents.hwp_supervisor.agent import HWPSupervisorAgent
 from socs.agents.hwp_gripper.agent import GripperAgent
+from socs.agents.hwp_rotation.agent import RotationAgent
+from socs.agents.hwp_supervisor.agent import HWPSupervisorAgent
+
 
 class HWPAgent:
     """
@@ -14,6 +16,7 @@ class HWPAgent:
     all HWP actions into a single agent, and allows for the creation of
     operations that command HWP subsystems without communicating over crossbar.
     """
+
     def __init__(self, agent, args):
         self.agent = agent
 
@@ -30,7 +33,7 @@ class HWPAgent:
 
         **Task** - Shutdown the HWP system
         """
-                # make into params?
+        # make into params?
         WAIT_TIME = 30
         MAX_WAIT = 40
         total_wait = 0  # minutes
