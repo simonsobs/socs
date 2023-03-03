@@ -1,12 +1,11 @@
 import argparse
-import txaio
 import os
 import time
+
+import txaio
 from epics import PV
-
+from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import Pacemaker
-from ocs import site_config, ocs_agent
-
 
 diagnostic_root = 'TPG:SMRF:1'
 regs = [
@@ -22,6 +21,7 @@ class SmurfTimingCardAgent:
     """
     Agent to monitor diagnostic variables for the SMuRF Timing Card.
     """
+
     def __init__(self, agent, args):
         self.agent = agent
         self.log = agent.log
@@ -32,14 +32,14 @@ class SmurfTimingCardAgent:
         self.timeout = args.timeout
         self.use_monitor = args.use_monitor
         agent.register_feed('diagnostics', record=True)
-    
+
     def run(self, session, params):
         """run()
-        
+
         **Process** -- Main loop for the timing card. This queries diagnostic
         PVs and publishes data.
         """
-        pacemaker = Pacemaker(1./self.sleep_time)
+        pacemaker = Pacemaker(1. / self.sleep_time)
         session.set_status('running')
         while session.status in ['starting', 'running']:
             data = {}
