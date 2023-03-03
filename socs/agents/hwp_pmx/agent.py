@@ -167,6 +167,11 @@ class PMXAgent:
         Method to start data acquisition process.
         The most recent data collected is stored in session.data in the
         structure::
+
+            >>> response.session['data']
+            {'curr': 0,
+             'volt': 0,
+             'last_updated': 1649085992.719602}
         """
         sleep_time = 1/self.f_sample - 0.01
 
