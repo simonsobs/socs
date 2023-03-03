@@ -12,21 +12,21 @@ class HWPPID:
     """Agent to PID control the rotation speed of the CHWP
 
     Args:
-        pid_ip (str): IP address for the PID controller
-        pid_port (str): Port for the PID controller
-        pid_verbosity (str): Verbosity of PID controller output
+        ip (str): IP address for the PID controller
+        port (str): Port for the PID controller
+        verbosity (str): Verbosity of PID controller output
 
     """
 
-    def __init__(self, agent, pid_ip, pid_port, pid_verbosity):
+    def __init__(self, agent, ip, port, verbosity):
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
         self._initialized = False
         self.take_data = False
-        self.pid_ip = pid_ip
-        self.pid_port = pid_port
-        self._pid_verbosity = pid_verbosity > 0
+        self.ip = ip
+        self.port = port
+        self._verbosity = verbosity > 0
         # self.pid = None  # PID object for pid controller commanding
 
         agg_params = {'frame_length': 60}
@@ -59,8 +59,8 @@ class HWPPID:
                 return False, 'Could not acquire lock'
 
             try:
-                self.pid = pd.PID(pid_ip=self.pid_ip, pid_port=self.pid_port,
-                                  verb=self._pid_verbosity)
+                self.pid = pd.PID(ip=self.ip, port=self.port,
+                                  verb=self._verbosity)
                 self.log.info('Connected to PID controller')
             except BrokenPipeError:
                 self.log.error('Could not establish connection to PID controller')
@@ -332,8 +332,8 @@ def make_parser(parser=None):
 
     # Add options specific to this agent
     pgroup = parser.add_argument_group('Agent Options')
-    pgroup.add_argument('--pid-ip')
-    pgroup.add_argument('--pid-port')
+    pgroup.add_argument('--ip')
+    pgroup.add_argument('--port')
     pgroup.add_argument('--verbose', '-v', action='count', default=0,
                         help='PID Controller verbosity level.')
     pgroup.add_argument('--mode', type=str, default='acq',
@@ -355,9 +355,9 @@ def main(args=None):
         init_params = {'auto_acquire': True}
 
     agent, runner = ocs_agent.init_site_agent(args)
-    hwppid_agent = HWPPID(agent, pid_ip=args.pid_ip,
-                          pid_port=args.pid_port,
-                          pid_verbosity=args.verbose)
+    hwppid_agent = HWPPID(agent, ip=args.ip,
+                          port=args.port,
+                          verbosity=args.verbose)
     agent.register_task('init_connection', hwppid_agent.init_connection,
                         startup=init_params)
     agent.register_process('acq', hwppid_agent.acq,

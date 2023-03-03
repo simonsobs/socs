@@ -6,8 +6,8 @@ class PID:
     """Class to communicate with the Omega CNi16D54-EIT PID controller.
 
     Args:
-        pid_ip (str): IP address for the controller.
-        pid_port (int): Port number for the socket connection.
+        ip (str): IP address for the controller.
+        port (int): Port number for the socket connection.
         verb (bool): Verbose output setting. Defaults to False.
 
     Attributes:
@@ -20,13 +20,13 @@ class PID:
 
     """
 
-    def __init__(self, pid_ip, pid_port, verb=False):
+    def __init__(self, ip, port, verb=False):
         self.verb = verb
         self.hex_freq = '00000'
         self.direction = None
         self.target = 0
         # Need to setup connection before setting direction
-        self.conn = self._establish_connection(pid_ip, int(pid_port))
+        self.conn = self._establish_connection(ip, int(port))
         self.set_direction('0')
 
     @staticmethod

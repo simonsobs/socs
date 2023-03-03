@@ -24,8 +24,8 @@ An example site-config-file block::
 
       {'agent-class': 'HWPPMXAgent',
        'instance-id': 'hwp-pmx',
-       'arguments': [['--kikusui-ip', '10.10.10.100'],
-                     ['--kikusui-port', '2000'],
+       'arguments': [['--ip', '10.10.10.100'],
+                     ['--port', '5025'],
                      ['--mode', 'acq'],
                      ['--sampling-frequency', 1],]},
 
