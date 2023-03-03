@@ -34,6 +34,11 @@ class TimingMasterAgent:
         agent.register_feed('diagnostics', record=True)
     
     def run(self, session, params):
+        """run()
+        
+        **Process** -- Main loop for the timing master. This queries diagnostic
+        PVs and publishes data.
+        """
         pacemaker = Pacemaker(1./self.sleep_time)
         session.set_status('running')
         while session.status in ['starting', 'running']:
