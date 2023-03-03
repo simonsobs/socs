@@ -1,5 +1,6 @@
 import time
-from socket import socket, SOCK_STREAM, AF_INET
+from socket import AF_INET, SOCK_STREAM, socket
+
 
 class PMX:
     """The PMX object for communicating with the Kikusui PMX power supplies.
@@ -7,6 +8,7 @@ class PMX:
         tcp_ip (str): TCP IP address
         tcp_port (int): TCP port
     """
+
     def __init__(self, ip, port):
         self.sock = socket(AF_INET, SOCK_STREAM)
         self.sock.connect((ip, port))
@@ -25,7 +27,7 @@ class PMX:
         self.sock.sendall(b'output?\n')
         val = int(self.read())
         msg = "Measured output state = "
-        states = {0:'OFF', 1: 'ON'}
+        states = {0: 'OFF', 1: 'ON'}
         if val in states:
             msg += states[val]
         else:

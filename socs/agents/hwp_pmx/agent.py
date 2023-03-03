@@ -6,9 +6,10 @@ import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
-import socs.agents.hwp_rotation.drivers.PMX_ethernet as pmx 
+import socs.agents.hwp_rotation.drivers.PMX_ethernet as pmx
 
 txaio.use_twisted()
+
 
 class PMXAgent:
     """Agent to control the current and voltage that drive the rotation of the CHWP
@@ -16,6 +17,7 @@ class PMXAgent:
         ip (str): IP address for the PMX Kikusui power supply
         port (str): Port for the PMX Kikusui power supply
     """
+
     def __init__(self, agent, ip, port, f_sample=1):
 
         self.agent: ocs_agent.OCSAgent = agent
@@ -173,7 +175,7 @@ class PMXAgent:
              'volt': 0,
              'last_updated': 1649085992.719602}
         """
-        sleep_time = 1/self.f_sample - 0.01
+        sleep_time = 1 / self.f_sample - 0.01
 
         with self.lock.acquire_timeout(0, job='acq') as acquired:
             if not acquired:
@@ -222,6 +224,7 @@ class PMXAgent:
         else:
             return False, 'acq is not currently running'
 
+
 def make_parser(parser=None):
     if parser is None:
         parser = argparse.ArgumentParser()
@@ -252,12 +255,12 @@ def main(args=None):
     elif args.mode == 'acq':
         init_params = {'auto_acquire': True}
 
-    kwargs = {'ip':args.ip, 'port':args.port}
+    kwargs = {'ip': args.ip, 'port': args.port}
     if args.sampling_frequency is not None:
         kwargs['f_sample'] = float(args.sampling_frequency)
     PMX = PMXAgent(agent, **kwargs)
 
-    agent.register_task('init_connection', PMX.init_connection, startup = init_params)
+    agent.register_task('init_connection', PMX.init_connection, startup=init_params)
     agent.register_process('acq', PMX.start_acq, PMX.stop_acq)
     agent.register_task('set_on', PMX.set_on)
     agent.register_task('set_off', PMX.set_off)
