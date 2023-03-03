@@ -49,7 +49,7 @@ Below is an example of the docker-compose service for the timing card agent::
         environment:
             - EPICS_CA_ADDR_LIST=127.255.255.255
             - EPICS_CA_MAX_ARRAY_BYTES=80000000
-            - INSTANCE_ID=timing_card
+            - INSTANCE_ID=smurf_timing_card
 
 Description
 --------------
