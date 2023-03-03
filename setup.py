@@ -45,6 +45,9 @@ smurf_sim_deps = ['so3g']
 # Synaccess Agent
 synacc_deps = ['requests']
 
+# Timing Master Monitor
+timing_master_deps = ['pyepics']
+
 # LATRt XY Stage Agent
 # xy_stage_deps = [
 #     'xy_stage_control @ git+https://github.com/kmharrington/xy_stage_control.git@main',
@@ -110,6 +113,7 @@ setup(
         # 'pysmurf': pysmurf_deps,
         'smurf_sim': smurf_sim_deps,
         'synacc': synacc_deps,
+        'timing_master': timing_master_deps,
         # 'xy_stage': xy_stage_deps,
     },
 )
