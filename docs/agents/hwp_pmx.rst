@@ -1,0 +1,70 @@
+.. highlight:: rst
+
+.. _hwp_pmx:
+
+=============
+HWP PMX Agent
+=============
+
+.. argparse::
+    :filename: ../socs/agents/hwp_pmx/agent.py
+    :func: make_parser
+    :prog: python3 agent.py
+
+Configuration File Examples
+---------------------------
+
+Below are configuration examples for the ocs config file and for running the
+Agent in a docker container.
+
+OCS Site Config
+```````````````
+
+An example site-config-file block::
+
+      {'agent-class': 'HWPPMXAgent',
+       'instance-id': 'hwp-pmx',
+       'arguments': [['--kikusui-ip', '10.10.10.100'],
+                     ['--kikusui-port', '2000'],
+                     ['--mode', 'acq'],
+                     ['--sampling-frequency', 1],]},
+
+Docker Compose
+``````````````
+
+An example docker-compose configuration::
+
+  ocs-hwp-pmx:
+    image: simonsobs/socs:latest
+    hostname: ocs-docker
+    network_mode: "host"
+    environment:
+      - INSTANCE_ID=whp-pmx
+      - SITE_HUB=ws://127.0.0.1:8001/ws
+      - SITE_HTTP=http://127.0.0.1:8001/call
+    volumes:
+      - ${OCS_CONFIG_DIR}:/config:ro
+
+.. note::
+    Since the Agent container needs ``network_mode: "host"``, it must be
+    configured to connect to the crossbar server as if it was on the host
+    system. In this example the crossbar server is running on localhost,
+    ``127.0.0.1``, but on your network this may be different.
+
+Description
+-----------
+
+session.data
+````````````
+The most recent data collected is stored in session.data in the following structure.::
+
+    >>> response.session['data']
+    {'curr': 0,
+     'volt': 0,
+     'last_updated': 1649085992.719602}
+
+Agent API
+---------
+
+.. autoclass:: socs.agents.hwp_pmx.agent.PMXAgent
+    :members:
