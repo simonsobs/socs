@@ -18,9 +18,9 @@ regs_full = {
 }
 
 
-class TimingMasterAgent:
+class SmurfTimingCardAgent:
     """
-    Agent to monitor diagnostic variables for the SMuRF Timing Master.
+    Agent to monitor diagnostic variables for the SMuRF Timing Card.
     """
     def __init__(self, agent, args):
         self.agent = agent
@@ -36,7 +36,7 @@ class TimingMasterAgent:
     def run(self, session, params):
         """run()
         
-        **Process** -- Main loop for the timing master. This queries diagnostic
+        **Process** -- Main loop for the timing card. This queries diagnostic
         PVs and publishes data.
         """
         pacemaker = Pacemaker(1./self.sleep_time)
@@ -81,11 +81,11 @@ def make_parser(parser=None):
 
 def main(args=None):
     parser = make_parser()
-    args = site_config.parse_args("TimingMasterAgent", parser=parser, args=args)
+    args = site_config.parse_args("SmurfTimingCardAgent", parser=parser, args=args)
     txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
     agent, runner = ocs_agent.init_site_agent(args)
-    timing_master = TimingMasterAgent(agent, args)
-    agent.register_process('run', timing_master.run, timing_master._stop, startup=True)
+    timing = SmurfTimingCardAgent(agent, args)
+    agent.register_process('run', timing.run, timing._stop, startup=True)
     runner.run(agent, auto_reconnect=True)
 
 

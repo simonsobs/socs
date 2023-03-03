@@ -66,7 +66,7 @@ API Reference        Full API documentation for core parts of the SOCS library.
     agents/synacc
     agents/tektronix3021c
     agents/thorlabs_mc2000b
-    agents/timing_master
+    agents/smurf_timing_card
     agents/ups
     agents/vantage_pro2
     agents/wiregrid_actuator

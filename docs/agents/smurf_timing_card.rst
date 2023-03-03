@@ -1,15 +1,15 @@
 .. highlight:: rst
 
-.. _timing_master:
+.. _smurf_timing_card:
 
-====================
-Timing Master Agent
-====================
-The Timing Master Agent monitors several diagnostic EPICS registers from SLAC's
+========================
+Smurf Timing Card Agent
+========================
+The Smurf Timing Card Agent monitors several diagnostic EPICS registers from SLAC's
 timing software.
 
 .. argparse::
-    :filename: ../socs/agents/timing_master/agent.py
+    :filename: ../socs/agents/smurf_timing_card/agent.py
     :func: make_parser
     :prog: python3 agent.py
 
@@ -23,8 +23,8 @@ OCS Site Config
 Below is an example of an agent configuration block for the ocs-site-config
 file::
 
-    {'agent-class': 'TimingMasterAgent',
-     'instance-id': 'timing_master',
+    {'agent-class': 'SmurfTimingCardAgent',
+     'instance-id': 'smurf_timing_card',
      'arguments': [
         '--timeout', 3,
         '--sleep-time', 30,
@@ -36,26 +36,26 @@ False by default.
 
 Docker Compose
 ````````````````
-Below is an example of the docker-compose service for the timing master agent::
+Below is an example of the docker-compose service for the timing card agent::
 
-    ocs-timing-master-agent:
+    ocs-timing-card-agent:
         image: socs
         <<: *log-options
         network_mode: host
         hostname: ocs-docker
-        container_name: ocs-timing-master-agent
+        container_name: ocs-timing-card-agent
         volumes:
             - ${OCS_CONFIG_DIR}:/config
         environment:
             - EPICS_CA_ADDR_LIST=127.255.255.255
             - EPICS_CA_MAX_ARRAY_BYTES=80000000
-            - INSTANCE_ID=timing_master
+            - INSTANCE_ID=timing_card
 
 Description
 --------------
 
 This agent uses EPICS to monitor several diagnostic registers of the SMuRF
-timing master software. More detail on the TPG PVs can be found `here`_ if
+timing card software. More detail on the TPG PVs can be found `here`_ if
 you have access to the SLAC confluence.
 
 .. _here: https://confluence.slac.stanford.edu/display/~khkim/PV+List+for+TPG+ioc
@@ -87,5 +87,5 @@ confluence page) are:
 
 Agent API
 -----------
-.. autoclass:: socs.agents.timing_master.agent.TimingMasterAgent
+.. autoclass:: socs.agents.smurf_timing_card.agent.SmurfTimingCardAgent
     :members:
