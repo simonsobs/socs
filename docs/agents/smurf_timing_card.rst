@@ -39,7 +39,7 @@ Docker Compose
 Below is an example of the docker-compose service for the timing card agent::
 
     ocs-timing-card-agent:
-        image: socs
+        image: simonsobs/socs:latest
         <<: *log-options
         network_mode: host
         hostname: ocs-docker
