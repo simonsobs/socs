@@ -7,6 +7,7 @@ from twisted.internet import reactor
 
 import socs.agents.hwp_rotation.drivers.pid_controller as pd
 
+
 class HWPPID:
     """Agent to PID control the rotation speed of the CHWP
 
@@ -26,7 +27,7 @@ class HWPPID:
         self.pid_ip = pid_ip
         self.pid_port = pid_port
         self._pid_verbosity = pid_verbosity > 0
-        #self.pid = None  # PID object for pid controller commanding
+        # self.pid = None  # PID object for pid controller commanding
 
         agg_params = {'frame_length': 60}
         self.agent.register_feed(
@@ -355,8 +356,8 @@ def main(args=None):
 
     agent, runner = ocs_agent.init_site_agent(args)
     hwppid_agent = HWPPID(agent, pid_ip=args.pid_ip,
-                                 pid_port=args.pid_port,
-                                 pid_verbosity=args.verbose)
+                          pid_port=args.pid_port,
+                          pid_verbosity=args.verbose)
     agent.register_task('init_connection', hwppid_agent.init_connection,
                         startup=init_params)
     agent.register_process('acq', hwppid_agent.acq,

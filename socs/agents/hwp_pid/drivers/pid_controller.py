@@ -314,7 +314,7 @@ class PID:
     def _decode_read(string):
         read_type = string[1:3]
         if read_type == '01':
-            self.target = float(int(string[4:], 16)/1000.)
+            self.target = float(int(string[4:], 16) / 1000.)
             return 'Setpoint = ' + str(self.target)
         # Decode direction
         if read_type == '02':
