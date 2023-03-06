@@ -1468,68 +1468,84 @@ class ACUAgent:
         with self.azel_lock.acquire_timeout(0, job='generate_scan') as acquired:
             if not acquired:
                 return False, f"Operation failed: {self.azel_lock.job} is running."
-            session.set_status('running')
-            while session.status == 'running':
-                if azonly:
-                    yield self.acu_control.azmode('ProgramTrack')
-                else:
-                    yield self.acu_control.mode('ProgramTrack')
+            if session.status not in ['starting', 'running']:
+                return False, "Operation aborted before motion began."
 
-                self.data['uploads']['Command_Type'] = 2
-                yield dsleep(0.5)
+            session.set_status('running')
+
+            if azonly:
+                yield self.acu_control.azmode('ProgramTrack')
+            else:
+                yield self.acu_control.mode('ProgramTrack')
+
+            self.data['uploads']['Command_Type'] = 2
+            yield dsleep(0.5)
+
+            # Values for mode are:
+            # - 'go' -- keep uploading points until trajectory is complete
+            # - 'stop' -- do not request more points from generator; finish the ones you have.
+            # - 'abort' -- do not upload more points; exit loop and clear stack.
+            mode = 'go'
+
+            lines = []
+            last_mode = None
+            last_time = 0
+
+            while True:
                 current_modes = {'Az': self.data['status']['summary']['Azimuth_mode'],
                                  'El': self.data['status']['summary']['Elevation_mode'],
                                  'Remote': self.data['status']['platform_status']['Remote_mode']}
-                while current_modes['Az'] == 'ProgramTrack':
+                free_positions = self.data['status']['summary']['Free_upload_positions']
+
+                if last_mode != mode or time.time() - last_time > 1:
+                    print(f'scan mode={mode}, line_buffer={len(lines)}, track_free={free_positions}')
+                    last_mode = mode
+                    last_time = time.time()
+
+                if mode != 'abort':
+                    # Reasons we might decide to abort ...
+                    if current_modes['Az'] != 'ProgramTrack':
+                        self.log.warn('Unexpected mode transition!')
+                        mode = 'abort'
                     if current_modes['Remote'] == 0:
-                        self.log.warn('ACU no longer in remote mode')
+                        self.log.warn('ACU no longer in remote mode!')
+                        mode = 'abort'
+                    if session.status == 'stopping':
+                        mode = 'abort'
+
+                if mode == 'abort':
+                    lines = []
+
+                while mode == 'go' and len(lines) < 10:
                     try:
-                        lines = next(g)
+                        lines.extend(next(g))
                     except StopIteration:
-                        break
+                        mode = 'stop'
 
-                    current_lines = lines
+                if len(lines) and free_positions > FULL_STACK - 10:
                     group_size = int(scan_upload_len_pts)
-                    while len(current_lines):
-                        current_modes = {'Az': self.data['status']['summary']['Azimuth_mode'],
-                                         'El': self.data['status']['summary']['Elevation_mode'],
-                                         'Remote': self.data['status']['platform_status']['Remote_mode']}
-                        upload_lines = current_lines[:group_size]
-                        # for u in range(len(upload_lines)):
-                        #     self.data['uploads']['PtStack_Time'] = upload_lines[u].split(';')[0]
-                        #     self.data['uploads']['PtStack_Azimuth'] = float(upload_lines[u].split(';')[1])
-                        #     self.data['uploads']['PtStack_Elevation'] = float(upload_lines[u].split(';')[2])
-                #             self.data['uploads']['PtStack_AzVelocity'] = float(upload_lines[u].split(';')[3])
-                #             self.data['uploads']['PtStack_ElVelocity'] = float(upload_lines[u].split(';')[4])
-                #             self.data['uploads']['PtStack_AzFlag'] = int(upload_lines[u].split(';')[5])
-                #             self.data['uploads']['PtStack_ElFlag'] = int(upload_lines[u].split(';')[6].strip())
-                #             self.data['uploads']['PtStack_ctime'] = uploadtime_to_ctime(self.data['uploads']['PtStack_Time'], int(self.data['status']['summary']['Year']))
-                #             acu_upload = {'timestamp': self.data['uploads']['PtStack_ctime'],
-                #                           'block_name': 'ACU_upload',
-                #                           'data': self.data['uploads']}
-                #             self.agent.publish_to_feed('acu_upload', acu_upload, from_reactor=True)
-                        text = ''.join(upload_lines)
-                        current_lines = current_lines[group_size:]
-                        free_positions = self.data['status']['summary']['Free_upload_positions']
-                        while free_positions < 10000 - 10:  # - scan_upload_len_pts:
-                            yield dsleep(0.1)
-                            free_positions = self.data['status']['summary']['Free_upload_positions']
-    #                    print(text)
-                        yield self.acu_control.http.UploadPtStack(text)
+                    lines, upload_lines = lines[group_size:], lines[:group_size]
+                    # for u in range(len(upload_lines)):
+                    #     self.data['uploads']['PtStack_Time'] = upload_lines[u].split(';')[0]
+                    #     self.data['uploads']['PtStack_Azimuth'] = float(upload_lines[u].split(';')[1])
+                    #     self.data['uploads']['PtStack_Elevation'] = float(upload_lines[u].split(';')[2])
+                    #     self.data['uploads']['PtStack_AzVelocity'] = float(upload_lines[u].split(';')[3])
+                    #     self.data['uploads']['PtStack_ElVelocity'] = float(upload_lines[u].split(';')[4])
+                    #     self.data['uploads']['PtStack_AzFlag'] = int(upload_lines[u].split(';')[5])
+                    #     self.data['uploads']['PtStack_ElFlag'] = int(upload_lines[u].split(';')[6].strip())
+                    #     self.data['uploads']['PtStack_ctime'] = uploadtime_to_ctime(self.data['uploads']['PtStack_Time'], int(self.data['status']['summary']['Year']))
+                    #     acu_upload = {'timestamp': self.data['uploads']['PtStack_ctime'],
+                    #                   'block_name': 'ACU_upload',
+                    #                   'data': self.data['uploads']}
+                    #     self.agent.publish_to_feed('acu_upload', acu_upload, from_reactor=True)
+                    text = ''.join(upload_lines)
+                    yield self.acu_control.http.UploadPtStack(text)
 
-                self.log.info('All points uploaded, waiting for stack to clear.')
+                if len(lines) == 0 and free_positions >= FULL_STACK - 1:
+                    break
 
-                # Wait at least 1 second before reading the free positions, to
-                # make sure its updated.
-                free_positions = 0
-                while free_positions < FULL_STACK - 1:
-                    yield dsleep(1)
-                    free_positions = self.data['status']['summary']['Free_upload_positions']
-                    self.log.info(f'There are {FULL_STACK - free_positions} track points remaining.')
-                    # todo: Should also watch for mode change, here, to exit cleanly...
+                yield dsleep(.1)
 
-                self.log.info('The track should now be completed.')
-                break  # so why am I in a loop?
             # Go to Stop mode?
             # yield self.acu_control.stop()
 
@@ -1555,7 +1571,6 @@ class ACUAgent:
         #               'data': self.data['uploads']
         #               }
         # self.agent.publish_to_feed('acu_upload', acu_upload)
-        session.set_status('stopping')
         return True, 'Track ended cleanly'
 
 
