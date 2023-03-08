@@ -1398,8 +1398,20 @@ class ACUAgent:
                 the scan and start with increasing azimuth), 'mid_dec' (start in
                 the middle of the scan and start with decreasing azimuth).
             scan_upload_length (float): number of seconds for each set of uploaded
-                points. Default value is 10.0.
+                points. Default value is 5.  Larger values here mean
+                that stopping the scan will take longer, as we must
+                wait for the stack to empty.
+
         """
+        # The approximate loop time
+        LOOP_STEP = 0.1  # seconds
+
+        # Minimum number of points to have in the stack.  While the
+        # docs strictly require 4, this number should be at least 1
+        # more than that to allow for rounding when we are setting the
+        # refill threshold.
+        MIN_STACK_POP = 6  # points
+
         bcast_check = yield self._check_daq_streams('broadcast')
         monitor_check = yield self._check_daq_streams('monitor')
         if not bcast_check or not monitor_check:
@@ -1411,7 +1423,7 @@ class ACUAgent:
         acc = params.get('acc')
         el_endpoint1 = params.get('el_endpoint1')
         azonly = params.get('azonly', True)
-        scan_upload_len = params.get('scan_upload_length', 10.0)
+        scan_upload_len = params.get('scan_upload_length', 5.0)
         scan_params = {k: params.get(k) for k in [
             'num_scans', 'num_batches', 'start_time',
             'wait_to_start', 'step_time', 'batch_size', 'ramp_up', 'az_start']
@@ -1436,12 +1448,6 @@ class ACUAgent:
         # print(plan)
         # print(info)
 
-        if 'step_time' in scan_params:
-            step_time = scan_params['step_time']
-        else:
-            step_time = 1.0
-        scan_upload_len_pts = scan_upload_len / step_time
-
         # go_to_params = {'az': plan['az_startpoint'],
         #                'el': plan['el'],
         #                'azonly': False,
@@ -1456,6 +1462,17 @@ class ACUAgent:
         # yield self.go_to(session=session, params=go_to_params)
         # self.agent.start('go_to', go_to_params)
         # self.log.info('Finished go_to, generating scan points')
+
+        if 'step_time' in scan_params:
+            step_time = scan_params['step_time']
+        else:
+            step_time = 1.0
+        scan_upload_len_pts = scan_upload_len / step_time
+
+        STACK_REFILL_THRESHOLD = FULL_STACK - \
+            max(MIN_STACK_POP + LOOP_STEP / step_time, scan_upload_len_pts)
+        STACK_TARGET = FULL_STACK - \
+            max(MIN_STACK_POP * 2 + LOOP_STEP / step_time, scan_upload_len_pts * 2)
 
         g = sh.generate_constant_velocity_scan(az_endpoint1=az_endpoint1,
                                                az_endpoint2=az_endpoint2,
@@ -1516,14 +1533,15 @@ class ACUAgent:
                 if mode == 'abort':
                     lines = []
 
-                while mode == 'go' and len(lines) < 10:
+                while mode == 'go' and len(lines) < 100:
                     try:
                         lines.extend(next(g))
                     except StopIteration:
                         mode = 'stop'
 
-                if len(lines) and free_positions > FULL_STACK - 10:
-                    group_size = int(scan_upload_len_pts)
+                if len(lines) and free_positions >= STACK_REFILL_THRESHOLD:
+
+                    group_size = max(int(free_positions - STACK_TARGET), 1)
                     lines, upload_lines = lines[group_size:], lines[:group_size]
                     # for u in range(len(upload_lines)):
                     #     self.data['uploads']['PtStack_Time'] = upload_lines[u].split(';')[0]
@@ -1544,7 +1562,7 @@ class ACUAgent:
                 if len(lines) == 0 and free_positions >= FULL_STACK - 1:
                     break
 
-                yield dsleep(.1)
+                yield dsleep(LOOP_STEP)
 
             # Go to Stop mode?
             # yield self.acu_control.stop()
