@@ -1435,38 +1435,26 @@ class ACUAgent:
             self.log.warn('ACU in local mode, cannot perform motion with OCS.')
             return False, 'ACU not in remote mode.'
 
-        # if 'az_start' in scan_params:
-        #     if scan_params['az_start'] in ('mid_inc', 'mid_dec'):
-        #         init = 'mid'
-        #     else:
-        #         init = 'end'
-        # throw = az_endpoint2 - az_endpoint1
+        plan = sh.plan_scan(az_endpoint1, az_endpoint2,
+                            el=el_endpoint1, v_az=az_speed, a_az=acc,
+                            az_start=scan_params.get('az_start'))
+        print(plan)
 
-        # plan, info = sh.plan_scan(az_end1=az_endpoint1, el=el_endpoint1,
-        #                          throw=throw, v_az=az_speed,
-        #                          a_az=acc, init=init)
-        # print(plan)
-        # print(info)
-
-        # go_to_params = {'az': plan['az_startpoint'],
-        #                'el': plan['el'],
-        #                'azonly': False,
-        #                'end_stop': False,
-        #                'wait': 1,
-        #                'rounding': 2}
+        self.log.info(f'Moving to start position, az={plan["init_az"]}')
+        ok, msg = yield self._go_to_axis(session, 'Azimuth', plan['init_az'])
+        if not ok:
+            return False, f'Start position seek failed with message: {msg}'
 
         yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
                                             'Clear Stack')
 
-        # self.log.info('Running go_to in generate_scan')
-        # yield self.go_to(session=session, params=go_to_params)
-        # self.agent.start('go_to', go_to_params)
-        # self.log.info('Finished go_to, generating scan points')
+        # Use the plan to set scan upload parameters.
+        if scan_params.get('step_time') is None:
+            scan_params['step_time'] = plan['step_time']
+        if scan_params.get('wait_to_start') is None:
+            scan_params['wait_to_start'] = plan['wait_to_start']
 
-        if 'step_time' in scan_params:
-            step_time = scan_params['step_time']
-        else:
-            step_time = 1.0
+        step_time = scan_params['step_time']
         scan_upload_len_pts = scan_upload_len / step_time
 
         STACK_REFILL_THRESHOLD = FULL_STACK - \
@@ -1480,7 +1468,7 @@ class ACUAgent:
                                                el_endpoint1=el_endpoint1,
                                                el_endpoint2=el_endpoint2,
                                                el_speed=el_speed,
-                                               # ramp_up=plan['ramp_up'],
+                                               ramp_up=plan['ramp_up'],
                                                **scan_params)
         with self.azel_lock.acquire_timeout(0, job='generate_scan') as acquired:
             if not acquired:
@@ -1506,7 +1494,6 @@ class ACUAgent:
 
             lines = []
             last_mode = None
-            last_time = 0
 
             while True:
                 current_modes = {'Az': self.data['status']['summary']['Azimuth_mode'],
@@ -1514,10 +1501,9 @@ class ACUAgent:
                                  'Remote': self.data['status']['platform_status']['Remote_mode']}
                 free_positions = self.data['status']['summary']['Free_upload_positions']
 
-                if last_mode != mode or time.time() - last_time > 1:
-                    print(f'scan mode={mode}, line_buffer={len(lines)}, track_free={free_positions}')
+                if last_mode != mode:
+                    self.log.info(f'scan mode={mode}, line_buffer={len(lines)}, track_free={free_positions}')
                     last_mode = mode
-                    last_time = time.time()
 
                 if mode != 'abort':
                     # Reasons we might decide to abort ...

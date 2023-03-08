@@ -260,11 +260,10 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
 
     # Bias the starting point for the first leg?
     if ramp_up is not None:
-        #        if increasing:
-        #            az -= ramp_up
-        #        else:
-        #            az += ramp_up
-        az -= ramp_up
+        if increasing:
+            az -= ramp_up
+        else:
+            az += ramp_up
 
     if start_time is None:
         t0 = time.time() + wait_to_start
@@ -380,56 +379,53 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                    point_block[6])
 
 
-def plan_scan(az_end1, el, throw, v_az=1, a_az=1, init='end', num_scans=1):
-    """
-    Calculate how far in advance you need to ramp into a scan.
-    """
-    plan = {
-        'az_endpoint1': az_end1,
-        'el': el,
-        'throw': throw,
-        'v_az': v_az,
-        'a_az': a_az,
-        'init': init,
-        'az_startpoint': az_end1,
-        'num_scans': num_scans,
-    }
+def plan_scan(az_end1, az_end2, el, v_az=1, a_az=1, az_start=None):
+    """Determine some important parameters for running a ProgramTrack
+    scan with the desired end points, velocity, and mean turn-around
+    acceleration.
 
-    info = {}
+    """
+    # Convert Agent-friendly arguments to az/throw/init
+    if az_start in [None, 'mid', 'mid_inc', 'mid_dec']:
+        init = 'mid'
+    else:
+        init = 'end'
+    az = (az_end1 + az_end2) / 2
+    throw = (az_end2 - az_end1) / 2
 
-    # point separation
+    # Info to pass back.
+    plan = {}
+
+    # Point time separation: at least 5 points per leg, preferably 10.
     dt = 2 * abs(throw / v_az) / 10
     dt = min(max(dt, 0.1), 1.0)
     assert (2 * abs(throw / v_az) / dt >= 5)
     plan['step_time'] = dt
+
+    # Turn around prep distance? 5 point periods, times the vel.
     az_prep = 5 * dt * v_az
-    a_max = 1.
-    az_rampup = v_az**2 / a_max
-    info['az_prep'] = az_prep
-    info['az_ramp_dist'] = az_rampup
-#    if init == 'mid':
-    ramp_val = az_prep + az_rampup - abs(throw)
-    ramp_up = np.sign(throw) * max(abs(ramp_val), 0)
-#    elif init == 'end':
-#        ramp_up = max(az_prep + az_rampup - 2 * abs(throw), 0)
-#    else:
-#        raise
+
+    # Ramp-up distance needed
+    a0 = 1.  # Peak accel of ramp-up...
+    az_rampup = v_az**2 / a0
+    plan['az_prep'] = az_prep
+    plan['az_rampup'] = az_rampup
+
+    # Any az ramp-up prep required?
+    if init == 'mid':
+        ramp_up = max(az_prep + az_rampup - abs(throw), 0)
+    elif init == 'end':
+        ramp_up = max(az_prep + az_rampup - 2 * abs(throw), 0)
     plan['ramp_up'] = ramp_up
-    pre_time = v_az / a_max
-    plan['wait_to_start'] = max(5, pre_time * 1.2)
-    info['pre_time'] = pre_time
 
-    plan['az_startpoint'] = az_end1 - math.copysign(ramp_up, throw)
-#    if init == 'end':
-#        if throw <= 5:
-#            plan['az_startpoint'] -= throw
+    # Set wait time (this comes out a little lower than its supposed to...)
+    # plan['wait_time'] = v_az / a0 * 2
+    plan['pre_time'] = v_az / a0
+    plan['wait_to_start'] = max(5, plan['pre_time'] * 1.2)
 
-    info['total_time'] = (num_scans * (2 * abs(throw) / v_az + 2 * v_az / a_az)
-                          + ramp_up / v_az * 2
-                          + plan['wait_to_start'])
+    # Fill out some other useful info...
+    plan['init_az'] = az - math.copysign(ramp_up, throw)
+    if init == 'end':
+        plan['init_az'] -= throw
 
-    return plan, info
-# if __name__ == "__main__":
-#    print(time.time())
-#    times, azs, els, vas, ves, azf, elf = linear_turnaround_scanpoints((120., 130.), 55., 1., 4, 2000)
-#    print(time.time())
+    return plan
