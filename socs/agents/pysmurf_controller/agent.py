@@ -560,7 +560,7 @@ class PysmurfController:
         tag : Optional[str]
             String containing a tag or comma-separated list of tags to attach
             to the g3 stream.
-            
+
 
         Notes
         -------
