@@ -57,7 +57,7 @@ timing_master_deps = ['pyepics']
 # all_deps = acu_deps + labjack_deps + magpie_deps + pfeiffer_deps + \
 #    pysmurf_deps + smurf_sim_deps + synacc_deps + xy_stage_deps
 all_deps = labjack_deps + magpie_deps + pfeiffer_deps + \
-    smurf_sim_deps + synacc_deps
+    smurf_sim_deps + synacc_deps + timing_master_deps
 all_deps = list(set(all_deps))
 
 setup(
