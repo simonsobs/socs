@@ -1,27 +1,73 @@
 import numpy as np
+import requests
 from numpy import random
 import os
 from os import environ
+import datetime
+import time
 
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
-from twisted.internet.defer import inlineCallbacks
-from autobahn.twisted.util import sleep as dsleep
+#from twisted.internet.defer import inlineCallbacks
+#from autobahn.twisted.util import sleep as dsleep
 import argparse
 import txaio
 
 # temporary until Agent is updated to read from API
-from api.pwv_web import read_data_from_textfile
+#from api.pwv_web import read_data_from_textfile
 
-# For logging
-txaio.use_twisted()
-LOG = txaio.make_logger()
+def _julian_day_year_to_unixtime(day, year):
+    """
+    Convert water vapor radiometer's output Julian Day to unix timestamp.
+
+    Args:
+        day (float): day of the year
+        year (int):  year for the corresponding Julian Day
+    """
+    a = datetime.datetime(year, 1, 1) + datetime.timedelta(day-1)
+    unixtime = time.mktime(a.timetuple())
+
+    return unixtime
 
 
-class PWV_Agent:
-    def __init__(self, agent, filename, year):
+def read_data_from_textfile(filename, year):
+    """Read the UCSC PWV data files.
+
+    Args:
+        filename (str): Path to file
+        year (int): Year the data is from
+
+    Returns:
+        tuple: (pwv, timestamp)
+
+    """
+    with open(filename, 'r') as f:
+        i = 0
+        for l in f.readlines():
+            if i == 0:
+                pass  # skip header
+            else:
+                line = l.strip().split()
+                timestamp = _julian_day_year_to_unixtime(float(line[0]), year)
+
+                pwv = float(line[1])
+
+                _data = (pwv, timestamp)
+
+            i += 1
+        return _data
+
+class PWVAgent:
+    """Monitor the PWV flask server.
+
+    Parameters
+    ----------
+    address (str): address to the pwv web api on the network
+    year (int): year for the corresponding Julian Day
+    """
+    def __init__(self, agent, url, year):
         self.agent = agent
-        self.filename = filename
+        self.url = url
         self.year = year
 
         self.active = True
@@ -40,18 +86,21 @@ class PWV_Agent:
                                  )
 
         self.last_published_reading = None
-
-    def start_acq(self, filename, year):
+    
+    def start_acq(self, session, params=None):
         """
         PROCESS: Acquire data and write to feed
 
         Args:
-            filename (str): name of PWV text file
+            address (str): address to the pwv web api on the network
             year (int): year for the corresponding Julian Day
 
         """
         while True:
-            last_pwv, last_timestamp = read_data_from_textfile(self.filename, self.year)
+            r = requests.get(self.url)
+            data= r.json()
+            last_pwv = data['pwv']
+            last_timestamp = data['timestamp']
 
             pwvs = {'block_name': 'pwvs',
                     'timestamp': last_timestamp,
@@ -66,7 +115,7 @@ class PWV_Agent:
                 self.agent.publish_to_feed('pwvs', pwvs)
                 self.last_published_reading = (last_pwv, last_timestamp)
 
-    def stop_acq(self):
+    def _stop_acq(self):
         ok = False
         with self.lock:
             if self.job == 'acq':
@@ -77,23 +126,32 @@ class PWV_Agent:
 
 def add_agent_args(parser_in=None):
     if parser_in is None:
-        parser_in = argparse.ArgumentParser()
+        from argparse import ArgumentParser as A
+        parser_in = A()
     pgroup = parser_in.add_argument_group('Agent Options')
-    pgroup.add_argument("--textfile", type=str, help="Filename for PWV textfile")
-    pgroup.add_argument("--year", type=int, help="Year for Julian Day in textfile")
+    pgroup.add_argument("--url", type=str, help="url for PWV flask server")
+    pgroup.add_argument("--year", type=int, help="year for Julian Day PWV measurement")
     return parser_in
 
+def main(args=None):
+    # For logging
+    txaio.use_twisted()
+    txaio.make_logger()
 
-if __name__ == "__main__":
-    # Start logging
-    txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
-
+    txaio.start_logging(level=environ.get("LOGLEVEL", "info"))
+    
     parser = add_agent_args()
-    args = site_config.parse_args(agent_class='PWV_Agent', parser=parser)
+    args = site_config.parse_args(agent_class='PWVAgent', parser=parser)
 
     agent, runner = ocs_agent.init_site_agent(args)
-    pwv_agent = PWV_Agent(agent, args.textfile, args.year)
+    pwv_agent = PWVAgent(agent, args.url, args.year)
 
-    agent.register_process('acq', pwv_agent.start_acq, pwv_agent.stop_acq, startup=True)
+    agent.register_process('acq', pwv_agent.start_acq, pwv_agent._stop_acq, startup=True)
 
     runner.run(agent, auto_reconnect=True)
+
+if __name__ == "__main__":
+    main()
+
+# TODO: add docstrings to class for parameters
+# TODO: add test mode to acq process

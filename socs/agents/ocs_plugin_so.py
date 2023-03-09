@@ -33,6 +33,7 @@ for n, f in [
         ('PfeifferTC400Agent', 'pfeiffer_tc400/agent.py'),
         ('PysmurfController', 'pysmurf_controller/agent.py'),
         ('PysmurfMonitor', 'pysmurf_monitor/agent.py'),
+        ('PWVAgent', 'pwv_agent/agent.py'),
         ('RotationAgent', 'hwp_rotation/agent.py'),
         ('ScpiPsuAgent', 'scpi_psu/agent.py'),
         ('SmurfFileEmulator', 'smurf_file_emulator/agent.py'),
