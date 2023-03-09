@@ -1,7 +1,6 @@
 # Built-in python modules
 import numpy as np
 
-
 class Gripper:
     """
     The Gripper object is used to control the gripper motors
@@ -9,7 +8,6 @@ class Gripper:
     Args:
     control (src.Control): Control object
     """
-
     def __init__(self, control):
         self.CTL = control
 
@@ -132,6 +130,7 @@ class Gripper:
             print(
                 "RESET aborted in Gripper.RESET() due to unknown alarm group")
             return False
+
         if not self.ALARM():
             print("Alarm successfully reset")
             return True
@@ -173,11 +172,11 @@ class Gripper:
                 return None
             # Loop over steps to construct move from largest to smallest
             for k in list(steps_to_check.keys())[::-1]:
-                move_step = float(steps_to_check[k][axis_no - 1])
+                move_step = float(steps_to_check[k][axis_no-1])
                 if np.round(move_step, decimals=1) == 0.0:
                     continue
                 try:
-                    div = np.round(float(d) / move_step, decimals=1)
+                    div = np.round(float(d)/move_step, decimals=1)
                 except ZeroDivisionError:
                     continue
                 if div >= 1.0:
