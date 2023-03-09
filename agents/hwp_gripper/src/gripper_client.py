@@ -1,6 +1,7 @@
-import socket
 import errno
 import select
+import socket
+
 
 class GripperClient(object):
     def __init__(self, ip, send_port, recv_port):
@@ -33,7 +34,7 @@ class GripperClient(object):
                 pass
 
         if len(self.data) > 0:
-            return_data =  self.data
+            return_data = self.data
             self.data = b''
             return return_data
         else:
@@ -42,4 +43,3 @@ class GripperClient(object):
     def __exit__(self):
         self._s_send.close()
         self._s_recv.close()
-

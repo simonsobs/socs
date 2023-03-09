@@ -1,10 +1,11 @@
-import multiprocessing
-import socket
-import signal
-import select
 import ctypes
-import time
 import errno
+import multiprocessing
+import select
+import signal
+import socket
+import time
+
 
 class GripperCollector(object):
     def __init__(self, pru_port):
@@ -15,7 +16,7 @@ class GripperCollector(object):
         self._s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self._s.setblocking(False)
         self._s.bind(("", pru_port))
-        
+
         self._data = b''
         self._timeout_sec = 1
 
@@ -24,8 +25,8 @@ class GripperCollector(object):
 
         self.queue = multiprocessing.Queue()
         self._process = multiprocessing.Process(
-                target = self.relay_gripper_data,
-                args = (self._should_stop, self._stopped))
+            target=self.relay_gripper_data,
+            args=(self._should_stop, self._stopped))
         self._process.start()
 
         signal.signal(signal.SIGINT, self.sigint_handler_parent)
@@ -54,7 +55,7 @@ class GripperCollector(object):
                     pass
 
             if len(self._data) > 0:
-                self.queue.put(obj = self._data, block = True, timeout = None)
+                self.queue.put(obj=self._data, block=True, timeout=None)
                 self._data = b''
 
         with stopped.get_lock():
