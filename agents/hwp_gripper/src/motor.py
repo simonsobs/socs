@@ -5,8 +5,7 @@ class Motor:
     Args:
     name (str): motor name (default "Unnamed Motor")
     """
-
-    def __init__(self, name='Unnamed Motor'):
+    def __init__(self, name = 'Unnamed Motor'):
         self.name = name
 
         self.is_home = False  # is homed

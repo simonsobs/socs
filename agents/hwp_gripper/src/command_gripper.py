@@ -1,7 +1,6 @@
 # Built-in python modules
 import sys as sy
 
-
 class Command:
     def __init__(self, GPR=None):
         """
@@ -24,25 +23,25 @@ class Command:
         if cmd == 'HELP':
             self._help()
         elif cmd == 'ON':
-            self.GPR.ON()
+            return self.GPR.ON()
         elif cmd == 'OFF':
-            self.GPR.OFF()
+            return self.GPR.OFF()
         elif cmd == 'BRAKE':
-            self._brake(args)
+            return self._brake(args)
         elif cmd == 'EMG':
-            self._emg(args)
+            return self._emg(args)
         elif cmd == 'MOVE':
-            self._move(args)
+            return self._move(args)
         elif cmd == 'HOME':
-            self.GPR.HOME()
+            return self.GPR.HOME()
         elif cmd == 'INP':
-            print(self.GPR.INP())
+            return self.GPR.INP()
         elif cmd == 'ACT':
-            self._act(args)
+            return self._act(args)
         elif cmd == 'ALARM':
-            print(self.GPR.ALARM())
+            return self.GPR.ALARM()
         elif cmd == 'RESET':
-            self.GPR.RESET()
+            return self.GPR.RESET()
         elif cmd == 'STATUS':
             print(self.GPR.STATUS())
         elif cmd == 'EXIT':
@@ -115,9 +114,9 @@ class Command:
                 self.GPR.CTL.BRAKE(state=ON, axis=axis)
         else:
             for i in range(3):
-                self.GPR.CTL.BRAKE(state=ON, axis=i + 1)
+                self.GPR.CTL.BRAKE(state=ON, axis=i+1)
         return True
-
+    
     def _emg(self, args):
         ON = None
         if not (len(args) == 2 or len(args) == 3):
@@ -159,7 +158,7 @@ class Command:
                 self.GPR.CTL.EMG(state=ON, axis=axis)
         else:
             for i in range(3):
-                self.GPR.CTL.EMG(state=ON, axis=i + 1)
+                self.GPR.CTL.EMG(state=ON, axis=i+1)
         return True
 
     def _move(self, args):
@@ -215,3 +214,5 @@ class Command:
                 return False
             result = self.GPR.ACT(axis)
             return result
+
+
