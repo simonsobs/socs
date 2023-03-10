@@ -269,6 +269,7 @@ class HWPPID:
                 >>> response.session['data']
                 {'current_freq': 0,
                  'target_freq': 0,
+                 'direction': 1,
                  'last_updated': 1649085992.719602}
 
         """
@@ -295,15 +296,17 @@ class HWPPID:
                         'block_name': 'HWPPID', 'data': {}}
 
                 current_freq = self.pid.get_freq()
-                target_freq = self.pid.get_target()
 
                 data['data']['current_freq'] = current_freq
-                data['data']['target_freq'] = target_freq
+                data['data']['target_freq'] = self.pid.target
+                data['data']['direction'] = self.pid.direction
+
 
                 self.agent.publish_to_feed('hwppid', data)
 
                 session.data = {'current_freq': current_freq,
                                 'target_freq': target_freq,
+                                'direction': direction,
                                 'last_updated': time.time()}
 
                 time.sleep(1)
