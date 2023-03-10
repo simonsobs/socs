@@ -6,7 +6,7 @@ import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
-import socs.agents.hwp_rotation.drivers.PMX_ethernet as pmx
+import socs.agents.hwp_pmx.drivers.PMX_ethernet as pmx
 
 txaio.use_twisted()
 
