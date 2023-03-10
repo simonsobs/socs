@@ -133,9 +133,10 @@ class PID:
         responses.append(self.send_message("*W01400000"))
         responses.append(self.send_message("*R01"))
         responses.append(self.send_message("*Z02"))
+        messages = self.return_messages(responses)
         if self.verb:
             print(responses)
-            print(self.return_messages(responses))
+            print(messages)
 
         stop_params = [0.2, 0, 0]
         self.set_pid(stop_params)
@@ -154,9 +155,10 @@ class PID:
         responses.append(self.send_message(f"*W014{self.hex_freq}"))
         responses.append(self.send_message("*R01"))
         responses.append(self.send_message("*Z02"))
+        messages = self.return_messages(responses)
         if self.verb:
             print(responses)
-            print(self.return_messages(responses))
+            print(messages)
 
         tune_params = [0.2, 63, 0]
         self.set_pid(tune_params)
@@ -181,8 +183,10 @@ class PID:
 
         responses = []
         responses.append(self.send_message("*R01"))
+        messages = self.return_messages(responses)
         if self.verb:
             print(responses)
+            print(messages)
 
         return self.target
 

@@ -60,6 +60,7 @@ The most recent data collected is stored in session.data in the following struct
     >>> response.session['data']
     {'current_freq': 0,
      'target_freq': 0,
+     'direction': 1,
      'last_updated': 1649085992.719602}
 
 Agent API
