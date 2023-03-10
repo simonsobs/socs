@@ -301,7 +301,6 @@ class HWPPID:
                 data['data']['target_freq'] = self.pid.target
                 data['data']['direction'] = self.pid.direction
 
-
                 self.agent.publish_to_feed('hwppid', data)
 
                 session.data = {'current_freq': current_freq,
