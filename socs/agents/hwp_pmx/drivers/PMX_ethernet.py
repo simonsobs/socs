@@ -23,7 +23,7 @@ class PMX:
         time.sleep(self.wait_time)
 
     def check_output(self):
-        """Return the output status."""
+        """ Return the output status """
         self.sock.sendall(b'output?\n')
         val = int(self.read())
         msg = "Measured output state = "
@@ -35,13 +35,13 @@ class PMX:
         return msg, val
 
     def turn_on(self):
-        """Turn the PMX on."""
+        """ Turn the PMX on """
         self.sock.sendall(b'output 1\n')
         self.wait()
         return self.check_output()
 
     def turn_off(self):
-        """Turn the PMX on."""
+        """ Turn the PMX off """
         self.sock.sendall(b'output 0\n')
         self.wait()
         return self.check_output()
