@@ -296,10 +296,12 @@ class HWPPID:
                         'block_name': 'HWPPID', 'data': {}}
 
                 current_freq = self.pid.get_freq()
+                target_freq = self.pid.target
+                direction = self.pid.direction
 
                 data['data']['current_freq'] = current_freq
-                data['data']['target_freq'] = self.pid.target
-                data['data']['direction'] = self.pid.direction
+                data['data']['target_freq'] = target_freq
+                data['data']['direction'] = direction
 
                 self.agent.publish_to_feed('hwppid', data)
 
