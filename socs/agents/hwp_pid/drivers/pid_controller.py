@@ -314,7 +314,7 @@ class PID:
 
         return output_array
 
-    def _decode_read(string):
+    def _decode_read(self, string):
         read_type = string[1:3]
         if read_type == '01':
             self.target = float(int(string[4:], 16) / 1000.)
