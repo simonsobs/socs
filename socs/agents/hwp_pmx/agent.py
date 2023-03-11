@@ -148,7 +148,7 @@ class PMXAgent:
                 self.log.warn(
                     'Could not use external voltage because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
-            msg = self.dev.use_external_voltage()
+            self.dev.use_external_voltage()
         return True, 'Set PMX Kikusui to PID control'
 
     def ign_ext(self, session, params):
@@ -161,7 +161,7 @@ class PMXAgent:
                 self.log.warn(
                     'Could not ignore external voltage because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
-            msg = self.dev.ign_external_voltage()
+            self.dev.ign_external_voltage()
         return True, 'Set PMX Kikusui to direct control'
 
     def start_acq(self, session, params):
