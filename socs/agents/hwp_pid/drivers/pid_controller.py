@@ -314,7 +314,6 @@ class PID:
 
         return output_array
 
-    @staticmethod
     def _decode_read(string):
         read_type = string[1:3]
         if read_type == '01':
