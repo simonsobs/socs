@@ -182,7 +182,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                                     step_time=1.,
                                     batch_size=500,
                                     az_start='mid_inc',
-                                    ramp_up=None,
+                                    az_first_pos=None,
                                     ptstack_fmt=True):
     """Python generator to produce times, azimuth and elevation positions,
     azimuth and elevation velocities, azimuth and elevation flags for
@@ -219,11 +219,9 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
             'az_endpoint1', 'az_endpoint2', 'mid_inc' (start in the middle of
             the scan and start with increasing azimuth), 'mid_dec' (start in
             the middle of the scan and start with decreasing azimuth).
-        ramp_up (float or None): make the first scan leg longer, by
-            this number of degrees, on the starting end.  This is used
-            to help the servo match the first leg velocity smoothly
-            before it has to start worrying about the first
-            turn-around.
+        az_first_pos (float): If not None, the first az scan will
+            start at this position (but otherwise proceed in the same
+            starting direction).
         ptstack_fmt (bool): determine whether values are produced with the
             necessary format to upload to the ACU. If False, this function will
             produce lists of time, azimuth, elevation, azimuth velocity,
@@ -259,11 +257,8 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                          'az_endpoint1, az_endpoint2, mid_inc, mid_dec')
 
     # Bias the starting point for the first leg?
-    if ramp_up is not None:
-        if increasing:
-            az -= ramp_up
-        else:
-            az += ramp_up
+    if az_first_pos is not None:
+        az = az_first_pos
 
     if start_time is None:
         t0 = time.time() + wait_to_start
@@ -384,6 +379,41 @@ def plan_scan(az_end1, az_end2, el, v_az=1, a_az=1, az_start=None):
     scan with the desired end points, velocity, and mean turn-around
     acceleration.
 
+    These get complicated in the limit of high velocity and narrow
+    scan.
+
+    Returns:
+
+      A dict with outputs of the calculations.  The following items
+      must be considered when generating and posting the track points:
+
+      - 'step_time': The recommended track point separation, in
+        seconds.
+      - 'wait_to_start': The minimum time (s) between initiating
+        ProgramTrack mode and the first uploaded point's timestamp.
+      - 'init_az': The az (deg) at which to position the telescope
+        before beginning the scan.  This takes into account any "ramp
+        up" that needs to occur and the fact that such ramp up needs
+        to be finished before the ACU starts profiling the first
+        turn-around.
+
+      The following dict items provide additional detail /
+      intermediate results:
+
+      - 'scan_start_buffer': Minimum amount (deg of az) by which to
+        shift the start of the first scan leg in order to satisfy the
+        requirements for az_prep and az_rampup.  This ultimately is
+        what can make init_az different from the natural first leg
+        starting point.  This parameter is always non-negative.
+      - 'turnprep_buffer': Minimum azimuth travel required for
+        ProgramTrack to prepare a turn-around.
+      - 'rampup_buffer': Minimum azimuth travel required for
+        ProgramTrack to ramp up to the first leg velocity.  Degrees,
+        positive.
+      - 'rampup_time': Number of seconds before the first track point
+        where the platform could start moving (as part of smooth
+        acceleration into the initial velocity).
+
     """
     # Convert Agent-friendly arguments to az/throw/init
     if az_start in [None, 'mid', 'mid_inc', 'mid_dec']:
@@ -402,29 +432,29 @@ def plan_scan(az_end1, az_end2, el, v_az=1, a_az=1, az_start=None):
     assert (2 * abs(throw / v_az) / dt >= 5)
     plan['step_time'] = dt
 
-    # Turn around prep distance? 5 point periods, times the vel.
-    az_prep = 5 * dt * v_az
+    # Turn around prep distance (deg)? 5 point periods, times the vel.
+    turnprep_buffer = 5 * dt * v_az
 
     # Ramp-up distance needed
     a0 = 1.  # Peak accel of ramp-up...
-    az_rampup = v_az**2 / a0
-    plan['az_prep'] = az_prep
-    plan['az_rampup'] = az_rampup
+    rampup_buffer = v_az**2 / a0
+    plan['turnprep_buffer'] = turnprep_buffer
+    plan['rampup_buffer'] = rampup_buffer
 
     # Any az ramp-up prep required?
     if init == 'mid':
-        ramp_up = max(az_prep + az_rampup - abs(throw), 0)
+        scan_start_buffer = max(turnprep_buffer + rampup_buffer - abs(throw), 0)
     elif init == 'end':
-        ramp_up = max(az_prep + az_rampup - 2 * abs(throw), 0)
-    plan['ramp_up'] = ramp_up
+        scan_start_buffer = max(turnprep_buffer + rampup_buffer - 2 * abs(throw), 0)
+    plan['scan_start_buffer'] = scan_start_buffer
 
     # Set wait time (this comes out a little lower than its supposed to...)
     # plan['wait_time'] = v_az / a0 * 2
-    plan['pre_time'] = v_az / a0
-    plan['wait_to_start'] = max(5, plan['pre_time'] * 1.2)
+    plan['rampup_time'] = v_az / a0
+    plan['wait_to_start'] = max(5, plan['rampup_time'] * 1.2)
 
     # Fill out some other useful info...
-    plan['init_az'] = az - math.copysign(ramp_up, throw)
+    plan['init_az'] = az - math.copysign(scan_start_buffer, throw)
     if init == 'end':
         plan['init_az'] -= throw
 

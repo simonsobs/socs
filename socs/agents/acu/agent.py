@@ -1426,7 +1426,7 @@ class ACUAgent:
         scan_upload_len = params.get('scan_upload_length', 5.0)
         scan_params = {k: params.get(k) for k in [
             'num_scans', 'num_batches', 'start_time',
-            'wait_to_start', 'step_time', 'batch_size', 'ramp_up', 'az_start']
+            'wait_to_start', 'step_time', 'batch_size', 'az_start']
             if params.get(k) is not None}
         el_endpoint2 = params.get('el_endpoint2', el_endpoint1)
         el_speed = params.get('el_speed', 0.0)
@@ -1468,7 +1468,7 @@ class ACUAgent:
                                                el_endpoint1=el_endpoint1,
                                                el_endpoint2=el_endpoint2,
                                                el_speed=el_speed,
-                                               ramp_up=plan['ramp_up'],
+                                               az_first_pos=plan['init_az'],
                                                **scan_params)
         with self.azel_lock.acquire_timeout(0, job='generate_scan') as acquired:
             if not acquired:
