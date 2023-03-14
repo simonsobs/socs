@@ -1368,7 +1368,7 @@ class ACUAgent:
             az_endpoint1 (float): first endpoint of a linear azimuth scan
             az_endpoint2 (float): second endpoint of a linear azimuth scan
             az_speed (float): azimuth speed for constant-velocity scan
-            acc (float): turnaround acceleration for a constant-velocity scan
+            az_accel (float): turnaround acceleration for a constant-velocity scan
             el_endpoint1 (float): first endpoint of elevation motion
             el_endpoint2 (float): second endpoint of elevation motion. For dev,
                 currently both el endpoints should be equal
@@ -1422,7 +1422,7 @@ class ACUAgent:
         az_endpoint1 = params.get('az_endpoint1')
         az_endpoint2 = params.get('az_endpoint2')
         az_speed = params.get('az_speed')
-        acc = params.get('acc')
+        az_accel = params.get('az_accel')
         el_endpoint1 = params.get('el_endpoint1')
         azonly = params.get('azonly', True)
         scan_upload_len = params.get('scan_upload_length', 5.0)
@@ -1438,7 +1438,7 @@ class ACUAgent:
             return False, 'ACU not in remote mode.'
 
         plan = sh.plan_scan(az_endpoint1, az_endpoint2,
-                            el=el_endpoint1, v_az=az_speed, a_az=acc,
+                            el=el_endpoint1, v_az=az_speed, a_az=az_accel,
                             az_start=scan_params.get('az_start'))
         print(plan)
 
@@ -1466,7 +1466,7 @@ class ACUAgent:
 
         g = sh.generate_constant_velocity_scan(az_endpoint1=az_endpoint1,
                                                az_endpoint2=az_endpoint2,
-                                               az_speed=az_speed, acc=acc,
+                                               az_speed=az_speed, acc=az_accel,
                                                el_endpoint1=el_endpoint1,
                                                el_endpoint2=el_endpoint2,
                                                el_speed=el_speed,
