@@ -212,14 +212,14 @@ class G3FrameGenerator:
 
     def get_data_frame(self, start, stop):
         if self.quantize:
-            # When "quantized", this clamps (start) and (stop) to integers so 
-            # timestamps created by np.arange are lined up when there's an 
+            # When "quantized", this clamps (start) and (stop) to integers so
+            # timestamps created by np.arange are lined up when there's an
             # integer sample rate
-            t0, t1 = int(start)-1, int(stop) + 1
+            t0, t1 = int(start) - 1, int(stop) + 1
 
             # Note that error does build up here due to floating precision of
             # 1./sample_rate, but for emulation this should be close enough
-            times = np.arange(t0, t1, 1./self.sample_rate, dtype=np.float64)
+            times = np.arange(t0, t1, 1. / self.sample_rate, dtype=np.float64)
             m = (start <= times) & (times < stop)
             times = times[m]
         else:
@@ -696,7 +696,6 @@ def make_parser(parser=None):
                         help="Time per G3 data frame (seconds)")
     pgroup.add_argument('--drop-chance', default=0, type=float,
                         help="Fractional chance to drop samples")
-                    
 
     return parser
 
