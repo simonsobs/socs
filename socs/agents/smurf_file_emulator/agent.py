@@ -616,6 +616,14 @@ class SmurfFileEmulator:
         Parameters:
             duration (float, optional):
                 If set, will stop stream after specified amount of time (sec).
+            use_stream_between (bool, optional):
+                If True, will use the DataStreamer's `stream_between` function
+                instead of writing frames one at a time. This allows you to write
+                an entire timestream for the specified duration without waiting.
+            start_offset (float, optional):
+                If set, this will add an offset to the start time passed to the
+                `stream_between` function, allowing you to create offsets between
+                streams taken at the same time.
         """
         session.set_status('starting')
 
