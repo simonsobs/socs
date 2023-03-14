@@ -174,7 +174,7 @@ def ptstack_format(conctimes, concaz, concel, concva, concve, az_flags,
 
 def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                                     acc, el_endpoint1, el_endpoint2,
-                                    el_speed,
+                                    el_speed=0,
                                     num_batches=None,
                                     num_scans=None,
                                     start_time=None,
@@ -215,10 +215,12 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
         batch_size (int): number of values to produce in each iteration.
             Default is 500. Batch size is reset to the length of one leg of the
             motion if num_batches is not None.
-        az_start (str): part of the scan to start at. Options are:
-            'az_endpoint1', 'az_endpoint2', 'mid_inc' (start in the middle of
-            the scan and start with increasing azimuth), 'mid_dec' (start in
-            the middle of the scan and start with decreasing azimuth).
+        az_start (str): part of the scan to start at.  To start at one
+            of the extremes, use 'az_endpoint1', 'az_endpoint2', or
+            'end' (same as 'az_endpoint1').  To start in the midpoint
+            of the scan use 'mid_inc' (for first half-leg to have
+            positive az velocity), 'mid_dec' (negative az velocity),
+            or 'mid' (velocity oriented towards endpoint2).
         az_first_pos (float): If not None, the first az scan will
             start at this position (but otherwise proceed in the same
             starting direction).
@@ -233,28 +235,24 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
     az_max = max(az_endpoint1, az_endpoint2)
     if az_max == az_min:
         raise ValueError('Generator requires two different az endpoints!')
-    if az_start in ['az_endpoint1', 'az_endpoint2']:
-        if az_start == 'az_endpoint1':
+    if az_start in ['az_endpoint1', 'az_endpoint2', 'end']:
+        if az_start in ['az_endpoint1', 'end']:
             az = az_endpoint1
         else:
             az = az_endpoint2
-        if az == az_min:
-            increasing = True
-            az_vel = az_speed
-        elif az == az_max:
-            increasing = False
-            az_vel = -1 * az_speed
-    elif az_start in ['mid_inc', 'mid_dec']:
+        increasing = (az == az_min)
+    elif az_start in ['mid_inc', 'mid_dec', 'mid']:
         az = (az_endpoint1 + az_endpoint2) / 2
-        if az_start == 'mid_inc':
+        if az_start == 'mid':
+            increasing = az_endpoint2 > az_endpoint1
+        elif az_start == 'mid_inc':
             increasing = True
-            az_vel = az_speed
         else:
             increasing = False
-            az_vel = -1 * az_speed
     else:
         raise ValueError('az_start value not supported. Choose from '
                          'az_endpoint1, az_endpoint2, mid_inc, mid_dec')
+    az_vel = az_speed if increasing else -az_speed
 
     # Bias the starting point for the first leg?
     if az_first_pos is not None:
@@ -416,12 +414,24 @@ def plan_scan(az_end1, az_end2, el, v_az=1, a_az=1, az_start=None):
 
     """
     # Convert Agent-friendly arguments to az/throw/init
-    if az_start in [None, 'mid', 'mid_inc', 'mid_dec']:
-        init = 'mid'
-    else:
-        init = 'end'
     az = (az_end1 + az_end2) / 2
     throw = (az_end2 - az_end1) / 2
+
+    if az_start in [None, 'mid']:
+        init = 'mid'
+    elif az_start == 'mid_inc':
+        init = 'mid'
+        throw = abs(throw)
+    elif az_start == 'mid_dec':
+        init = 'mid'
+        throw = -abs(throw)
+    elif az_start in ['az_endpoint1', 'end']:
+        init = 'end'
+    elif az_start in ['az_endpoint2']:
+        init = 'end'
+        throw = -throw
+    else:
+        raise ValueError(f'Unexpected az_start={az_start}')
 
     # Info to pass back.
     plan = {}

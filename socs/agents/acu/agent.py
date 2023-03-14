@@ -1393,10 +1393,12 @@ class ACUAgent:
                 to help the servo match the first leg velocity smoothly
                 before it has to start worrying about the first
                 turn-around.
-            az_start (str): part of the scan to start at. Options are:
-                'az_endpoint1', 'az_endpoint2', 'mid_inc' (start in the middle of
-                the scan and start with increasing azimuth), 'mid_dec' (start in
-                the middle of the scan and start with decreasing azimuth).
+            az_start (str): part of the scan to start at.  To start at one
+                of the extremes, use 'az_endpoint1', 'az_endpoint2', or
+                'end' (same as 'az_endpoint1').  To start in the midpoint
+                of the scan use 'mid_inc' (for first half-leg to have
+                positive az velocity), 'mid_dec' (negative az velocity),
+                or 'mid' (velocity oriented towards endpoint2).
             scan_upload_length (float): number of seconds for each set of uploaded
                 points. Default value is 5.  Larger values here mean
                 that stopping the scan will take longer, as we must
