@@ -37,6 +37,7 @@ for n, f in [
         ('ScpiPsuAgent', 'scpi_psu/agent.py'),
         ('SmurfFileEmulator', 'smurf_file_emulator/agent.py'),
         ('SmurfStreamSimulator', 'smurf_stream_simulator/agent.py'),
+        ('SmurfTimingCardAgent', 'smurf_timing_card/agent.py'),
         ('SupRsync', 'suprsync/agent.py'),
         ('SynaccessAgent', 'synacc/agent.py'),
         ('SynthAgent', 'holo_synth/agent.py'),

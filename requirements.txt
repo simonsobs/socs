@@ -39,6 +39,9 @@ sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master
 # synacc agent
 requests
 
+# timing master monitor
+pyepics
+
 # xy_stage
 xy_stage_control @ git+https://github.com/kmharrington/xy_stage_control.git@main
 

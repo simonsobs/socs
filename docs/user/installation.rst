@@ -32,6 +32,8 @@ The different groups, and the agents they provide dependencies for are:
      - SMuRF File Emulator, SMuRF Stream Simulator
    * - ``synacc``
      - Synaccess Agent
+   * - ``timing_master``
+     - SMuRF Timing Card Agent
 
 If you would like to install all optional dependencies use the special varient
 "all"::
