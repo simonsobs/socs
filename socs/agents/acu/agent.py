@@ -1356,7 +1356,7 @@ class ACUAgent:
     @ocs_agent.param('az_endpoint2', type=float)
     @ocs_agent.param('az_speed', type=float)
     @ocs_agent.param('az_accel', type=float)
-    @ocs_agent.param('el_endpoint1', type=float)
+    @ocs_agent.param('el_endpoint1', type=float, default=None)
     @ocs_agent.param('el_endpoint2', type=float, default=None)
     @ocs_agent.param('el_speed', type=float, default=0.)
     @ocs_agent.param('num_scans', type=float, default=None)
@@ -1387,32 +1387,42 @@ class ACUAgent:
             az_endpoint2 (float): second endpoint of a linear azimuth scan
             az_speed (float): azimuth speed for constant-velocity scan
             az_accel (float): turnaround acceleration for a constant-velocity scan
-            el_endpoint1 (float): first endpoint of elevation motion
-            el_endpoint2 (float): second endpoint of elevation motion. For dev,
-                currently both el endpoints should be equal
-            el_speed (float): speed of motion for a scan with changing
-                elevation. For dev, currently set to 0.0
-            num_scans (int or None): if not None, limits the scan
-                to the specified number of constant velocity legs.
-            start_time (float or None): a ctime at which to start the scan.
-                Default is None, interpreted as now
-            wait_to_start (float): number of seconds to wait before starting a
-                scan. Default is 3 seconds
-            step_time (float): time between points on the constant-velocity
-                parts of the motion. Default is 0.1 s. Minimum 0.05 s
+            el_endpoint1 (float): first endpoint of elevation motion.
+                In the present implementation, this will be the
+                constant elevation declared at every point in the
+                track.
+            el_endpoint2 (float): this is ignored.
+            el_speed (float): this is ignored.
+            num_scans (int or None): if not None, limits the scan to
+                the specified number of constant velocity legs. The
+                process will exit without error once that has
+                completed.
+            start_time (float or None): a unix timestamp giving the
+                time at which the scan should being.  The default is
+                None, which means the scan will start immediately (but
+                taking into account the value of wait_to_start).
+            wait_to_start (float): number of seconds to wait before
+                starting a scan, in the case that start_time is None.
+                The default is to compute a minimum time based on the
+                scan parameters and the ACU ramp-up algorithm; this is
+                typically 5-10 seconds.
+            step_time (float): time, in seconds, between points on the
+                constant-velocity parts of the motion.  The default is
+                None, which will cause an appropriate value to be
+                chosen automatically (typically 0.1 to 1.0).
             az_start (str): part of the scan to start at.  To start at one
                 of the extremes, use 'az_endpoint1', 'az_endpoint2', or
                 'end' (same as 'az_endpoint1').  To start in the midpoint
                 of the scan use 'mid_inc' (for first half-leg to have
                 positive az velocity), 'mid_dec' (negative az velocity),
                 or 'mid' (velocity oriented towards endpoint2).
-            az_only (bool): if True (the default), only command the
-                Azimuth axis to ProgramTrack mode, and put the El axis
-                in Stop mode at its present position.
-            scan_upload_length (float): number of seconds for each set of uploaded
-                points. Default value is 5.  Larger values here mean
-                that stopping the scan will take longer, as we must
-                wait for the stack to empty.
+            az_only (bool): if True (the default), then only the
+                Azimuth axis is put in ProgramTrack mode, and the El axis
+                is put in Stop mode.
+            scan_upload_length (float): number of seconds for each set
+                of uploaded points. Default value is 5.  Larger values
+                here mean that stopping the scan will take longer, as
+                we must wait for the stack to empty.
 
         """
         # The approximate loop time
