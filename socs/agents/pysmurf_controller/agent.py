@@ -377,11 +377,11 @@ class PysmurfController:
             params['kwargs'] = {}
 
         if params['stream_type']:
-            params['kwarg']['tag'] = params['stream_type']
+            params['kwargs']['tag'] = params['stream_type']
         if params['subtype'] is not None:
-            params['kwarg']['subtype'] = params['subtype']
+            params['kwargs']['subtype'] = params['subtype']
         if params['tag'] is not None:
-            params['kwarg']['tag'] = params['tag']
+            params['kwargs']['tag'] = params['tag']
 
         with self.lock.acquire_timeout(0, job='stream') as acquired:
             if not acquired:
