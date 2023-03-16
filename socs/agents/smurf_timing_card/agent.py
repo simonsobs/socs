@@ -39,18 +39,19 @@ class SmurfTimingCardAgent:
         **Process** -- Main loop for the timing card. This queries diagnostic
         PVs and publishes data.
 
-        An example of the session data::
+        Notes:
+            An example of the session data::
 
-            >>> response.session['data']
-               {'COUNT186M': 1671196546,
-                'COUNTBRT': 480000,
-                'COUNTINTV': 122879999,
-                'COUNTPLL': 1,
-                'COUNTSYNCERR': 4,
-                'COUNTTXCLK': 1461994265,
-                'DELTATXCLK': 15416942,
-                'RATETXCLK': 123.33553599999999,
-                'timestamp': 1678983237.832111}
+                >>> response.session['data']
+                   {'COUNT186M': 1671196546,
+                    'COUNTBRT': 480000,
+                    'COUNTINTV': 122879999,
+                    'COUNTPLL': 1,
+                    'COUNTSYNCERR': 4,
+                    'COUNTTXCLK': 1461994265,
+                    'DELTATXCLK': 15416942,
+                    'RATETXCLK': 123.33553599999999,
+                    'timestamp': 1678983237.832111}
 
         """
         pacemaker = Pacemaker(1. / self.sleep_time)
