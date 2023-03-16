@@ -84,4 +84,6 @@ def test_stream(tmp_path):
     session = mock.MagicMock()
     session.data = {}
     emulator.uxm_relock(session, {'test_mode': True})
-    emulator.stream(session, params={'duration': 2})
+    emulator.stream(session, params={'duration': 2,
+                                     'use_stream_between': True,
+                                     'start_offset': 0})
