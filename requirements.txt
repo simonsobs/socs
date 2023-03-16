@@ -44,6 +44,9 @@ sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master
 # timing master monitor
 pyepics
 
+# timing master monitor
+pyepics
+
 # xy_stage
 xy_stage_control @ git+https://github.com/kmharrington/xy_stage_control.git@main
 

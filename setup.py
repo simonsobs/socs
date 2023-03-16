@@ -50,6 +50,9 @@ smurf_sim_deps = ['so3g']
 # Timing Master Monitor
 timing_master_deps = ['pyepics']
 
+# Timing Master Monitor
+timing_master_deps = ['pyepics']
+
 # LATRt XY Stage Agent
 # xy_stage_deps = [
 #     'xy_stage_control @ git+https://github.com/kmharrington/xy_stage_control.git@main',
