@@ -6,7 +6,7 @@ from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
 
-class PWVAgent:
+class UCSCRadiometerAgent:
     """Monitor the PWV Flask Server.
 
     Parameters
@@ -98,10 +98,10 @@ def main(args=None):
     txaio.start_logging(level=environ.get("LOGLEVEL", "info"))
 
     parser = add_agent_args()
-    args = site_config.parse_args(agent_class='PWVAgent', parser=parser, args=args)
+    args = site_config.parse_args(agent_class='UCSCRadiometerAgent', parser=parser, args=args)
 
     agent, runner = ocs_agent.init_site_agent(args)
-    pwv_agent = PWVAgent(agent, args.url, args.year)
+    pwv_agent = UCSCRadiometerAgent(agent, args.url, args.year)
 
     agent.register_process('acq', pwv_agent.start_acq, pwv_agent._stop_acq, startup=True)
 
