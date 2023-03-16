@@ -106,10 +106,13 @@ def update_cache(get_result, timestamp):
     The cache consists of a dictionary, with the unique OIDs as keys, and
     another dictionary as the value. Each of these nested dictionaries contains the
     OID values, name, and description (decoded string). An example for a single OID::
+
         {"upsBatteryStatus":
             {"status": 2,
                 "description": "batteryNormal"}}
+
     Additionally there is connection status and timestamp information under::
+
         {"ups_connection":
             {"last_attempt": 1598543359.6326838,
             "connected": True}
