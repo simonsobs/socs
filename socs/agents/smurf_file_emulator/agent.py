@@ -491,8 +491,9 @@ class SmurfFileEmulator:
         if session is not None:
             session.data['noise_file'] = streamer.file_list[0]
 
+    @ocs_agent.param('sleep', default=True)
     def uxm_setup(self, session, params):
-        """uxm_setup(test_mode=False)
+        """uxm_setup(sleep=True)
 
         **Task** - Emulates files that might come from a general tune dets
         function. These are some of the files found on simons1 registered when
@@ -502,6 +503,12 @@ class SmurfFileEmulator:
              2. setup_notches
              3. tracking_setup
              4. short g3 stream
+
+        Parameters:
+            sleep (bool, optional):
+                If True, will sleep for 1 sec after creating the tunefile,
+                which is required for preventing filename collisions in
+                end-to-end testing.
         """
         self._run_setup(action='uxm_setup', action_time=time.time(),
                         session=session)
