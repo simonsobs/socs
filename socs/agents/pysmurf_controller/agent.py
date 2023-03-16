@@ -331,6 +331,8 @@ class PysmurfController:
     @ocs_agent.param("duration", default=None, type=float)
     @ocs_agent.param('kwargs', default=None)
     @ocs_agent.param('load_tune', default=True, type=bool)
+    @ocs_agent.param('stream_type', default='obs')
+    @ocs_agent.param('subtype', default=None)
     @ocs_agent.param('tag', default=None)
     @ocs_agent.param('test_mode', default=False, type=bool)
     def stream(self, session, params):
@@ -351,7 +353,13 @@ class PysmurfController:
         load_tune : bool
             If true, will load a tune-file to the pysmurf object on
             instantiation.
-        tag : Optional[string]
+        stream_type : string, optional
+            Stream type. This can be either 'obs' or 'oper', and will be 'obs'
+            by default. The tags attached to the stream will be
+            ``<stream_type>,<subtype>,<tag>``.
+        subtype : string, optional
+            Operation subtype used tot tag the stream.
+        tag : string, optional
             Tag (or comma-separated list of tags) to attach to the G3 stream.
             This has precedence over the `tag` key in the kwargs dict.
 
@@ -368,6 +376,10 @@ class PysmurfController:
         if params['kwargs'] is None:
             params['kwargs'] = {}
 
+        if params['stream_type']:
+            params['kwarg']['tag'] = params['stream_type']
+        if params['subtype'] is not None:
+            params['kwarg']['subtype'] = params['subtype']
         if params['tag'] is not None:
             params['kwarg']['tag'] = params['tag']
 
@@ -557,9 +569,9 @@ class PysmurfController:
         kwargs : dict
             Dict containing additional keyword args to pass to the take_noise
             function.
-        tag : Optional[str]
-            String containing a tag or comma-separated list of tags to attach
-            to the g3 stream.
+        tag : string, optional
+            Tag (or comma-separated list of tags) to attach to the G3 stream.
+            This has precedence over the `tag` key in the kwargs dict.
 
 
         Notes

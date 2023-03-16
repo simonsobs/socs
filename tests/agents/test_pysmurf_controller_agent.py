@@ -378,7 +378,8 @@ def test_stream(agent):
     """
     session = create_session('stream')
     res = agent.stream(session, {'duration': None, 'load_tune': False,
-                                 'kwargs': None, 'test_mode': True, 'tag': None})
+                                 'kwargs': None, 'test_mode': True, 'tag': None,
+                                 'stream_type': 'obs', 'subtype': None})
     assert res[0] is True
 
 
