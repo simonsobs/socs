@@ -1,15 +1,9 @@
-import numpy as np
 import requests
-from numpy import random
-import os
-from os import environ
-import datetime
-import time
+import txaio
 
+from os import environ
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
-import argparse
-import txaio
 
 
 class PWVAgent:
@@ -60,9 +54,8 @@ class PWVAgent:
         """
         while True:
             r = requests.get(self.url)
-            data= r.json()
-            print('data', data)
-            last_pwv =  data['pwv']
+            data = r.json()
+            last_pwv = data['pwv']
             last_timestamp = data['timestamp']
 
             pwvs = {'block_name': 'pwvs',
@@ -77,8 +70,6 @@ class PWVAgent:
             else:
                 self.agent.publish_to_feed('pwvs', pwvs)
                 self.last_published_reading = (last_pwv, last_timestamp)
-
-            time.sleep(1)
 
     def _stop_acq(self, session, params=None):
         ok = False
@@ -98,13 +89,14 @@ def add_agent_args(parser_in=None):
     pgroup.add_argument("--year", type=int, help="year for Julian Day PWV measurement")
     return parser_in
 
+
 def main(args=None):
     # For logging
     txaio.use_twisted()
     txaio.make_logger()
 
     txaio.start_logging(level=environ.get("LOGLEVEL", "info"))
-    
+
     parser = add_agent_args()
     args = site_config.parse_args(agent_class='PWVAgent', parser=parser, args=args)
 
@@ -115,8 +107,6 @@ def main(args=None):
 
     runner.run(agent, auto_reconnect=True)
 
+
 if __name__ == "__main__":
     main()
-
-# TODO: add docstrings to class for parameters
-# TODO: add test mode to acq process
