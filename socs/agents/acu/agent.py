@@ -1352,14 +1352,32 @@ class ACUAgent:
         # self.agent.publish_to_feed('acu_upload', acu_upload)
         return True
 
+    @ocs_agent.param('az_endpoint1', type=float)
+    @ocs_agent.param('az_endpoint2', type=float)
+    @ocs_agent.param('az_speed', type=float)
+    @ocs_agent.param('az_accel', type=float)
+    @ocs_agent.param('el_endpoint1', type=float)
+    @ocs_agent.param('el_endpoint2', type=float, default=None)
+    @ocs_agent.param('el_speed', type=float, default=0.)
+    @ocs_agent.param('num_scans', type=float, default=None)
+    @ocs_agent.param('start_time', type=float, default=None)
+    @ocs_agent.param('wait_to_start', type=float, default=None)
+    @ocs_agent.param('step_time', type=float, default=None)
+    @ocs_agent.param('az_start', default='end',
+                     choices=['end', 'mid', 'az_endpoint1', 'az_endpoint2',
+                              'mid_inc', 'mid_dec'])
+    @ocs_agent.param('az_only', type=bool, default=True)
+    @ocs_agent.param('scan_upload_length', type=float, default=5.)
     @inlineCallbacks
     def generate_scan(self, session, params):
-        """generate_scan(az_endpoint1=None, az_endpoint2=None, az_speed=None, \
-                         acc=None, el_endpoint1=None, el_endpoint2=None, \
+        """generate_scan(az_endpoint1=None, az_endpoint2=None, \
+                         az_speed=None, az_accel=None, \
+                         el_endpoint1=None, el_endpoint2=None, \
                          el_speed=None, \
-                         num_scans=None, num_batches=None, start_time=None, \
-                         wait_to_start=None, step_time=None, batch_size=None, \
-                         az_start=None)
+                         num_scans=None, start_time=None, \
+                         wait_to_start=None, step_time=None, \
+                         az_start=None, az_only=None, \
+                         scan_upload_length=None)
 
         **Process** - Scan generator, currently only works for
         constant-velocity az scans with fixed elevation.
@@ -1376,29 +1394,21 @@ class ACUAgent:
                 elevation. For dev, currently set to 0.0
             num_scans (int or None): if not None, limits the scan
                 to the specified number of constant velocity legs.
-            num_batches (int or None): sets the number of batches for the
-                generator to create. Default value is None (interpreted as infinite
-                batches).
             start_time (float or None): a ctime at which to start the scan.
                 Default is None, interpreted as now
             wait_to_start (float): number of seconds to wait before starting a
                 scan. Default is 3 seconds
             step_time (float): time between points on the constant-velocity
                 parts of the motion. Default is 0.1 s. Minimum 0.05 s
-            batch_size (int): number of values to produce in each iteration.
-                Default is 500. Batch size is reset to the length of one leg of the
-                motion if num_batches is not None.
-            ramp_up (float or None): make the first scan leg longer, by
-                this number of degrees, on the starting end.  This is used
-                to help the servo match the first leg velocity smoothly
-                before it has to start worrying about the first
-                turn-around.
             az_start (str): part of the scan to start at.  To start at one
                 of the extremes, use 'az_endpoint1', 'az_endpoint2', or
                 'end' (same as 'az_endpoint1').  To start in the midpoint
                 of the scan use 'mid_inc' (for first half-leg to have
                 positive az velocity), 'mid_dec' (negative az velocity),
                 or 'mid' (velocity oriented towards endpoint2).
+            az_only (bool): if True (the default), only command the
+                Azimuth axis to ProgramTrack mode, and put the El axis
+                in Stop mode at its present position.
             scan_upload_length (float): number of seconds for each set of uploaded
                 points. Default value is 5.  Larger values here mean
                 that stopping the scan will take longer, as we must
@@ -1424,7 +1434,7 @@ class ACUAgent:
         az_speed = params.get('az_speed')
         az_accel = params.get('az_accel')
         el_endpoint1 = params.get('el_endpoint1')
-        azonly = params.get('azonly', True)
+        azonly = params.get('az_only', True)
         scan_upload_len = params.get('scan_upload_length', 5.0)
         scan_params = {k: params.get(k) for k in [
             'num_scans', 'num_batches', 'start_time',
