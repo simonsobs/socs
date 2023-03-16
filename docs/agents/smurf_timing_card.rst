@@ -24,7 +24,7 @@ Below is an example of an agent configuration block for the ocs-site-config
 file::
 
     {'agent-class': 'SmurfTimingCardAgent',
-     'instance-id': 'smurf_timing_card',
+     'instance-id': 'smurf-timing-card',
      'arguments': [
         '--timeout', 3,
         '--sleep-time', 30,
@@ -38,18 +38,18 @@ Docker Compose
 ````````````````
 Below is an example of the docker-compose service for the timing card agent::
 
-    ocs-timing-card-agent:
+    ocs-smurf-timing-card:
         image: simonsobs/socs:latest
         <<: *log-options
         network_mode: host
         hostname: ocs-docker
-        container_name: ocs-timing-card-agent
+        container_name: ocs-smurf-timing-card
         volumes:
             - ${OCS_CONFIG_DIR}:/config
         environment:
             - EPICS_CA_ADDR_LIST=127.255.255.255
             - EPICS_CA_MAX_ARRAY_BYTES=80000000
-            - INSTANCE_ID=smurf_timing_card
+            - INSTANCE_ID=smurf-timing-card
 
 Description
 --------------

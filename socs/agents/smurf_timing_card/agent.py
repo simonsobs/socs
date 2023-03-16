@@ -49,6 +49,9 @@ class SmurfTimingCardAgent:
                     self.log.error("Timeout for PV: {name}", name=name)
                     break
                 data[name] = res
+
+                session.data = data
+                session.data['timestamp'] = time.time()
             else:
                 msg = {
                     'timestamp': time.time(),

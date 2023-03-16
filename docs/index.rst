@@ -62,11 +62,11 @@ API Reference        Full API documentation for core parts of the SOCS library.
     agents/pysmurf-monitor
     agents/scpi_psu
     agents/smurf_crate_monitor
+    agents/smurf_timing_card
     agents/suprsync
     agents/synacc
     agents/tektronix3021c
     agents/thorlabs_mc2000b
-    agents/smurf_timing_card
     agents/ups
     agents/vantage_pro2
     agents/wiregrid_actuator
