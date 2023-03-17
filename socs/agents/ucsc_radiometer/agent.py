@@ -41,7 +41,7 @@ class UCSCRadiometerAgent:
         self.last_published_reading = None
 
     @ocs_agent.param('test_mode', default=False, type=bool)
-    def start_acq(self, session, params=None):
+    def acq(self, session, params=None):
         """acq()
 
         **Process** - Fetch values from PWV Flask Server
@@ -103,7 +103,7 @@ def main(args=None):
     agent, runner = ocs_agent.init_site_agent(args)
     pwv_agent = UCSCRadiometerAgent(agent, args.url, args.year)
 
-    agent.register_process('acq', pwv_agent.start_acq, pwv_agent._stop_acq, startup=True)
+    agent.register_process('acq', pwv_agent.acq, pwv_agent._stop_acq, startup=True)
 
     runner.run(agent, auto_reconnect=True)
 
