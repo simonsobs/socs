@@ -20,13 +20,13 @@ class UCSCRadiometerAgent:
     """
     def __init__(self, agent, url, year):
         self.agent = agent
+        self.log = agent.log
+        self.lock = TimeoutLock()
+        
         self.url = url
         self.year = year
 
-        self.active = True
-        self.log = agent.log
-        self.lock = TimeoutLock()
-        self.job = None
+        self.take_data = False
 
         agg_params = {'frame_length': 60,
                       'exclude_influx': False}
@@ -52,7 +52,8 @@ class UCSCRadiometerAgent:
             Run the Process loop only once. Meant only for testing.
             Default is False.
         """
-        while True:
+        self.take_data = True
+        while self.take_data:
             r = requests.get(self.url)
             data = r.json()
             last_pwv = data['pwv']
@@ -71,13 +72,17 @@ class UCSCRadiometerAgent:
                 self.agent.publish_to_feed('pwvs', pwvs)
                 self.last_published_reading = (last_pwv, last_timestamp)
 
+            if params['test_mode']:
+                break
+
+        return True, 'Acquisition exited cleanly.'
+
     def _stop_acq(self, session, params=None):
-        ok = False
-        with self.lock:
-            if self.job == 'acq':
-                self.job = '!acq'
-                ok = True
-            return (ok, {True: 'Requested process stop.', False: 'Failed to request process stop.'}[ok])
+        """
+        Stops acq process.
+        """
+        self.take_data = False
+        return True, 'Stopping acq process'
 
 
 def add_agent_args(parser_in=None):
