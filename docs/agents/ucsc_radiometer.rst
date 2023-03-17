@@ -54,8 +54,8 @@ Description
 -----------
 
 The UCSC radiometer measures precipitable water vapor (pwv) of the atmosphere, 
-and outputs the values to a textfile on a computer at the site where OCS 
-is not setup. As a result, a Flask app is built to server the files from the 
+and outputs the values to a textfile per day on a computer at the site where OCS 
+is not setup. As a result, a Flask app is built to server textfiles from the 
 radiometer server, where this Agent uses HTTP queries to publish pwv data to OCS.
 
 Agent API
