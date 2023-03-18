@@ -360,8 +360,8 @@ def main(args=None):
 
     agent, runner = ocs_agent.init_site_agent(args)
     hwppid_agent = HWPPIDAgent(agent, ip=args.ip,
-                          port=args.port,
-                          verbosity=args.verbose)
+                               port=args.port,
+                               verbosity=args.verbose)
     agent.register_task('init_connection', hwppid_agent.init_connection,
                         startup=init_params)
     agent.register_process('acq', hwppid_agent.acq,
