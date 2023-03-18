@@ -50,19 +50,6 @@ An example docker-compose configuration::
     system. In this example the crossbar server is running on localhost,
     ``127.0.0.1``, but on your network this may be different.
 
-Description
------------
-
-session.data
-````````````
-The most recent data collected is stored in session.data in the following structure.::
-
-    >>> response.session['data']
-    {'current_freq': 0,
-     'target_freq': 0,
-     'direction': 1,
-     'last_updated': 1649085992.719602}
-
 Agent API
 ---------
 
