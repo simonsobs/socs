@@ -39,7 +39,7 @@ An example docker-compose configuration::
     hostname: ocs-docker
     network_mode: "host"
     environment:
-      - INSTANCE_ID=whp-pmx
+      - INSTANCE_ID=hwp-pmx
       - SITE_HUB=ws://127.0.0.1:8001/ws
       - SITE_HTTP=http://127.0.0.1:8001/call
     volumes:
@@ -50,18 +50,6 @@ An example docker-compose configuration::
     configured to connect to the crossbar server as if it was on the host
     system. In this example the crossbar server is running on localhost,
     ``127.0.0.1``, but on your network this may be different.
-
-Description
------------
-
-session.data
-````````````
-The most recent data collected is stored in session.data in the following structure.::
-
-    >>> response.session['data']
-    {'curr': 0,
-     'volt': 0,
-     'last_updated': 1649085992.719602}
 
 Agent API
 ---------
