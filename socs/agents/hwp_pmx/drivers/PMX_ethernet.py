@@ -16,6 +16,9 @@ class PMX:
         self.wait_time = 0.01
         self.buffer_size = 128
 
+    def close(self):
+        self.sock.close()
+
     def read(self):
         return self.sock.recv(self.buffer_size).decode('utf-8')
 
