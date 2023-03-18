@@ -11,11 +11,12 @@ import socs.agents.hwp_pmx.drivers.PMX_ethernet as pmx
 txaio.use_twisted()
 
 
-class PMXAgent:
+class HWPPMXAgent:
     """Agent to control the current and voltage that drive the rotation of the CHWP
     Args:
         ip (str): IP address for the PMX Kikusui power supply
         port (str): Port for the PMX Kikusui power supply
+        f_sample (float): sampling frequency (Hz)
     """
 
     def __init__(self, agent, ip, port, f_sample=1):
@@ -257,8 +258,8 @@ def main(args=None):
 
     kwargs = {'ip': args.ip, 'port': args.port}
     if args.sampling_frequency is not None:
-        kwargs['f_sample'] = float(args.sampling_frequency)
-    PMX = PMXAgent(agent, **kwargs)
+        kwargs['f_sample'] = args.sampling_frequency
+    PMX = HWMPMXAgent(agent, **kwargs)
 
     agent.register_task('init_connection', PMX.init_connection, startup=init_params)
     agent.register_process('acq', PMX.start_acq, PMX.stop_acq)
