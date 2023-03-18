@@ -5,6 +5,7 @@ import time
 import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
+from twisted.internet import reactor
 
 import socs.agents.hwp_pmx.drivers.PMX_ethernet as pmx
 
@@ -43,6 +44,7 @@ class HWPPMXAgent:
     def init_connection(self, session, params=None):
         """init_connection(auto_acquire=False)
         **Task** - Initialize connection to PMX
+
         Parameters:
             auto_acquire (bool, optional): Default is False. Starts data
                 acquisition after initialization if True.
@@ -51,10 +53,23 @@ class HWPPMXAgent:
             self.log.info("Connection already initialized. Returning...")
             return True, "Connection already initialized"
 
-        self.dev = pmx.PMX(ip=self.ip, port=self.port)
+        with self.lock.acquire_timeout(0, job='init_connection') as acquired:
+            if not acquired:
+                self.log.warn(
+                    'Could not run init_connection because {} is already running'.format(self.lock.job))
+                return False, 'Could not acquire lock'
+
+            try:
+                self.dev = pmx.PMX(ip=self.ip, port=self.port)
+                self.log.info('Connected to PMX Kikusui')
+            except BrokenPipeError:
+                self.log.error('Could not establish connection to PMX Kikusui')
+                reactor.callFromThread(reactor.stop)
+                return False, 'Unable to connect to PMX Kikusui'
 
         if params['auto_acquire']:
             self.agent.start('acq')
+
         return True, 'Connection to PMX established'
 
     def set_on(self, session, params):
@@ -85,6 +100,7 @@ class HWPPMXAgent:
     def set_i(self, session, params):
         """set_i(curr=0)
         **Task** - Set the current.
+
         Parameters:
             curr (float): set current
         """
@@ -100,6 +116,7 @@ class HWPPMXAgent:
     def set_v(self, session, params):
         """set_v(volt=0)
         **Task** - Set the voltage.
+
         Parameters:
             volt (float): set voltage
         """
@@ -115,6 +132,7 @@ class HWPPMXAgent:
     def set_i_lim(self, session, params):
         """set_i_lim(curr=1)
         **Task** - Set the drive current limit.
+
         Parameters:
             curr (float): limit current
         """
@@ -130,6 +148,7 @@ class HWPPMXAgent:
     def set_v_lim(self, session, params):
         """set_v_lim(volt=32)
         **Task** - Set the drive voltage limit.
+
         Parameters:
             volt (float): limit voltage
         """
@@ -241,7 +260,7 @@ def make_parser(parser=None):
                         help="ip address for kikusui PMX")
     pgroup.add_argument('--port', type=int,
                         help="port for kikusui PMX")
-    pgroup.add_argument('--mode', type=str, default='acq', choices=['idle', 'acq'],
+    pgroup.add_argument('--mode', type=str, default='acq', choices=['init', 'acq'],
                         help="Starting action for the agent.")
     pgroup.add_argument('--sampling-frequency', type=float,
                         help="Sampling frequency for data acquisition")
@@ -257,7 +276,7 @@ def main(args=None):
                                   args=args)
 
     agent, runner = ocs_agent.init_site_agent(args)
-    if args.mode == 'idle':
+    if args.mode == 'init':
         init_params = {'auto_acquire': False}
     elif args.mode == 'acq':
         init_params = {'auto_acquire': True}
