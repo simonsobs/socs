@@ -254,13 +254,9 @@ class HWPPIDAgent:
         return True, 'Set scale'
 
     def acq(self, session, params):
-        """acq(test_mode=False)
+        """acq
 
         **Process** - Start PID data acquisition.
-
-        Parameters:
-            test_mode (bool, optional): Run the Process loop only once.
-                This is meant only for testing. Default is False.
 
         Notes:
             The most recent data collected is stored in the session data in the
@@ -341,7 +337,7 @@ def make_parser(parser=None):
     pgroup.add_argument('--verbose', '-v', action='count', default=0,
                         help='PID Controller verbosity level.')
     pgroup.add_argument('--mode', type=str, default='acq',
-                        choices=['idle', 'init', 'acq'],
+                        choices=['init', 'acq'],
                         help="Starting operation for the Agent.")
     return parser
 
