@@ -12,7 +12,9 @@ txaio.use_twisted()
 
 
 class HWPPMXAgent:
-    """Agent to control the current and voltage that drive the rotation of the CHWP
+    """Agent for interfacing with a PMX Kikusui power supply
+    to control the current and voltage that drive the rotation of the CHWP.
+
     Args:
         ip (str): IP address for the PMX Kikusui power supply
         port (str): Port for the PMX Kikusui power supply
@@ -35,7 +37,7 @@ class HWPPMXAgent:
 
         agg_params = {'frame_length': 60}
         self.agent.register_feed(
-            'Rotation', record=True, agg_params=agg_params, buffer_time=1)
+            'hwppmx', record=True, agg_params=agg_params, buffer_time=1)
 
     @ocs_agent.param('auto_acquire', default=False, type=bool)
     def init_connection(self, session, params=None):
@@ -165,16 +167,20 @@ class HWPPMXAgent:
             self.dev.ign_external_voltage()
         return True, 'Set PMX Kikusui to direct control'
 
-    def start_acq(self, session, params):
+    def acq(self, session, params):
         """acq
-        Method to start data acquisition process.
-        The most recent data collected is stored in session.data in the
-        structure::
+
+        **Process** - Start data acquisition.
+
+        Notes:
+            The most recent data collected is stored in session data in the
+            structure::
 
             >>> response.session['data']
             {'curr': 0,
              'volt': 0,
              'last_updated': 1649085992.719602}
+
         """
         sleep_time = 1 / self.f_sample - 0.01
 
@@ -198,7 +204,7 @@ class HWPPMXAgent:
 
                 data = {
                     'timestamp': current_time,
-                    'block_name': 'Rotation',
+                    'block_name': 'hwppmx',
                     'data': {}
                 }
                 msg, curr = self.dev.meas_current()
@@ -206,15 +212,15 @@ class HWPPMXAgent:
                 msg, volt = self.dev.meas_voltage()
                 data['data']['voltage'] = volt
 
-                self.agent.publish_to_feed('Rotation', data)
+                self.agent.publish_to_feed('hwppmx', data)
                 session.data = {'curr': curr,
                                 'volt': volt,
                                 'last_updated': current_time}
                 time.sleep(sleep_time)
-            self.agent.feeds['Rotation'].flush_buffer()
+            self.agent.feeds['hwppmx'].flush_buffer()
         return True, 'Acquisition exited cleanly.'
 
-    def stop_acq(self, session, params=None):
+    def _stop_acq(self, session, params=None):
         """
         Stop acq process.
         """
@@ -259,10 +265,10 @@ def main(args=None):
     kwargs = {'ip': args.ip, 'port': args.port}
     if args.sampling_frequency is not None:
         kwargs['f_sample'] = args.sampling_frequency
-    PMX = HWMPMXAgent(agent, **kwargs)
+    PMX = HWPPMXAgent(agent, **kwargs)
 
     agent.register_task('init_connection', PMX.init_connection, startup=init_params)
-    agent.register_process('acq', PMX.start_acq, PMX.stop_acq)
+    agent.register_process('acq', PMX.acq, PMX._stop_acq)
     agent.register_task('set_on', PMX.set_on)
     agent.register_task('set_off', PMX.set_off)
     agent.register_task('set_i', PMX.set_i)
