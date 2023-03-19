@@ -183,12 +183,12 @@ class PID:
 
         responses = []
         responses.append(self.send_message("*R01"))
-        messages = self.return_messages(responses)
+        target = self.return_messages(responses)[0]
         if self.verb:
             print(responses)
-            print(messages)
+            print('Setpoint = ' + str(target))
 
-        return self.target
+        return target
 
     def get_direction(self):
         """Get the current rotation direction.
@@ -202,13 +202,12 @@ class PID:
 
         responses = []
         responses.append(self.send_message("*R02"))
-
         direction = self.return_messages(responses)[0]
-        if direction == 1:
-            print('Direction = Reverse')
-        elif direction == 0:
-            print('Direction = Forward')
-        self.direction = direction
+        if self.verb:
+            if direction == 1:
+                print('Direction = Reverse')
+            elif direction == 0:
+                print('Direction = Forward')
 
         return direction
 
@@ -314,18 +313,18 @@ class PID:
 
         return output_array
 
-    def _decode_read(self, string):
+    @staticmethod
+    def _decode_read(string):
         read_type = string[1:3]
+        # Decode target
         if read_type == '01':
-            self.target = float(int(string[4:], 16) / 1000.)
-            return 'Setpoint = ' + str(self.target)
+            target = float(int(string[4:], 16) / 1000.)
+            return target
         # Decode direction
         if read_type == '02':
             if int(string[4:], 16) / 1000. > 2.5:
-                print('Direction = Reverse')
                 return 1
             else:
-                print('Direction = Forward')
                 return 0
         else:
             return 'Unrecognized Read'

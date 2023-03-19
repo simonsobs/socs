@@ -27,7 +27,6 @@ class HWPPIDAgent:
         self.ip = ip
         self.port = port
         self._verbosity = verbosity > 0
-        # self.pid = None  # PID object for pid controller commanding
 
         agg_params = {'frame_length': 60}
         self.agent.register_feed(
@@ -189,7 +188,7 @@ class HWPPIDAgent:
 
             freq = self.pid.get_target()
 
-        return True, 'Current frequency = {}'.format(freq)
+        return True, 'Target frequency = {}'.format(freq)
 
     def get_direction(self, session, params):
         """get_direction()
@@ -206,7 +205,7 @@ class HWPPIDAgent:
 
             direction = self.pid.get_direction()
 
-        return True, 'Current Direction = {}'.format(['Forward', 'Reverse'][direction])
+        return True, 'Current direction = {}'.format(['Forward', 'Reverse'][direction])
 
     @ocs_agent.param('direction', type=str, default='0', choices=['0', '1'])
     def set_direction(self, session, params):
@@ -292,8 +291,8 @@ class HWPPIDAgent:
                         'block_name': 'HWPPID', 'data': {}}
 
                 current_freq = self.pid.get_freq()
-                target_freq = self.pid.target
-                direction = self.pid.direction
+                target_freq = self.pid.get_target()
+                direction = self.pid.get_direction()
 
                 data['data']['current_freq'] = current_freq
                 data['data']['target_freq'] = target_freq
