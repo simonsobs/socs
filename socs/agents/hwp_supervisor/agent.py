@@ -1,11 +1,11 @@
 import argparse
-
 import time
-
-from ocs import ocs_agent,site_config, client_http
-from ocs.ocs_twisted import Pacemaker
-from ocs.ocs_client import OCSClient, OCSReply
 from collections import defaultdict
+
+from ocs import client_http, ocs_agent, site_config
+from ocs.ocs_client import OCSClient, OCSReply
+from ocs.ocs_twisted import Pacemaker
+
 
 class HWPSupervisor:
     def __init__(self, agent, args):
@@ -71,7 +71,7 @@ class HWPSupervisor:
             data['status'] = 'ok'
         except Exception as e:
             self.log.error("Error parsing session data for {agent_id}.{op}:\n{e}",
-                            agent_id=agent_id, op=op_name, e=e)
+                           agent_id=agent_id, op=op_name, e=e)
             data['status'] = 'error_parsing_session_data'
             return data
 
@@ -82,8 +82,8 @@ class HWPSupervisor:
 
         *Process* -- Monitors various HWP related HK systems
         """
-        pm = Pacemaker(1./self.sleep_time)
-        
+        pm = Pacemaker(1. / self.sleep_time)
+
         session.data = {
             'hwp_temperature': {},
             'hwp_encoder': {},
@@ -128,6 +128,7 @@ def make_parser(parser=None):
     pgroup.add_argument('--ups-id')
 
     return parser
+
 
 def main(args=None):
     parser = make_parser()
