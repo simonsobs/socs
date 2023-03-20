@@ -903,7 +903,6 @@ class ACUAgent:
 
     @ocs_agent.param('az', type=float)
     @ocs_agent.param('el', type=float)
-    @ocs_agent.param('wait', default=None, type=float)  # temporary for ocs-web
     @ocs_agent.param('end_stop', default=False, type=bool)
     @inlineCallbacks
     def go_to(self, session, params):
@@ -964,7 +963,7 @@ class ACUAgent:
 
         return all_ok, msg
 
-    @ocs_agent.param('b', type=float)
+    @ocs_agent.param('target', type=float)
     @ocs_agent.param('end_stop', default=False, type=bool)
     @inlineCallbacks
     def set_boresight(self, session, params):
@@ -985,7 +984,7 @@ class ACUAgent:
             if not ok:
                 return False, msg
 
-            target = params['b']
+            target = params['target']
 
             for axis, target in {'boresight': target}.items():
                 limit_func, limits = self._get_limit_func(axis)
