@@ -10,6 +10,9 @@ from collections import defaultdict
 class HWPSupervisor:
     def __init__(self, agent, args):
         self.agent = agent
+        self.args = args
+
+        self.sleep_time = args.sleep_time
         self.log = agent.log
         self.hwp_lakeshore_id = args.hwp_lakeshore_id
         self.hwp_temp_field = args.hwp_temp_field
@@ -24,25 +27,6 @@ class HWPSupervisor:
             'temperature': d['fields'][self.hwp_temp_field]['T'],
             'timestamp': d['timestamp'],
         }
-
-    def _parse_encoder(self, d):
-        """Parses session.data from the hwp_encoder.acq process"""
-        return {
-            'approx_hwp_freq': (d['encoder_last_updated'],
-                                d['approx_hwp_freq']),
-            'irig_time': (d['irig_last_updated'], d['irig_time']),
-        }
-    
-    def _parse_rotation(self, d):
-        """Parses session.data from the hwp_rotation.iv_acq process"""
-        return {
-            'kikusui_volt': (d['last_updated'], d['kikusui_volt']),
-            'kikusui_curr': (d['last_updated'], d['kikusui_curr']),
-        }
-
-    def _parse_ups(sef, d):
-        """Parses session data from the ups.acq process"""
-        return {'data': d}
 
     def _get_op_data(self, agent_id, op_name, session_data_parser=None):
         """
@@ -98,7 +82,7 @@ class HWPSupervisor:
         """
         *Process* -- Monitors various HK 
         """
-        pm = Pacemaker(1)
+        pm = Pacemaker(1./self.sleep_time)
         
         session.data = {
             'hwp_temperature': {},
@@ -142,6 +126,7 @@ def make_parser(parser=None):
         parser = argparse.ArgumentParser()
     pgroup = parser.add_argument_group('Agent Options')
 
+    pgroup.add_argument('--sleep-time', type=float, default=2.)
     pgroup.add_argument('--hwp-lakeshore-id')
     pgroup.add_argument('--hwp-temp-field')
     pgroup.add_argument('--hwp-encoder-id')
