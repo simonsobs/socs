@@ -27,7 +27,8 @@ class HWPSupervisor:
             'timestamp': d['timestamp'],
         }
 
-    def _get_op_data(self, agent_id, op_name, session_data_parser=None):
+    def _get_op_data(self, agent_id, op_name, session_data_parser=None,
+                     test_mode=False):
         """
         Process data from an agent operation, and formats it for the ``monitor``
         operation session data.
@@ -49,6 +50,10 @@ class HWPSupervisor:
         }
         if agent_id is None:
             data['status'] = 'no_agent_provided'
+            return data
+
+        if test_mode:
+            data['status'] = 'test_mode'
             return data
 
         client = site_config.get_control_client(agent_id)
@@ -77,12 +82,14 @@ class HWPSupervisor:
 
         return data
 
+    @ocs_agent.param('test_mode', type=bool)
     def monitor(self, session, params):
         """monitor()
 
         *Process* -- Monitors various HWP related HK systems
         """
         pm = Pacemaker(1. / self.sleep_time)
+        test_mode = params.get('test_mode', False)
 
         session.data = {
             'hwp_temperature': {},
@@ -97,15 +104,22 @@ class HWPSupervisor:
 
             session.data['hwp_temperature'].update(
                 self._get_op_data(self.hwp_lakeshore_id, 'acq',
-                                  session_data_parser=self._parse_hwp_temp))
+                                  session_data_parser=self._parse_hwp_temp,
+                                  test_mode=test_mode))
 
             session.data['hwp_encoder'].update(
-                self._get_op_data(self.hwp_encoder_id, 'acq'))
+                self._get_op_data(self.hwp_encoder_id, 'acq', test_mode=test_mode))
 
             session.data['hwp_rotation'].update(
-                self._get_op_data(self.hwp_rotation_id, 'iv_acq'))
+                self._get_op_data(self.hwp_rotation_id, 'iv_acq',
+                                  test_mode=test_mode))
 
-            session.data['ups'].update(self._get_op_data(self.ups_id, 'acq'))
+            session.data['ups'].update(self._get_op_data(self.ups_id, 'acq',
+                                                         test_mode=test_mode))
+
+            if test_mode:
+                break
+
             pm.sleep()
 
         return True, "Monitor process stopped"
