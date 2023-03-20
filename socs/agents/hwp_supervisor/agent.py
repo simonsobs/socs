@@ -79,8 +79,9 @@ class HWPSupervisor:
         return data
 
     def monitor(self, session, params):
-        """
-        *Process* -- Monitors various HK 
+        """monitor()
+
+        *Process* -- Monitors various HWP related HK systems
         """
         pm = Pacemaker(1./self.sleep_time)
         
@@ -95,23 +96,17 @@ class HWPSupervisor:
         while session.status in ['starting', 'running']:
             session.data['timestamp'] = time.time()
 
-            # HWP Temperature
             session.data['hwp_temperature'].update(
                 self._get_op_data(self.hwp_lakeshore_id, 'acq',
                                   session_data_parser=self._parse_hwp_temp))
 
-            # Encoder
             session.data['hwp_encoder'].update(
                 self._get_op_data(self.hwp_encoder_id, 'acq'))
 
-            # Rotation
             session.data['hwp_rotation'].update(
                 self._get_op_data(self.hwp_rotation_id, 'iv_acq'))
 
-            # UPS
             session.data['ups'].update(self._get_op_data(self.ups_id, 'acq'))
-
-            print(session.data)
             pm.sleep()
 
         return True, "Monitor process stopped"
