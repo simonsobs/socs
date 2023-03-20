@@ -19,7 +19,6 @@ class HWPSupervisor:
         self.hwp_encoder_id = args.hwp_encoder_id
         self.hwp_rotation_id = args.hwp_rotation_id
         self.ups_id = args.ups_id
-        self.clients = {}
 
     def _parse_hwp_temp(self, d):
         """Parses session.data from the ls240.acq operation"""
@@ -113,7 +112,7 @@ class HWPSupervisor:
 
     def _stop_monitor(self, session, params):
         session.status = 'stopping'
-        return 
+        return True, 'Stopping monitor process'
 
 
 def make_parser(parser=None):
