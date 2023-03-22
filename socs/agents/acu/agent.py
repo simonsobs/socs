@@ -315,6 +315,10 @@ class ACUAgent:
         session.set_status('running')
         version = yield self.acu_read.http.Version()
         self.log.info(version)
+
+        # Note that any dict items in session.data will get scanned
+        # through when assigning data to feed blocks... strings and
+        # floats will be ignored.
         session.data = {'PlatformType': self.acu_config['platform']}
 
         # Numbering as per ICD.
@@ -432,7 +436,7 @@ class ACUAgent:
                 yield dsleep(1)
                 continue
             for k, v in session.data.items():
-                if not isinstance(v, float):
+                if isinstance(v, dict):
                     for (key, value) in v.items():
                         for category in self.monitor_fields:
                             if key in self.monitor_fields[category]:
