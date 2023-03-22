@@ -278,18 +278,44 @@ class ACUAgent:
         """monitor()
 
         **Process** - Refresh the cache of SATP ACU status information and
-        report it on the 'acu_status_summary' and 'acu_status_full' HK feeds.
+        report it on the 'acu_status' and 'acu_status_influx' HK feeds.
 
         Summary parameters are ACU-provided time code, Azimuth mode,
         Azimuth position, Azimuth velocity, Elevation mode, Elevation position,
         Elevation velocity, Boresight mode, and Boresight position.
+
+        The session.data of this process is a nested dictionary.
+        Here's an example::
+
+        {
+          "StatusDetailed": {
+            "Time": 81.661170959322,
+            "Year": 2023,
+            "Azimuth mode": "Stop",
+            "Azimuth commanded position": -20.0012,
+            "Azimuth current position": -20.0012,
+            "Azimuth current velocity": 0.0002,
+            "Azimuth average position error": 0,
+            "Azimuth peak position error": 0,
+            "Azimuth computer disabled": false,
+            ...
+          },
+          "Status3rdAxis": {},
+          "StatusResponseRate": 19.237531827325963,
+          "PlatformType": "satp"
+        }
+
+        In the case of an SATP, the Status3rdAxis is not populated
+        (the Boresight info can be found in StatusDetailed).  In the
+        case of the LAT, the corotator info is queried separately and
+        stored under Status3rdAxis.
 
         """
 
         session.set_status('running')
         version = yield self.acu_read.http.Version()
         self.log.info(version)
-        session.data = {'platform': self.acu_config['platform']}
+        session.data = {'PlatformType': self.acu_config['platform']}
 
         # Numbering as per ICD.
         mode_key = {
@@ -362,9 +388,9 @@ class ACUAgent:
             j2 = yield self.acu_read.http.Values(self.acu3rdaxis)
         else:
             j2 = {}
-        session.data = {'StatusDetailed': j,
-                        'Status3rdAxis': j2,
-                        'StatusResponseRate': n_ok / (query_t - report_t)}
+        session.data.update({'StatusDetailed': j,
+                             'Status3rdAxis': j2,
+                             'StatusResponseRate': n_ok / (query_t - report_t)})
 
         was_remote = False
         last_resp_rate = None
@@ -556,8 +582,36 @@ class ACUAgent:
     def broadcast(self, session, params):
         """broadcast()
 
-        **Process** - Read UDP data from the port specified by self.acu_config,
-        decode it, and publish to an HK feed.
+        **Process** - Read UDP data from the port specified by
+        self.acu_config, decode it, and publish to HK feeds.  Full
+        resolution (200 Hz) data are written to feed "acu_udp_stream"
+        while 1 Hz decimated are written to "acu_broadcast_influx".
+        The 1 Hz decimated output are also stored in session.data.
+
+        The session.data looks like this (this is for a SATP running
+        with servo details in the UDP output)::
+
+          {
+            "Time": 1679499948.8234625,
+            "Corrected_Azimuth": -20.00112176010607,
+            "Corrected_Elevation": 50.011521050839434,
+            "Corrected_Boresight": 29.998428712246067,
+            "Raw_Azimuth": -20.00112176010607,
+            "Raw_Elevation": 50.011521050839434,
+            "Raw_Boresight": 29.998428712246067,
+            "Azimuth_Current_1": -0.000384521484375,
+            "Azimuth_Current_2": -0.0008331298828125,
+            "Elevation_Current_1": 0.003397979736328125,
+            "Boresight_Current_1": -0.000483856201171875,
+            "Boresight_Current_2": -0.000105743408203125,
+            "Azimuth_Vel_1": -0.000002288818359375,
+            "Azimuth_Vel_2": 0,
+            "Az_Vel_Act": -0.0000011444091796875,
+            "Az_Vel_Des": 0,
+            "Az_Vffw": 0,
+            "Az_Pos_Des": -20.00112176010607,
+            "Az_Pos_Err": 0
+          }
 
         """
         session.set_status('running')
