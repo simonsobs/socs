@@ -216,10 +216,8 @@ class G3FrameGenerator:
             # timestamps created by np.arange are lined up when there's an
             # integer sample rate
             t0, t1 = int(start) - 1, int(stop) + 1
-
-            # Note that error does build up here due to floating precision of
-            # 1./sample_rate, but for emulation this should be close enough
-            times = np.arange(t0, t1, 1. / self.sample_rate, dtype=np.float64)
+            nsamp = int((t1 - t0) * self.sample_rate)
+            times = np.linspace(t0, t1, nsamp + 1, endpoint=True)
             m = (start <= times) & (times < stop)
             times = times[m]
         else:
@@ -287,6 +285,7 @@ class DataStreamer:
         self.file_list = []
         self.frame_len = frame_len
         self.tag = tag
+        self._last_stop = None
 
     def _get_g3_filename(self):
         """
@@ -328,11 +327,16 @@ class DataStreamer:
         current file start time and the file duration. This sleep wait
         for the frame-duration before writing the G3Frame to disk.
         """
-        start = time.time()
+        if self._last_stop is None:
+            start = time.time()
+        else:
+            start = self._last_stop
+
         if (start - self.file_start > self.file_duration) or (self.writer is None):
             self._new_file()
         time.sleep(self.frame_len)
         stop = time.time()
+        self._last_stop = stop
         self.writer(self.frame_gen.get_data_frame(start, stop))
 
     def stream_between(self, start, stop, wait=False):
