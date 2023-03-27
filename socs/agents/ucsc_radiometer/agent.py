@@ -1,5 +1,6 @@
 import requests
 import txaio
+import time
 
 from os import environ
 from ocs import ocs_agent, site_config
@@ -56,6 +57,7 @@ class UCSCRadiometerAgent:
         while self.take_data:
             r = requests.get(self.url)
             data = r.json()
+            print('data', data)
             last_pwv = data['pwv']
             last_timestamp = data['timestamp']
 
@@ -65,7 +67,8 @@ class UCSCRadiometerAgent:
                     }
 
             if self.last_published_reading is not None:
-                if last_timestamp > self.last_published_reading[0]:
+                if last_timestamp > self.last_published_reading[1]:
+                    print('last_published_reading[1]', self.last_published_reading[1])
                     self.agent.publish_to_feed('pwvs', pwvs)
                     self.last_published_reading = (last_pwv, last_timestamp)
             else:
