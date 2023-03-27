@@ -1,6 +1,5 @@
 import requests
 import txaio
-import time
 
 from os import environ
 from ocs import ocs_agent, site_config
@@ -23,7 +22,7 @@ class UCSCRadiometerAgent:
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
-        
+
         self.url = url
         self.year = year
 
@@ -53,8 +52,8 @@ class UCSCRadiometerAgent:
             Run the Process loop only once. Meant only for testing.
             Default is False.
         """
-        pm = Pacemaker(1/60, quantize=False)
-        
+        pm = Pacemaker(1 / 60, quantize=False)
+
         self.take_data = True
         while self.take_data:
             pm.sleep()
