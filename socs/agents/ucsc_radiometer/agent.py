@@ -4,7 +4,7 @@ import time
 
 from os import environ
 from ocs import ocs_agent, site_config
-from ocs.ocs_twisted import TimeoutLock
+from ocs.ocs_twisted import TimeoutLock, Pacemaker
 
 
 class UCSCRadiometerAgent:
@@ -53,11 +53,14 @@ class UCSCRadiometerAgent:
             Run the Process loop only once. Meant only for testing.
             Default is False.
         """
+        pm = Pacemaker(1/60, quantize=False)
+        
         self.take_data = True
         while self.take_data:
+            pm.sleep()
+
             r = requests.get(self.url)
             data = r.json()
-            print('data', data)
             last_pwv = data['pwv']
             last_timestamp = data['timestamp']
 
@@ -68,7 +71,6 @@ class UCSCRadiometerAgent:
 
             if self.last_published_reading is not None:
                 if last_timestamp > self.last_published_reading[1]:
-                    print('last_published_reading[1]', self.last_published_reading[1])
                     self.agent.publish_to_feed('pwvs', pwvs)
                     self.last_published_reading = (last_pwv, last_timestamp)
             else:
