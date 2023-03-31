@@ -79,5 +79,3 @@ Agent API
     :members:
 
 .. autoclass:: socs.agents.hwp_supervisor.agent.get_op_data
-
-

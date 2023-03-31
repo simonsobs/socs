@@ -21,7 +21,7 @@ def get_op_data(agent_id, op_name, log=None, test_mode=False):
         Operation from which to grab session data
     log : logger, optional
         Log object
-    
+
     Returns
     -----------
     Returns a dictionary with the following fields:
@@ -146,7 +146,7 @@ class HWPSupervisor:
                     'temperature': {see above},
                     'ups': {see above}},
                 # State data parsed from monitored sessions
-                'state': {   
+                'state': {
                     'hwp_temp': None,
                     'hwp_temp_status': 'no_data',
                     'hwp_freq': None,
