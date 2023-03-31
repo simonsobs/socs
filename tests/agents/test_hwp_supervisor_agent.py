@@ -29,5 +29,6 @@ def test_hwp_supervisor_agent():
     session = create_session('monitor')
     params = {'test_mode': True}
     agent.monitor(session, params)
-    assert session.data['hwp_temperature']['status'] == 'no_agent_provided'
-    assert session.data['hwp_encoder']['status'] == 'test_mode'
+    monitored_sessions = session.data['monitored_sessions']
+    assert monitored_sessions['temperature']['status'] == 'no_agent_provided'
+    assert monitored_sessions['encoder']['status'] == 'test_mode'
