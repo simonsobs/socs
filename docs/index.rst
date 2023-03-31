@@ -44,6 +44,7 @@ API Reference        Full API documentation for core parts of the SOCS library.
     agents/hwp_encoder
     agents/hwp_picoscope
     agents/hwp_rotation_agent
+    agents/hwp_supervisor_agent
     agents/holo_fpga
     agents/holo_synth
     agents/ibootbar
