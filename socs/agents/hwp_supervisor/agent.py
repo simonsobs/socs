@@ -21,6 +21,31 @@ def get_op_data(agent_id, op_name, log=None, test_mode=False):
         Operation from which to grab session data
     log : logger, optional
         Log object
+    
+    Returns
+    -----------
+    Returns a dictionary with the following fields:
+
+    agent_id: str
+        Instance id for the agent being queried
+    op_name : str
+        Operation name being queried
+    timestamp : float
+        Time the operation status was queried
+    data : dict
+        Session data of the operation. This will be ``None`` if we can't connect
+        to the operation.
+    status : str
+        Connection status of the operation. This can be the following:
+
+        - ``no_agent_provided``: if the passed agent_id is None
+        - ``test_mode``: if ``test_mode=True``, this will be the status and no
+          operation will be queried.
+        - ``op_not_found``: This means the operation could not be found, likely
+          meaning the agent isn't running
+        - ``no_active_session``: This means the operation specified exists but
+           was never run.
+        - ``ok``: Operation and session.data exist
     """
     if log is None:
         log = txaio.make_logger()
@@ -43,7 +68,7 @@ def get_op_data(agent_id, op_name, log=None, test_mode=False):
     try:
         _, _, session = OCSReply(*client.request('status', op_name))
     except client_http.ControlClientError as e:
-        self.log.warn('Error getting status: {e}', e=e)
+        log.warn('Error getting status: {e}', e=e)
         data['status'] = 'op_not_found'
         return data
 
@@ -73,7 +98,7 @@ class HWPSupervisor:
         self.ups_id = args.ups_id
 
     def parse_hwp_temp(self, op_data):
-        if op_data['state'] != 'ok':
+        if op_data['status'] != 'ok':
             return None, 'no_data'
 
         fields = op_data['data']['fields']
@@ -86,11 +111,50 @@ class HWPSupervisor:
         else:
             return hwp_temp, 'ok'
 
-    @ocs_agent.param('test_mode', type=bool)
+    @ocs_agent.param('test_mode', type=bool, default=False)
     def monitor(self, session, params):
         """monitor()
 
-        *Process* -- Monitors various HWP related HK systems
+        *Process* -- Monitors various HWP related HK systems.
+
+        This operation has three main steps:
+
+        - Query session data for all HWP and HWP adjacent agents. Session info for each
+          queried operation will be stored in the ``monitored_sessions`` field of the
+          session data. See the docs for the ``get_op_data`` function for information on
+          what info will be saved.
+        - Parse session-data from monitored operations to create the ``state`` dict,
+          containing info such as ``hwp_temp`` and ``hwp_freq``.
+        - Determine subsystem actions based on the HWP state, which will be stored in
+          the ``actions`` dict which can be read by hwp subsystems to initiate a
+          shutdown
+
+        An example of the session data::
+
+            >>> response.session['data']
+
+                {'timestamp': 1601924482.722671,
+                'monitored_sessions': {
+                    'encoder': {
+                        'agent_id': 'test',
+                        'data': <session data for test.acq>,
+                        'op_name': 'acq',
+                        'status': 'ok',
+                        'timestamp': 1680273288.6200094},
+                    },
+                    'rotation': {see above},
+                    'temperature': {see above},
+                    'ups': {see above}},
+                # State data parsed from monitored sessions
+                'state': {   
+                    'hwp_temp': None,
+                    'hwp_temp_status': 'no_data',
+                    'hwp_freq': None,
+                },
+                # Subsystem action recommendations determined from state data
+                'actions': {
+                    'rotation': 'no_data'
+                }}
         """
         pm = Pacemaker(1. / self.sleep_time)
         test_mode = params.get('test_mode', False)
@@ -132,12 +196,11 @@ class HWPSupervisor:
             }
 
             # Get actions for each hwp subsystem
+            rot_action = 'ok'
             if hwp_temp_status == 'over':
                 rot_action = 'stop'
-            elif hwp_temp_status == 'nodata':
+            elif hwp_temp_status == 'no_data':
                 rot_action = 'no_data'
-            elif hwp_temp_status == 'ok':
-                rot_action = 'ok'
 
             # TODO: Add gripper and encoder action
 
