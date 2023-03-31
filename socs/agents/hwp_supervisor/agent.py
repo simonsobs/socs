@@ -2,10 +2,10 @@ import argparse
 import time
 from collections import defaultdict
 
+import txaio
 from ocs import client_http, ocs_agent, site_config
 from ocs.ocs_client import OCSClient, OCSReply
 from ocs.ocs_twisted import Pacemaker
-import txaio
 
 
 def get_op_data(agent_id, op_name, log=None, test_mode=False):
@@ -72,21 +72,19 @@ class HWPSupervisor:
         self.hwp_rotation_id = args.hwp_rotation_id
         self.ups_id = args.ups_id
 
-
     def parse_hwp_temp(self, op_data):
         if op_data['state'] != 'ok':
             return None, 'no_data'
-        
+
         fields = op_data['data']['fields']
         if self.hwp_temp_field not in fields:
             return None, 'no_data'
-        
+
         hwp_temp = fields[self.hwp_temp_field]['T']
         if hwp_temp > self.hwp_temp_thresh:
             return hwp_temp, 'over'
         else:
             return hwp_temp, 'ok'
-
 
     @ocs_agent.param('test_mode', type=bool)
     def monitor(self, session, params):
@@ -125,8 +123,8 @@ class HWPSupervisor:
             hwp_freq = None
             if enc_op['status'] == 'ok':
                 hwp_freq = enc_op['data']['approx_hwp_freq']
-            
-            # TODO: Add UPS state 
+
+            # TODO: Add UPS state
 
             session.data['state'] = {
                 'hwp_temp': hwp_temp, 'hwp_temp_status': hwp_temp_status,
@@ -168,7 +166,7 @@ def make_parser(parser=None):
 
     pgroup.add_argument('--hwp-lakeshore-id',
                         help="Instance ID for lakeshore reading out HWP temp")
-    pgroup.add_argument('--hwp-temp-field', 
+    pgroup.add_argument('--hwp-temp-field',
                         help='Field name of lakeshore channel reading out HWP temp')
     pgroup.add_argument('--hwp-temp-thresh', type=float,
                         help="Threshold for HWP temp.")
