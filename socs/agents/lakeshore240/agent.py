@@ -224,7 +224,7 @@ class LS240_Agent:
                     self.agent.start('init_lakeshore')
                     self.agent.wait('init_lakeshore')
 
-                # Only get readings if connected    
+                # Only get readings if connected
                 if self.initialized:
                     session.data.update({'connection': {'last_attempt': time.time(),
                                                         'connected': True}})
@@ -235,12 +235,12 @@ class LS240_Agent:
                         try:
                             temp_reading = chan.get_reading(unit='K')
                             sensor_reading = chan.get_reading(unit='S')
-                        except:
+                        except BaseException:
                             self.log.info('No reponse. Check your connection.')
                             self.initialized = False
                             time.sleep(1)
                             break
-                        
+
                         # For data feed
                         data['data'][chan_string + '_T'] = temp_reading
                         data['data'][chan_string + '_V'] = sensor_reading
