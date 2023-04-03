@@ -182,6 +182,8 @@ class LS240_Agent:
                  "Channel_6": {"T": 99.58, "V": 101.75},
                  "Channel_7": {"T": 98.03, "V": 100.82},
                  "Channel_8": {"T": 101.14, "V":101.01}},
+                {'connection': {'last_attempt': 1601925677.6914878,
+                                'connected': True}}
              "timestamp":1601925677.6914878}
 
         """
