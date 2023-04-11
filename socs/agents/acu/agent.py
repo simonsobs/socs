@@ -1,4 +1,5 @@
 import argparse
+import random
 import struct
 import time
 from enum import Enum
@@ -7,6 +8,7 @@ import numpy as np
 import soaculib as aculib
 import soaculib.status_keys as status_keys
 import twisted.web.client as tclient
+import yaml
 from autobahn.twisted.util import sleep as dsleep
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
@@ -15,6 +17,8 @@ from twisted.internet import protocol, reactor
 from twisted.internet.defer import DeferredList, inlineCallbacks
 
 import socs.agents.acu.drivers as sh
+
+from . import exercisor
 
 #: The number of free ProgramTrack positions, when stack is empty.
 FULL_STACK = 10000
@@ -29,14 +33,18 @@ class ACUAgent:
         acu_config (str):
             The configuration for the ACU, as referenced in aculib.configs.
             Default value is 'guess'.
-
+        exercise_plan (str):
+            The full path to a scan config file describing motions to cycle
+            through on the ACU.  If this is None, the associated process and
+            feed will not be registered.
     """
 
-    def __init__(self, agent, acu_config='guess'):
+    def __init__(self, agent, acu_config='guess', exercise_plan=None):
         # Separate locks for exclusive access to az/el, and boresight motions.
         self.azel_lock = TimeoutLock()
         self.boresight_lock = TimeoutLock()
 
+        self.acu_config_name = acu_config
         self.acu_config = aculib.guess_config(acu_config)
         self.sleeptime = self.acu_config['motion_waittime']
         self.udp = self.acu_config['streams']['main']
@@ -49,6 +57,8 @@ class ACUAgent:
         self.acu3rdaxis = self.acu_config['status'].get('3rdaxis_name')
         self.monitor_fields = status_keys.status_fields[self.acu_config['platform']]['status_fields']
         self.motion_limits = self.acu_config['motion_limits']
+
+        self.exercise_plan = exercise_plan
 
         self.log = agent.log
 
@@ -159,6 +169,17 @@ class ACUAgent:
         agent.register_task('clear_faults',
                             self.clear_faults,
                             blocking=False)
+
+        # Automatic exercise program...
+        if exercise_plan:
+            agent.register_process(
+                'exercise', self.exercise, self._simple_process_stop)
+            self.agent.register_feed('activity',
+                                     record=True,
+                                     buffer_time=0,
+                                     agg_params={
+                                         'frame_length': 600,
+                                     })
 
     @inlineCallbacks
     def _simple_task_abort(self, session, params):
@@ -1377,12 +1398,135 @@ class ACUAgent:
 
         return True, 'Track ended cleanly'
 
+    @ocs_agent.param('starting_index', type=int, default=0)
+    def exercise(self, session, params):
+        """exercise()
+
+        **Process** - Run telescope platform through some pre-defined motions.
+
+        For historical reasons, this does not command agent functions
+        internally, but rather instantiates a *client* and calls the
+        agent as though it were an external entity.
+
+        """
+        # Load the exercise plan.
+        plans = yaml.safe_load(open(self.exercise_plan, 'rb'))
+        super_plan = exercisor.get_plan(plans[self.acu_config_name])
+
+        session.data = {
+            'timestamp': time.time(),
+            'iterations': 0,
+            'attempts': 0,
+            'errors': 0,
+        }
+        session.set_status('running')
+
+        def _publish_activity(activity):
+            msg = {
+                'block_name': 'A',
+                'timestamp': time.time(),
+                'data': {'activity': activity},
+            }
+            self.agent.publish_to_feed('activity', msg)
+
+        def _publish_error(delta_error=1):
+            session.data['errors'] += delta_error
+            msg = {
+                'block_name': 'B',
+                'timestamp': time.time(),
+                'data': {'error_count': session.data['errors']}
+            }
+            self.agent.publish_to_feed('activity', msg)
+
+        def _exit_now(ok, msg):
+            _publish_activity('idle')
+            self.agent.feeds['activity'].flush_buffer()
+            return ok, msg
+
+        _publish_activity('idle')
+        _publish_error(0)
+
+        target_instance_id = self.agent.agent_address.split('.')[-1]
+        exercisor.set_client(target_instance_id)
+        settings = super_plan.get('settings', {})
+
+        plan_idx = 0
+        plan_t = None
+
+        for plan in super_plan['steps']:
+            plan['iter'] = iter(plan['driver'])
+
+        while session.status in ['running']:
+            time.sleep(1)
+            session.data['timestamp'] = time.time()
+            session.data['iterations'] += 1
+
+            # Fault maintenance
+            faults = exercisor.get_faults()
+            if faults['safe_lock']:
+                self.log.info('SAFE lock detected, exiting')
+                return _exit_now(False, 'Exiting on SAFE lock.')
+
+            if faults['local_mode']:
+                self.log.info('LOCAL mode detected, exiting')
+                return _exit_now(False, 'Exiting on LOCAL mode.')
+
+            if faults['az_summary']:
+                if session.data['attempts'] > 5:
+                    self.log.info('Too many az summary faults, exiting.')
+                    return _exit_now(False, 'Too many az summary faults.')
+                session.data['attempts'] += 1
+                self.log.info('az summary fault -- trying to clear.')
+                exercisor.clear_faults()
+                time.sleep(10)
+                continue
+
+            session.data['attempts'] = 0
+
+            # Plan execution
+            active_plan = super_plan['steps'][plan_idx]
+            if plan_t is None:
+                plan_t = time.time()
+
+            now = time.time()
+            if now - plan_t > active_plan['duration']:
+                plan_idx = (plan_idx + 1) % len(super_plan['steps'])
+                plan_t = None
+                continue
+
+            if settings.get('use_boresight'):
+                bore_target = random.choice(settings['boresight_opts'])
+                self.log.info(f'Setting boresight={bore_target}...')
+                _publish_activity('boresight')
+                exercisor.set_boresight(bore_target)
+
+            plan, info = next(active_plan['iter'])
+
+            self.log.info(f'Launching next scan. plan={plan}')
+
+            _publish_activity(active_plan['driver'].code)
+            ok = None
+            if 'targets' in plan:
+                exercisor.steps(**plan)
+            else:
+                exercisor.scan(**plan)
+            _publish_activity('idle')
+
+            if ok is None:
+                self.log.info('Scan completed without error.')
+            else:
+                self.log.info(f'Scan exited with error: {ok}')
+                _publish_error()
+
+        return _exit_now(True, "Stopped run process")
+
 
 def add_agent_args(parser_in=None):
     if parser_in is None:
         parser_in = argparse.ArgumentParser()
     pgroup = parser_in.add_argument_group('Agent Options')
     pgroup.add_argument("--acu_config")
+    pgroup.add_argument("--exercise_plan")
     return parser_in
 
 
@@ -1392,7 +1536,7 @@ def main(args=None):
                                   parser=parser,
                                   args=args)
     agent, runner = ocs_agent.init_site_agent(args)
-    _ = ACUAgent(agent, args.acu_config)
+    _ = ACUAgent(agent, args.acu_config, args.exercise_plan)
 
     runner.run(agent, auto_reconnect=True)
 
