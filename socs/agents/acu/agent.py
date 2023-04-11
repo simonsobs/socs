@@ -236,15 +236,29 @@ class ACUAgent:
         """
 
         session.set_status('running')
-        version = yield self.acu_read.http.Version()
-        self.log.info(version)
 
         # Note that session.data will get scanned, to assign data to
         # feed blocks.  Items in session.data that are themselves
         # dicts will parsed; but items (such as PlatformType and
         # StatusResponseRate) which are simple strings or floats will
         # be ignored for feed assignment.
-        session.data = {'PlatformType': self.acu_config['platform']}
+        session.data = {'PlatformType': self.acu_config['platform'],
+                        'connected': False}
+
+        last_complaint = 0
+        while True:
+            try:
+                version = yield self.acu_read.http.Version()
+                break
+            except Exception as e:
+                if time.time() - last_complaint > 3600:
+                    errormsg = {'aculib_error_message': str(e)}
+                    self.log.error(str(e))
+                    self.log.error('monitor process failed to query version! Will keep trying.')
+                    last_complaint = time.time()
+                yield dsleep(10)
+        self.log.info(version)
+        session.data['connected'] = True
 
         # Numbering as per ICD.
         mode_key = {
@@ -347,17 +361,21 @@ class ACUAgent:
                     j2 = yield self.acu_read.http.Values(self.acu3rdaxis)
                 else:
                     j2 = {}
-                session.data.update({'StatusDetailed': j, 'Status3rdAxis': j2})
+                session.data.update({'StatusDetailed': j, 'Status3rdAxis': j2,
+                                     'connected': True})
                 n_ok += 1
+                last_complaint = 0
             except Exception as e:
-                # Need more error handling here...
-                errormsg = {'aculib_error_message': str(e)}
-                self.log.error(str(e))
-                acu_error = {'timestamp': time.time(),
-                             'block_name': 'ACU_error',
-                             'data': errormsg
-                             }
-                self.agent.publish_to_feed('acu_error', acu_error)
+                if now - last_complaint > 3600:
+                    errormsg = {'aculib_error_message': str(e)}
+                    self.log.error(str(e))
+                    acu_error = {'timestamp': time.time(),
+                                 'block_name': 'ACU_error',
+                                 'data': errormsg
+                                 }
+                    self.agent.publish_to_feed('acu_error', acu_error)
+                    last_complaint = time.time()
+                    session.data['connected'] = False
                 yield dsleep(1)
                 continue
             for k, v in session.data.items():
