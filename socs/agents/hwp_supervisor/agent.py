@@ -104,19 +104,19 @@ class HWPSupervisor:
         if hwp_temp is not None and self.hwp_temp_thresh is not None:
             if hwp_temp > self.hwp_temp_thresh:
                 return 'stop'
-        
+
         minutes_remaining = state['ups_estimated_minutes_remaining']
         if minutes_remaining is not None:
             if minutes_remaining < self.ups_minutes_remaining_thresh:
                 return 'stop'
-        
+
         # If either hwp_temp or ups state is None, return no_data
         for val in [hwp_temp, minutes_remaining]:
             if val is None:
                 return 'no_data'
-        
+
         return 'ok'
-    
+
     def _get_gripper_action(self, state):
         """
         Gets the gripper action based on the current state of the system.
@@ -129,10 +129,10 @@ class HWPSupervisor:
             return 'ok'
         if rot_action == 'no_data':
             return 'no_data'
-        
+
         hwp_freq = state['hwp_freq']
         if hwp_freq is None:
-            return 'no_data'  
+            return 'no_data'
         elif hwp_freq > 0:
             return 'ok'
         else:  # Only grip if the hwp_freq is exactly 0
@@ -164,7 +164,7 @@ class HWPSupervisor:
                 state['hwp_temp_status'] = 'over'
 
         return state
-    
+
     def _update_state_ups(self, ups_op, state):
         """
         Updates state dict with UPS data.
@@ -182,17 +182,17 @@ class HWPSupervisor:
             for k in ups_keymap:
                 state[k] = None
             return
-        
+
         # get oid
         data = ups_op['data']
         for k in data:
             if k.startswith('upsOutputSource'):
                 ups_oid = k.split('_')[1]
                 break
-        
+
         for k, field in ups_keymap.items():
             state[k] = data[f'{field[0]}_{ups_oid}'][field[1]]
-        
+
         return state
 
     @ocs_agent.param('test_mode', type=bool, default=False)
@@ -262,13 +262,13 @@ class HWPSupervisor:
             ups_op = get_op_data(self.ups_id, 'acq', **kw)
 
             session.data['monitored_sessions'] = {
-                'temperature': temp_op, 
-                'encoder': enc_op, 
+                'temperature': temp_op,
+                'encoder': enc_op,
                 'rotation': rot_op,
                 'ups': ups_op
             }
 
-            # gather state info 
+            # gather state info
             state = {}
             self._update_state_temp(temp_op, state)
             self._update_state_ups(ups_op, state)
@@ -279,13 +279,12 @@ class HWPSupervisor:
                 state['hwp_freq'] = None
 
             session.data['state'] = state
-            
+
             # Get actions for each hwp subsystem
             session.data['actions'] = {
                 'rotation': self._get_rotator_action(state),
                 'gripper': self._get_gripper_action(state),
             }
-
 
             if test_mode:
                 break
