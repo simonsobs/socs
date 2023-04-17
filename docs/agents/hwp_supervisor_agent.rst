@@ -1,6 +1,6 @@
 .. highlight:: rst
 
-.. _chwp_encoder:
+.. _hwp_supervisor:
 
 =====================
 HWP Supervisor Agent
