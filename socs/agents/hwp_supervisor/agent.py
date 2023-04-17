@@ -350,6 +350,13 @@ class HWPSupervisor:
                 {'forward': True,
                 'commanded_freq': 2.0,
                 'pid_freq': 1.2}
+        
+        Parameters
+        ------------
+        forward : bool
+            If True, will spin the HWP in the forward direction.
+        freq : float
+            Frequency to command with the HWP PID.
         """
         clients = self._get_hwp_clients()
 
@@ -380,9 +387,7 @@ class HWPSupervisor:
     def spin_down(self, session, params):
         """spin_down(pid_freq_thresh=0.2, use_pid=True)
 
-        *Task* -- Commands the HWP to spin down. If ``use_pid=True``, this will
-        use the PID to quickly spin down the HWP. If ``use_pid=False``, this
-        will tell the rotation agent to just cut the power.
+        *Task* -- Commands the HWP to spin down.
 
         An example of the session data::
 
@@ -391,6 +396,16 @@ class HWPSupervisor:
                 {'pid_freq': 0.6,
                  'pid_freq_thresh': 0.2,
                  'use_pid': True}
+        
+        Parameters
+        ------------
+        pid_freq_thresh : float
+            When the PID freq drops below this threshold, rotation power supply
+            will be cut off.
+        use_pid : bool
+            If True, will use the PID to spin down the HWP. If False, will
+            just tell the rotation agent to cut power.
+            
         """
         clients = self._get_hwp_clients()
 
