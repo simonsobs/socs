@@ -1,9 +1,6 @@
 from unittest import mock
 
-import numpy as np
-import pytest
 import txaio
-from ocs import site_config
 from ocs.ocs_agent import OpSession
 
 from socs.agents.hwp_supervisor.agent import HWPSupervisor, make_parser

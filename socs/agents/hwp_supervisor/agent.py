@@ -3,7 +3,7 @@ import time
 
 import txaio
 from ocs import client_http, ocs_agent, site_config
-from ocs.ocs_client import OCSClient, OCSReply
+from ocs.ocs_client import OCSReply
 from ocs.ocs_twisted import Pacemaker
 
 
@@ -47,7 +47,7 @@ def get_op_data(agent_id, op_name, log=None, test_mode=False):
         - ``ok``: Operation and session.data exist
     """
     if log is None:
-        log = txaio.make_logger()
+        log = txaio.make_logger()  # pyright: ignore
 
     data = {
         'agent_id': agent_id,
@@ -189,6 +189,9 @@ class HWPSupervisor:
             if k.startswith('upsOutputSource'):
                 ups_oid = k.split('_')[1]
                 break
+        else:
+            self.log.error(f"Could not find OID for {self.ups_id}")
+            return
 
         for k, field in ups_keymap.items():
             state[k] = data[f'{field[0]}_{ups_oid}'][field[1]]
