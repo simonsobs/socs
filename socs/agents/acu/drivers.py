@@ -107,23 +107,19 @@ def from_file(filename):
     the file, all flags are set to 0 to accommodate non-linear scans
     """
     info = np.load(filename)
-    if len(info) < 5:
-        raise TypeError('Not enough fields in numpy file! Expected '
-                        '5 fields.')
+    if len(info) not in [5, 7]:
+        raise ValueError(f'Unexpected field count ({len(info)}) in {filename}')
     conctimes = info[0]
     concaz = info[1]
     concel = info[2]
     concva = info[3]
     concve = info[4]
     if len(info) == 5:
-        az_flags = np.array([0 for x in range(len(conctimes))])
+        az_flags = np.zeros(len(conctimes), int)
         el_flags = az_flags
     elif len(info) == 7:
-        az_flags = info[5]
-        el_flags = info[6]
-    else:
-        print('File has too many parameters!')
-        return False
+        az_flags = info[5].astype('int')
+        el_flags = info[6].astype('int')
     return conctimes, concaz, concel, concva, concve, az_flags, el_flags
 
 
