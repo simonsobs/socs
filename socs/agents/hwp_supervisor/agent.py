@@ -1,10 +1,13 @@
 import argparse
 import time
+from dataclasses import dataclass
+from typing import Optional
 
 import txaio
 from ocs import client_http, ocs_agent, site_config
-from ocs.ocs_client import OCSReply
+from ocs.ocs_client import OCSReply, OCSClient
 from ocs.ocs_twisted import Pacemaker
+from ocs.client_http import ControlClientError
 
 
 def get_op_data(agent_id, op_name, log=None, test_mode=False):
@@ -80,6 +83,14 @@ def get_op_data(agent_id, op_name, log=None, test_mode=False):
     return data
 
 
+@dataclass
+class HWPClients:
+    encoder: Optional[OCSClient] = None
+    rotation: Optional[OCSClient] = None
+    ups: Optional[OCSClient] = None
+    lakeshore: Optional[OCSClient] = None
+
+
 class HWPSupervisor:
     def __init__(self, agent, args):
         self.agent = agent
@@ -97,6 +108,24 @@ class HWPSupervisor:
         self.ups_id = args.ups_id
         self._ups_oid = None
         self.ups_minutes_remaining_thresh = args.ups_minutes_remaining_thresh
+    
+    def _get_hwp_clients(self):
+        def get_client(id):
+            if id is None:
+                return None
+            try:
+                return  OCSClient(id)
+            except ControlClientError:
+                self.log.error("Could not connect to client: {id}", id=id)
+                return None
+
+        return HWPClients(
+            encoder=get_client(self.hwp_encoder_id),
+            rotation=get_client(self.hwp_rotation_id),
+            ups=get_client(self.ups_id),
+            lakeshore=get_client(self.hwp_lakeshore_id)
+        )
+
 
     def _get_rotator_action(self, state):
         # First check if either ups or temp are beyond a threshold
@@ -216,7 +245,8 @@ class HWPSupervisor:
           the ``actions`` dict which can be read by hwp subsystems to initiate a
           shutdown
 
-        An example of the session data::
+        An example of the session data, along with possible options for status
+        strings can be seen below::
 
             >>> response.session['data']
 
@@ -226,7 +256,7 @@ class HWPSupervisor:
                         'agent_id': 'test',
                         'data': <session data for test.acq>,
                         'op_name': 'acq',
-                        'status': 'ok',
+                        'status': 'ok',  # See ``get_op_data`` docstring for choices
                         'timestamp': 1680273288.6200094},
                     },
                     'rotation': {see above},
@@ -234,13 +264,20 @@ class HWPSupervisor:
                     'ups': {see above}},
                 # State data parsed from monitored sessions
                 'state': {
-                    'hwp_temp': None,
-                    'hwp_temp_status': 'no_data',
                     'hwp_freq': None,
+                    'hwp_temp': 20.0,
+                    'hwp_temp_status': 'ok',  # `no_data`, `ok`, or `over`
+                    'hwp_temp_thresh': 75.0,
+                    'ups_battery_current': 0,
+                    'ups_battery_voltags': 136,
+                    'ups_estimated_minutes_remaining': 50,
+                    'ups_minutes_remaining_thresh': 45.0,
+                    'ups_output_source': 'normal'  # See UPS agent docs for choices
                 },
-                # Subsystem action recommendations determined from state data
+                 # Subsystem action recommendations determined from state data
                 'actions': {
-                    'rotation': 'no_data'
+                    'rotation': 'ok'  # 'ok', 'stop', or 'no_data'
+                    'grippder': 'ok'  # 'ok', 'stop', or 'no_data'
                 }}
         """
         pm = Pacemaker(1. / self.sleep_time)
@@ -299,6 +336,91 @@ class HWPSupervisor:
     def _stop_monitor(self, session, params):
         session.status = 'stopping'
         return True, 'Stopping monitor process'
+    
+    @ocs_agent.param('forward', type=bool, default=True)
+    @ocs_agent.param('freq', type=float)
+    def spin_up(self, session, params):
+        """spin_up(forward=True, freq=2.0)
+
+        *Task* -- Sets the HWP to spin at a given frequency.
+
+        An example of the session data::
+
+            >>> response.session['data']
+
+                {'forward': True,
+                'commanded_freq': 2.0,
+                'pid_freq': 1.2}
+        """
+        clients = self._get_hwp_clients()
+
+        direction = '0' if params['forward'] else '1'
+        clients.rotation.set_direction(direction=direction)
+        session.add_message("Set rotation direction: forward={}".format(params['forward']))
+
+        clients.rotation.declare_freq(freq=params['freq'])
+        clients.rotation.tune_freq()
+        clients.rotation.set_on()
+        session.add_messsage("Tuning PID to {:.2f} Hz".format(params['freq']))
+
+        session.data = {'forward': params['forward'], 
+                        'commanded_freq': params['freq'],
+                        'pid_freq': 0}
+        while True:
+            _, _, s = clients.rotation.get_freq()
+            cur_freq = s.data['freq']
+            session.data['pid_freq'] = cur_freq
+            if cur_freq - params['freq'] < 0.005:
+                break
+            time.sleep(0.5)
+        
+        return True, f'HWP spinning at {cur_freq:.2f} Hz'
+    
+    @ocs_agent.param('pid_freq_thresh', type=float, default=0.2)
+    @ocs_agent.param('use_pid', type=bool, default=True)
+    def spin_down(self, session, params):
+        """spin_down(pid_freq_thresh=0.2, use_pid=True)
+
+        *Task* -- Commands the HWP to spin down. If ``use_pid=True``, this will
+        use the PID to quickly spin down the HWP. If ``use_pid=False``, this
+        will tell the rotation agent to just cut the power.
+
+        An example of the session data::
+
+            >>> response.session['data']
+
+                {'pid_freq': 0.6,
+                 'pid_freq_thresh': 0.2,
+                 'use_pid': True}
+        """
+        clients = self._get_hwp_clients()
+
+        if not params.use_pid:
+            clients.rotation.set_off()
+            session.data = {
+                'pid_freq': None,
+                'pid_freq_thresh': params['pid_freq_thresh'],
+                'use_pid': params['use_pid']
+            }
+            return True, "Commanded HWP to stop spinning"
+
+        clients.rotation.tune_stop()
+        clients.rotation.set_on()
+        session.add_messsage("Tuning PID to stop")
+
+        session.data = {
+            'pid_freq_thresh': params.pid_freq_thresh,
+            'use_pid': params.use_pid
+        }
+        while True:
+            _, _, s = clients.rotation.get_freq()
+            cur_freq = s.data['freq']
+            session.data['pid_freq'] = cur_freq
+            if cur_freq < params.pid_freq_thresh:
+                break
+        
+        clients.rotation.set_off()
+        return True, "Commanded HWP to stop spinning"
 
 
 def make_parser(parser=None):
@@ -338,6 +460,8 @@ def main(args=None):
 
     agent.register_process('monitor', hwp.monitor, hwp._stop_monitor,
                            startup=True)
+    agent.register_task('spin_up', hwp.spin_up)
+    agent.register_task('spin_down', hwp.spin_down)
 
     runner.run(agent, auto_reconnect=True)
 

@@ -187,6 +187,7 @@ class RotationAgent:
                 return False, 'Could not acquire lock'
 
             freq = self.pid.get_freq()
+            session.data = {'freq': freq}
 
         return True, 'Current frequency = {}'.format(freq)
 
