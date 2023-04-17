@@ -5,9 +5,9 @@ from typing import Optional
 
 import txaio
 from ocs import client_http, ocs_agent, site_config
-from ocs.ocs_client import OCSReply, OCSClient
-from ocs.ocs_twisted import Pacemaker
 from ocs.client_http import ControlClientError
+from ocs.ocs_client import OCSClient, OCSReply
+from ocs.ocs_twisted import Pacemaker
 
 
 def get_op_data(agent_id, op_name, log=None, test_mode=False):
@@ -108,13 +108,13 @@ class HWPSupervisor:
         self.ups_id = args.ups_id
         self._ups_oid = None
         self.ups_minutes_remaining_thresh = args.ups_minutes_remaining_thresh
-    
+
     def _get_hwp_clients(self):
         def get_client(id):
             if id is None:
                 return None
             try:
-                return  OCSClient(id)
+                return OCSClient(id)
             except ControlClientError:
                 self.log.error("Could not connect to client: {id}", id=id)
                 return None
@@ -125,7 +125,6 @@ class HWPSupervisor:
             ups=get_client(self.ups_id),
             lakeshore=get_client(self.hwp_lakeshore_id)
         )
-
 
     def _get_rotator_action(self, state):
         # First check if either ups or temp are beyond a threshold
@@ -336,7 +335,7 @@ class HWPSupervisor:
     def _stop_monitor(self, session, params):
         session.status = 'stopping'
         return True, 'Stopping monitor process'
-    
+
     @ocs_agent.param('forward', type=bool, default=True)
     @ocs_agent.param('freq', type=float)
     def spin_up(self, session, params):
@@ -363,7 +362,7 @@ class HWPSupervisor:
         clients.rotation.set_on()
         session.add_messsage("Tuning PID to {:.2f} Hz".format(params['freq']))
 
-        session.data = {'forward': params['forward'], 
+        session.data = {'forward': params['forward'],
                         'commanded_freq': params['freq'],
                         'pid_freq': 0}
         while True:
@@ -373,9 +372,9 @@ class HWPSupervisor:
             if cur_freq - params['freq'] < 0.005:
                 break
             time.sleep(0.5)
-        
+
         return True, f'HWP spinning at {cur_freq:.2f} Hz'
-    
+
     @ocs_agent.param('pid_freq_thresh', type=float, default=0.2)
     @ocs_agent.param('use_pid', type=bool, default=True)
     def spin_down(self, session, params):
@@ -418,7 +417,7 @@ class HWPSupervisor:
             session.data['pid_freq'] = cur_freq
             if cur_freq < params.pid_freq_thresh:
                 break
-        
+
         clients.rotation.set_off()
         return True, "Commanded HWP to stop spinning"
 
