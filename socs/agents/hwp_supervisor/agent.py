@@ -200,7 +200,7 @@ class HWPSupervisor:
         ups_keymap = {
             'ups_output_source': ('upsOutputSource', 'description'),
             'ups_estimated_minutes_remaining': ('upsEstimatedMinutesRemaining', 'status'),
-            'ups_battery_voltags': ('upsBatteryVoltage', 'status'),
+            'ups_battery_voltage': ('upsBatteryVoltage', 'status'),
             'ups_battery_current': ('upsBatteryCurrent', 'status'),
         }
 
