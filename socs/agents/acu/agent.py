@@ -1,6 +1,4 @@
 import argparse
-import calendar
-import datetime
 import struct
 import time
 from enum import Enum
@@ -579,18 +577,8 @@ class ACUAgent:
 
                 process_data = udp_data[:200]
                 udp_data = udp_data[200:]
-                year = datetime.datetime.now().year
-                gyear = calendar.timegm(time.strptime(str(year), '%Y'))
-                # if len(process_data):
-                #     sample_rate = (len(process_data)
-                #                    / ((process_data[-1][0] - process_data[0][0]) * 86400
-                #                    + process_data[-1][1] - process_data[0][1]))
-                # else:
-                #     sample_rate = 0.0
                 for d in process_data:
-                    gday = (d[0] - 1) * 86400
-                    sec = d[1]
-                    data_ctime = gyear + gday + sec
+                    data_ctime = sh.timecode(d[0] + d[1] / sh.DAY)
                     self.data['broadcast']['Time'] = data_ctime
                     influx_data['Time_bcast_influx'].append(data_ctime)
                     for i in range(2, len(d)):
