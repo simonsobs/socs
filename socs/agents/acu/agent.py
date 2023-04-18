@@ -218,10 +218,6 @@ class ACUAgent:
                             self.go_to,
                             blocking=False,
                             aborter=self._simple_task_abort)
-        agent.register_task('constant_velocity_scan',
-                            self.constant_velocity_scan,
-                            blocking=False,
-                            aborter=self._abort_motion_op_azel)
         agent.register_task('fromfile_scan',
                             self.fromfile_scan,
                             blocking=False,
@@ -232,12 +228,6 @@ class ACUAgent:
                             aborter=self._simple_task_abort)
         agent.register_task('stop_and_clear',
                             self.stop_and_clear,
-                            blocking=False)
-        agent.register_task('preset_stop_clear_azel',
-                            self.preset_stop_clear_azel,
-                            blocking=False)
-        agent.register_task('preset_stop_clear_boresight',
-                            self.preset_stop_clear_boresight,
                             blocking=False)
         agent.register_task('clear_faults',
                             self.clear_faults,
@@ -252,15 +242,6 @@ class ACUAgent:
     def _simple_process_stop(self, session, params):
         # Trigger a process stop by updating state to "stopping"
         yield session.set_status('stopping')
-
-    @inlineCallbacks
-    def _abort_motion_op_azel(self, session, params):
-        if session.status == 'running':
-            session.set_status('stopping')
-            yield dsleep(0.1)
-            print(session.status)
-        self.agent.start('preset_stop_clear_azel', params)
-        yield
 
     @inlineCallbacks
     def restart_idle(self, session, params):
@@ -1063,75 +1044,6 @@ class ACUAgent:
         return ok, msg
 
     @inlineCallbacks
-    def preset_stop_clear_azel(self, session, params):
-
-        session.set_status('running')
-        current_data = self.data['status']['summary']
-        current_vel = {'Az': current_data['Azimuth_current_velocity'],
-                       'El': current_data['Elevation_current_velocity']}
-        print(current_vel)
-
-        current_pos = {'Az': current_data['Azimuth_current_position'],
-                       'El': current_data['Elevation_current_position']}
-        print(current_pos)
-        new_az = current_pos['Az'] + (3 * np.sign(current_vel['Az']) * current_vel)
-        if new_az >= self.motion_limits['azimuth']['upper']:
-            new_az = self.motion_limits['azimuth']['upper']
-        if new_az <= self.motion_limits['azimuth']['lower']:
-            new_az = self.motion_limits['azimuth']['lower']
-        new_pos = {'Az': new_az,
-                   'El': current_pos['El']}
-        print(new_pos)
-        self.log.info('Az and El changed to Preset')
-        yield self.acu_control.go_to(new_pos['Az'], new_pos['El'])
-        while round(current_pos['Az'] - new_pos['Az'], 1) != 0.:
-            yield dsleep(0.5)
-            current_data = self.data['status']['summary']
-            current_pos = {'Az': current_data['Azimuth_current_position'],
-                           'El': current_data['Elevation_current_position']}
-        yield dsleep(2)  # give the platform time to settle in position
-        yield self.acu_control.stop()
-        self.log.info('Stopped')
-        yield dsleep(2)
-        yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
-                                            'Clear Stack')
-        self.log.info('Cleared stack (first attempt)')
-        yield dsleep(5)
-        yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
-                                            'Clear Stack')
-        self.log.info('Cleared stack (second attempt)')
-        return True, 'Job completed'
-
-    @inlineCallbacks
-    def preset_stop_clear_boresight(self, session, params):
-        if self.acu_config['platform'] == 'satp':
-            axis = 'Boresight'
-        else:
-            axis = 'Axis3'
-        current_data = self.data['status']['summary']
-
-        current_pos = current_data[axis + '_current_position']
-        new_pos = current_pos
-        self.log.info('Boresight now set to ' + str(new_pos))
-        self.log.info(axis + ' changed to Preset')
-        yield self.acu_control.go_3rd_axis(new_pos)
-        current_pos = self.data['status']['summary'][axis + '_current_position']
-        while round(current_pos - new_pos, 1) != 0.:
-            yield dsleep(0.5)
-            current_pos = self.data['status']['summary'][axis + '_current_position']
-        yield dsleep(2)  # give the platform time to settle in position
-        yield self.acu_control.http.Command('DataSets.CmdModeTransfer', 'Set3rdAxisMode', 'Stop')
-        yield dsleep(2)
-        yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
-                                            'Clear Stack')
-        self.log.info('Cleared stack (first attempt)')
-        yield dsleep(5)
-        yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
-                                            'Clear Stack')
-        self.log.info('Cleared stack (second attempt)')
-        return True, 'Job completed'
-
-    @inlineCallbacks
     def clear_faults(self, session, params):
         """clear_faults()
 
@@ -1266,187 +1178,6 @@ class ACUAgent:
         ok, err = yield self._run_track(session, point_gen, step_time,
                                         azonly=params['azonly'])
         return ok, err
-
-#    @ocs_agent.param('azpts', type=tuple)
-#    @ocs_agent.param('el', type=float)
-#    @ocs_agent.param('azvel', type=float)
-#    @ocs_agent.param('acc', type=float)
-#    @ocs_agent.param('ntimes', type=int)
-#    @ocs_agent.param('azonly', type=bool)
-#    @ocs_agent.param('simulator', default=False, type=bool)
-    @inlineCallbacks
-    def constant_velocity_scan(self, session, params=None):
-        """constant_velocity_scan(azpts=None, el=None, azvel=None, acc=None, \
-                                  ntimes=None, azonly=None, simulator=False)
-
-        **Task** - Run a constant velocity scan.
-
-        Parameters:
-            azpts (tuple): spatial endpoints of the azimuth scan
-            el (float): elevation (constant) throughout the scan
-            azvel (float): velocity of the azimuth axis
-            acc (float): acceleration of the turnaround
-            ntimes (int): number of times the platform traverses
-                between azimuth endpoints
-            azonly (bool): option for scans with azimuth motion and
-                elevation in Stop
-            simulator (bool): toggle option for ACU simulator
-
-        """
-        azpts = params['azpts']
-        el = params['el']
-        azvel = params['azvel']
-        acc = params['acc']
-        ntimes = params['ntimes']
-        azonly = params['azonly']
-        simulator = params['simulator']
-        session.set_status('running')
-        if abs(acc) > self.motion_limits['acc']:
-            raise ocs_agent.ParamError('Acceleration too great!')
-        if min(azpts) <= self.motion_limits['azimuth']['lower'] or max(azpts) >= self.motion_limits['azimuth']['upper']:
-            raise ocs_agent.ParamError('Azimuth location out of range!')
-        if el <= self.motion_limits['elevation']['lower'] or el >= self.motion_limits['elevation']['upper']:
-            raise ocs_agent.ParamError('Elevation location out of range!')
-        times, azs, els, vas, ves, azflags, elflags = sh.constant_velocity_scanpoints(azpts, el, azvel, acc, ntimes)
-        while session.status == 'running':
-            yield self._run_specified_scan(session, times, azs, els, vas, ves, azflags, elflags, azonly, simulator)
-        session.set_status('stopping')
-        return True, 'Track completed.'
-
-    @inlineCallbacks
-    def _run_specified_scan(self, session, times, azs, els, vas, ves, azflags, elflags, azonly, simulator):
-
-        session.set_status('running')
-        while session.status == 'running':
-            bcast_check = yield self._check_daq_streams('broadcast')
-            monitor_check = yield self._check_daq_streams('monitor')
-            if not bcast_check or not monitor_check:
-                session.set_status('stopping')
-                return False, 'Cannot complete scan with process not running.'
-
-        if self.data['status']['platform_status']['Remote_mode'] == 0:
-            self.log.warn('ACU in local mode, cannot perform motion with OCS.')
-            return False, 'ACU not in remote mode.'
-
-        UPLOAD_GROUP_SIZE = 120
-        UPLOAD_THRESHOLD = FULL_STACK - 100
-
-        end_az = azs[-1]
-        end_el = els[-1]
-
-#        self.data['uploads']['Start_Azimuth'] = start_az
-#        self.data['uploads']['Start_Elevation'] = start_el
-#        self.data['uploads']['Command_Type'] = 2
-
-#        acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
-#                      'block_name': 'ACU_upload',
-#                      'data': self.data['uploads']
-#                      }
-#        self.agent.publish_to_feed('acu_upload', acu_upload)
-
-        # Follow the scan in ProgramTrack mode, then switch to Stop mode
-        all_lines = sh.ptstack_format(times, azs, els, vas, ves, azflags, elflags)
-        self.log.info('all_lines generated')
-        self.data['uploads']['PtStack_Lines'] = 'True'
-        if azonly:
-            yield self.acu_control.azmode('ProgramTrack')
-        else:
-            yield self.acu_control.mode('ProgramTrack')
-        self.log.info('mode is now ProgramTrack')
-        if simulator:
-            group_size = len(all_lines)
-        else:
-            group_size = UPLOAD_GROUP_SIZE
-        spec = {'times': times,
-                'azs': azs,
-                'els': els,
-                'vas': vas,
-                'ves': ves,
-                'azflags': azflags,
-                'elflags': elflags,
-                }
-        while len(all_lines):
-            upload_lines = all_lines[:group_size]
-            all_lines = all_lines[group_size:]
-            # upload_vals = front_group(spec, group_size)
-            spec = pop_first_vals(spec, group_size)
-
-#            for u in range(len(upload_vals['azs'])):
-#                self.data['uploads']['PtStack_Time'] = upload_lines[u].split(';')[0]
-#                self.data['uploads']['PtStack_Azimuth'] = upload_vals['azs'][u]
-#                self.data['uploads']['PtStack_Elevation'] = upload_vals['els'][u]
-#                self.data['uploads']['PtStack_AzVelocity'] = upload_vals['vas'][u]
-#                self.data['uploads']['PtStack_ElVelocity'] = upload_vals['ves'][u]
-#                self.data['uploads']['PtStack_AzFlag'] = upload_vals['azflags'][u]
-#                self.data['uploads']['PtStack_ElFlag'] = upload_vals['elflags'][u]
-#                self.data['uploads']['PtStack_ctime'] = uploadtime_to_ctime(self.data['uploads']['PtStack_Time'], int(self.data['status']['summary']['Year']))
-#                acu_upload = {'timestamp': self.data['uploads']['PtStack_ctime'],
-#                              'block_name': 'ACU_upload',
-#                              'data': self.data['uploads']
-#                              }
-#                self.agent.publish_to_feed('acu_upload', acu_upload, from_reactor=True)
-            text = ''.join(upload_lines)
-            yield dsleep(0.05)
-            free_positions = self.data['status']['summary']['Free_upload_positions']
-            while free_positions < UPLOAD_THRESHOLD:
-                free_positions = self.data['status']['summary']['Free_upload_positions']
-                az_mode = self.data['status']['summary']['Azimuth_mode']
-                yield dsleep(0.05)
-                if az_mode == 'Stop':
-                    self.log.warn('Scan aborted!')
-                    return False, 'Mode changed to Stop'
-                elif az_mode != 'ProgramTrack':
-                    self.log.warn(f'Unexpected azimuth mode: "{az_mode}"!')
-                    return False, f'Mode changed to {az_mode}'
-            yield self.acu_control.http.UploadPtStack(text)
-            self.log.info('Uploaded a group')
-        self.log.info('No more lines to upload')
-        free_positions = self.data['status']['summary']['Free_upload_positions']
-        while free_positions < FULL_STACK - 1:
-            yield dsleep(0.1)
-            modes = (self.data['status']['summary']['Azimuth_mode'],
-                     self.data['status']['summary']['Elevation_mode'])
-            if azonly:
-                if modes[0] != 'ProgramTrack':
-                    return False, 'Azimuth mode no longer ProgramTrack!!'
-            else:
-                if modes != ('ProgramTrack', 'ProgramTrack'):
-                    return False, 'Fault triggered (not ProgramTrack)!'
-            free_positions = self.data['status']['summary']['Free_upload_positions']
-        self.log.info('No more points in the queue')
-        # current_az = self.data['broadcast']['Corrected_Azimuth']
-        # current_el = self.data['broadcast']['Corrected_Elevation']
-        current_az = self.data['status']['summary']['Azimuth_current_position']
-        current_el = self.data['status']['summary']['Elevation_current_position']
-        while round(current_az - end_az, 1) != 0.:
-            self.log.info('Waiting to settle at azimuth position')
-            yield dsleep(0.1)
-            current_az = self.data['status']['summary']['Azimuth_current_position']
-            # current_az = self.data['broadcast']['Corrected_Azimuth']
-        if not azonly:
-            while round(current_el - end_el, 1) != 0.:
-                self.log.info('Waiting to settle at elevation position')
-                yield dsleep(0.1)
-                current_el = self.data['broadcast']['Corrected_Elevation']
-        yield dsleep(self.sleeptime)
-        yield self.acu_control.stop()
-        # self.data['uploads']['Start_Azimuth'] = 0.0
-        # self.data['uploads']['Start_Elevation'] = 0.0
-        # self.data['uploads']['Command_Type'] = 0
-        # self.data['uploads']['PtStack_Lines'] = 'False'
-        # self.data['uploads']['PtStack_Time'] = '000, 00:00:00.000000'
-        # self.data['uploads']['PtStack_Azimuth'] = 0.0
-        # self.data['uploads']['PtStack_Elevation'] = 0.0
-        # self.data['uploads']['PtStack_AzVelocity'] = 0.0
-        # self.data['uploads']['PtStack_ElVelocity'] = 0.0
-        # self.data['uploads']['PtStack_AzFlag'] = 0
-        # self.data['uploads']['PtStack_ElFlag'] = 0
-        # acu_upload = {'timestamp': self.data['status']['summary']['ctime'],
-        #               'block_name': 'ACU_upload',
-        #               'data': self.data['uploads']
-        #               }
-        # self.agent.publish_to_feed('acu_upload', acu_upload)
-        return True
 
     @ocs_agent.param('az_endpoint1', type=float)
     @ocs_agent.param('az_endpoint2', type=float)
