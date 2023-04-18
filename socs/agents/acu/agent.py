@@ -225,7 +225,7 @@ class ACUAgent:
         agent.register_task('fromfile_scan',
                             self.fromfile_scan,
                             blocking=False,
-                            aborter=self._abort_motion_op_azel)
+                            aborter=self._simple_task_abort)
         agent.register_task('set_boresight',
                             self.set_boresight,
                             blocking=False,
@@ -1201,32 +1201,71 @@ class ACUAgent:
         session.set_status('stopping')
         return True, 'Job completed'
 
+    @ocs_agent.param('filename', type=str)
+    @ocs_agent.param('adjust_times', type=bool, default=True)
+    @ocs_agent.param('azonly', type=bool, default=True)
     @inlineCallbacks
     def fromfile_scan(self, session, params=None):
-        """fromfile_scan(filename=None, simulator=None)
+        """fromfile_scan(filename=None, adjust_times=True, azonly=True)
 
         **Task** - Upload and execute a scan pattern from numpy file.
 
         Parameters:
-            filename (str): full path to desired numpy file. File contains
-                an array of three lists ([list(times), list(azimuths),
-                list(elevations)]).  Times begin from 0.0.
-            simulator (bool): toggle for using the ACU simulator.
+            filename (str): full path to desired numpy file. File should
+                contain an array of shape (5, nsamp) or (7, nsamp).  See Note.
+            adjust_times (bool): If True (the default), the track
+                timestamps are interpreted as relative times, only,
+                and the track will be formatted so the first point
+                happens a few seconds in the future.  If False, the
+                track times will be taken at face value (even if the
+                first one is, like, 0).
+            azonly (bool): If True, the elevation part of the track
+                will be uploaded but the el axis won't be put in
+                ProgramTrack mode.  It might be put in Stop mode
+                though.
+
+        Notes:
+            The columns in the numpy array are:
+
+            - 0: timestamps, in seconds.
+            - 1: azimuth, in degrees.
+            - 2: elevation, in degrees.
+            - 3: az_vel, in deg/s.
+            - 4: el_vel, in deg/s.
+            - 5: az_flags (2 if last point in a leg; 1 otherwise.)
+            - 6: el_flags (2 if last point in a leg; 1 otherwise.)
+
+            It is acceptable to omit columns 5 and 6.
         """
         session.set_status('running')
-        filename = params.get('filename')
-        simulator = params.get('simulator')
-        times, azs, els, vas, ves, azflags, elflags = sh.from_file(filename)
-        if min(azs) <= self.motion_limits['azimuth']['lower'] or max(azs) >= self.motion_limits['azimuth']['upper']:
-            session.set_status('stopping')
+
+        times, azs, els, vas, ves, azflags, elflags = sh.from_file(params['filename'])
+        if min(azs) <= self.motion_limits['azimuth']['lower'] \
+           or max(azs) >= self.motion_limits['azimuth']['upper']:
             return False, 'Azimuth location out of range!'
-        if min(els) <= self.motion_limits['elevation']['lower'] or max(els) >= self.motion_limits['elevation']['upper']:
-            session.set_status('stopping')
+        if min(els) <= self.motion_limits['elevation']['lower'] \
+           or max(els) >= self.motion_limits['elevation']['upper']:
             return False, 'Elevation location out of range!'
-        while session.status == 'running':
-            yield self._run_specified_scan(session, times, azs, els, vas, ves, azflags, elflags, azonly=False, simulator=simulator)
-        session.set_status('stopping')
-        yield True, 'Track completed'
+
+        # Modify times?
+        if params['adjust_times']:
+            times = times + time.time() - times[0] + 5.
+
+        # Turn those lines into a generator.
+        all_lines = sh.ptstack_format(times, azs, els, vas, ves, azflags, elflags,
+                                      absolute=True)
+
+        def line_batcher(lines, n=10):
+            while len(lines):
+                some, lines = lines[:n], lines[n:]
+                yield some
+
+        point_gen = line_batcher(all_lines)
+        step_time = np.median(np.diff(times))
+
+        ok, err = yield self._run_track(session, point_gen, step_time,
+                                        azonly=params['azonly'])
+        return ok, err
 
 #    @ocs_agent.param('azpts', type=tuple)
 #    @ocs_agent.param('el', type=float)

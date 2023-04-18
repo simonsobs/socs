@@ -124,7 +124,7 @@ def from_file(filename):
 
 
 def ptstack_format(conctimes, concaz, concel, concva, concve, az_flags,
-                   el_flags, start_offset=3., generator=False):
+                   el_flags, start_offset=0, absolute=False):
     """
     Produces a list of lines in the format necessary to upload to the ACU
     to complete a scan. Params are the outputs of from_file,
@@ -141,20 +141,21 @@ def ptstack_format(conctimes, concaz, concel, concva, concve, az_flags,
             conctimes
         el_flags (list): Flags associated with elevation motions at
             conctimes
-        start_offset (float): Seconds to wait before starting the scan
-        generator (bool): Toggles the start time. When true, start time is
-            start_offset, otherwise start time is time.time() + start_offset
+        start_offset (float): Offset, in seconds, to apply to all
+            timestamps.
+        absolute (bool): If true, timestamps are taken at face value,
+            and only start_offset is added.  If false, then the current
+            time is also added (but note that if the first timestamp
+            is 0, then you will need to also pass start_offset > 0).
 
     Returns:
         list: Lines in the correct format to upload to the ACU
     """
 
     fmt = '%j, %H:%M:%S'
-    if generator:
-        start_time = start_offset
-    else:
-        start_time = time.time() + start_offset
-    true_times = [start_time + i for i in conctimes]
+    if not absolute:
+        start_offset = time.time() + start_offset
+    true_times = [start_offset + i for i in conctimes]
     fmt_times = [time.strftime(fmt, time.gmtime(t))
                  + ('{tt:.6f}'.format(tt=t % 1.))[1:] for t in true_times]
 
@@ -361,7 +362,8 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
             yield ptstack_format(point_block[0], point_block[1],
                                  point_block[2], point_block[3],
                                  point_block[4], point_block[5],
-                                 point_block[6], generator=True)
+                                 point_block[6],
+                                 start_offset=3, absolute=True)
         else:
             yield (point_block[0], point_block[1], point_block[2],
                    point_block[3], point_block[4], point_block[5],
