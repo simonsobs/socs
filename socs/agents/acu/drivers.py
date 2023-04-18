@@ -196,11 +196,11 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
             constant az scans, this must be equal to el_endpoint1.
         el_speed (float): speed of the elevation motion. For constant az
             scans, set to 0.0
-        num_scans (int or None): if not None, limits the points
-          returned to the specified number of constant velocity legs.
         num_batches (int or None): sets the number of batches for the
             generator to create. Default value is None (interpreted as infinite
             batches).
+        num_scans (int or None): if not None, limits the points
+          returned to the specified number of constant velocity legs.
         start_time (float or None): a ctime at which to start the scan.
             Default is None, which is interpreted as starting now +
             wait_to_start.

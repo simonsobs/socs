@@ -38,37 +38,6 @@ def timecode(acutime):
     return comptime
 
 
-def uploadtime_to_ctime(ptstack_time, upload_year):
-    year = int(upload_year)
-    gyear = calendar.timegm(time.strptime(str(year), '%Y'))
-    day_of_year = float(ptstack_time.split(',')[0]) - 1.0
-    hour = float(ptstack_time.split(',')[1].split(':')[0])
-    minute = float(ptstack_time.split(',')[1].split(':')[1])
-    second = float(ptstack_time.split(',')[1].split(':')[2])
-    comptime = gyear + day_of_year * 60 * 60 * 24 + hour * 60 * 60 + minute * 60 + second
-    return comptime
-
-
-def pop_first_vals(data_dict, group_size):
-    new_data_dict = {}
-    for key in data_dict.keys():
-        if len(data_dict[key]):
-            new_data_dict[key] = data_dict[key][group_size:]
-        else:
-            print('no more data')
-    return new_data_dict
-
-
-def front_group(data_dict, group_size):
-    new_data_dict = {}
-    for key in data_dict.keys():
-        if len(data_dict[key]) > group_size:
-            new_data_dict[key] = data_dict[key][:group_size]
-        else:
-            new_data_dict[key] = data_dict[key]
-    return new_data_dict
-
-
 class ACUAgent:
     """
     Agent to acquire data from an ACU and control telescope pointing with the
@@ -155,9 +124,6 @@ class ACUAgent:
                                self._simple_process_stop,
                                blocking=False,
                                startup=True)
-#        agent.register_process('monitor_spem',
-#                               self.monitor_spem,
-#                               lambda
         agent.register_process('broadcast',
                                self.broadcast,
                                self._simple_process_stop,
@@ -243,8 +209,17 @@ class ACUAgent:
         # Trigger a process stop by updating state to "stopping"
         yield session.set_status('stopping')
 
+    @ocs_agent.param('_')
     @inlineCallbacks
     def restart_idle(self, session, params):
+        """restart_idle()
+
+        **Process** - Issue the 'RestartIdleTime' command at regular intervals.
+
+        In some ACU versions, this is required to prevent the antenna
+        from reverting to survival mode.
+
+        """
         session.set_status('running')
         while session.status in ['running']:
             resp = yield self.acu_control.http.Command('DataSets.CmdModeTransfer',
@@ -268,23 +243,29 @@ class ACUAgent:
         The session.data of this process is a nested dictionary.
         Here's an example::
 
-        {
-          "StatusDetailed": {
-            "Time": 81.661170959322,
-            "Year": 2023,
-            "Azimuth mode": "Stop",
-            "Azimuth commanded position": -20.0012,
-            "Azimuth current position": -20.0012,
-            "Azimuth current velocity": 0.0002,
-            "Azimuth average position error": 0,
-            "Azimuth peak position error": 0,
-            "Azimuth computer disabled": false,
-            ...
-          },
-          "Status3rdAxis": {},
-          "StatusResponseRate": 19.237531827325963,
-          "PlatformType": "satp"
-        }
+          {
+            "StatusDetailed": {
+              "Time": 81.661170959322,
+              "Year": 2023,
+              "Azimuth mode": "Stop",
+              "Azimuth commanded position": -20.0012,
+              "Azimuth current position": -20.0012,
+              "Azimuth current velocity": 0.0002,
+              "Azimuth average position error": 0,
+              "Azimuth peak position error": 0,
+              "Azimuth computer disabled": false,
+              ...
+            },
+            "Status3rdAxis": {
+              "3rd axis Mode": "Stop",
+              "3rd axis commanded position": 77,
+              "3rd axis current position": 77,
+              "3rd axis computer disabled": "No Fault",
+              ...
+            },
+            "StatusResponseRate": 19.237531827325963,
+            "PlatformType": "satp"
+          }
 
         In the case of an SATP, the Status3rdAxis is not populated
         (the Boresight info can be found in StatusDetailed).  In the
@@ -297,9 +278,11 @@ class ACUAgent:
         version = yield self.acu_read.http.Version()
         self.log.info(version)
 
-        # Note that any dict items in session.data will get scanned
-        # through when assigning data to feed blocks... strings and
-        # floats will be ignored.
+        # Note that session.data will get scanned, to assign data to
+        # feed blocks.  Items in session.data that are themselves
+        # dicts will parsed; but items (such as PlatformType and
+        # StatusResponseRate) which are simple strings or floats will
+        # be ignored for feed assignment.
         session.data = {'PlatformType': self.acu_config['platform']}
 
         # Numbering as per ICD.
@@ -775,15 +758,17 @@ class ACUAgent:
                      ['INIT', 'WAIT_MOVING', 'WAIT_STILL', 'FAIL', 'DONE'])
 
         # Specialization for different axis types.
-        if axis in ['Azimuth', 'Elevation']:
-            def get_pos():
-                return self.data['status']['summary'][f'{axis}_current_position']
+        # pos/mode are common:
+        def get_pos():
+            return self.data['status']['summary'][f'{axis}_current_position']
 
+        def get_mode():
+            return self.data['status']['summary'][f'{axis}_mode']
+
+        # vel/goto are different:
+        if axis in ['Azimuth', 'Elevation']:
             def get_vel():
                 return self.data['status']['summary'][f'{axis}_current_velocity']
-
-            def get_mode():
-                return self.data['status']['summary'][f'{axis}_mode']
 
             if axis == 'Azimuth':
                 @inlineCallbacks
@@ -797,19 +782,14 @@ class ACUAgent:
                     return result
 
         elif axis in ['Boresight']:
-            def get_pos():
-                return self.data['status']['summary'][f'{axis}_current_position']
-
             def get_vel():
                 return 0.
-
-            def get_mode():
-                return self.data['status']['summary'][f'{axis}_mode']
 
             @inlineCallbacks
             def goto(target):
                 result = yield self.acu_control.go_3rd_axis(target)
                 return result
+
         else:
             return False, f"No configuration for axis={axis}"
 
@@ -861,9 +841,9 @@ class ACUAgent:
 
             # Log only on state changes
             if state != last_state:
-                self.log.info(f'{axis}.state={state.name:<11} '
-                              f'dt={now-start_time:.3f} '
-                              f'dist={distance:.3f}')
+                _state = f'{axis}.state={state.name}'
+                self.log.info(
+                    f'{_state:<30} dt={now-start_time:7.3f} dist={distance:8.3f}')
                 last_state = state
 
             # Handle task abort
@@ -1011,7 +991,7 @@ class ACUAgent:
         **Task** - Move the telescope to a particular third-axis angle.
 
         Parameters:
-            b (float): destination angle for boresight rotation
+            target (float): destination angle for boresight rotation
             end_stop (bool): put axes in Stop mode after motion
 
         """
