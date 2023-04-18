@@ -1424,7 +1424,7 @@ class ACUAgent:
                      choices=['end', 'mid', 'az_endpoint1', 'az_endpoint2',
                               'mid_inc', 'mid_dec'])
     @ocs_agent.param('az_only', type=bool, default=True)
-    @ocs_agent.param('scan_upload_length', type=float, default=5.)
+    @ocs_agent.param('scan_upload_length', type=float, default=None)
     @inlineCallbacks
     def generate_scan(self, session, params):
         """generate_scan(az_endpoint1=None, az_endpoint2=None, \
@@ -1477,9 +1477,87 @@ class ACUAgent:
                 Azimuth axis is put in ProgramTrack mode, and the El axis
                 is put in Stop mode.
             scan_upload_length (float): number of seconds for each set
-                of uploaded points. Default value is 5.  Larger values
-                here mean that stopping the scan will take longer, as
-                we must wait for the stack to empty.
+                of uploaded points. If this is not specified, the
+                track manager will try to use as short a time as is
+                reasonable.
+
+        """
+        az_endpoint1 = params.get('az_endpoint1')
+        az_endpoint2 = params.get('az_endpoint2')
+        az_speed = params.get('az_speed')
+        az_accel = params.get('az_accel')
+        el_endpoint1 = params.get('el_endpoint1')
+        azonly = params.get('az_only', True)
+        scan_upload_len = params.get('scan_upload_length')
+        scan_params = {k: params.get(k) for k in [
+            'num_scans', 'num_batches', 'start_time',
+            'wait_to_start', 'step_time', 'batch_size', 'az_start']
+            if params.get(k) is not None}
+        el_endpoint2 = params.get('el_endpoint2', el_endpoint1)
+        el_speed = params.get('el_speed', 0.0)
+
+        plan = sh.plan_scan(az_endpoint1, az_endpoint2,
+                            el=el_endpoint1, v_az=az_speed, a_az=az_accel,
+                            az_start=scan_params.get('az_start'))
+
+        # Use the plan to set scan upload parameters.
+        if scan_params.get('step_time') is None:
+            scan_params['step_time'] = plan['step_time']
+        if scan_params.get('wait_to_start') is None:
+            scan_params['wait_to_start'] = plan['wait_to_start']
+
+        step_time = scan_params['step_time']
+        point_batch_count = None
+        if scan_upload_len:
+            point_batch_count = scan_upload_len / step_time
+
+        session.set_status('running')
+
+        # Verify we're good to move
+        ok, msg = yield self._check_ready_motion(session)
+        if not ok:
+            return False, msg
+
+        # Seek to starting position
+        self.log.info(f'Moving to start position, az={plan["init_az"]}')
+        ok, msg = yield self._go_to_axis(session, 'Azimuth', plan['init_az'])
+        if not ok:
+            return False, f'Start position seek failed with message: {msg}'
+
+        # Prepare the point generator.
+        g = sh.generate_constant_velocity_scan(az_endpoint1=az_endpoint1,
+                                               az_endpoint2=az_endpoint2,
+                                               az_speed=az_speed, acc=az_accel,
+                                               el_endpoint1=el_endpoint1,
+                                               el_endpoint2=el_endpoint2,
+                                               el_speed=el_speed,
+                                               az_first_pos=plan['init_az'],
+                                               **scan_params)
+
+        return (yield self._run_track(
+            session=session, point_gen=g, step_time=step_time,
+            azonly=azonly, point_batch_count=point_batch_count))
+
+    @inlineCallbacks
+    def _run_track(self, session, point_gen, step_time, azonly=False,
+                   point_batch_count=None):
+        """Run a ProgramTrack track scan, with points provided by a
+        generator.
+
+        Args:
+          session: session object for the parent operation.
+          point_gen: generator that yields points
+          step_time: the minimum time between point track points.
+            This is used to guarantee that points are uploaded
+            sufficiently in advance for the servo unit to process
+            them.
+          azonly: set to True to leave the el axis locked.
+          point_batch_count: number of points to include in batch
+            uploads.  This parameter can be used to increase the value
+            beyond the minimum set internally based on step_time.
+
+        Returns:
+          Tuple (success, msg) where success is a bool.
 
         """
         # The approximate loop time
@@ -1491,71 +1569,24 @@ class ACUAgent:
         # refill threshold.
         MIN_STACK_POP = 6  # points
 
-        bcast_check = yield self._check_daq_streams('broadcast')
-        monitor_check = yield self._check_daq_streams('monitor')
-        if not bcast_check or not monitor_check:
-            return False, 'Cannot complete go_to with process not running.'
-
-        az_endpoint1 = params.get('az_endpoint1')
-        az_endpoint2 = params.get('az_endpoint2')
-        az_speed = params.get('az_speed')
-        az_accel = params.get('az_accel')
-        el_endpoint1 = params.get('el_endpoint1')
-        azonly = params.get('az_only', True)
-        scan_upload_len = params.get('scan_upload_length', 5.0)
-        scan_params = {k: params.get(k) for k in [
-            'num_scans', 'num_batches', 'start_time',
-            'wait_to_start', 'step_time', 'batch_size', 'az_start']
-            if params.get(k) is not None}
-        el_endpoint2 = params.get('el_endpoint2', el_endpoint1)
-        el_speed = params.get('el_speed', 0.0)
-
-        if self.data['status']['platform_status']['Remote_mode'] == 0:
-            self.log.warn('ACU in local mode, cannot perform motion with OCS.')
-            return False, 'ACU not in remote mode.'
-
-        plan = sh.plan_scan(az_endpoint1, az_endpoint2,
-                            el=el_endpoint1, v_az=az_speed, a_az=az_accel,
-                            az_start=scan_params.get('az_start'))
-        print(plan)
-
-        self.log.info(f'Moving to start position, az={plan["init_az"]}')
-        ok, msg = yield self._go_to_axis(session, 'Azimuth', plan['init_az'])
-        if not ok:
-            return False, f'Start position seek failed with message: {msg}'
-
-        yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
-                                            'Clear Stack')
-
-        # Use the plan to set scan upload parameters.
-        if scan_params.get('step_time') is None:
-            scan_params['step_time'] = plan['step_time']
-        if scan_params.get('wait_to_start') is None:
-            scan_params['wait_to_start'] = plan['wait_to_start']
-
-        step_time = scan_params['step_time']
-        scan_upload_len_pts = scan_upload_len / step_time
+        if point_batch_count is None:
+            point_batch_count = 0
 
         STACK_REFILL_THRESHOLD = FULL_STACK - \
-            max(MIN_STACK_POP + LOOP_STEP / step_time, scan_upload_len_pts)
+            max(MIN_STACK_POP + LOOP_STEP / step_time, point_batch_count)
         STACK_TARGET = FULL_STACK - \
-            max(MIN_STACK_POP * 2 + LOOP_STEP / step_time, scan_upload_len_pts * 2)
+            max(MIN_STACK_POP * 2 + LOOP_STEP / step_time, point_batch_count * 2)
 
-        g = sh.generate_constant_velocity_scan(az_endpoint1=az_endpoint1,
-                                               az_endpoint2=az_endpoint2,
-                                               az_speed=az_speed, acc=az_accel,
-                                               el_endpoint1=el_endpoint1,
-                                               el_endpoint2=el_endpoint2,
-                                               el_speed=el_speed,
-                                               az_first_pos=plan['init_az'],
-                                               **scan_params)
         with self.azel_lock.acquire_timeout(0, job='generate_scan') as acquired:
+
             if not acquired:
                 return False, f"Operation failed: {self.azel_lock.job} is running."
             if session.status not in ['starting', 'running']:
                 return False, "Operation aborted before motion began."
 
-            session.set_status('running')
+            yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
+                                                'Clear Stack')
+            yield dsleep(0.2)
 
             if azonly:
                 yield self.acu_control.azmode('ProgramTrack')
@@ -1599,7 +1630,7 @@ class ACUAgent:
 
                 while mode == 'go' and len(lines) < 100:
                     try:
-                        lines.extend(next(g))
+                        lines.extend(next(point_gen))
                     except StopIteration:
                         mode = 'stop'
 
