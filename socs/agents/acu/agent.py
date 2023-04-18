@@ -88,24 +88,7 @@ class ACUAgent:
                                 'ACU_emergency': {},
                                 'third_axis': {},
                                 },
-                     'spem': {},
                      'broadcast': {},
-                     'uploads': {'Start_Azimuth': 0.0,
-                                 'Start_Elevation': 0.0,
-                                 'Start_Boresight': 0.0,
-                                 'Command_Type': 0,
-                                 'Preset_Azimuth': 0.0,
-                                 'Preset_Elevation': 0.0,
-                                 'Preset_Boresight': 0.0,
-                                 'PtStack_Lines': 'False',
-                                 'PtStack_Time': '000, 00:00:00.000000',
-                                 'PtStack_Azimuth': 0.0,
-                                 'PtStack_Elevation': 0.0,
-                                 'PtStack_AzVelocity': 0.0,
-                                 'PtStack_ElVelocity': 0.0,
-                                 'PtStack_AzFlag': 0,
-                                 'PtStack_ElFlag': 0},
-                     'scanspec': {},
                      }
 
         self.agent = agent
@@ -171,10 +154,6 @@ class ACUAgent:
         self.agent.register_feed('acu_broadcast_influx',
                                  record=True,
                                  agg_params=influx_agg_params,
-                                 buffer_time=1)
-        self.agent.register_feed('acu_upload',
-                                 record=True,
-                                 agg_params=basic_agg_params,
                                  buffer_time=1)
         self.agent.register_feed('acu_error',
                                  record=True,
@@ -474,8 +453,6 @@ class ACUAgent:
                                              'data': {'Boresight_commanded_position_influx': self.data['status']['commands']['Boresight_commanded_position']}
                                              }
                             self.agent.publish_to_feed('acu_commands_influx', acucommand_bs)
-            if self.data['uploads']['PtStack_Time'] == '000, 00:00:00.000000':
-                self.data['uploads']['PtStack_ctime'] = self.data['status']['summary']['ctime']
 
             acustatus_summary = {'timestamp':
                                  self.data['status']['summary']['ctime'],
@@ -687,9 +664,12 @@ class ACUAgent:
     @inlineCallbacks
     def _check_ready_motion(self, session):
         bcast_check = yield self._check_daq_streams('broadcast')
+        if not bcast_check:
+            return False, 'Motion blocked; problem with "broadcast" data acq process.'
+
         monitor_check = yield self._check_daq_streams('monitor')
-        if not bcast_check or not monitor_check:
-            return False, 'Cannot complete motion because of problem with data acq processes.'
+        if not monitor_check:
+            return False, 'Motion blocked; problem with "monitor" data acq process.'
 
         if self.data['status']['platform_status']['Remote_mode'] == 0:
             self.log.warn('ACU in local mode, cannot perform motion with OCS.')
@@ -1040,8 +1020,8 @@ class ACUAgent:
     def stop_and_clear(self, session, params):
         """stop_and_clear()
 
-        **Task** - Change the azimuth and elevation modes to Stop and clear
-        points uploaded to the stack.
+        **Task** - Change the azimuth, elevation, and 3rd axis modes
+        to Stop; also clear the ProgramTrack stack.
 
         """
 
@@ -1177,13 +1157,13 @@ class ACUAgent:
     @ocs_agent.param('scan_upload_length', type=float, default=None)
     @inlineCallbacks
     def generate_scan(self, session, params):
-        """generate_scan(az_endpoint1=None, az_endpoint2=None, \
-                         az_speed=None, az_accel=None, \
+        """generate_scan(az_endpoint1, az_endpoint2, \
+                         az_speed, az_accel, \
                          el_endpoint1=None, el_endpoint2=None, \
                          el_speed=None, \
                          num_scans=None, start_time=None, \
                          wait_to_start=None, step_time=None, \
-                         az_start=None, az_only=None, \
+                         az_start='end', az_only=True, \
                          scan_upload_length=None)
 
         **Process** - Scan generator, currently only works for
@@ -1205,7 +1185,7 @@ class ACUAgent:
                 process will exit without error once that has
                 completed.
             start_time (float or None): a unix timestamp giving the
-                time at which the scan should being.  The default is
+                time at which the scan should begin.  The default is
                 None, which means the scan will start immediately (but
                 taking into account the value of wait_to_start).
             wait_to_start (float): number of seconds to wait before
@@ -1421,8 +1401,6 @@ def main(args=None):
     args = site_config.parse_args(agent_class='ACUAgent',
                                   parser=parser,
                                   args=args)
-    print(args)
-#    print('args.acu_config = '+str(args.acu_config))
     agent, runner = ocs_agent.init_site_agent(args)
     _ = ACUAgent(agent, args.acu_config)
 
