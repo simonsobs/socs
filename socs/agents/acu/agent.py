@@ -2758,7 +2758,6 @@ def main(args=None):
     args = site_config.parse_args(agent_class='ACUAgent',
                                   parser=parser,
                                   args=args)
-
     agent, runner = ocs_agent.init_site_agent(args)
     _ = ACUAgent(agent, args.acu_config, args.exercise_plan,
                  startup=not args.no_processes,
