@@ -21,13 +21,13 @@ class HWPPMXAgent:
         ip (str): IP address for the PMX Kikusui power supply
         port (str): Port for the PMX Kikusui power supply
         f_sample (float): sampling frequency (Hz)
-        supervisor_id (str): ID of HWP supervisor 
-        no_data_timeout (float): Time (in seconds) to wait between receiving 
+        supervisor_id (str): ID of HWP supervisor
+        no_data_timeout (float): Time (in seconds) to wait between receiving
             'no_data' actions from the supervisro and triggering a shutdown
     """
 
-    def __init__(self, agent, ip, port, f_sample=1, supervisor_id=None, 
-                 no_data_timeout=15*60):
+    def __init__(self, agent, ip, port, f_sample=1, supervisor_id=None,
+                 no_data_timeout=15 * 60):
 
         self.agent: ocs_agent.OCSAgent = agent
         self.log = agent.log
@@ -48,7 +48,7 @@ class HWPPMXAgent:
         agg_params = {'frame_length': 60}
         self.agent.register_feed(
             'hwppmx', record=True, agg_params=agg_params, buffer_time=1)
-        
+
         self.agent.register_feed('rotation_action', record=True)
 
     @ocs_agent.param('auto_acquire', default=False, type=bool)
@@ -92,7 +92,7 @@ class HWPPMXAgent:
                 self.log.warn(
                     'Could not set on because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
-            
+
             if self.shutdown_mode:
                 return False, "Shutdown mode is in effect"
 
@@ -108,7 +108,7 @@ class HWPPMXAgent:
                 self.log.warn(
                     'Could not set on because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
-            
+
             if self.shutdown_mode:
                 return False, "Shutdown mode is in effect"
 
@@ -128,7 +128,7 @@ class HWPPMXAgent:
                 self.log.warn(
                     'Could not set i because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
-            
+
             if self.shutdown_mode:
                 return False, "Shutdown mode is in effect"
 
@@ -148,7 +148,7 @@ class HWPPMXAgent:
                 self.log.warn(
                     'Could not set v because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
-            
+
             if self.shutdown_mode:
                 return False, "Shutdown mode is in effect"
 
@@ -197,7 +197,7 @@ class HWPPMXAgent:
                 self.log.warn(
                     'Could not use external voltage because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
-            
+
             if self.shutdown_mode:
                 return False, "Shutdown mode is in effect"
 
@@ -214,7 +214,7 @@ class HWPPMXAgent:
                 self.log.warn(
                     'Could not ignore external voltage because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
-            
+
             if self.shutdown_mode:
                 return False, "Shutdown mode is in effect"
 
@@ -294,7 +294,7 @@ class HWPPMXAgent:
             return True, 'requested to stop taking data.'
         else:
             return False, 'acq is not currently running'
-    
+
     def initiate_shutdown(self, session, params):
         """
         Initiate the shutdown of the agent.
@@ -309,7 +309,6 @@ class HWPPMXAgent:
             self.shutdown_mode = True
             self.dev.ign_external_voltage()
             self.dev.stop()
-    
 
     def reverse_shutdown(self, session, params):
         """
@@ -318,7 +317,6 @@ class HWPPMXAgent:
         self.shutdown_mode = False
         return True, "Reversed shutdown mode"
 
-    
     def monitor_shutdown(self, session, params):
         """
         Monitor the shutdown of the agent.
@@ -350,10 +348,10 @@ class HWPPMXAgent:
                         self.agent.start('initiate_shutdown')
 
             # If action is 'shutdown', trigger shutdown
-            elif action == 'stop': 
+            elif action == 'stop':
                 if not self.shutdown_mode:
                     self.agent.start('initiate_shutdown')
-            
+
             data = {
                 'data': {'rotation_action': action},
                 'block_name': 'rotation_action',
@@ -370,7 +368,7 @@ class HWPPMXAgent:
             time.sleep(0.2)
 
         return True, 'PMX Kikusui monitor shutdown.'
-    
+
     def _stop_monitor_shutdown(self, session, params):
         session.set_status('stopping')
         return True, "Stopping monitor shutdown."
@@ -389,9 +387,9 @@ def make_parser(parser=None):
                         help="Starting action for the agent.")
     pgroup.add_argument('--sampling-frequency', type=float,
                         help="Sampling frequency for data acquisition")
-    pgroup.add_argument('--supervisor-id', type=str, 
+    pgroup.add_argument('--supervisor-id', type=str,
                         help="Instance ID for HWP Supervisor agent")
-    pgroup.add_argument('--no-data-timeout', type=float, default=15*60,
+    pgroup.add_argument('--no-data-timeout', type=float, default=15 * 60,
                         help="Time (sec) after which a 'no_data' action should "
                              "trigger a shutdown")
     return parser
@@ -411,9 +409,9 @@ def main(args=None):
     elif args.mode == 'acq':
         init_params = {'auto_acquire': True}
 
-    kwargs = {'ip': args.ip, 'port': args.port, 
-              'supervisor_id': args.supervisor_id, 
-              'no_data_timeout': args.no_data_timeout,}
+    kwargs = {'ip': args.ip, 'port': args.port,
+              'supervisor_id': args.supervisor_id,
+              'no_data_timeout': args.no_data_timeout, }
     if args.sampling_frequency is not None:
         kwargs['f_sample'] = args.sampling_frequency
     PMX = HWPPMXAgent(agent, **kwargs)
