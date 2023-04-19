@@ -359,11 +359,10 @@ class HWPPMXAgent:
             }
 
             self.agent.publish_to_feed('gripper_action', data)
-            session.data =  {
+            session.data = {
                 'rotation_action': action,
                 'time': time.time()
             }
-
 
             time.sleep(0.2)
 
