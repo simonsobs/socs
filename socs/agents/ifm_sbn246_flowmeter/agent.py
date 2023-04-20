@@ -1,4 +1,5 @@
 import txaio
+import argparse
 from pyModbusTCP.client import ModbusClient
 
 from os import environ
@@ -22,7 +23,7 @@ class FlowmeterAgent:
     agent : OCS Agent
         OCSAgent object which forms this Agent
     ip: str
-        IP address of the power meter
+        IP address of IFM DAQ IO devicer
     port : int
         Port for the ip address
     daq_port: string
@@ -86,9 +87,9 @@ class FlowmeterAgent:
 
             data = {'block_name': 'flowmeter',
                     'timestamp': time.time(),
-                    'data' :{'flow': flow}},
-                            # 'temp': temp}
-                   # }
+                    'data' :{'flow': flow,
+                             'temp': temp}
+                    }
 
             self.agent.publish_to_feed('flowmeter', data)
 
@@ -118,6 +119,7 @@ def add_agent_args(parser_in=None):
     pgroup.add_argument("--auto-open", type=bool, default=True, help="state for automatically keeping TCP connection open")
     pgroup.add_argument("--auto-close", type=bool, default=False, help="state for automatically closing TCP connection")
 
+    return parser_in
 
 def main(args=None):
     # For logging
@@ -130,9 +132,9 @@ def main(args=None):
     args = site_config.parse_args(agent_class='FlowmeterAgent', parser=parser, args=args)
 
     agent, runner = ocs_agent.init_site_agent(args)
-    flowmeter = FlowmeterAgent(agent, args.ip_address, args.daq_port, args.port, args.unit_id, args.auto_open, args.auto_close)
+    f = FlowmeterAgent(agent, args.ip_address, args.daq_port, args.port, args.unit_id, args.auto_open, args.auto_close)
 
-    agent.register_process('acq', flowmeter.acq, flowmeter._stop_acq, startup=True)
+    agent.register_process('acq', f.acq, f._stop_acq, startup=True)
 
     runner.run(agent, auto_reconnect=True)
 
