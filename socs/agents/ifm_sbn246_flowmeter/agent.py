@@ -9,13 +9,13 @@ from ocs.ocs_twisted import TimeoutLock
 # based on port you attach things to
 
 # dictionary for defining register address given the port you plug into
-daq_ports = {'X01': 1002,
-             'X02': 2002,
-             'X03': 3002,
-             'X04': 4002}
+daq_ports = {1: 1002,
+             2: 2002,
+             3: 3002,
+             4: 4002}
 
 
-class SBNFlowmeterAgent:
+class FlowmeterAgent:
     """Monitor the flowmeter.
     Parameters
     ----------
@@ -34,12 +34,14 @@ class SBNFlowmeterAgent:
     auto_close : bool
         # TODO
     """
-    def __init__(self, agent, ip, daq_port, port=502, unit_id=1, auto_open=True, auto_close=False):
+    def __init__(self, agent, ip_address, daq_port, port=502, unit_id=1, auto_open=True, auto_close=False):
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
 
-        self.ip = ip
+         # TODO: fix the order
+
+        self.ip_address = ip_address
         self.port = port
         self.daq_port = daq_port
         self.auto_open = auto_open
@@ -51,7 +53,7 @@ class SBNFlowmeterAgent:
                       'exclude_influx': False}
 
         # register the feed
-        self.agent.register_feed('powermeter',
+        self.agent.register_feed('flowmeter',
                                  record=True,
                                  agg_params=agg_params,
                                  buffer_time=1
@@ -69,22 +71,26 @@ class SBNFlowmeterAgent:
         """
         self.take_data = True
         while self.take_data:
-            m = ModbusClient(host=self.ip, port=self.port, unit_id=self.unit_id, auto_open=self.auto_open, auto_close=self.auto_close)
+            m = ModbusClient(host=self.ip_address, port=self.port, unit_id=self.unit_id, auto_open=self.auto_open, auto_close=self.auto_close)
            
-            register = daq_ports[daq_port] # TODO: this is wrong because you need both 1002, and 1003 register address to read the flow and temp
-                                           # so find a smarter way to do this
-                                           # and then you need to split it into a float value; i think this should all be done as driver code above the class
+            # and then you need to split it into a float value; i think this should all be done as driver code above the class
+            register = int(daq_ports[self.daq_port])
+            print('register1', register)
+            register_temp = register + 1
+            register_temp = int(register_temp)
+            print('register_temp', register_temp)
+
             
             flow = m.read_holding_registers(register, 1)
-            temp = m.read_holding_registers(register, 1)
+            temp = m.read_holding_registers(register_temp, 1)
 
             data = {'block_name': 'flowmeter',
                     'timestamp': time.time(),
-                    'data' :{'flow': flow,
-                             'temp': temp}
-                    }
+                    'data' :{'flow': flow}},
+                            # 'temp': temp}
+                   # }
 
-            self.agent.publish_to_feed('powermeter_status', data)
+            self.agent.publish_to_feed('flowmeter', data)
 
             if params['test_mode']:
                 break
@@ -103,17 +109,17 @@ class SBNFlowmeterAgent:
 def add_agent_args(parser_in=None):
     if parser_in is None:
         from argparse import ArgumentParser as A
-        parser_in - A()
-    pgroup = praser_in.add_argument_group('Agent Options')
-    pgroup.add_argument("--ip-address", type=str, help="ip address of IFM DAQ IO device connected to IFM flowmeter")
-    pgroup.add_argument("--daq-port", type=int, help="Port number on IFM DAQ IO device that IFM is connected to")
-    pgroup.add_argument("--port", type=int, default=502, help="PyModbusTCP port for querying information from the DAQ Modbus TCP port")
+        parser_in = A()
+    pgroup = parser_in.add_argument_group('Agent Options')
+    pgroup.add_argument("--ip-address", type=str, default='localhost', help="ip address of IFM DAQ IO device connected to IFM flowmeter")
+    pgroup.add_argument("--daq-port", type=int, default=1, help="Port number on IFM DAQ IO device that IFM is connected to")
+    pgroup.add_argument("--port", type=int, default=5021, help="PyModbusTCP port for querying information from the DAQ Modbus TCP port")
     pgroup.add_argument("--unit-id", type=int, default=1, help="Unit ID for pymodbus TCP protocol")
     pgroup.add_argument("--auto-open", type=bool, default=True, help="state for automatically keeping TCP connection open")
     pgroup.add_argument("--auto-close", type=bool, default=False, help="state for automatically closing TCP connection")
 
 
-def main():
+def main(args=None):
     # For logging
     txaio.use_twisted()
     txaio.make_logger()
@@ -121,10 +127,10 @@ def main():
     txaio.start_logging(level=environ.get("LOGLEVEL", "info"))
 
     parser = add_agent_args()
-    args = site_config.parse_args(agent_class='SBNFlowmeterAgent', parser=parser, args=args)
+    args = site_config.parse_args(agent_class='FlowmeterAgent', parser=parser, args=args)
 
     agent, runner = ocs_agent.init_site_agent(args)
-    flowmeter = SBNFlowmeterAgent(agent, args.ip, args.daq_port, args.port, args.unit_id, args.auto_open, args.auto_close)
+    flowmeter = FlowmeterAgent(agent, args.ip_address, args.daq_port, args.port, args.unit_id, args.auto_open, args.auto_close)
 
     agent.register_process('acq', flowmeter.acq, flowmeter._stop_acq, startup=True)
 
