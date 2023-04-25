@@ -36,7 +36,7 @@ using all of the available arguments::
                      ['--port', '502']]},
 
 .. note::
-    The ``-ip--address`` argument should be the ip address of the DAQ device on the network.
+    The ``-ip--address`` argument should be the IP address of the DAQ device on the network.
 
 Docker Compose
 ``````````````
@@ -66,12 +66,11 @@ The SBN246 Flowmeter is a device from IFM Electronic, and will be used to
 monitor the flow and temperature of the cooling loops at the site. This 
 monitoring is critical, as any change in flow or temperature will allow SO
 to immediately diagnose/anticipate DR behavior. The Agent communicates to
-the flowmeter via an AL1340 model of the flowmeter company's (IFM electronic)
-IO-Link master with a Modbus TCP interface. The flowmeter plugs into 1 of 4
-ports on the DAQ IO-Link device, and the agent queries data directly from
-that DAQ port. This is only possible when an ethernet connection is established
-via the DAQ IO-Link device's Modbus TCP port (of which there are 2, but only 1
-is needed to be in use).
+the flowmeter via an AL1340 IFM Electronic device--a DAQ IO-Link master device with 
+a Modbus TCP interface. The flowmeter plugs into 1 of 4 ports on the DAQ IO-Link
+device, and the agent queries data directly from that DAQ port. This is only 
+possible when an ethernet connection is established via the DAQ IO-Link device's
+Modbus TCP port (of which there are 2, but only 1 is needed to be in use).
 
 
 Agent API
@@ -79,11 +78,3 @@ Agent API
 
 .. autoclass:: socs.agents.ifm_sbn246_flowmeter.agent.FlowmeterAgent
     :members:
-
-
-Supporting APIs
----------------
-
-.. autoclass:: socs.agents.ifm_sbn246_flowmeter.agent
-    :members:
-    :noindex:

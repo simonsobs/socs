@@ -18,7 +18,8 @@ daq_ports = {1: 1002,
 
 
 class FlowmeterAgent:
-    """Monitor the flowmeter.
+    """
+    Monitor the flowmeter.
 
     Parameters
     ----------
@@ -65,9 +66,11 @@ class FlowmeterAgent:
 
     @ocs_agent.param('test_mode', default=False, type=bool)
     def acq(self, session, params=None):
-        """acq(test_mode=False)
+        """
+        acq(test_mode=False)
 
         **Process** - Fetch values from the flowmeter using the DAQ device
+        
         Parameters
         ----------
         test_mode : bool, option
@@ -116,12 +119,12 @@ def add_agent_args(parser_in=None):
         from argparse import ArgumentParser as A
         parser_in = A()
     pgroup = parser_in.add_argument_group('Agent Options')
-    pgroup.add_argument("--ip-address", type=str, default='localhost', help="ip address of IFM DAQ IO device connected to IFM flowmeter")
-    pgroup.add_argument("--daq-port", type=int, default=1, help="Port number on IFM DAQ IO device that IFM is connected to")
-    pgroup.add_argument("--port", type=int, default=5021, help="PyModbusTCP port for querying information from the DAQ Modbus TCP port")
+    pgroup.add_argument("--ip-address", type=str, default='localhost', help="IP address of IFM DAQ IO device connected to IFM flowmeter")
+    pgroup.add_argument("--daq-port", type=int, default=1, help="Port on DAQ IO-Link device that IFM is connected to")
+    pgroup.add_argument("--port", type=int, default=502, help="PyModbusTCP port for querying from DAQ IO Link device")
     pgroup.add_argument("--unit-id", type=int, default=1, help="Unit ID for pymodbus TCP protocol")
-    pgroup.add_argument("--auto-open", type=bool, default=True, help="state for automatically keeping TCP connection open")
-    pgroup.add_argument("--auto-close", type=bool, default=True, help="state for automatically closing TCP connection")
+    pgroup.add_argument("--auto-open", type=bool, default=True, help="State for automatically keeping TCP connection open")
+    pgroup.add_argument("--auto-close", type=bool, default=True, help="State for automatically closing TCP connection")
 
     return parser_in
 
