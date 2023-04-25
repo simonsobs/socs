@@ -91,7 +91,6 @@ class FlowmeterAgent:
                     'data': {'flow': flow,
                              'temp': temp}
                     }
-            print('data', data)
 
             self.agent.publish_to_feed('flowmeter', data)
 
