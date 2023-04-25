@@ -1,14 +1,13 @@
 import txaio
 import time
 
-from pyModbusTCP.client import ModbusClient
-
-#from os import environ
+from os import environ
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock, Pacemaker
 
-#on_rtd = environ.get('READTHEDOCS') == 'True'
-#if not on_rtd:
+on_rtd = environ.get('READTHEDOCS') == 'True'
+if not on_rtd:
+    from pyModbusTCP.client import ModbusClient
 
 
 # dictionary for defining register address given the daq port you plug into
