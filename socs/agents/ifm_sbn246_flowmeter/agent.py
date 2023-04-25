@@ -1,13 +1,15 @@
 import txaio
 import time
+
 from pyModbusTCP.client import ModbusClient
 
-from os import environ
+#from os import environ
+from ocs import ocs_agent, site_config
+from ocs.ocs_twisted import TimeoutLock, Pacemaker
 
-on_rtd = environ.get('READTHEDOCS') == 'True'
-if not on_rtd:
-    from ocs import ocs_agent, site_config
-    from ocs.ocs_twisted import TimeoutLock, Pacemaker
+#on_rtd = environ.get('READTHEDOCS') == 'True'
+#if not on_rtd:
+
 
 # dictionary for defining register address given the daq port you plug into
 daq_ports = {1: 1002,
@@ -18,6 +20,7 @@ daq_ports = {1: 1002,
 
 class FlowmeterAgent:
     """Monitor the flowmeter.
+
     Parameters
     ----------
     agent : OCS Agent
@@ -63,7 +66,8 @@ class FlowmeterAgent:
 
     @ocs_agent.param('test_mode', default=False, type=bool)
     def acq(self, session, params=None):
-        """acq()
+        """acq(test_mode=False)
+
         **Process** - Fetch values from the flowmeter using the DAQ device
         Parameters
         ----------
