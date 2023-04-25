@@ -25,13 +25,13 @@ class FlowmeterAgent:
     ip_address: str
         IP address of IFM DAQ IO device
     port : int
-        Port for the ip address
+        Port for the ip address. Default is 502 for the DAQ device
     daq_port: int
         Port on daq IO device that connects to flowmeter
     unit_id : int
         Unit identifier for Modbus bridge that allows for communication
         across multiple ports on the daq device while using the same
-        ip address. Default unit identifier is 502
+        ip address. Default unit identifier is 1
     auto_open : bool
         State for automatically keeping TCP connection open
     auto_close : bool
