@@ -1,9 +1,9 @@
-import txaio
 import time
-
 from os import environ
+
+import txaio
 from ocs import ocs_agent, site_config
-from ocs.ocs_twisted import TimeoutLock, Pacemaker
+from ocs.ocs_twisted import Pacemaker, TimeoutLock
 
 on_rtd = environ.get('READTHEDOCS') == 'True'
 if not on_rtd:
@@ -40,6 +40,7 @@ class FlowmeterAgent:
     auto_close : bool
         State for automatically closing TCP connection
     """
+
     def __init__(self, agent, ip_address, daq_port, port=502, unit_id=1, auto_open=True, auto_close=True):
         self.agent = agent
         self.log = agent.log
@@ -70,7 +71,7 @@ class FlowmeterAgent:
         acq(test_mode=False)
 
         **Process** - Fetch values from the flowmeter using the DAQ device
-        
+
         Parameters
         ----------
         test_mode : bool, option
