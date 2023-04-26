@@ -6,15 +6,29 @@
 SBN246 Flowmeter Agent
 ======================
 
-The SBN246 Flowmeter Agent is an OCS Agent which monitors flow in gallons per minute
+The SBN246 Flowmeter Agent is an OCS Agent which monitors flow in liters per minute
 and temperature in Celsius of the cooling loop of the DRs installed at the site.
-Monitoring is performed by connecting the flowmeter device to a DAQ I/O readout device from
-the same company, the querying of flowmeter data is done via ModbusTCP connection to that DAQ device.
+Monitoring is performed by connecting the flowmeter device to a DAQ IO-Link readout device from
+the same company, the querying of flowmeter data is done via HTTP requests to that DAQ device.
 
 .. argparse::
     :filename: ../socs/agents/ifm_sbn246_flowmeter/agent.py
     :func: add_agent_args
     :prog: python3 agent.py
+
+DAQ IO-Link Device Network Setup
+--------------------------------
+After plugging into the IoT port on your IFM Electronic AL1340 DAQ IO-Link device,
+the IP address of the IO-Link device must be configured using the LR Device software.
+On the LR Device software, click the 'read from device' on the upper right (leftmost 
+IOLINK button). Once the software has found your IO-Link device, click on the device name
+(AL1340) on the column on the left side (not the ports that may say P1, P2... or the name
+of the device connected to any of the 4 ports on the IO-Link device). You should now be
+able to change the IP address to by clicking the Network (DHCP) button.
+
+ - `LR Device Software <https://www.ifm.com/de/en/download/LR_Device>`_
+
+
 
 Configuration File Examples
 ---------------------------
@@ -31,12 +45,12 @@ using all of the available arguments::
 
       {'agent-class': 'FlowmeterAgent',
        'instance-id': 'flow',
-       'arguments': [['--ip-address', '192.168.1.250'],
-                     ['--daq-port', '2'],
-                     ['--port', '502']]},
+       'arguments': [['--ip-address', '10.10.10.159'],
+                     ['--daq-port', '2']]},
 
 .. note::
-    The ``-ip--address`` argument should be the IP address of the DAQ device on the network.
+    The ``--ip-address`` argument should use the IP address of the DAQ device you've now
+    configured to be on the network.
 
 Docker Compose
 ``````````````
@@ -66,11 +80,11 @@ The SBN246 Flowmeter is a device from IFM Electronic, and will be used to
 monitor the flow and temperature of the cooling loops at the site. This
 monitoring is critical, as any change in flow or temperature will allow SO
 to immediately diagnose/anticipate DR behavior. The Agent communicates to
-the flowmeter via an AL1340 IFM Electronic device--a DAQ IO-Link master device with
-a Modbus TCP interface. The flowmeter plugs into 1 of 4 ports on the DAQ IO-Link
+the flowmeter via an AL1340 IFM Electronic device--a DAQ IO-Link from which the
+agent makes HTTP requests. The flowmeter plugs into 1 of 4 ports on the DAQ IO-Link
 device, and the agent queries data directly from that DAQ port. This is only
 possible when an ethernet connection is established via the DAQ IO-Link device's
-Modbus TCP port (of which there are 2, but only 1 is needed to be in use).
+IoT port.
 
 
 Agent API
