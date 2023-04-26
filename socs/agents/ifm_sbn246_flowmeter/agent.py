@@ -90,7 +90,9 @@ class FlowmeterAgent:
 
             flow_gpm, temp_f = extract(value)  # units [gallons/minute], [F]
             flow = flow_gpm * 3.785411784  # liters/minute
+            flow = round(flow, 1)
             temp = (temp_f - 32) * (5 / 9)  # Celsius
+            temp = round(temp, 1)
 
             data = {'block_name': 'flowmeter',
                     'timestamp': time.time(),
