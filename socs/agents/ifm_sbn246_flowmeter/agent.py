@@ -6,11 +6,6 @@ import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import Pacemaker, TimeoutLock
 
-# TODO: fix below, not sure we need the on_rtd since we already have the requests package
-#on_rtd = environ.get('READTHEDOCS') == 'True'
-#if not on_rtd:
-#    from pyModbusTCP.client import ModbusClient
-
 
 def extract(value):
     """
@@ -93,7 +88,7 @@ class FlowmeterAgent:
             r = requests.post(url, json={"code": "request", "cid": -1, "adr": adr})
             value = r.json()['data']['value']
 
-            flow, temp = extract(value)
+            flow, temp = extract(value)  # units [gallons/minute], [F]
 
             data = {'block_name': 'flowmeter',
                     'timestamp': time.time(),
@@ -122,7 +117,7 @@ def add_agent_args(parser_in=None):
         from argparse import ArgumentParser as A
         parser_in = A()
     pgroup = parser_in.add_argument_group('Agent Options')
-    pgroup.add_argument("--ip-address", type=str, help="IPaddress of DAQ IO-Link device.")
+    pgroup.add_argument("--ip-address", type=str, help="IP address of DAQ IO-Link device.")
     pgroup.add_argument("--daq-port", type=int, help="Port on DAQ IO-Link device that IFM is connected to")
 
     return parser_in
