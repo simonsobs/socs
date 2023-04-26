@@ -88,7 +88,9 @@ class FlowmeterAgent:
             r = requests.post(url, json={"code": "request", "cid": -1, "adr": adr})
             value = r.json()['data']['value']
 
-            flow, temp = extract(value)  # units [gallons/minute], [F]
+            flow_gpm, temp_f = extract(value)  # units [gallons/minute], [F]
+            flow = flow_gpm * 3.785411784  # liters/minute
+            temp = (temp_f - 32) * (5 / 9)  # Celsius
 
             data = {'block_name': 'flowmeter',
                     'timestamp': time.time(),
