@@ -42,19 +42,18 @@ class FlowmeterAgent:
     ----------
     agent : OCS Agent
         OCSAgent object which forms this Agent
-    url: str
-        HTTP url of the DAQ IO-Link device to make requests from
-        Ex: 'http://10.10.10.159'
+    ip_address: str
+        IP address of DAQ IO-Link device to make requests from
     daq_port: int
         Port on daq IO device that connects to flowmeter. Choices are 1-4
     """
 
-    def __init__(self, agent, url, daq_port):
+    def __init__(self, agent, ip_address, daq_port):
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
 
-        self.url = url
+        self.ip_address = ip_address
         self.daq_port = daq_port
 
         self.take_data = False
@@ -89,8 +88,9 @@ class FlowmeterAgent:
 
             dp = int(self.daq_port)
             adr = "/iolinkmaster/port[{}]/iolinkdevice/pdin/getdata".format(dp)
+            url = 'http://{}'.format(self.ip_address)
 
-            r = requests.post(self.url, json={"code": "request", "cid": -1, "adr": adr})
+            r = requests.post(url, json={"code": "request", "cid": -1, "adr": adr})
             value = r.json()['data']['value']
 
             flow, temp = extract(value)
@@ -122,7 +122,7 @@ def add_agent_args(parser_in=None):
         from argparse import ArgumentParser as A
         parser_in = A()
     pgroup = parser_in.add_argument_group('Agent Options')
-    pgroup.add_argument("--url", type=str, help="HTTP address of DAQ IO-Link device. Ex: 'http://10.10.10.159'")
+    pgroup.add_argument("--ip-address", type=str, help="IPaddress of DAQ IO-Link device.")
     pgroup.add_argument("--daq-port", type=int, help="Port on DAQ IO-Link device that IFM is connected to")
 
     return parser_in
@@ -139,7 +139,7 @@ def main(args=None):
     args = site_config.parse_args(agent_class='FlowmeterAgent', parser=parser, args=args)
 
     agent, runner = ocs_agent.init_site_agent(args)
-    f = FlowmeterAgent(agent, args.url, args.daq_port)
+    f = FlowmeterAgent(agent, args.ip_address, args.daq_port)
 
     agent.register_process('acq', f.acq, f._stop_acq, startup=True)
 
