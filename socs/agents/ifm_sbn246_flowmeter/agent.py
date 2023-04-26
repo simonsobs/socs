@@ -101,8 +101,6 @@ class FlowmeterAgent:
                              'temp': temp}
                     }
 
-            print(data)
-
             self.agent.publish_to_feed('flowmeter', data)
 
             if params['test_mode']:
