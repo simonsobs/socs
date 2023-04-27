@@ -35,7 +35,7 @@ class FlowmeterAgent:
 
     Parameters
     ----------
-    agent : OCS Agent
+    agent : OCSAgent
         OCSAgent object which forms this Agent
     ip_address: str
         IP address of DAQ IO-Link device to make requests from
