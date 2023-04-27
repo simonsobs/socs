@@ -2,9 +2,9 @@
 
 .. _ifm_sbn246_flowmeter:
 
-======================
-SBN246 Flowmeter Agent
-======================
+==========================
+IFM SBN246 Flowmeter Agent
+==========================
 
 The SBN246 Flowmeter Agent is an OCS Agent which monitors flow in liters per minute
 and temperature in Celsius of the cooling loop of the DRs installed at the site.
