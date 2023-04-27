@@ -1,6 +1,6 @@
+import argparse
 import time
 from os import environ
-import argparse
 
 import requests
 import txaio
@@ -51,7 +51,7 @@ class FlowmeterAgent:
 
         self.ip_address = ip_address
         self.daq_port = daq_port
-        
+
         # check serial number of flowmeter, otherwise may seriously
         # impact understanding of our flow and temp (converted into metric)
         prod_adr = "/iolinkmaster/port[{}]/iolinkdevice/productname/getdata".format(self.daq_port)
@@ -119,7 +119,7 @@ class FlowmeterAgent:
                     }
 
             self.agent.publish_to_feed('flowmeter', data)
-            
+
             session.data = {"timestamp": now,
                             "fields": {}}
 
