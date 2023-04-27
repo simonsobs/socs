@@ -94,11 +94,15 @@ class FlowmeterAgent:
             flow = round(flow, 1)
             temp = (temp_f - 32) * (5 / 9)  # Celsius
             temp = round(temp, 1)
+            now = time.time()
+            session.data = {"flow": flow,
+                            "temperature": temp,
+                            "timestamp": now}
 
             data = {'block_name': 'flowmeter',
-                    'timestamp': time.time(),
+                    'timestamp': now,
                     'data': {'flow': flow,
-                             'temp': temp}
+                             'temperature': temp}
                     }
 
             self.agent.publish_to_feed('flowmeter', data)
