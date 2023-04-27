@@ -58,7 +58,7 @@ Docker Compose
 The SBN246 Flowmeter Agent should be configured to run in a Docker container. An
 example docker-compose service configuration is shown here::
 
-  ocs-ibootbar:
+  ocs-flow:
     image: simonsobs/socs:latest
     hostname: ocs-docker
     network_mode: "host"
