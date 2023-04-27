@@ -16,17 +16,6 @@ the same company, the querying of flowmeter data is done via HTTP requests to th
     :func: add_agent_args
     :prog: python3 agent.py
 
-DAQ IO-Link Device Network Setup
---------------------------------
-After plugging into the IoT port on your IFM Electronic AL1340 DAQ IO-Link device,
-the IP address of the IO-Link device must be configured using the LR Device software.
-On the LR Device software, click the 'read from device' on the upper right (leftmost
-IOLINK button). Once the software has found your IO-Link device, click on the device name
-(AL1340) on the column on the left side (not the ports that may say P1, P2... or the name
-of the device connected to any of the 4 ports on the IO-Link device). You should now be
-able to change the IP address to by clicking the Network (DHCP) button.
-
- - `LR Device Software <https://www.ifm.com/de/en/download/LR_Device>`_
 
 
 
@@ -86,6 +75,18 @@ device, and the agent queries data directly from that DAQ port. This is only
 possible when an ethernet connection is established via the DAQ IO-Link device's
 IoT port.
 
+IO-Link Master Network Setup
+````````````````````````````````
+After plugging into the IoT port on your IFM Electronic AL1340 IO-Link master,
+the IP address of the IO-Link device can be configured using the LR Device software.
+Once the LR Device software is downloaded, click the 'read from device' on the upper
+right (leftmost IOLINK button). Once the software has found your IO-Link device,
+click on the device name (AL1340) on the column on the left side (not the ports
+that may say P1, P2... or the name of the device connected to any of the 4 ports
+on your IO-Link master). You can now change  the IP address by clicking the
+Network (DHCP) button.
+
+ - `LR Device Software <https://www.ifm.com/de/en/download/LR_Device>`_
 
 Agent API
 ---------
