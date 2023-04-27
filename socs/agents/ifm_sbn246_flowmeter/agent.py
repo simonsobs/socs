@@ -73,7 +73,7 @@ class FlowmeterAgent:
 
         Parameters
         ----------
-        test_mode : bool, option
+        test_mode : bool, optional
             Run the Process loop only once. Meant only for testing.
             Default is False.
         """
