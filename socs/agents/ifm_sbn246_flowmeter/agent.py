@@ -51,6 +51,12 @@ class FlowmeterAgent:
 
         self.ip_address = ip_address
         self.daq_port = daq_port
+        
+        # check serial number of flowmeter, otherwise may seriously
+        # impact understanding of our flow and temp (converted into metric)
+        prod_adr = "/iolinkmaster/port[{}]/iolinkdevice/productname/getdata".format(self.daq_port)
+        q = requests.post('http://{}'.format(self.ip_address), json={"code": "request", "cid": -1, "adr": prod_adr})
+        assert q.json()['data']['value'] == 'SBN246', "Flowmeter serial number {}, not SBN246".format(serial_num)
 
         self.take_data = False
 
