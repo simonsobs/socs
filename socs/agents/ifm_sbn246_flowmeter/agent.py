@@ -76,6 +76,16 @@ class FlowmeterAgent:
         test_mode : bool, optional
             Run the Process loop only once. Meant only for testing.
             Default is False.
+
+        Notes:
+            The most recent data collected is stored in session data in the structure
+            Note the units are [liters/min] and [Celsius]::
+
+                    >>> response.session['data']
+                    {'timestamp': 1682630863.0066128,
+                     'fields':
+                        {'flow': 42.4, 'temperature': 22.8}
+                    }
         """
         pm = Pacemaker(1, quantize=True)
         self.take_data = True
@@ -95,9 +105,6 @@ class FlowmeterAgent:
             temp = (temp_f - 32) * (5 / 9)  # Celsius
             temp = round(temp, 1)
             now = time.time()
-            session.data = {"flow": flow,
-                            "temperature": temp,
-                            "timestamp": now}
 
             data = {'block_name': 'flowmeter',
                     'timestamp': now,
@@ -106,6 +113,12 @@ class FlowmeterAgent:
                     }
 
             self.agent.publish_to_feed('flowmeter', data)
+            
+            session.data = {"timestamp": now,
+                            "fields": {}}
+
+            session.data['fields']['flow'] = flow
+            session.data['fields']['temperature'] = temp
 
             if params['test_mode']:
                 break
