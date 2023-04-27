@@ -1,5 +1,6 @@
 import time
 from os import environ
+import argparse
 
 import requests
 import txaio
@@ -118,8 +119,7 @@ class FlowmeterAgent:
 
 def add_agent_args(parser_in=None):
     if parser_in is None:
-        from argparse import ArgumentParser as A
-        parser_in = A()
+        parser_in = argparse.ArgumentParser()
     pgroup = parser_in.add_argument_group('Agent Options')
     pgroup.add_argument("--ip-address", type=str, help="IP address of DAQ IO-Link device.")
     pgroup.add_argument("--daq-port", type=int, help="Port on DAQ IO-Link device that IFM is connected to")
