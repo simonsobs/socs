@@ -64,8 +64,8 @@ def test_ibootbar_acq(wait_for_crossbar, start_responder, run_agent, client):
     resp = client.acq.wait()
     check_resp_success(resp)
     print(resp.session["data"])
-    # assert resp.session["data"]["outletStatus_0"]["status"] == 0
-    return resp
+    assert resp.session["data"]["outletStatus_0"]["status"] == 0
+    # return resp
 
 
 @pytest.mark.integtest
@@ -80,12 +80,12 @@ def test_ibootbar_set_outlet(wait_for_crossbar, start_responder, run_agent, clie
     outlet = [("IBOOTPDU-MIB", "outletStatus", outlet_number - 1)]
     print(outlet)
     yield snmp.set(oid_list=outlet, version=2, setvalue=1, community_name="public")
-    # time.sleep(5)
+    time.sleep(5)
 
-    resp = test_ibootbar_acq(wait_for_crossbar, start_responder, run_agent, client)
-    # resp = client.acq.start(test_mode=True)
-    # resp = client.acq.wait()
-    # print(resp.session["data"])
+    # resp = test_ibootbar_acq(wait_for_crossbar, start_responder, run_agent, client)
+    resp = client.acq.start(test_mode=True)
+    resp = client.acq.wait()
+    print(resp.session["data"])
 
     assert resp.session["data"][f"outletStatus_{outlet_number - 1}"]["status"] == 1
 

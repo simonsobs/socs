@@ -58,7 +58,7 @@ jobs:
     - name: Run integration tests
       working-directory: ./tests
       run: |
-        COVERAGE_FILE=.coverage.int python3 -m pytest --cov -m 'integtest' -k 'ibootbar'
+        COVERAGE_FILE=.coverage.int python3 -m pytest -rP --cov -m 'integtest' -k 'ibootbar'
 
     # Coverage
     - name: Report test coverage
