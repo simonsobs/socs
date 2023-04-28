@@ -75,7 +75,7 @@ master's IoT port.
 
 IO-Link Master Network
 ```````````````````````
-Once plugged into the IoT port on your IO-Link master, the IP address of the 
+Once plugged into the IoT port on your IO-Link master, the IP address of the
 IO-Link master is automatically set by a DHCP server in the network. If no DHCP
 server is reached, the IP address is automatically assigned to the factory setting
 for the IoT port (169.254.X.X).
