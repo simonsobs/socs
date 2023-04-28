@@ -3,6 +3,7 @@ import signal
 import subprocess
 from multiprocessing import Process
 from unittest.mock import patch
+import time
 
 import ocs
 import pytest
@@ -75,10 +76,11 @@ def test_ibootbar_set_outlet(wait_for_crossbar, start_responder, run_agent, clie
     snmp = SNMPTwister(address, port)
     outlet = [("IBOOTPDU-MIB", "outletStatus", outlet_number - 1)]
     print(outlet)
-    yield snmp.set(oid_list=outlet, version=2, setvalue=1, community_name="public")
+    yield snmp.set(oid_list=outlet, version=2, setvalue=1, community_name="private")
 
     resp = client.acq.start(test_mode=True)
     resp = client.acq.wait()
+    # time.sleep(10000)
 
     assert resp.session["data"][f"outletStatus_{outlet_number - 1}"]["status"] == 1
 

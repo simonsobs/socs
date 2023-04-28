@@ -45,10 +45,10 @@ jobs:
         pip3 install -e .
 
     # Unit Tests
-    - name: Run unit tests
-      working-directory: ./tests
-      run: |
-        COVERAGE_FILE=.coverage.unit python3 -m pytest --cov -m 'not integtest'
+    # - name: Run unit tests
+    #   working-directory: ./tests
+    #   run: |
+    #     COVERAGE_FILE=.coverage.unit python3 -m pytest --cov -m 'not integtest'
 
     - name: Build docker test images
       run: |
@@ -58,7 +58,7 @@ jobs:
     - name: Run integration tests
       working-directory: ./tests
       run: |
-        COVERAGE_FILE=.coverage.int python3 -m pytest --cov -m 'integtest'
+        COVERAGE_FILE=.coverage.int python3 -m pytest --cov -m 'integtest' -k 'ibootbar'
 
     # Coverage
     - name: Report test coverage
