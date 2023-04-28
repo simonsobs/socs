@@ -41,7 +41,7 @@ class FlowmeterAgent:
     ip_address: str
         IP address of DAQ IO-Link device to make requests from
     daq_port: int
-        Port on daq IO device that connects to flowmeter. Choices are 1-4
+        Port on IO-Link master that connects to flowmeter. Choices are 1-4
     """
 
     def __init__(self, agent, ip_address, daq_port):
@@ -75,7 +75,7 @@ class FlowmeterAgent:
         """
         acq(test_mode=False)
 
-        **Process** - Fetch values from the flowmeter using the DAQ device
+        **Process** - Fetch values from the flowmeter using the IO-Link master
 
         Parameters
         ----------
@@ -144,8 +144,8 @@ def add_agent_args(parser_in=None):
     if parser_in is None:
         parser_in = argparse.ArgumentParser()
     pgroup = parser_in.add_argument_group('Agent Options')
-    pgroup.add_argument("--ip-address", type=str, help="IP address of DAQ IO-Link device.")
-    pgroup.add_argument("--daq-port", type=int, help="Port on DAQ IO-Link device that IFM is connected to")
+    pgroup.add_argument("--ip-address", type=str, help="IP address of IO-Link master.")
+    pgroup.add_argument("--daq-port", type=int, help="Port on IO-Link master that flowmeter is connected to")
 
     return parser_in
 
