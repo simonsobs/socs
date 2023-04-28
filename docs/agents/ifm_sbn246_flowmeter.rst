@@ -82,7 +82,7 @@ for the IoT port (169.254.X.X).
 
 IO-Link Visualization Software
 ```````````````````````````````
-Windows software called LR Device exists for parameter setting and visualization
+A Windows software called LR Device exists for parameter setting and visualization
 of IO-Link master and device data. The software download link is below should the
 user need it for changing settings on the IO-Link master. On the LR Device software
 panel, click the 'read from device' button on the upper right (leftmost IOLINK
