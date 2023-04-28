@@ -266,10 +266,12 @@ class ibootbarAgent:
                 message = _build_message(get_result, names, read_time)
                 self.log.debug("{msg}", msg=message)
                 session.app.publish_to_feed('ibootbar', message)
+                return True, "DONE"
             except ConnectionError as e:
                 self.log.error(f'{e}')
                 yield dsleep(1)
                 self.log.info('Trying to reconnect.')
+                return False, "CONNECTION ERROR"
 
             if params['test_mode']:
                 break

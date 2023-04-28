@@ -176,6 +176,5 @@ def test_pfeiffer_tc400_acq(wait_for_crossbar, emulator, run_agent, client):
 
     resp = client.acq.start(test_mode=True, wait=0)
     resp = client.acq.wait()
-    print(resp.session['data'])
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
