@@ -105,7 +105,7 @@ class GeneratorAgent:
 
         if read_config is not None:
             with open(read_config) as f:
-                data = yaml.load(f)
+                data = yaml.load(f, Loader=yaml.FullLoader)
             self.build_config([data])
             self.log.info("Config file loaded successfully.")
         else:
