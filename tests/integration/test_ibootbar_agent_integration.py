@@ -76,11 +76,13 @@ def test_ibootbar_set_outlet(wait_for_crossbar, start_responder, run_agent, clie
     snmp = SNMPTwister(address, port)
     outlet = [("IBOOTPDU-MIB", "outletStatus", outlet_number - 1)]
     print(outlet)
-    yield snmp.set(oid_list=outlet, version=2, setvalue=1, community_name="private")
+    yield snmp.set(oid_list=outlet, version=2, setvalue=1, community_name="public")
+    time.sleep(5)
 
     resp = client.acq.start(test_mode=True)
     resp = client.acq.wait()
     # time.sleep(10000)
+    print(resp.session["data"])
 
     assert resp.session["data"][f"outletStatus_{outlet_number - 1}"]["status"] == 1
 
