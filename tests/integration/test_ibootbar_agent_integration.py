@@ -74,6 +74,7 @@ def test_ibootbar_set_outlet(wait_for_crossbar, start_responder, run_agent, clie
     # Simulate internal state transition of hardware
     snmp = SNMPTwister(address, port)
     outlet = [("IBOOTPDU-MIB", "outletStatus", outlet_number - 1)]
+    print(outlet)
     yield snmp.set(oid_list=outlet, version=2, setvalue=1, community_name="public")
 
     resp = client.acq.start(test_mode=True)
