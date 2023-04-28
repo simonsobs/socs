@@ -73,13 +73,21 @@ master, and the agent queries data directly from that IO-Link master port.
 This is only possible when an ethernet connection is established via the IO-Link
 master's IoT port.
 
-IO-Link Master Network Setup
-````````````````````````````````
-After plugging into the IoT port on your IO-Link master, the IP address of the IO-Link
-master is configured using the LR Device software. On the LR Device software panel,
-click the 'read from device' button on the upper right (leftmost IOLINK
+IO-Link Master Network
+```````````````````````
+Once plugged into the IoT port on your IO-Link master, the IP address of the 
+IO-Link master is automatically set by a DHCP server in the network. If no DHCP
+server is reached, the IP address is automatically assigned to the factory setting
+for the IoT port (169.254.X.X).
+
+IO-Link Visualization Software
+```````````````````````````````
+Windows software called LR Device exists for parameter setting and visualization
+of IO-Link master and device data. The software download link is below should the
+user need it for changing settings on the IO-Link master. On the LR Device software
+panel, click the 'read from device' button on the upper right (leftmost IOLINK
 button); the software will then search for the IO-Link master. Once found, it will
-inform the user of the model number (AL1340) and the IO-Link master's ip address.
+inform the user of the IO-Link master model number (AL1340) and its IP address.
 
  - `LR Device Software <https://www.ifm.com/de/en/download/LR_Device>`_
 
