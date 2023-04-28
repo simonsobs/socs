@@ -76,12 +76,10 @@ master's IoT port.
 IO-Link Master Network Setup
 ````````````````````````````````
 After plugging into the IoT port on your IO-Link master, the IP address of the IO-Link
-master can be configured using the LR Device software. Once the LR Device software
-is downloaded, click the 'read from device' on the upper right (leftmost IOLINK
-button). Once the software has found your IO-Link device, click on the device
-name (AL1340) on the column on the left side (not the ports that may say P1,
-P2... or the name of the device connected to any of the 4 ports on your IO-Link
-master). You can now change  the IP address by clicking the Network (DHCP) button.
+master is configured using the LR Device software. On the LR Device software panel,
+click the 'read from device' button on the upper right (leftmost IOLINK
+button); the software will then search for the IO-Link master. Once found, it will
+inform the user of the model number (AL1340) and the IO-Link master's ip address.
 
  - `LR Device Software <https://www.ifm.com/de/en/download/LR_Device>`_
 
