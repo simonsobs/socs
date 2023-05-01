@@ -308,7 +308,7 @@ class HWPPMXAgent:
 
             self.shutdown_mode = True
             self.dev.ign_external_voltage()
-            self.dev.stop()
+            self.dev.turn_off()
 
     def reverse_shutdown(self, session, params):
         """
