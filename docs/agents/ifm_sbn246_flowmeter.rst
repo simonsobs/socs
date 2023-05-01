@@ -6,11 +6,11 @@
 IFM SBN246 Flowmeter Agent
 ==========================
 
-The SBN246 Flowmeter Agent is an OCS Agent which monitors flow in liters per minute
-and temperature in Celsius of the cooling loop of the DRs installed at the site.
-Monitoring is performed by connecting the flowmeter device to an IO-Link master
-device from the same company; the querying of flowmeter data is done via
-HTTP requests to the IO-Link master.
+The IFM SBN246 Flowmeter Agent is an OCS Agent which monitors flow in liters
+per minute and temperature in Celsius of the cooling loop of the DRs installed
+at the site. Monitoring is performed by connecting the flowmeter device to an
+IO-Link master device from the same company; the querying of flowmeter data is
+done via HTTP requests to the IO-Link master.
 
 .. argparse::
     :filename: ../socs/agents/ifm_sbn246_flowmeter/agent.py
@@ -26,7 +26,7 @@ Agent in a docker container.
 OCS Site Config
 ```````````````
 
-To configure the SBN Flowmeter Agent we need to add a FlowmeterAgent
+To configure the IFM SBN246 Flowmeter Agent we need to add a FlowmeterAgent
 block to our ocs configuration file. Here is an example configuration block
 using all of the available arguments::
 
@@ -36,14 +36,14 @@ using all of the available arguments::
                      ['--daq-port', '2']]},
 
 .. note::
-    The ``--ip-address`` argument should use the IP address of the DAQ device you've now
-    configured to be on the network.
+    The ``--ip-address`` argument should use the IP address of the IO-Link
+    master.
 
 Docker Compose
 ``````````````
 
-The SBN246 Flowmeter Agent should be configured to run in a Docker container. An
-example docker-compose service configuration is shown here::
+The IFM SBN246 Flowmeter Agent should be configured to run in a Docker
+container. An example docker-compose service configuration is shown here::
 
   ocs-flow:
     image: simonsobs/socs:latest
@@ -63,10 +63,10 @@ debugging. The default level is "info".
 Description
 -----------
 
-The SBN246 Flowmeter is a device from IFM Electronic, and will be used to
+The SBN246 Flowmeter is a device from IFM Electronic, and is used to
 monitor the flow and temperature of the cooling loops at the site. This
-monitoring is critical, as any change in flow or temperature will allow SO
-to immediately diagnose/anticipate DR behavior. The Agent communicates to
+monitoring is critical, as any change in flow or temperature allows us
+to immediately diagnose/anticipate DR behavior. The Agent communicates with
 the flowmeter via an AL1340 IFM Electronic device--an IO-Link master from which the
 agent makes HTTP requests. The flowmeter plugs into 1 of 4 ports on the IO-Link
 master, and the agent queries data directly from that IO-Link master port.

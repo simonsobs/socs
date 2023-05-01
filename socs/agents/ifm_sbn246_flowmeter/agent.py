@@ -12,12 +12,16 @@ def extract(value):
     """
     Extract flow and temp from raw hexidecimal value from SBN246 Process Data.
 
-    Args:
-        value (str): Hexidecimal value from SBN246 Process Data.
+    Parameters
+    ----------
+    value : str
+        Hexidecimal value from SBN246 Process Data.
 
-    Returns:
-        float, int: The flow in units of gallons per minute (gpm) and
-        temperature in units of F.
+    Returns
+    -------
+    float, int
+        The flow in units of gallons per minute (gpm) and temperature in units
+        of F.
 
     """
     binary = bin(int(value, 16))[2:].zfill(32)
@@ -37,11 +41,12 @@ class FlowmeterAgent:
     Parameters
     ----------
     agent : OCSAgent
-        OCSAgent object which forms this Agent
+        OCSAgent object which forms this Agent.
     ip_address: str
-        IP address of DAQ IO-Link device to make requests from
+        IP address of IO-Link master to make requests from.
     daq_port: int
-        Port on IO-Link master that connects to flowmeter. Choices are 1-4
+        Port on IO-Link master that connects to flowmeter. Choices are 1-4.
+
     """
 
     def __init__(self, agent, ip_address, daq_port):
@@ -75,7 +80,7 @@ class FlowmeterAgent:
         """
         acq(test_mode=False)
 
-        **Process** - Fetch values from the flowmeter using the IO-Link master
+        **Process** - Fetch values from the flowmeter using the IO-Link master.
 
         Parameters
         ----------
@@ -83,15 +88,17 @@ class FlowmeterAgent:
             Run the Process loop only once. Meant only for testing.
             Default is False.
 
-        Notes:
-            The most recent data collected is stored in session data in the structure
-            Note the units are [liters/min] and [Celsius]::
+        Notes
+        -----
+        The most recent data collected is stored in session data in the
+        following structure. Note the units are [liters/min] and [Celsius]::
 
-                    >>> response.session['data']
-                    {'timestamp': 1682630863.0066128,
-                     'fields':
-                        {'flow': 42.4, 'temperature': 22.8}
-                    }
+            >>> response.session['data']
+            {'timestamp': 1682630863.0066128,
+             'fields':
+                {'flow': 42.4, 'temperature': 22.8}
+            }
+
         """
         pm = Pacemaker(1, quantize=True)
         self.take_data = True
@@ -145,7 +152,7 @@ def add_agent_args(parser_in=None):
         parser_in = argparse.ArgumentParser()
     pgroup = parser_in.add_argument_group('Agent Options')
     pgroup.add_argument("--ip-address", type=str, help="IP address of IO-Link master.")
-    pgroup.add_argument("--daq-port", type=int, help="Port on IO-Link master that flowmeter is connected to")
+    pgroup.add_argument("--daq-port", type=int, help="Port on IO-Link master that flowmeter is connected to.")
 
     return parser_in
 
