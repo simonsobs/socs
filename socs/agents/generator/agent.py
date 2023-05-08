@@ -1,13 +1,12 @@
 import argparse
 import os
+import sys
 import time
 import warnings
 from typing import Optional
-import sys
-import yaml
 
 import txaio
-
+import yaml
 from pyModbusTCP.client import ModbusClient
 
 on_rtd = os.environ.get('READTHEDOCS') == 'True'
@@ -16,18 +15,23 @@ if not on_rtd:
     from ocs.ocs_twisted import TimeoutLock
 
 byteorder = sys.byteorder
+
+
 def twos(val, bytes):
     '''Take an unsigned integer representation of a two's compilment integer and return the correctly signed integer'''
     b = val.to_bytes(bytes, byteorder=byteorder, signed=False)
     return int.from_bytes(b, byteorder=byteorder, signed=True)
 
+
 def interp_unsigned_double_reg(r1, r2):
     '''Take two 16 bit register values and combine them assuming we really wanted to read a 32 bit unsigned register'''
-    return (r1<<16)+r2
+    return (r1 << 16) + r2
+
 
 def interp_signed_double_reg(r1, r2):
     '''Take two 16 bit register values and combine them assuming we really wanted to read a 32 bit signed register'''
-    return twos(interp_unsigned_double_reg(r1,r2), 4)
+    return twos(interp_unsigned_double_reg(r1, r2), 4)
+
 
 class ReadString(object):
 
@@ -44,33 +48,35 @@ class ReadString(object):
 
     def build_reader_function(self, offset, rconfig):
         if rconfig['read_as'] == '16U':
-            evaluator = lambda registers: registers[offset]
+            def evaluator(registers): return registers[offset]
         elif rconfig['read_as'] == '16S':
-            evaluator = lambda registers: twos(registers[offset], 2)
+            def evaluator(registers): return twos(registers[offset], 2)
         elif rconfig['read_as'] == '32U':
-            evaluator = lambda registers: interp_unsigned_double_reg(registers[offset], registers[offset+1])
+            def evaluator(registers): return interp_unsigned_double_reg(registers[offset], registers[offset + 1])
         elif rconfig['read_as'] == '32S':
-            evaluator = lambda registers: interp_signed_double_reg(registers[offset], registers[offset+1])
+            def evaluator(registers): return interp_signed_double_reg(registers[offset], registers[offset + 1])
         else:
-            evaluator = lambda registers: self.error_val
+            def evaluator(registers): return self.error_val
 
         def process(registers):
             val = evaluator(registers)
             if 'scale' in rconfig:
-                val = val*rconfig['scale']
+                val = val * rconfig['scale']
 
             if self.error_out_of_range:
                 try:
                     if val < rconfig['min_va']:
                         val = self.error_val
-                except KeyError: pass
+                except KeyError:
+                    pass
 
                 try:
                     if val > rconfig['max_val']:
                         val = self.error_val
-                except KeyError: pass
+                except KeyError:
+                    pass
 
-            return {rconfig['name'].replace(' ', '_'):{'value':val, 'units':rconfig['units']}}
+            return {rconfig['name'].replace(' ', '_'): {'value': val, 'units': rconfig['units']}}
 
         return process
 
@@ -85,6 +91,7 @@ class ReadString(object):
             print(f'Error in processing data: {e}')
 
         return return_data
+
 
 class GeneratorAgent:
 
@@ -118,7 +125,7 @@ class GeneratorAgent:
                                  record=True,
                                  agg_params=agg_params,
                                  buffer_time=0)
-        
+
     def build_config(self, config):
         for string in config:
             self.read_strings.append(ReadString(string))
@@ -134,7 +141,7 @@ class GeneratorAgent:
         except Exception as e:
             print('error in read', e)
             return
-        
+
         return data
 
     def init_generator(self, session, params=None):
@@ -200,11 +207,11 @@ class GeneratorAgent:
                  ...
                  'connection': {'last_attempt': 1680812613.939653, 'connected': True}},
              "timestamp":1601925677.6914878}
-        
+
         Refer to the config file for all possible fields and their respective
         min/max values and units. Note: -1 will be returned for readings
         out of range.
-        
+
         """
         if params is None:
             params = {}
@@ -244,9 +251,9 @@ class GeneratorAgent:
                 if self.initialized:
                     session.data.update({'connection': {'last_attempt': time.time(),
                                                         'connected': True}})
-                    
+
                     regdata = self.read_cycle(self.client)
-                    
+
                     if regdata:
                         for reg in regdata:
                             data['data'][reg] = regdata[reg]["value"]
