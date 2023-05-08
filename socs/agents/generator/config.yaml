@@ -1,5 +1,5 @@
-read_len: 8
-read_start: 0
+read_len: 8 # update this to number of registers to query starting from 0
+read_start: 1024
 registers:
   0:
     max_val: 10000.0
