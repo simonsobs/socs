@@ -99,6 +99,7 @@ setup(
         'pyyaml',
         'sqlalchemy>=1.4',
         'twisted',
+        'pyasn1==0.4.8',
     ],
     extras_require={
         'all': all_deps,
