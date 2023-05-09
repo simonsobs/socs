@@ -10,10 +10,9 @@ from integration.util import create_crossbar_fixture
 from ocs.base import OpCode
 from ocs.testing import create_agent_runner_fixture, create_client_fixture
 from snmpsim.commands import responder
+from twisted.internet.defer import inlineCallbacks
 
-# from twisted.internet.defer import inlineCallbacks  # disabled for issue #434
-
-# from socs.snmp import SNMPTwister  # disabled for issue #434
+from socs.snmp import SNMPTwister
 
 pytest_plugins = "docker_compose"
 
@@ -65,24 +64,22 @@ def test_ibootbar_acq(wait_for_crossbar, start_responder, run_agent, client):
     check_resp_success(resp)
 
 
-# Disabled until issue #434 can be resolved
-# https://github.com/simonsobs/socs/issues/434
-# @pytest.mark.integtest
-# @inlineCallbacks
-# def test_ibootbar_set_outlet(wait_for_crossbar, start_responder, run_agent, client):
-#     outlet_number = 3
-#     resp = client.set_outlet(outlet=outlet_number, state="on")
-#     check_resp_success(resp)
-#
-#     # Simulate internal state transition of hardware
-#     snmp = SNMPTwister(address, port)
-#     outlet = [("IBOOTPDU-MIB", "outletStatus", outlet_number - 1)]
-#     yield snmp.set(oid_list=outlet, version=2, setvalue=1, community_name="public")
-#
-#     resp = client.acq.start(test_mode=True)
-#     resp = client.acq.wait()
-#
-#     assert resp.session["data"][f"outletStatus_{outlet_number - 1}"]["status"] == 1
+@pytest.mark.integtest
+@inlineCallbacks
+def test_ibootbar_set_outlet(wait_for_crossbar, start_responder, run_agent, client):
+    outlet_number = 3
+    resp = client.set_outlet(outlet=outlet_number, state="on")
+    check_resp_success(resp)
+
+    # Simulate internal state transition of hardware
+    snmp = SNMPTwister(address, port)
+    outlet = [("IBOOTPDU-MIB", "outletStatus", outlet_number - 1)]
+    yield snmp.set(oid_list=outlet, version=2, setvalue=1, community_name="public")
+
+    resp = client.acq.start(test_mode=True)
+    resp = client.acq.wait()
+
+    assert resp.session["data"][f"outletStatus_{outlet_number - 1}"]["status"] == 1
 
 
 @pytest.mark.integtest
