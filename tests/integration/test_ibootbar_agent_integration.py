@@ -10,7 +10,6 @@ from integration.util import create_crossbar_fixture
 from ocs.base import OpCode
 from ocs.testing import create_agent_runner_fixture, create_client_fixture
 from snmpsim.commands import responder
-
 from twisted.internet.defer import inlineCallbacks
 
 from socs.snmp import SNMPTwister
