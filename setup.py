@@ -106,7 +106,7 @@ setup(
         'ocs',
         'pyModbusTCP',
         'pyserial',
-        'pysnmp',
+        'pysnmp-lextudio',
         'pysmi',
         'pyyaml',
         'requests',
