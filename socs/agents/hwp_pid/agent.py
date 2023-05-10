@@ -253,7 +253,7 @@ class HWPPIDAgent:
         return True, 'Set scale'
 
     def acq(self, session, params):
-        """acq
+        """acq()
 
         **Process** - Start PID data acquisition.
 
