@@ -12,6 +12,7 @@ class PMX:
     def __init__(self, ip, port):
         self.sock = socket(AF_INET, SOCK_STREAM)
         self.sock.connect((ip, port))
+        self.sock.settimeout(5)
 
         self.wait_time = 0.01
         self.buffer_size = 128
