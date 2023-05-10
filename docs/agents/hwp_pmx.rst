@@ -54,5 +54,5 @@ An example docker-compose configuration::
 Agent API
 ---------
 
-.. autoclass:: socs.agents.hwp_pmx.agent.PMXAgent
+.. autoclass:: socs.agents.hwp_pmx.agent.HWPPMXAgent
     :members:
