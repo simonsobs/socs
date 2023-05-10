@@ -186,10 +186,15 @@ class HWPPMXAgent:
             self.dev.ign_external_voltage()
         return True, 'Set PMX Kikusui to direct control'
 
+    @ocs_agent.param('test_mode', default=False, type=bool)
     def acq(self, session, params):
-        """acq()
+        """acq(test_mode=False)
 
         **Process** - Start data acquisition.
+
+        Parameters:
+            test_mode (bool, optional): Run the Process loop only once.
+                This is meant only for testing. Default is False.
 
         Notes:
             The most recent data collected is stored in session data in the
@@ -235,8 +240,14 @@ class HWPPMXAgent:
                 session.data = {'curr': curr,
                                 'volt': volt,
                                 'last_updated': current_time}
+
                 time.sleep(sleep_time)
+
+                if params['test_mode']:
+                    break
+
             self.agent.feeds['hwppmx'].flush_buffer()
+
         return True, 'Acquisition exited cleanly.'
 
     def _stop_acq(self, session, params=None):
