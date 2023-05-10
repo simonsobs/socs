@@ -19,6 +19,8 @@ for n, f in [
         ('FTSAerotechAgent', 'fts_aerotech/agent.py'),
         ('HWPBBBAgent', 'hwp_encoder/agent.py'),
         ('HWPPicoscopeAgent', 'hwp_picoscope/agent.py'),
+        ('HWPPIDAgent', 'hwp_pid/agent.py'),
+        ('HWPPMXAgent', 'hwp_pmx/agent.py'),
         ('ibootbarAgent', 'ibootbar/agent.py'),
         ('LabJackAgent', 'labjack/agent.py'),
         ('Lakeshore240Agent', 'lakeshore240/agent.py'),
