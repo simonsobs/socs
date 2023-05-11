@@ -24,6 +24,7 @@ class PID:
         self.verb = verb
         self.hex_freq = '00000'
         self.direction = None
+        self.target = 0
         # Need to setup connection before setting direction
         self.conn = self._establish_connection(pid_ip, int(pid_port))
         self.set_direction('0')
@@ -173,6 +174,18 @@ class PID:
         freq = self.return_messages(responses)[0]
         return freq
 
+    def get_target(self):
+        """Returns the target frequency of the CHWP."""
+        if self.verb:
+            print('Finding target CHWP Frequency')
+
+        responses = []
+        responses.append(self.send_message("*R01"))
+        if self.verb:
+            print(responses)
+
+        return self.target
+
     def get_direction(self):
         """Get the current rotation direction.
 
@@ -301,7 +314,8 @@ class PID:
     def _decode_read(string):
         read_type = string[1:3]
         if read_type == '01':
-            return 'Setpoint = ' + str(int(string[4:], 16) / 1000.)
+            self.target = float(int(string[4:], 16)/1000.)
+            return 'Setpoint = ' + str(self.target)
         # Decode direction
         if read_type == '02':
             if int(string[4:], 16) / 1000. > 2.5:
