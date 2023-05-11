@@ -442,6 +442,7 @@ class HWPSupervisor:
         clients.pmx.set_off()
         return True, "Commanded HWP to stop spinning"
 
+
 def make_parser(parser=None):
     if parser is None:
         parser = argparse.ArgumentParser()
