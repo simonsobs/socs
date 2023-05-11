@@ -86,7 +86,8 @@ def get_op_data(agent_id, op_name, log=None, test_mode=False):
 @dataclass
 class HWPClients:
     encoder: Optional[OCSClient] = None
-    rotation: Optional[OCSClient] = None
+    pmx: Optional[OCSClient] = None
+    pid: Optional[OCSClient] = None
     ups: Optional[OCSClient] = None
     lakeshore: Optional[OCSClient] = None
 
@@ -104,7 +105,8 @@ class HWPSupervisor:
         self.hwp_temp_thresh = args.hwp_temp_thresh
 
         self.hwp_encoder_id = args.hwp_encoder_id
-        self.hwp_rotation_id = args.hwp_rotation_id
+        self.hwp_pmx_id = args.hwp_pmx_id
+        self.hwp_pid_id = args.hwp_pid_id
         self.ups_id = args.ups_id
         self._ups_oid = None
         self.ups_minutes_remaining_thresh = args.ups_minutes_remaining_thresh
@@ -121,12 +123,13 @@ class HWPSupervisor:
 
         return HWPClients(
             encoder=get_client(self.hwp_encoder_id),
-            rotation=get_client(self.hwp_rotation_id),
+            pmx=get_client(self.hwp_pmx_id),
+            pid=get_client(self.hwp_pid_id),
             ups=get_client(self.ups_id),
             lakeshore=get_client(self.hwp_lakeshore_id)
         )
 
-    def _get_rotator_action(self, state):
+    def _get_pmx_action(self, state):
         # First check if either ups or temp are beyond a threshold
         hwp_temp = state['hwp_temp']
         if hwp_temp is not None and self.hwp_temp_thresh is not None:
@@ -149,10 +152,10 @@ class HWPSupervisor:
         """
         Gets the gripper action based on the current state of the system.
         This will only report 'stop' if the rot_action is 'stop' and the hwp
-        freq is exactly 0. The gripper agent should not grip the hwp in a
+        freq is smaller than 0.01. The gripper agent should not grip the hwp in a
         no-data event.
         """
-        rot_action = self._get_rotator_action(state)
+        rot_action = self._get_pmx_action(state)
         if rot_action == 'ok':
             return 'ok'
         if rot_action == 'no_data':
@@ -161,9 +164,9 @@ class HWPSupervisor:
         hwp_freq = state['hwp_freq']
         if hwp_freq is None:
             return 'no_data'
-        elif hwp_freq > 0:
+        elif hwp_freq > 0.01:
             return 'ok'
-        else:  # Only grip if the hwp_freq is exactly 0
+        else:  # Only grip if the hwp_freq is smaller than 0.01
             return 'stop'
 
     def _update_state_temp(self, temp_op, state):
@@ -275,7 +278,7 @@ class HWPSupervisor:
                 },
                  # Subsystem action recommendations determined from state data
                 'actions': {
-                    'rotation': 'ok'  # 'ok', 'stop', or 'no_data'
+                    'pmx': 'ok'  # 'ok', 'stop', or 'no_data'
                     'grippder': 'ok'  # 'ok', 'stop', or 'no_data'
                 }}
         """
@@ -297,13 +300,15 @@ class HWPSupervisor:
             # 1. Gather data from relevant operations
             temp_op = get_op_data(self.hwp_lakeshore_id, 'acq', **kw)
             enc_op = get_op_data(self.hwp_encoder_id, 'acq', **kw)
-            rot_op = get_op_data(self.hwp_rotation_id, 'iv_acq', **kw)
+            pmx_op = get_op_data(self.hwp_pmx_id, 'acq', **kw)
+            pid_op = get_op_data(self.hwp_pid_id, 'acq', **kw)
             ups_op = get_op_data(self.ups_id, 'acq', **kw)
 
             session.data['monitored_sessions'] = {
                 'temperature': temp_op,
                 'encoder': enc_op,
-                'rotation': rot_op,
+                'pmx': pmx_op,
+                'pid': pid_op,
                 'ups': ups_op
             }
 
@@ -321,7 +326,7 @@ class HWPSupervisor:
 
             # Get actions for each hwp subsystem
             session.data['actions'] = {
-                'rotation': self._get_rotator_action(state),
+                'pmx': self._get_pmx_action(state),
                 'gripper': self._get_gripper_action(state),
             }
 
@@ -337,9 +342,9 @@ class HWPSupervisor:
         return True, 'Stopping monitor process'
 
     @ocs_agent.param('forward', type=bool, default=True)
-    @ocs_agent.param('freq', type=float)
+    @ocs_agent.param('target_freq', type=float)
     def spin_up(self, session, params):
-        """spin_up(forward=True, freq=2.0)
+        """spin_up(forward=True, target_freq=2.0)
 
         *Task* -- Sets the HWP to spin at a given frequency.
 
@@ -361,22 +366,23 @@ class HWPSupervisor:
         clients = self._get_hwp_clients()
 
         direction = '0' if params['forward'] else '1'
-        clients.rotation.set_direction(direction=direction)
+        clients.pid.set_direction(direction=direction)
         session.add_message("Set rotation direction: forward={}".format(params['forward']))
 
-        clients.rotation.declare_freq(freq=params['freq'])
-        clients.rotation.tune_freq()
-        clients.rotation.set_on()
+        clients.pid.declare_freq(freq=params['freq'])
+        clients.pid.tune_freq()
+        clients.pmx.use_ext()
+        clients.pmx.set_on()
         session.add_messsage("Tuning PID to {:.2f} Hz".format(params['freq']))
 
         session.data = {'forward': params['forward'],
-                        'commanded_freq': params['freq'],
+                        'target_freq': params['target_freq'],
                         'pid_freq': 0}
         while True:
-            _, _, s = clients.rotation.get_freq()
-            cur_freq = s.data['freq']
+            _, _, s = clients.pid.get_freq()
+            cur_freq = s.data['current_freq']
             session.data['pid_freq'] = cur_freq
-            if cur_freq - params['freq'] < 0.005:
+            if cur_freq - params['target_freq'] < 0.005:
                 break
             time.sleep(0.5)
 
@@ -400,17 +406,16 @@ class HWPSupervisor:
         Parameters
         ------------
         pid_freq_thresh : float
-            When the PID freq drops below this threshold, rotation power supply
-            will be cut off.
+            When the PID freq drops below this threshold, tell the hwp_pmx to cut power.
         use_pid : bool
             If True, will use the PID to spin down the HWP. If False, will
-            just tell the rotation agent to cut power.
+            just tell the hwp_pmx agent to cut power.
 
         """
         clients = self._get_hwp_clients()
 
         if not params.use_pid:
-            clients.rotation.set_off()
+            clients.pmx.set_off()
             session.data = {
                 'pid_freq': None,
                 'pid_freq_thresh': params['pid_freq_thresh'],
@@ -418,8 +423,9 @@ class HWPSupervisor:
             }
             return True, "Commanded HWP to stop spinning"
 
-        clients.rotation.tune_stop()
-        clients.rotation.set_on()
+        clients.pid.tune_stop()
+        clients.pmx.use_ext()
+        clients.pmx.set_on()
         session.add_messsage("Tuning PID to stop")
 
         session.data = {
@@ -427,15 +433,14 @@ class HWPSupervisor:
             'use_pid': params.use_pid
         }
         while True:
-            _, _, s = clients.rotation.get_freq()
-            cur_freq = s.data['freq']
+            _, _, s = clients.pid.get_freq()
+            cur_freq = s.data['current_freq']
             session.data['pid_freq'] = cur_freq
             if cur_freq < params.pid_freq_thresh:
                 break
 
-        clients.rotation.set_off()
+        clients.pmx.set_off()
         return True, "Commanded HWP to stop spinning"
-
 
 def make_parser(parser=None):
     if parser is None:
@@ -453,8 +458,10 @@ def make_parser(parser=None):
 
     pgroup.add_argument('--hwp-encoder-id',
                         help="Instance id for HWP encoder agent")
-    pgroup.add_argument('--hwp-rotation-id',
-                        help="Instance ID for rotation agent")
+    pgroup.add_argument('--hwp-pmx-id',
+                        help="Instance ID for HWP pmx agent")
+    pgroup.add_argument('--hwp-pid-id',
+                        help="Instance ID for HWP pid agent")
     pgroup.add_argument('--ups-id', help="Instance ID for UPS agent")
     pgroup.add_argument('--ups-minutes-remaining-thresh', type=float, default=30.,
                         help="Threshold for UPS minutes remaining before a "
