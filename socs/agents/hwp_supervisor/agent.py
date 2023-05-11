@@ -369,11 +369,11 @@ class HWPSupervisor:
         clients.pid.set_direction(direction=direction)
         session.add_message("Set rotation direction: forward={}".format(params['forward']))
 
-        clients.pid.declare_freq(freq=params['freq'])
+        clients.pid.declare_freq(freq=params['target_freq'])
         clients.pid.tune_freq()
         clients.pmx.use_ext()
         clients.pmx.set_on()
-        session.add_messsage("Tuning PID to {:.2f} Hz".format(params['freq']))
+        session.add_messsage("Tuning PID to {:.2f} Hz".format(params['target_freq']))
 
         session.data = {'forward': params['forward'],
                         'target_freq': params['target_freq'],
