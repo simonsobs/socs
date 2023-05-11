@@ -14,7 +14,7 @@ run_agent = create_agent_runner_fixture(
 run_agent_idle = create_agent_runner_fixture(
     '../socs/agents/hwp_pmx/agent.py', 'hwp_pmx_agent', args=['--mode', 'idle', '--log-dir', './logs/'])
 client = create_client_fixture('hwp-pmx')
-kikusui_emu = create_device_emulator({}, relay_type='tcp', port=2000)
+kikusui_emu = create_device_emulator({}, relay_type='tcp', port=5025)
 
 
 @pytest.mark.integtest

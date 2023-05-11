@@ -39,7 +39,7 @@ hosts:
       {'agent-class': 'HWPPIDAgent',
        'instance-id': 'hwp-pid',
        'arguments': [['--ip', '127.0.0.1'],
-                     ['--port', '2001'],
+                     ['--port', '2000'],
                      ['-v'],
                      ['--mode', 'init'],
                     ]
@@ -47,7 +47,7 @@ hosts:
       {'agent-class': 'HWPPMXAgent',
        'instance-id': 'hwp-pmx',
        'arguments': [['--ip', '127.0.0.1'],
-                     ['--port', '2000'],
+                     ['--port', '5025'],
                      ['--mode', 'init'],
                     ]
       },

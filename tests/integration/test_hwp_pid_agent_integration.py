@@ -15,7 +15,7 @@ run_agent_idle = create_agent_runner_fixture(
     '../socs/agents/hwp_pid/agent.py', 'hwp_pid_agent', args=['--mode', 'init', '--log-dir', './logs/'])
 client = create_client_fixture('hwp-pid')
 pid_emu = create_device_emulator(
-    {'*W02400000': 'W02\r'}, relay_type='tcp', port=2001)
+    {'*W02400000': 'W02\r'}, relay_type='tcp', port=2000)
 
 
 @pytest.mark.integtest
