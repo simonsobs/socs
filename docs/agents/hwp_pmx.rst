@@ -1,13 +1,13 @@
 .. highlight:: rst
 
-.. _hwp_rotation_agent:
+.. _hwp_pmx:
 
-==================
-HWP Rotation Agent
-==================
+=============
+HWP PMX Agent
+=============
 
 .. argparse::
-    :filename: ../socs/agents/hwp_rotation/agent.py
+    :filename: ../socs/agents/hwp_pmx/agent.py
     :func: make_parser
     :prog: python3 agent.py
 
@@ -22,25 +22,24 @@ OCS Site Config
 
 An example site-config-file block::
 
-      {'agent-class': 'RotationAgent',
-       'instance-id': 'rotator',
-       'arguments': [['--kikusui-ip', '10.10.10.100'],
-                     ['--kikusui-port', '2000'],
-                     ['--pid-ip', '10.10.10.101'],
-                     ['--pid-port', '2001'],
-                     ['--mode', 'iv_acq']]},
+      {'agent-class': 'HWPPMXAgent',
+       'instance-id': 'hwp-pmx',
+       'arguments': [['--ip', '10.10.10.100'],
+                     ['--port', '5025'],
+                     ['--mode', 'acq'],
+                     ['--sampling-frequency', 1],]},
 
 Docker Compose
 ``````````````
 
 An example docker-compose configuration::
 
-  ocs-hwp-rotation:
+  ocs-hwp-pmx:
     image: simonsobs/socs:latest
     hostname: ocs-docker
     network_mode: "host"
     environment:
-      - INSTANCE_ID=rotator
+      - INSTANCE_ID=hwp-pmx
       - SITE_HUB=ws://127.0.0.1:8001/ws
       - SITE_HTTP=http://127.0.0.1:8001/call
     volumes:
@@ -52,19 +51,8 @@ An example docker-compose configuration::
     system. In this example the crossbar server is running on localhost,
     ``127.0.0.1``, but on your network this may be different.
 
-Description
------------
-
-
 Agent API
 ---------
 
-.. autoclass:: socs.agents.hwp_rotation.agent.RotationAgent
+.. autoclass:: socs.agents.hwp_pmx.agent.HWPPMXAgent
     :members:
-
-Supporting APIs
----------------
-
-.. automodule:: socs.common.pmx
-    :members:
-    :noindex:

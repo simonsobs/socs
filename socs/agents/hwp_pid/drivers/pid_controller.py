@@ -6,8 +6,8 @@ class PID:
     """Class to communicate with the Omega CNi16D54-EIT PID controller.
 
     Args:
-        pid_ip (str): IP address for the controller.
-        pid_port (int): Port number for the socket connection.
+        ip (str): IP address for the controller.
+        port (int): Port number for the socket connection.
         verb (bool): Verbose output setting. Defaults to False.
 
     Attributes:
@@ -20,12 +20,13 @@ class PID:
 
     """
 
-    def __init__(self, pid_ip, pid_port, verb=False):
+    def __init__(self, ip, port, verb=False):
         self.verb = verb
         self.hex_freq = '00000'
         self.direction = None
+        self.target = 0
         # Need to setup connection before setting direction
-        self.conn = self._establish_connection(pid_ip, int(pid_port))
+        self.conn = self._establish_connection(ip, int(port))
         self.set_direction('0')
 
     @staticmethod
@@ -132,9 +133,10 @@ class PID:
         responses.append(self.send_message("*W01400000"))
         responses.append(self.send_message("*R01"))
         responses.append(self.send_message("*Z02"))
+        messages = self.return_messages(responses)
         if self.verb:
             print(responses)
-            print(self.return_messages(responses))
+            print(messages)
 
         stop_params = [0.2, 0, 0]
         self.set_pid(stop_params)
@@ -153,9 +155,10 @@ class PID:
         responses.append(self.send_message(f"*W014{self.hex_freq}"))
         responses.append(self.send_message("*R01"))
         responses.append(self.send_message("*Z02"))
+        messages = self.return_messages(responses)
         if self.verb:
             print(responses)
-            print(self.return_messages(responses))
+            print(messages)
 
         tune_params = [0.2, 63, 0]
         self.set_pid(tune_params)
@@ -173,6 +176,20 @@ class PID:
         freq = self.return_messages(responses)[0]
         return freq
 
+    def get_target(self):
+        """Returns the target frequency of the CHWP."""
+        if self.verb:
+            print('Finding target CHWP Frequency')
+
+        responses = []
+        responses.append(self.send_message("*R01"))
+        target = self.return_messages(responses)[0]
+        if self.verb:
+            print(responses)
+            print('Setpoint = ' + str(target))
+
+        return target
+
     def get_direction(self):
         """Get the current rotation direction.
 
@@ -185,13 +202,12 @@ class PID:
 
         responses = []
         responses.append(self.send_message("*R02"))
-
         direction = self.return_messages(responses)[0]
-        if direction == 1:
-            print('Direction = Reverse')
-        elif direction == 0:
-            print('Direction = Forward')
-        self.direction = direction
+        if self.verb:
+            if direction == 1:
+                print('Direction = Reverse')
+            elif direction == 0:
+                print('Direction = Forward')
 
         return direction
 
@@ -300,15 +316,15 @@ class PID:
     @staticmethod
     def _decode_read(string):
         read_type = string[1:3]
+        # Decode target
         if read_type == '01':
-            return 'Setpoint = ' + str(int(string[4:], 16) / 1000.)
+            target = float(int(string[4:], 16) / 1000.)
+            return target
         # Decode direction
         if read_type == '02':
             if int(string[4:], 16) / 1000. > 2.5:
-                print('Direction = Reverse')
                 return 1
             else:
-                print('Direction = Forward')
                 return 0
         else:
             return 'Unrecognized Read'
