@@ -243,7 +243,6 @@ class HWPPMXAgent:
         """
         Stop acq process.
         """
-        self.dev.close()
         if self.take_data:
             self.take_data = False
             return True, 'requested to stop taking data.'
