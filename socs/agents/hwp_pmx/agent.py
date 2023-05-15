@@ -21,7 +21,7 @@ class HWPPMXAgent:
         ip (str): IP address for the PMX Kikusui power supply
         port (str): Port for the PMX Kikusui power supply
         f_sample (float): sampling frequency (Hz)
-        supervisor_id (str): ID of HWP supervisor
+        supervisor_id (str): Instance id of HWP supervisor
         no_data_timeout (float): Time (in seconds) to wait between receiving
             'no_data' actions from the supervisro and triggering a shutdown
     """
@@ -320,8 +320,9 @@ class HWPPMXAgent:
             return False, 'acq is not currently running'
 
     def initiate_shutdown(self, session, params):
-        """
-        Initiate the shutdown of the agent.
+        """ initiate_shutdown()
+
+        **Task** - Initiate the shutdown of the agent.
         """
         self.log.warn("INITIATING SHUTDOWN")
 
@@ -335,15 +336,17 @@ class HWPPMXAgent:
             self.dev.turn_off()
 
     def reverse_shutdown(self, session, params):
-        """
-        Reverses shutdown mode, allowing other tasks to update the power supply
+        """reverse_shutdown()
+
+        **Task** - Reverses shutdown mode, allowing other tasks to update the power supply
         """
         self.shutdown_mode = False
         return True, "Reversed shutdown mode"
 
     def monitor_shutdown(self, session, params):
-        """
-        Monitor the shutdown of the agent.
+        """monitor_shutdown()
+
+        **Process** - Monitor the shutdown of the agent.
         """
 
         session.set_status('running')
@@ -369,12 +372,12 @@ class HWPPMXAgent:
             elif action == 'no_data':
                 if (time.time() - last_ok_time) > self.no_data_timeout:
                     if not self.shutdown_mode:
-                        self.agent.start('initiate_shutdown')
+                        self.agent.start('initiate_shutdown', params=None)
 
             # If action is 'shutdown', trigger shutdown
             elif action == 'stop':
                 if not self.shutdown_mode:
-                    self.agent.start('initiate_shutdown')
+                    self.agent.start('initiate_shutdown', params=None)
 
             data = {
                 'data': {'rotation_action': action},
