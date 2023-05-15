@@ -1,7 +1,8 @@
-import multiprocessing
-import socket
-import select
 import errno
+import multiprocessing
+import select
+import socket
+
 
 class GripperCollector(object):
     def __init__(self, pru_port):
@@ -30,5 +31,5 @@ class GripperCollector(object):
                 pass
 
         if len(self._data) > 0:
-            self.queue.put(obj = self._data, block = True, timeout = None)
+            self.queue.put(obj=self._data, block=True, timeout=None)
             self._data = b''
