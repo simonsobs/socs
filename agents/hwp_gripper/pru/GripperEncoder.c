@@ -101,4 +101,3 @@ int main(void) {
     // Stop PRU data taking
     __halt();
 }
-
