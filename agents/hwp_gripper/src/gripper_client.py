@@ -1,7 +1,6 @@
+import socket
 import errno
 import select
-import socket
-
 
 class GripperClient(object):
     def __init__(self, ip, send_port, recv_port):
@@ -22,9 +21,9 @@ class GripperClient(object):
     def send_data(self, data):
         self._s_send.sendto(bytes(data, 'utf-8'), (self.ip, self.send_port))
 
-    def listen(self):
+    def listen(self, timeout = 0.01):
         try:
-            ready = select.select([self._s_recv], [], [], 0.01)
+            ready = select.select([self._s_recv], [], [], timeout)
             if ready[0]:
                 self.data = self._s_recv.recv(1024)
         except socket.error as err:
@@ -34,7 +33,7 @@ class GripperClient(object):
                 pass
 
         if len(self.data) > 0:
-            return_data = self.data
+            return_data =  self.data
             self.data = b''
             return return_data
         else:
@@ -43,3 +42,4 @@ class GripperClient(object):
     def __exit__(self):
         self._s_send.close()
         self._s_recv.close()
+
