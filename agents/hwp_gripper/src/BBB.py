@@ -1,7 +1,6 @@
 # Built-in python modules
 import Adafruit_BBIO.GPIO as gpio
 
-
 class BBB:
     def __init__(self):
         # Read/write -- controllable by user
@@ -100,3 +99,4 @@ class BBB:
         addr (str): BBB pin address from which to read
         """
         return gpio.output(addr, gpio.LOW)
+

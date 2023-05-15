@@ -1,7 +1,6 @@
 # Built-in python modules
 import sys as sy
 
-
 class Command:
     def __init__(self, GPR=None):
         """
@@ -115,7 +114,7 @@ class Command:
                 self.GPR.CTL.BRAKE(state=ON, axis=axis)
         else:
             for i in range(3):
-                self.GPR.CTL.BRAKE(state=ON, axis=i + 1)
+                self.GPR.CTL.BRAKE(state=ON, axis=i+1)
         return True
 
     def _emg(self, args):
@@ -159,7 +158,7 @@ class Command:
                 self.GPR.CTL.EMG(state=ON, axis=axis)
         else:
             for i in range(3):
-                self.GPR.CTL.EMG(state=ON, axis=i + 1)
+                self.GPR.CTL.EMG(state=ON, axis=i+1)
         return True
 
     def _move(self, args):
@@ -215,3 +214,5 @@ class Command:
                 return False
             result = self.GPR.ACT(axis)
             return result
+
+

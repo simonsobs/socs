@@ -1,19 +1,18 @@
-import errno
-import os
-import select
 import socket
+import os
 import sys
+import select
+import errno
 
 this_dir = os.path.dirname(__file__)
 sys.path.append(this_dir)
 
 import BBB as bb
-import command_gripper as cg
+import JXC831 as jx
 import control as ct
 import gripper as gp
+import command_gripper as cg
 import gripper_client as gc
-import JXC831 as jx
-
 
 class GripperServer(object):
     def __init__(self, host_ip, command_port, return_port):
@@ -35,10 +34,9 @@ class GripperServer(object):
             self.data = self.client.listen()
 
             if len(self.data) > 0:
-                return_value = self.CMD.CMD(self.data.decode(encoding='UTF-8'))
+                return_value = self.CMD.CMD(self.data.decode(encoding = 'UTF-8'))
                 self.client.send_data(str(return_value))
                 self.data = b''
-
 
 server = GripperServer('10.10.10.50', 8041, 8042)
 server.process_command()
