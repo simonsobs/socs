@@ -119,10 +119,10 @@ int main(int argc, char **argv) {
 		printf("prussdrv_open() failed\n");
 		return 1;
 	}
-
+	
 	tpruss_intc_initdata pruss_intc_initdata = PRUSS_INTC_CUSTOM;
 	prussdrv_pruintc_init(&pruss_intc_initdata);
-
+	
 	on = (volatile unsigned long *) (init_prumem() + (ON_OFFSET / READOUT_BYTES));
 	clock_overflow = (volatile unsigned long *) (init_prumem() + (OVERFLOW_OFFSET / READOUT_BYTES));
 	encoder_ready = (volatile unsigned long *) (init_prumem() + (ENCODER_READY_OFFSET / READOUT_BYTES));
@@ -245,7 +245,7 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	if (*on == 1) {
+	if (*on == 1) {	
 		prussdrv_pru_wait_event(PRU_EVTOUT_1);
 		printf("All done\n");
 		prussdrv_pru_disable(1);

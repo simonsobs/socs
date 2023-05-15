@@ -56,3 +56,4 @@ config-pin P9_29 pruin # ACTUATOR_1_ENC_B
 config-pin P9_30 pruin # ACTUATOR_2_ENC_A
 config-pin P9_31 pruin # ACTUATOR_1_ENC_A
 config-pin P9_92 pruin # ACTUATOR_3_ENC_A
+

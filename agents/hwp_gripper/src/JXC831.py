@@ -7,7 +7,6 @@ class JXC831:
     Args:
     BBB (src.BBB): inherited BBB object
     """
-
     def __init__(self, BBB):
         if BBB is None:
             raise Exception(
@@ -72,7 +71,7 @@ class JXC831:
         for n in range(self.num_attempts):
             try:
                 return self.BBB.read_pin(addr)
-            except BaseException:
+            except:
                 continue
         raise Exception(
             'JXC831 Exception: Cannot read pin at address', addr)
@@ -87,7 +86,7 @@ class JXC831:
         for n in range(self.num_attempts):
             try:
                 return self.BBB.set_pin_on(addr)
-            except BaseException:
+            except:
                 continue
         return Exception(
             'JXC831 Exception: Cannot write to pin at address', addr)
@@ -102,7 +101,8 @@ class JXC831:
         for n in range(self.num_attempts):
             try:
                 return self.BBB.set_pin_off(addr)
-            except BaseException:
+            except:
                 continue
         return Exception(
             'JXC831 Exception: Cannot write to pin at address', addr)
+
