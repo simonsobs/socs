@@ -23,7 +23,7 @@ class HWPPMXAgent:
         f_sample (float): sampling frequency (Hz)
         supervisor_id (str): Instance id of HWP supervisor
         no_data_timeout (float): Time (in seconds) to wait between receiving
-            'no_data' actions from the supervisro and triggering a shutdown
+            'no_data' actions from the supervisor and triggering a shutdown
     """
 
     def __init__(self, agent, ip, port, f_sample=1, supervisor_id=None,
@@ -361,7 +361,7 @@ class HWPPMXAgent:
                 'timestamp': time.time()
             }
 
-            self.agent.publish_to_feed('gripper_action', data)
+            self.agent.publish_to_feed('rotation_action', data)
             session.data = {
                 'rotation_action': action,
                 'time': time.time()
