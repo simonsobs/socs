@@ -167,7 +167,7 @@ class LabJackAgent:
     """
 
     def __init__(self, agent, ip_address, active_channels, function_file,
-                 sampling_frequency):
+                 sampling_frequency,res_index=None):
         self.active = True
         self.agent = agent
         self.log = agent.log
@@ -176,6 +176,13 @@ class LabJackAgent:
         self.module = None
         self.ljf = LabJackFunctions()
         self.sampling_frequency = sampling_frequency
+
+        #Resolution index 
+        if res_index == None:
+            self.res_index = 0
+        else:
+            self.res_index = res_index #valid values between 0-5 for the Labjack T7, default is 0 which corresponds to resolution index = 1
+
 
         # Labjack channels to read
         if active_channels[0] == 'T7-all':
@@ -275,6 +282,8 @@ class LabJackAgent:
         Parameters:
             sampling_frequency (float):
                 Sampling frequency for data collection. Defaults to 2.5 Hz.
+            res_index (int):
+                resolution index for data collection. Defaults to 0
 
         """
         if params is None:
@@ -287,6 +296,15 @@ class LabJackAgent:
         scans_per_read = max(1, int(scan_rate_input))
         num_chs = len(self.chs)
         ch_addrs = ljm.namesToAddresses(num_chs, self.chs)[0]
+        
+        #For assigning the resolution index (keep aNames, aValues, as lists in case want to add values to other Labjack Registers later
+        #For a single register one can also use the function eWriteName()
+        aNames = ['STREAM_RESOLUTION_INDEX']
+        
+        #Either take resolution index from site config (params is none), or from matched client (params = {'res_index' = x}
+        res_index = params.get('res_index',self.res_index)
+        aValues = [res_index,]
+        numFrames = len(aNames)
 
         with self.lock.acquire_timeout(0, job='acq') as acquired:
             if not acquired:
@@ -296,7 +314,15 @@ class LabJackAgent:
 
             session.set_status('running')
             self.take_data = True
+            
+            #Set resolution index for all channels
+            try:
+                ljm.eWriteNames(self.handle,numFrames,aNames,aValues)
 
+            except (LJMError,TypeError) as e:
+                self.log.error(e)
+                self.log.error("Resolution index not properly set, starting stream with default index = 1")
+              
             # Start the data stream. Use the scan rate returned by the stream,
             # which should be the same as the input scan rate.
             try:
@@ -308,9 +334,17 @@ class LabJackAgent:
                 ljm.eStreamStop(self.handle)
                 scan_rate = ljm.eStreamStart(self.handle, scans_per_read, num_chs,
                                              ch_addrs, scan_rate_input)
+            #Confirm Scan Rate    
             self.log.info(f"\nStream started with a scan rate of {scan_rate} Hz.")
+            
+            #Check That resolution Index is set + log what it is
+            res_index_val = ljm.eReadNames(self.handle,numFrames,aNames)[0]
+            self.log.info(f'Successfully set Stream Resolution Index to {res_index_val}')
+            
 
             cur_time = time.time()
+            
+            
             while self.take_data:
                 data = {
                     'block_name': 'sens',
@@ -492,6 +526,9 @@ def make_parser(parser=None):
     acq_txt += ', or **idle**: leave device idle at startup.'
     pgroup.add_argument('--mode', default='acq',
                         choices=['idel', 'acq', 'acq_reg'], help=acq_txt)
+    pgroup.add_argument('--function-file', default='None')
+    pgroup.add_argument('--sampling-frequency', default='2.5')
+    pgroup.add_argument('--resolution_index', default = 'None')
 
     return parser
 
@@ -515,6 +552,7 @@ def main(args=None):
     active_channels = args.active_channels
     function_file = str(args.function_file)
     sampling_frequency = float(args.sampling_frequency)
+    res_index = int(args.resolution_index)
 
     agent, runner = ocs_agent.init_site_agent(args)
 
@@ -522,7 +560,8 @@ def main(args=None):
                            ip_address=ip_address,
                            active_channels=active_channels,
                            function_file=function_file,
-                           sampling_frequency=sampling_frequency)
+                           sampling_frequency=sampling_frequency,
+                           res_index = res_index)
 
     agent.register_task('init_labjack',
                         sensors.init_labjack,
