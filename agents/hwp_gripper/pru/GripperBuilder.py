@@ -1,6 +1,8 @@
-import numpy as np
-import time
 import struct
+import time
+
+import numpy as np
+
 
 class GripperBuilder(object):
     def __init__(self, collector):
@@ -18,7 +20,7 @@ class GripperBuilder(object):
         self._timeout_msg = 'CHWP Gripper Timeout'
         self._error_msg = 'CHWP Gripper Error'
 
-        self.limit_state = (0,0)
+        self.limit_state = (0, 0)
 
         self._define_encoder_packet()
         self._define_limit_packet()
@@ -26,15 +28,15 @@ class GripperBuilder(object):
 
     def process_packets(self):
         approx_size = self.queue.qsize()
-        return_dict = {'clock':[], 'state':[]}
+        return_dict = {'clock': [], 'state': []}
         detect_limit = 0
         for _ in range(approx_size):
-            self._data = self.queue.get(block = True, timeout = None)
+            self._data = self.queue.get(block=True, timeout=None)
 
             data_len = len(self._data)
             parse_index = 0
             while parse_index < data_len:
-                header = self._data[parse_index : parse_index + self._header_size]
+                header = self._data[parse_index: parse_index + self._header_size]
                 header = struct.unpack(("%s%s" % (
                     self._endian, self._unsigned_long_int_str)), header)[0]
 
@@ -58,7 +60,7 @@ class GripperBuilder(object):
             self._data = ''
 
         if not detect_limit:
-            self.limit_state = (0,0)
+            self.limit_state = (0, 0)
 
         return_dict['clock'] = np.array(return_dict['clock']).flatten()
         return_dict['state'] = np.array(return_dict['state']).flatten()
@@ -82,7 +84,7 @@ class GripperBuilder(object):
         self._encoder_packet_size = (
             self._encoder_header_size + self._encoder_data_size)
 
-        self._encoder_unpack_str = ( "%s%s%s" % (
+        self._encoder_unpack_str = ("%s%s%s" % (
             self._endian, self._encoder_header_str,
             self._encoder_data_str))
         return
@@ -114,8 +116,8 @@ class GripperBuilder(object):
             self._limit_data_units * self._unsigned_long_int_str)
 
         self._limit_packet_size = (
-            self._limit_header_size + self._limit_clock_size +
-            self._limit_overflow_size + self._limit_data_size)
+            self._limit_header_size + self._limit_clock_size
+            + self._limit_overflow_size + self._limit_data_size)
 
         self._limit_unpack_str = ("%s%s%s%s%s" % (
             self._endian, self._limit_header_str,
@@ -176,7 +178,7 @@ class GripperBuilder(object):
 
         clk = clock_data + (overflow_data * 2**self._num_overflow_bits)
 
-        return clk/self._clock_freq, state
+        return clk / self._clock_freq, state
 
     def _process_limit_packet(self, parse_index):
         start_ind = parse_index
@@ -228,4 +230,3 @@ class GripperBuilder(object):
         else:
             print("Timeout: unknown type '0x%X'" % (timeout_type))
         return
-
