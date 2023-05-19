@@ -1,8 +1,8 @@
 import argparse
+import os
 import time
 from dataclasses import dataclass
 from typing import Optional
-import os
 
 import txaio
 from ocs import client_http, ocs_agent, site_config
@@ -156,7 +156,7 @@ class HWPSupervisor:
 
         if min_remaining is None and self.ups_minutes_remaining_thresh is not None:
             return 'no_data'
-        
+
         return 'ok'
 
     def _get_gripper_action(self, state):
@@ -332,7 +332,7 @@ class HWPSupervisor:
             state['hwp_enc_freq'] = None
             if enc_op['status'] == 'ok':
                 state['hwp_enc_freq'] = enc_op['data'].get('approx_hwp_freq')
-            
+
             state['hwp_pid_freq'] = None
             try:
                 clients.pid.get_freq()
@@ -492,6 +492,8 @@ def make_parser(parser=None):
 
 
 import sys
+
+
 def main(args=None):
     parser = make_parser()
     args = site_config.parse_args(agent_class='HWPSupervisor',
