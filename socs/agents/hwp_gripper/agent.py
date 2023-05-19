@@ -30,6 +30,7 @@ class GripperAgent:
         no_data_timeout (float): Time (in seconds) to wait between receiving
             'no_data' actions from the supervisor and triggering a shutdown
     """
+
     def __init__(self, agent, mcu_ip, pru_port, control_port,
                  return_port, supervisor_id=None, no_data_timeout=45 * 60):
         self.agent = agent
@@ -140,7 +141,7 @@ class GripperAgent:
         **Task** - Controls actuator brakes
 
         Parameters:
-            state (str): State to set the actuator brake to. Takes input of 'ON' or 
+            state (str): State to set the actuator brake to. Takes input of 'ON' or
                 'OFF' but case doesn't matter
             actuator (int): Actuator number. Takes input of 0-3 with 1-3 controlling
                 and individual actuator and 0 controlling all three
@@ -168,7 +169,7 @@ class GripperAgent:
         **Task** - Move an actuator a specific distance
 
         Parameters:
-            mode (str): Movement mode. Takes inputs of 'POS' (positioning) or 
+            mode (str): Movement mode. Takes inputs of 'POS' (positioning) or
                 'PUSH' (pushing) but case doesn't matter
             actuator (int): Actuator number 1-3
             distance (float): Distance to move. Takes positive and negative numbers
@@ -177,7 +178,7 @@ class GripperAgent:
 
         Notes:
             Positioning mode is used when you want to position the actuators without
-            gripping the rotor. Pushing mode is used when you want the grip the 
+            gripping the rotor. Pushing mode is used when you want the grip the
             rotor.
         """
         with self.lock.acquire_timeout(0, job='grip_move') as acquired:
@@ -348,7 +349,7 @@ class GripperAgent:
         **Task** - Series of commands executed during a shutdown
 
         Notes:
-            This function is called once a shutdown trigger has been given.   
+            This function is called once a shutdown trigger has been given.
         """
         self.log.warn('INITIATING SHUTDOWN')
 
