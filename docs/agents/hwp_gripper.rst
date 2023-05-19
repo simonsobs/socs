@@ -6,7 +6,7 @@
 HWP Gripper Agent
 =================
 
-Agent which controls and monitor's the HWP's set of three LEY32C-30 linear actuators. 
+Agent which controls and monitor's the HWP's set of three LEY32C-30 linear actuators.
 Functions include issuing movement commands, monitoring actuator position, and handling
 limit switch activation.
 
