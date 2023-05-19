@@ -8,18 +8,12 @@ import signal
 import subprocess
 import sys
 import time
-
 import numpy as np
 
-this_dir = os.path.dirname(__file__)
-sys.path.append(
-    os.path.join(this_dir, 'src'))
-sys.path.append(
-    os.path.join(this_dir, 'pru'))
+import socs.agents.hwp_gripper.drivers.gripper_client as gclient
+import socs.agents.hwp_gripper.drivers.GripperBuilder as gb
+import socs.agents.hwp_gripper.drivers.GripperCollector as gc
 
-import gripper_client as gclient
-import GripperBuilder as gb
-import GripperCollector as gc
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
@@ -81,8 +75,8 @@ class GripperAgent:
         self.client = gclient.GripperClient(self.mcu_ip, self.control_port, self.return_port)
         self.collector = gc.GripperCollector(self.pru_port)
 
-        self.agent.start('grip_collect_pru')
-        self.agent.start('grip_build_pru')
+        self.agent.start('grip_collect_pru', params=None)
+        self.agent.start('grip_build_pru', params=None)
         # self.agent.start('grip_monitor')
 
         if params['auto_acquire']:
@@ -532,12 +526,11 @@ def make_parser(parser=None):
     return parser
 
 
-if __name__ == '__main__':
-    site_parser = site_config.add_arguments()
-    parser = make_parser(site_parser)
-
-    args = parser.parse_args()
-    site_config.reparse_args(args, 'GripperAgent')
+def main(args=None):
+    parser = make_parser()
+    args = site_config.parse_args(agent_class='HWPGripperAgent',
+                                  parser=parser,
+                                  args=args)
 
     init_params = {'auto_acquire': True}
 
@@ -573,3 +566,7 @@ if __name__ == '__main__':
     agent.register_task('grip_rev_shutdown', gripper_agent.grip_rev_shutdown)
 
     runner.run(agent, auto_reconnect=True)
+
+
+if __name__ == '__main__':
+    main()
