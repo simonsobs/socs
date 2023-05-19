@@ -16,6 +16,20 @@ from socs.agents.hwp_supervisor.agent import get_op_data
 
 
 class GripperAgent:
+    """Agent for controlling/monitoring the HWP's three LEY32C-30 linear actuators.
+    Functions include issuing movement commands, monitoring actuator positions, and
+    handling limit switch activation
+
+    Args:
+        mcu_ip (string): IP of the Beaglebone mircocontroller running adjacent code
+        pru_port (int): Port for pru packet communication arbitrary* but needs to be
+            changed in beaglebone code as well
+        control_port (int): Port for control commands sent to the Beaglebone. Arbitrary
+        return_port (int): Port for return communication from the Beaglebone. Arbitrary
+        supervisor_id (str): ID of HWP supervisor
+        no_data_timeout (float): Time (in seconds) to wait between receiving
+            'no_data' actions from the supervisor and triggering a shutdown
+    """
     def __init__(self, agent, mcu_ip, pru_port, control_port,
                  return_port, supervisor_id=None, no_data_timeout=45 * 60):
         self.agent = agent
@@ -63,6 +77,13 @@ class GripperAgent:
 
     @ocs_agent.param('auto_acquire', default=True, type=bool)
     def init_processes(self, session, params):
+        """init_connection(auto_acquire=False)
+        **Task** - Initialize connection to the Beaglebone microcontroller
+
+        Parameters:
+            auto_acquire (bool, optional): Default is True. Starts data acquisition
+                after initialization if True
+        """
         if self._initialized:
             self.log.info('Connection already initialized. Returning...')
             return True, 'Connection already initialized'
@@ -81,6 +102,9 @@ class GripperAgent:
         return True, 'Processes started'
 
     def grip_on(self, session, params=None):
+        """grip_on()
+        **Task** - Turns on power to the linear actuators. If brakes are on, turn them off
+        """
         with self.lock.acquire_timeout(0, job='grip_on') as acquired:
             if not acquired:
                 self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
@@ -94,6 +118,9 @@ class GripperAgent:
         return True, 'Power on'
 
     def grip_off(self, session, params=None):
+        """grip_off()
+        **Task** - Turns off power to the linear actuators. If brakes are off, turn them on
+        """
         with self.lock.acquire_timeout(0, job='grip_off') as acquired:
             if not acquired:
                 self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
@@ -109,6 +136,15 @@ class GripperAgent:
     @ocs_agent.param('state', default='ON', type=str)
     @ocs_agent.param('actuator', default=0, type=int, check=lambda x: 0 <= x <= 3)
     def grip_brake(self, session, params=None):
+        """grip_brake(state = 'OFF', actuator = 0)
+        **Task** - Controls actuator brakes
+
+        Parameters:
+            state (str): State to set the actuator brake to. Takes input of 'ON' or 
+                'OFF' but case doesn't matter
+            actuator (int): Actuator number. Takes input of 0-3 with 1-3 controlling
+                and individual actuator and 0 controlling all three
+        """
         with self.lock.acquire_timeout(0, job='grip_brake') as acquired:
             if not acquired:
                 self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
@@ -128,6 +164,22 @@ class GripperAgent:
     @ocs_agent.param('actuator', default=1, type=int, check=lambda x: 1 <= x <= 3)
     @ocs_agent.param('distance', default=0, type=float, check=lambda x: -10. <= x <= 10.)
     def grip_move(self, session, params=None):
+        """grip_move(mode = 'POS', actuator = 1, distance = 1.3)
+        **Task** - Move an actuator a specific distance
+
+        Parameters:
+            mode (str): Movement mode. Takes inputs of 'POS' (positioning) or 
+                'PUSH' (pushing) but case doesn't matter
+            actuator (int): Actuator number 1-3
+            distance (float): Distance to move. Takes positive and negative numbers
+                for 'POS' mode. Takes only positive numbers for 'PUSH' mode. Value
+                should be a multiple of 0.1
+
+        Notes:
+            Positioning mode is used when you want to position the actuators without
+            gripping the rotor. Pushing mode is used when you want the grip the 
+            rotor.
+        """
         with self.lock.acquire_timeout(0, job='grip_move') as acquired:
             if not acquired:
                 self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
@@ -156,6 +208,13 @@ class GripperAgent:
         return True, 'Moved actuators'
 
     def grip_home(self, session, params=None):
+        """grip_home()
+        **Task** - Homes and recalibrates the position of the actuators
+
+        Note:
+            This action much be done first after a power cycle. Otherwise the
+            controller will throw an error.
+        """
         with self.lock.acquire_timeout(0, job='grip_home') as acquired:
             if not acquired:
                 self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
@@ -179,6 +238,9 @@ class GripperAgent:
         return True, 'Homed actuators'
 
     def grip_inp(self, session, params=None):
+        """grip_inp()
+        **Task** - Queries whether the actuators are in a known position
+        """
         with self.lock.acquire_timeout(0, job='grip_inp') as acquired:
             if not acquired:
                 self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
@@ -189,6 +251,9 @@ class GripperAgent:
         return True, 'Queried are actuators in known state'
 
     def grip_alarm(self, session, params=None):
+        """grip_alarm()
+        **Task** - Queries the actuator controller alarm state
+        """
         with self.lock.acquire_timeout(0, job='grip_alarm') as acquired:
             if not acquired:
                 self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
@@ -199,6 +264,9 @@ class GripperAgent:
         return True, 'Queried alarm state'
 
     def grip_reset(self, session, params=None):
+        """grip_reset()
+        **Task** - Resets the current active controller alarm
+        """
         with self.lock.acquire_timeout(0, job='grip_reset') as acquired:
             if not acquired:
                 self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
@@ -210,6 +278,12 @@ class GripperAgent:
 
     @ocs_agent.param('actuator', default=1, type=int, check=lambda x: 1 <= x <= 3)
     def grip_act(self, session, params=None):
+        """grip_act(actuator = 1)
+        **Task** - Queries whether an actuator is connected
+
+        Parameters:
+            actuator (int): Actuator number 1-3
+        """
         with self.lock.acquire_timeout(0, job='grip_act') as acquired:
             if not acquired:
                 self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
@@ -221,6 +295,16 @@ class GripperAgent:
 
     @ocs_agent.param('value', default=False, type=bool)
     def grip_mode(self, session, params=None):
+        """grip_mode(value = False)
+        **Task** - Set the code to operate in warm/cold grip configuration
+
+        Parameters:
+            value (bool): Set to warm grip (False) or cold grip (True)
+
+        Notes:
+            Configures the software to query the correct set of limit switches. The
+            maximum extension of the actuators depends on the cryostat temperature.
+        """
         with self.lock.acquire_timeout(0, job='grip_mode') as acquired:
             if not acquired:
                 self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
@@ -233,6 +317,19 @@ class GripperAgent:
 
     @ocs_agent.param('value', default=False, type=bool)
     def grip_force(self, session, params=None):
+        """grip_force(value = False)
+        **Tast** - Set the code to ignore limit switch information
+
+        Parameters:
+            value (bool): Use limit switch information (False) or ignore limit
+                switch information (True)
+
+        Notes:
+            By default the code is configured to prevent actuator movement if
+            on of the limit switches has been triggered. This function can be
+            called to forcibly move the actuators even with a limit switch
+            trigger.
+        """
         with self.lock.acquire_timeout(0, job='grip_force') as acquired:
             if not acquired:
                 self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
@@ -247,6 +344,12 @@ class GripperAgent:
         return True, 'Changed force parameter'
 
     def grip_shutdown(self, session, params=None):
+        """grip_shutdown()
+        **Task** - Series of commands executed during a shutdown
+
+        Notes:
+            This function is called once a shutdown trigger has been given.   
+        """
         self.log.warn('INITIATING SHUTDOWN')
 
         with self.lock.acquire_timeout(10, job='grip_shutdown') as acquired:
@@ -289,10 +392,29 @@ class GripperAgent:
         return True, 'Shutdown completed'
 
     def grip_rev_shutdown(self, session, params=None):
+        """grip_rev_shutdown()
+        **Task** - Take the gripper agent out of shutdown mode
+        """
         self.shutdown_mode = False
         return True, 'Reversed shutdown mode'
 
     def grip_acq(self, session, params=None):
+        """grip_acq()
+        **Process** - Publishes gripper positions
+
+        Notes:
+            The most recent data collected  is stored in session data in the
+            structure::
+
+                >>> responce.session['data']
+                {'act1_a': 0,
+                 'act1_b': 0,
+                 'act2_a': 0,
+                 'act2_b': 0,
+                 'act3_a': 0,
+                 'act3_b': 0,
+                 'last_updated': 1649085992.719602}
+        """
         session.set_status('running')
 
         self._run_acq = True
@@ -325,6 +447,9 @@ class GripperAgent:
         return True, 'Aquisition exited cleanly'
 
     def grip_monitor(self, session, params=None):
+        """grip_monitor()
+        **Process** - Monitor the shutdown of the agent
+        """
         session.set_status('running')
         last_ok_time = time.time()
 
@@ -369,6 +494,9 @@ class GripperAgent:
         return True, 'Gripper monitor exited cleanly'
 
     def grip_collect_pru(self, session, params=None):
+        """grip_collect_pru()
+        **Process** - Collects raw encoder data sent from the Beaglebone
+        """
         session.set_status('running')
 
         if self.collector is None:
@@ -382,6 +510,10 @@ class GripperAgent:
         return True, 'Pru collection exited cleanly'
 
     def grip_build_pru(self, session, params=None):
+        """grip_build_pru()
+        **Process** - Extracts data from the raw encoder data; updates changes to
+            the gripper positions and handles any triggered limit switches
+        """
         session.set_status('running')
 
         if self.collector is None:
@@ -397,6 +529,7 @@ class GripperAgent:
 
         self._run_build_pru = True
         while self._run_build_pru:
+            # Use collected data packets to find changes in gripper positions
             encoder_data = self.builder.process_packets()
             if len(encoder_data['state']):
                 edges = np.concatenate(([self.last_encoder ^ encoder_data['state'][0]],
@@ -412,6 +545,7 @@ class GripperAgent:
 
                 self.last_encoder = encoder_data['state'][-1]
 
+            # Check if any of the limit switches have been triggered and prevent gripper movement if necessary
             clock, state = self.builder.limit_state[0], int(self.builder.limit_state[1])
 
             for index, pru in enumerate(self.limit_pru):
@@ -457,26 +591,41 @@ class GripperAgent:
         return True, 'Pru building exited cleanly'
 
     def _stop_acq(self, session, params=None):
+        """
+        Stop grip_acq process
+        """
         if self._run_acq:
             self._run_acq = False
         return True, 'Stopping gripper acquisition'
 
     def _stop_monitor(self, session, params=None):
+        """
+        Stop grip_monitor process
+        """
         if self._run_monitor:
             self._run_monitor = False
         return True, 'Stopping monitor'
 
     def _stop_collect_pru(self, session, params=None):
+        """
+        Stop grip_collect_pru process
+        """
         if self._run_collect_pru:
             self._run_collect_pru = False
         return True, 'Stopping collecting pru packets'
 
     def _stop_build_pru(self, session, params=None):
+        """
+        Stop grip_build_pru process
+        """
         if self._run_build_pru:
             self._run_build_pru = False
         return True, 'Stopping pru packet building'
 
     def _send_command(self, command):
+        """
+        Helper function for sending commands to the Beaglebone
+        """
         if self.client is None:
             return False
 
@@ -485,10 +634,16 @@ class GripperAgent:
         return self.client.listen(timeout=10)
 
     def _get_pos(self):
+        """
+        Converts raw encoder rising edges to millimeters
+        """
         slope = 1 / 160.
         return [rising_edges * slope for rising_edges in self.encoder_edges]
 
     def _wait_for_responce(self, timeout=10):
+        """
+        Wait for a responce from the Beaglebone after issuing a command
+        """
         start = time.time()
         while time.time() - start < timeout:
             if self.command_responce.value == 3:
