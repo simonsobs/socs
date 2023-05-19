@@ -3,8 +3,6 @@
 import argparse
 import ctypes
 import multiprocessing
-import os
-import sys
 import time
 
 import numpy as np
@@ -15,7 +13,7 @@ import socs.agents.hwp_gripper.drivers.gripper_client as gclient
 import socs.agents.hwp_gripper.drivers.GripperBuilder as gb
 import socs.agents.hwp_gripper.drivers.GripperCollector as gc
 
-# from socs.agents.hwp_supervisor.agent import get_op_data
+from socs.agents.hwp_supervisor.agent import get_op_data
 
 
 class GripperAgent:
