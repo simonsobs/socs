@@ -8,14 +8,14 @@ import signal
 import subprocess
 import sys
 import time
+
 import numpy as np
+from ocs import ocs_agent, site_config
+from ocs.ocs_twisted import TimeoutLock
 
 import socs.agents.hwp_gripper.drivers.gripper_client as gclient
 import socs.agents.hwp_gripper.drivers.GripperBuilder as gb
 import socs.agents.hwp_gripper.drivers.GripperCollector as gc
-
-from ocs import ocs_agent, site_config
-from ocs.ocs_twisted import TimeoutLock
 
 # from socs.agents.hwp_supervisor.agent import get_op_data
 
