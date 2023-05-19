@@ -4,8 +4,6 @@ import argparse
 import ctypes
 import multiprocessing
 import os
-import signal
-import subprocess
 import sys
 import time
 
@@ -397,7 +395,7 @@ class GripperAgent:
         if self.client is None:
             return False, 'Control client not defined'
 
-        with self.lock.acquire_timeout(10, job='grip_limit_switches') as acquired:
+        with self.lock.acquire_timeout(10, job='grip_limit_switches'):
             self._send_command('EMG ON')
 
         self._run_build_pru = True
@@ -425,11 +423,11 @@ class GripperAgent:
             if (state and not self.mode.value) or self.limit_state[0] or self.limit_state[2] or self.limit_state[4]:
                 self.last_limit_time = time.time()
                 if self.force.value and not self.is_forced:
-                    with self.lock.acquire_timeout(10, job='grip_limit_switches') as acquired:
+                    with self.lock.acquire_timeout(10, job='grip_limit_switches'):
                         self._send_command('EMG ON')
                         self.is_forced = True
                 elif self.last_limit != state and not self.force.value:
-                    with self.lock.acquire_timeout(10, job='grip_limit_switches') as acquired:
+                    with self.lock.acquire_timeout(10, job='grip_limit_switches'):
                         self.last_limit = state
 
                         if (self.limit_state[1] and not self.mode.value) or self.limit_state[0]:
@@ -454,7 +452,7 @@ class GripperAgent:
             else:
                 if time.time() - self.last_limit_time > 5:
                     if self.last_limit != 0:
-                        with self.lock.acquire_timeout(10, job='grip_limit_switches') as acquired:
+                        with self.lock.acquire_timeout(10, job='grip_limit_switches'):
                             self._send_command('EMG ON')
                             self.last_limit = 0
 
