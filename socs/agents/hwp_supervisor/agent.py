@@ -2,6 +2,7 @@ import argparse
 import time
 from dataclasses import dataclass
 from typing import Optional
+import os
 
 import txaio
 from ocs import client_http, ocs_agent, site_config
@@ -66,7 +67,11 @@ def get_op_data(agent_id, op_name, log=None, test_mode=False):
         data['status'] = 'test_mode'
         return data
 
-    client = site_config.get_control_client(agent_id)
+    args = []
+    if 'SITE_HTTP' in os.environ:
+        args += [f"--site-http={os.environ['SITE_HTTP']}"]
+
+    client = site_config.get_control_client(agent_id, args=args)
     try:
         _, _, session = OCSReply(*client.request('status', op_name))
     except client_http.ControlClientError as e:
@@ -113,10 +118,13 @@ class HWPSupervisor:
 
     def _get_hwp_clients(self):
         def get_client(id):
+            args = []
+            if 'SITE_HTTP' in os.environ:
+                args += [f"--site-http={os.environ['SITE_HTTP']}"]
             if id is None:
                 return None
             try:
-                return OCSClient(id)
+                return OCSClient(id, args=args)
             except ControlClientError:
                 self.log.error("Could not connect to client: {id}", id=id)
                 return None
@@ -136,16 +144,19 @@ class HWPSupervisor:
             if hwp_temp > self.hwp_temp_thresh:
                 return 'stop'
 
-        minutes_remaining = state['ups_estimated_minutes_remaining']
-        if minutes_remaining is not None:
-            if minutes_remaining < self.ups_minutes_remaining_thresh:
+        min_remaining = state['ups_estimated_minutes_remaining']
+        min_remaining_thresh = self.ups_minutes_remaining_thresh
+        if min_remaining is not None and min_remaining_thresh is not None:
+            if min_remaining < min_remaining_thresh:
                 return 'stop'
 
         # If either hwp_temp or ups state is None, return no_data
-        for val in [hwp_temp, minutes_remaining]:
-            if val is None:
-                return 'no_data'
+        if hwp_temp is None and (self.hwp_temp_thresh is not None):
+            return 'no_data'
 
+        if min_remaining is None and self.ups_minutes_remaining_thresh is not None:
+            return 'no_data'
+        
         return 'ok'
 
     def _get_gripper_action(self, state):
@@ -161,7 +172,7 @@ class HWPSupervisor:
         if rot_action == 'no_data':
             return 'no_data'
 
-        hwp_freq = state['hwp_freq']
+        hwp_freq = state['hwp_pid_freq']
         if hwp_freq is None:
             return 'no_data'
         elif hwp_freq > 0.01:
@@ -284,6 +295,7 @@ class HWPSupervisor:
         """
         pm = Pacemaker(1. / self.sleep_time)
         test_mode = params.get('test_mode', False)
+        clients = self._get_hwp_clients()
 
         session.data = {
             'timestamp': time.time(),
@@ -317,10 +329,17 @@ class HWPSupervisor:
             self._update_state_temp(temp_op, state)
             self._update_state_ups(ups_op, state)
 
+            state['hwp_enc_freq'] = None
             if enc_op['status'] == 'ok':
-                state['hwp_freq'] = enc_op['data']['approx_hwp_freq']
-            else:
-                state['hwp_freq'] = None
+                state['hwp_enc_freq'] = enc_op['data'].get('approx_hwp_freq')
+            
+            state['hwp_pid_freq'] = None
+            try:
+                clients.pid.get_freq()
+                d = clients.pid.get_freq.status().session['data']
+                state['hwp_pid_freq'] = d['freq']
+            except Exception as e:
+                self.log.error("Could not get frequency from PID: {e}", e=e)
 
             session.data['state'] = state
 
@@ -373,14 +392,15 @@ class HWPSupervisor:
         clients.pid.tune_freq()
         clients.pmx.use_ext()
         clients.pmx.set_on()
-        session.add_messsage("Tuning PID to {:.2f} Hz".format(params['target_freq']))
+        session.add_message("Tuning PID to {:.2f} Hz".format(params['target_freq']))
 
         session.data = {'forward': params['forward'],
                         'target_freq': params['target_freq'],
                         'pid_freq': 0}
         while True:
-            _, _, s = clients.pid.get_freq()
-            cur_freq = s.data['current_freq']
+            clients.pid.get_freq()
+            d = clients.pid.get_freq.status().session['data']
+            cur_freq = d['freq']
             session.data['pid_freq'] = cur_freq
             if cur_freq - params['target_freq'] < 0.005:
                 break
@@ -464,13 +484,14 @@ def make_parser(parser=None):
     pgroup.add_argument('--hwp-pid-id',
                         help="Instance ID for HWP pid agent")
     pgroup.add_argument('--ups-id', help="Instance ID for UPS agent")
-    pgroup.add_argument('--ups-minutes-remaining-thresh', type=float, default=30.,
+    pgroup.add_argument('--ups-minutes-remaining-thresh', type=float,
                         help="Threshold for UPS minutes remaining before a "
                              "shutdown is triggered")
 
     return parser
 
 
+import sys
 def main(args=None):
     parser = make_parser()
     args = site_config.parse_args(agent_class='HWPSupervisor',
