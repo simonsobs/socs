@@ -19,6 +19,88 @@ class GripperClient(object):
 
         self._s_recv.bind(('', self.recv_port))
 
+    def POWER(self, state):
+        if type(state) is not bool:
+            return False
+
+        if state:
+            return self.send_command('ON')
+        else:
+            return self.send_command('OFF')
+    
+    def HOME(self):
+        return self.send_command('HOME')
+
+    def MOVE(self, mode, actuator, distance):
+        if type(mode) is not str:
+            return False
+        elif mode.upper() not in ['POS','PUSH']:
+            return False
+
+        if actuator not in [1,2,3]:
+            return False
+
+        if type(distance) not in [float, int]:
+            return False
+
+        return self.send_command('MOVE ' + mode + ' ' + str(actuator) + ' ' + str(distance))
+
+    def BRAKE(self, state, actuator = 0):
+        if type(state) is not bool:
+            return False
+
+        if actuator is 0:
+            if state:
+                return self.send_command('BRAKE ON')
+            else:
+                return self.send_command('BRAKE OFF')
+        else:
+            if actuator not in [1,2,3]:
+                return False
+
+            if state:
+                return self.send_command('BRAKE ON ' + str(actuator))
+            else:
+                return self.send_command('BRAKE OFF ' + str(actuator))
+
+    def EMG(self, state, actuator = 0):
+        if type(state) is not bool:
+            return False
+
+        if actuator is 0:
+            if state:
+                return self.send_command('EMG ON')
+            else:
+                return self.send_command('EMG OFF')
+        else:
+            if actuator not in [1,2,3]:
+                return False
+
+            if state:
+                return self.send_command('EMG ON ' + str(actuator))
+            else:
+                return self.send_command('EMG OFF ' + str(actuator))
+
+    def ALARM(self):
+        return self.send_command('ALARM')
+
+    def RESET(self):
+        return self.send_command('RESET')
+
+    def INP(self):
+        return self.send_command('INP')
+
+    def ACT(self, actuator):
+        if actuator not in [1,2,3]:
+            return False
+
+        return self.send_command('ACT ' + str(actuator))
+
+    def send_command(self, command):
+        _ = self.listen()
+        self.send_data(command)
+        return self.listen(timeout = 10)
+
     def send_data(self, data):
         self._s_send.sendto(bytes(data, 'utf-8'), (self.ip, self.send_port))
 

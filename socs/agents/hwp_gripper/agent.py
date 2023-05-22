@@ -102,11 +102,12 @@ class GripperAgent:
         self._initialized = True
         return True, 'Processes started'
 
-    def grip_on(self, session, params=None):
-        """grip_on()
-        **Task** - Turns on power to the linear actuators. If brakes are on, turn them off
+    @ocs_agent.param('state', default=True, type=bool)
+    def grip_power(self, session, params=None):
+        """grip_power()
+        **Task** - Turns on/off power to the linear actuators. If brakes are on/off, turn them off/on
         """
-        with self.lock.acquire_timeout(0, job='grip_on') as acquired:
+        with self.lock.acquire_timeout(0, job='grip_power') as acquired:
             if not acquired:
                 self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
@@ -114,27 +115,11 @@ class GripperAgent:
             if self.shutdown_mode:
                 return False, 'Shutdown mode is in effect'
 
-            self.log.info(self._send_command('ON'))
+            self.log.info(self.client.POWER(params['state']))
 
-        return True, 'Power on'
+        return True, 'Power state changed'
 
-    def grip_off(self, session, params=None):
-        """grip_off()
-        **Task** - Turns off power to the linear actuators. If brakes are off, turn them on
-        """
-        with self.lock.acquire_timeout(0, job='grip_off') as acquired:
-            if not acquired:
-                self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
-                return False, 'Could not acquire lock'
-
-            if self.shutdown_mode:
-                return False, 'Shutdown mode is in effect'
-
-            self.log.info(self._send_command('OFF'))
-
-        return True, 'Power off'
-
-    @ocs_agent.param('state', default='ON', type=str)
+    @ocs_agent.param('state', default=True, type=bool)
     @ocs_agent.param('actuator', default=0, type=int, check=lambda x: 0 <= x <= 3)
     def grip_brake(self, session, params=None):
         """grip_brake(state = 'OFF', actuator = 0)
@@ -154,10 +139,7 @@ class GripperAgent:
             if self.shutdown_mode:
                 return False, 'Shutdown mode is in effect'
 
-            if params['actuator'] == 0:
-                self.log.info(self._send_command('BRAKE ' + params['state']))
-            else:
-                self.log.info(self._send_command('BRAKE ' + params['state'] + ' ' + str(params['actuator'])))
+            self.log.info(self.client.BRAKE(params['state'], params['actuator']))
 
         return True, 'Changed brake state'
 
@@ -199,8 +181,7 @@ class GripperAgent:
                         elif params['distance'] < 0:
                             self.encoder_direction[chain] = -1
 
-            self.log.info(self._send_command('MOVE ' + params['mode'] + ' ' + str(params['actuator'])
-                                             + ' ' + str(params['distance'])))
+            self.log.info(self.client.MOVE(params['mode'], params['actuator'], params['distance']))
 
             with self.encoder_edges_record.get_lock():
                 for chain in pru_chains:
@@ -228,7 +209,7 @@ class GripperAgent:
                 for index, _ in enumerate(self.encoder_edges_record):
                     self.encoder_edges_record[index] = 1
 
-            self.log.info(self._send_command('HOME'))
+            self.log.info(self.client.HOME())
 
             with self.encoder_edges.get_lock():
                 with self.encoder_edges_record.get_lock():
@@ -247,7 +228,7 @@ class GripperAgent:
                 self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            self.log.info(self._send_command('INP'))
+            self.log.info(self.client.INP())
 
         return True, 'Queried are actuators in known state'
 
@@ -260,7 +241,7 @@ class GripperAgent:
                 self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            self.log.info(self._send_command('ALARM'))
+            self.log.info(self.client.ALARM())
 
         return True, 'Queried alarm state'
 
@@ -273,7 +254,7 @@ class GripperAgent:
                 self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            self.log.info(self._send_command('RESET'))
+            self.log.info(self.client.RESET())
 
         return True, 'Reset alarm state'
 
@@ -290,7 +271,7 @@ class GripperAgent:
                 self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            self.log.info(self._send_command('ACT ' + str(params['actuator'])))
+            self.log.info(self.client.ACT(params['actuator']))
 
         return True, 'Queried actuator connection'
 
@@ -360,34 +341,34 @@ class GripperAgent:
 
             self.shutdown_mode = True
 
-            self.log.info(self._send_command('ON'))
+            self.log.info(self.client.POWER(True))
             time.sleep(1)
 
-            self.log.info(self._send_command('BRAKE OFF'))
+            self.log.info(self.client.BRAKE(False))
             time.sleep(1)
 
-            self.log.info(self._send_command('HOME'))
+            self.log.info(self.client.HOME())
             time.sleep(15)
 
             for actuator in (1 + np.arange(3) % 3):
-                self.log.info(self._send_command('MOVE POS ' + str(actuator) + ' 10'))
+                self.log.info(self.client.MOVE('POS', actuator, 10))
                 time.sleep(5)
 
             for actuator in (1 + np.arange(12) % 3):
-                self.log.info(self._send_command('MOVE POS ' + str(actuator) + ' 1'))
+                self.log.info(self.client.MOVE('POS', actuator, 1))
                 time.sleep(3)
 
-                self.log.info(self._send_command('RESET'))
+                self.log.info(self.client.RESET())
                 time.sleep(0.5)
 
             for actuator in (1 + np.arange(3) % 3):
-                self.log.info(self._send_command('MOVE POS ' + str(actuator) + ' -1'))
+                self.log.info(self.client.MOVE('POS', actuator, -1))
                 time.sleep(3)
 
-            self.log.info(self._send_command('BRAKE ON'))
+            self.log.info(self.client.BRAKE(True))
             time.sleep(1)
 
-            self.log.info(self._send_command('OFF'))
+            self.log.info(self.client.POWER(False))
             time.sleep(1)
 
         return True, 'Shutdown completed'
@@ -526,7 +507,7 @@ class GripperAgent:
             return False, 'Control client not defined'
 
         with self.lock.acquire_timeout(10, job='grip_limit_switches'):
-            self._send_command('EMG ON')
+            self.client.EMG(True)
 
         self._run_build_pru = True
         while self._run_build_pru:
@@ -556,26 +537,26 @@ class GripperAgent:
                 self.last_limit_time = time.time()
                 if self.force.value and not self.is_forced:
                     with self.lock.acquire_timeout(10, job='grip_limit_switches'):
-                        self._send_command('EMG ON')
+                        self.client.EMG(True)
                         self.is_forced = True
                 elif self.last_limit != state and not self.force.value:
                     with self.lock.acquire_timeout(10, job='grip_limit_switches'):
                         self.last_limit = state
 
                         if (self.limit_state[1] and not self.mode.value) or self.limit_state[0]:
-                            self._send_command('EMG OFF 1')
+                            self.client.EMG(False,1)
                         else:
-                            self._send_command('EMG ON 1')
+                            self.client.EMG(True,1)
 
                         if (self.limit_state[3] and not self.mode.value) or self.limit_state[2]:
-                            self._send_command('EMG OFF 2')
+                            self.client.EMG(False,2)
                         else:
-                            self._send_command('EMG ON 2')
+                            self.client.EMG(True,2)
 
                         if (self.limit_state[5] and not self.mode.value) or self.limit_state[4]:
-                            self._send_command('EMG OFF 3')
+                            self.client.EMG(False,3)
                         else:
-                            self._send_command('EMG ON 3')
+                            self.client.EMG(True,3)
 
                         print('Limit switch activation at clock: {}'.format(clock))
                         for index, name in enumerate(self.limit_names):
@@ -585,7 +566,7 @@ class GripperAgent:
                 if time.time() - self.last_limit_time > 5:
                     if self.last_limit != 0:
                         with self.lock.acquire_timeout(10, job='grip_limit_switches'):
-                            self._send_command('EMG ON')
+                            self.client.EMG(True)
                             self.last_limit = 0
 
         session.set_status('stopping')
@@ -622,18 +603,7 @@ class GripperAgent:
         if self._run_build_pru:
             self._run_build_pru = False
         return True, 'Stopping pru packet building'
-
-    def _send_command(self, command):
-        """
-        Helper function for sending commands to the Beaglebone
-        """
-        if self.client is None:
-            return False
-
-        _ = self.client.listen()
-        self.client.send_data(command)
-        return self.client.listen(timeout=10)
-
+    
     def _get_pos(self):
         """
         Converts raw encoder rising edges to millimeters
@@ -702,8 +672,7 @@ def main(args=None):
                            gripper_agent._stop_build_pru)
     agent.register_task('init_processes', gripper_agent.init_processes,
                         startup=init_params)
-    agent.register_task('grip_on', gripper_agent.grip_on)
-    agent.register_task('grip_off', gripper_agent.grip_off)
+    agent.register_task('grip_power', gripper_agent.grip_power)
     agent.register_task('grip_brake', gripper_agent.grip_brake)
     agent.register_task('grip_move', gripper_agent.grip_move)
     agent.register_task('grip_home', gripper_agent.grip_home)
