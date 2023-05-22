@@ -130,7 +130,7 @@ def update_cache(get_result, timestamp):
         oid_cache['ups_connection'] = {'last_attempt': time.time(),
                                        'connected': False}
         return oid_cache
-    
+
     try:
         for item in get_result:
             field_name, oid_value, oid_description = _extract_oid_field_and_value(item)
@@ -378,7 +378,7 @@ class UPSAgent:
 
                 if get_result is None:
                     raise ConnectionError('No SNMP response. Check your connection.')
-                
+
                 self.lastGet = time.time()
                 # Publish to feed
                 message = _build_message(get_result, read_time)
