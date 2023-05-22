@@ -128,6 +128,11 @@ def update_cache(get_result, names, timestamp):
         Timestamp for when the SNMP GET was issued.
     """
     oid_cache = {}
+    if get_result is None:
+        oid_cache['ibootbar_connection'] = {'last_attempt': time.time(),
+                                       'connected': False}
+        return oid_cache
+
     try:
         for item in get_result:
             field_name, oid_value, oid_description = _extract_oid_field_and_value(item)
@@ -146,7 +151,7 @@ def update_cache(get_result, names, timestamp):
     except TypeError:
         oid_cache['ibootbar_connection'] = {'last_attempt': time.time(),
                                             'connected': False}
-        raise ConnectionError('No SNMP response. Check your connection.')
+        raise TypeError('Unable to interpret SNMP response.')
 
     return oid_cache
 
@@ -227,6 +232,7 @@ class ibootbarAgent:
         names = ['Outlet-1', 'Outlet-2', 'Outlet-3', 'Outlet-4',
                  'Outlet-5', 'Outlet-6', 'Outlet-7', 'Outlet-8']
 
+        session.set_status('running')
         self.is_streaming = True
         while self.is_streaming:
             yield dsleep(1)
@@ -260,8 +266,11 @@ class ibootbarAgent:
                 oid_cache = update_cache(get_result, names, read_time)
                 session.data = oid_cache
                 self.log.debug("{data}", data=session.data)
-                self.lastGet = time.time()
 
+                if get_result is None:
+                    raise ConnectionError('No SNMP response. Check your connection.')
+
+                self.lastGet = time.time()
                 # Publish to feed
                 message = _build_message(get_result, names, read_time)
                 self.log.debug("{msg}", msg=message)
@@ -280,8 +289,12 @@ class ibootbarAgent:
         """_stop_acq()
         **Task** - Stop task associated with acq process.
         """
-        self.is_streaming = False
-        return True, "Stopping Recording"
+        if self.is_streaming:
+            session.set_status('stopping')
+            self.is_streaming = False
+            return True, "Stopping Recording"
+        else:
+            return False, "Acq is not currently running"
 
     @ocs_agent.param('outlet', choices=[1, 2, 3, 4, 5, 6, 7, 8])
     @ocs_agent.param('state', choices=['on', 'off'])
