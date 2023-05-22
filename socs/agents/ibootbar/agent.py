@@ -130,7 +130,7 @@ def update_cache(get_result, names, timestamp):
     oid_cache = {}
     if get_result is None:
         oid_cache['ibootbar_connection'] = {'last_attempt': time.time(),
-                                       'connected': False}
+                                            'connected': False}
         return oid_cache
 
     try:
@@ -321,7 +321,7 @@ class ibootbarAgent:
         with self.lock.acquire_timeout(3, job='set_outlet') as acquired:
             if not acquired:
                 return False, "Could not acquire lock"
-            
+
             # Check if outlet is locked
             outlet_id = params['outlet'] - 1
             if self.outlet_locked[outlet_id]:
@@ -362,7 +362,7 @@ class ibootbarAgent:
         with self.lock.acquire_timeout(3, job='cycle_outlet') as acquired:
             if not acquired:
                 return False, "Could not acquire lock"
-            
+
             # Check if outlet is locked
             outlet_id = params['outlet'] - 1
             if self.outlet_locked[outlet_id]:
@@ -401,7 +401,7 @@ class ibootbarAgent:
         with self.lock.acquire_timeout(3, job='reboot') as acquired:
             if not acquired:
                 return False, "Could not acquire lock"
-            
+
             # Check if any outlets are locked
             for outlet in self.outlet_locked:
                 if outlet:
@@ -416,7 +416,7 @@ class ibootbarAgent:
         self.lastGet = self.lastGet - 60
 
         return True, 'Rebooting. Outlets will be set to their initial states.'
-    
+
     @ocs_agent.param('outlet', choices=[1, 2, 3, 4, 5, 6, 7, 8])
     @ocs_agent.param('lock', choices=[True, False])
     def lock_outlet(self, session, params=None):
@@ -435,7 +435,7 @@ class ibootbarAgent:
             if not acquired:
                 return False, "Could not acquire lock"
             # Lock/unlock specific outlet
-            outlet = params['outlet'] -1
+            outlet = params['outlet'] - 1
             if params['lock']:
                 self.outlet_locked[outlet] = True
             elif not params['lock']:
