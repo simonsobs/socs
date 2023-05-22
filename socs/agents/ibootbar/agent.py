@@ -189,6 +189,7 @@ class ibootbarAgent:
 
         self.log.info(f'Using SNMP version {version}.')
         self.version = version
+        self.address = address
         self.snmp = SNMPTwister(address, port)
 
         self.lastGet = 0
@@ -264,6 +265,7 @@ class ibootbarAgent:
             try:
                 # Update session.data
                 oid_cache = update_cache(get_result, names, read_time)
+                oid_cache['address'] = self.address
                 session.data = oid_cache
                 self.log.debug("{data}", data=session.data)
 
@@ -408,7 +410,7 @@ def add_agent_args(parser=None):
     pgroup.add_argument("--snmp-version", default='2', choices=['1', '2', '3'],
                         help="SNMP version for communication. Must match "
                              + "configuration on the ibootbar.")
-    pgroup.add_argument("--mode", choices=['acq', 'test'])
+    pgroup.add_argument("--mode", default='acq', choices=['acq', 'test'])
 
     return parser
 
