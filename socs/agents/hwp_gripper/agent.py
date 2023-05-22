@@ -74,11 +74,11 @@ class GripperAgent:
 
         # Array which holds how many rising/falling edges have been detected from the encoder signal
         self.encoder_edges = multiprocessing.Array(ctypes.c_int, (0, 0, 0, 0, 0, 0))
-        
+
         # Array which tells the code whether it should use incomming data to change the number of
         # encoder edges. There are six values, one for each encoder chain
         self.encoder_edges_record = multiprocessing.Array(ctypes.c_int, (0, 0, 0, 0, 0, 0))
-        
+
         # Array which tells the code what direction the actuator should be moving in. There are six
         # values, one for each encoder chain
         self.encoder_direction = multiprocessing.Array(ctypes.c_int, (1, 1, 1, 1, 1, 1))
@@ -86,8 +86,8 @@ class GripperAgent:
         # Names of the limit chains
         self.limit_names = ['Actuator 1 Cold', 'Actuator 1 Warm', 'Actuator 2 Cold',
                             'Actuator 2 Warm', 'Actuator 3 Cold', 'Actuator 3 Warm']
-        
-        # Which bits on Beaglebone PRU0 register are used for the limit switches (these values shouldn't 
+
+        # Which bits on Beaglebone PRU0 register are used for the limit switches (these values shouldn't
         # change)
         self.limit_pru = [8, 9, 10, 11, 12, 13]
 
