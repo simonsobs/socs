@@ -187,6 +187,11 @@ class ibootbarAgent:
         self.log = self.agent.log
         self.lock = TimeoutLock()
 
+        # Initialize with outlets unlocked; replace with config later
+        self.outlet_locked = []
+        for i in range(8):
+            self.outlet_locked.append(False)
+
         self.log.info(f'Using SNMP version {version}.')
         self.version = version
         self.address = address
@@ -316,6 +321,12 @@ class ibootbarAgent:
         with self.lock.acquire_timeout(3, job='set_outlet') as acquired:
             if not acquired:
                 return False, "Could not acquire lock"
+            
+            # Check if outlet is locked
+            outlet_id = params['outlet'] - 1
+            if self.outlet_locked[outlet_id]:
+                return False, 'Outlet {} is locked. Cannot turn outlet on/off.'.format(params['outlet'])
+
             # Convert given state parameter to integer
             if params['state'] == 'on':
                 state = 1
@@ -331,7 +342,7 @@ class ibootbarAgent:
         self.lastGet = self.lastGet - 60
 
         return True, 'Set outlet {} to {}'.\
-            format(params['outlet'] - 1, params['state'])
+            format(params['outlet'], params['state'])
 
     @ocs_agent.param('outlet', choices=[1, 2, 3, 4, 5, 6, 7, 8])
     @ocs_agent.param('cycle_time', default=10, type=int)
@@ -351,6 +362,12 @@ class ibootbarAgent:
         with self.lock.acquire_timeout(3, job='cycle_outlet') as acquired:
             if not acquired:
                 return False, "Could not acquire lock"
+            
+            # Check if outlet is locked
+            outlet_id = params['outlet'] - 1
+            if self.outlet_locked[outlet_id]:
+                return False, 'Outlet {} is locked. Cannot cycle outlet.'.format(params['outlet'])
+
             # Issue SNMP SET command for cycle time
             set_cycle = [('IBOOTPDU-MIB', 'outletCycleTime', params['outlet'] - 1)]
             setcmd1 = yield self.snmp.set(set_cycle, self.version, params['cycle_time'])
@@ -369,7 +386,7 @@ class ibootbarAgent:
             yield dsleep(1)
 
         return True, 'Cycled outlet {} for {} seconds'.\
-            format(params['outlet'] - 1, params['cycle_time'])
+            format(params['outlet'], params['cycle_time'])
 
     @ocs_agent.param('_')
     @inlineCallbacks
@@ -384,6 +401,12 @@ class ibootbarAgent:
         with self.lock.acquire_timeout(3, job='reboot') as acquired:
             if not acquired:
                 return False, "Could not acquire lock"
+            
+            # Check if any outlets are locked
+            for outlet in self.outlet_locked:
+                if outlet:
+                    return False, 'An outlet(s) is locked. Cannot reboot.'
+
             # Send SNMP SET command to set rebootSystem to True
             reboot = [('IBOOTPDU-MIB', 'rebootSystem', 0)]
             setcmd = yield self.snmp.set(reboot, self.version, 1)
@@ -393,6 +416,35 @@ class ibootbarAgent:
         self.lastGet = self.lastGet - 60
 
         return True, 'Rebooting. Outlets will be set to their initial states.'
+    
+    @ocs_agent.param('outlet', choices=[1, 2, 3, 4, 5, 6, 7, 8])
+    @ocs_agent.param('lock', choices=[True, False])
+    def lock_outlet(self, session, params=None):
+        """lock_outlet(outlet, lock)
+
+        **Task** - Lock/unlocks a particular outlet, preventing change of state.
+
+        Parameters
+        ----------
+        outlet : int
+            Index of outlet to lock/unlock
+        lock : bool
+            Set to true to lock, set to false to unlock
+        """
+        with self.lock.acquire_timeout(3, job='lock_outlet') as acquired:
+            if not acquired:
+                return False, "Could not acquire lock"
+            # Lock/unlock specific outlet
+            outlet = params['outlet'] -1
+            if params['lock']:
+                self.outlet_locked[outlet] = True
+            elif not params['lock']:
+                self.outlet_locked[outlet] = False
+            else:
+                return False, 'No valid lock state provided.'
+
+        return True, 'Set outlet {} lock to {}'.\
+            format(params['outlet'], params['lock'])
 
 
 def add_agent_args(parser=None):
@@ -443,6 +495,7 @@ def main(args=None):
     agent.register_task("set_outlet", p.set_outlet, blocking=False)
     agent.register_task("cycle_outlet", p.cycle_outlet, blocking=False)
     agent.register_task("set_initial_state", p.set_initial_state, blocking=False)
+    agent.register_task("lock_outlet", p.lock_outlet, blocking=False)
 
     runner.run(agent, auto_reconnect=True)
 
