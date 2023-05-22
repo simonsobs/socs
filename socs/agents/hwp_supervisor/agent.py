@@ -24,6 +24,9 @@ def get_op_data(agent_id, op_name, log=None, test_mode=False):
         Operation from which to grab session data
     log : logger, optional
         Log object
+    test_mode : bool
+        If True, this will run in test mode, and not try to connect to the
+        specified agent.
 
     Returns
     -----------
@@ -51,7 +54,7 @@ def get_op_data(agent_id, op_name, log=None, test_mode=False):
         - ``ok``: Operation and session.data exist
     """
     if log is None:
-        log = txaio.make_logger()  # pyright: ignore
+        log = txaio.make_logger()
 
     data = {
         'agent_id': agent_id,
@@ -244,7 +247,7 @@ class HWPSupervisor:
     def monitor(self, session, params):
         """monitor()
 
-        *Process* -- Monitors various HWP related HK systems.
+        **Process** -- Monitors various HWP related HK systems.
 
         This operation has three main steps:
 
@@ -290,7 +293,7 @@ class HWPSupervisor:
                  # Subsystem action recommendations determined from state data
                 'actions': {
                     'pmx': 'ok'  # 'ok', 'stop', or 'no_data'
-                    'grippder': 'ok'  # 'ok', 'stop', or 'no_data'
+                    'gripper': 'ok'  # 'ok', 'stop', or 'no_data'
                 }}
         """
         pm = Pacemaker(1. / self.sleep_time)
@@ -489,9 +492,6 @@ def make_parser(parser=None):
                              "shutdown is triggered")
 
     return parser
-
-
-import sys
 
 
 def main(args=None):
