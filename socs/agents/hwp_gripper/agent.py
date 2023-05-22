@@ -56,20 +56,51 @@ class GripperAgent:
         self.last_limit_time = 0
         self.is_forced = False
 
+        # The Beaglebone code periodically queries the status of six pins measuring the
+        # encoder signal and sends that data to the agent in the form of UDP packets.
+        # Each actuator has two encoder signals
+
+        # Similarly the Beaglebone code also periodically queries the status of six pins
+        # hooked up to the warm and cold limit switches on each actuator and sends that
+        # data to the agent as seperate UDP packets
+
+        # Names of the encoder chains (currently the code does not use these, but it's still a
+        # good reference to know which index corresponds to which chain)
         # self.encoder_names = ['Actuator 1 A', 'Actuator 1 B', 'Actuator 2 A',
         #                      'Actuator 2 B', 'Actuator 3 A', 'Actuator 3 B']
 
+        # Which bits on Beaglebone PRU1 register are used for the encoder (these values shouldn't change)
         self.encoder_pru = [0, 1, 2, 3, 4, 5]
+
+        # Array which holds how many rising/falling edges have been detected from the encoder signal
         self.encoder_edges = multiprocessing.Array(ctypes.c_int, (0, 0, 0, 0, 0, 0))
+        
+        # Array which tells the code whether it should use incomming data to change the number of
+        # encoder edges. There are six values, one for each encoder chain
         self.encoder_edges_record = multiprocessing.Array(ctypes.c_int, (0, 0, 0, 0, 0, 0))
+        
+        # Array which tells the code what direction the actuator should be moving in. There are six
+        # values, one for each encoder chain
         self.encoder_direction = multiprocessing.Array(ctypes.c_int, (1, 1, 1, 1, 1, 1))
 
+        # Names of the limit chains
         self.limit_names = ['Actuator 1 Cold', 'Actuator 1 Warm', 'Actuator 2 Cold',
                             'Actuator 2 Warm', 'Actuator 3 Cold', 'Actuator 3 Warm']
+        
+        # Which bits on Beaglebone PRU0 register are used for the limit switches (these values shouldn't 
+        # change)
         self.limit_pru = [8, 9, 10, 11, 12, 13]
+
+        # Array which holds the current status of each limit switch
         self.limit_state = [0, 0, 0, 0, 0, 0]
 
+        # Variable to tell the code whether the cryostat is warm (False) or cold (True). Needs to be
+        # given by the user
         self.mode = multiprocessing.Value(ctypes.c_bool, False)
+
+        # Variable to tell the code whether it should ignore any flags sent by the limit switches. If
+        # this variable is False the actuators will only move while none of the active limit switches
+        # are triggered (which limit switches are chosen depends on self.mode)
         self.force = multiprocessing.Value(ctypes.c_bool, False)
 
         agg_params = {'frame_length': 60}
@@ -381,7 +412,7 @@ class GripperAgent:
         return True, 'Reversed shutdown mode'
 
     def grip_acq(self, session, params=None):
-        """grip_acq()
+        A"""grip_acq()
         **Process** - Publishes gripper positions
 
         Notes:
