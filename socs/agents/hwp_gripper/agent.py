@@ -544,19 +544,19 @@ class GripperAgent:
                         self.last_limit = state
 
                         if (self.limit_state[1] and not self.mode.value) or self.limit_state[0]:
-                            self.client.EMG(False,1)
+                            self.client.EMG(False, 1)
                         else:
-                            self.client.EMG(True,1)
+                            self.client.EMG(True, 1)
 
                         if (self.limit_state[3] and not self.mode.value) or self.limit_state[2]:
-                            self.client.EMG(False,2)
+                            self.client.EMG(False, 2)
                         else:
-                            self.client.EMG(True,2)
+                            self.client.EMG(True, 2)
 
                         if (self.limit_state[5] and not self.mode.value) or self.limit_state[4]:
-                            self.client.EMG(False,3)
+                            self.client.EMG(False, 3)
                         else:
-                            self.client.EMG(True,3)
+                            self.client.EMG(True, 3)
 
                         print('Limit switch activation at clock: {}'.format(clock))
                         for index, name in enumerate(self.limit_names):
@@ -603,7 +603,7 @@ class GripperAgent:
         if self._run_build_pru:
             self._run_build_pru = False
         return True, 'Stopping pru packet building'
-    
+
     def _get_pos(self):
         """
         Converts raw encoder rising edges to millimeters
