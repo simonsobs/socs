@@ -16,9 +16,8 @@ from soaculib.twisted_backend import TwistedHttpBackend
 from twisted.internet import protocol, reactor
 from twisted.internet.defer import DeferredList, inlineCallbacks
 
-import socs.agents.acu.drivers as sh
-
-from . import exercisor
+from socs.agents.acu import drivers as sh
+from socs.agents.acu import exercisor
 
 #: The number of free ProgramTrack positions, when stack is empty.
 FULL_STACK = 10000
