@@ -1,9 +1,11 @@
 import argparse
+import enum
 import os
 import time
 from dataclasses import dataclass, asdict, field
 from typing import Optional
 import threading
+import time
 import traceback
 import numpy as np
 import txaio
@@ -169,9 +171,9 @@ class HWPState:
             self.temp = None
             self.temp_status = 'no_data'
             return
-        
+
         self.temp = fields[self.temp_field]['T']
-        
+
         if self.temp_thresh is not None:
             if self.temp > self.temp_thresh:
                 self.temp_status = 'over'
@@ -193,7 +195,7 @@ class HWPState:
         keymap = {'pmx_current': 'curr', 'pmx_voltage': 'volt',
                   'pmx_source': 'source', 'pmx_last_updated': 'last_updated'}
         self._update_from_keymap(op, keymap)
-    
+
     def update_pid_state(self, op):
         """
         Updates state values from the pid acq operation results.
@@ -244,7 +246,7 @@ class HWPState:
 
         for k, field in ups_keymap.items():
             setattr(self, k, data[f'{field[0]}_{ups_oid}'][field[1]])
-    
+
     @property
     def pmx_action(self):
         """
@@ -513,6 +515,7 @@ class ControlStateMachine:
             self._set_state(state)
             return True
 
+
 class HWPSupervisor:
     """
     The HWPSupervisor agent is responsible for monitoring HWP and related
@@ -535,6 +538,7 @@ class HWPSupervisor:
     forward_is_cw : bool
         True if the PID "forward" direction is clockwise, False if CCW.
     """
+
     def __init__(self, agent, args):
         self.agent = agent
         self.args = args
@@ -552,7 +556,7 @@ class HWPSupervisor:
         self.ups_id = args.ups_id
 
         self.hwp_state = HWPState(
-            temp_thresh=args.hwp_temp_thresh, 
+            temp_thresh=args.hwp_temp_thresh,
             ups_minutes_remaining_thresh=args.ups_minutes_remaining_thresh,
         )
         self.control_state_machine = ControlStateMachine()
