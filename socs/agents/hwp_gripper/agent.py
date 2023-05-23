@@ -412,7 +412,7 @@ class GripperAgent:
         return True, 'Reversed shutdown mode'
 
     def grip_acq(self, session, params=None):
-        A"""grip_acq()
+        """grip_acq()
         **Process** - Publishes gripper positions
 
         Notes:
