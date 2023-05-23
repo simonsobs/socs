@@ -283,21 +283,31 @@ class HWPPMXAgent:
                 }
                 msg, curr = self.dev.meas_current()
                 data['data']['current'] = curr
+
                 msg, volt = self.dev.meas_voltage()
                 data['data']['voltage'] = volt
+
                 msg, code = self.dev.check_error()
                 data['data']['err_code'] = code
                 data['data']['err_msg'] = msg
+
                 prot_code = self.dev.check_prot()
                 if prot_code != 0:
                     self.prot = prot_code
+
+                prot_msg = self.dev.get_prot_msg(self.prot)
                 data['data']['prot_code'] = self.prot
-                data['data']['prot_msg'] = self.dev.get_prot_msg(self.prot)
+                data['data']['prot_msg'] = prot_msg
+
+                msg, src = self.dev.check_source()
+                data['data']['source'] = src
 
                 self.agent.publish_to_feed('hwppmx', data)
                 session.data = {'curr': curr,
                                 'volt': volt,
                                 'prot': self.prot,
+                                'prot_msg': prot_msg,
+                                'source': src,
                                 'last_updated': current_time}
 
                 time.sleep(sleep_time)
