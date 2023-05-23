@@ -1,8 +1,12 @@
 import argparse
 import os
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from typing import Optional
+import threading
+import traceback
+import enum
+import numpy as np
 
 import txaio
 from ocs import client_http, ocs_agent, site_config
@@ -100,7 +104,351 @@ class HWPClients:
     lakeshore: Optional[OCSClient] = None
 
 
+@dataclass
+class HWPState:
+    temp: Optional[float] = None
+    temp_status: Optional[str] = None
+    temp_thresh: Optional[float] = None
+    temp_field: Optional[str] = None
+
+    ups_output_source: Optional[str] = None
+    ups_estimated_minutes_remaining: Optional[float] = None
+    ups_battery_voltage: Optional[float] = None
+    ups_battery_current: Optional[float] = None
+    ups_minutes_remaining_thresh: Optional[float] = None
+
+    pid_current_freq: Optional[float] = None
+    pid_target_freq: Optional[float] = None
+    pid_direction: Optional[str] = None
+    pid_last_updated: Optional[float] = None
+
+    pmx_current: Optional[float] = None
+    pmx_voltage: Optional[float] = None
+    pmx_source: Optional[str] = None
+    pmx_last_updated: Optional[float] = None
+
+    enc_freq: Optional[float] = None
+
+    def _update_from_keymap(self, op, keymap):
+        if op['status'] != 'ok':
+            for k in keymap:
+                setattr(self, k, None)
+            return
+
+        for k, v in keymap.items():
+            setattr(self, k, op['data'].get(v))
+
+    def update_enc_state(self, op):
+        self._update_from_keymap(op, {'enc_freq': 'approx_hwp_freq'})
+
+    def update_temp_state(self, op):
+        if op['status'] != 'ok': 
+            self.temp = None
+            self.temp_status = 'no_data'
+            return
+
+        fields = op['data']['fields']
+        if self.temp_field not in fields:
+            self.temp = None
+            self.temp_status = 'no_data'
+            return
+        
+        self.temp = fields[self.temp_field]['T']
+        
+        if self.temp_thresh is not None:
+            if self.temp > self.temp_thresh:
+                self.temp_status = 'over'
+            else:
+                self.temp_status = 'ok'
+        else:
+            self.temp_status = 'ok'
+
+    def update_pmx_state(self, op):
+        keymap = {'pmx_current': 'curr', 'pmx_voltage': 'volt',
+                  'pmx_source': 'source', 'pmx_last_updated': 'last_updated'}
+        self._update_from_keymap(op, keymap)
+    
+    def update_pid_state(self, op):
+        self._update_from_keymap(op, {
+            'pid_current_freq': 'current_freq',
+            'pid_target_freq': 'target_freq',
+            'pid_direction': 'direction',
+            'pid_last_updated': 'last_updated'
+        })
+
+    def update_ups_state(self, op):
+        ups_keymap = {
+            'ups_output_source': ('upsOutputSource', 'description'),
+            'ups_estimated_minutes_remaining': ('upsEstimatedMinutesRemaining', 'status'),
+            'ups_battery_voltage': ('upsBatteryVoltage', 'status'),
+            'ups_battery_current': ('upsBatteryCurrent', 'status'),
+        }
+
+        if op['status'] != 'ok':
+            for k in ups_keymap:
+                setattr(self, k, None)
+            return
+
+        # get oid
+        data = op['data']
+        for k in data:
+            if k.startswith('upsOutputSource'):
+                ups_oid = k.split('_')[1]
+                break
+        else:
+            raise ValueError('Could not find upsOutputSource OID')
+
+        for k, field in ups_keymap.items():
+            setattr(self, k, data[f'{field[0]}_{ups_oid}'][field[1]])
+    
+    @property
+    def pmx_action(self):
+        # First check if either ups or temp are beyond a threshold
+        if self.temp is not None and self.temp_thresh is not None:
+            if self.temp > self.temp_thresh:
+                return 'stop'
+
+        min_remaining = self.ups_estimated_minutes_remaining
+        min_remaining_thresh = self.ups_minutes_remaining_thresh
+        if min_remaining is not None and min_remaining_thresh is not None:
+            if min_remaining < min_remaining_thresh:
+                return 'stop'
+
+        # If either hwp_temp or ups state is None, return no_data
+        if self.temp is None and (self.temp_thresh is not None):
+            return 'no_data'
+
+        if min_remaining is None and (min_remaining_thresh is not None):
+            return 'no_data'
+
+        return 'ok'
+
+    @property
+    def gripper_action(self):
+        pmx_action = self.pmx_action
+        if pmx_action == 'ok':
+            return 'ok'
+        if pmx_action == 'no_data':
+            return 'no_data'
+
+        if self.pid_current_freq is None:
+            return 'no_data'
+        elif self.pid_current_freq > 0.01:
+            return 'ok'
+        else:  # Only grip if the hwp_freq is smaller than 0.01
+            return 'stop'
+
+
+class ControlStateType(enum.Enum):
+    NONE = enum.auto()
+    PID_FREQ = enum.auto()
+    WAIT_FOR_TARGET_FREQ = enum.auto()
+    BRAKE = enum.auto()
+    PMX_OFF = enum.auto()
+    CONST_VOLT = enum.auto()
+    DONE = enum.auto()
+    ERROR = enum.auto()
+
+
+class ControlState:
+    """
+    Representation of the HWP Spin State.
+
+    Args
+    --------------
+    state_type : SpinStateType
+        Current state type
+    target_freq : float
+        Target Frequency for any state that changes or monitors the frequency
+    freq_thresh : float
+        Maximum difference between target freq and PID freq for the frequency to
+        be considered set correctly.
+    freq_thresh_duration : float
+        Time (sec) required within freq_thresh before moving onto DONE state.
+    voltage : float
+        Voltage to set for CONST_VOLT state
+    
+    Attributes:
+    ---------------
+    success : bool, optional
+        In the DONE state, this will be True / False depending on whether
+        operation was successful. In all other states, this will be None.
+    msg : str, optional
+        Message that can be used to better describe DONE state.
+    idx : int
+        Global index of state. This will be incremented each time a SpinState
+        is instantiated, allowing you to check whether the current state is the
+        same as one you set before.
+    """
+    _idx = 0
+    _idx_lock = threading.Lock()
+
+    def __init__(self, state_type, target_freq=None, freq_thresh=None,
+                 freq_thresh_duration=None, voltage=None, pid_dir=None):
+        self.state_type = state_type
+        self.target_freq = target_freq
+        self.freq_thresh = freq_thresh
+        self.freq_thresh_duration = freq_thresh_duration
+        self.voltage = voltage
+        self.pid_dir = pid_dir
+        self.success = None
+        self.msg = None
+        self.freq_within_thresh_start = None
+        self.default_timeout = 10
+
+        self.log = txaio.make_logger()
+
+        with self._idx_lock:
+            self.idx = self._idx
+            self._idx += 1
+
+        # Prevent you from setting bad states
+        if self.state_type == ControlStateType.PID_FREQ:
+            if self.target_freq is None:
+                raise ValueError("Frequency must be set for PID_FREQ type")
+            if self.pid_dir is None:
+                raise ValueError("PID dir must be set for PID_FREQ type")
+            if self.freq_thresh is None:
+                raise ValueError("Frequency Threshold must be set for PID_FREQ type")
+            if self.freq_thresh_duration is None:
+                raise ValueError("Freq Threshold Duration must be set for "
+                                 "PID_FREQ type")
+
+        if self.state_type == ControlStateType.CONST_VOLT:
+            if self.voltage is None:
+                raise ValueError("Voltage must be set for CONST_VOLT type")
+    
+    def set_state_type(self, state_type, success=None, msg=None):
+        self.log.info(f"Setting state type to {state_type.name}")
+        if msg is not None:
+            self.log.info(f"  Message: {msg}")
+        if success is not None:
+            self.log.info(f"  Success: {success}")
+
+        self.success = success
+        self.msg = msg
+        self.state_type = state_type
+    
+    def run_and_validate(self, op, kwargs=None, timeout=-1):
+        """
+        Runs an OCS Operation, and validates that it was successful.
+
+        Args
+        -------
+        op : OCS MatchedOp
+            Operation to run. This must be a MatchedOp, or a method of an
+            OCSClient
+        kwargs : dict, optional
+            Kwargs to pass to the operation
+        timeout : float, optional
+            Timeout for the wait command. This defaults to
+            ``default_wait_timeout`` which is 10 seconds. If this is set to
+            None, will wait indefinitely.
+        """
+        if kwargs is None:
+            kwargs = {}
+        if timeout is -1:
+            timeout = self.default_timeout
+        op.start(**kwargs)
+        status, msg, session = op.wait(timeout=timeout)
+    
+    def update(self, clients: HWPClients, hwp_state: HWPState):
+        """
+        Runs control operations and updates the control-state based on the
+        ``hwp_state`` object.
+
+        Args
+        --------
+        clients : HWPClients
+            Clients to use to control the HWP.
+        hwp_state : HWPState
+            Current state of the HWP.
+        """
+        if self.state_type == ControlStateType.NONE:
+            return
+
+        elif self.state_type == ControlStateType.PID_FREQ:
+            # Set the PID and then switch to WAIT_FOR_TARGET_FREQ
+            self.run_and_validate(clients.pid.set_direction,
+                                   kwargs={'direction': self.pid_dir})
+            self.run_and_validate(clients.pid.declare_freq, 
+                                   kwargs={'freq': self.target_freq})
+            self.run_and_validate(clients.pid.use_ext)
+            self.run_and_validate(clients.pid.set_on)
+            self.set_state_type(ControlStateType.WAIT_FOR_TARGET_FREQ)
+        
+        elif self.state_type == ControlStateType.PMX_OFF:
+            # Turn PMX off and then switch to WAIT_FOR_TARGET_FREQ
+            self.run_and_validate(clients.pid.set_off)
+            self.set_state_type(ControlStateType.WAIT_FOR_TARGET_FREQ)
+        
+        elif self.state_type == ControlStateType.WAIT_FOR_TARGET_FREQ:
+            # Check if we are close enough to the target frequency.
+            # This will make sure we remain within the frequency threshold for
+            # ``self.freq_thresh_duration`` seconds before switching to DONE
+            f = hwp_state.pid_current_freq
+            if f is not None:
+                # If within_thresh for freq_thresh_duration, switch to Done
+                if np.abs(f - self.target_freq) < self.freq_thresh:
+                    if self.freq_within_thresh_start is None:
+                        self.freq_within_thresh_start = time.time()
+                    elif time.time() - self.freq_within_thresh_start > self.freq_thresh_duration:
+                        self.set_state_type(ControlStateType.DONE, success=True)
+                else:
+                    self.freq_within_thresh_start = None
+            else:
+                self.freq_within_thresh_start = None
+
+        elif self.state_type == ControlStateType.CONST_VOLT:
+            # Set to constant voltage mode
+            clients.pmx.ign_ext()
+            self.run_and_validate(clients.pmx.ign_ext)
+            self.run_and_validate(clients.pmx.set_v,
+                                    kwargs={'voltage': self.voltage})
+            self.set_state_type(ControlStateType.DONE, success=True)
+
+        elif self.state_type == ControlStateType.BRAKE:
+            # Actively set the PID to brake the HWP
+            self.run_and_validate(clients.pid.tune_stop)
+            self.run_and_validate(clients.pid.use_ext)
+            self.run_and_validate(clients.pid.set_on)
+            self.set_state_type(ControlStateType.WAIT_FOR_TARGET_FREQ)
+
+    def encoded(self):
+        """Encodes ControlState as a dict"""
+        return {
+            'state_type': self.state_type.name,
+            'target_freq': self.target_freq,
+            'freq_thresh': self.freq_thresh,
+            'freq_thresh_duration': self.freq_thresh_duration,
+            'voltage': self.voltage,
+            'success': self.success,
+            'msg': self.msg,
+            'idx': self.idx,
+        }
+
 class HWPSupervisor:
+    """
+    The HWPSupervisor agent is responsible for monitoring HWP and related
+    components, and high-level control of the HWP. This maintains an updated
+    HWPState containing state info pertaining to HWP agents. Additionally, it
+    contains a state-machine for controlling the HWP based on the ControlState.
+
+
+    Attributes
+    ----------------
+    agent : OCSAgent
+        OCS agent instance
+    args : argparse.Namespace
+        Argument namespace
+    hwp_state : HWPState
+        Class containing most recent state information for the HWP
+    control_state : ControlState
+        Current control_state object. This will be used to determine what
+        commands to issue to HWP agents.
+    forward_is_cw : bool
+        True if the PID "forward" direction is clockwise, False if CCW.
+    """
     def __init__(self, agent, args):
         self.agent = agent
         self.args = args
@@ -116,8 +464,13 @@ class HWPSupervisor:
         self.hwp_pmx_id = args.hwp_pmx_id
         self.hwp_pid_id = args.hwp_pid_id
         self.ups_id = args.ups_id
-        self._ups_oid = None
-        self.ups_minutes_remaining_thresh = args.ups_minutes_remaining_thresh
+
+        self.hwp_state = HWPState(
+            temp_thresh=args.hwp_temp_thresh, 
+            ups_minutes_remaining_thresh=args.ups_minutes_remaining_thresh,
+        )
+        self.control_state = ControlState(ControlStateType.NONE)
+        self.forward_is_cw = args.forward_dir == 'cw'
 
     def _get_hwp_clients(self):
         def get_client(id):
@@ -139,109 +492,6 @@ class HWPSupervisor:
             ups=get_client(self.ups_id),
             lakeshore=get_client(self.hwp_lakeshore_id)
         )
-
-    def _get_pmx_action(self, state):
-        # First check if either ups or temp are beyond a threshold
-        hwp_temp = state['hwp_temp']
-        if hwp_temp is not None and self.hwp_temp_thresh is not None:
-            if hwp_temp > self.hwp_temp_thresh:
-                return 'stop'
-
-        min_remaining = state['ups_estimated_minutes_remaining']
-        min_remaining_thresh = self.ups_minutes_remaining_thresh
-        if min_remaining is not None and min_remaining_thresh is not None:
-            if min_remaining < min_remaining_thresh:
-                return 'stop'
-
-        # If either hwp_temp or ups state is None, return no_data
-        if hwp_temp is None and (self.hwp_temp_thresh is not None):
-            return 'no_data'
-
-        if min_remaining is None and self.ups_minutes_remaining_thresh is not None:
-            return 'no_data'
-
-        return 'ok'
-
-    def _get_gripper_action(self, state):
-        """
-        Gets the gripper action based on the current state of the system.
-        This will only report 'stop' if the rot_action is 'stop' and the hwp
-        freq is smaller than 0.01. The gripper agent should not grip the hwp in a
-        no-data event.
-        """
-        rot_action = self._get_pmx_action(state)
-        if rot_action == 'ok':
-            return 'ok'
-        if rot_action == 'no_data':
-            return 'no_data'
-
-        hwp_freq = state['hwp_pid_freq']
-        if hwp_freq is None:
-            return 'no_data'
-        elif hwp_freq > 0.01:
-            return 'ok'
-        else:  # Only grip if the hwp_freq is smaller than 0.01
-            return 'stop'
-
-    def _update_state_temp(self, temp_op, state):
-        """
-        Updates state dict with temperature data.
-        """
-        state.update({
-            'hwp_temp': None,
-            'hwp_temp_status': 'no_data',
-            'hwp_temp_thresh': self.hwp_temp_thresh,
-        })
-
-        if temp_op['status'] != 'ok':
-            return state
-
-        fields = temp_op['data']['fields']
-        if self.hwp_temp_field not in fields:
-            return state
-
-        hwp_temp = fields[self.hwp_temp_field]['T']
-        state['hwp_temp'] = hwp_temp
-        state['hwp_temp_status'] = 'ok'
-
-        if self.hwp_temp_thresh is not None:
-            if hwp_temp > self.hwp_temp_thresh:
-                state['hwp_temp_status'] = 'over'
-
-        return state
-
-    def _update_state_ups(self, ups_op, state):
-        """
-        Updates state dict with UPS data.
-        """
-        ups_keymap = {
-            'ups_output_source': ('upsOutputSource', 'description'),
-            'ups_estimated_minutes_remaining': ('upsEstimatedMinutesRemaining', 'status'),
-            'ups_battery_voltage': ('upsBatteryVoltage', 'status'),
-            'ups_battery_current': ('upsBatteryCurrent', 'status'),
-        }
-
-        state['ups_minutes_remaining_thresh'] = self.ups_minutes_remaining_thresh
-
-        if ups_op['status'] != 'ok':
-            for k in ups_keymap:
-                state[k] = None
-            return
-
-        # get oid
-        data = ups_op['data']
-        for k in data:
-            if k.startswith('upsOutputSource'):
-                ups_oid = k.split('_')[1]
-                break
-        else:
-            self.log.error(f"Could not find OID for {self.ups_id}")
-            return
-
-        for k, field in ups_keymap.items():
-            state[k] = data[f'{field[0]}_{ups_oid}'][field[1]]
-
-        return state
 
     @ocs_agent.param('test_mode', type=bool, default=False)
     def monitor(self, session, params):
@@ -285,7 +535,7 @@ class HWPSupervisor:
                     'hwp_temp_status': 'ok',  # `no_data`, `ok`, or `over`
                     'hwp_temp_thresh': 75.0,
                     'ups_battery_current': 0,
-                    'ups_battery_voltags': 136,
+                    'ups_battery_voltage': 136,
                     'ups_estimated_minutes_remaining': 50,
                     'ups_minutes_remaining_thresh': 45.0,
                     'ups_output_source': 'normal'  # See UPS agent docs for choices
@@ -298,7 +548,6 @@ class HWPSupervisor:
         """
         pm = Pacemaker(1. / self.sleep_time)
         test_mode = params.get('test_mode', False)
-        clients = self._get_hwp_clients()
 
         session.data = {
             'timestamp': time.time(),
@@ -328,28 +577,17 @@ class HWPSupervisor:
             }
 
             # gather state info
-            state = {}
-            self._update_state_temp(temp_op, state)
-            self._update_state_ups(ups_op, state)
-
-            state['hwp_enc_freq'] = None
-            if enc_op['status'] == 'ok':
-                state['hwp_enc_freq'] = enc_op['data'].get('approx_hwp_freq')
-
-            state['hwp_pid_freq'] = None
-            try:
-                clients.pid.get_freq()
-                d = clients.pid.get_freq.status().session['data']
-                state['hwp_pid_freq'] = d['freq']
-            except Exception as e:
-                self.log.error("Could not get frequency from PID: {e}", e=e)
-
-            session.data['state'] = state
+            self.hwp_state.update_pid_state(pid_op)
+            self.hwp_state.update_pmx_state(pmx_op)
+            self.hwp_state.update_temp_state(temp_op)
+            self.hwp_state.update_ups_state(ups_op)
+            self.hwp_state.update_enc_state(enc_op)
+            session.data['hwp_state'] = asdict(self.hwp_state)
 
             # Get actions for each hwp subsystem
             session.data['actions'] = {
-                'pmx': self._get_pmx_action(state),
-                'gripper': self._get_gripper_action(state),
+                'pmx': self.hwp_state.pmx_action,
+                'gripper': self.hwp_state.gripper_action,
             }
 
             if test_mode:
@@ -363,107 +601,119 @@ class HWPSupervisor:
         session.status = 'stopping'
         return True, 'Stopping monitor process'
 
-    @ocs_agent.param('forward', type=bool, default=True)
-    @ocs_agent.param('target_freq', type=float)
-    def spin_up(self, session, params):
-        """spin_up(forward=True, target_freq=2.0)
+    def spin_control(self, session, params):
+        """spin_control()
 
-        *Task* -- Sets the HWP to spin at a given frequency.
-
-        An example of the session data::
-
-            >>> response.session['data']
-
-                {'forward': True,
-                'commanded_freq': 2.0,
-                'pid_freq': 1.2}
-
-        Parameters
-        ------------
-        forward : bool
-            If True, will spin the HWP in the forward direction.
-        freq : float
-            Frequency to command with the HWP PID.
+        **Process** - Process to manage the spin-state for HWP agents. This will
+        issue commands to various HWP agents depending on the current control
+        state.
         """
         clients = self._get_hwp_clients()
 
-        direction = '0' if params['forward'] else '1'
-        clients.pid.set_direction(direction=direction)
-        session.add_message("Set rotation direction: forward={}".format(params['forward']))
+        while session.status in ['starting', 'running']:
+            try:
+                self.control_state.update(clients, self.hwp_state)
+            except Exception:
+                msg = f"Error updating control state:\n{traceback.format_exc()}"
+                self.log.error(msg)
+                self.control_state.set_state_type(ControlStateType.ERROR, msg=msg)
 
-        clients.pid.declare_freq(freq=params['target_freq'])
-        clients.pid.tune_freq()
-        clients.pmx.use_ext()
-        clients.pmx.set_on()
-        session.add_message("Tuning PID to {:.2f} Hz".format(params['target_freq']))
-
-        session.data = {'forward': params['forward'],
-                        'target_freq': params['target_freq'],
-                        'pid_freq': 0}
-        while True:
-            clients.pid.get_freq()
-            d = clients.pid.get_freq.status().session['data']
-            cur_freq = d['freq']
-            session.data['pid_freq'] = cur_freq
-            if cur_freq - params['target_freq'] < 0.005:
-                break
-            time.sleep(0.5)
-
-        return True, f'HWP spinning at {cur_freq:.2f} Hz'
-
-    @ocs_agent.param('pid_freq_thresh', type=float, default=0.2)
-    @ocs_agent.param('use_pid', type=bool, default=True)
-    def spin_down(self, session, params):
-        """spin_down(pid_freq_thresh=0.2, use_pid=True)
-
-        *Task* -- Commands the HWP to spin down.
-
-        An example of the session data::
-
-            >>> response.session['data']
-
-                {'pid_freq': 0.6,
-                 'pid_freq_thresh': 0.2,
-                 'use_pid': True}
-
-        Parameters
-        ------------
-        pid_freq_thresh : float
-            When the PID freq drops below this threshold, tell the hwp_pmx to cut power.
-        use_pid : bool
-            If True, will use the PID to spin down the HWP. If False, will
-            just tell the hwp_pmx agent to cut power.
-
-        """
-        clients = self._get_hwp_clients()
-
-        if not params.use_pid:
-            clients.pmx.set_off()
             session.data = {
-                'pid_freq': None,
-                'pid_freq_thresh': params['pid_freq_thresh'],
-                'use_pid': params['use_pid']
+                'state': self.control_state.encoded(),
+                'timestamp': time.time(),
             }
-            return True, "Commanded HWP to stop spinning"
+            time.sleep(1)
 
-        clients.pid.tune_stop()
-        clients.pmx.use_ext()
-        clients.pmx.set_on()
-        session.add_messsage("Tuning PID to stop")
+    def _stop_spin_control(self, session, params):
+        session.status = 'stopping'
+        return True, 'Stopping spin control process'
 
-        session.data = {
-            'pid_freq_thresh': params.pid_freq_thresh,
-            'use_pid': params.use_pid
-        }
-        while True:
-            _, _, s = clients.pid.get_freq()
-            cur_freq = s.data['current_freq']
-            session.data['pid_freq'] = cur_freq
-            if cur_freq < params.pid_freq_thresh:
-                break
+    @ocs_agent.param('target_freq', type=float)
+    @ocs_agent.param('freq_thresh', type=float, default=0.05)
+    @ocs_agent.param('freq_thresh_duration', type=float, default=10)
+    def pid_to_freq(self, session, params):
+        """pid_to_freq(target_freq=2.0, freq_thresh=0.05, freq_thresh_duration=10)
 
-        clients.pmx.set_off()
-        return True, "Commanded HWP to stop spinning"
+        **Task** - Sets the control state to PID the HWP to the given ``target_freq``.
+
+        Args
+        -------
+        target_freq : float
+            Target frequency of the HWP (Hz). Positive values are CW, negative are CCW.
+        freq_thresh : float
+            Frequency threshold (Hz) for determining when the HWP is at the target frequency.
+        freq_thresh_duration : float
+            Duration (seconds) for which the HWP must be within ``freq_thresh`` of the
+            ``target_freq`` to be considered successful.
+        """
+        if params['target_freq'] >= 0:
+            d = '0' if self.forward_is_cw else '1'
+        else:
+            d = '1' if self.forward_is_cw else '1'
+
+        self.control_state = ControlState(
+            state_type=ControlStateType.PID_FREQ,
+            target_freq=params['target_freq'],
+            freq_thresh=params['freq_thresh'],
+            freq_thresh_duration=params['freq_thresh_duration'],
+            pid_dir=d,
+        )
+        return True, f"Set state to {self.control_state.state_type.name}"
+
+    @ocs_agent.param('voltage', type=float)
+    def set_const_voltage(self, session, params):
+        """set_const_voltage(voltage=1.0)
+
+        **Task** - Sets the control state set the PMX to a constant voltage.
+
+        Args
+        -------
+        voltage : float
+            Voltage to set the PMX to (V).
+        """
+        self.control_state = ControlState(
+            state_type=ControlStateType.CONST_VOLT,
+            voltage=params['voltage'],
+        )
+        return True, f"Set state to {self.control_state.state_type.name}"
+    
+    @ocs_agent.param('freq_thresh', type=float, default=0.05)
+    @ocs_agent.param('freq_thresh_duration', type=float, default=10)
+    def brake(self, session, params):
+        """brake(freq_thresh=0.05, freq_thresh_duration=10)
+
+        **Task** - Sets the control state to brake the HWP.
+
+        Args
+        -------
+        freq_thresh : float
+            Frequency threshold (Hz) for determining when the HWP is at the target frequency.
+        freq_thresh_duration : float
+            Duration (seconds) for which the HWP must be within ``freq_thresh`` of the
+            ``target_freq`` to be considered successful.
+        """
+        self.control_state = ControlState(
+            state_type=ControlStateType.BRAKE,
+            target_freq=0,
+            freq_thresh=params['freq_thresh'],
+            freq_thresh_duration=params['freq_thresh_duration']
+        )
+        return True, f"Set state to {self.control_state.state_type.name}"
+
+    @ocs_agent.param('freq_thresh', type=float, default=0.05)
+    @ocs_agent.param('freq_thresh_duration', type=float, default=10)
+    def pmx_off(self, session, params):
+        """pmx_off()
+
+        **Task** - Sets the control state to turn off the PMX.
+        """
+        self.control_state = ControlState(
+            state_type=ControlStateType.PMX_OFF,
+            target_freq=0,
+            freq_thresh=params['freq_thresh'],
+            freq_thresh_duration=params['freq_thresh_duration']
+        )
+        return True, f"Set state to {self.control_state.state_type.name}"
 
 
 def make_parser(parser=None):
@@ -491,6 +741,8 @@ def make_parser(parser=None):
                         help="Threshold for UPS minutes remaining before a "
                              "shutdown is triggered")
 
+    pgroup.add_argument('--forward-dir', choices=['cw', 'ccw'], default="cw",
+                        help="Whether the PID 'forward' direction is cw or ccw")
     return parser
 
 
@@ -505,8 +757,12 @@ def main(args=None):
 
     agent.register_process('monitor', hwp.monitor, hwp._stop_monitor,
                            startup=True)
-    agent.register_task('spin_up', hwp.spin_up)
-    agent.register_task('spin_down', hwp.spin_down)
+    agent.register_process(
+        'spin_control', hwp.spin_control, hwp._stop_spin_control, startup=True)
+    agent.register_task('pid_to_freq', hwp.pid_to_freq)
+    agent.register_task('set_const_voltage', hwp.set_const_voltage)
+    agent.register_task('brake', hwp.brake)
+    agent.register_task('pmx_off', hwp.pmx_off)
 
     runner.run(agent, auto_reconnect=True)
 
