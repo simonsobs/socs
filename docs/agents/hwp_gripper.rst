@@ -11,7 +11,7 @@ Functions include issuing movement commands, monitoring actuator position, and h
 limit switch activation.
 
 .. argparse::
-   :filename: ../socs/agent/hwp_gripper/agent.py
+   :filename: ../socs/agents/hwp_gripper/agent.py
    :func: make_parser
    :prog: python3 agent.py
 
@@ -52,5 +52,5 @@ An example docker-compose configuration::
 Agent API
 ---------
 
-.. autoclass:: socs.agents.hwp_gripper.agent.HWPGripper
+.. autoclass:: socs.agents.hwp_gripper.agent.GripperAgent
    :members:
