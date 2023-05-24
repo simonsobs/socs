@@ -169,6 +169,8 @@ class ibootbarAgent:
         SNMP port to issue GETs to, default to 161.
     version : int
         SNMP version for communication (1, 2, or 3), defaults to 2.
+    lock_outlet : list of ints
+        List of outlets to lock on agent startup.
 
     Attributes
     ----------
@@ -238,7 +240,8 @@ class ibootbarAgent:
              'ibootbar_connection':
                 {'last_attempt': 1656085022.680916,
                  'connected': True},
-             'timestamp': 1656085022.680916}
+             'timestamp': 1656085022.680916,
+             'address': '10.10.10.50'}
         """
         # Set initial default outlet names
         names = ['Outlet-1', 'Outlet-2', 'Outlet-3', 'Outlet-4',
