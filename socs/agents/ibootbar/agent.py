@@ -181,16 +181,22 @@ class ibootbarAgent:
         txaio logger object, created by the OCSAgent
     """
 
-    def __init__(self, agent, address, port=161, version=2):
+    def __init__(self, agent, address, port=161, version=2, lock_outlet=None):
         self.agent = agent
         self.is_streaming = False
         self.log = self.agent.log
         self.lock = TimeoutLock()
 
-        # Initialize with outlets unlocked; replace with config later
+        # Initialize with locked outlets if given in args
         self.outlet_locked = []
         for i in range(8):
             self.outlet_locked.append(False)
+        if lock_outlet is not None:
+            for i in range(8):
+                if i+1 in lock_outlet:
+                    self.outlet_locked[i] = True
+                else:
+                    self.outlet_locked[i] = False
 
         self.log.info(f'Using SNMP version {version}.')
         self.version = version
@@ -402,11 +408,6 @@ class ibootbarAgent:
             if not acquired:
                 return False, "Could not acquire lock"
 
-            # Check if any outlets are locked
-            for outlet in self.outlet_locked:
-                if outlet:
-                    return False, 'An outlet(s) is locked. Cannot reboot.'
-
             # Send SNMP SET command to set rebootSystem to True
             reboot = [('IBOOTPDU-MIB', 'rebootSystem', 0)]
             setcmd = yield self.snmp.set(reboot, self.version, 1)
@@ -463,6 +464,8 @@ def add_agent_args(parser=None):
                         help="SNMP version for communication. Must match "
                              + "configuration on the ibootbar.")
     pgroup.add_argument("--mode", default='acq', choices=['acq', 'test'])
+    pgroup.add_argument("--lock-outlet", nargs='+', type=int, 
+                        help="List of outlets to lock on startup.")
 
     return parser
 
@@ -485,7 +488,8 @@ def main(args=None):
     p = ibootbarAgent(agent,
                       address=args.address,
                       port=int(args.port),
-                      version=int(args.snmp_version))
+                      version=int(args.snmp_version),
+                      lock_outlet=args.lock_outlet)
 
     agent.register_process("acq",
                            p.acq,
