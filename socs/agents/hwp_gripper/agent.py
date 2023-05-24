@@ -372,7 +372,7 @@ class GripperAgent:
 
             self.shutdown_mode = True
 
-            time.sleep(5*60)
+            time.sleep(5 * 60)
 
             self.log.info(self.client.POWER(True))
             time.sleep(1)
