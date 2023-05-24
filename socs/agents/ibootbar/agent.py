@@ -195,7 +195,7 @@ class ibootbarAgent:
             self.outlet_locked.append(False)
         if lock_outlet is not None:
             for i in range(8):
-                if i+1 in lock_outlet:
+                if i + 1 in lock_outlet:
                     self.outlet_locked[i] = True
                 else:
                     self.outlet_locked[i] = False
@@ -467,7 +467,7 @@ def add_agent_args(parser=None):
                         help="SNMP version for communication. Must match "
                              + "configuration on the ibootbar.")
     pgroup.add_argument("--mode", default='acq', choices=['acq', 'test'])
-    pgroup.add_argument("--lock-outlet", nargs='+', type=int, 
+    pgroup.add_argument("--lock-outlet", nargs='+', type=int,
                         help="List of outlets to lock on startup.")
 
     return parser
