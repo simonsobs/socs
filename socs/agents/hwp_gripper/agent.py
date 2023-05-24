@@ -32,7 +32,7 @@ class GripperAgent:
     """
 
     def __init__(self, agent, mcu_ip, pru_port, control_port,
-                 return_port, supervisor_id=None, no_data_timeout=45 * 60):
+                 return_port, supervisor_id=None, no_data_timeout=30 * 60):
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
@@ -372,6 +372,8 @@ class GripperAgent:
 
             self.shutdown_mode = True
 
+            time.sleep(5*60)
+
             self.log.info(self.client.POWER(True))
             time.sleep(1)
 
@@ -469,9 +471,10 @@ class GripperAgent:
         if self.supervisor_id is None:
             return False, 'No supervisor ID set'
 
+        self._inital_warning = True
         self._run_monitor = True
         while self._run_monitor:
-            res = get_op_data(self.supervisor_id)
+            res = get_op_data(self.supervisor_id, 'monitor')
             if res['status'] != 'ok':
                 action = 'no_data'
             else:
@@ -487,7 +490,13 @@ class GripperAgent:
 
             elif action == 'stop':
                 if not self.shutdown_mode:
-                    self.agent.start('grip_shutdown')
+                    cur_freq = res['data']['hwp_state']['pid_current_freq']
+                    if cur_freq is None and self._initial_warning:
+                        self._initial_warning = False
+                        self.log.error("Missing pid frequency data")
+                    elif cur_freq < 0.05:
+                        self._initial_warning = True
+                        self.agent.start('grip_shutdown')
 
             data = {
                 'data': {'gripper_action': action},
