@@ -7,9 +7,9 @@ from typing import Optional
 import threading
 import time
 import traceback
+
 import numpy as np
 import txaio
-
 from ocs import client_http, ocs_agent, site_config
 from ocs.client_http import ControlClientError
 from ocs.ocs_client import OCSClient, OCSReply
@@ -161,7 +161,7 @@ class HWPState:
             Dict containing the operations (from get_op_data) from the lakeshore
             ``acq`` process
         """
-        if op['status'] != 'ok': 
+        if op['status'] != 'ok':
             self.temp = None
             self.temp_status = 'no_data'
             return
@@ -326,11 +326,11 @@ class ControlState:
         freq_tol: float
         freq_tol_duration: float
         start_time: float = field(default_factory=time.time)
-    
+
     @dataclass
     class WaitForTargetFreq:
         """
-        Wait until HWP reaches its target frequency before transitioning to 
+        Wait until HWP reaches its target frequency before transitioning to
         the Done state
 
         Attributes
@@ -352,7 +352,7 @@ class ControlState:
         freq_tol_duration: float
         freq_within_thresh_start: Optional[float] = None
         start_time: float = field(default_factory=time.time)
-    
+
     @dataclass
     class ConstVolt:
         """
@@ -367,7 +367,7 @@ class ControlState:
         """
         voltage: float
         start_time: float = field(default_factory=time.time)
-    
+
     @dataclass
     class Done:
         """
@@ -409,7 +409,7 @@ class ControlState:
         freq_tol: float
         freq_tol_duration: float
         start_time: float = field(default_factory=time.time)
-    
+
     class PmxOff:
         """
         Turns off the PMX
@@ -420,6 +420,7 @@ class ControlState:
             Time that the state was entered
         """
         start_time: float = field(default_factory=time.time)
+
 
 def run_and_validate(op, kwargs=None, timeout=10):
     """
@@ -444,16 +445,17 @@ def run_and_validate(op, kwargs=None, timeout=10):
     status, msg, session = op.wait(timeout=timeout)
     return
 
+
 class ControlStateMachine:
     def __init__(self):
         self.state = ControlState.Idle()
         self.log = txaio.make_logger()
         self.lock = threading.Lock()
-    
+
     def _set_state(self, state):
         self.log.info("Changing from {self.state} to {state}")
         self.state = state
-    
+
     def update(self, clients, hwp_state):
         try:
             self.lock.acquire()
@@ -470,7 +472,7 @@ class ControlStateMachine:
                     freq_tol=self.state.freq_tol,
                     freq_tol_duration=self.state.freq_tol_duration
                 ))
-            
+
             elif isinstance(self.state, ControlState.WaitForTargetFreq):
                 # Check if we are close enough to the target frequency.
                 # This will make sure we remain within the frequency threshold for
@@ -496,7 +498,7 @@ class ControlStateMachine:
                 run_and_validate(clients.pmx.set_voltage,
                                  kwargs={'voltage': self.state.voltage})
                 self._set_state(ControlState.Done(success=True))
-            
+
             elif isinstance(self.state, ControlState.Brake):
                 pass
 
@@ -509,7 +511,7 @@ class ControlStateMachine:
             self._set_state(ControlState.Error(traceback=tb))
         finally:
             self.lock.release()
-    
+
     def request_state(self, state):
         with self.lock:
             self._set_state(state)
@@ -769,7 +771,7 @@ class HWPSupervisor:
             return True, f"Set state to {state}"
         else:
             return False, "Failed to update state"
-    
+
     @ocs_agent.param('freq_thresh', type=float, default=0.05)
     @ocs_agent.param('freq_thresh_duration', type=float, default=10)
     def brake(self, session, params):
@@ -808,6 +810,7 @@ class HWPSupervisor:
             return True, f"Set state to {state}"
         else:
             return False, "Failed to update state"
+
 
 def make_parser(parser=None):
     if parser is None:
