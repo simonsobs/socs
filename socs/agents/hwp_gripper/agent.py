@@ -36,7 +36,7 @@ class GripperAgent:
 
     def __init__(self, agent, mcu_ip, pru_port, control_port,
                  return_port, supervisor_id=None, no_data_timeout=30 * 60,
-                 limit_pos = [13.,10.,13.,10.,13.,10.]):
+                 limit_pos=[13., 10., 13., 10., 13., 10.]):
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
