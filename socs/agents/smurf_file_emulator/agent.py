@@ -489,7 +489,8 @@ class SmurfFileEmulator:
         self._write_smurf_file(fname, action, action_time=action_time, prepend_ctime=False)
 
         # Short g3 stream
-        streamer = self._new_streamer(action=action, action_time=action_time)
+        streamer = self._new_streamer(action=action, action_time=action_time,
+                                      tag='oper,noise')
         now = time.time()
         streamer.stream_between(now, now + 30, wait=False)
         if session is not None:
@@ -528,7 +529,8 @@ class SmurfFileEmulator:
         action = 'take_noise'
         action_time = time.time()
 
-        streamer = self._new_streamer(action=action, action_time=action_time)
+        streamer = self._new_streamer(action=action, action_time=action_time,
+                                      tag='oper,noise')
         now = time.time()
         streamer.stream_between(now, now + 30, wait=False)
         session.data['noise_file'] = streamer.file_list[0]
@@ -556,7 +558,8 @@ class SmurfFileEmulator:
         action_time = time.time()
         files = ['iv_analyze.npy', 'iv_bias_all.npy', 'iv_info.npy']
 
-        streamer = self._new_streamer(action=action, action_time=action_time)
+        streamer = self._new_streamer(action=action, action_time=action_time,
+                                      tag='oper,iv')
         now = time.time()
         streamer.stream_between(now, now + 5, wait=params['wait'])
 
@@ -575,7 +578,8 @@ class SmurfFileEmulator:
         action_time = time.time()
         files = ['bias_step_analysis.npy']
 
-        streamer = self._new_streamer(action=action, action_time=action_time)
+        streamer = self._new_streamer(action=action, action_time=action_time,
+                                      tag='oper,bias_steps')
         now = time.time()
         streamer.stream_between(now, now + 5, wait=params['wait'])
 
@@ -593,7 +597,8 @@ class SmurfFileEmulator:
         action = 'take_bgmap'
         action_time = time.time()
 
-        streamer = self._new_streamer(action=action, action_time=action_time)
+        streamer = self._new_streamer(action=action, action_time=action_time,
+                                      tag='oper,bgmap')
         now = time.time()
         streamer.stream_between(now, now + 5, wait=params['wait'])
 
