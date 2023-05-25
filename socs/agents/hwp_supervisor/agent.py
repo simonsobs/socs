@@ -1,14 +1,13 @@
 import argparse
 import os
 import time
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from typing import Optional
 import threading
 import traceback
-import enum
 import numpy as np
-
 import txaio
+
 from ocs import client_http, ocs_agent, site_config
 from ocs.client_http import ControlClientError
 from ocs.ocs_client import OCSClient, OCSReply
@@ -139,9 +138,27 @@ class HWPState:
             setattr(self, k, op['data'].get(v))
 
     def update_enc_state(self, op):
+        """
+        Updates state values from the encoder acq operation results.
+
+        Args
+        -----
+        op : dict
+            Dict containing the operations (from get_op_data) from the encoder
+            ``acq`` process
+        """
         self._update_from_keymap(op, {'enc_freq': 'approx_hwp_freq'})
 
     def update_temp_state(self, op):
+        """
+        Updates state values from the Lakeshore acq operation results.
+
+        Args
+        -----
+        op : dict
+            Dict containing the operations (from get_op_data) from the lakeshore
+            ``acq`` process
+        """
         if op['status'] != 'ok': 
             self.temp = None
             self.temp_status = 'no_data'
@@ -164,11 +181,29 @@ class HWPState:
             self.temp_status = 'ok'
 
     def update_pmx_state(self, op):
+        """
+        Updates state values from the pmx acq operation results.
+
+        Args
+        -----
+        op : dict
+            Dict containing the operations (from get_op_data) from the pmx
+            ``acq`` process
+        """
         keymap = {'pmx_current': 'curr', 'pmx_voltage': 'volt',
                   'pmx_source': 'source', 'pmx_last_updated': 'last_updated'}
         self._update_from_keymap(op, keymap)
     
     def update_pid_state(self, op):
+        """
+        Updates state values from the pid acq operation results.
+
+        Args
+        -----
+        op : dict
+            Dict containing the operations (from get_op_data) from the pid
+            ``acq`` process
+        """
         self._update_from_keymap(op, {
             'pid_current_freq': 'current_freq',
             'pid_target_freq': 'target_freq',
@@ -177,6 +212,15 @@ class HWPState:
         })
 
     def update_ups_state(self, op):
+        """
+        Updates state values from the UPS acq operation results.
+
+        Args
+        -----
+        op : dict
+            Dict containing the operations (from get_op_data) from the UPS
+            ``acq`` process
+        """
         ups_keymap = {
             'ups_output_source': ('upsOutputSource', 'description'),
             'ups_estimated_minutes_remaining': ('upsEstimatedMinutesRemaining', 'status'),
@@ -203,6 +247,10 @@ class HWPState:
     
     @property
     def pmx_action(self):
+        """
+        PMX action to take based on the current state of the HWP. This can be
+        ``stop``, ``ok``, or ``no_data``.
+        """
         # First check if either ups or temp are beyond a threshold
         if self.temp is not None and self.temp_thresh is not None:
             if self.temp > self.temp_thresh:
@@ -225,6 +273,10 @@ class HWPState:
 
     @property
     def gripper_action(self):
+        """
+        Gripper action to take based on the current state of the HWP. This can be
+        ``stop``, ``ok``, or ``no_data``.
+        """
         pmx_action = self.pmx_action
         if pmx_action == 'ok':
             return 'ok'
@@ -239,193 +291,227 @@ class HWPState:
             return 'stop'
 
 
-class ControlStateType(enum.Enum):
-    NONE = enum.auto()
-    PID_FREQ = enum.auto()
-    WAIT_FOR_TARGET_FREQ = enum.auto()
-    BRAKE = enum.auto()
-    PMX_OFF = enum.auto()
-    CONST_VOLT = enum.auto()
-    DONE = enum.auto()
-    ERROR = enum.auto()
-
-
 class ControlState:
     """
-    Representation of the HWP Spin State.
+    Namespace for HWP control state definitions
+    """
+    @dataclass
+    class Idle:
+        """Does nothing"""
+        start_time: float = field(default_factory=time.time)
+
+    @dataclass
+    class PIDToFreq:
+        """
+        Configures PID and PMX agents to PID to a target frequency.
+
+        Attributes
+        -----------
+        target_freq : float
+            Target frequency to PID to
+        direction : str
+            Direction to set the PID. Should either be '1' or '0'.
+        freq_tol : float
+            Tolerance between the target frequency and the current frequency
+            to consider the target frequency reached.
+        freq_tol_duration : float
+            Duration in seconds that the frequency must be within the tolerance
+        start_time : float
+            Time that the state was entered
+        """
+        target_freq: float
+        direction: str
+        freq_tol: float
+        freq_tol_duration: float
+        start_time: float = field(default_factory=time.time)
+    
+    @dataclass
+    class WaitForTargetFreq:
+        """
+        Wait until HWP reaches its target frequency before transitioning to 
+        the Done state
+
+        Attributes
+        -----------
+        target_freq : float
+            Target frequency to PID to
+        freq_tol : float
+            Tolerance between the target frequency and the current frequency
+            to consider the target frequency reached.
+        freq_tol_duration : float
+            Duration in seconds that the frequency must be within the tolerance
+        freq_within_thresh_start : float
+            Time that the frequency entered the tolerance range
+        start_time : float
+            Time that the state was entered
+        """
+        target_freq: float
+        freq_tol: float
+        freq_tol_duration: float
+        freq_within_thresh_start: Optional[float] = None
+        start_time: float = field(default_factory=time.time)
+    
+    @dataclass
+    class ConstVolt:
+        """
+        Configure PMX agent to output a constant voltage.
+
+        Attributes
+        -----------
+        voltage : float
+            Voltage to set the PMX to
+        start_time : float
+            Time that the state was entered
+        """
+        voltage: float
+        start_time: float = field(default_factory=time.time)
+    
+    @dataclass
+    class Done:
+        """
+        Signals the last state has completed
+
+        Attributes
+        -----------
+        success : bool
+            Whether the last state was completed successfully
+        msg : str
+            Optional message to include with the Done state
+        start_time : float
+            Time that the state was entered
+        """
+        success: bool
+        msg: str = None
+        start_time: float = field(default_factory=time.time)
+
+    @dataclass
+    class Error:
+        """
+        Signals the last state update threw an error
+
+        Attributes
+        -----------
+        traceback : str
+            Traceback of the error
+        start_time : float
+            Time that the state was entered
+        """
+        traceback: str
+        start_time: float = field(default_factory=time.time)
+
+    @dataclass
+    class Brake:
+        """
+        Configure the PID and PMX agents to actively brake the HWP
+        """
+        freq_tol: float
+        freq_tol_duration: float
+        start_time: float = field(default_factory=time.time)
+    
+    class PmxOff:
+        """
+        Turns off the PMX
+
+        Attributes
+        -----------
+        start_time : float
+            Time that the state was entered
+        """
+        start_time: float = field(default_factory=time.time)
+
+def run_and_validate(op, kwargs=None, timeout=10):
+    """
+    Runs an OCS Operation, and validates that it was successful.
 
     Args
-    --------------
-    state_type : SpinStateType
-        Current state type
-    target_freq : float
-        Target Frequency for any state that changes or monitors the frequency
-    freq_thresh : float
-        Maximum difference between target freq and PID freq for the frequency to
-        be considered set correctly.
-    freq_thresh_duration : float
-        Time (sec) required within freq_thresh before moving onto DONE state.
-    voltage : float
-        Voltage to set for CONST_VOLT state
-    
-    Attributes:
-    ---------------
-    success : bool, optional
-        In the DONE state, this will be True / False depending on whether
-        operation was successful. In all other states, this will be None.
-    msg : str, optional
-        Message that can be used to better describe DONE state.
-    idx : int
-        Global index of state. This will be incremented each time a SpinState
-        is instantiated, allowing you to check whether the current state is the
-        same as one you set before.
+    -------
+    op : OCS MatchedOp
+        Operation to run. This must be a MatchedOp, or a method of an
+        OCSClient
+    kwargs : dict, optional
+        Kwargs to pass to the operation
+    timeout : float, optional
+        Timeout for the wait command. This defaults to
+        ``default_wait_timeout`` which is 10 seconds. If this is set to
+        None, will wait indefinitely.
     """
-    _idx = 0
-    _idx_lock = threading.Lock()
+    if kwargs is None:
+        kwargs = {}
 
-    def __init__(self, state_type, target_freq=None, freq_thresh=None,
-                 freq_thresh_duration=None, voltage=None, pid_dir=None):
-        self.state_type = state_type
-        self.target_freq = target_freq
-        self.freq_thresh = freq_thresh
-        self.freq_thresh_duration = freq_thresh_duration
-        self.voltage = voltage
-        self.pid_dir = pid_dir
-        self.success = None
-        self.msg = None
-        self.freq_within_thresh_start = None
-        self.default_timeout = 10
+    op.start(**kwargs)
+    status, msg, session = op.wait(timeout=timeout)
+    return
 
+class ControlStateMachine:
+    def __init__(self):
+        self.state = ControlState.Idle()
         self.log = txaio.make_logger()
-
-        with self._idx_lock:
-            self.idx = self._idx
-            self._idx += 1
-
-        # Prevent you from setting bad states
-        if self.state_type == ControlStateType.PID_FREQ:
-            if self.target_freq is None:
-                raise ValueError("Frequency must be set for PID_FREQ type")
-            if self.pid_dir is None:
-                raise ValueError("PID dir must be set for PID_FREQ type")
-            if self.freq_thresh is None:
-                raise ValueError("Frequency Threshold must be set for PID_FREQ type")
-            if self.freq_thresh_duration is None:
-                raise ValueError("Freq Threshold Duration must be set for "
-                                 "PID_FREQ type")
-
-        if self.state_type == ControlStateType.CONST_VOLT:
-            if self.voltage is None:
-                raise ValueError("Voltage must be set for CONST_VOLT type")
+        self.lock = threading.Lock()
     
-    def set_state_type(self, state_type, success=None, msg=None):
-        self.log.info(f"Setting state type to {state_type.name}")
-        if msg is not None:
-            self.log.info(f"  Message: {msg}")
-        if success is not None:
-            self.log.info(f"  Success: {success}")
-
-        self.success = success
-        self.msg = msg
-        self.state_type = state_type
+    def _set_state(self, state):
+        self.log.info("Changing from {self.state} to {state}")
+        self.state = state
     
-    def run_and_validate(self, op, kwargs=None, timeout=-1):
-        """
-        Runs an OCS Operation, and validates that it was successful.
+    def update(self, clients, hwp_state):
+        try:
+            self.lock.acquire()
+            if isinstance(self.state, ControlState.PIDToFreq):
+                run_and_validate(clients.pid.set_direction,
+                                 kwargs={'direction': self.state.direction})
+                run_and_validate(clients.pid.declare_freq,
+                                 kwargs={'freq': self.state.target_freq})
+                run_and_validate(clients.pid.use_ext)
+                run_and_validate(clients.pid.set_on)
 
-        Args
-        -------
-        op : OCS MatchedOp
-            Operation to run. This must be a MatchedOp, or a method of an
-            OCSClient
-        kwargs : dict, optional
-            Kwargs to pass to the operation
-        timeout : float, optional
-            Timeout for the wait command. This defaults to
-            ``default_wait_timeout`` which is 10 seconds. If this is set to
-            None, will wait indefinitely.
-        """
-        if kwargs is None:
-            kwargs = {}
-        if timeout is -1:
-            timeout = self.default_timeout
-        op.start(**kwargs)
-        status, msg, session = op.wait(timeout=timeout)
+                self._set_state(ControlState.WaitForTargetFreq(
+                    target_freq=self.state.target_freq,
+                    freq_tol=self.state.freq_tol,
+                    freq_tol_duration=self.state.freq_tol_duration
+                ))
+            
+            elif isinstance(self.state, ControlState.WaitForTargetFreq):
+                # Check if we are close enough to the target frequency.
+                # This will make sure we remain within the frequency threshold for
+                # ``self.freq_tol_duration`` seconds before switching to DONE
+                f = hwp_state.pid_current_freq
+                if f is None:
+                    self.state.freq_within_thresh_start = None
+                    return
+
+                if np.abs(f - self.state.target_freq) > self.state.freq_tol:
+                    self.state.freq_within_thresh_start = None
+                    return
+
+                # If within_thresh for freq_tol_duration, switch to Done
+                if self.state.freq_within_tol_start is None:
+                    self.state.freq_within_tol_start = time.time()
+
+                time_within_tol = time.time() - self.state.freq_within_tol_start
+                if time_within_tol > self.state.freq_tol_duration:
+                    self._set_state(ControlState.Done(success=True))
+
+            elif isinstance(self.state, ControlState.ConstVolt):
+                run_and_validate(clients.pmx.set_voltage,
+                                 kwargs={'voltage': self.state.voltage})
+                self._set_state(ControlState.Done(success=True))
+            
+            elif isinstance(self.state, ControlState.Brake):
+                pass
+
+            elif isinstance(self.state, ControlState.PmxOff):
+                pass
+
+        except Exception:
+            tb = traceback.format_exc()
+            self.log.error(f"Error updating state:\n{tb}")
+            self._set_state(ControlState.Error(traceback=tb))
+        finally:
+            self.lock.release()
     
-    def update(self, clients: HWPClients, hwp_state: HWPState):
-        """
-        Runs control operations and updates the control-state based on the
-        ``hwp_state`` object.
-
-        Args
-        --------
-        clients : HWPClients
-            Clients to use to control the HWP.
-        hwp_state : HWPState
-            Current state of the HWP.
-        """
-        if self.state_type == ControlStateType.NONE:
-            return
-
-        elif self.state_type == ControlStateType.PID_FREQ:
-            # Set the PID and then switch to WAIT_FOR_TARGET_FREQ
-            self.run_and_validate(clients.pid.set_direction,
-                                   kwargs={'direction': self.pid_dir})
-            self.run_and_validate(clients.pid.declare_freq, 
-                                   kwargs={'freq': self.target_freq})
-            self.run_and_validate(clients.pid.use_ext)
-            self.run_and_validate(clients.pid.set_on)
-            self.set_state_type(ControlStateType.WAIT_FOR_TARGET_FREQ)
-        
-        elif self.state_type == ControlStateType.PMX_OFF:
-            # Turn PMX off and then switch to WAIT_FOR_TARGET_FREQ
-            self.run_and_validate(clients.pid.set_off)
-            self.set_state_type(ControlStateType.WAIT_FOR_TARGET_FREQ)
-        
-        elif self.state_type == ControlStateType.WAIT_FOR_TARGET_FREQ:
-            # Check if we are close enough to the target frequency.
-            # This will make sure we remain within the frequency threshold for
-            # ``self.freq_thresh_duration`` seconds before switching to DONE
-            f = hwp_state.pid_current_freq
-            if f is not None:
-                # If within_thresh for freq_thresh_duration, switch to Done
-                if np.abs(f - self.target_freq) < self.freq_thresh:
-                    if self.freq_within_thresh_start is None:
-                        self.freq_within_thresh_start = time.time()
-                    elif time.time() - self.freq_within_thresh_start > self.freq_thresh_duration:
-                        self.set_state_type(ControlStateType.DONE, success=True)
-                else:
-                    self.freq_within_thresh_start = None
-            else:
-                self.freq_within_thresh_start = None
-
-        elif self.state_type == ControlStateType.CONST_VOLT:
-            # Set to constant voltage mode
-            clients.pmx.ign_ext()
-            self.run_and_validate(clients.pmx.ign_ext)
-            self.run_and_validate(clients.pmx.set_v,
-                                    kwargs={'voltage': self.voltage})
-            self.set_state_type(ControlStateType.DONE, success=True)
-
-        elif self.state_type == ControlStateType.BRAKE:
-            # Actively set the PID to brake the HWP
-            self.run_and_validate(clients.pid.tune_stop)
-            self.run_and_validate(clients.pid.use_ext)
-            self.run_and_validate(clients.pid.set_on)
-            self.set_state_type(ControlStateType.WAIT_FOR_TARGET_FREQ)
-
-    def encoded(self):
-        """Encodes ControlState as a dict"""
-        return {
-            'state_type': self.state_type.name,
-            'target_freq': self.target_freq,
-            'freq_thresh': self.freq_thresh,
-            'freq_thresh_duration': self.freq_thresh_duration,
-            'voltage': self.voltage,
-            'success': self.success,
-            'msg': self.msg,
-            'idx': self.idx,
-        }
+    def request_state(self, state):
+        with self.lock:
+            self._set_state(state)
+            return True
 
 class HWPSupervisor:
     """
@@ -469,7 +555,7 @@ class HWPSupervisor:
             temp_thresh=args.hwp_temp_thresh, 
             ups_minutes_remaining_thresh=args.ups_minutes_remaining_thresh,
         )
-        self.control_state = ControlState(ControlStateType.NONE)
+        self.control_state_machine = ControlStateMachine()
         self.forward_is_cw = args.forward_dir == 'cw'
 
     def _get_hwp_clients(self):
@@ -611,15 +697,14 @@ class HWPSupervisor:
         clients = self._get_hwp_clients()
 
         while session.status in ['starting', 'running']:
-            try:
-                self.control_state.update(clients, self.hwp_state)
-            except Exception:
-                msg = f"Error updating control state:\n{traceback.format_exc()}"
-                self.log.error(msg)
-                self.control_state.set_state_type(ControlStateType.ERROR, msg=msg)
+            self.control_state_machine.update(clients, self.hwp_state)
+
+            s = self.control_state_machine.state
+            state_dict = asdict(s)
+            state_dict['state_name'] = s.__class__.__name__
 
             session.data = {
-                'state': self.control_state.encoded(),
+                'state': state_dict,
                 'timestamp': time.time(),
             }
             time.sleep(1)
@@ -649,16 +734,19 @@ class HWPSupervisor:
         if params['target_freq'] >= 0:
             d = '0' if self.forward_is_cw else '1'
         else:
-            d = '1' if self.forward_is_cw else '1'
+            d = '1' if self.forward_is_cw else '0'
 
-        self.control_state = ControlState(
-            state_type=ControlStateType.PID_FREQ,
+        state = ControlState.PIDToFreq(
             target_freq=params['target_freq'],
             freq_thresh=params['freq_thresh'],
             freq_thresh_duration=params['freq_thresh_duration'],
-            pid_dir=d,
+            direction=d
         )
-        return True, f"Set state to {self.control_state.state_type.name}"
+        success = self.control_state_machine.request_state(state)
+        if success:
+            return True, f"Set state to {state}"
+        else:
+            return False, "Failed to update state"
 
     @ocs_agent.param('voltage', type=float)
     def set_const_voltage(self, session, params):
@@ -671,11 +759,12 @@ class HWPSupervisor:
         voltage : float
             Voltage to set the PMX to (V).
         """
-        self.control_state = ControlState(
-            state_type=ControlStateType.CONST_VOLT,
-            voltage=params['voltage'],
-        )
-        return True, f"Set state to {self.control_state.state_type.name}"
+        state = ControlState.ConstVolt(voltage=params['voltage'])
+        success = self.control_state_machine.request_state(state)
+        if success:
+            return True, f"Set state to {state}"
+        else:
+            return False, "Failed to update state"
     
     @ocs_agent.param('freq_thresh', type=float, default=0.05)
     @ocs_agent.param('freq_thresh_duration', type=float, default=10)
@@ -692,13 +781,15 @@ class HWPSupervisor:
             Duration (seconds) for which the HWP must be within ``freq_thresh`` of the
             ``target_freq`` to be considered successful.
         """
-        self.control_state = ControlState(
-            state_type=ControlStateType.BRAKE,
-            target_freq=0,
+        state = ControlState.Brake(
             freq_thresh=params['freq_thresh'],
             freq_thresh_duration=params['freq_thresh_duration']
         )
-        return True, f"Set state to {self.control_state.state_type.name}"
+        success = self.control_state_machine.request_state(state)
+        if success:
+            return True, f"Set state to {state}"
+        else:
+            return False, "Failed to update state"
 
     @ocs_agent.param('freq_thresh', type=float, default=0.05)
     @ocs_agent.param('freq_thresh_duration', type=float, default=10)
@@ -707,14 +798,12 @@ class HWPSupervisor:
 
         **Task** - Sets the control state to turn off the PMX.
         """
-        self.control_state = ControlState(
-            state_type=ControlStateType.PMX_OFF,
-            target_freq=0,
-            freq_thresh=params['freq_thresh'],
-            freq_thresh_duration=params['freq_thresh_duration']
-        )
-        return True, f"Set state to {self.control_state.state_type.name}"
-
+        state = ControlState.PmxOff()
+        success = self.control_state_machine.request_state(state)
+        if success:
+            return True, f"Set state to {state}"
+        else:
+            return False, "Failed to update state"
 
 def make_parser(parser=None):
     if parser is None:
