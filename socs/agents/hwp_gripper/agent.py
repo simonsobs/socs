@@ -29,10 +29,14 @@ class GripperAgent:
         supervisor_id (str): ID of HWP supervisor
         no_data_timeout (float): Time (in seconds) to wait between receiving
             'no_data' actions from the supervisor and triggering a shutdown
+        limit_pos (arr, float): Expected physical position of the limit switches in mm.
+            [Actuator 1 Cold, Actuator 1 Warm, Actuator 2, Cold, Actuator 2 Warm,
+             Actuator 3 Cold, Actuator 3 Warm]
     """
 
     def __init__(self, agent, mcu_ip, pru_port, control_port,
-                 return_port, supervisor_id=None, no_data_timeout=30 * 60):
+                 return_port, supervisor_id=None, no_data_timeout=30 * 60,
+                 limit_pos = [13.,10.,13.,10.,13.,10.]):
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
@@ -54,6 +58,7 @@ class GripperAgent:
         self.last_encoder = 0
         self.last_limit = 0
         self.last_limit_time = 0
+        self.limit_pos = limit_pos
         self.is_forced = False
 
         # The Beaglebone code periodically queries the status of six pins measuring the
@@ -96,11 +101,11 @@ class GripperAgent:
 
         # Variable to tell the code whether the cryostat is warm (False) or cold (True). Needs to be
         # given by the user
-        self.mode = multiprocessing.Value(ctypes.c_bool, False)
+        self.is_cold = multiprocessing.Value(ctypes.c_bool, False)
 
         # Variable to tell the code whether it should ignore any flags sent by the limit switches. If
         # this variable is False the actuators will only move while none of the active limit switches
-        # are triggered (which limit switches are chosen depends on self.mode)
+        # are triggered (which limit switches are chosen depends on self.is_cold)
         self.force = multiprocessing.Value(ctypes.c_bool, False)
 
         agg_params = {'frame_length': 60}
@@ -212,7 +217,25 @@ class GripperAgent:
                         elif params['distance'] < 0:
                             self.encoder_direction[chain] = -1
 
-            self.log.info(self.client.MOVE(params['mode'], params['actuator'], params['distance']))
+            cur_pos = self._get_pos()[2 * params['actuator'] - 2]
+            warm_limit_pos = self.limit_pos[2 * params['actuator'] - 1]
+            cold_limit_pos = self.limit_pos[2 * params['actuator'] - 2]
+            if cur_pos + params['distance'] > warm_limit_pos and not self.force and not self.is_cold:
+                self.log.warn('Move command beyond warm limit switch position')
+                dist = (warm_limit_pos - cur_pos) - (warm_limit_pos - cur_pos) % 0.1
+                if dist < 0:
+                    self.log.error('Actuator already beyond warm limit switch position')
+                    dist = 0
+            elif cur_pos + params['distance'] > cold_limit_pos and not self.force:
+                self.log.warn('Move command beyond cold limit switch position')
+                dist = (cold_limit_pos - cur_pos) - (cold_limit_pos - cur_pos) % 0.1
+                if dist < 0:
+                    self.log.error('Actuator already beyond cold limit switch position')
+                    dist = 0
+            else:
+                dist = params['distance']
+
+            self.log.info(self.client.MOVE(params['mode'], params['actuator'], dist))
 
             with self.encoder_edges_record.get_lock():
                 for chain in pru_chains:
@@ -307,8 +330,8 @@ class GripperAgent:
         return True, 'Queried actuator connection'
 
     @ocs_agent.param('value', default=False, type=bool)
-    def grip_mode(self, session, params=None):
-        """grip_mode(value = False)
+    def grip_is_cold(self, session, params=None):
+        """grip_is_cold(value = False)
         **Task** - Set the code to operate in warm/cold grip configuration
 
         Parameters:
@@ -318,13 +341,13 @@ class GripperAgent:
             Configures the software to query the correct set of limit switches. The
             maximum extension of the actuators depends on the cryostat temperature.
         """
-        with self.lock.acquire_timeout(0, job='grip_mode') as acquired:
+        with self.lock.acquire_timeout(0, job='grip_is_cold') as acquired:
             if not acquired:
                 self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            with self.mode.get_lock():
-                self.mode.value = params['value']
+            with self.is_cold.get_lock():
+                self.is_cold.value = params['value']
 
         return True, 'Changed temperature mode'
 
@@ -573,7 +596,7 @@ class GripperAgent:
             for index, pru in enumerate(self.limit_pru):
                 self.limit_state[index] = ((state & (1 << pru)) >> pru)
 
-            if (state and not self.mode.value) or self.limit_state[0] or self.limit_state[2] or self.limit_state[4]:
+            if (state and not self.is_cold.value) or self.limit_state[0] or self.limit_state[2] or self.limit_state[4]:
                 self.last_limit_time = time.time()
                 if self.force.value and not self.is_forced:
                     with self.lock.acquire_timeout(10, job='grip_limit_switches'):
@@ -583,17 +606,17 @@ class GripperAgent:
                     with self.lock.acquire_timeout(10, job='grip_limit_switches'):
                         self.last_limit = state
 
-                        if (self.limit_state[1] and not self.mode.value) or self.limit_state[0]:
+                        if (self.limit_state[1] and not self.is_cold.value) or self.limit_state[0]:
                             self.client.EMG(False, 1)
                         else:
                             self.client.EMG(True, 1)
 
-                        if (self.limit_state[3] and not self.mode.value) or self.limit_state[2]:
+                        if (self.limit_state[3] and not self.is_cold.value) or self.limit_state[2]:
                             self.client.EMG(False, 2)
                         else:
                             self.client.EMG(True, 2)
 
-                        if (self.limit_state[5] and not self.mode.value) or self.limit_state[4]:
+                        if (self.limit_state[5] and not self.is_cold.value) or self.limit_state[4]:
                             self.client.EMG(False, 3)
                         else:
                             self.client.EMG(True, 3)
@@ -684,6 +707,7 @@ def make_parser(parser=None):
     pgroup.add_argument('--no-data-timeout', type=float, default=45 * 60,
                         help="Time (sec) after which a 'no_data' action should "
                         "trigger a shutdown")
+    pgroup.add_argument('--limit_pos', help="Physical position of limit switches (mm)")
     return parser
 
 
@@ -720,7 +744,7 @@ def main(args=None):
     agent.register_task('grip_alarm', gripper_agent.grip_alarm)
     agent.register_task('grip_reset', gripper_agent.grip_reset)
     agent.register_task('grip_act', gripper_agent.grip_act)
-    agent.register_task('grip_mode', gripper_agent.grip_mode)
+    agent.register_task('grip_is_cold', gripper_agent.grip_is_cold)
     agent.register_task('grip_force', gripper_agent.grip_force)
     agent.register_task('grip_shutdown', gripper_agent.grip_shutdown)
     agent.register_task('grip_rev_shutdown', gripper_agent.grip_rev_shutdown)
