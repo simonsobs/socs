@@ -96,6 +96,7 @@ setup(
         'autobahn[serialization]',
         'numpy',
         'ocs',
+        'pyModbusTCP',
         'pyserial',
         'pysnmp-lextudio',
         'pysmi',
