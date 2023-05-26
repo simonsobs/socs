@@ -126,29 +126,23 @@ def update_cache(get_result, timestamp):
         Timestamp for when the SNMP GET was issued.
     """
     oid_cache = {}
+    # Return disconnected if SNMP response is empty
     if get_result is None:
         oid_cache['ups_connection'] = {'last_attempt': time.time(),
                                        'connected': False}
         return oid_cache
 
-    try:
-        for item in get_result:
-            field_name, oid_value, oid_description = _extract_oid_field_and_value(item)
-            if oid_value is None:
-                continue
+    for item in get_result:
+        field_name, oid_value, oid_description = _extract_oid_field_and_value(item)
+        if oid_value is None:
+            continue
 
-            # Update OID Cache for session.data
-            oid_cache[field_name] = {"status": oid_value}
-            oid_cache[field_name]["description"] = oid_description
-            oid_cache['ups_connection'] = {'last_attempt': time.time(),
-                                           'connected': True}
-            oid_cache['timestamp'] = timestamp
-    # This is a TypeError due to nothing coming back from the yield,
-    # so get_result is None here and can't be iterated.
-    except TypeError:
+        # Update OID Cache for session.data
+        oid_cache[field_name] = {"status": oid_value}
+        oid_cache[field_name]["description"] = oid_description
         oid_cache['ups_connection'] = {'last_attempt': time.time(),
-                                       'connected': False}
-        raise TypeError('Unable to interpret SNMP response.')
+                                        'connected': True}
+        oid_cache['timestamp'] = timestamp
 
     return oid_cache
 
