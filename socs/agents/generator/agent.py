@@ -3,7 +3,6 @@ import os
 import sys
 import time
 import warnings
-from typing import Optional
 
 import txaio
 import yaml
@@ -48,15 +47,20 @@ class ReadString(object):
 
     def build_reader_function(self, offset, rconfig):
         if rconfig['read_as'] == '16U':
-            def evaluator(registers): return registers[offset]
+            def evaluator(registers):
+                return registers[offset]
         elif rconfig['read_as'] == '16S':
-            def evaluator(registers): return twos(registers[offset], 2)
+            def evaluator(registers):
+                return twos(registers[offset], 2)
         elif rconfig['read_as'] == '32U':
-            def evaluator(registers): return interp_unsigned_double_reg(registers[offset], registers[offset + 1])
+            def evaluator(registers):
+                return interp_unsigned_double_reg(registers[offset], registers[offset + 1])
         elif rconfig['read_as'] == '32S':
-            def evaluator(registers): return interp_signed_double_reg(registers[offset], registers[offset + 1])
+            def evaluator(registers):
+                return interp_signed_double_reg(registers[offset], registers[offset + 1])
         else:
-            def evaluator(registers): return self.error_val
+            def evaluator(registers):
+                return self.error_val
 
         def process(registers):
             val = evaluator(registers)
@@ -260,7 +264,7 @@ class GeneratorAgent:
                             field_dict = {reg: regdata[reg]}
                             session.data['fields'].update(field_dict)
                     else:
-                        self.log.info(f'Connection error or error in processing data.')
+                        self.log.info('Connection error or error in processing data.')
                         self.initialized = False
                         time.sleep(1)
 
