@@ -10,7 +10,7 @@ The Generator Agent is an OCS Agent which monitors on-site generators via Modbus
 
 .. argparse::
     :filename: ../socs/agents/generator/agent.py
-    :func: add_agent_args
+    :func: make_parser
     :prog: python3 agent.py
 
 Configuration File Examples
