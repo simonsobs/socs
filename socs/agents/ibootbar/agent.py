@@ -128,30 +128,24 @@ def update_cache(get_result, names, timestamp):
         Timestamp for when the SNMP GET was issued.
     """
     oid_cache = {}
+    # Return disconnected if SNMP response is empty
     if get_result is None:
         oid_cache['ibootbar_connection'] = {'last_attempt': time.time(),
                                             'connected': False}
         return oid_cache
 
-    try:
-        for item in get_result:
-            field_name, oid_value, oid_description = _extract_oid_field_and_value(item)
-            if oid_value is None:
-                continue
+    for item in get_result:
+        field_name, oid_value, oid_description = _extract_oid_field_and_value(item)
+        if oid_value is None:
+            continue
 
-            # Update OID Cache for session.data
-            oid_cache[field_name] = {"status": oid_value}
-            oid_cache[field_name]["name"] = names[int(field_name[-1])]
-            oid_cache[field_name]["description"] = oid_description
-            oid_cache['ibootbar_connection'] = {'last_attempt': time.time(),
-                                                'connected': True}
-            oid_cache['timestamp'] = timestamp
-    # This is a TypeError due to nothing coming back from the yield,
-    # so get_result is None here and can't be iterated.
-    except TypeError:
+        # Update OID Cache for session.data
+        oid_cache[field_name] = {"status": oid_value}
+        oid_cache[field_name]["name"] = names[int(field_name[-1])]
+        oid_cache[field_name]["description"] = oid_description
         oid_cache['ibootbar_connection'] = {'last_attempt': time.time(),
-                                            'connected': False}
-        raise TypeError('Unable to interpret SNMP response.')
+                                            'connected': True}
+        oid_cache['timestamp'] = timestamp
 
     return oid_cache
 
@@ -244,6 +238,7 @@ class ibootbarAgent:
              'address': '10.10.10.50'}
         """
         # Set initial default outlet names
+        # Note outlets are numbered 1-8 physically on ibootbars, OIDs are numbered 0-7
         names = ['Outlet-1', 'Outlet-2', 'Outlet-3', 'Outlet-4',
                  'Outlet-5', 'Outlet-6', 'Outlet-7', 'Outlet-8']
 
@@ -323,7 +318,7 @@ class ibootbarAgent:
         Parameters
         ----------
         outlet : int
-            Index of outlet to set
+            Outlet number to set. Choices are 1-8 (physical outlets), corresponding to 0-7 index for OIDs
         state : str
             State to set outlet to
         """
@@ -364,7 +359,7 @@ class ibootbarAgent:
         Parameters
         ----------
         outlet : int
-            Index of outlet to cycle
+            Outlet number to cycle. Choices are 1-8 (physical outlets), corresponding to 0-7 index for OIDs
         cycle_time : int
             The amount of seconds to cycle an outlet. Default is 10 seconds.
         """
@@ -431,7 +426,7 @@ class ibootbarAgent:
         Parameters
         ----------
         outlet : int
-            Index of outlet to lock/unlock
+            Outlet number to lock/unlock. Choices are 1-8 (physical outlets), corresponding to 0-7 index for OIDs
         lock : bool
             Set to true to lock, set to false to unlock
         """
