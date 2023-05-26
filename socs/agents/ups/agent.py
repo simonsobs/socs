@@ -141,7 +141,7 @@ def update_cache(get_result, timestamp):
         oid_cache[field_name] = {"status": oid_value}
         oid_cache[field_name]["description"] = oid_description
         oid_cache['ups_connection'] = {'last_attempt': time.time(),
-                                        'connected': True}
+                                       'connected': True}
         oid_cache['timestamp'] = timestamp
 
     return oid_cache
