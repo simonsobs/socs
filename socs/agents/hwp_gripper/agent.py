@@ -142,7 +142,7 @@ class GripperAgent:
     def grip_power(self, session, params=None):
         """grip_power(state = True)
         **Task** - Turns on/off power to the linear actuators. If brakes are on/off, turn them off/on
-        
+
         Parameters:
             state (bool): State to set the actuator power to. Takes bool input
         """
