@@ -126,24 +126,23 @@ def update_cache(get_result, timestamp):
         Timestamp for when the SNMP GET was issued.
     """
     oid_cache = {}
-    try:
-        for item in get_result:
-            field_name, oid_value, oid_description = _extract_oid_field_and_value(item)
-            if oid_value is None:
-                continue
-
-            # Update OID Cache for session.data
-            oid_cache[field_name] = {"status": oid_value}
-            oid_cache[field_name]["description"] = oid_description
-            oid_cache['ups_connection'] = {'last_attempt': time.time(),
-                                           'connected': True}
-            oid_cache['timestamp'] = timestamp
-    # This is a TypeError due to nothing coming back from the yield,
-    # so get_result is None here and can't be iterated.
-    except TypeError:
+    # Return disconnected if SNMP response is empty
+    if get_result is None:
         oid_cache['ups_connection'] = {'last_attempt': time.time(),
                                        'connected': False}
-        raise ConnectionError('No SNMP response. Check your connection.')
+        return oid_cache
+
+    for item in get_result:
+        field_name, oid_value, oid_description = _extract_oid_field_and_value(item)
+        if oid_value is None:
+            continue
+
+        # Update OID Cache for session.data
+        oid_cache[field_name] = {"status": oid_value}
+        oid_cache[field_name]["description"] = oid_description
+        oid_cache['ups_connection'] = {'last_attempt': time.time(),
+                                       'connected': True}
+        oid_cache['timestamp'] = timestamp
 
     return oid_cache
 
@@ -306,6 +305,7 @@ class UPSAgent:
                 Units:: Watts
         """
 
+        session.set_status('running')
         self.is_streaming = True
         while self.is_streaming:
             yield dsleep(1)
@@ -369,8 +369,11 @@ class UPSAgent:
                 # Update session.data
                 session.data = update_cache(get_result, read_time)
                 self.log.debug("{data}", data=session.data)
-                self.lastGet = time.time()
 
+                if get_result is None:
+                    raise ConnectionError('No SNMP response. Check your connection.')
+
+                self.lastGet = time.time()
                 # Publish to feed
                 message = _build_message(get_result, read_time)
                 self.log.debug("{msg}", msg=message)
@@ -389,8 +392,12 @@ class UPSAgent:
         """_stop_acq()
         **Task** - Stop task associated with acq process.
         """
-        self.is_streaming = False
-        return True, "Stopping Recording"
+        if self.is_streaming:
+            session.set_status('stopping')
+            self.is_streaming = False
+            return True, "Stopping Recording"
+        else:
+            return False, "Acq is not currently running"
 
 
 def add_agent_args(parser=None):
