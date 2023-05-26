@@ -113,7 +113,7 @@ class GripperAgent:
         self.agent.register_feed('gripper_action', record=True)
 
     @ocs_agent.param('auto_acquire', default=True, type=bool)
-    def init_processes(self, session, params):
+    def init_connection(self, session, params):
         """init_connection(auto_acquire=False)
         **Task** - Initialize connection to the Beaglebone microcontroller
 
@@ -140,8 +140,11 @@ class GripperAgent:
 
     @ocs_agent.param('state', default=True, type=bool)
     def grip_power(self, session, params=None):
-        """grip_power()
+        """grip_power(state = True)
         **Task** - Turns on/off power to the linear actuators. If brakes are on/off, turn them off/on
+        
+        Parameters:
+            state (bool): State to set the actuator power to. Takes bool input
         """
         with self.lock.acquire_timeout(0, job='grip_power') as acquired:
             if not acquired:
@@ -158,12 +161,11 @@ class GripperAgent:
     @ocs_agent.param('state', default=True, type=bool)
     @ocs_agent.param('actuator', default=0, type=int, check=lambda x: 0 <= x <= 3)
     def grip_brake(self, session, params=None):
-        """grip_brake(state = 'OFF', actuator = 0)
+        """grip_brake(state = True, actuator = 0)
         **Task** - Controls actuator brakes
 
         Parameters:
-            state (str): State to set the actuator brake to. Takes input of 'ON' or
-                'OFF' but case doesn't matter
+            state (bool): State to set the actuator brake to. Takes bool input
             actuator (int): Actuator number. Takes input of 0-3 with 1-3 controlling
                 and individual actuator and 0 controlling all three
         """
@@ -179,19 +181,19 @@ class GripperAgent:
 
         return True, 'Changed brake state'
 
-    @ocs_agent.param('mode', default='PUSH', type=str)
+    @ocs_agent.param('mode', default='push', type=str, choices=['push', 'pos'])
     @ocs_agent.param('actuator', default=1, type=int, check=lambda x: 1 <= x <= 3)
     @ocs_agent.param('distance', default=0, type=float, check=lambda x: -10. <= x <= 10.)
     def grip_move(self, session, params=None):
-        """grip_move(mode = 'POS', actuator = 1, distance = 1.3)
+        """grip_move(mode = 'pos', actuator = 1, distance = 1.3)
         **Task** - Move an actuator a specific distance
 
         Parameters:
-            mode (str): Movement mode. Takes inputs of 'POS' (positioning) or
-                'PUSH' (pushing) but case doesn't matter
+            mode (str): Movement mode. Takes inputs of 'pos' (positioning) or
+                'push' (pushing)
             actuator (int): Actuator number 1-3
             distance (float): Distance to move. Takes positive and negative numbers
-                for 'POS' mode. Takes only positive numbers for 'PUSH' mode. Value
+                for 'pos' mode. Takes only positive numbers for 'push' mode. Value
                 should be a multiple of 0.1
 
         Notes:
@@ -674,20 +676,6 @@ class GripperAgent:
         slope = 1 / 160.
         return [rising_edges * slope for rising_edges in self.encoder_edges]
 
-    def _wait_for_responce(self, timeout=10):
-        """
-        Wait for a responce from the Beaglebone after issuing a command
-        """
-        start = time.time()
-        while time.time() - start < timeout:
-            if self.command_responce.value == 3:
-                pass
-            else:
-                return self.command_responce.value
-            time.sleep(0.1)
-
-        return self.command_responce.value
-
 
 def make_parser(parser=None):
     if parser is None:
@@ -734,7 +722,7 @@ def main(args=None):
                            gripper_agent._stop_collect_pru)
     agent.register_process('grip_build_pru', gripper_agent.grip_build_pru,
                            gripper_agent._stop_build_pru)
-    agent.register_task('init_processes', gripper_agent.init_processes,
+    agent.register_task('init_connection', gripper_agent.init_connection,
                         startup=init_params)
     agent.register_task('grip_power', gripper_agent.grip_power)
     agent.register_task('grip_brake', gripper_agent.grip_brake)
