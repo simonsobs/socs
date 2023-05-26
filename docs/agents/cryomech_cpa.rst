@@ -9,8 +9,8 @@ Cryomech CPA Agent
 The Cryomech CPA compressor is a commonly used compressor model for the
 pulse tubes within SO. The CPA Agent interfaces with the compressor over
 ethernet to monitor the health of the unit, including stats such as Helium
-temperature and pressure, oil temperature, and more. Control is not yet
-implemented.
+temperature and pressure, oil temperature, and more. The Agent can also
+remotely start and stop the compressor.
 
 .. argparse::
     :filename: ../socs/agents/cryomech_cpa/agent.py
