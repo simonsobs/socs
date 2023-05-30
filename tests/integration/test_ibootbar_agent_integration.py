@@ -97,8 +97,8 @@ def test_ibootbar_cycle_outlet(wait_for_crossbar, start_responder, run_agent, cl
 
 @pytest.mark.integtest
 def test_ibootbar_lock_outlet(wait_for_crossbar, start_responder, run_agent, client):
-    resp = client.lock_outlet(outlet=1, lock=True)
-    check_resp_success(resp)
-
     resp = client.set_outlet(outlet=1, state="off")
     assert resp.session["op_code"] == OpCode.FAILED.value
+
+    resp = client.lock_outlet(outlet=1, lock=False)
+    check_resp_success(resp)

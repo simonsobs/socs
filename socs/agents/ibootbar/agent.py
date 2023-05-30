@@ -184,9 +184,7 @@ class ibootbarAgent:
         self.lock = TimeoutLock()
 
         # Initialize with locked outlets if given in args
-        self.outlet_locked = []
-        for i in range(8):
-            self.outlet_locked.append(False)
+        self.outlet_locked = [False for i in range(8)]
         if lock_outlet is not None:
             for i in range(8):
                 if i + 1 in lock_outlet:
@@ -439,8 +437,6 @@ class ibootbarAgent:
                 self.outlet_locked[outlet] = True
             elif not params['lock']:
                 self.outlet_locked[outlet] = False
-            else:
-                return False, 'No valid lock state provided.'
 
         return True, 'Set outlet {} lock to {}'.\
             format(params['outlet'], params['lock'])
