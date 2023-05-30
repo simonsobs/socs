@@ -614,7 +614,7 @@ class HWPSupervisor:
         self.ups_id = args.ups_id
 
         self.hwp_state = HWPState(
-            temp_field = self.ybco_temp_field,
+            temp_field=self.ybco_temp_field,
             temp_thresh=args.ybco_temp_thresh,
             ups_minutes_remaining_thresh=args.ups_minutes_remaining_thresh,
         )
