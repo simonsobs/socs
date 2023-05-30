@@ -342,21 +342,24 @@ class HWPPMXAgent:
                 return False, "Could not acquire lock."
 
             self.shutdown_mode = True
-            self.dev.ign_external_voltage()
             self.dev.turn_off()
 
-    def reverse_shutdown(self, session, params):
-        """reverse_shutdown()
+    def cancel_shutdown(self, session, params):
+        """cancel_shutdown()
 
-        **Task** - Reverses shutdown mode, allowing other tasks to update the power supply
+        **Task** - Cancels shutdown mode, allowing other tasks to update the power supply
         """
         self.shutdown_mode = False
-        return True, "Reversed shutdown mode"
+        return True, "Cancelled shutdown mode"
 
-    def monitor_shutdown(self, session, params):
-        """monitor_shutdown()
+    def monitor_supervisor(self, session, params):
+        """monitor_supervisor()
 
-        **Process** - Monitor the shutdown of the agent.
+        **Process** - This is a process that is constantly running to monitor the
+        HWP supervisor and the recommended course of action
+        course of action recommended by the HWP supervisor. If certain conditions
+        are met, this will trigger a shutdown and force the power supply to
+        power off.
         """
 
         session.set_status('running')
@@ -403,9 +406,9 @@ class HWPPMXAgent:
 
             time.sleep(0.2)
 
-        return True, 'PMX Kikusui monitor shutdown.'
+        return True, 'Supervisor monitor has exited.'
 
-    def _stop_monitor_shutdown(self, session, params):
+    def _stop_monitor_supervisor(self, session, params):
         session.set_status('stopping')
         return True, "Stopping monitor shutdown."
 
@@ -455,7 +458,7 @@ def main(args=None):
     agent.register_task('init_connection', PMX.init_connection, startup=init_params)
     agent.register_process('acq', PMX.acq, PMX._stop_acq)
     agent.register_process(
-        'monitor_shutdown', PMX.monitor_shutdown, PMX._stop_monitor_shutdown,
+        'monitor_supervisor', PMX.monitor_supervisor, PMX._stop_monitor_supervisor,
         startup=True)
     agent.register_task('set_on', PMX.set_on)
     agent.register_task('set_off', PMX.set_off)
@@ -467,7 +470,7 @@ def main(args=None):
     agent.register_task('use_ext', PMX.use_ext)
     agent.register_task('ign_ext', PMX.ign_ext)
     agent.register_task('initiate_shutdown', PMX.initiate_shutdown)
-    agent.register_task('reverse_shutdown', PMX.reverse_shutdown)
+    agent.register_task('cancel_shutdown', PMX.cancel_shutdown)
     runner.run(agent, auto_reconnect=True)
 
 
