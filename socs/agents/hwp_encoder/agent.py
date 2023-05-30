@@ -498,6 +498,8 @@ class HWPBBBAgent:
         self.rising_edge_count = 0
         self.irig_time = 0
 
+        self.last_quad = None
+
         agg_params = {'frame_length': 60}
         self.agent.register_feed('HWPEncoder', record=True,
                                  agg_params=agg_params)
@@ -612,6 +614,8 @@ class HWPBBBAgent:
                         data['timestamps'] = received_time_list
                         data['data']['quad'] = quad_list
                         self.agent.publish_to_feed('HWPEncoder', data)
+                        if quad_list:
+                            self.last_quad = quad_list[-1]
 
                         # Publishing counter data
                         # (full sampled data will not be recorded in influxdb)
@@ -664,7 +668,9 @@ class HWPBBBAgent:
 
                 data_cache['approx_hwp_freq'] = self.hwp_freq
                 data_cache['encoder_last_updated'] = self.ct
+                data_cache['last_quad'] = self.last_quad
                 session.data.update(data_cache)
+
 
         self.agent.feeds['HWPEncoder'].flush_buffer()
         return True, 'Acquisition exited cleanly.'

@@ -129,6 +129,7 @@ class HWPState:
     pmx_last_updated: Optional[float] = None
 
     enc_freq: Optional[float] = None
+    last_quad: Optional[float] = None
 
     def _update_from_keymap(self, op, keymap):
         if op['status'] != 'ok':
@@ -149,7 +150,10 @@ class HWPState:
             Dict containing the operations (from get_op_data) from the encoder
             ``acq`` process
         """
-        self._update_from_keymap(op, {'enc_freq': 'approx_hwp_freq'})
+        self._update_from_keymap(op, {
+            'enc_freq': 'approx_hwp_freq',
+            'last_quad': 'last_quad',
+        })
 
     def update_temp_state(self, op):
         """
@@ -411,6 +415,23 @@ class ControlState:
         freq_tol_duration: float
         start_time: float = field(default_factory=time.time)
 
+
+    @dataclass
+    class WaitForBrake:
+        """
+        Waits until the HWP has slowed before shutting off PMX
+
+        min_freq : float
+            Frequency (Hz) below which the PMX should be shut off.
+        init_quad : float
+            Initial quadrature reading while the HWP is spinning.  This is used
+            to determine if the HWP has reversed direction.
+        """
+        min_freq: float
+        init_quad: float
+        start_time: float = field(default_factory=time.time)
+
+    @dataclass
     class PmxOff:
         """
         Turns off the PMX
@@ -516,16 +537,29 @@ class ControlStateMachine:
                 ))
 
             elif isinstance(self.state, ControlState.Brake):
+                init_quad = hwp_state.last_quad
                 run_and_validate(clients.pid.tune_stop)
                 run_and_validate(clients.pmx.use_ext)
                 run_and_validate(clients.pmx.set_on)
-                self._set_state(ControlState.WaitForTargetFreq(
-                    target_freq=0,
-                    freq_tol=self.state.freq_tol,
-                    freq_tol_duration=self.state.freq_tol_duration,
+                self._set_state(ControlState.WaitForBrake(
+                    init_quad=init_quad,
+                    min_freq=0.5
                 ))
-                # TODO: Implement state to wait until HWP has stopped or reversed
-                # before shutting PMX off.
+
+            elif isinstance(self.state, ControlState.WaitForBrake):
+                quad = hwp_state.last_quad
+                freq = hwp_state.enc_freq
+
+                quad_diff = np.abs(quad - self.state.init_quad)
+                if freq < self.state.min_freq or quad_diff > 0.1:
+                    run_and_validate(clients.pmx.set_off)
+                    self._set_state(ControlState.WaitForTargetFreq(
+                        target_freq=0,
+                        freq_tol=0.1,
+                        freq_tol_duration=10,
+                    ))
+            
+
 
         except Exception:
             tb = traceback.format_exc()
