@@ -264,7 +264,7 @@ class HWPState:
             if min_remaining < min_remaining_thresh:
                 return 'stop'
 
-        # If either hwp_temp or ups state is None, return no_data
+        # If either ybco_temp or ups state is None, return no_data
         if self.temp is None and (self.temp_thresh is not None):
             return 'no_data'
 
@@ -366,6 +366,7 @@ class ControlState:
             Time that the state was entered
         """
         voltage: float
+        direction: str
         start_time: float = field(default_factory=time.time)
 
     @dataclass
@@ -468,8 +469,8 @@ class ControlStateMachine:
                                  kwargs={'direction': self.state.direction})
                 run_and_validate(clients.pid.declare_freq,
                                  kwargs={'freq': self.state.target_freq})
-                run_and_validate(clients.pid.use_ext)
-                run_and_validate(clients.pid.set_on)
+                run_and_validate(clients.pmx.use_ext)
+                run_and_validate(clients.pmx.set_on)
 
                 self._set_state(ControlState.WaitForTargetFreq(
                     target_freq=self.state.target_freq,
@@ -499,6 +500,9 @@ class ControlStateMachine:
                     self._set_state(ControlState.Done(success=True))
 
             elif isinstance(self.state, ControlState.ConstVolt):
+                run_and_validate(clients.pid.set_direction,
+                                 kwargs={'direction', self.state.direction})
+                run_and_validate(clients.pmx.ign_ext)
                 run_and_validate(clients.pmx.set_voltage,
                                  kwargs={'voltage': self.state.voltage})
                 self._set_state(ControlState.Done(success=True))
@@ -513,8 +517,8 @@ class ControlStateMachine:
 
             elif isinstance(self.state, ControlState.Brake):
                 run_and_validate(clients.pid.tune_stop)
-                run_and_validate(clients.pid.use_ext)
-                run_and_validate(clients.pid.set_on)
+                run_and_validate(clients.pmx.use_ext)
+                run_and_validate(clients.pmx.set_on)
                 self._set_state(ControlState.WaitForTargetFreq(
                     target_freq=0,
                     freq_tol=self.state.freq_tol,
@@ -567,8 +571,8 @@ class HWPSupervisor:
         self.log = agent.log
 
         self.hwp_lakeshore_id = args.hwp_lakeshore_id
-        self.hwp_temp_field = args.hwp_temp_field
-        self.hwp_temp_thresh = args.hwp_temp_thresh
+        self.ybco_temp_field = args.ybco_temp_field
+        self.ybco_temp_thresh = args.ybco_temp_thresh
 
         self.hwp_encoder_id = args.hwp_encoder_id
         self.hwp_pmx_id = args.hwp_pmx_id
@@ -576,7 +580,8 @@ class HWPSupervisor:
         self.ups_id = args.ups_id
 
         self.hwp_state = HWPState(
-            temp_thresh=args.hwp_temp_thresh,
+            temp_field = self.ybco_temp_field,
+            temp_thresh=args.ybco_temp_thresh,
             ups_minutes_remaining_thresh=args.ups_minutes_remaining_thresh,
         )
         self.control_state_machine = ControlStateMachine()
@@ -616,7 +621,7 @@ class HWPSupervisor:
           session data. See the docs for the ``get_op_data`` function for information on
           what info will be saved.
         - Parse session-data from monitored operations to create the ``state`` dict,
-          containing info such as ``hwp_temp`` and ``hwp_freq``.
+          containing info such as ``ybco_temp`` and ``hwp_freq``.
         - Determine subsystem actions based on the HWP state, which will be stored in
           the ``actions`` dict which can be read by hwp subsystems to initiate a
           shutdown
@@ -641,9 +646,9 @@ class HWPSupervisor:
                 # State data parsed from monitored sessions
                 'state': {
                     'hwp_freq': None,
-                    'hwp_temp': 20.0,
-                    'hwp_temp_status': 'ok',  # `no_data`, `ok`, or `over`
-                    'hwp_temp_thresh': 75.0,
+                    'ybco_temp': 20.0,
+                    'ybco_temp_status': 'ok',  # `no_data`, `ok`, or `over`
+                    'ybco_temp_thresh': 75.0,
                     'ups_battery_current': 0,
                     'ups_battery_voltage': 136,
                     'ups_estimated_minutes_remaining': 50,
@@ -748,7 +753,9 @@ class HWPSupervisor:
         Args
         -------
         target_freq : float
-            Target frequency of the HWP (Hz). Positive values are CW, negative are CCW.
+            Target frequency of the HWP (Hz). This is aa signed float where
+            positive values correspond to counter-clockwise motion, as seen when
+            looking at the cryostat from the sky.
         freq_thresh : float
             Frequency threshold (Hz) for determining when the HWP is at the target frequency.
         freq_thresh_duration : float
@@ -762,8 +769,8 @@ class HWPSupervisor:
 
         state = ControlState.PIDToFreq(
             target_freq=params['target_freq'],
-            freq_thresh=params['freq_thresh'],
-            freq_thresh_duration=params['freq_thresh_duration'],
+            freq_tol=params['freq_tol'],
+            freq_tol_duration=params['freq_tol_duration'],
             direction=d
         )
         success = self.control_state_machine.request_state(state)
@@ -773,6 +780,7 @@ class HWPSupervisor:
             return False, "Failed to update state"
 
     @ocs_agent.param('voltage', type=float)
+    @ocs_agent.param('direction', type=str, choices=['cw', 'ccw'], default='cw')
     def set_const_voltage(self, session, params):
         """set_const_voltage(voltage=1.0)
 
@@ -782,8 +790,19 @@ class HWPSupervisor:
         -------
         voltage : float
             Voltage to set the PMX to (V).
+        direction : str
+            Direction of the HWP. Must be one of ``cw`` or ``ccw``,
+            corresponding to the clockwise and counter-clockwise directions of
+            the HWP, as seen when looking at the cryostat from the sky.
         """
-        state = ControlState.ConstVolt(voltage=params['voltage'])
+        if params['direction'] == 'cw':
+            d = '0' if self.forward_is_cw else '1'
+        else:
+            d = '1' if self.forward_is_cw else '0'
+        state = ControlState.ConstVolt(
+            voltage=params['voltage'],
+            direction=d
+        )
         success = self.control_state_machine.request_state(state)
         if success:
             return True, f"Set state to {state}"
