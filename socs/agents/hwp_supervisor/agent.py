@@ -59,7 +59,7 @@ def get_op_data(agent_id, op_name, log=None, test_mode=False):
         - ``ok``: Operation and session.data exist
     """
     if log is None:
-        log = txaio.make_logger()
+        log = txaio.make_logger()  # pylint: disable=E1101
 
     data = {
         'agent_id': agent_id,
@@ -331,7 +331,7 @@ class ControlState:
     class WaitForTargetFreq:
         """
         Wait until HWP reaches its target frequency before transitioning to
-        the Done state
+        the Done state.
 
         Attributes
         -----------
@@ -350,7 +350,7 @@ class ControlState:
         target_freq: float
         freq_tol: float
         freq_tol_duration: float
-        freq_within_thresh_start: Optional[float] = None
+        freq_within_tol_start: Optional[float] = None
         start_time: float = field(default_factory=time.time)
 
     @dataclass
@@ -419,6 +419,8 @@ class ControlState:
         start_time : float
             Time that the state was entered
         """
+        freq_tol: float
+        freq_tol_duration: float
         start_time: float = field(default_factory=time.time)
 
 
@@ -449,7 +451,7 @@ def run_and_validate(op, kwargs=None, timeout=10):
 class ControlStateMachine:
     def __init__(self):
         self.state = ControlState.Idle()
-        self.log = txaio.make_logger()
+        self.log = txaio.make_logger()  # pylint: disable=E1101
         self.lock = threading.Lock()
 
     def _set_state(self, state):
@@ -457,8 +459,10 @@ class ControlStateMachine:
         self.state = state
 
     def update(self, clients, hwp_state):
+        """Run the next series of actions for the current state"""
         try:
             self.lock.acquire()
+
             if isinstance(self.state, ControlState.PIDToFreq):
                 run_and_validate(clients.pid.set_direction,
                                  kwargs={'direction': self.state.direction})
@@ -479,14 +483,14 @@ class ControlStateMachine:
                 # ``self.freq_tol_duration`` seconds before switching to DONE
                 f = hwp_state.pid_current_freq
                 if f is None:
-                    self.state.freq_within_thresh_start = None
+                    self.state.freq_within_tol_start = None
                     return
 
                 if np.abs(f - self.state.target_freq) > self.state.freq_tol:
-                    self.state.freq_within_thresh_start = None
+                    self.state.freq_within_tol_start = None
                     return
 
-                # If within_thresh for freq_tol_duration, switch to Done
+                # If within tolerance for freq_tol_duration, switch to Done
                 if self.state.freq_within_tol_start is None:
                     self.state.freq_within_tol_start = time.time()
 
@@ -499,11 +503,25 @@ class ControlStateMachine:
                                  kwargs={'voltage': self.state.voltage})
                 self._set_state(ControlState.Done(success=True))
 
-            elif isinstance(self.state, ControlState.Brake):
-                pass
-
             elif isinstance(self.state, ControlState.PmxOff):
-                pass
+                run_and_validate(clients.pid.set_off)
+                self._set_state(ControlState.WaitForTargetFreq(
+                    target_freq=0,
+                    freq_tol=self.state.freq_tol,
+                    freq_tol_duration=self.state.freq_tol_duration,
+                ))
+
+            elif isinstance(self.state, ControlState.Brake):
+                run_and_validate(clients.pid.tune_stop)
+                run_and_validate(clients.pid.use_ext)
+                run_and_validate(clients.pid.set_on)
+                self._set_state(ControlState.WaitForTargetFreq(
+                    target_freq=0,
+                    freq_tol=self.state.freq_tol,
+                    freq_tol_duration=self.state.freq_tol_duration,
+                ))
+                # TODO: Implement state to wait until HWP has stopped or reversed
+                # before shutting PMX off.
 
         except Exception:
             tb = traceback.format_exc()
@@ -772,8 +790,8 @@ class HWPSupervisor:
         else:
             return False, "Failed to update state"
 
-    @ocs_agent.param('freq_thresh', type=float, default=0.05)
-    @ocs_agent.param('freq_thresh_duration', type=float, default=10)
+    @ocs_agent.param('freq_tol', type=float, default=0.05)
+    @ocs_agent.param('freq_tol_duration', type=float, default=10)
     def brake(self, session, params):
         """brake(freq_thresh=0.05, freq_thresh_duration=10)
 
@@ -788,8 +806,8 @@ class HWPSupervisor:
             ``target_freq`` to be considered successful.
         """
         state = ControlState.Brake(
-            freq_thresh=params['freq_thresh'],
-            freq_thresh_duration=params['freq_thresh_duration']
+            freq_tol=params['freq_tol'],
+            freq_tol_duration=params['freq_tol_duration']
         )
         success = self.control_state_machine.request_state(state)
         if success:
@@ -797,14 +815,17 @@ class HWPSupervisor:
         else:
             return False, "Failed to update state"
 
-    @ocs_agent.param('freq_thresh', type=float, default=0.05)
-    @ocs_agent.param('freq_thresh_duration', type=float, default=10)
+    @ocs_agent.param('freq_tol', type=float, default=0.05)
+    @ocs_agent.param('freq_tol_duration', type=float, default=10)
     def pmx_off(self, session, params):
         """pmx_off()
 
         **Task** - Sets the control state to turn off the PMX.
         """
-        state = ControlState.PmxOff()
+        state = ControlState.PmxOff(
+            freq_tol=params['freq_tol'],
+            freq_tol_duration=params['freq_tol_duration']
+        )
         success = self.control_state_machine.request_state(state)
         if success:
             return True, f"Set state to {state}"
