@@ -671,7 +671,6 @@ class HWPBBBAgent:
                 data_cache['last_quad'] = self.last_quad
                 session.data.update(data_cache)
 
-
         self.agent.feeds['HWPEncoder'].flush_buffer()
         return True, 'Acquisition exited cleanly.'
 

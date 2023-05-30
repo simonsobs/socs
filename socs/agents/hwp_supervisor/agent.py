@@ -415,7 +415,6 @@ class ControlState:
         freq_tol_duration: float
         start_time: float = field(default_factory=time.time)
 
-
     @dataclass
     class WaitForBrake:
         """
@@ -558,8 +557,6 @@ class ControlStateMachine:
                         freq_tol=0.1,
                         freq_tol_duration=10,
                     ))
-            
-
 
         except Exception:
             tb = traceback.format_exc()
