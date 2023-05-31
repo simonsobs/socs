@@ -1,7 +1,7 @@
 import errno
+import pickle as pkl
 import select
 import socket
-import pickle as pkl
 
 
 class GripperClient(object):
@@ -91,9 +91,9 @@ class GripperClient(object):
         return self.send_command('ACT ' + str(actuator))
 
     def send_command(self, command):
-        if type(command) == str:
+        if isinstance(command, str):
             self.s.sendall(bytes(command, 'utf-8'))
-        elif type(command) == bytes:
+        elif isinstance(command, bytes):
             self.s.sendall(command)
 
         return pkl.loads(self.s.recv(4096))
