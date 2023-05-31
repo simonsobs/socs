@@ -10,6 +10,7 @@ import traceback
 
 import numpy as np
 import txaio
+import ocs
 from ocs import client_http, ocs_agent, site_config
 from ocs.client_http import ControlClientError
 from ocs.ocs_client import OCSClient, OCSReply
@@ -445,38 +446,59 @@ class ControlState:
         start_time: float = field(default_factory=time.time)
 
 
-def run_and_validate(op, kwargs=None, timeout=10):
-    """
-    Runs an OCS Operation, and validates that it was successful.
-
-    Args
-    -------
-    op : OCS MatchedOp
-        Operation to run. This must be a MatchedOp, or a method of an
-        OCSClient
-    kwargs : dict, optional
-        Kwargs to pass to the operation
-    timeout : float, optional
-        Timeout for the wait command. This defaults to
-        ``default_wait_timeout`` which is 10 seconds. If this is set to
-        None, will wait indefinitely.
-    """
-    if kwargs is None:
-        kwargs = {}
-
-    op.start(**kwargs)
-    status, msg, session = op.wait(timeout=timeout)
-    return
 
 
 class ControlStateMachine:
-    def __init__(self):
+    def __init__(self, pmx_v_lim=None, pmx_i_lim=None):
         self.state = ControlState.Idle()
         self.log = txaio.make_logger()  # pylint: disable=E1101
         self.lock = threading.Lock()
+        self.pmx_v_lim = pmx_v_lim
+        self.pmx_i_lim = pmx_i_lim
+
+    def run_and_validate(self, op, kwargs=None, timeout=10, log=None):
+        """
+        Runs an OCS Operation, and validates that it was successful.
+
+        Args
+        -------
+        op : OCS MatchedOp
+            Operation to run. This must be a MatchedOp, or a method of an
+            OCSClient
+        kwargs : dict, optional
+            Kwargs to pass to the operation
+        timeout : float, optional
+            Timeout for the wait command. This defaults to
+            ``default_wait_timeout`` which is 10 seconds. If this is set to
+            None, will wait indefinitely.
+        """
+        if kwargs is None:
+            kwargs = {}
+        
+        status, msg, session = op.start(**kwargs)
+
+        if status == ocs.ERROR:
+            raise ControlClientError("op-start returned Error:\n  msg: " + msg)
+
+        if status == ocs.TIMEOUT:
+            raise ControlClientError(f"op-start timed out")
+
+        status, msg, session = op.wait(timeout=timeout)
+
+        if status == ocs.ERROR:
+            raise ControlClientError("op-wait returned Error:\n  msg: " + msg)
+
+        if status == ocs.TIMEOUT:
+            raise ControlClientError(f"op-wait timed out")
+        
+        self.log.info("Completed op: name={name}, success={success}, kwargs={kw}", 
+                name=session.get('op_name'), success=session.get('success'),
+                kw=kwargs)
+
+        return
 
     def _set_state(self, state):
-        self.log.info("Changing from {self.state} to {state}")
+        self.log.info("Changing from {s1} to {s2}", s1=self.state, s2=state)
         self.state = state
 
     def update(self, clients, hwp_state):
@@ -485,12 +507,14 @@ class ControlStateMachine:
             self.lock.acquire()
 
             if isinstance(self.state, ControlState.PIDToFreq):
-                run_and_validate(clients.pid.set_direction,
+                self.run_and_validate(clients.pid.set_direction,
                                  kwargs={'direction': self.state.direction})
-                run_and_validate(clients.pid.declare_freq,
+                self.run_and_validate(clients.pid.declare_freq,
                                  kwargs={'freq': self.state.target_freq})
-                run_and_validate(clients.pmx.use_ext)
-                run_and_validate(clients.pmx.set_on)
+                self.run_and_validate(clients.pmx.use_ext)
+                self.run_and_validate(clients.pmx.set_on)
+                self.run_and_validate(clients.pid.tune_freq)
+                                #  kwargs={'freq': self.state.target_freq})
 
                 self._set_state(ControlState.WaitForTargetFreq(
                     target_freq=self.state.target_freq,
@@ -520,15 +544,22 @@ class ControlStateMachine:
                     self._set_state(ControlState.Done(success=True))
 
             elif isinstance(self.state, ControlState.ConstVolt):
-                run_and_validate(clients.pid.set_direction,
-                                 kwargs={'direction', self.state.direction})
-                run_and_validate(clients.pmx.ign_ext)
-                run_and_validate(clients.pmx.set_voltage,
-                                 kwargs={'voltage': self.state.voltage})
+                if self.pmx_i_lim is not None:
+                    self.run_and_validate(clients.pmx.set_i_lim,
+                                     kwargs={'curr': self.pmx_i_lim})
+                if self.pmx_v_lim is not None:
+                    self.run_and_validate(clients.pmx.set_v_lim,
+                                     kwargs={'volt': self.pmx_v_lim})
+
+                self.run_and_validate(clients.pid.set_direction,
+                                 kwargs={'direction': self.state.direction})
+                self.run_and_validate(clients.pmx.ign_ext)
+                self.run_and_validate(clients.pmx.set_v,
+                                 kwargs={'volt': self.state.voltage})
                 self._set_state(ControlState.Done(success=True))
 
             elif isinstance(self.state, ControlState.PmxOff):
-                run_and_validate(clients.pid.set_off)
+                self.run_and_validate(clients.pmx.set_off)
                 self._set_state(ControlState.WaitForTargetFreq(
                     target_freq=0,
                     freq_tol=self.state.freq_tol,
@@ -537,9 +568,9 @@ class ControlStateMachine:
 
             elif isinstance(self.state, ControlState.Brake):
                 init_quad = hwp_state.last_quad
-                run_and_validate(clients.pid.tune_stop)
-                run_and_validate(clients.pmx.use_ext)
-                run_and_validate(clients.pmx.set_on)
+                self.run_and_validate(clients.pid.tune_stop)
+                self.run_and_validate(clients.pmx.use_ext)
+                self.run_and_validate(clients.pmx.set_on)
                 self._set_state(ControlState.WaitForBrake(
                     init_quad=init_quad,
                     min_freq=0.5
@@ -551,7 +582,7 @@ class ControlStateMachine:
 
                 quad_diff = np.abs(quad - self.state.init_quad)
                 if freq < self.state.min_freq or quad_diff > 0.1:
-                    run_and_validate(clients.pmx.set_off)
+                    self.run_and_validate(clients.pmx.set_off)
                     self._set_state(ControlState.WaitForTargetFreq(
                         target_freq=0,
                         freq_tol=0.1,
@@ -560,7 +591,7 @@ class ControlStateMachine:
 
         except Exception:
             tb = traceback.format_exc()
-            self.log.error(f"Error updating state:\n{tb}")
+            self.log.error("Error updating state:\n{tb}", tb=tb)
             self._set_state(ControlState.Error(traceback=tb))
         finally:
             self.lock.release()
@@ -601,7 +632,7 @@ class HWPSupervisor:
         self.sleep_time = args.sleep_time
         self.log = agent.log
 
-        self.hwp_lakeshore_id = args.hwp_lakeshore_id
+        self.ybco_lakeshore_id = args.ybco_lakeshore_id
         self.ybco_temp_field = args.ybco_temp_field
         self.ybco_temp_thresh = args.ybco_temp_thresh
 
@@ -615,7 +646,10 @@ class HWPSupervisor:
             temp_thresh=args.ybco_temp_thresh,
             ups_minutes_remaining_thresh=args.ups_minutes_remaining_thresh,
         )
-        self.control_state_machine = ControlStateMachine()
+        self.control_state_machine = ControlStateMachine(
+            pmx_v_lim=args.pmx_v_lim,
+            pmx_i_lim=args.pmx_i_lim,
+        )
         self.forward_is_cw = args.forward_dir == 'cw'
 
     def _get_hwp_clients(self):
@@ -636,7 +670,7 @@ class HWPSupervisor:
             pmx=get_client(self.hwp_pmx_id),
             pid=get_client(self.hwp_pid_id),
             ups=get_client(self.ups_id),
-            lakeshore=get_client(self.hwp_lakeshore_id)
+            lakeshore=get_client(self.ybco_lakeshore_id),
         )
 
     @ocs_agent.param('test_mode', type=bool, default=False)
@@ -698,8 +732,8 @@ class HWPSupervisor:
         session.data = {
             'timestamp': time.time(),
             'monitored_sessions': {},
-            'state': {},
-            'actions': {}
+            'hwp_state': {},
+            'actions': {},
         }
 
         kw = {'test_mode': test_mode, 'log': self.log}
@@ -708,7 +742,7 @@ class HWPSupervisor:
             session.data['timestamp'] = time.time()
 
             # 1. Gather data from relevant operations
-            temp_op = get_op_data(self.hwp_lakeshore_id, 'acq', **kw)
+            temp_op = get_op_data(self.ybco_lakeshore_id, 'acq', **kw)
             enc_op = get_op_data(self.hwp_encoder_id, 'acq', **kw)
             pmx_op = get_op_data(self.hwp_pmx_id, 'acq', **kw)
             pid_op = get_op_data(self.hwp_pid_id, 'acq', **kw)
@@ -774,8 +808,8 @@ class HWPSupervisor:
         return True, 'Stopping spin control process'
 
     @ocs_agent.param('target_freq', type=float)
-    @ocs_agent.param('freq_thresh', type=float, default=0.05)
-    @ocs_agent.param('freq_thresh_duration', type=float, default=10)
+    @ocs_agent.param('freq_tol', type=float, default=0.05)
+    @ocs_agent.param('freq_tol_duration', type=float, default=10)
     def pid_to_freq(self, session, params):
         """pid_to_freq(target_freq=2.0, freq_thresh=0.05, freq_thresh_duration=10)
 
@@ -890,11 +924,11 @@ def make_parser(parser=None):
 
     pgroup.add_argument('--sleep-time', type=float, default=2.)
 
-    pgroup.add_argument('--hwp-lakeshore-id',
+    pgroup.add_argument('--ybco-lakeshore-id',
                         help="Instance ID for lakeshore reading out HWP temp")
-    pgroup.add_argument('--hwp-temp-field',
+    pgroup.add_argument('--ybco-temp-field',
                         help='Field name of lakeshore channel reading out HWP temp')
-    pgroup.add_argument('--hwp-temp-thresh', type=float,
+    pgroup.add_argument('--ybco-temp-thresh', type=float,
                         help="Threshold for HWP temp.")
 
     pgroup.add_argument('--hwp-encoder-id',
@@ -907,6 +941,12 @@ def make_parser(parser=None):
     pgroup.add_argument('--ups-minutes-remaining-thresh', type=float,
                         help="Threshold for UPS minutes remaining before a "
                              "shutdown is triggered")
+
+    pgroup.add_argument('--pmx-i-lim', type=float,
+                        help="Current limit (A) for pmx")
+    pgroup.add_argument('--pmx-v-lim', type=float,
+                        help="Voltage limit (V) for pmx")
+
 
     pgroup.add_argument('--forward-dir', choices=['cw', 'ccw'], default="cw",
                         help="Whether the PID 'forward' direction is cw or ccw")
