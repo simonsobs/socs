@@ -9,8 +9,8 @@ import time
 import traceback
 
 import numpy as np
-import txaio
 import ocs
+import txaio
 from ocs import client_http, ocs_agent, site_config
 from ocs.client_http import ControlClientError
 from ocs.ocs_client import OCSClient, OCSReply
@@ -448,8 +448,6 @@ class ControlState:
         start_time: float = field(default_factory=time.time)
 
 
-
-
 class ControlStateMachine:
     def __init__(self):
         self.state = ControlState.Idle()
@@ -474,7 +472,7 @@ class ControlStateMachine:
         """
         if kwargs is None:
             kwargs = {}
-        
+
         status, msg, session = op.start(**kwargs)
 
         if status == ocs.ERROR:
@@ -490,10 +488,10 @@ class ControlStateMachine:
 
         if status == ocs.TIMEOUT:
             raise ControlClientError(f"op-wait timed out")
-        
-        self.log.info("Completed op: name={name}, success={success}, kwargs={kw}", 
-                name=session.get('op_name'), success=session.get('success'),
-                kw=kwargs)
+
+        self.log.info("Completed op: name={name}, success={success}, kwargs={kw}",
+                      name=session.get('op_name'), success=session.get('success'),
+                      kw=kwargs)
 
         return
 
@@ -508,13 +506,13 @@ class ControlStateMachine:
 
             if isinstance(self.state, ControlState.PIDToFreq):
                 self.run_and_validate(clients.pid.set_direction,
-                                 kwargs={'direction': self.state.direction})
+                                      kwargs={'direction': self.state.direction})
                 self.run_and_validate(clients.pid.declare_freq,
-                                 kwargs={'freq': self.state.target_freq})
+                                      kwargs={'freq': self.state.target_freq})
                 self.run_and_validate(clients.pmx.use_ext)
                 self.run_and_validate(clients.pmx.set_on)
                 self.run_and_validate(clients.pid.tune_freq)
-                                #  kwargs={'freq': self.state.target_freq})
+                #  kwargs={'freq': self.state.target_freq})
 
                 self._set_state(ControlState.WaitForTargetFreq(
                     target_freq=self.state.target_freq,
@@ -546,10 +544,10 @@ class ControlStateMachine:
             elif isinstance(self.state, ControlState.ConstVolt):
                 self.run_and_validate(clients.pmx.set_on)
                 self.run_and_validate(clients.pid.set_direction,
-                                 kwargs={'direction': self.state.direction})
+                                      kwargs={'direction': self.state.direction})
                 self.run_and_validate(clients.pmx.ign_ext)
                 self.run_and_validate(clients.pmx.set_v,
-                                 kwargs={'volt': self.state.voltage})
+                                      kwargs={'volt': self.state.voltage})
                 self._set_state(ControlState.Done(success=True))
 
             elif isinstance(self.state, ControlState.PmxOff):
