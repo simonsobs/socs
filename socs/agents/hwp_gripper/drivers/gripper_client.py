@@ -102,9 +102,9 @@ class GripperClient(object):
         return self.listen(timeout=10)
 
     def send_data(self, data):
-        if type(data) == str:
+        if isinstance(data, str):
             self._s_send.sendto(bytes(data, 'utf-8'), (self.ip, self.send_port))
-        elif type(data) == bytes:
+        elif isinstance(data, bytes):
             self._s_send.sendto(data, (self.ip, self.send_port))
 
     def listen(self, timeout=0.01):
