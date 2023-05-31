@@ -1,23 +1,17 @@
 import errno
 import select
 import socket
+import pickle as pkl
 
 
 class GripperClient(object):
-    def __init__(self, ip, send_port, recv_port):
+    def __init__(self, ip, port):
         self.ip = ip
-        self.send_port = send_port
-        self.recv_port = recv_port
+        self.port = port
+        self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.s.connect((self.ip, self.port))
+
         self.data = b''
-
-        self._s_send = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self._s_send.setblocking(False)
-
-        self._s_recv = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self._s_recv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self._s_recv.setblocking(False)
-
-        self._s_recv.bind(('', self.recv_port))
 
     def POWER(self, state):
         if not isinstance(state, bool):
@@ -97,34 +91,12 @@ class GripperClient(object):
         return self.send_command('ACT ' + str(actuator))
 
     def send_command(self, command):
-        _ = self.listen()
-        self.send_data(command)
-        return self.listen(timeout=10)
+        if type(command) == str:
+            self.s.sendall(bytes(command, 'utf-8'))
+        elif type(command) == bytes:
+            self.s.sendall(command)
 
-    def send_data(self, data):
-        if isinstance(data, str):
-            self._s_send.sendto(bytes(data, 'utf-8'), (self.ip, self.send_port))
-        elif isinstance(data, bytes):
-            self._s_send.sendto(data, (self.ip, self.send_port))
-
-    def listen(self, timeout=0.01):
-        try:
-            ready = select.select([self._s_recv], [], [], timeout)
-            if ready[0]:
-                self.data = self._s_recv.recv(1024)
-        except socket.error as err:
-            if err.errno != errno.EAGAIN:
-                raise
-            else:
-                pass
-
-        if len(self.data) > 0:
-            return_data = self.data
-            self.data = b''
-            return return_data
-        else:
-            return b''
+        return pkl.loads(self.s.recv(4096))
 
     def __exit__(self):
-        self._s_send.close()
-        self._s_recv.close()
+        self.s.close()

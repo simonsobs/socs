@@ -25,7 +25,6 @@ class GripperAgent:
         pru_port (int): Port for pru packet communication arbitrary* but needs to be
             changed in beaglebone code as well
         control_port (int): Port for control commands sent to the Beaglebone. Arbitrary
-        return_port (int): Port for return communication from the Beaglebone. Arbitrary
         supervisor_id (str): ID of HWP supervisor
         no_data_timeout (float): Time (in seconds) to wait between receiving
             'no_data' actions from the supervisor and triggering a shutdown
@@ -35,7 +34,7 @@ class GripperAgent:
     """
 
     def __init__(self, agent, mcu_ip, pru_port, control_port,
-                 return_port, supervisor_id=None, no_data_timeout=30 * 60,
+                 supervisor_id=None, no_data_timeout=30 * 60,
                  limit_pos=[13., 10., 13., 10., 13., 10.]):
         self.agent = agent
         self.log = agent.log
@@ -45,7 +44,6 @@ class GripperAgent:
         self.mcu_ip = mcu_ip
         self.pru_port = pru_port
         self.control_port = control_port
-        self.return_port = return_port
 
         self.shutdown_mode = False
         self.supervisor_id = supervisor_id
@@ -125,7 +123,7 @@ class GripperAgent:
             self.log.info('Connection already initialized. Returning...')
             return True, 'Connection already initialized'
 
-        self.client = gclient.GripperClient(self.mcu_ip, self.control_port, self.return_port)
+        self.client = gclient.GripperClient(self.mcu_ip, self.control_port)
         self.collector = gc.GripperCollector(self.pru_port)
 
         self.agent.start('collect_pru', params=None)
@@ -154,9 +152,10 @@ class GripperAgent:
             if self.shutdown_mode:
                 return False, 'Shutdown mode is in effect'
 
-            self.log.info(self.client.POWER(params['state']))
+            return_dict = self.client.POWER(params['state'])
+            [self.log.info(line) for line in return_dict['log']]
 
-        return True, 'Power state changed'
+            return return_dict['result'], f"Success: {return_dict['result']}"
 
     @ocs_agent.param('state', default=True, type=bool)
     @ocs_agent.param('actuator', default=0, type=int, check=lambda x: 0 <= x <= 3)
@@ -177,9 +176,10 @@ class GripperAgent:
             if self.shutdown_mode:
                 return False, 'Shutdown mode is in effect'
 
-            self.log.info(self.client.BRAKE(params['state'], params['actuator']))
+            return_dict = self.client.BRAKE(params['state'], params['actuator'])
+            [self.log.info(line) for line in return_dict['log']]
 
-        return True, 'Changed brake state'
+            return return_dict['result'], f"Success: {return_dict['result']}"
 
     @ocs_agent.param('mode', default='push', type=str, choices=['push', 'pos'])
     @ocs_agent.param('actuator', default=1, type=int, check=lambda x: 1 <= x <= 3)
@@ -237,13 +237,14 @@ class GripperAgent:
             else:
                 dist = params['distance']
 
-            self.log.info(self.client.MOVE(params['mode'], params['actuator'], dist))
+            return_dict = self.client.MOVE(params['mode'], params['actuator'], dist)
+            [self.log.info(line) for line in return_dict['log']]
 
             with self.encoder_edges_record.get_lock():
                 for chain in pru_chains:
                     self.encoder_edges_record[chain] = 0
 
-        return True, 'Moved actuators'
+            return return_dict['result'], f"Success: {return_dict['result']}"
 
     def home(self, session, params=None):
         """home()
@@ -265,7 +266,8 @@ class GripperAgent:
                 for index, _ in enumerate(self.encoder_edges_record):
                     self.encoder_edges_record[index] = 1
 
-            self.log.info(self.client.HOME())
+            return_dict = self.client.HOME()
+            [self.log.info(line) for line in return_dict['log']]
 
             with self.encoder_edges.get_lock():
                 with self.encoder_edges_record.get_lock():
@@ -273,7 +275,7 @@ class GripperAgent:
                         self.encoder_edges_record[index] = 0
                         self.encoder_edges[index] = 0
 
-        return True, 'Homed actuators'
+            return return_dict['result'], f"Success: {return_dict['result']}"
 
     def inp(self, session, params=None):
         """inp()
@@ -284,9 +286,10 @@ class GripperAgent:
                 self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            self.log.info(self.client.INP())
+            return_dict = self.client.INP()
+            [self.log.info(line) for line in return_dict['log']]
 
-        return True, 'Queried are actuators in known state'
+            return return_dict['result'], f"Success: {return_dict['result']}"
 
     def alarm(self, session, params=None):
         """alarm()
@@ -297,9 +300,10 @@ class GripperAgent:
                 self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            self.log.info(self.client.ALARM())
+            return_dict = self.client.ALARM()
+            [self.log.info(line) for line in return_dict['log']]
 
-        return True, 'Queried alarm state'
+            return return_dict['result'], f"Success: {return_dict['result']}"
 
     def reset(self, session, params=None):
         """reset()
@@ -310,9 +314,10 @@ class GripperAgent:
                 self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            self.log.info(self.client.RESET())
+            return_dict = self.client.RESET()
+            [self.log.info(line) for line in return_dict['log']]
 
-        return True, 'Reset alarm state'
+            return return_dict['result'], f"Success: {return_dict['result']}"
 
     @ocs_agent.param('actuator', default=1, type=int, check=lambda x: 1 <= x <= 3)
     def act(self, session, params=None):
@@ -327,9 +332,10 @@ class GripperAgent:
                 self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            self.log.info(self.client.ACT(params['actuator']))
+            return_dict = self.client.ACT(params['actuator'])
+            [self.log.info(line) for line in return_dict['log']]
 
-        return True, 'Queried actuator connection'
+            return return_dict['result'], f"Success: {return_dict['result']}"
 
     @ocs_agent.param('value', default=False, type=bool)
     def is_cold(self, session, params=None):
@@ -689,8 +695,6 @@ def make_parser(parser=None):
                         help='Arbitrary port for actuator encoders')
     pgroup.add_argument('--control_port', type=int, default=8041,
                         help='Arbitrary port for actuator control')
-    pgroup.add_argument('--return_port', type=int, default=8042,
-                        help='Arbitrary port for actuator messaging')
     pgroup.add_argument('--supervisor-id', type=str,
                         help='Instance ID for HWP Supervisor agent')
     pgroup.add_argument('--no-data-timeout', type=float, default=45 * 60,
@@ -712,7 +716,6 @@ def main(args=None):
     gripper_agent = GripperAgent(agent, mcu_ip=args.mcu_ip,
                                  pru_port=args.pru_port,
                                  control_port=args.control_port,
-                                 return_port=args.return_port,
                                  supervisor_id=args.supervisor_id,
                                  no_data_timeout=args.no_data_timeout)
     agent.register_process('acq', gripper_agent.acq,
