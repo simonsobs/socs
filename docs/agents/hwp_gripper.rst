@@ -30,8 +30,7 @@ An example site-config-file block::
      'instance-id': 'gripper',
      'arguments': [['--mcu_port', '10.10.10.115'],
                    ['--pru_port', 8040],
-                   ['--control_port', 8041],
-                   ['--return_port', 8042]]},
+                   ['--control_port', 8041]]},
 
 Docker Compose
 --------------
