@@ -1,8 +1,9 @@
-import struct
 import errno
 import multiprocessing
 import select
 import socket
+import struct
+
 import numpy as np
 
 
