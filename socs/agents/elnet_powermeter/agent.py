@@ -5,6 +5,16 @@ from os import environ
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
+powermeter_keys = {'volt1': 1,
+                   'volt2': 3,
+                   'volt3': 5,
+                   'current1': 13,
+                   'current2': 15,
+                   'current3': 17,
+                   'freq1': 51,
+                   'freq2': 53,
+                   'freq3': 55}
+
 class ElnetPowerMeterAgent:
     """Monitor the Power Meter.
 
@@ -32,6 +42,7 @@ class ElnetPowerMeterAgent:
         self.port = port
         self.auto_open = auto_open
         self.auto_close = auto_close
+        self.initialized = False
 
         self.take_data = False
 
@@ -45,9 +56,54 @@ class ElnetPowerMeterAgent:
                                  buffer_time=1
                                  )
 
+    @ocs_agent.param('auto_acquire', default=False, type=bool)
+    def init_powermeter(self, session, params=None):
+        """init_powermeter(auto_acquire=False)
+        
+        **Task** - Perform first time setup of the Elnet Powermeter
+
+        Parameters
+        ----------
+        auto_acquire : bool, option
+            Starts data acquistion after initialization if True. 
+            Defaults to False.
+
+        """
+        # TODO: check this parms is none, don't need this
+        if params is None:
+            params = {}
+
+        auto_acquire = params.get('auto_acquire', False)
+
+        if self.initialized:
+            return True, "Already initialized."
+        
+        # TODO: check the timeout order of this
+        with self.lock.acquire_timeout(3, job='init_powermeter') as acquired:
+            if not acquired:
+                self.log.warn("Could not start init because "
+                              "{} is already running".format(self.lock.job))
+                return False, "Could not acquire lock."
+
+            session.set_status('starting')
+
+            c = ModbusClient(host=self.host, port=self.port, auto_open=self.auto_open, auto_close=self.auto_close)
+            if c.open():
+                self.client = c
+                self.initialized = True
+            else:
+                self.initialized = False
+                return False, "Could not connect to power meter"
+
+        # Start acq if requested
+        if auto_acquire:
+            self.agent.start('acq')
+
+        return True, "Power meter initialized."
+
     @ocs_agent.param('test_mode', default=False, type=bool)
     def acq(self, session, params=None):
-        """acq()
+        """acq(test_mode=False)
 
         **Process** - Fetch values from the Elnet Power Meter
 
@@ -60,43 +116,16 @@ class ElnetPowerMeterAgent:
         self.take_data = True
         while self.take_data:
             m = ModbusClient(host=self.ip, port=self.port, unit_id=self.unit_id, auto_open=self.auto_open, auto_close=self.auto_close)
-           
-            # TODO: possibly still care about the voltage between the lines and the power factor between the lines
-            volt1 = m.read_holding_registers(1,2)
-            volt2 = m.read_holding_registers(3,2)
-            volt3 = m.read_holding_registers(5,2)
-
-            current1 = m.read_holding_registers(13,2)
-            current2 = m.read_holding_registers(15,2)
-            current3 = m.read_holding_registers(17,2)
-            
-            power_fac1 = m.read_holding_registers(43,2)  # this is PF, there's also an L&C and idk what those mean
-            power_fac2 = m.read_holding_registers(45,2)
-            power_fac3 = m.read_holding_registers(47,2)
-
-            total_powerfac = m.read_holding_registers(49,2)
-            
-            freq1 = m.read_holding_registers(51,2)
-            freq2 = m.read_holding_registers(53,2)
-            freq3 = m.read_holding_registers(55,2)
 
             data = {'block_name': 'powermeter_status',
                     'timestamp': time.time(),
-                    'data' :{}}
+                    'data' :{}} # add fields? 
 
-            data['data']['voltage_line1'] = volt1
-            data['data']['voltage_line2'] = volt2
-            data['data']['voltage_line3'] = volt3
-            data['data']['current_line1'] = current1
-            data['data']['current_line2'] = current2
-            data['data']['current_line3'] = current3
-            data['data']['powerfactor_line1'] = power_fac1
-            data['data']['powerfactor_line2'] = power_fac2
-            data['data']['powerfactor_line3'] = power_fac3
-            data['data']['frequency_line1'] = freq1
-            data['data']['frequency_line2'] = freq2
-            data['data']['frequency_line3'] = freq3
-            data['data']['total_powerfactor'] = total_powerfac
+            for key in powermeter_keys:
+                val = m.read_holding_registers(powermeter_keys[key],1)
+                val = int(val[0])
+                info = {key: val}
+                data['data'].update(info)
 
             self.agent.publish_to_feed('powermeter_status', data)
 
