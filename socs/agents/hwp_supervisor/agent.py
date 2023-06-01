@@ -568,7 +568,7 @@ class ControlStateMachine:
                     self._set_state(ControlState.PmxOff())
                     return
 
-                quad_last_updated= time.time() - init_quad_time
+                quad_last_updated = time.time() - init_quad_time
                 if quad_last_updated > 10.0:
                     self.log.warn(f"Quad has not been updated in last {quad_last_updated} sec")
                     self.log.warn("Setting PMX Off, since can't confirm direction")
@@ -595,7 +595,7 @@ class ControlStateMachine:
                     self._set_state(ControlState.PmxOff())
                     return
 
-                quad_last_updated= time.time() - quad_time
+                quad_last_updated = time.time() - quad_time
                 if quad_last_updated > 10.0:
                     self.log.warn(f"Quad has not been updated in last {quad_last_updated} sec")
                     self.log.warn("Setting PMX Off, since can't confirm direction")
@@ -611,7 +611,7 @@ class ControlStateMachine:
                         freq_tol_duration=10,
                     ))
 
-                return 
+                return
 
         except Exception:
             tb = traceback.format_exc()
