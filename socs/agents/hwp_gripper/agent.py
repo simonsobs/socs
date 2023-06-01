@@ -9,9 +9,8 @@ import numpy as np
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
-import socs.agents.hwp_gripper.drivers.gripper_client as gclient
-import socs.agents.hwp_gripper.drivers.GripperBuilder as gb
-import socs.agents.hwp_gripper.drivers.GripperCollector as gc
+import socs.agents.hwp_gripper.drivers.gripper_client as cli
+import socs.agents.hwp_gripper.drivers.gripper_collector as col
 from socs.agents.hwp_supervisor.agent import get_op_data
 
 
@@ -50,7 +49,6 @@ class GripperAgent:
         self.no_data_timeout = no_data_timeout
 
         self.collector = None
-        self.builder = None
         self.client = None
 
         self.last_encoder = 0
@@ -123,11 +121,10 @@ class GripperAgent:
             self.log.info('Connection already initialized. Returning...')
             return True, 'Connection already initialized'
 
-        self.client = gclient.GripperClient(self.mcu_ip, self.control_port)
-        self.collector = gc.GripperCollector(self.pru_port)
+        self.client = cli.GripperClient(self.mcu_ip, self.control_port)
+        self.collector = col.GripperCollector(self.pru_port)
 
         self.agent.start('collect_pru', params=None)
-        self.agent.start('build_pru', params=None)
         self.agent.start('monitor')
 
         if params['auto_acquire']:
@@ -548,42 +545,27 @@ class GripperAgent:
 
     def collect_pru(self, session, params=None):
         """collect_pru()
-        **Process** - Collects raw encoder data sent from the Beaglebone
+        **Process** - Collects and extracts data from raw encoder data; updates
+            changes to the gripper positions and handles any triggered limit switches
         """
         session.set_status('running')
 
         if self.collector is None:
             return False, 'Pru collector not defined'
-
-        self._run_collect_pru = True
-        while self._run_collect_pru:
-            self.collector.relay_gripper_data()
-
-        session.set_status('stopping')
-        return True, 'Pru collection exited cleanly'
-
-    def build_pru(self, session, params=None):
-        """build_pru()
-        **Process** - Extracts data from the raw encoder data; updates changes to
-            the gripper positions and handles any triggered limit switches
-        """
-        session.set_status('running')
-
-        if self.collector is None:
-            return False, 'Pru collector not defined'
-
-        self.builder = gb.GripperBuilder(self.collector)
 
         if self.client is None:
             return False, 'Control client not defined'
 
-        with self.lock.acquire_timeout(10, job='build_pru'):
+        with self.lock.acquire_timeout(10, job='collect_pru'):
             self.client.EMG(True)
 
-        self._run_build_pru = True
-        while self._run_build_pru:
+        self._run_collect_pru = True
+        while self._run_collect_pru:
+            # collect data packets
+            self.collector.relay_gripper_data()
+
             # Use collected data packets to find changes in gripper positions
-            encoder_data = self.builder.process_packets()
+            encoder_data = self.collector.process_packets()
             if len(encoder_data['state']):
                 edges = np.concatenate(([self.last_encoder ^ encoder_data['state'][0]],
                                         encoder_data['state'][1:] ^ encoder_data['state'][:-1]))
@@ -599,7 +581,7 @@ class GripperAgent:
                 self.last_encoder = encoder_data['state'][-1]
 
             # Check if any of the limit switches have been triggered and prevent gripper movement if necessary
-            clock, state = self.builder.limit_state[0], int(self.builder.limit_state[1])
+            clock, state = self.collector.limit_state[0], int(self.collector.limit_state[1])
 
             for index, pru in enumerate(self.limit_pru):
                 self.limit_state[index] = ((state & (1 << pru)) >> pru)
@@ -608,11 +590,11 @@ class GripperAgent:
                     or self.limit_state[4]:
                 self.last_limit_time = time.time()
                 if self.force.value and not self.is_forced:
-                    with self.lock.acquire_timeout(10, job='build_pru'):
+                    with self.lock.acquire_timeout(10, job='collect_pru'):
                         self.client.EMG(True)
                         self.is_forced = True
                 elif self.last_limit != state and not self.force.value:
-                    with self.lock.acquire_timeout(10, job='build_pru'):
+                    with self.lock.acquire_timeout(10, job='collect_pru'):
                         self.last_limit = state
 
                         if (self.limit_state[1] and not self.is_cold.value) or self.limit_state[0]:
@@ -637,12 +619,12 @@ class GripperAgent:
             else:
                 if time.time() - self.last_limit_time > 5:
                     if self.last_limit != 0:
-                        with self.lock.acquire_timeout(10, job='build_pru'):
+                        with self.lock.acquire_timeout(10, job='collect_pru'):
                             self.client.EMG(True)
                             self.last_limit = 0
 
         session.set_status('stopping')
-        return True, 'Pru building exited cleanly'
+        return True, 'Pru collecting exited cleanly'
 
     def _stop_acq(self, session, params=None):
         """
@@ -667,14 +649,6 @@ class GripperAgent:
         if self._run_collect_pru:
             self._run_collect_pru = False
         return True, 'Stopping collecting pru packets'
-
-    def _stop_build_pru(self, session, params=None):
-        """
-        Stop build_pru process
-        """
-        if self._run_build_pru:
-            self._run_build_pru = False
-        return True, 'Stopping pru packet building'
 
     def _get_pos(self):
         """
@@ -724,8 +698,6 @@ def main(args=None):
                            gripper_agent._stop_monitor)
     agent.register_process('collect_pru', gripper_agent.collect_pru,
                            gripper_agent._stop_collect_pru)
-    agent.register_process('build_pru', gripper_agent.build_pru,
-                           gripper_agent._stop_build_pru)
     agent.register_task('init_connection', gripper_agent.init_connection,
                         startup=init_params)
     agent.register_task('power', gripper_agent.power)

@@ -1,12 +1,25 @@
 import struct
-
+import errno
+import multiprocessing
+import select
+import socket
 import numpy as np
 
 
-class GripperBuilder(object):
-    def __init__(self, collector):
-        self._collector = collector
-        self.queue = self._collector.queue
+class GripperCollector(object):
+    def __init__(self, pru_port):
+        self._read_chunk_size = 2**20
+        self.pru_port = pru_port
+
+        self.s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        self.s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.s.setblocking(False)
+        self.s.bind(('', self.pru_port))
+
+        self._data_buffer = b''
+        self._timeout_sec = 1
+
+        self.queue = multiprocessing.Queue()
         self._data = ''
 
         self._endian = '<'
@@ -24,6 +37,21 @@ class GripperBuilder(object):
         self._define_encoder_packet()
         self._define_limit_packet()
         self._define_timeout_packet()
+
+    def relay_gripper_data(self):
+        try:
+            ready = select.select([self.s], [], [], self._timeout_sec)
+            if ready[0]:
+                self._data_buffer += self.s.recv(self._read_chunk_size)
+        except socket.error as err:
+            if err.errno != errno.EAGAIN:
+                raise
+            else:
+                pass
+
+        if len(self._data_buffer) > 0:
+            self.queue.put(obj=self._data_buffer, block=True, timeout=None)
+            self._data_buffer = b''
 
     def process_packets(self):
         approx_size = self.queue.qsize()
