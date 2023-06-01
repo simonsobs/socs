@@ -499,6 +499,7 @@ class HWPBBBAgent:
         self.irig_time = 0
 
         self.last_quad = None
+        self.last_quad_time = None
 
         agg_params = {'frame_length': 60}
         self.agent.register_feed('HWPEncoder', record=True,
@@ -616,6 +617,7 @@ class HWPBBBAgent:
                         self.agent.publish_to_feed('HWPEncoder', data)
                         if quad_list:
                             self.last_quad = quad_list[-1]
+                            self.last_quad_time = time.time()
 
                         # Publishing counter data
                         # (full sampled data will not be recorded in influxdb)
@@ -645,7 +647,7 @@ class HWPBBBAgent:
                         diff_counter = np.diff(counter_list)
                         diff_index = np.diff(counter_index_list)
 
-                        self.log.info(f'pulse_rate {pulse_rate} {hwp_freq}')
+                        self.log.debug(f'pulse_rate {pulse_rate} {hwp_freq}')
                         data['data']['approx_hwp_freq'] = hwp_freq
                         data['data']['diff_counter_mean'] = np.mean(diff_counter)
                         data['data']['diff_index_mean'] = np.mean(diff_index)
@@ -669,6 +671,7 @@ class HWPBBBAgent:
                 data_cache['approx_hwp_freq'] = self.hwp_freq
                 data_cache['encoder_last_updated'] = self.ct
                 data_cache['last_quad'] = self.last_quad
+                data_cache['last_quad_time'] = self.last_quad_time
                 session.data.update(data_cache)
 
         self.agent.feeds['HWPEncoder'].flush_buffer()

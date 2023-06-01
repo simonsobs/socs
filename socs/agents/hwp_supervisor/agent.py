@@ -131,6 +131,7 @@ class HWPState:
 
     enc_freq: Optional[float] = None
     last_quad: Optional[float] = None
+    last_quad_time: Optional[float] = None
 
     def _update_from_keymap(self, op, keymap):
         if op['status'] != 'ok':
@@ -154,6 +155,7 @@ class HWPState:
         self._update_from_keymap(op, {
             'enc_freq': 'approx_hwp_freq',
             'last_quad': 'last_quad',
+            'last_quad_time': 'last_quad_time',
         })
 
     def update_temp_state(self, op):
@@ -441,20 +443,18 @@ class ControlState:
         start_time : float
             Time that the state was entered
         """
-        freq_tol: float
-        freq_tol_duration: float
+        freq_tol: float = 0.05
+        freq_tol_duration: float = 20
         start_time: float = field(default_factory=time.time)
 
 
 
 
 class ControlStateMachine:
-    def __init__(self, pmx_v_lim=None, pmx_i_lim=None):
+    def __init__(self):
         self.state = ControlState.Idle()
         self.log = txaio.make_logger()  # pylint: disable=E1101
         self.lock = threading.Lock()
-        self.pmx_v_lim = pmx_v_lim
-        self.pmx_i_lim = pmx_i_lim
 
     def run_and_validate(self, op, kwargs=None, timeout=10, log=None):
         """
@@ -544,13 +544,7 @@ class ControlStateMachine:
                     self._set_state(ControlState.Done(success=True))
 
             elif isinstance(self.state, ControlState.ConstVolt):
-                if self.pmx_i_lim is not None:
-                    self.run_and_validate(clients.pmx.set_i_lim,
-                                     kwargs={'curr': self.pmx_i_lim})
-                if self.pmx_v_lim is not None:
-                    self.run_and_validate(clients.pmx.set_v_lim,
-                                     kwargs={'volt': self.pmx_v_lim})
-
+                self.run_and_validate(clients.pmx.set_on)
                 self.run_and_validate(clients.pid.set_direction,
                                  kwargs={'direction': self.state.direction})
                 self.run_and_validate(clients.pmx.ign_ext)
@@ -568,9 +562,25 @@ class ControlStateMachine:
 
             elif isinstance(self.state, ControlState.Brake):
                 init_quad = hwp_state.last_quad
+                init_quad_time = hwp_state.last_quad_time
+
+                if init_quad is None or init_quad_time is None:
+                    self.log.warn("Could not determine direction from Encoder agent")
+                    self.log.warn("Setting PMX Off")
+                    self._set_state(ControlState.PmxOff())
+                    return
+
+                quad_last_updated= time.time() - init_quad_time
+                if quad_last_updated > 10.0:
+                    self.log.warn(f"Quad has not been updated in last {quad_last_updated} sec")
+                    self.log.warn("Setting PMX Off, since can't confirm direction")
+                    self._set_state(ControlState.PmxOff())
+                    return
+
                 self.run_and_validate(clients.pid.tune_stop)
                 self.run_and_validate(clients.pmx.use_ext)
                 self.run_and_validate(clients.pmx.set_on)
+
                 self._set_state(ControlState.WaitForBrake(
                     init_quad=init_quad,
                     min_freq=0.5
@@ -578,7 +588,21 @@ class ControlStateMachine:
 
             elif isinstance(self.state, ControlState.WaitForBrake):
                 quad = hwp_state.last_quad
+                quad_time = hwp_state.last_quad_time
                 freq = hwp_state.enc_freq
+
+                if quad is None or quad_time is None:
+                    self.log.warn("Could not determine direction from Encoder agent")
+                    self.log.warn("Setting PMX Off")
+                    self._set_state(ControlState.PmxOff())
+                    return
+
+                quad_last_updated= time.time() - quad_time
+                if quad_last_updated > 10.0:
+                    self.log.warn(f"Quad has not been updated in last {quad_last_updated} sec")
+                    self.log.warn("Setting PMX Off, since can't confirm direction")
+                    self._set_state(ControlState.PmxOff())
+                    return
 
                 quad_diff = np.abs(quad - self.state.init_quad)
                 if freq < self.state.min_freq or quad_diff > 0.1:
@@ -588,6 +612,8 @@ class ControlStateMachine:
                         freq_tol=0.1,
                         freq_tol_duration=10,
                     ))
+
+                return 
 
         except Exception:
             tb = traceback.format_exc()
@@ -646,10 +672,7 @@ class HWPSupervisor:
             temp_thresh=args.ybco_temp_thresh,
             ups_minutes_remaining_thresh=args.ups_minutes_remaining_thresh,
         )
-        self.control_state_machine = ControlStateMachine(
-            pmx_v_lim=args.pmx_v_lim,
-            pmx_i_lim=args.pmx_i_lim,
-        )
+        self.control_state_machine = ControlStateMachine()
         self.forward_is_cw = args.forward_dir == 'cw'
 
     def _get_hwp_clients(self):
@@ -833,7 +856,7 @@ class HWPSupervisor:
             d = '1' if self.forward_is_cw else '0'
 
         state = ControlState.PIDToFreq(
-            target_freq=params['target_freq'],
+            target_freq=np.abs(params['target_freq']),
             freq_tol=params['freq_tol'],
             freq_tol_duration=params['freq_tol_duration'],
             direction=d
@@ -899,17 +922,18 @@ class HWPSupervisor:
         else:
             return False, "Failed to update state"
 
-    @ocs_agent.param('freq_tol', type=float, default=0.05)
-    @ocs_agent.param('freq_tol_duration', type=float, default=10)
+    @ocs_agent.param('freq_tol', type=float, default=None)
+    @ocs_agent.param('freq_tol_duration', type=float, default=None)
     def pmx_off(self, session, params):
         """pmx_off()
 
         **Task** - Sets the control state to turn off the PMX.
         """
-        state = ControlState.PmxOff(
-            freq_tol=params['freq_tol'],
-            freq_tol_duration=params['freq_tol_duration']
-        )
+        kw = {}
+        for p in ['freq_tol', 'freq_tol_duration']:
+            if params[p] is not None:
+                kw[p] = params[p]
+        state = ControlState.PmxOff(**kw)
         success = self.control_state_machine.request_state(state)
         if success:
             return True, f"Set state to {state}"
@@ -941,12 +965,6 @@ def make_parser(parser=None):
     pgroup.add_argument('--ups-minutes-remaining-thresh', type=float,
                         help="Threshold for UPS minutes remaining before a "
                              "shutdown is triggered")
-
-    pgroup.add_argument('--pmx-i-lim', type=float,
-                        help="Current limit (A) for pmx")
-    pgroup.add_argument('--pmx-v-lim', type=float,
-                        help="Voltage limit (V) for pmx")
-
 
     pgroup.add_argument('--forward-dir', choices=['cw', 'ccw'], default="cw",
                         help="Whether the PID 'forward' direction is cw or ccw")
