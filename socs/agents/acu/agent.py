@@ -543,9 +543,10 @@ class ACUAgent:
                               }
         return True, 'Acquisition exited cleanly.'
 
+    @ocs_agent.param('auto_enable', type=bool, default=True)
     @inlineCallbacks
     def broadcast(self, session, params):
-        """broadcast()
+        """broadcast(auto_enable=True)
 
         **Process** - Read UDP data from the port specified by
         self.acu_config, decode it, and publish to HK feeds.  Full
@@ -553,30 +554,36 @@ class ACUAgent:
         while 1 Hz decimated are written to "acu_broadcast_influx".
         The 1 Hz decimated output are also stored in session.data.
 
-        The session.data looks like this (this is for a SATP running
-        with servo details in the UDP output)::
+        Args:
+          auto_enable (bool): If True, the Process will try to
+            configure and (re-)enable the UDP stream if at any point
+            the stream seems to drop out.
 
-          {
-            "Time": 1679499948.8234625,
-            "Corrected_Azimuth": -20.00112176010607,
-            "Corrected_Elevation": 50.011521050839434,
-            "Corrected_Boresight": 29.998428712246067,
-            "Raw_Azimuth": -20.00112176010607,
-            "Raw_Elevation": 50.011521050839434,
-            "Raw_Boresight": 29.998428712246067,
-            "Azimuth_Current_1": -0.000384521484375,
-            "Azimuth_Current_2": -0.0008331298828125,
-            "Elevation_Current_1": 0.003397979736328125,
-            "Boresight_Current_1": -0.000483856201171875,
-            "Boresight_Current_2": -0.000105743408203125,
-            "Azimuth_Vel_1": -0.000002288818359375,
-            "Azimuth_Vel_2": 0,
-            "Az_Vel_Act": -0.0000011444091796875,
-            "Az_Vel_Des": 0,
-            "Az_Vffw": 0,
-            "Az_Pos_Des": -20.00112176010607,
-            "Az_Pos_Err": 0
-          }
+        Notes:
+          The session.data looks like this (this is for a SATP running
+          with servo details in the UDP output)::
+
+            {
+              "Time": 1679499948.8234625,
+              "Corrected_Azimuth": -20.00112176010607,
+              "Corrected_Elevation": 50.011521050839434,
+              "Corrected_Boresight": 29.998428712246067,
+              "Raw_Azimuth": -20.00112176010607,
+              "Raw_Elevation": 50.011521050839434,
+              "Raw_Boresight": 29.998428712246067,
+              "Azimuth_Current_1": -0.000384521484375,
+              "Azimuth_Current_2": -0.0008331298828125,
+              "Elevation_Current_1": 0.003397979736328125,
+              "Boresight_Current_1": -0.000483856201171875,
+              "Boresight_Current_2": -0.000105743408203125,
+              "Azimuth_Vel_1": -0.000002288818359375,
+              "Azimuth_Vel_2": 0,
+              "Az_Vel_Act": -0.0000011444091796875,
+              "Az_Vel_Des": 0,
+              "Az_Vffw": 0,
+              "Az_Pos_Des": -20.00112176010607,
+              "Az_Pos_Err": 0
+            }
 
         """
         session.set_status('running')
@@ -586,6 +593,9 @@ class ACUAgent:
         udp_data = []
         fields = self.udp_schema['fields']
         session.data = {}
+
+        # BroadcastStreamControl instance.
+        stream = self.acu_control.streams['main']
 
         class MonitorUDP(protocol.DatagramProtocol):
             def datagramReceived(self, data, src_addr):
@@ -642,10 +652,20 @@ class ACUAgent:
                     sd[ky.split('_bcast_influx')[0]] = influx_means[ky]
                 session.data.update(sd)
             else:
+                # Consider logging an outage, attempting reconfig.
                 if active and now - last_packet_time > 3:
                     self.log.info('No UDP packets are being received.')
                     active = False
+                    next_reconfig = time.time()
+                if not active and params['auto_enable'] and next_reconfig <= time.time():
+                    self.log.info('Requesting UDP stream enable.')
+                    try:
+                        cfg, raw = yield stream.safe_enable()
+                    except Exception as err:
+                        self.log.info('Exception while trying to enable stream: {err}', err=err)
+                    next_reconfig += 60
                 yield dsleep(1)
+
             yield dsleep(0.005)
 
         handler.stopListening()
