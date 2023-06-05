@@ -1,7 +1,8 @@
+import time
+from datetime import datetime
+
 import ocs
 import pytest
-from datetime import datetime
-import time
 from flask import jsonify, request
 from http_server_mock import HttpServerMock
 from integration.util import create_crossbar_fixture

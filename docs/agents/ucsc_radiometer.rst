@@ -15,7 +15,7 @@ The UCSC Radiometer agent uses HTTP queries to publish pwv data from a Flask ser
 
 Configuration File Examples
 ---------------------------
-Below are configuration examples for the ocs config file and for running the 
+Below are configuration examples for the ocs config file and for running the
 Agent in a docker container
 
 OCS Site Config
@@ -53,9 +53,9 @@ example docker-compose service configuration is shown here::
 Description
 -----------
 
-The UCSC radiometer measures precipitable water vapor (pwv) of the atmosphere, 
-and outputs the values to a textfile per day on a computer at the site where OCS 
-is not setup. As a result, a Flask app is built to server textfiles from the 
+The UCSC radiometer measures precipitable water vapor (pwv) of the atmosphere,
+and outputs the values to a textfile per day on a computer at the site where OCS
+is not setup. As a result, a Flask app is built to server textfiles from the
 radiometer server, where this Agent uses HTTP queries to publish pwv data to OCS.
 
 Agent API

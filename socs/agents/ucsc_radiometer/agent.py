@@ -1,9 +1,9 @@
+from os import environ
+
 import requests
 import txaio
-
-from os import environ
 from ocs import ocs_agent, site_config
-from ocs.ocs_twisted import TimeoutLock, Pacemaker
+from ocs.ocs_twisted import Pacemaker, TimeoutLock
 
 
 class UCSCRadiometerAgent:
@@ -18,6 +18,7 @@ class UCSCRadiometerAgent:
     year : int
         year for the corresponding Julian Day
     """
+
     def __init__(self, agent, url, year):
         self.agent = agent
         self.log = agent.log

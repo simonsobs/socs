@@ -1,7 +1,7 @@
-import os
-import glob
-import time
 import datetime
+import glob
+import os
+import time
 
 from flask import Flask, jsonify
 
@@ -16,7 +16,7 @@ def _julian_day_year_to_unixtime(day, year):
         day (float): day of the year
         year (int):  year for the corresponding Julian Day
     """
-    a = datetime.datetime(year, 1, 1) + datetime.timedelta(day-1)
+    a = datetime.datetime(year, 1, 1) + datetime.timedelta(day - 1)
     unixtime = time.mktime(a.timetuple())
 
     return unixtime
@@ -68,8 +68,7 @@ def get_latest_pwv_file(data_dir):
 
     """
     year = datetime.datetime.now().year
-    files = glob.glob(os.path.join(data_dir, f"PWV_UCSC*{year}*.txt"))
-    files.sort()
+    files = sorted(glob.glob(os.path.join(data_dir, f"PWV_UCSC*{year}*.txt")))
     return files[-1]
 
 
