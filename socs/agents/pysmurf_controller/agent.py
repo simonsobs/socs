@@ -331,7 +331,7 @@ class PysmurfController:
     @ocs_agent.param("duration", default=None, type=float)
     @ocs_agent.param('kwargs', default=None)
     @ocs_agent.param('load_tune', default=True, type=bool)
-    @ocs_agent.param('stream_type', default='obs')
+    @ocs_agent.param('stream_type', default='obs', choices=['obs', 'oper'])
     @ocs_agent.param('subtype', default=None)
     @ocs_agent.param('tag', default=None)
     @ocs_agent.param('test_mode', default=False, type=bool)
