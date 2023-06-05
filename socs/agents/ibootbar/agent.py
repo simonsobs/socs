@@ -100,7 +100,7 @@ def _build_message(get_result, names, time):
     return message
 
 
-def update_cache(get_result, names, timestamp):
+def update_cache(get_result, names, outlet_locked, timestamp):
     """Update the OID Value Cache.
 
     The OID Value Cache is used to store each unique OID and will be passed to
@@ -124,6 +124,8 @@ def update_cache(get_result, names, timestamp):
         Result from a pysnmp GET command.
     names : list
         List of strings for outlet names
+    outlet_locked : list of bool
+        List of bool for outlets (1-8) that are locked
     timestamp : float
         Timestamp for when the SNMP GET was issued.
     """
@@ -142,6 +144,7 @@ def update_cache(get_result, names, timestamp):
         # Update OID Cache for session.data
         oid_cache[field_name] = {"status": oid_value}
         oid_cache[field_name]["name"] = names[int(field_name[-1])]
+        oid_cache[field_name]["locked"] = outlet_locked[int(field_name[-1])]
         oid_cache[field_name]["description"] = oid_description
         oid_cache['ibootbar_connection'] = {'last_attempt': time.time(),
                                             'connected': True}
@@ -164,7 +167,7 @@ class ibootbarAgent:
     version : int
         SNMP version for communication (1, 2, or 3), defaults to 2.
     lock_outlet : list of ints
-        List of outlets to lock on agent startup.
+        List of outlets to lock on agent startup. Outlets are numbered 1-8.
 
     Attributes
     ----------
@@ -198,6 +201,7 @@ class ibootbarAgent:
         self.snmp = SNMPTwister(address, port)
 
         self.lastGet = 0
+        self.sample_rate = 60
 
         agg_params = {
             'frame_length': 10 * 60  # [sec]
@@ -246,8 +250,8 @@ class ibootbarAgent:
             yield dsleep(1)
             read_time = time.time()
 
-            # Check if 60 seconds has passed before getting status
-            if (read_time - self.lastGet) < 60:
+            # Check if sample rate time has passed before getting status
+            if (read_time - self.lastGet) < self.sample_rate:
                 continue
 
             get_list = []
@@ -271,7 +275,7 @@ class ibootbarAgent:
             # Do not publish if ibootbar connection has dropped
             try:
                 # Update session.data
-                oid_cache = update_cache(get_result, names, read_time)
+                oid_cache = update_cache(get_result, names, self.outlet_locked, read_time)
                 oid_cache['address'] = self.address
                 session.data = oid_cache
                 self.log.debug("{data}", data=session.data)
@@ -316,9 +320,9 @@ class ibootbarAgent:
         Parameters
         ----------
         outlet : int
-            Outlet number to set. Choices are 1-8 (physical outlets), corresponding to 0-7 index for OIDs
+            Outlet number to set. Choices are 1-8 (physical outlets).
         state : str
-            State to set outlet to
+            State to set outlet to, which may be 'on' or 'off'
         """
         with self.lock.acquire_timeout(3, job='set_outlet') as acquired:
             if not acquired:
@@ -336,12 +340,12 @@ class ibootbarAgent:
                 state = 0
 
             # Issue SNMP SET command to given outlet
-            outlet = [('IBOOTPDU-MIB', 'outletControl', params['outlet'] - 1)]
+            outlet = [('IBOOTPDU-MIB', 'outletControl', outlet_id)]
             setcmd = yield self.snmp.set(outlet, self.version, state)
             self.log.info('{}'.format(setcmd))
 
-        # Force SNMP GET status commands by rewinding the lastGet time by 60 seconds
-        self.lastGet = self.lastGet - 60
+        # Force SNMP GET status commands by rewinding the lastGet time by sample rate time
+        self.lastGet = self.lastGet - self.sample_rate
 
         return True, 'Set outlet {} to {}'.\
             format(params['outlet'], params['state'])
@@ -357,7 +361,7 @@ class ibootbarAgent:
         Parameters
         ----------
         outlet : int
-            Outlet number to cycle. Choices are 1-8 (physical outlets), corresponding to 0-7 index for OIDs
+            Outlet number to cycle. Choices are 1-8 (physical outlets).
         cycle_time : int
             The amount of seconds to cycle an outlet. Default is 10 seconds.
         """
@@ -371,20 +375,20 @@ class ibootbarAgent:
                 return False, 'Outlet {} is locked. Cannot cycle outlet.'.format(params['outlet'])
 
             # Issue SNMP SET command for cycle time
-            set_cycle = [('IBOOTPDU-MIB', 'outletCycleTime', params['outlet'] - 1)]
+            set_cycle = [('IBOOTPDU-MIB', 'outletCycleTime', outlet_id)]
             setcmd1 = yield self.snmp.set(set_cycle, self.version, params['cycle_time'])
             self.log.info('{}'.format(setcmd1))
 
             # Issue SNMP SET command to given outlet
-            outlet = [('IBOOTPDU-MIB', 'outletControl', params['outlet'] - 1)]
+            outlet = [('IBOOTPDU-MIB', 'outletControl', outlet_id)]
             setcmd2 = yield self.snmp.set(outlet, self.version, 2)
             self.log.info('{}'.format(setcmd2))
             self.log.info('Cycling outlet {} for {} seconds'.
-                          format(params['outlet'] - 1, params['cycle_time']))
+                          format(outlet_id, params['cycle_time']))
 
         # Force SNMP GET status commands throughout the cycle time
         for i in range(params['cycle_time'] + 1):
-            self.lastGet = self.lastGet - 60
+            self.lastGet = self.lastGet - self.sample_rate
             yield dsleep(1)
 
         return True, 'Cycled outlet {} for {} seconds'.\
@@ -410,7 +414,7 @@ class ibootbarAgent:
             self.log.info('{}'.format(setcmd))
 
         # Force SNMP GET status commands
-        self.lastGet = self.lastGet - 60
+        self.lastGet = self.lastGet - self.sample_rate
 
         return True, 'Rebooting. Outlets will be set to their initial states.'
 
@@ -424,7 +428,7 @@ class ibootbarAgent:
         Parameters
         ----------
         outlet : int
-            Outlet number to lock/unlock. Choices are 1-8 (physical outlets), corresponding to 0-7 index for OIDs
+            Outlet number to lock/unlock. Choices are 1-8 (physical outlets).
         lock : bool
             Set to true to lock, set to false to unlock
         """
