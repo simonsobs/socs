@@ -75,18 +75,10 @@ Agent Fields
 ````````````
 
 The fields consist of the register name and the last value, which are necessarily
-formatted depending on the register. There is also a connection field to provide
-the last timestamp the agent was successfully connected to the generator.
+formatted depending on the register.
 
 Agent API
 ---------
 
 .. autoclass:: socs.agents.generator.agent.GeneratorAgent
     :members:
-
-Supporting APIs
----------------
-
-.. autoclass:: socs.agents.generator.agent.update_cache
-    :members:
-    :noindex:

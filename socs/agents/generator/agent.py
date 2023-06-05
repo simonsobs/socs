@@ -8,27 +8,28 @@ import txaio
 import yaml
 from pyModbusTCP.client import ModbusClient
 
-on_rtd = os.environ.get('READTHEDOCS') == 'True'
-if not on_rtd:
-    from ocs import ocs_agent, site_config
-    from ocs.ocs_twisted import TimeoutLock
+from ocs import ocs_agent, site_config
+from ocs.ocs_twisted import TimeoutLock
 
 byteorder = sys.byteorder
 
 
 def twos(val, bytes):
-    '''Take an unsigned integer representation of a two's compilment integer and return the correctly signed integer'''
+    """Take an unsigned integer representation of a two's compilment integer
+    and return the correctly signed integer"""
     b = val.to_bytes(bytes, byteorder=byteorder, signed=False)
     return int.from_bytes(b, byteorder=byteorder, signed=True)
 
 
 def interp_unsigned_double_reg(r1, r2):
-    '''Take two 16 bit register values and combine them assuming we really wanted to read a 32 bit unsigned register'''
+    """Take two 16 bit register values and combine them assuming we really
+    wanted to read a 32 bit unsigned register"""
     return (r1 << 16) + r2
 
 
 def interp_signed_double_reg(r1, r2):
-    '''Take two 16 bit register values and combine them assuming we really wanted to read a 32 bit signed register'''
+    """Take two 16 bit register values and combine them assuming we really
+    wanted to read a 32 bit signed register"""
     return twos(interp_unsigned_double_reg(r1, r2), 4)
 
 
@@ -98,6 +99,29 @@ class ReadString(object):
 
 
 class GeneratorAgent:
+    """Monitor the Generator controller via ModBus.
+
+    Parameters
+    ----------
+    agent : OCSAgent
+        OCSAgent object which forms this Agent
+    host : str
+        Address of the generator controller.
+    port : int
+        Port to generator controller, default to 5021.
+    read_config : str
+        Path to config file of registers.
+
+    Attributes
+    ----------
+    agent : OCSAgent
+        OCSAgent object which forms this Agent
+    take_data : bool
+        Tracks whether or not the agent is actively issuing SNMP GET commands
+        to the ibootbar. Setting to false stops sending commands.
+    log : txaio.tx.Logger
+        txaio logger object, created by the OCSAgent
+    """
 
     def __init__(self, agent, host='localhost', port=5021, read_config=None):
 
@@ -116,7 +140,7 @@ class GeneratorAgent:
 
         if read_config is not None:
             with open(read_config) as f:
-                data = yaml.load(f, Loader=yaml.FullLoader)
+                data = yaml.load(f, Loader=yaml.SafeLoader)
             self.build_config([data])
             self.log.info("Config file loaded successfully.")
         else:
@@ -148,6 +172,7 @@ class GeneratorAgent:
 
         return data
 
+    @ocs_agent.param('auto_acquire', default=False, type=bool)
     def init_generator(self, session, params=None):
         """init_generator(auto_acquire=False)
 
@@ -158,10 +183,6 @@ class GeneratorAgent:
                 initialization if True. Defaults to False.
 
         """
-        if params is None:
-            params = {}
-
-        auto_acquire = params.get('auto_acquire', False)
 
         if self.initialized:
             return True, "Already initialized."
@@ -183,11 +204,12 @@ class GeneratorAgent:
                 return False, 'Could not connect to generator'
 
         # Start data acquisition if requested
-        if auto_acquire:
+        if params['auto_acquire']:
             self.agent.start('acq')
 
         return True, 'Generator initialized.'
 
+    @ocs_agent.param('_')
     def acq(self, session, params=None):
         """acq()
 
@@ -217,8 +239,6 @@ class GeneratorAgent:
         out of range.
 
         """
-        if params is None:
-            params = {}
 
         with self.lock.acquire_timeout(0, job='acq') as acquired:
             if not acquired:
@@ -319,22 +339,10 @@ def main(args=None):
 
     parser = make_parser()
 
-    # Not used anymore, but we don't it to break the agent if these args are passed
-    parser.add_argument('--fake-data', help=argparse.SUPPRESS)
-    parser.add_argument('--num-channels', help=argparse.SUPPRESS)
-
     # Interpret options in the context of site_config.
     args = site_config.parse_args(agent_class='GeneratorAgent',
                                   parser=parser,
                                   args=args)
-
-    if args.fake_data is not None:
-        warnings.warn("WARNING: the --fake-data parameter is deprecated, please "
-                      "remove from your site-config file", DeprecationWarning)
-
-    if args.num_channels is not None:
-        warnings.warn("WARNING: the --num-channels parameter is deprecated, please "
-                      "remove from your site-config file", DeprecationWarning)
 
     # Automatically acquire data if requested (default)
     init_params = False
