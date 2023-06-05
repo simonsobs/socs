@@ -10,6 +10,7 @@ from pyModbusTCP.client import ModbusClient
 
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
+from ocs.ocs_twisted import Pacemaker
 
 byteorder = sys.byteorder
 
@@ -109,8 +110,6 @@ class GeneratorAgent:
         Address of the generator controller.
     port : int
         Port to generator controller, default to 5021.
-    read_config : str
-        Path to config file of registers.
 
     Attributes
     ----------
@@ -123,7 +122,7 @@ class GeneratorAgent:
         txaio logger object, created by the OCSAgent
     """
 
-    def __init__(self, agent, host='localhost', port=5021, read_config=None):
+    def __init__(self, agent, host='localhost', port=5021):
 
         self.host = host
         self.port = port
@@ -137,14 +136,12 @@ class GeneratorAgent:
         self.take_data = False
 
         self.client = None
-
-        if read_config is not None:
-            with open(read_config) as f:
-                data = yaml.load(f, Loader=yaml.SafeLoader)
-            self.build_config([data])
-            self.log.info("Config file loaded successfully.")
-        else:
-            self.log.info("No config file provided.")
+        
+        read_config = os.path.join(os.path.dirname(__file__), "config.yaml")
+        with open(read_config) as f:
+            data = yaml.load(f, Loader=yaml.SafeLoader)
+        self.build_config([data])
+        self.log.info("Config file loaded successfully.")
 
         agg_params = {
             'frame_length': 10 * 60  # [sec]
@@ -209,7 +206,7 @@ class GeneratorAgent:
 
         return True, 'Generator initialized.'
 
-    @ocs_agent.param('_')
+    # @ocs_agent.param('_')
     def acq(self, session, params=None):
         """acq()
 
@@ -234,9 +231,9 @@ class GeneratorAgent:
                  'connection': {'last_attempt': 1680812613.939653, 'connected': True}},
              "timestamp":1601925677.6914878}
 
-        Refer to the config file for all possible fields and their respective
-        min/max values and units. Note: -1 will be returned for readings
-        out of range.
+        Refer to the config file at /socs/agents/generator/config.yaml for all possible
+        fields and their respective min/max values and units.
+        Note: -1 will be returned for readings out of range.
 
         """
 
@@ -252,7 +249,9 @@ class GeneratorAgent:
 
             session.data = {"fields": {}}
 
+            pm = Pacemaker(1, quantize=True)
             while self.take_data:
+                pm.sleep()
                 current_time = time.time()
                 data = {
                     'timestamp': current_time,
@@ -327,8 +326,6 @@ def make_parser(parser=None):
                         help="Port to listen on.")
     pgroup.add_argument('--mode', type=str, choices=['idle', 'init', 'acq'],
                         help="Starting action for the agent.")
-    pgroup.add_argument('--read-config', type=str,
-                        help="Path to config file.")
 
     return parser
 
@@ -355,8 +352,7 @@ def main(args=None):
 
     p = GeneratorAgent(agent,
                        host=args.host,
-                       port=int(args.port),
-                       read_config=args.read_config)
+                       port=int(args.port))
 
     agent.register_task('init_generator', p.init_generator,
                         startup=init_params)
