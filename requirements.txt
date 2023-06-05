@@ -6,8 +6,9 @@ twisted
 
 # hardware communication
 pyserial
-pysnmp
+pysnmp-lextudio
 pysmi
+pyasn1==0.4.8
 
 # common dependencies - used by multiple agents
 numpy
@@ -38,6 +39,9 @@ sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master
 
 # synacc agent
 requests
+
+# timing master monitor
+pyepics
 
 # xy_stage
 xy_stage_control @ git+https://github.com/kmharrington/xy_stage_control.git@main

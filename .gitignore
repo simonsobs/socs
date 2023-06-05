@@ -137,3 +137,5 @@ key.*
 node.pid
 
 .DS_Store
+
+*.db

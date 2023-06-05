@@ -45,6 +45,9 @@ smurf_sim_deps = ['so3g']
 # Synaccess Agent
 synacc_deps = ['requests']
 
+# Timing Master Monitor
+timing_master_deps = ['pyepics']
+
 # LATRt XY Stage Agent
 # xy_stage_deps = [
 #     'xy_stage_control @ git+https://github.com/kmharrington/xy_stage_control.git@main',
@@ -54,7 +57,7 @@ synacc_deps = ['requests']
 # all_deps = acu_deps + labjack_deps + magpie_deps + pfeiffer_deps + \
 #    pysmurf_deps + smurf_sim_deps + synacc_deps + xy_stage_deps
 all_deps = labjack_deps + magpie_deps + pfeiffer_deps + \
-    smurf_sim_deps + synacc_deps
+    smurf_sim_deps + synacc_deps + timing_master_deps
 all_deps = list(set(all_deps))
 
 setup(
@@ -94,11 +97,12 @@ setup(
         'numpy',
         'ocs',
         'pyserial',
-        'pysnmp',
+        'pysnmp-lextudio',
         'pysmi',
         'pyyaml',
         'sqlalchemy>=1.4',
         'twisted',
+        'pyasn1==0.4.8',
     ],
     extras_require={
         'all': all_deps,
@@ -110,6 +114,7 @@ setup(
         # 'pysmurf': pysmurf_deps,
         'smurf_sim': smurf_sim_deps,
         'synacc': synacc_deps,
+        'timing_master': timing_master_deps,
         # 'xy_stage': xy_stage_deps,
     },
 )

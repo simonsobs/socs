@@ -36,13 +36,18 @@ hosts:
        'arguments': [['--ip-address', '127.0.0.1'],
                        ['--port-number', '9001'],
                        ['--turbo-address', '1']]},
-      {'agent-class': 'RotationAgent',
-       'instance-id': 'rotator',
-       'arguments': [['--kikusui-ip', '127.0.0.1'],
-                     ['--kikusui-port', '2000'],
-                     ['--pid-ip', '127.0.0.1'],
-                     ['--pid-port', '2001'],
+      {'agent-class': 'HWPPIDAgent',
+       'instance-id': 'hwp-pid',
+       'arguments': [['--ip', '127.0.0.1'],
+                     ['--port', '2000'],
                      ['-v'],
+                     ['--mode', 'init'],
+                    ]
+      },
+      {'agent-class': 'HWPPMXAgent',
+       'instance-id': 'hwp-pmx',
+       'arguments': [['--ip', '127.0.0.1'],
+                     ['--port', '5025'],
                      ['--mode', 'init'],
                     ]
       },
@@ -94,10 +99,17 @@ hosts:
                      ['--snmp-version', 1],
                     ]
       },
+      {'agent-class': 'PysmurfMonitor',
+       'instance-id': 'pysmurf-monitor',
+       'arguments': [['--udp-port', 8200],
+                     ['--create-table', True],
+                     ['--echo-sql'],
+                     ['--test-mode']
+                    ]
+      },
       {'agent-class': 'UCSCRadiometerAgent',
       'instance-id': 'pwvs',
       'arguments': [['--url', 'http://127.0.0.1:5002']]
       },
-
     ]
   }
