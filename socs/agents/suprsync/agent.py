@@ -6,13 +6,16 @@ import time
 import txaio
 from ocs import ocs_agent, site_config
 
-from socs.db.suprsync import SupRsyncFileHandler, SupRsyncFilesManager
+from socs.db.suprsync import (
+    SupRsyncFileHandler, SupRsyncFilesManager, check_timecode, split_path
+    TimecodeDir,
+)
 
 
 class SupRsync:
     """
     Agent to rsync files to a remote (or local) destination, verify successful
-    transfer, and delete local files after a specified amount of time.
+    transfer, and delete local files after a specified amount of time. 
 
     Parameters
     --------------
@@ -48,6 +51,7 @@ class SupRsync:
 
     def __init__(self, agent, args):
         self.agent = agent
+        self.instance_id = args.instance_id
         self.log = txaio.make_logger()
         self.archive_name = args.archive_name
         self.ssh_host = args.ssh_host
@@ -70,6 +74,80 @@ class SupRsync:
                                  agg_params={
                                      'exclude_aggregator': True,
                                  })
+    
+    def _update_tcdir(self, tcdir, srfm, session):
+        """
+        Takes the next series of actions for a timecode dir object.
+        - If we expect no more files to be added to the tc dir, marks it as
+          complete
+        - If all files in the tc dir have been synced, marks it as synced
+        - If the tc dir is synced and not finalized, creates the finalization
+          file and marks as finalized.
+        """
+        if tcdir.finalized:
+            return
+        
+        if not tcdir.completed:
+            all_tcs = session.query(TimecodeDir.timecode).all()
+            for tc, in all_tcs:
+                if tc > tcdir.timecode:
+                    # Mark as complete if there's a timecode after this one
+                    tcdir.completed = True
+                    break
+            else:
+                # No timecodes after this one. Mark after complete if we are
+                # over a full day away.
+                if (time.time()//1e5 - tcdir.timecode) > 1:
+                    tcdir.completed = True
+
+        # Gets all files in this tcdir
+        files = session.query(SupRsyncFile).filter(
+            SupRsyncFile.remote_path.like(f'{tcdir.timecode}/%')
+        ).all()
+        
+        if tcdir.completed and not tcdir.synced:
+            for f in files:
+                if f.local_md5sum != f.remote_md5sum:
+                    break # File is not synced properly
+            else:
+                tcdir.synced = True
+        
+        if tcdir.synced and not tcdir.finalized: # Finalize file
+            # Get subdirs this suprsync instance is responsible for
+            subdirs = set()
+            for f in files:
+                split = split_path(f.remote_path)
+                if len(split) > 2:
+                subdirs.add(split[1])
+
+            tcdir_summary = {
+                'timecode': tcdir.timecode,
+                'num_files': len(files),
+                'subdirs': list(subdirs),
+                'finalized_at': time.time(),
+                'archive_name': tcdir.archive_name,
+                'instance_id': self.instance_id
+            }
+
+            tc = int(time.time() // 1e5)
+            timestamp = int(time.time())
+            instance_id = self.agent.instance_id
+            fname = f'{timestamp}_{tcdir.archive_name}_{tcdir.timecode}_final.yaml'
+            finalize_local_path = os.path.join(
+                self.finalize_root, str(tc), 'suprsync', self.instance_id, fname,
+            )
+            finalize_remote_path = os.path.join(
+                str(tc), 'suprsync', self.instance_id, fname
+            )
+            with open(finalize_local_path, 'w') as f:
+                yaml.dump(tcdir_summary, f)
+            
+            file = srfm.add_file(
+                finalize_local_path, finalize_remote_path, self.archive_name,
+                session=session
+            )
+            tcdir.finalized = True
+            tcdir.finalize_file_id = file.id
 
     def run(self, session, params=None):
         """run()
@@ -132,6 +210,7 @@ class SupRsync:
             counters['iterations'] += 1
 
             op = {'start_time': time.time()}
+
             try:
                 session.data['activity'] = 'copying'
                 op['files'] = handler.copy_files(max_copy_attempts=self.max_copy_attempts,
@@ -161,6 +240,9 @@ class SupRsync:
             if self.delete_after is not None:
                 session.data['activity'] = 'deleting'
                 handler.delete_files(self.delete_after)
+
+            # After handling files, update the timecode dirs
+            self.update_timecode_dirs(srfm)
 
             session.data['activity'] = 'idle'
             time.sleep(self.sleep_time)
