@@ -331,6 +331,9 @@ class PysmurfController:
     @ocs_agent.param("duration", default=None, type=float)
     @ocs_agent.param('kwargs', default=None)
     @ocs_agent.param('load_tune', default=True, type=bool)
+    @ocs_agent.param('stream_type', default='obs', choices=['obs', 'oper'])
+    @ocs_agent.param('subtype', default=None)
+    @ocs_agent.param('tag', default=None)
     @ocs_agent.param('test_mode', default=False, type=bool)
     def stream(self, session, params):
         """stream(duration=None)
@@ -350,6 +353,15 @@ class PysmurfController:
         load_tune : bool
             If true, will load a tune-file to the pysmurf object on
             instantiation.
+        stream_type : string, optional
+            Stream type. This can be either 'obs' or 'oper', and will be 'obs'
+            by default. The tags attached to the stream will be
+            ``<stream_type>,<subtype>,<tag>``.
+        subtype : string, optional
+            Operation subtype used tot tag the stream.
+        tag : string, optional
+            Tag (or comma-separated list of tags) to attach to the G3 stream.
+            This has precedence over the `tag` key in the kwargs dict.
 
         Notes
         ------
@@ -363,6 +375,13 @@ class PysmurfController:
         """
         if params['kwargs'] is None:
             params['kwargs'] = {}
+
+        if params['stream_type']:
+            params['kwargs']['tag'] = params['stream_type']
+        if params['subtype'] is not None:
+            params['kwargs']['subtype'] = params['subtype']
+        if params['tag'] is not None:
+            params['kwargs']['tag'] = params['tag']
 
         with self.lock.acquire_timeout(0, job='stream') as acquired:
             if not acquired:
@@ -533,6 +552,7 @@ class PysmurfController:
 
     @ocs_agent.param('duration', default=30., type=float)
     @ocs_agent.param('kwargs', default=None)
+    @ocs_agent.param('tag', default=None)
     def take_noise(self, session, params):
         """take_noise(duration=30., kwargs=None)
 
@@ -549,6 +569,10 @@ class PysmurfController:
         kwargs : dict
             Dict containing additional keyword args to pass to the take_noise
             function.
+        tag : string, optional
+            Tag (or comma-separated list of tags) to attach to the G3 stream.
+            This has precedence over the `tag` key in the kwargs dict.
+
 
         Notes
         -------
@@ -565,6 +589,9 @@ class PysmurfController:
         if params['kwargs'] is None:
             params['kwargs'] = {}
 
+        if params['tag'] is not None:
+            params['kwargs']['g3_tag'] = params['tag']
+
         with self.lock.acquire_timeout(0, job='take_noise') as acquired:
             if not acquired:
                 return False, f"Operation failed: {self.lock.job} is running."
@@ -575,6 +602,7 @@ class PysmurfController:
             return True, "Finished taking noise"
 
     @ocs_agent.param('kwargs', default=None)
+    @ocs_agent.param('tag', default=None)
     def take_bgmap(self, session, params):
         """take_bgmap(kwargs=None)
 
@@ -589,6 +617,9 @@ class PysmurfController:
         ----
         kwargs : dict
             Additional kwargs to pass to take_bgmap function.
+        tag : Optional[str]
+            String containing a tag or comma-separated list of tags to attach
+            to the g3 stream.
 
         Notes
         ------
@@ -605,6 +636,9 @@ class PysmurfController:
         """
         if params['kwargs'] is None:
             params['kwargs'] = {}
+
+        if params['tag'] is not None:
+            params['kwargs']['g3_tag'] = params['tag']
 
         with self.lock.acquire_timeout(0, job='take_bgmap') as acquired:
             if not acquired:
@@ -630,6 +664,7 @@ class PysmurfController:
             return True, "Finished taking bgmap"
 
     @ocs_agent.param('kwargs', default=None)
+    @ocs_agent.param('tag', default=None)
     def take_iv(self, session, params):
         """take_iv(kwargs=None)
 
@@ -644,6 +679,9 @@ class PysmurfController:
         ----
         kwargs : dict
             Additional kwargs to pass to the ``take_iv`` function.
+        tag : Optional[str]
+            String containing a tag or comma-separated list of tags to attach
+            to the g3 stream.
 
         Notes
         ------
@@ -660,6 +698,9 @@ class PysmurfController:
         """
         if params['kwargs'] is None:
             params['kwargs'] = {}
+
+        if params['tag'] is not None:
+            params['kwargs']['g3_tag'] = params['tag']
 
         with self.lock.acquire_timeout(0, job='take_iv') as acquired:
             if not acquired:
@@ -679,6 +720,7 @@ class PysmurfController:
 
     @ocs_agent.param('kwargs', default=None)
     @ocs_agent.param('rfrac_range', default=(0.2, 0.9))
+    @ocs_agent.param('tag', default=None)
     def take_bias_steps(self, session, params):
         """take_bias_steps(kwargs=None, rfrac_range=(0.2, 0.9))
 
@@ -694,6 +736,9 @@ class PysmurfController:
         rfrac_range : tuple
             Range of valid rfracs to check against when determining the number
             of good detectors.
+        tag : Optional[str]
+            String containing a tag or comma-separated list of tags to attach
+            to the g3 stream.
 
         Notes
         ------
@@ -717,6 +762,9 @@ class PysmurfController:
 
         if params['kwargs'] is None:
             params['kwargs'] = {}
+
+        if params['tag'] is not None:
+            params['kwargs']['g3_tag'] = params['tag']
 
         with self.lock.acquire_timeout(0, job='bias_steps') as acquired:
             if not acquired:
