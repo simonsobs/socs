@@ -35,11 +35,11 @@ def read_data_from_textfile(filename, year):
     """
     with open(filename, 'r') as f:
         i = 0
-        for l in f.readlines():
+        for line in f.readlines():
             if i == 0:
                 pass  # skip header
             else:
-                line = l.strip().split()
+                line = line.strip().split()
                 timestamp = _julian_day_year_to_unixtime(float(line[0]), year)
 
                 pwv = float(line[1])
