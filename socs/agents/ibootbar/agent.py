@@ -201,7 +201,7 @@ class ibootbarAgent:
         self.snmp = SNMPTwister(address, port)
 
         self.lastGet = 0
-        self.sample_rate = 60
+        self.sample_period = 60
 
         agg_params = {
             'frame_length': 10 * 60  # [sec]
@@ -250,8 +250,8 @@ class ibootbarAgent:
             yield dsleep(1)
             read_time = time.time()
 
-            # Check if sample rate time has passed before getting status
-            if (read_time - self.lastGet) < self.sample_rate:
+            # Check if sample period has passed before getting status
+            if (read_time - self.lastGet) < self.sample_period:
                 continue
 
             get_list = []
@@ -344,8 +344,8 @@ class ibootbarAgent:
             setcmd = yield self.snmp.set(outlet, self.version, state)
             self.log.info('{}'.format(setcmd))
 
-        # Force SNMP GET status commands by rewinding the lastGet time by sample rate time
-        self.lastGet = self.lastGet - self.sample_rate
+        # Force SNMP GET status commands by rewinding the lastGet time by sample period
+        self.lastGet = self.lastGet - self.sample_period
 
         return True, 'Set outlet {} to {}'.\
             format(params['outlet'], params['state'])
@@ -388,7 +388,7 @@ class ibootbarAgent:
 
         # Force SNMP GET status commands throughout the cycle time
         for i in range(params['cycle_time'] + 1):
-            self.lastGet = self.lastGet - self.sample_rate
+            self.lastGet = self.lastGet - self.sample_period
             yield dsleep(1)
 
         return True, 'Cycled outlet {} for {} seconds'.\
@@ -414,7 +414,7 @@ class ibootbarAgent:
             self.log.info('{}'.format(setcmd))
 
         # Force SNMP GET status commands
-        self.lastGet = self.lastGet - self.sample_rate
+        self.lastGet = self.lastGet - self.sample_period
 
         return True, 'Rebooting. Outlets will be set to their initial states.'
 
