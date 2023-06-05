@@ -133,7 +133,9 @@ class LabJackFunctions:
 
         # Import the Ohms to Celsius cal curve and apply cubic
         # interpolation to find the temperature
-        reader = csv.reader(open('cal_curves/GA10K4D25_cal_curve.txt'),
+        cal_curves = os.path.join(os.path.dirname(__file__),
+                                  'cal_curves/GA10K4D25_cal_curve.txt')
+        reader = csv.reader(open(cal_curves),
                             delimiter=' ')
         lists = [el for el in [row for row in reader]]
         T_cal = np.array([float(RT[0]) for RT in lists[1:]])
