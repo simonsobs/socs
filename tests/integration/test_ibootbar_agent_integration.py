@@ -94,6 +94,7 @@ def test_ibootbar_cycle_outlet(wait_for_crossbar, start_responder, run_agent, cl
     resp = client.cycle_outlet(outlet=7, cycle_time=5)
     check_resp_success(resp)
 
+
 @pytest.mark.integtest
 def test_ibootbar_set_locked_outlet(wait_for_crossbar, start_responder, run_agent, client):
     resp = client.lock_outlet(outlet=2, lock=True)
@@ -102,6 +103,7 @@ def test_ibootbar_set_locked_outlet(wait_for_crossbar, start_responder, run_agen
     resp = client.set_outlet(outlet=2, state="off")
     assert resp.session["op_code"] == OpCode.FAILED.value
 
+
 @pytest.mark.integtest
 def test_ibootbar_cycle_locked_outlet(wait_for_crossbar, start_responder, run_agent, client):
     resp = client.lock_outlet(outlet=2, lock=True)
@@ -109,6 +111,7 @@ def test_ibootbar_cycle_locked_outlet(wait_for_crossbar, start_responder, run_ag
 
     resp = client.cycle_outlet(outlet=2, cycle_time=5)
     assert resp.session["op_code"] == OpCode.FAILED.value
+
 
 @pytest.mark.integtest
 def test_ibootbar_unlock_outlet(wait_for_crossbar, start_responder, run_agent, client):
