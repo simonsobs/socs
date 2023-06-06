@@ -206,7 +206,7 @@ class GeneratorAgent:
 
         return True, 'Generator initialized.'
 
-    # @ocs_agent.param('_')
+    @ocs_agent.param('_')
     def acq(self, session, params=None):
         """acq()
 
@@ -252,6 +252,7 @@ class GeneratorAgent:
             pm = Pacemaker(1, quantize=True)
             while self.take_data:
                 pm.sleep()
+
                 current_time = time.time()
                 data = {
                     'timestamp': current_time,
@@ -285,7 +286,6 @@ class GeneratorAgent:
                     else:
                         self.log.info('Connection error or error in processing data.')
                         self.initialized = False
-                        time.sleep(1)
 
                 session.data.update({'timestamp': current_time})
 
@@ -294,12 +294,9 @@ class GeneratorAgent:
                     session.data.update({'connection': {'last_attempt': time.time(),
                                                         'connected': False}})
                     self.log.info('Trying to reconnect.')
-                    time.sleep(1)
                     continue
 
                 self.agent.publish_to_feed('generator', data)
-
-                time.sleep(1)
 
             self.agent.feeds['generator'].flush_buffer()
 
