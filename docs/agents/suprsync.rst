@@ -184,7 +184,7 @@ where the remote-basedir is set in the suprsync site config, and everything
 after is what is registered as the ``remote_path`` in the suprsync database.
 
 With this schema, it is important to transmit information that will allow
-upstream processors to determine whether or not a timecode directory is
+downstream processors to determine whether or not a timecode directory is
 complete, as opposed to not copied over yet.
 
 The SupRsync database will now automatically detect the timecode directory of
@@ -225,7 +225,7 @@ This file will be synced to the remote path::
 
     <remote_basedir>/16861/suprsync/smurf-sync-srv20/1686152766_smurf_16750_finalized.yaml
 
-where it can be processed by upstream data packaging software.
+where it can be processed by downstream data packaging software.
 
 
 Agent API
