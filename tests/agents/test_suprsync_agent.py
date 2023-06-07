@@ -4,10 +4,8 @@ import time
 import numpy as np
 import txaio
 
-from socs.db.suprsync import (
-    SupRsyncFileHandler, SupRsyncFilesManager,
-    SupRsyncFile, TimecodeDir
-)
+from socs.db.suprsync import (SupRsyncFile, SupRsyncFileHandler,
+                              SupRsyncFilesManager, TimecodeDir)
 
 txaio.use_twisted()
 
@@ -22,6 +20,7 @@ def test_suprsync_files_manager(tmp_path):
     fpath = tmp_path / 'test.txt'
     fpath.write_text('test')
     srfm.add_file(str(fpath.absolute()), 'test.txt', 'test')
+
 
 def test_timecode_dirs(tmp_path):
     txaio.start_logging(level='info')
@@ -40,7 +39,7 @@ def test_timecode_dirs(tmp_path):
     srfm = SupRsyncFilesManager(db_path)
 
     tc = time.time() // 1e5
-    tcs = np.arange(tc-5, tc+1, dtype=int).tolist()
+    tcs = np.arange(tc - 5, tc + 1, dtype=int).tolist()
     print(tcs)
 
     file_data = np.zeros(10)
@@ -77,8 +76,7 @@ def test_timecode_dirs(tmp_path):
                 finalize_files.append(os.path.join(root, f))
 
     print(finalize_files)
-    assert(len(finalize_files) == len(tcs) - 1)
-
+    assert (len(finalize_files) == len(tcs) - 1)
 
     assert False
 

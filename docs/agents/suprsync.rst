@@ -194,7 +194,7 @@ new files that are added, and will track whether a timecode directory is
 
 Once a timecode directory is complete and fully synced, suprsync will write a
 finalization file::
-    
+
     <timestamp>_<archive_name>_<dir timecode>_finalized.yaml
 
 that will contain information about the timecode directory, including the
