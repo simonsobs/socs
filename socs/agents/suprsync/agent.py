@@ -8,10 +8,11 @@ from ocs import ocs_agent, site_config
 
 from socs.db.suprsync import SupRsyncFileHandler, SupRsyncFilesManager
 
+
 class SupRsync:
     """
     Agent to rsync files to a remote (or local) destination, verify successful
-    transfer, and delete local files after a specified amount of time. 
+    transfer, and delete local files after a specified amount of time.
 
     Parameters
     --------------

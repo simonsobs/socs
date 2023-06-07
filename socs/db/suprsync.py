@@ -2,12 +2,13 @@ import os
 import subprocess
 import tempfile
 import time
-import yaml
 
 import txaio
-from sqlalchemy import Boolean, Column, Float, Integer, String, create_engine, ForeignKey
+import yaml
+from sqlalchemy import (Boolean, Column, Float, ForeignKey, Integer, String,
+                        create_engine)
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.orm import relationship, sessionmaker
 
 from socs.util import get_md5sum
 
@@ -50,6 +51,7 @@ class TimecodeDir(Base):
     synced = Column(Boolean, default=False)
     finalized = Column(Boolean, default=False)
     finalize_file_id = Column(Integer, ForeignKey(f"supersync_v{TABLE_VERSION}.id"))
+
 
 class SupRsyncFile(Base):
     """
@@ -109,9 +111,11 @@ class SupRsyncFile(Base):
         ])
         return s
 
+
 def split_path(path):
     """Splits path into a list where each element is a subdirectory"""
     return os.path.normpath(path).strip('/').split('/')
+
 
 def check_timecode(file: SupRsyncFile):
     """
@@ -121,7 +125,7 @@ def check_timecode(file: SupRsyncFile):
     split = split_path(file.remote_path)
     try:
         timecode = int(split[0])
-        if len(str(timecode)) != 5: # Timecode must be 5 digits
+        if len(str(timecode)) != 5:  # Timecode must be 5 digits
             raise ValueError("Timecode not 5 digits")
         return timecode
     except ValueError:
@@ -334,7 +338,7 @@ class SupRsyncFilesManager:
         )
 
         return list(query.all())
-    
+
     def _add_file_tcdir(self, file: SupRsyncFile, session):
         """
         Creates and adds a TimecodeDir for a file if possible.  This will
@@ -347,7 +351,7 @@ class SupRsyncFilesManager:
             return None
 
         tcdir = session.query(TimecodeDir).filter(
-            TimecodeDir.timecode==tc,
+            TimecodeDir.timecode == tc,
             TimecodeDir.archive_name == file.archive_name,
         ).one_or_none()
 
@@ -357,19 +361,19 @@ class SupRsyncFilesManager:
         tcdir = TimecodeDir(timecode=tc, archive_name=file.archive_name)
         session.add(tcdir)
         return tcdir
-    
+
     def create_all_timecode_dirs(self, archive_name):
         with self.Session.begin() as session:
             files = self.get_known_files(archive_name, session=session)
             for file in files:
                 self._add_file_tcdir(file, session)
-    
+
     def update_all_timecode_dirs(self, archive_name, file_root, sync_id):
         with self.Session.begin() as session:
             tcdirs = session.query(TimecodeDir).all()
             for tcdir in tcdirs:
                 self._update_tcdir(tcdir, session, file_root, sync_id)
-    
+
     def _update_tcdir(self, tcdir, session, file_root, sync_id):
         """
         Takes the next series of actions for a timecode dir object.
@@ -381,7 +385,7 @@ class SupRsyncFilesManager:
         """
         if tcdir.finalized:
             return
-        
+
         if not tcdir.completed:
             all_tcs = session.query(TimecodeDir.timecode).all()
             for tc, in all_tcs:
@@ -392,22 +396,22 @@ class SupRsyncFilesManager:
             else:
                 # No timecodes after this one. Mark after complete if we are
                 # over a full day away.
-                if (time.time()//1e5 - tcdir.timecode) > 1:
+                if (time.time() // 1e5 - tcdir.timecode) > 1:
                     tcdir.completed = True
 
         # Gets all files in this tcdir
         files = session.query(SupRsyncFile).filter(
             SupRsyncFile.remote_path.like(f'{tcdir.timecode}/%')
         ).all()
-        
+
         if tcdir.completed and not tcdir.synced:
             for f in files:
                 if f.local_md5sum != f.remote_md5sum:
-                    break # File is not synced properly
+                    break  # File is not synced properly
             else:
                 tcdir.synced = True
-        
-        if tcdir.synced and not tcdir.finalized: # Finalize file
+
+        if tcdir.synced and not tcdir.finalized:  # Finalize file
             # Get subdirs this suprsync instance is responsible for
             subdirs = set()
             for f in files:
@@ -436,14 +440,13 @@ class SupRsyncFilesManager:
             os.makedirs(os.path.dirname(finalize_local_path), exist_ok=True)
             with open(finalize_local_path, 'w') as f:
                 yaml.dump(tcdir_summary, f)
-            
+
             file = self.add_file(
                 finalize_local_path, finalize_remote_path, tcdir.archive_name,
                 session=session
             )
             tcdir.finalized = True
             tcdir.finalize_file_id = file.id
-
 
 
 class SupRsyncFileHandler:
