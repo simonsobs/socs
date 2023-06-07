@@ -8,14 +8,15 @@ from ocs.ocs_twisted import TimeoutLock
 powermeter_keys = {'volt1': 1,
                    'volt2': 3,
                    'volt3': 5,
-                   'current1': 13,
-                   'current2': 15,
-                   'current3': 17,
+                   'amps1': 13,
+                   'amps2': 15,
+                   'amps3': 17,
                    'freq1': 51,
                    'freq2': 53,
-                   'freq3': 55}
+                   'freq3': 55,
+                   'total_active_power': 25}
 
-class ElnetPowerMeterAgent:
+class PowermeterAgent:
     """Monitor the Power Meter.
 
     Parameters
@@ -33,7 +34,7 @@ class ElnetPowerMeterAgent:
     auto_close : bool
         # TODO
     """
-    def __init__(self, agent, ip, port=502, unit_id=1, auto_open=True, auto_close=False):
+    def __init__(self, agent, ip, port, unit_id=1, auto_open=True, auto_close=False):
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
@@ -89,7 +90,7 @@ class ElnetPowerMeterAgent:
 
             c = ModbusClient(host=self.host, port=self.port, auto_open=self.auto_open, auto_close=self.auto_close)
             if c.open():
-                self.client = c
+                self.client = c # TODO this necessary somewhere else? 
                 self.initialized = True
             else:
                 self.initialized = False
@@ -112,25 +113,37 @@ class ElnetPowerMeterAgent:
         test_mode : bool, option
             Run the Process loop only once. Meant only for testing.
             Default is False.
+
         """
-        self.take_data = True
-        while self.take_data:
-            m = ModbusClient(host=self.ip, port=self.port, unit_id=self.unit_id, auto_open=self.auto_open, auto_close=self.auto_close)
+        if params is None:
+            params = {}
 
-            data = {'block_name': 'powermeter_status',
-                    'timestamp': time.time(),
-                    'data' :{}} # add fields? 
+        with self.lock.acquire_timeout(0, job='acq') as acquired:
+            if not acquired:
+                self.log.warn("Could not start acq because {} is already running"
+                              .format(self.lock.job))
+                return False, "Could not acquire lock."
+            
+            session.set_status('running')
 
-            for key in powermeter_keys:
-                val = m.read_holding_registers(powermeter_keys[key],1)
-                val = int(val[0])
-                info = {key: val}
-                data['data'].update(info)
+            self.take_data = True
+            while self.take_data:
+                m = ModbusClient(host=self.ip, port=self.port, unit_id=self.unit_id, auto_open=self.auto_open, auto_close=self.auto_close)
 
-            self.agent.publish_to_feed('powermeter_status', data)
+                data = {'block_name': 'powermeter_status',
+                        'timestamp': time.time(),
+                        'data' :{'fields': {}}}
 
-            if params['test_mode']:
-                break
+                for key in powermeter_keys:
+                    val = m.read_holding_registers(powermeter_keys[key],1)
+                    val = int(val[0])
+                    info = {key: val}
+                    data['data']['fields'].update(info)
+
+                self.agent.publish_to_feed('powermeter_status', data)
+
+                if params['test_mode']:
+                    break
 
         return True, 'Acquisition exited cleanly.'
 
@@ -139,4 +152,49 @@ class ElnetPowerMeterAgent:
         Stops acq process.
         """
         self.take_data = False
-        return True, 'Stopping acq process''
+        return True, 'Stopping acq process'
+
+
+def make_parser(parser=None):
+    if parser is None:
+        parser=argparse.ArgumentParser()
+
+    pgroup = parser.add_argument_group('Agent Options')
+    pgroup.add_argument("--ip", type=str, help="IP Address to listen to.")
+    pgroup.add_argument("--port", type=int, default=502, help="Port to listen on.")
+    pgroup.add_argument"--mode", type=str, choices=['idle', 'init', 'acq'],
+                       help="Starting action for the agent.")
+
+    return parser
+
+def main(args=None):
+    # Start logging
+    txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
+
+    parser = make_parser()
+
+    args = site_config.parse_args(agent_class='PowermeterAgent',
+                                  parser=parser,
+                                  args=args)
+
+    # Automatically acquire data if requested
+    init_params = False
+    if args.mode == 'init':
+        init_params = {'auto_acquire': False}
+    elif args.mode == 'acq':
+        init_params = {'auto_acquire': True}
+
+    agent, runner = ocs_agent.init_site_agent(args)
+
+    p = PowermeterAgent(agent,
+                        ip=agent.ip,
+                        port=int(args.port))
+
+    agent.register_task('init_powermeter', p.init_powermeter,
+                        startup=init_params)
+    agent.register_process('acq', p.acq, p._stop_acq)
+
+    runner.run(agent, auto_reconnect=True)
+
+if __name__ == '__main__':
+    main()
