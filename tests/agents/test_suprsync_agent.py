@@ -80,9 +80,6 @@ def test_timecode_dirs(tmp_path):
     assert(len(finalize_files) == len(tcs) - 1)
 
 
-    assert False
-
-
 def test_suprsync_handle_files(tmp_path):
     """
     Tests file handling
