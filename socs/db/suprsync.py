@@ -428,7 +428,7 @@ class SupRsyncFilesManager:
             timestamp = int(time.time())
             fname = f'{timestamp}_{tcdir.archive_name}_{tcdir.timecode}_finalized.yaml'
             finalize_local_path = os.path.join(
-                file_root, str(tc), 'suprsync', sync_id, fname,
+                file_root, str(tc), sync_id, fname,
             )
             finalize_remote_path = os.path.join(
                 str(tc), 'suprsync', sync_id, fname
