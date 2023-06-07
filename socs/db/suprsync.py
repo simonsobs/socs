@@ -386,6 +386,8 @@ class SupRsyncFilesManager:
         if tcdir.finalized:
             return
 
+        now = time.time()
+
         if not tcdir.completed:
             all_tcs = session.query(TimecodeDir.timecode).all()
             for tc, in all_tcs:
@@ -396,7 +398,7 @@ class SupRsyncFilesManager:
             else:
                 # No timecodes after this one. Mark after complete if we are
                 # over a full day away.
-                if (time.time() // 1e5 - tcdir.timecode) > 1:
+                if (now // 1e5 - tcdir.timecode) > 1:
                     tcdir.completed = True
 
         # Gets all files in this tcdir
@@ -423,13 +425,13 @@ class SupRsyncFilesManager:
                 'timecode': tcdir.timecode,
                 'num_files': len(files),
                 'subdirs': list(subdirs),
-                'finalized_at': time.time(),
+                'finalized_at': now,
                 'archive_name': tcdir.archive_name,
                 'instance_id': sync_id
             }
 
-            tc = int(time.time() // 1e5)
-            timestamp = int(time.time())
+            tc = int(now // 1e5)
+            timestamp = int(now)
             fname = f'{timestamp}_{tcdir.archive_name}_{tcdir.timecode}_finalized.yaml'
             finalize_local_path = os.path.join(
                 file_root, str(tc), sync_id, fname,
@@ -443,7 +445,7 @@ class SupRsyncFilesManager:
 
             file = self.add_file(
                 finalize_local_path, finalize_remote_path, tcdir.archive_name,
-                session=session
+                session=session, timestamp=now
             )
             tcdir.finalized = True
             tcdir.finalize_file_id = file.id

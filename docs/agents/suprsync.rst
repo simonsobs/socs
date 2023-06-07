@@ -205,8 +205,8 @@ be written to is set using the ``--suprsync-file-root`` argument, and the
 path on the remote host will be automatically generated.
 
 Timecode Dir Completion Requirements
-```````````````````````````````````
-A timecode directory will be marked as complete if:
+`````````````````````````````````````
+A timecode directory will be marked as complete if any of the following are true:
 
  - There are files in the suprsync archive written to a newer timecode directory
  - ``tc_now - tc_directory > 1``,  or we are roughly 1 day past when the timecode directory ended.
