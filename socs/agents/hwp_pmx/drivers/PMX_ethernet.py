@@ -38,6 +38,19 @@ class PMX:
             msg += 'Fail'
         return msg, val
 
+    def check_error(self):
+        """ Check oldest error from error queues. Error queues store up to 255 errors """
+        self.sock.sendall(b':system:error?\n')
+        val = self.read()
+        code, msg = val.split(',')
+        code = int(code)
+        msg = msg[1:-2]
+        return msg, code
+
+    def clear_alarm(self):
+        """ Clear alarm """
+        self.sock.sendall(b'output:protection:clear\n')
+
     def turn_on(self):
         """ Turn the PMX on """
         self.sock.sendall(b'output 1\n')
