@@ -89,7 +89,7 @@ class ElnetPowermeterAgent:
 
             session.set_status('starting')
 
-            c = ModbusClient(ip=self.ip, port=self.port, auto_open=self.auto_open, auto_close=self.auto_close)
+            c = ModbusClient(self.ip, port=self.port, auto_open=self.auto_open, auto_close=self.auto_close)
             if c.open():
                 self.client = c # TODO this necessary somewhere else? 
                 self.initialized = True
@@ -129,7 +129,7 @@ class ElnetPowermeterAgent:
 
             self.take_data = True
             while self.take_data:
-                m = ModbusClient(host=self.ip, port=self.port, unit_id=self.unit_id, auto_open=self.auto_open, auto_close=self.auto_close)
+                m = ModbusClient(self.ip, port=self.port, unit_id=self.unit_id, auto_open=self.auto_open, auto_close=self.auto_close)
 
                 data = {'block_name': 'powermeter_status',
                         'timestamp': time.time(),
