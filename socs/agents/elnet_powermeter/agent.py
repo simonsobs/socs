@@ -16,7 +16,7 @@ powermeter_keys = {'volt1': 1,
                    'freq3': 55,
                    'total_active_power': 25}
 
-class PowermeterAgent:
+class ElnetPowermeterAgent:
     """Monitor the Power Meter.
 
     Parameters
@@ -173,7 +173,7 @@ def main(args=None):
 
     parser = make_parser()
 
-    args = site_config.parse_args(agent_class='PowermeterAgent',
+    args = site_config.parse_args(agent_class='ElnetPowermeterAgent',
                                   parser=parser,
                                   args=args)
 
@@ -186,7 +186,7 @@ def main(args=None):
 
     agent, runner = ocs_agent.init_site_agent(args)
 
-    p = PowermeterAgent(agent,
+    p = ElnetPowermeterAgent(agent,
                         ip=agent.ip,
                         port=int(args.port))
 
