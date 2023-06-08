@@ -99,6 +99,46 @@ class ReadString(object):
         return return_data
 
 
+class Generator:
+    """Functions to communite with the Generator controller
+
+    Attributes
+    ----------
+    read_strings : list
+        Strings of registers defined in config to read from
+    """
+
+    def __init__(self):
+        self.read_strings = []
+
+        read_config = os.path.join(os.path.dirname(__file__), "config.yaml")
+        with open(read_config) as f:
+            data = yaml.load(f, Loader=yaml.SafeLoader)
+        self.build_config([data])
+
+    def init_client(self, host, port):
+        client = ModbusClient(host, port, auto_open=True, auto_close=False)
+        return client
+
+    def build_config(self, config):
+        for string in config:
+            self.read_strings.append(ReadString(string))
+
+    def read_cycle(self, client):
+        for i, val in enumerate(self.read_strings):
+            data = self.read_regs(client, val)
+            return data
+
+    def read_regs(self, client, register_string_obj):
+        try:
+            data = register_string_obj.read(client)
+        except Exception as e:
+            print('error in read', e)
+            return
+        
+        return data
+
+
 class GeneratorAgent:
     """Monitor the Generator controller via ModBus.
 
@@ -126,7 +166,6 @@ class GeneratorAgent:
 
         self.host = host
         self.port = port
-        self.read_strings = []
 
         self.agent: ocs_agent.OCSAgent = agent
         self.log = agent.log
@@ -136,12 +175,7 @@ class GeneratorAgent:
         self.take_data = False
 
         self.client = None
-        
-        read_config = os.path.join(os.path.dirname(__file__), "config.yaml")
-        with open(read_config) as f:
-            data = yaml.load(f, Loader=yaml.SafeLoader)
-        self.build_config([data])
-        self.log.info("Config file loaded successfully.")
+        self.generator = Generator()
 
         agg_params = {
             'frame_length': 10 * 60  # [sec]
@@ -150,24 +184,6 @@ class GeneratorAgent:
                                  record=True,
                                  agg_params=agg_params,
                                  buffer_time=0)
-
-    def build_config(self, config):
-        for string in config:
-            self.read_strings.append(ReadString(string))
-
-    def read_cycle(self, client):
-        for i, val in enumerate(self.read_strings):
-            data = self.read_regs(client, val)
-            return data
-
-    def read_regs(self, client, register_string_obj):
-        try:
-            data = register_string_obj.read(client)
-        except Exception as e:
-            print('error in read', e)
-            return
-
-        return data
 
     @ocs_agent.param('auto_acquire', default=False, type=bool)
     def init_generator(self, session, params=None):
@@ -192,7 +208,7 @@ class GeneratorAgent:
 
             session.set_status('starting')
 
-            client = ModbusClient(host=self.host, port=self.port, auto_open=True, auto_close=False)
+            client = self.generator.init_client(self.host, self.port)
             if client.open():
                 self.client = client
                 self.initialized = True
@@ -276,7 +292,7 @@ class GeneratorAgent:
                     session.data.update({'connection': {'last_attempt': time.time(),
                                                         'connected': True}})
 
-                    regdata = self.read_cycle(self.client)
+                    regdata = self.generator.read_cycle(self.client)
 
                     if regdata:
                         for reg in regdata:
