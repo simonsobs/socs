@@ -38,7 +38,7 @@ file. An example configuration block using all availabile arguments is below::
 
     {'agent-class': 'ACUAgent',
      'instance-id': 'acu-satp1',
-     'arguments': [['--acu_config', 'satp1']],
+     'arguments': [['--acu-config', 'satp1']],
      }
 
 soaculib
@@ -87,6 +87,40 @@ example configuration block is below::
         },
     }
 
+
+Exercisor Mode
+--------------
+
+The agent can run itself through various motion patterns, using the
+Process ``exercise``.  This process is only visible if the agent is
+invoked with the ``--exercise-plan`` argument and a path to the
+exercise plan config file.  Here is an example config file:
+
+.. code-block:: yaml
+
+  satp1:
+    settings:
+      use_boresight: false
+    steps:
+    - type: 'elnod'
+      repeat: 2
+    - type: 'grid'
+      duration: 3600
+    - type: 'schedule'
+      files:
+        - /path/to/schedule1.txt
+        - /path/to/schedule2.txt
+      duration: 3600
+      dwell_time: 600
+    - type: 'grease'
+      duration: 900
+
+Note that the root level may contain multiple entries; the key
+corresponds to the ACU config block name, which would correspond to
+the ACU agent ``--acu-config`` argument.
+
+The exercisor writes some diagnostic and timing information to a feed
+called ``activity``.
 
 Agent API
 ---------

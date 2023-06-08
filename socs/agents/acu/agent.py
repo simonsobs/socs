@@ -1,4 +1,5 @@
 import argparse
+import random
 import struct
 import time
 from enum import Enum
@@ -7,6 +8,7 @@ import numpy as np
 import soaculib as aculib
 import soaculib.status_keys as status_keys
 import twisted.web.client as tclient
+import yaml
 from autobahn.twisted.util import sleep as dsleep
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
@@ -14,7 +16,8 @@ from soaculib.twisted_backend import TwistedHttpBackend
 from twisted.internet import protocol, reactor
 from twisted.internet.defer import DeferredList, inlineCallbacks
 
-import socs.agents.acu.drivers as sh
+from socs.agents.acu import drivers as sh
+from socs.agents.acu import exercisor
 
 #: The number of free ProgramTrack positions, when stack is empty.
 FULL_STACK = 10000
@@ -29,14 +32,18 @@ class ACUAgent:
         acu_config (str):
             The configuration for the ACU, as referenced in aculib.configs.
             Default value is 'guess'.
-
+        exercise_plan (str):
+            The full path to a scan config file describing motions to cycle
+            through on the ACU.  If this is None, the associated process and
+            feed will not be registered.
     """
 
-    def __init__(self, agent, acu_config='guess'):
+    def __init__(self, agent, acu_config='guess', exercise_plan=None):
         # Separate locks for exclusive access to az/el, and boresight motions.
         self.azel_lock = TimeoutLock()
         self.boresight_lock = TimeoutLock()
 
+        self.acu_config_name = acu_config
         self.acu_config = aculib.guess_config(acu_config)
         self.sleeptime = self.acu_config['motion_waittime']
         self.udp = self.acu_config['streams']['main']
@@ -49,6 +56,8 @@ class ACUAgent:
         self.acu3rdaxis = self.acu_config['status'].get('3rdaxis_name')
         self.monitor_fields = status_keys.status_fields[self.acu_config['platform']]['status_fields']
         self.motion_limits = self.acu_config['motion_limits']
+
+        self.exercise_plan = exercise_plan
 
         self.log = agent.log
 
@@ -160,6 +169,18 @@ class ACUAgent:
                             self.clear_faults,
                             blocking=False)
 
+        # Automatic exercise program...
+        if exercise_plan:
+            agent.register_process(
+                'exercise', self.exercise, self._simple_process_stop)
+            # Use longer default frame length ... very low volume feed.
+            self.agent.register_feed('activity',
+                                     record=True,
+                                     buffer_time=0,
+                                     agg_params={
+                                         'frame_length': 600,
+                                     })
+
     @inlineCallbacks
     def _simple_task_abort(self, session, params):
         # Trigger a task abort by updating state to "stopping"
@@ -225,7 +246,8 @@ class ACUAgent:
               ...
             },
             "StatusResponseRate": 19.237531827325963,
-            "PlatformType": "satp"
+            "PlatformType": "satp",
+            "connected": True,
           }
 
         In the case of an SATP, the Status3rdAxis is not populated
@@ -236,15 +258,29 @@ class ACUAgent:
         """
 
         session.set_status('running')
-        version = yield self.acu_read.http.Version()
-        self.log.info(version)
 
         # Note that session.data will get scanned, to assign data to
         # feed blocks.  Items in session.data that are themselves
         # dicts will parsed; but items (such as PlatformType and
         # StatusResponseRate) which are simple strings or floats will
         # be ignored for feed assignment.
-        session.data = {'PlatformType': self.acu_config['platform']}
+        session.data = {'PlatformType': self.acu_config['platform'],
+                        'connected': False}
+
+        last_complaint = 0
+        while True:
+            try:
+                version = yield self.acu_read.http.Version()
+                break
+            except Exception as e:
+                if time.time() - last_complaint > 3600:
+                    errormsg = {'aculib_error_message': str(e)}
+                    self.log.error(str(e))
+                    self.log.error('monitor process failed to query version! Will keep trying.')
+                    last_complaint = time.time()
+                yield dsleep(10)
+        self.log.info(version)
+        session.data['connected'] = True
 
         # Numbering as per ICD.
         mode_key = {
@@ -347,17 +383,21 @@ class ACUAgent:
                     j2 = yield self.acu_read.http.Values(self.acu3rdaxis)
                 else:
                     j2 = {}
-                session.data.update({'StatusDetailed': j, 'Status3rdAxis': j2})
+                session.data.update({'StatusDetailed': j, 'Status3rdAxis': j2,
+                                     'connected': True})
                 n_ok += 1
+                last_complaint = 0
             except Exception as e:
-                # Need more error handling here...
-                errormsg = {'aculib_error_message': str(e)}
-                self.log.error(str(e))
-                acu_error = {'timestamp': time.time(),
-                             'block_name': 'ACU_error',
-                             'data': errormsg
-                             }
-                self.agent.publish_to_feed('acu_error', acu_error)
+                if now - last_complaint > 3600:
+                    errormsg = {'aculib_error_message': str(e)}
+                    self.log.error(str(e))
+                    acu_error = {'timestamp': time.time(),
+                                 'block_name': 'ACU_error',
+                                 'data': errormsg
+                                 }
+                    self.agent.publish_to_feed('acu_error', acu_error)
+                    last_complaint = time.time()
+                    session.data['connected'] = False
                 yield dsleep(1)
                 continue
             for k, v in session.data.items():
@@ -505,9 +545,10 @@ class ACUAgent:
                               }
         return True, 'Acquisition exited cleanly.'
 
+    @ocs_agent.param('auto_enable', type=bool, default=True)
     @inlineCallbacks
     def broadcast(self, session, params):
-        """broadcast()
+        """broadcast(auto_enable=True)
 
         **Process** - Read UDP data from the port specified by
         self.acu_config, decode it, and publish to HK feeds.  Full
@@ -515,30 +556,36 @@ class ACUAgent:
         while 1 Hz decimated are written to "acu_broadcast_influx".
         The 1 Hz decimated output are also stored in session.data.
 
-        The session.data looks like this (this is for a SATP running
-        with servo details in the UDP output)::
+        Args:
+          auto_enable (bool): If True, the Process will try to
+            configure and (re-)enable the UDP stream if at any point
+            the stream seems to drop out.
 
-          {
-            "Time": 1679499948.8234625,
-            "Corrected_Azimuth": -20.00112176010607,
-            "Corrected_Elevation": 50.011521050839434,
-            "Corrected_Boresight": 29.998428712246067,
-            "Raw_Azimuth": -20.00112176010607,
-            "Raw_Elevation": 50.011521050839434,
-            "Raw_Boresight": 29.998428712246067,
-            "Azimuth_Current_1": -0.000384521484375,
-            "Azimuth_Current_2": -0.0008331298828125,
-            "Elevation_Current_1": 0.003397979736328125,
-            "Boresight_Current_1": -0.000483856201171875,
-            "Boresight_Current_2": -0.000105743408203125,
-            "Azimuth_Vel_1": -0.000002288818359375,
-            "Azimuth_Vel_2": 0,
-            "Az_Vel_Act": -0.0000011444091796875,
-            "Az_Vel_Des": 0,
-            "Az_Vffw": 0,
-            "Az_Pos_Des": -20.00112176010607,
-            "Az_Pos_Err": 0
-          }
+        Notes:
+          The session.data looks like this (this is for a SATP running
+          with servo details in the UDP output)::
+
+            {
+              "Time": 1679499948.8234625,
+              "Corrected_Azimuth": -20.00112176010607,
+              "Corrected_Elevation": 50.011521050839434,
+              "Corrected_Boresight": 29.998428712246067,
+              "Raw_Azimuth": -20.00112176010607,
+              "Raw_Elevation": 50.011521050839434,
+              "Raw_Boresight": 29.998428712246067,
+              "Azimuth_Current_1": -0.000384521484375,
+              "Azimuth_Current_2": -0.0008331298828125,
+              "Elevation_Current_1": 0.003397979736328125,
+              "Boresight_Current_1": -0.000483856201171875,
+              "Boresight_Current_2": -0.000105743408203125,
+              "Azimuth_Vel_1": -0.000002288818359375,
+              "Azimuth_Vel_2": 0,
+              "Az_Vel_Act": -0.0000011444091796875,
+              "Az_Vel_Des": 0,
+              "Az_Vffw": 0,
+              "Az_Pos_Des": -20.00112176010607,
+              "Az_Pos_Err": 0
+            }
 
         """
         session.set_status('running')
@@ -548,6 +595,9 @@ class ACUAgent:
         udp_data = []
         fields = self.udp_schema['fields']
         session.data = {}
+
+        # BroadcastStreamControl instance.
+        stream = self.acu_control.streams['main']
 
         class MonitorUDP(protocol.DatagramProtocol):
             def datagramReceived(self, data, src_addr):
@@ -604,10 +654,20 @@ class ACUAgent:
                     sd[ky.split('_bcast_influx')[0]] = influx_means[ky]
                 session.data.update(sd)
             else:
+                # Consider logging an outage, attempting reconfig.
                 if active and now - last_packet_time > 3:
                     self.log.info('No UDP packets are being received.')
                     active = False
+                    next_reconfig = time.time()
+                if not active and params['auto_enable'] and next_reconfig <= time.time():
+                    self.log.info('Requesting UDP stream enable.')
+                    try:
+                        cfg, raw = yield stream.safe_enable()
+                    except Exception as err:
+                        self.log.info('Exception while trying to enable stream: {err}', err=err)
+                    next_reconfig += 60
                 yield dsleep(1)
+
             yield dsleep(0.005)
 
         handler.stopListening()
@@ -1359,12 +1419,135 @@ class ACUAgent:
 
         return True, 'Track ended cleanly'
 
+    @ocs_agent.param('starting_index', type=int, default=0)
+    def exercise(self, session, params):
+        """exercise(starting_index=0)
+
+        **Process** - Run telescope platform through some pre-defined motions.
+
+        For historical reasons, this does not command agent functions
+        internally, but rather instantiates a *client* and calls the
+        agent as though it were an external entity.
+
+        """
+        # Load the exercise plan.
+        plans = yaml.safe_load(open(self.exercise_plan, 'rb'))
+        super_plan = exercisor.get_plan(plans[self.acu_config_name])
+
+        session.data = {
+            'timestamp': time.time(),
+            'iterations': 0,
+            'attempts': 0,
+            'errors': 0,
+        }
+        session.set_status('running')
+
+        def _publish_activity(activity):
+            msg = {
+                'block_name': 'A',
+                'timestamp': time.time(),
+                'data': {'activity': activity},
+            }
+            self.agent.publish_to_feed('activity', msg)
+
+        def _publish_error(delta_error=1):
+            session.data['errors'] += delta_error
+            msg = {
+                'block_name': 'B',
+                'timestamp': time.time(),
+                'data': {'error_count': session.data['errors']}
+            }
+            self.agent.publish_to_feed('activity', msg)
+
+        def _exit_now(ok, msg):
+            _publish_activity('idle')
+            self.agent.feeds['activity'].flush_buffer()
+            return ok, msg
+
+        _publish_activity('idle')
+        _publish_error(0)
+
+        target_instance_id = self.agent.agent_address.split('.')[-1]
+        exercisor.set_client(target_instance_id)
+        settings = super_plan.get('settings', {})
+
+        plan_idx = 0
+        plan_t = None
+
+        for plan in super_plan['steps']:
+            plan['iter'] = iter(plan['driver'])
+
+        while session.status in ['running']:
+            time.sleep(1)
+            session.data['timestamp'] = time.time()
+            session.data['iterations'] += 1
+
+            # Fault maintenance
+            faults = exercisor.get_faults()
+            if faults['safe_lock']:
+                self.log.info('SAFE lock detected, exiting')
+                return _exit_now(False, 'Exiting on SAFE lock.')
+
+            if faults['local_mode']:
+                self.log.info('LOCAL mode detected, exiting')
+                return _exit_now(False, 'Exiting on LOCAL mode.')
+
+            if faults['az_summary']:
+                if session.data['attempts'] > 5:
+                    self.log.info('Too many az summary faults, exiting.')
+                    return _exit_now(False, 'Too many az summary faults.')
+                session.data['attempts'] += 1
+                self.log.info('az summary fault -- trying to clear.')
+                exercisor.clear_faults()
+                time.sleep(10)
+                continue
+
+            session.data['attempts'] = 0
+
+            # Plan execution
+            active_plan = super_plan['steps'][plan_idx]
+            if plan_t is None:
+                plan_t = time.time()
+
+            now = time.time()
+            if now - plan_t > active_plan['duration']:
+                plan_idx = (plan_idx + 1) % len(super_plan['steps'])
+                plan_t = None
+                continue
+
+            if settings.get('use_boresight'):
+                bore_target = random.choice(settings['boresight_opts'])
+                self.log.info(f'Setting boresight={bore_target}...')
+                _publish_activity('boresight')
+                exercisor.set_boresight(bore_target)
+
+            plan, info = next(active_plan['iter'])
+
+            self.log.info(f'Launching next scan. plan={plan}')
+
+            _publish_activity(active_plan['driver'].code)
+            ok = None
+            if 'targets' in plan:
+                exercisor.steps(**plan)
+            else:
+                exercisor.scan(**plan)
+            _publish_activity('idle')
+
+            if ok is None:
+                self.log.info('Scan completed without error.')
+            else:
+                self.log.info(f'Scan exited with error: {ok}')
+                _publish_error()
+
+        return _exit_now(True, "Stopped run process")
+
 
 def add_agent_args(parser_in=None):
     if parser_in is None:
         parser_in = argparse.ArgumentParser()
     pgroup = parser_in.add_argument_group('Agent Options')
-    pgroup.add_argument("--acu_config")
+    pgroup.add_argument("--acu-config")
+    pgroup.add_argument("--exercise-plan")
     return parser_in
 
 
@@ -1374,7 +1557,7 @@ def main(args=None):
                                   parser=parser,
                                   args=args)
     agent, runner = ocs_agent.init_site_agent(args)
-    _ = ACUAgent(agent, args.acu_config)
+    _ = ACUAgent(agent, args.acu_config, args.exercise_plan)
 
     runner.run(agent, auto_reconnect=True)
 
