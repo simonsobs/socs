@@ -6,11 +6,9 @@ import warnings
 
 import txaio
 import yaml
-from pyModbusTCP.client import ModbusClient
-
 from ocs import ocs_agent, site_config
-from ocs.ocs_twisted import TimeoutLock
-from ocs.ocs_twisted import Pacemaker
+from ocs.ocs_twisted import Pacemaker, TimeoutLock
+from pyModbusTCP.client import ModbusClient
 
 byteorder = sys.byteorder
 
@@ -135,7 +133,7 @@ class Generator:
         except Exception as e:
             print('error in read', e)
             return
-        
+
         return data
 
 
