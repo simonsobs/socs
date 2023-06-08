@@ -188,8 +188,8 @@ def main(args=None):
     agent, runner = ocs_agent.init_site_agent(args)
 
     p = ElnetPowermeterAgent(agent,
-                        ip=agent.ip,
-                        port=int(args.port))
+                             ip=args.ip,
+                             port=int(args.port))
 
     agent.register_task('init_powermeter', p.init_powermeter,
                         startup=init_params)
