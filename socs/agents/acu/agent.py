@@ -173,6 +173,7 @@ class ACUAgent:
         if exercise_plan:
             agent.register_process(
                 'exercise', self.exercise, self._simple_process_stop)
+            # Use longer default frame length ... very low volume feed.
             self.agent.register_feed('activity',
                                      record=True,
                                      buffer_time=0,
@@ -245,7 +246,8 @@ class ACUAgent:
               ...
             },
             "StatusResponseRate": 19.237531827325963,
-            "PlatformType": "satp"
+            "PlatformType": "satp",
+            "connected": True,
           }
 
         In the case of an SATP, the Status3rdAxis is not populated
@@ -1419,7 +1421,7 @@ class ACUAgent:
 
     @ocs_agent.param('starting_index', type=int, default=0)
     def exercise(self, session, params):
-        """exercise()
+        """exercise(starting_index=0)
 
         **Process** - Run telescope platform through some pre-defined motions.
 
@@ -1544,8 +1546,8 @@ def add_agent_args(parser_in=None):
     if parser_in is None:
         parser_in = argparse.ArgumentParser()
     pgroup = parser_in.add_argument_group('Agent Options')
-    pgroup.add_argument("--acu_config")
-    pgroup.add_argument("--exercise_plan")
+    pgroup.add_argument("--acu-config")
+    pgroup.add_argument("--exercise-plan")
     return parser_in
 
 
