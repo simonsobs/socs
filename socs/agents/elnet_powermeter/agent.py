@@ -1,5 +1,6 @@
 import txaio
 import argparse
+import time
 from pyModbusTCP.client import ModbusClient
 
 from os import environ
