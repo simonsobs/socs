@@ -42,7 +42,7 @@ class ElnetPowermeterAgent:
 
         self.ip = ip
         self.port = port
-        self_unit_id = unit_id
+        self.unit_id = unit_id
         self.auto_open = auto_open
         self.auto_close = auto_close
         self.initialized = False
