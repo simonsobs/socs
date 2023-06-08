@@ -133,7 +133,7 @@ class ElnetPowermeterAgent:
             while self.take_data:
                 m = ModbusClient(self.ip, port=self.port, unit_id=self.unit_id, auto_open=self.auto_open, auto_close=self.auto_close)
 
-                data = {'block_name': 'powermeter_status',
+                data = {'block_name': 'powermeter',
                         'timestamp': time.time(),
                         'data' :{'fields': {}}}
 
@@ -143,7 +143,7 @@ class ElnetPowermeterAgent:
                     info = {key: val}
                     data['data']['fields'].update(info)
 
-                self.agent.publish_to_feed('powermeter_status', data)
+                self.agent.publish_to_feed('powermeter', data)
 
                 if params['test_mode']:
                     break
