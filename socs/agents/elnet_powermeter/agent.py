@@ -162,7 +162,7 @@ def make_parser(parser=None):
     pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument("--ip", type=str, help="IP Address to listen to.")
     pgroup.add_argument("--port", type=int, default=502, help="Port to listen on.")
-    pgroup.add_argument"--mode", type=str, choices=['idle', 'init', 'acq'],
+    pgroup.add_argument("--mode", type=str, choices=['idle', 'init', 'acq'],
                        help="Starting action for the agent.")
 
     return parser
