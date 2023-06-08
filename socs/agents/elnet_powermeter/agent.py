@@ -169,7 +169,7 @@ def make_parser(parser=None):
 
 def main(args=None):
     # Start logging
-    txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
+    txaio.start_logging(level=environ.get("LOGLEVEL", "info"))
 
     parser = make_parser()
 
