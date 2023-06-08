@@ -89,7 +89,7 @@ class ElnetPowermeterAgent:
 
             session.set_status('starting')
 
-            c = ModbusClient(host=self.host, port=self.port, auto_open=self.auto_open, auto_close=self.auto_close)
+            c = ModbusClient(ip=self.ip, port=self.port, auto_open=self.auto_open, auto_close=self.auto_close)
             if c.open():
                 self.client = c # TODO this necessary somewhere else? 
                 self.initialized = True
