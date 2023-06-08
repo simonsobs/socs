@@ -38,7 +38,7 @@ file. An example configuration block using all availabile arguments is below::
 
     {'agent-class': 'ACUAgent',
      'instance-id': 'acu-satp1',
-     'arguments': [['--acu_config', 'satp1']],
+     'arguments': [['--acu-config', 'satp1']],
      }
 
 soaculib
@@ -117,7 +117,7 @@ exercise plan config file.  Here is an example config file:
 
 Note that the root level may contain multiple entries; the key
 corresponds to the ACU config block name, which would correspond to
-the ACU agent ``--acu_config`` argument.
+the ACU agent ``--acu-config`` argument.
 
 The exercisor writes some diagnostic and timing information to a feed
 called ``activity``.
