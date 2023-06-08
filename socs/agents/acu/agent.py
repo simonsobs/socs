@@ -331,6 +331,18 @@ class ACUAgent:
                                          'frame_length': 600,
                                      })
 
+        # Automatic exercise program...
+        if exercise_plan:
+            agent.register_process(
+                'exercise', self.exercise, self._simple_process_stop)
+            # Use longer default frame length ... very low volume feed.
+            self.agent.register_feed('activity',
+                                     record=True,
+                                     buffer_time=0,
+                                     agg_params={
+                                         'frame_length': 600,
+                                     })
+
     @inlineCallbacks
     def _simple_task_abort(self, session, params):
         # Trigger a task abort by updating state to "stopping"
@@ -2707,6 +2719,128 @@ class ACUAgent:
             plan, info = next(active_plan['iter'])
 
             self.log.info('Launching next scan. plan={plan}', plan=plan)
+
+            _publish_activity(active_plan['driver'].code)
+            ok = None
+            if 'targets' in plan:
+                exercisor.steps(**plan)
+            else:
+                exercisor.scan(**plan)
+            _publish_activity('idle')
+
+            if ok is None:
+                self.log.info('Scan completed without error.')
+            else:
+                self.log.info(f'Scan exited with error: {ok}')
+                _publish_error()
+
+        return _exit_now(True, "Stopped run process")
+
+    @ocs_agent.param('starting_index', type=int, default=0)
+    def exercise(self, session, params):
+        """exercise(starting_index=0)
+
+        **Process** - Run telescope platform through some pre-defined motions.
+
+        For historical reasons, this does not command agent functions
+        internally, but rather instantiates a *client* and calls the
+        agent as though it were an external entity.
+
+        """
+        # Load the exercise plan.
+        plans = yaml.safe_load(open(self.exercise_plan, 'rb'))
+        super_plan = exercisor.get_plan(plans[self.acu_config_name])
+
+        session.data = {
+            'timestamp': time.time(),
+            'iterations': 0,
+            'attempts': 0,
+            'errors': 0,
+        }
+        session.set_status('running')
+
+        def _publish_activity(activity):
+            msg = {
+                'block_name': 'A',
+                'timestamp': time.time(),
+                'data': {'activity': activity},
+            }
+            self.agent.publish_to_feed('activity', msg)
+
+        def _publish_error(delta_error=1):
+            session.data['errors'] += delta_error
+            msg = {
+                'block_name': 'B',
+                'timestamp': time.time(),
+                'data': {'error_count': session.data['errors']}
+            }
+            self.agent.publish_to_feed('activity', msg)
+
+        def _exit_now(ok, msg):
+            _publish_activity('idle')
+            self.agent.feeds['activity'].flush_buffer()
+            return ok, msg
+
+        _publish_activity('idle')
+        _publish_error(0)
+
+        target_instance_id = self.agent.agent_address.split('.')[-1]
+        exercisor.set_client(target_instance_id)
+        settings = super_plan.get('settings', {})
+
+        plan_idx = 0
+        plan_t = None
+
+        for plan in super_plan['steps']:
+            plan['iter'] = iter(plan['driver'])
+
+        while session.status in ['running']:
+            time.sleep(1)
+            session.data['timestamp'] = time.time()
+            session.data['iterations'] += 1
+
+            # Fault maintenance
+            faults = exercisor.get_faults()
+            if faults['safe_lock']:
+                self.log.info('SAFE lock detected, exiting')
+                return _exit_now(False, 'Exiting on SAFE lock.')
+
+            if faults['local_mode']:
+                self.log.info('LOCAL mode detected, exiting')
+                return _exit_now(False, 'Exiting on LOCAL mode.')
+
+            if faults['az_summary']:
+                if session.data['attempts'] > 5:
+                    self.log.info('Too many az summary faults, exiting.')
+                    return _exit_now(False, 'Too many az summary faults.')
+                session.data['attempts'] += 1
+                self.log.info('az summary fault -- trying to clear.')
+                exercisor.clear_faults()
+                time.sleep(10)
+                continue
+
+            session.data['attempts'] = 0
+
+            # Plan execution
+            active_plan = super_plan['steps'][plan_idx]
+            if plan_t is None:
+                plan_t = time.time()
+
+            now = time.time()
+            if now - plan_t > active_plan['duration']:
+                plan_idx = (plan_idx + 1) % len(super_plan['steps'])
+                plan_t = None
+                continue
+
+            if settings.get('use_boresight'):
+                bore_target = random.choice(settings['boresight_opts'])
+                self.log.info(f'Setting boresight={bore_target}...')
+                _publish_activity('boresight')
+                exercisor.set_boresight(bore_target)
+
+            plan, info = next(active_plan['iter'])
+
+            self.log.info(f'Launching next scan. plan={plan}')
 
             _publish_activity(active_plan['driver'].code)
             ok = None
