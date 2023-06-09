@@ -5,8 +5,9 @@ Utility script for interacting with the suprsync db.
 import argparse
 import os
 
-from socs.db.suprsync import SupRsyncFile, SupRsyncFilesManager
 from tqdm.auto import trange
+
+from socs.db.suprsync import SupRsyncFile, SupRsyncFilesManager
 
 
 def check_func(args):
@@ -61,7 +62,7 @@ def add_local_files_func(args):
                 remote_paths.append(os.path.relpath(path, args.local_root))
 
     if args.dry:
-        print("Dry run\n"+ 40 * '-')
+        print("Dry run\n" + 40 * '-')
         print(f"Would add {len(local_paths)} files, including:")
         n = min(len(local_paths), 20)
         for i in range(10):
@@ -116,8 +117,7 @@ def main():
         help="Create the db if it doesn't exist"
     )
     add_local_files_parser.add_argument('--dry', action='store_true',
-        help="Does a dry run and prints what files would be added")
-
+                                        help="Does a dry run and prints what files would be added")
 
     args = parser.parse_args()
 
