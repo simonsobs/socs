@@ -137,14 +137,20 @@ class ElnetPowermeterAgent:
                         'timestamp': time.time(),
                         'data' :{'fields': {}}}
 
+                data_cache = {'timestamp': time.time(),
+                              'fields': {}}
+                
                 for key in powermeter_keys:
                     val = m.read_holding_registers(powermeter_keys[key],1)
                     val = int(val[0])
                     info = {key: val}
                     data['data']['fields'].update(info)
+                    data_cache['fields'].update(info)
 
                 self.agent.publish_to_feed('powermeter', data)
-
+                
+                session.data.update(data_cache)
+                
                 if params['test_mode']:
                     break
 
