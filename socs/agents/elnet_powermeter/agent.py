@@ -135,7 +135,7 @@ class ElnetPowermeterAgent:
 
                 data = {'block_name': 'powermeter',
                         'timestamp': time.time(),
-                        'data' :{'fields': {}}}
+                        'data' :{}}
 
                 data_cache = {'timestamp': time.time(),
                               'fields': {}}
@@ -144,7 +144,7 @@ class ElnetPowermeterAgent:
                     val = m.read_holding_registers(powermeter_keys[key],1)
                     val = int(val[0])
                     info = {key: val}
-                    data['data']['fields'].update(info)
+                    data['data'].update(info)
                     data_cache['fields'].update(info)
 
                 self.agent.publish_to_feed('powermeter', data)
