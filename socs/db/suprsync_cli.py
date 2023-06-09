@@ -6,6 +6,7 @@ import argparse
 import os
 
 from socs.db.suprsync import SupRsyncFile, SupRsyncFilesManager
+from tqdm.auto import trange
 
 
 def check_func(args):
@@ -43,15 +44,33 @@ def list_func(args):
 
 def add_local_files_func(args):
     srfm = SupRsyncFilesManager(args.db, create_all=args.create_db)
+
+    args.local_root = os.path.abspath(args.local_root)
+
     known_files = srfm.get_known_files(args.archive_name)
     known_paths = [f.local_path for f in known_files]
+    local_paths = []
+    remote_paths = []
+
     for root, _, files in os.walk(args.local_root):
         for file in files:
             path = os.path.join(root, file)
             path = os.path.abspath(path)
             if path not in known_paths:
-                remote_path = os.path.relpath(path, args.local_root)
-                srfm.add_file(path, remote_path, args.archive_name)
+                local_paths.append(path)
+                remote_paths.append(os.path.relpath(path, args.local_root))
+
+    if args.dry:
+        print("Dry run\n"+ 40 * '-')
+        print(f"Would add {len(local_paths)} files, including:")
+        n = min(len(local_paths), 20)
+        for i in range(10):
+            print(f"{i}: {local_paths[i]} --> {remote_paths[i]}")
+        return
+
+    print(f"Adding {len(local_paths)} files to the add to {args.db} from {args.local_root}")
+    for i in trange(len(local_paths)):
+        srfm.add_file(local_paths[i], remote_paths[i], args.archive_name)
 
 
 def main():
@@ -96,6 +115,9 @@ def main():
         '--create-db', action='store_true',
         help="Create the db if it doesn't exist"
     )
+    add_local_files_parser.add_argument('--dry', action='store_true',
+        help="Does a dry run and prints what files would be added")
+
 
     args = parser.parse_args()
 
