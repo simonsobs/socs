@@ -85,7 +85,7 @@ def main():
     add_local_files_parser = subparsers.add_parser(
         'add-local-files',
         help="Adds all files from a local directory to the suprsync db"
-    ) 
+    )
     add_local_files_parser.set_defaults(func=add_local_files_func)
     add_local_files_parser.add_argument(
         'local_root', help="Root directory to search for files")
