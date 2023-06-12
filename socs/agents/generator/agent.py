@@ -253,10 +253,11 @@ class GeneratorAgent:
              "address": 'localhost',
              "timestamp":1601925677.6914878}
 
-        Refer to the config file at
-        https://github.com/simonsobs/socs/blob/main/socs/agents/generator/config.yaml
+        Refer to the config file at `socs/agents/generator/config.yaml`_
         for all possible fields and their respective min/max values and units.
         Note: -1 will be returned for readings out of range.
+
+        .. _socs/agents/generator/config.yaml: https://github.com/simonsobs/socs/blob/main/socs/agents/generator/config.yaml
 
         """
 
