@@ -237,14 +237,6 @@ Agent API
 Supporting APIs
 ---------------
 
-.. _TimecodeDir:
-
-TimecodeDir Table
-```````````````````
-
-.. autoclass:: socs.db.suprsync.TimecodeDir
-    :members:
-
 .. _SupRsyncFiles:
 
 SupRsyncFiles Table
@@ -259,4 +251,12 @@ SupRsyncFiles Manager
 `````````````````````
 
 .. autoclass:: socs.db.suprsync.SupRsyncFilesManager
+    :members:
+
+.. _TimecodeDir:
+
+TimecodeDir Table
+```````````````````
+
+.. autoclass:: socs.db.suprsync.TimecodeDir
     :members:
