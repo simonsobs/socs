@@ -65,8 +65,10 @@ def test_timecode_dirs(tmp_path):
 
     session = srfm.Session()
     tcdirs = session.query(TimecodeDir).all()
+    print("TCDirs:")
     for tcdir in tcdirs:
-        print(tcdir.timecode, tcdir.completed, tcdir.synced, tcdir.finalized)
+        print(tcdir.timecode, tcdir.completed, tcdir.synced, tcdir.finalized,
+              tcdir.finalize_file_id)
 
     # Check that all but one timecode dirs have been successfully copied
     finalize_files = []
@@ -75,8 +77,8 @@ def test_timecode_dirs(tmp_path):
             if f.endswith('finalized.yaml'):
                 finalize_files.append(os.path.join(root, f))
 
-    print(finalize_files)
     assert (len(finalize_files) == len(tcs) - 1)
+    assert(False)
 
 def test_suprsync_handle_files(tmp_path):
     """

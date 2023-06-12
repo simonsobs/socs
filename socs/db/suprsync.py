@@ -447,6 +447,9 @@ class SupRsyncFilesManager:
                 finalize_local_path, finalize_remote_path, tcdir.archive_name,
                 session=session, timestamp=now
             )
+            session.add(file)
+            session.flush()
+
             tcdir.finalized = True
             tcdir.finalize_file_id = file.id
 
