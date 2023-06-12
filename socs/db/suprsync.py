@@ -8,7 +8,7 @@ import yaml
 from sqlalchemy import (Boolean, Column, Float, ForeignKey, Integer, String,
                         create_engine)
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, sessionmaker
+from sqlalchemy.orm import sessionmaker
 
 from socs.util import get_md5sum
 
@@ -119,7 +119,7 @@ def split_path(path):
 
 def check_timecode(file: SupRsyncFile):
     """
-    Tries to extract timecode from the remote path. If it failes, returns
+    Tries to extract timecode from the remote path. If it fails, returns
     None.
     """
     split = split_path(file.remote_path)

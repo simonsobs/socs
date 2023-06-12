@@ -4,8 +4,9 @@ import time
 import numpy as np
 import txaio
 
-from socs.db.suprsync import (SupRsyncFile, SupRsyncFileHandler,
-                              SupRsyncFilesManager, TimecodeDir)
+from socs.db.suprsync import (
+    SupRsyncFileHandler, SupRsyncFilesManager, TimecodeDir
+)
 
 txaio.use_twisted()
 
