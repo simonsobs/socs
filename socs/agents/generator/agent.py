@@ -99,36 +99,45 @@ class ReadString(object):
 class Generator:
     """Functions to communite with the Generator controller
 
+    Parameters
+    ----------
+    host : str
+        Address of the generator controller.
+    port : int
+        Port to generator controller, default to 5021.
+
     Attributes
     ----------
     read_strings : list
         Strings of registers defined in config to read from
+    client : ModbusClient
+        ModbusClient object that initializes connection
     """
 
-    def __init__(self):
+    def __init__(self, host, port):
+        self.host = host
+        self.port = port
         self.read_strings = []
 
+        self._build_config()
+
+        self.client = ModbusClient(self.host, self.port, auto_open=True, auto_close=False)
+
+    def _build_config(self):
         read_config = os.path.join(os.path.dirname(__file__), "config.yaml")
         with open(read_config) as f:
             data = yaml.load(f, Loader=yaml.SafeLoader)
-        self.build_config([data])
-
-    def init_client(self, host, port):
-        client = ModbusClient(host, port, auto_open=True, auto_close=False)
-        return client
-
-    def build_config(self, config):
-        for string in config:
+        for string in [data]:
             self.read_strings.append(ReadString(string))
 
-    def read_cycle(self, client):
+    def read_cycle(self):
         for i, val in enumerate(self.read_strings):
-            data = self.read_regs(client, val)
+            data = self._read_regs(val)
             return data
 
-    def read_regs(self, client, register_string_obj):
+    def _read_regs(self, register_string_obj):
         try:
-            data = register_string_obj.read(client)
+            data = register_string_obj.read(self.client)
         except Exception as e:
             print('error in read', e)
             return
@@ -171,8 +180,7 @@ class GeneratorAgent:
         self.initialized = False
         self.take_data = False
 
-        self.client = None
-        self.generator = Generator()
+        self.generator = None
 
         agg_params = {
             'frame_length': 10 * 60  # [sec]
@@ -205,9 +213,9 @@ class GeneratorAgent:
 
             session.set_status('starting')
 
-            client = self.generator.init_client(self.host, self.port)
+            self.generator = Generator(self.host, self.port)
+            client = self.generator.client
             if client.open():
-                self.client = client
                 self.initialized = True
             else:
                 self.initialized = False
@@ -242,10 +250,12 @@ class GeneratorAgent:
                  'Generator_frequency': {'value': 1.0, 'units': 'Hz'},
                  ...
                  'connection': {'last_attempt': 1680812613.939653, 'connected': True}},
+             "address": 'localhost',
              "timestamp":1601925677.6914878}
 
-        Refer to the config file at /socs/agents/generator/config.yaml for all possible
-        fields and their respective min/max values and units.
+        Refer to the config file at
+        https://github.com/simonsobs/socs/blob/main/socs/agents/generator/config.yaml
+        for all possible fields and their respective min/max values and units.
         Note: -1 will be returned for readings out of range.
 
         """
@@ -273,7 +283,7 @@ class GeneratorAgent:
                     'block_name': 'registers',
                     'data': {}
                 }
-                if not self.client.is_open:
+                if not self.generator.client.is_open:
                     self.initialized = False
 
                 # Try to re-initialize if connection lost
@@ -288,8 +298,9 @@ class GeneratorAgent:
                 if self.initialized:
                     session.data.update({'connection': {'last_attempt': time.time(),
                                                         'connected': True}})
+                    session.data['address'] = self.host
 
-                    regdata = self.generator.read_cycle(self.client)
+                    regdata = self.generator.read_cycle()
 
                     if regdata:
                         for reg in regdata:
