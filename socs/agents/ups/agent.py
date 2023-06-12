@@ -64,7 +64,7 @@ def _extract_oid_field_and_value(get_result):
     return field_name, oid_value, oid_description
 
 
-def _build_message(get_result, time):
+def _build_message(get_result, time, blockname):
     """Build the message for publication on an OCS Feed.
 
     Parameters
@@ -80,7 +80,7 @@ def _build_message(get_result, time):
         OCS Feed formatted message for publishing
     """
     message = {
-        'block_name': 'ups',
+        'block_name': blockname,
         'timestamp': time,
         'data': {}
     }
@@ -315,6 +315,7 @@ class UPSAgent:
             if (read_time - self.lastGet) < 60:
                 continue
 
+            main_get_list = []
             get_list = []
 
             # Create the list of OIDs to send get commands
@@ -330,7 +331,10 @@ class UPSAgent:
                     'upsOutputSource']
 
             for oid in oids:
+                main_get_list.append(('UPS-MIB', oid, 0))
                 get_list.append(('UPS-MIB', oid, 0))
+
+            ups_get_result = yield self.snmp.get(get_list, self.version)
 
             # Append input OIDs to GET list
             input_oids = ['upsInputVoltage',
@@ -338,13 +342,18 @@ class UPSAgent:
                           'upsInputTruePower']
 
             # Use number of input lines used to append correct number of input OIDs
-            num_lines = [('UPS-MIB', 'upsInputNumLines', 0)]
-            num_res = yield self.snmp.get(num_lines, self.version)
+            input_num_lines = [('UPS-MIB', 'upsInputNumLines', 0)]
+            num_res = yield self.snmp.get(input_num_lines, self.version)
             if num_res is not None:
+                input_get_results = []
                 inputs = num_res[0][1]._value
                 for i in range(inputs):
+                    get_list = []
                     for oid in input_oids:
+                        main_get_list.append(('UPS-MIB', oid, i + 1))
                         get_list.append(('UPS-MIB', oid, i + 1))
+                    input_get_result = yield self.snmp.get(get_list, self.version)
+                    input_get_results.append(input_get_result)
 
             # Append output OIDs to GET list
             output_oids = ['upsOutputVoltage',
@@ -353,16 +362,21 @@ class UPSAgent:
                            'upsOutputPercentLoad']
 
             # Use number of output lines used to append correct number of output OIDs
-            num_lines = [('UPS-MIB', 'upsOutputNumLines', 0)]
-            num_res = yield self.snmp.get(num_lines, self.version)
+            output_num_lines = [('UPS-MIB', 'upsOutputNumLines', 0)]
+            num_res = yield self.snmp.get(output_num_lines, self.version)
             if num_res is not None:
+                output_get_results = []
                 outputs = num_res[0][1]._value
                 for i in range(outputs):
+                    get_list = []
                     for oid in output_oids:
+                        main_get_list.append(('UPS-MIB', oid, i + 1))
                         get_list.append(('UPS-MIB', oid, i + 1))
+                    output_get_result = yield self.snmp.get(get_list, self.version)
+                    output_get_results.append(output_get_result)
 
             # Issue SNMP GET command
-            get_result = yield self.snmp.get(get_list, self.version)
+            get_result = yield self.snmp.get(main_get_list, self.version)
 
             # Do not publish if UPS connection has dropped
             try:
@@ -375,9 +389,19 @@ class UPSAgent:
 
                 self.lastGet = time.time()
                 # Publish to feed
-                message = _build_message(get_result, read_time)
+                message = _build_message(ups_get_result, read_time, 'ups')
                 self.log.debug("{msg}", msg=message)
                 session.app.publish_to_feed('ups', message)
+                for i, result in enumerate(input_get_results):
+                    blockname = f'input_{i}'
+                    message = _build_message(result, read_time, blockname)
+                    self.log.debug("{msg}", msg=message)
+                    session.app.publish_to_feed('ups', message)
+                for i, result in enumerate(output_get_results):
+                    blockname = f'output_{i}'
+                    message = _build_message(result, read_time, blockname)
+                    self.log.debug("{msg}", msg=message)
+                    session.app.publish_to_feed('ups', message)
             except ConnectionError as e:
                 self.log.error(f'{e}')
                 yield dsleep(1)
