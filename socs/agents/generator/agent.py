@@ -122,6 +122,7 @@ class Generator:
         self._build_config()
 
         self.client = ModbusClient(self.host, self.port, auto_open=True, auto_close=False)
+        self.client.open()
 
     def _build_config(self):
         read_config = os.path.join(os.path.dirname(__file__), "config.yaml")
