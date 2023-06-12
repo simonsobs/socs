@@ -214,8 +214,7 @@ class GeneratorAgent:
             session.set_status('starting')
 
             self.generator = Generator(self.host, self.port)
-            client = self.generator.client
-            if client.open():
+            if self.generator.client.is_open:
                 self.initialized = True
             else:
                 self.initialized = False
