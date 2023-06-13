@@ -190,6 +190,17 @@ class GeneratorAgent:
                                  record=True,
                                  agg_params=agg_params,
                                  buffer_time=0)
+        
+    def connect(self):
+        """connect()
+        Instantiates Generator object and check if client is open
+        """
+
+        self.generator = Generator(self.host, self.port)
+        if self.generator.client.is_open:
+            self.initialized = True
+        else:
+            self.initialized = False
 
     @ocs_agent.param('auto_acquire', default=False, type=bool)
     def init_generator(self, session, params=None):
@@ -214,11 +225,8 @@ class GeneratorAgent:
 
             session.set_status('starting')
 
-            self.generator = Generator(self.host, self.port)
-            if self.generator.client.is_open:
-                self.initialized = True
-            else:
-                self.initialized = False
+            self.connect()
+            if not self.initialized:
                 return False, 'Could not connect to generator'
 
         # Start data acquisition if requested
@@ -289,11 +297,7 @@ class GeneratorAgent:
 
                 # Try to re-initialize if connection lost
                 if not self.initialized:
-                    if not self.lock.release_and_acquire(timeout=10):
-                        self.log.warn(f"Could not re-acquire lock now held by {self.lock.job}.")
-                        return False
-                    self.agent.start('init_generator')
-                    self.agent.wait('init_generator')
+                    self.connect()
 
                 # Only get readings if connected
                 if self.initialized:
