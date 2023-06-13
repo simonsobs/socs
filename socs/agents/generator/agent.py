@@ -190,7 +190,7 @@ class GeneratorAgent:
                                  record=True,
                                  agg_params=agg_params,
                                  buffer_time=0)
-        
+
     def connect(self):
         """connect()
         Instantiates Generator object and check if client is open
