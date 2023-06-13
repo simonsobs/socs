@@ -45,7 +45,7 @@ def test_take_noise(tmp_path):
     session = mock.MagicMock()
     session.data = {}
     emulator.uxm_relock(session, {'test_mode': True})
-    emulator.take_noise(session)
+    emulator.take_noise(session, params={'tag': 'test'})
 
 
 def test_take_bgmap(tmp_path):

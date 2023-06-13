@@ -521,6 +521,7 @@ class SmurfFileEmulator:
             time.sleep(1)
         return True, "Wrote tune files"
 
+    @ocs_agent.param('tag', default=None)
     def take_noise(self, session, params=None):
         """take_noise()
 
@@ -529,8 +530,12 @@ class SmurfFileEmulator:
         action = 'take_noise'
         action_time = time.time()
 
+        tag = 'oper,noise'
+        if params.get('tag') is not None:
+            tag += f',{params["tag"]}'
+
         streamer = self._new_streamer(action=action, action_time=action_time,
-                                      tag='oper,noise')
+                                      tag=tag)
         now = time.time()
         streamer.stream_between(now, now + 30, wait=False)
         session.data['noise_file'] = streamer.file_list[0]
@@ -549,6 +554,7 @@ class SmurfFileEmulator:
         return True, "Wrote tune files"
 
     @ocs_agent.param('wait', default=True)
+    @ocs_agent.param('tag', default=None)
     def take_iv(self, session, params=None):
         """take_iv()
 
@@ -558,8 +564,12 @@ class SmurfFileEmulator:
         action_time = time.time()
         files = ['iv_analyze.npy', 'iv_bias_all.npy', 'iv_info.npy']
 
+        tag = 'oper,iv'
+        if params.get('tag') is not None:
+            tag += f',{params["tag"]}'
+
         streamer = self._new_streamer(action=action, action_time=action_time,
-                                      tag='oper,iv')
+                                      tag=tag)
         now = time.time()
         streamer.stream_between(now, now + 5, wait=params['wait'])
 
@@ -569,6 +579,7 @@ class SmurfFileEmulator:
         return True, "Wrote IV files"
 
     @ocs_agent.param('wait', default=True)
+    @ocs_agent.param('tag', default=None)
     def take_bias_steps(self, session, params=None):
         """take_bias_steps()
 
@@ -578,8 +589,12 @@ class SmurfFileEmulator:
         action_time = time.time()
         files = ['bias_step_analysis.npy']
 
+        tag = 'oper,bias_steps'
+        if params.get('tag') is not None:
+            tag += f',{params["tag"]}'
+
         streamer = self._new_streamer(action=action, action_time=action_time,
-                                      tag='oper,bias_steps')
+                                      tag=tag)
         now = time.time()
         streamer.stream_between(now, now + 5, wait=params['wait'])
 
@@ -589,6 +604,7 @@ class SmurfFileEmulator:
         return True, "Wrote Bias Step Files"
 
     @ocs_agent.param('wait', default=True)
+    @ocs_agent.param('tag', default=None)
     def take_bgmap(self, session, params=None):
         """take_bgmap()
 
@@ -597,8 +613,12 @@ class SmurfFileEmulator:
         action = 'take_bgmap'
         action_time = time.time()
 
+        tag = 'oper,bgmap'
+        if params.get('tag') is not None:
+            tag += f',{params["tag"]}'
+
         streamer = self._new_streamer(action=action, action_time=action_time,
-                                      tag='oper,bgmap')
+                                      tag=tag)
         now = time.time()
         streamer.stream_between(now, now + 5, wait=params['wait'])
 
@@ -619,6 +639,7 @@ class SmurfFileEmulator:
     @ocs_agent.param('duration', default=None)
     @ocs_agent.param('use_stream_between', default=False, type=bool)
     @ocs_agent.param('start_offset', default=0, type=float)
+    @ocs_agent.param('tag', default=None)
     def stream(self, session, params):
         """stream(duration=None)
 
@@ -652,6 +673,7 @@ class SmurfFileEmulator:
         else:
             action = 'stream_g3_on'
 
+
         action_time = time.time()
         files = ['freq.txt', 'mask.txt']
         for f in files:
@@ -661,6 +683,10 @@ class SmurfFileEmulator:
         end_time = None
         if params.get('duration') is not None:
             end_time = start_time + params['duration']
+        
+        tag = 'obs,cmb'
+        if params.get('tag') is not None:
+            tag += f',{params["tag"]}'
 
         session.set_status('running')
         streamer = self._new_streamer(action=action, action_time=action_time, tag='obs,cmb')
