@@ -181,6 +181,7 @@ class UPSAgent:
         self.log.info(f'Using SNMP version {version}.')
         self.version = version
         self.snmp = SNMPTwister(address, port)
+        self.connected = True
 
         self.lastGet = 0
 
@@ -335,6 +336,10 @@ class UPSAgent:
                 get_list.append(('UPS-MIB', oid, 0))
 
             ups_get_result = yield self.snmp.get(get_list, self.version)
+            if ups_get_result is None:
+                self.connected = False
+            else:
+                self.connected = True
 
             # Append input OIDs to GET list
             input_oids = ['upsInputVoltage',
@@ -344,7 +349,10 @@ class UPSAgent:
             # Use number of input lines used to append correct number of input OIDs
             input_num_lines = [('UPS-MIB', 'upsInputNumLines', 0)]
             num_res = yield self.snmp.get(input_num_lines, self.version)
-            if num_res is not None:
+            if num_res is None:
+                self.connected = False
+            else:
+                self.connected = True
                 input_get_results = []
                 inputs = num_res[0][1]._value
                 for i in range(inputs):
@@ -364,7 +372,10 @@ class UPSAgent:
             # Use number of output lines used to append correct number of output OIDs
             output_num_lines = [('UPS-MIB', 'upsOutputNumLines', 0)]
             num_res = yield self.snmp.get(output_num_lines, self.version)
-            if num_res is not None:
+            if num_res is None:
+                self.connected = False
+            else:
+                self.connected = True
                 output_get_results = []
                 outputs = num_res[0][1]._value
                 for i in range(outputs):
@@ -377,6 +388,10 @@ class UPSAgent:
 
             # Issue SNMP GET command
             get_result = yield self.snmp.get(main_get_list, self.version)
+            if get_result is None:
+                self.connected = False
+            else:
+                self.connected = True
 
             # Do not publish if UPS connection has dropped
             try:
@@ -384,7 +399,7 @@ class UPSAgent:
                 session.data = update_cache(get_result, read_time)
                 self.log.debug("{data}", data=session.data)
 
-                if get_result is None:
+                if not self.connected:
                     raise ConnectionError('No SNMP response. Check your connection.')
 
                 self.lastGet = time.time()
