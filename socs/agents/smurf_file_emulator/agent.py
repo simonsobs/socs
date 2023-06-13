@@ -673,7 +673,6 @@ class SmurfFileEmulator:
         else:
             action = 'stream_g3_on'
 
-
         action_time = time.time()
         files = ['freq.txt', 'mask.txt']
         for f in files:
@@ -683,7 +682,7 @@ class SmurfFileEmulator:
         end_time = None
         if params.get('duration') is not None:
             end_time = start_time + params['duration']
-        
+
         tag = 'obs,cmb'
         if params.get('tag') is not None:
             tag += f',{params["tag"]}'
