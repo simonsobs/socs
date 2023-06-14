@@ -146,6 +146,6 @@ class PMX:
             0: No protection
             1: Protection mode
         """
-        self.sock.sendall(b'stat:prot?\n')
+        self.sock.sendall(b'stat:ques?\n')
         val = int(self.read())
         return val

@@ -203,6 +203,7 @@ class HWPPMXAgent:
                 >>> response.session['data']
                 {'curr': 0,
                  'volt': 0,
+                 'prot': 0,
                  'last_updated': 1649085992.719602}
 
         """
