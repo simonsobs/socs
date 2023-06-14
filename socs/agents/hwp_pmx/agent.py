@@ -324,6 +324,7 @@ def main(args=None):
     agent.register_process('acq', PMX.acq, PMX._stop_acq)
     agent.register_task('set_on', PMX.set_on)
     agent.register_task('set_off', PMX.set_off)
+    agent.register_task('clear_alarm', PMX.clear_alarm)
     agent.register_task('set_i', PMX.set_i)
     agent.register_task('set_v', PMX.set_v)
     agent.register_task('set_i_lim', PMX.set_i_lim)
