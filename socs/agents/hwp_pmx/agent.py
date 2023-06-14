@@ -96,6 +96,18 @@ class HWPPMXAgent:
             self.dev.turn_off()
         return True, 'Set PMX Kikusui off'
 
+    def clear_alarm(self, session, params):
+        """clear_alarm()
+        **Task** - Clear alarm and exit protection mode.
+        """
+        with self.lock.acquire_timeout(3, job='clear_alarm') as acquired:
+            if not acquired:
+                self.log.warn(
+                    'Could not clear alarm because {} is already running'.format(self.lock.job))
+                return False, 'Could not acquire lock'
+            self.dev.clear_alarm()
+        return True, 'Clear alarm'
+
     @ocs_agent.param('curr', default=0, type=float, check=lambda x: 0 <= x <= 3)
     def set_i(self, session, params):
         """set_i(curr=0)
