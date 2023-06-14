@@ -107,7 +107,7 @@ class HWPPMXAgent:
                     'Could not clear alarm because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
             self.dev.clear_alarm()
-            self.prot_mode = 0
+            self.prot = 0
         return True, 'Clear alarm'
 
     @ocs_agent.param('curr', default=0, type=float, check=lambda x: 0 <= x <= 3)
