@@ -1,6 +1,16 @@
 import time
 from socket import AF_INET, SOCK_STREAM, socket
 
+protection_status_key = [
+    'Over voltage',
+    'Over current',
+    'AC power failure or power interuption',
+    '',
+    'Over temperature',
+    '',
+    'IOC communication error',
+    '',
+]
 
 class PMX:
     """The PMX object for communicating with the Kikusui PMX power supplies.
@@ -143,9 +153,22 @@ class PMX:
     def check_prot(self):
         """ Check the protection status
         Return:
-            0: No protection
-            1: Protection mode
+            val (int): protection status code
         """
         self.sock.sendall(b'stat:ques?\n')
         val = int(self.read())
         return val
+
+    def get_prot_msg(self, val):
+        """ Get the protection status message
+        Args:
+            val (int): protection status code
+        Return:
+            msg (str): protection status message
+        """
+        msg = []
+        for i in range(8):
+            if (val >> i & 1):
+                msg.append(protection_status_key[i])
+        msg = ', '.join(msg)
+        return msg

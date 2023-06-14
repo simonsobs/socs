@@ -35,6 +35,7 @@ class HWPPMXAgent:
 
         self._initialized = False
         self.take_data = False
+        self.prot = 0
 
         agg_params = {'frame_length': 60}
         self.agent.register_feed(
@@ -106,6 +107,7 @@ class HWPPMXAgent:
                     'Could not clear alarm because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
             self.dev.clear_alarm()
+            self.prot_mode = False
         return True, 'Clear alarm'
 
     @ocs_agent.param('curr', default=0, type=float, check=lambda x: 0 <= x <= 3)
@@ -251,13 +253,16 @@ class HWPPMXAgent:
                 msg, code = self.dev.check_error()
                 data['data']['err_code'] = code
                 data['data']['err_msg'] = msg
-                prot = self.dev.check_prot()
-                data['data']['prot'] = prot
+                prot_code = self.dev.check_prot()
+                if prot_code != 0:
+                    self.prot = prot_code
+                data['data']['prot_code'] = self.prot
+                data['data']['prot_msg'] = self.dev.get_prot_msg(self.prot)
 
                 self.agent.publish_to_feed('hwppmx', data)
                 session.data = {'curr': curr,
                                 'volt': volt,
-                                'prot': prot,
+                                'prot': self.prot,
                                 'last_updated': current_time}
 
                 time.sleep(sleep_time)
