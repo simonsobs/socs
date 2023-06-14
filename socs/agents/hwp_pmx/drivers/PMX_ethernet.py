@@ -139,3 +139,13 @@ class PMX:
         val = float(self.read())
         msg = "Voltage Limit: {:.3f} V".format(val)
         return msg
+
+    def check_prot(self):
+        """ Check the protection status
+        Return:
+            0: No protection
+            1: Protection mode
+        """
+        self.sock.sendall(b'stat:prot?\n')
+        val = int(self.read())
+        return val

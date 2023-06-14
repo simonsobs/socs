@@ -235,10 +235,16 @@ class HWPPMXAgent:
                 data['data']['current'] = curr
                 msg, volt = self.dev.meas_voltage()
                 data['data']['voltage'] = volt
+                msg, code = self.dev.check_error()
+                data['data']['err_code'] = code
+                data['data']['err_msg'] = msg
+                prot = self.dev.check_prot()
+                data['data']['prot'] = prot
 
                 self.agent.publish_to_feed('hwppmx', data)
                 session.data = {'curr': curr,
                                 'volt': volt,
+                                'prot': prot,
                                 'last_updated': current_time}
 
                 time.sleep(sleep_time)
