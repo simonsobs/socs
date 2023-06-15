@@ -12,6 +12,7 @@ protection_status_key = [
     '',
 ]
 
+
 class PMX:
     """The PMX object for communicating with the Kikusui PMX power supplies.
     Args:
