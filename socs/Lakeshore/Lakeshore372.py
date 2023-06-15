@@ -1361,6 +1361,8 @@ class Curve:
                 if units != float(point[1]):
                     self.set_curve(_file)
 
+        logging.info("all points uploaded successfully")
+
     def delete_curve(self):
         """Delete the curve using the CRVDEL command.
 
