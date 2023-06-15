@@ -1326,7 +1326,6 @@ class Curve:
 
         # refresh curve attributes
         self.get_header()
-        logging.info("checking that all points uploaded successfully...")
         self._check_curve(_file)
 
     def _check_curve(self, _file):
@@ -1347,6 +1346,7 @@ class Curve:
         for i in range(9, len(content)):
             values.append(content[i].strip().split())  # data points that should have been uploaded
 
+        logging.info("checking that all points uploaded successfully...")
         for j in range(1, len(values) + 1):
             try:
                 resp = self.get_data_point(j)  # response from the 372
