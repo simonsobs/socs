@@ -1346,7 +1346,7 @@ class Curve:
         for i in range(9, len(content)):
             values.append(content[i].strip().split())  # data points that should have been uploaded
 
-        logging.info("checking that all points uploaded successfully...")
+        logging.info("checking that points uploaded successfully...")
         for j in range(1, len(values) + 1):
             try:
                 resp = self.get_data_point(j)  # response from the 372
@@ -1361,7 +1361,7 @@ class Curve:
                 if units != float(point[1]):
                     self.set_curve(_file)
 
-        logging.info("all points uploaded successfully")
+        logging.info("all points uploaded successfully!")
 
     def delete_curve(self):
         """Delete the curve using the CRVDEL command.
