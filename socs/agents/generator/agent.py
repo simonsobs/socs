@@ -191,7 +191,7 @@ class GeneratorAgent:
                                  agg_params=agg_params,
                                  buffer_time=0)
 
-    def connect(self):
+    def _connect(self):
         """connect()
         Instantiates Generator object and check if client is open
         """
@@ -225,7 +225,7 @@ class GeneratorAgent:
 
             session.set_status('starting')
 
-            self.connect()
+            self._connect()
             if not self.initialized:
                 return False, 'Could not connect to generator'
 
@@ -297,7 +297,7 @@ class GeneratorAgent:
 
                 # Try to re-initialize if connection lost
                 if not self.initialized:
-                    self.connect()
+                    self._connect()
 
                 # Only get readings if connected
                 if self.initialized:
@@ -312,11 +312,10 @@ class GeneratorAgent:
                             data['data'][reg] = regdata[reg]["value"]
                             field_dict = {reg: regdata[reg]}
                             session.data['fields'].update(field_dict)
+                        session.data.update({'timestamp': current_time})
                     else:
                         self.log.info('Connection error or error in processing data.')
                         self.initialized = False
-
-                session.data.update({'timestamp': current_time})
 
                 # Continue trying to connect
                 if not self.initialized:
