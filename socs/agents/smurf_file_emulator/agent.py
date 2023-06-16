@@ -523,9 +523,13 @@ class SmurfFileEmulator:
 
     @ocs_agent.param('tag', default=None)
     def take_noise(self, session, params=None):
-        """take_noise()
+        """take_noise(tag=None)
 
         **Task** - Takes a short noise timestream
+
+        Parameters:
+            tag (str, optional):
+                User tag to add to the g3 stream.
         """
         action = 'take_noise'
         action_time = time.time()
@@ -556,9 +560,16 @@ class SmurfFileEmulator:
     @ocs_agent.param('wait', default=True)
     @ocs_agent.param('tag', default=None)
     def take_iv(self, session, params=None):
-        """take_iv()
+        """take_iv(wait=True, tag=None)
 
         **Task** - Creates files generated associated with iv taking / analysis
+
+        Parameters:
+            wait (bool, optional):
+                If true, will wait for the 5 seconds where fake IV data is
+                generated
+            tag (str, optional):
+                User tag to add to the g3 stream.
         """
         action = 'take_iv'
         action_time = time.time()
@@ -581,9 +592,16 @@ class SmurfFileEmulator:
     @ocs_agent.param('wait', default=True)
     @ocs_agent.param('tag', default=None)
     def take_bias_steps(self, session, params=None):
-        """take_bias_steps()
+        """take_bias_steps(wait=True, tag=None)
 
         **Task** - Creates files associated with taking bias steps
+
+        Parameters:
+            wait (bool, optional):
+                If true, will wait for the 5 seconds where fake data is
+                generated
+            tag (str, optional):
+                User tag to add to the g3 stream.
         """
         action = 'take_bias_steps'
         action_time = time.time()
@@ -606,9 +624,16 @@ class SmurfFileEmulator:
     @ocs_agent.param('wait', default=True)
     @ocs_agent.param('tag', default=None)
     def take_bgmap(self, session, params=None):
-        """take_bgmap()
+        """take_bgmap(wait=True, tag=None)
 
         **Task** - Creates files associated with taking a bias group mapping.
+
+        Parameters:
+            wait (bool, optional):
+                If true, will wait for the 5 seconds where fake data is
+                generated
+            tag (str, optional):
+                User tag to add to the g3 stream.
         """
         action = 'take_bgmap'
         action_time = time.time()
@@ -641,7 +666,7 @@ class SmurfFileEmulator:
     @ocs_agent.param('start_offset', default=0, type=float)
     @ocs_agent.param('tag', default=None)
     def stream(self, session, params):
-        """stream(duration=None)
+        """stream(duration=None, use_stream_between=False, start_offset=0, tag=None)
 
         **Process** - Generates example fake-files organized in the same way as
         they would be a regular smurf-stream. For end-to-end testing, we want
@@ -661,6 +686,8 @@ class SmurfFileEmulator:
                 If set, this will add an offset to the start time passed to the
                 `stream_between` function, allowing you to create offsets between
                 streams taken at the same time.
+            tag (str, optional):
+                User tag to add to the g3 stream.
         """
         session.set_status('starting')
 
