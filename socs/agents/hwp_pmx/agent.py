@@ -35,6 +35,7 @@ class HWPPMXAgent:
 
         self._initialized = False
         self.take_data = False
+        self.prot = 0
 
         agg_params = {'frame_length': 60}
         self.agent.register_feed(
@@ -95,6 +96,19 @@ class HWPPMXAgent:
                 return False, 'Could not acquire lock'
             self.dev.turn_off()
         return True, 'Set PMX Kikusui off'
+
+    def clear_alarm(self, session, params):
+        """clear_alarm()
+        **Task** - Clear alarm and exit protection mode.
+        """
+        with self.lock.acquire_timeout(3, job='clear_alarm') as acquired:
+            if not acquired:
+                self.log.warn(
+                    'Could not clear alarm because {} is already running'.format(self.lock.job))
+                return False, 'Could not acquire lock'
+            self.dev.clear_alarm()
+            self.prot = 0
+        return True, 'Clear alarm'
 
     @ocs_agent.param('curr', default=0, type=float, check=lambda x: 0 <= x <= 3)
     def set_i(self, session, params):
@@ -203,6 +217,7 @@ class HWPPMXAgent:
                 >>> response.session['data']
                 {'curr': 0,
                  'volt': 0,
+                 'prot': 0,
                  'last_updated': 1649085992.719602}
 
         """
@@ -235,10 +250,19 @@ class HWPPMXAgent:
                 data['data']['current'] = curr
                 msg, volt = self.dev.meas_voltage()
                 data['data']['voltage'] = volt
+                msg, code = self.dev.check_error()
+                data['data']['err_code'] = code
+                data['data']['err_msg'] = msg
+                prot_code = self.dev.check_prot()
+                if prot_code != 0:
+                    self.prot = prot_code
+                data['data']['prot_code'] = self.prot
+                data['data']['prot_msg'] = self.dev.get_prot_msg(self.prot)
 
                 self.agent.publish_to_feed('hwppmx', data)
                 session.data = {'curr': curr,
                                 'volt': volt,
+                                'prot': self.prot,
                                 'last_updated': current_time}
 
                 time.sleep(sleep_time)
@@ -300,6 +324,7 @@ def main(args=None):
     agent.register_process('acq', PMX.acq, PMX._stop_acq)
     agent.register_task('set_on', PMX.set_on)
     agent.register_task('set_off', PMX.set_off)
+    agent.register_task('clear_alarm', PMX.clear_alarm)
     agent.register_task('set_i', PMX.set_i)
     agent.register_task('set_v', PMX.set_v)
     agent.register_task('set_i_lim', PMX.set_i_lim)
