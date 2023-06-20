@@ -1,6 +1,17 @@
 import time
 from socket import AF_INET, SOCK_STREAM, socket
 
+protection_status_key = [
+    'Over voltage',
+    'Over current',
+    'AC power failure or power interuption',
+    '',
+    'Over temperature',
+    '',
+    'IOC communication error',
+    '',
+]
+
 
 class PMX:
     """The PMX object for communicating with the Kikusui PMX power supplies.
@@ -37,6 +48,19 @@ class PMX:
         else:
             msg += 'Fail'
         return msg, val
+
+    def check_error(self):
+        """ Check oldest error from error queues. Error queues store up to 255 errors """
+        self.sock.sendall(b':system:error?\n')
+        val = self.read()
+        code, msg = val.split(',')
+        code = int(code)
+        msg = msg[1:-2]
+        return msg, code
+
+    def clear_alarm(self):
+        """ Clear alarm """
+        self.sock.sendall(b'output:protection:clear\n')
 
     def turn_on(self):
         """ Turn the PMX on """
@@ -125,4 +149,27 @@ class PMX:
         self.sock.sendall(b'volt:prot?\n')
         val = float(self.read())
         msg = "Voltage Limit: {:.3f} V".format(val)
+        return msg
+
+    def check_prot(self):
+        """ Check the protection status
+        Return:
+            val (int): protection status code
+        """
+        self.sock.sendall(b'stat:ques?\n')
+        val = int(self.read())
+        return val
+
+    def get_prot_msg(self, val):
+        """ Get the protection status message
+        Args:
+            val (int): protection status code
+        Return:
+            msg (str): protection status message
+        """
+        msg = []
+        for i in range(8):
+            if (val >> i & 1):
+                msg.append(protection_status_key[i])
+        msg = ', '.join(msg)
         return msg

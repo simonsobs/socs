@@ -147,7 +147,9 @@ def test_hwp_rotation_ign_ext(wait_for_crossbar, kikusui_emu, run_agent, client)
 @pytest.mark.integtest
 def test_hwp_rotation_acq(wait_for_crossbar, kikusui_emu, run_agent, client):
     responses = {'meas:volt?': '2',
-                 'meas:curr?': '1'}
+                 'meas:curr?': '1',
+                 ':system:error?': '+0,"No error"\n',
+                 'stat:ques?': '0'}
     kikusui_emu.define_responses(responses)
 
     client.init_connection.wait()  # wait for connection to be made
