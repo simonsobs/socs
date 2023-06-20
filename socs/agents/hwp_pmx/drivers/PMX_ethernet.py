@@ -12,6 +12,17 @@ protection_status_key = [
     '',
 ]
 
+protection_status_key = [
+    'Over voltage',
+    'Over current',
+    'AC power failure or power interuption',
+    '',
+    'Over temperature',
+    '',
+    'IOC communication error',
+    '',
+]
+
 
 class PMX:
     """The PMX object for communicating with the Kikusui PMX power supplies.
