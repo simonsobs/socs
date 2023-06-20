@@ -1,12 +1,11 @@
 import argparse
 import enum
 import os
-import time
-from dataclasses import dataclass, asdict, field
-from typing import Optional
 import threading
 import time
 import traceback
+from dataclasses import asdict, dataclass, field
+from typing import Optional
 
 import numpy as np
 import ocs
@@ -257,7 +256,7 @@ class HWPState:
 
         for k, field in ups_keymap.items():
             setattr(self, k, data[f'{field[0]}_{ups_oid}'][field[1]])
-        
+
         self.ups_last_connection_attempt = data['ups_connection']['last_attempt']
         self.ups_connected = data['ups_connection']['connected']
 
@@ -594,13 +593,13 @@ class ControlStateMachine:
                 if (f1 - f0) > 0:
                     self.log.warn("HWP is speeding up!! Reversing direction")
                     new_d = '0' if (hwp_state.pid_direction == '1') else '1'
-                    self.run_and_validate(clients.pid.set_direction, 
+                    self.run_and_validate(clients.pid.set_direction,
                                           kwargs=dict(direction=new_d))
 
                 self._set_state(ControlState.WaitForBrake(
                     init_quad=init_quad,
                     min_freq=0.5,
-                    prev_freq = hwp_state.enc_freq
+                    prev_freq=hwp_state.enc_freq
                 ))
 
             elif isinstance(self.state, ControlState.WaitForBrake):
@@ -620,7 +619,7 @@ class ControlStateMachine:
                     self.log.warn("Setting PMX Off, since can't confirm direction")
                     self._set_state(ControlState.PmxOff())
                     return
-                
+
                 if freq - self.state.prev_freq > 0:
                     self.log.warn("HWP Freq is increasing! Setting PMX Off")
                     self._set_state(ControlState.PmxOff())
@@ -634,7 +633,7 @@ class ControlStateMachine:
                         freq_tol=0.1,
                         freq_tol_duration=10,
                     ))
-                
+
                 self.prev_freq = freq
                 return
 
