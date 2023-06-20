@@ -115,9 +115,12 @@ class HWPState:
 
     ups_output_source: Optional[str] = None
     ups_estimated_minutes_remaining: Optional[float] = None
+    ups_estimated_charge_remaining: Optional[float] = None
     ups_battery_voltage: Optional[float] = None
     ups_battery_current: Optional[float] = None
     ups_minutes_remaining_thresh: Optional[float] = None
+    ups_connected: Optional[bool] = None
+    ups_last_connection_attempt: Optional[bool] = None
 
     pid_current_freq: Optional[float] = None
     pid_target_freq: Optional[float] = None
@@ -233,6 +236,7 @@ class HWPState:
         ups_keymap = {
             'ups_output_source': ('upsOutputSource', 'description'),
             'ups_estimated_minutes_remaining': ('upsEstimatedMinutesRemaining', 'status'),
+            'ups_estimated_charge_remaining': ('upsEstimatedChargeRemaining', 'status'),
             'ups_battery_voltage': ('upsBatteryVoltage', 'status'),
             'ups_battery_current': ('upsBatteryCurrent', 'status'),
         }
@@ -253,6 +257,9 @@ class HWPState:
 
         for k, field in ups_keymap.items():
             setattr(self, k, data[f'{field[0]}_{ups_oid}'][field[1]])
+        
+        self.ups_last_connection_attempt = data['ups_connection']['last_attempt']
+        self.ups_connected = data['ups_connection']['connected']
 
     @property
     def pmx_action(self):
@@ -431,6 +438,7 @@ class ControlState:
         """
         min_freq: float
         init_quad: float
+        prev_freq: float = None
         start_time: float = field(default_factory=time.time)
 
     @dataclass
@@ -493,7 +501,7 @@ class ControlStateMachine:
                       name=session.get('op_name'), success=session.get('success'),
                       kw=kwargs)
 
-        return
+        return session
 
     def _set_state(self, state):
         self.log.info("Changing from {s1} to {s2}", s1=self.state, s2=state)
@@ -575,13 +583,24 @@ class ControlStateMachine:
                     self._set_state(ControlState.PmxOff())
                     return
 
+                self.run_and_validate(clients.pmx.ign_ext)
                 self.run_and_validate(clients.pid.tune_stop)
-                self.run_and_validate(clients.pmx.use_ext)
-                self.run_and_validate(clients.pmx.set_on)
+                # self.run_and_validate(clients.pmx.set_on)
+                self.run_and_validate(clients.pmx.set_v, kwargs={'volt': 30.0})
+
+                f0 = hwp_state.enc_freq
+                time.sleep(2)
+                f1 = hwp_state.enc_freq
+                if (f1 - f0) > 0:
+                    self.log.warn("HWP is speeding up!! Reversing direction")
+                    new_d = '0' if (hwp_state.pid_direction == '1') else '1'
+                    self.run_and_validate(clients.pid.set_direction, 
+                                          kwargs=dict(direction=new_d))
 
                 self._set_state(ControlState.WaitForBrake(
                     init_quad=init_quad,
-                    min_freq=0.5
+                    min_freq=0.5,
+                    prev_freq = hwp_state.enc_freq
                 ))
 
             elif isinstance(self.state, ControlState.WaitForBrake):
@@ -601,6 +620,11 @@ class ControlStateMachine:
                     self.log.warn("Setting PMX Off, since can't confirm direction")
                     self._set_state(ControlState.PmxOff())
                     return
+                
+                if freq - self.state.prev_freq > 0:
+                    self.log.warn("HWP Freq is increasing! Setting PMX Off")
+                    self._set_state(ControlState.PmxOff())
+                    return
 
                 quad_diff = np.abs(quad - self.state.init_quad)
                 if freq < self.state.min_freq or quad_diff > 0.1:
@@ -610,7 +634,8 @@ class ControlStateMachine:
                         freq_tol=0.1,
                         freq_tol_duration=10,
                     ))
-
+                
+                self.prev_freq = freq
                 return
 
         except Exception:

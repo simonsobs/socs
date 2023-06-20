@@ -205,6 +205,7 @@ class HWPPIDAgent:
                 return False, 'Could not acquire lock'
 
             direction = self.pid.get_direction()
+            session.data = {'direction': direction}
 
         return True, 'Current direction = {}'.format(['Forward', 'Reverse'][direction])
 
