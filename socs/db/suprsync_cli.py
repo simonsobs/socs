@@ -63,9 +63,14 @@ def add_local_files_func(args):
 
     if args.dry:
         print("Dry run\n" + 40 * '-')
+
+        if len(local_paths) == 0:
+            print("No files to add")
+            return
+
         print(f"Would add {len(local_paths)} files, including:")
-        n = min(len(local_paths), 20)
-        for i in range(10):
+        n = min(len(local_paths), 10)
+        for i in range(n):
             print(f"{i}: {local_paths[i]} --> {remote_paths[i]}")
         return
 
