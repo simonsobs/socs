@@ -78,7 +78,6 @@ def test_timecode_dirs(tmp_path):
                 finalize_files.append(os.path.join(root, f))
 
     assert (len(finalize_files) == len(tcs) - 1)
-    assert (False)
 
 
 def test_suprsync_handle_files(tmp_path):
