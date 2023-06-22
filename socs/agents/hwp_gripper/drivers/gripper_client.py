@@ -90,6 +90,24 @@ class GripperClient(object):
 
         return self.send_command('ACT ' + str(actuator))
 
+    def IS_COLD(self, value):
+        if value:
+            return self.send_command('IS_COLD 1')
+        else:
+            return self.send_command('IS_COLD 0')
+
+    def FORCE(self, value):
+        if value:
+            return self.send_command('FORCE 1')
+        else:
+            return self.send_command('FORCE 0')
+
+    def LIMIT(self):
+        return self.send_command('LIMIT')
+
+    def POSITION(self):
+        return self.send_command('POSITION')
+
     def send_command(self, command):
         if isinstance(command, str):
             self.s.sendall(bytes(command, 'utf-8'))
