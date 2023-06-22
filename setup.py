@@ -72,6 +72,7 @@ setup(
     package_data={'socs': [
         'agents/smurf_file_emulator/*.yaml',
         'agents/labjack/cal_curves/*.txt',
+        'agents/generator/*.yaml'
     ]},
     entry_points={
         'ocs.plugins': [
@@ -96,6 +97,7 @@ setup(
         'autobahn[serialization]',
         'numpy',
         'ocs',
+        'pyModbusTCP',
         'pyserial',
         'pysnmp-lextudio',
         'pysmi',

@@ -51,6 +51,9 @@ pysmurf @ git+https://github.com/slaclab/pysmurf.git@main
 sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master
 sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master
 
+# modbus
+pyModbusTCP
+
 # Docs
 # see docs/requirements.txt
 
