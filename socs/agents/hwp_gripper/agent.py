@@ -287,7 +287,7 @@ class GripperAgent:
             if not acquired:
                 self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
-        
+
             return_dict = self.client.LIMIT()
             [self.log.info(line) for line in return_dict['log']]
 
@@ -298,7 +298,7 @@ class GripperAgent:
             if not acquired:
                 self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
-    
+
             return_dict = self.client.POSITION()
             [self.log.info(line) for line in return_dict['log']]
 
@@ -386,9 +386,9 @@ class GripperAgent:
                     'block_name': 'HWPGripper_POS', 'data': {}}
 
             # NEEDS TO BE UPDATED
-            #cur_pos = self._get_pos()
-            cur_pos = [0,0,0,0,0,0]
-            
+            # cur_pos = self._get_pos()
+            cur_pos = [0, 0, 0, 0, 0, 0]
+
             data['data']['act1_a'] = cur_pos[0]
             data['data']['act1_b'] = cur_pos[1]
             data['data']['act2_a'] = cur_pos[2]
