@@ -6,7 +6,7 @@ import time
 import txaio
 import yaml
 from sqlalchemy import (Boolean, Column, Float, ForeignKey, Integer, String,
-                        create_engine)
+                        create_engine, asc)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
@@ -86,6 +86,9 @@ class SupRsyncFile(Base):
             Number of failed copy attempts
         deletable : Bool
             Whether file should be deleted after copying
+        ignore : Bool
+            If true, file will be ignored by SupRsync agent and not
+            included in `finalized_until`.
     """
     __tablename__ = f"supersync_v{TABLE_VERSION}"
 
@@ -100,6 +103,7 @@ class SupRsyncFile(Base):
     removed = Column(Float)
     failed_copy_attempts = Column(Integer, default=0)
     deletable = Column(Boolean, default=True)
+    ignore = Column(Boolean, default=False)
 
     def __str__(self):
         excl = ('_sa_adapter', '_sa_instance_state')
@@ -207,6 +211,62 @@ class SupRsyncFilesManager:
 
         if create_all:
             Base.metadata.create_all(self._engine)
+    
+    def get_archive_stats(self, session=None):
+        if session is None:
+            session = self.Session()
+        
+        archive_names =  session.query(SupRsyncFile.archive_name)\
+                            .distinct().all()
+        
+        stats = {}
+        for name, in archive_names:
+            files = session.query(SupRsyncFile).filter(
+                SupRsyncFile.archive_name == name,
+            ).order_by(asc(SupRsyncFile.timestamp)).all()
+
+            finalized_until = None
+            num_files_to_copy = 0
+
+            for f in files:
+                if (not f.ignore) and (f.local_md5sum != f.remote_md5sum):
+                    num_files_to_copy += 1
+                
+                if finalized_until is None and not (f.ignore):
+                    if f.local_md5sum != f.remote_md5sum:
+                        finalized_until = f.timestamp - 1
+
+            # There are no more uncopied files that aren't ignored
+            if finalized_until is None:  
+                finalized_until = time.time()
+
+            stats[name] = {
+                'finalized_until': finalized_until,
+                'num_files': len(files),
+                'uncopied_files': len([f for f in files if f.copied is None]),
+            }
+
+        return stats
+
+    def get_finalized_until(self, archive_name, session=None):
+        """
+        Returns a timetamp for which all files preceding are either successfully
+        copied, or ignored. If all files are copied, returns the current time.
+        """
+        if session is None:
+            session = self.Session()
+
+        query = session.query(SupRsyncFile).filter(
+            SupRsyncFile.archive_name == archive_name,
+        ).order_by(asc(SupRsyncFile.timestamp))
+
+        for file in query.all():
+            if file.ignore:
+                continue
+            if file.local_md5sum != file.remote_md5sum:
+                return file.timestamp - 1
+        else:
+            return time.time()
 
     def add_file(self, local_path, remote_path, archive_name,
                  local_md5sum=None, timestamp=None, session=None,
@@ -339,7 +399,7 @@ class SupRsyncFilesManager:
 
         query = session.query(SupRsyncFile).filter(
             SupRsyncFile.archive_name == archive_name,
-        )
+        ).order_by(asc(SupRsyncFile.timestamp))
 
         return list(query.all())
 
@@ -430,6 +490,7 @@ class SupRsyncFilesManager:
                 'num_files': len(files),
                 'subdirs': list(subdirs),
                 'finalized_at': now,
+                'finalized_until': self.get_finalized_until(tcdir.archive_name),
                 'archive_name': tcdir.archive_name,
                 'instance_id': sync_id
             }

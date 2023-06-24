@@ -72,6 +72,7 @@ class SupRsync:
                                  agg_params={
                                      'exclude_aggregator': True,
                                  })
+        self.agent.register_feed('archive_stats', record=True)
 
     def run(self, session, params=None):
         """run()
@@ -148,8 +149,21 @@ class SupRsync:
                 self.log.error("rsync returned non-zero exit code! {e}", e=e)
                 op['error'] = 'nonzero exit'
                 counters['errors_nonzero'] += 1
-
+            
             now = time.time()
+
+            archive_stats = srfm.get_archive_stats()
+            for archive_name, stats in archive_stats.items():
+                self.agent.publish_to_feed('archive_stats', {
+                    'block_name': archive_name,
+                    'timestamp': now,
+                    'data': {
+                        f'{archive_name}_{k}': v
+                        for k, v in stats.items()
+                    }
+                })
+            session.data['archive_stats'] = archive_stats
+
             op['stop_time'] = now
             session.data['last_copy'] = op
             session.data['timestamp'] = now
