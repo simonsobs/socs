@@ -22,6 +22,7 @@ Base = declarative_base()
 # the subsequent timecode dir has not been created.
 DAYS_TO_COMPLETE_TCDIR = 1
 
+
 class TimecodeDir(Base):
     """
     Table for information about 'timecode' directories. These are directories
