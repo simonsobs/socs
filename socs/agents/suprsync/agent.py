@@ -158,7 +158,7 @@ class SupRsync:
                 self.log.error("rsync returned non-zero exit code! {e}", e=e)
                 op['error'] = 'nonzero exit'
                 counters['errors_nonzero'] += 1
-            
+
             now = time.time()
 
             archive_stats = srfm.get_archive_stats().get(self.archive_name)

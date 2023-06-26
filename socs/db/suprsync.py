@@ -6,7 +6,7 @@ import time
 import txaio
 import yaml
 from sqlalchemy import (Boolean, Column, Float, ForeignKey, Integer, String,
-                        create_engine, asc)
+                        asc, create_engine)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
@@ -211,14 +211,14 @@ class SupRsyncFilesManager:
 
         if create_all:
             Base.metadata.create_all(self._engine)
-    
+
     def get_archive_stats(self, session=None):
         if session is None:
             session = self.Session()
-        
-        archive_names =  session.query(SupRsyncFile.archive_name)\
-                            .distinct().all()
-        
+
+        archive_names = session.query(SupRsyncFile.archive_name)\
+            .distinct().all()
+
         stats = {}
         for name, in archive_names:
             files = session.query(SupRsyncFile).filter(
@@ -237,13 +237,13 @@ class SupRsyncFilesManager:
 
                 if (not f.ignore) and (f.local_md5sum != f.remote_md5sum):
                     num_files_to_copy += 1
-                
+
                 if finalized_until is None and not (f.ignore):
                     if f.local_md5sum != f.remote_md5sum:
                         finalized_until = f.timestamp - 1
 
             # There are no more uncopied files that aren't ignored
-            if finalized_until is None:  
+            if finalized_until is None:
                 finalized_until = time.time()
 
             stats[name] = {
