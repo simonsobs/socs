@@ -4,7 +4,9 @@ import tempfile
 import time
 
 import txaio
-from sqlalchemy import Boolean, Column, Float, Integer, String, create_engine
+import yaml
+from sqlalchemy import (Boolean, Column, Float, ForeignKey, Integer, String,
+                        create_engine)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
@@ -15,6 +17,44 @@ txaio.use_twisted()
 
 
 Base = declarative_base()
+
+# Number of days after which a timecode directory will be marked as complete if
+# the subsequent timecode dir has not been created.
+DAYS_TO_COMPLETE_TCDIR = 1
+
+
+class TimecodeDir(Base):
+    """
+    Table for information about 'timecode' directories. These are directories
+    in particular archives such as 'smurf' that we care about tracking whether
+    or not they've completed syncing.
+
+    Timecode directories must start with a 5-digit time-code.
+
+    Attributes
+    ---------------
+    timecode: int
+        Timecode for directory. Must be 5 digits, and will be roughly 1 a day.
+    archive_name : str
+        Archive the directory is in.
+    completed : bool
+        True if we expect no more files to be added to this directory.
+    synced : bool
+        True if all files in this directory have been synced to the remote.
+    finalized : bool
+        True if the 'finalization' file has been written and added to the db.
+    finalize_file_id : int
+        ID for the SupRsyncFile object that is the finalization file for this
+        timecode dir.
+    """
+    __tablename__ = f"timecode_dirs_v{TABLE_VERSION}"
+    id = Column(Integer, primary_key=True)
+    timecode = Column(Integer, nullable=False)
+    archive_name = Column(String, nullable=False)
+    completed = Column(Boolean, default=False)
+    synced = Column(Boolean, default=False)
+    finalized = Column(Boolean, default=False)
+    finalize_file_id = Column(Integer, ForeignKey(f"supersync_v{TABLE_VERSION}.id"))
 
 
 class SupRsyncFile(Base):
@@ -74,6 +114,26 @@ class SupRsyncFile(Base):
             for k, v in d.items()
         ])
         return s
+
+
+def split_path(path):
+    """Splits path into a list where each element is a subdirectory"""
+    return os.path.normpath(path).strip('/').split('/')
+
+
+def check_timecode(file: SupRsyncFile):
+    """
+    Tries to extract timecode from the remote path. If it fails, returns
+    None.
+    """
+    split = split_path(file.remote_path)
+    try:
+        timecode = int(split[0])
+        if len(str(timecode)) != 5:  # Timecode must be 5 digits
+            raise ValueError("Timecode not 5 digits")
+        return timecode
+    except ValueError:
+        return None
 
 
 def create_file(local_path, remote_path, archive_name, local_md5sum=None,
@@ -179,9 +239,13 @@ class SupRsyncFilesManager:
                            deletable=deletable)
         if session is None:
             with self.Session.begin() as session:
+                self._add_file_tcdir(file, session)
                 session.add(file)
         else:
+            self._add_file_tcdir(file, session)
             session.add(file)
+
+        return file
 
     def get_copyable_files(self, archive_name, session=None,
                            max_copy_attempts=None, num_files=None):
@@ -278,6 +342,120 @@ class SupRsyncFilesManager:
         )
 
         return list(query.all())
+
+    def _add_file_tcdir(self, file: SupRsyncFile, session):
+        """
+        Creates and adds a TimecodeDir for a file if possible.  This will
+        attempt to extract the timecode from the remote filename, and will
+        create a new TimecodeDir if it doesn't already exist.
+        """
+        # print(file.remote_path)
+        tc = check_timecode(file)
+        if tc is None:
+            return None
+
+        tcdir = session.query(TimecodeDir).filter(
+            TimecodeDir.timecode == tc,
+            TimecodeDir.archive_name == file.archive_name,
+        ).one_or_none()
+
+        if tcdir is not None:
+            return tcdir
+
+        tcdir = TimecodeDir(timecode=tc, archive_name=file.archive_name)
+        session.add(tcdir)
+        return tcdir
+
+    def create_all_timecode_dirs(self, archive_name):
+        with self.Session.begin() as session:
+            files = self.get_known_files(archive_name, session=session)
+            for file in files:
+                self._add_file_tcdir(file, session)
+
+    def update_all_timecode_dirs(self, archive_name, file_root, sync_id):
+        with self.Session.begin() as session:
+            tcdirs = session.query(TimecodeDir).all()
+            for tcdir in tcdirs:
+                self._update_tcdir(tcdir, session, file_root, sync_id)
+
+    def _update_tcdir(self, tcdir, session, file_root, sync_id):
+        """
+        Takes the next series of actions for a timecode dir object.
+        - If we expect no more files to be added to the tc dir, marks it as
+          complete
+        - If all files in the tc dir have been synced, marks it as synced
+        - If the tc dir is synced and not finalized, creates the finalization
+          file and marks as finalized.
+        """
+        if tcdir.finalized:
+            return
+
+        now = time.time()
+
+        if not tcdir.completed:
+            all_tcs = session.query(TimecodeDir.timecode).all()
+            for tc, in all_tcs:
+                if tc > tcdir.timecode:
+                    # Mark as complete if there's a timecode after this one
+                    tcdir.completed = True
+                    break
+            else:
+                # No timecodes after this one. Mark after complete if we are
+                # over a full day away.
+                if (now // 1e5 - tcdir.timecode) > DAYS_TO_COMPLETE_TCDIR:
+                    tcdir.completed = True
+
+        # Gets all files in this tcdir
+        files = session.query(SupRsyncFile).filter(
+            SupRsyncFile.remote_path.like(f'{tcdir.timecode}/%')
+        ).all()
+
+        if tcdir.completed and not tcdir.synced:
+            for f in files:
+                if f.local_md5sum != f.remote_md5sum:
+                    break  # File is not synced properly
+            else:
+                tcdir.synced = True
+
+        if tcdir.synced and not tcdir.finalized:  # Finalize file
+            # Get subdirs this suprsync instance is responsible for
+            subdirs = set()
+            for f in files:
+                split = split_path(f.remote_path)
+                if len(split) > 2:
+                    subdirs.add(split[1])
+
+            tcdir_summary = {
+                'timecode': tcdir.timecode,
+                'num_files': len(files),
+                'subdirs': list(subdirs),
+                'finalized_at': now,
+                'archive_name': tcdir.archive_name,
+                'instance_id': sync_id
+            }
+
+            tc = int(now // 1e5)
+            timestamp = int(now)
+            fname = f'{timestamp}_{tcdir.archive_name}_{tcdir.timecode}_finalized.yaml'
+            finalize_local_path = os.path.join(
+                file_root, str(tc), sync_id, fname,
+            )
+            finalize_remote_path = os.path.join(
+                str(tc), 'suprsync', sync_id, fname
+            )
+            os.makedirs(os.path.dirname(finalize_local_path), exist_ok=True)
+            with open(finalize_local_path, 'w') as f:
+                yaml.dump(tcdir_summary, f)
+
+            file = self.add_file(
+                finalize_local_path, finalize_remote_path, tcdir.archive_name,
+                session=session, timestamp=now
+            )
+            session.add(file)
+            session.flush()
+
+            tcdir.finalized = True
+            tcdir.finalize_file_id = file.id
 
 
 class SupRsyncFileHandler:
