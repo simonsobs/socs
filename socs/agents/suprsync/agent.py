@@ -9,6 +9,16 @@ from ocs import ocs_agent, site_config
 from socs.db.suprsync import SupRsyncFileHandler, SupRsyncFilesManager
 
 
+def format_fieldname(name):
+    """
+    Formats a string so that it can be accepted as an OCS field-name
+    """
+    _name = name
+    for char in ['-', ' ']:
+        _name = _name.replace(char, '_')
+    return _name
+
+
 class SupRsync:
     """
     Agent to rsync files to a remote (or local) destination, verify successful
@@ -94,6 +104,15 @@ class SupRsync:
                     "files": [],
                     "stop_time": 1661284493.5398622
                   },
+                  'archive_stats': {
+                    'smurf': {
+                        'finalized_until': 1687797424.652119,
+                        'num_files': 3,
+                        'uncopied_files': 0,
+                        'last_file_added': '/path/to/file',
+                        'last_file_copied': '/path/to/file'
+                    }
+                  },
                   "counters": {
                     "iterations": 1,
                     "copies": 0,
@@ -153,15 +172,18 @@ class SupRsync:
             now = time.time()
 
             archive_stats = srfm.get_archive_stats()
+
+            # Publish stats to hk fieeds
             for archive_name, stats in archive_stats.items():
                 self.agent.publish_to_feed('archive_stats', {
                     'block_name': archive_name,
                     'timestamp': now,
                     'data': {
-                        f'{archive_name}_{k}': v
+                        format_fieldname(f'{archive_name}_{k}'): v
                         for k, v in stats.items()
                     }
                 })
+
             session.data['archive_stats'] = archive_stats
 
             op['stop_time'] = now
