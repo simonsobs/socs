@@ -18,6 +18,9 @@ txaio.use_twisted()
 
 Base = declarative_base()
 
+# Number of days after which a timecode directory will be marked as complete if
+# the subsequent timecode dir has not been created.
+DAYS_TO_COMPLETE_TCDIR = 1
 
 class TimecodeDir(Base):
     """
@@ -398,7 +401,7 @@ class SupRsyncFilesManager:
             else:
                 # No timecodes after this one. Mark after complete if we are
                 # over a full day away.
-                if (now // 1e5 - tcdir.timecode) > 1:
+                if (now // 1e5 - tcdir.timecode) > DAYS_TO_COMPLETE_TCDIR:
                     tcdir.completed = True
 
         # Gets all files in this tcdir
