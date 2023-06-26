@@ -75,6 +75,9 @@ setup(
         'agents/generator/*.yaml'
     ]},
     entry_points={
+        'console_scripts': [
+            'suprsync=socs.db.suprsync_cli:main'
+        ],
         'ocs.plugins': [
             'socs = socs.plugin',
         ],
