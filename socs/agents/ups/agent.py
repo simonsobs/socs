@@ -404,19 +404,22 @@ class UPSAgent:
 
                 self.lastGet = time.time()
                 # Publish to feed
-                message = _build_message(ups_get_result, read_time, 'ups')
-                self.log.debug("{msg}", msg=message)
-                session.app.publish_to_feed('ups', message)
+                if ups_get_result is not None:
+                    message = _build_message(ups_get_result, read_time, 'ups')
+                    self.log.debug("{msg}", msg=message)
+                    session.app.publish_to_feed('ups', message)
                 for i, result in enumerate(input_get_results):
-                    blockname = f'input_{i}'
-                    message = _build_message(result, read_time, blockname)
-                    self.log.debug("{msg}", msg=message)
-                    session.app.publish_to_feed('ups', message)
+                    if result is not None:
+                        blockname = f'input_{i}'
+                        message = _build_message(result, read_time, blockname)
+                        self.log.debug("{msg}", msg=message)
+                        session.app.publish_to_feed('ups', message)
                 for i, result in enumerate(output_get_results):
-                    blockname = f'output_{i}'
-                    message = _build_message(result, read_time, blockname)
-                    self.log.debug("{msg}", msg=message)
-                    session.app.publish_to_feed('ups', message)
+                    if result is not None:
+                        blockname = f'output_{i}'
+                        message = _build_message(result, read_time, blockname)
+                        self.log.debug("{msg}", msg=message)
+                        session.app.publish_to_feed('ups', message)
             except ConnectionError as e:
                 self.log.error(f'{e}')
                 yield dsleep(1)
