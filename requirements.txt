@@ -1,28 +1,61 @@
-sphinx-argparse
-numpy
+# core dependencies
 autobahn[serialization]
+ocs
+sqlalchemy>=1.4
 twisted
 
-# Lakeshore240
+# hardware communication
 pyserial
+pysnmp-lextudio
+pysmi
+pyasn1==0.4.8
 
-mysql-connector>=2.1.6
+# common dependencies - used by multiple agents
+numpy
+pyyaml
+
+# acu agent
+soaculib @ git+https://github.com/simonsobs/soaculib.git@master
+
+# holography agent - python 3.8 only!
+# -r requirements/holography.txt
 
 # LabJack Agent
-pymodbus
 numexpr
-pyyaml
 scipy
+labjack-ljm
 
-# Meinberg M1000
-pysnmp
-pysmi
+# magpie agent
+scipy
+pandas
+
+# pfeiffer tc 400
+pfeiffer-vacuum-protocol==0.4
+
+# pysmurf controller
+pysmurf @ git+https://github.com/slaclab/pysmurf.git@main
+sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master
+sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master
+
+# synacc agent
+requests
+
+# timing master monitor
+pyepics
+
+# xy_stage
+xy_stage_control @ git+https://github.com/kmharrington/xy_stage_control.git@main
+
+# pysmurf controller
+pysmurf @ git+https://github.com/slaclab/pysmurf.git@main
+sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master
+sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master
+
+# modbus
+pyModbusTCP
 
 # Docs
 # see docs/requirements.txt
 
 # testing
-pytest
-pytest-cov
-pytest-docker-compose
-pytest-dependency
+-r requirements/testing.txt

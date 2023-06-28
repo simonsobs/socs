@@ -12,12 +12,13 @@
 # ls.msg('SCAN?'), ls.msg('INTYPE? 1'), ls.msg('OUTMODE? 0')
 
 
+import argparse
+import logging
 import os
 import socket
-import argparse
-import numpy as np
-import logging
 import time
+
+import numpy as np
 
 BUFF_SIZE = 4096
 
@@ -54,8 +55,9 @@ current_excitation_key = {1: 1.0e-12,
                           18: 316.0e-6,
                           19: 1.0e-3,
                           20: 3.16e-3,
-                          21: 10.0-3,
-                          22: 31.6-3}
+                          21: 10.0e-3,
+                          22: 31.6e-3}
+
 
 class Lakeshore372_Simulator:
     def __init__(self, port, num_channels=16, sn="LSASIM"):
@@ -220,7 +222,7 @@ class Lakeshore372_Simulator:
                 while True:
                     data = conn.recv(BUFF_SIZE)
                     elapsed_time = time.time() - start_time
-                    #self.log.debug('time:', elapsed_time)  # timestamp printed every time a command is received
+                    # self.log.debug('time:', elapsed_time)  # timestamp printed every time a command is received
 
                     if not data:
                         self.log.info("Connection closed by client")
@@ -233,8 +235,8 @@ class Lakeshore372_Simulator:
                     cmds = data.decode().split(';')
 
                     if int(self.scanner) == 1:  # useful only if all channels have the same dwell and pause settings
-                        channel_change = int(elapsed_time // (self.channels[int(self.active_channel)].dwell +
-                                                              self.channels[int(self.active_channel)].pause))
+                        channel_change = int(elapsed_time // (self.channels[int(self.active_channel)].dwell
+                                                              + self.channels[int(self.active_channel)].pause))
                         # print(channel_change)
                         if 0 < channel_change < 16:
                             self.active_channel = 1 + channel_change
@@ -438,7 +440,7 @@ class Lakeshore372_Simulator:
             self.log.warning("heater output must be between 0 and 2")
             return
 
-        if int(enabled) in [0,1]:
+        if int(enabled) in [0, 1]:
             self.heaters[int(heater_output)].ramp = int(enabled)
         else:
             self.log.warning("0 = ramping off, 1 = ramping on")
@@ -500,19 +502,19 @@ class Lakeshore372_Simulator:
             return
 
         if 0.0 <= float(p) <= 1000:
-            self.heaters[int(heater_output)].P = float(p)
+            self.heaters[int(heater_output)].p = float(p)
         else:
             self.log.warning("P value must be between 0.0 and 1000")
             return
 
         if 0 <= float(i) <= 10000:
-            self.heaters[int(heater_output)].I = float(i)
+            self.heaters[int(heater_output)].i = float(i)
         else:
             self.log.warning("I value must be between 0 and 10000")
             return
 
         if 0 <= float(d) <= 2500:
-            self.heaters[int(heater_output)].D = float(d)
+            self.heaters[int(heater_output)].d = float(d)
         else:
             self.log.warning("D value must be between 0 and 2500")
             return
@@ -520,7 +522,7 @@ class Lakeshore372_Simulator:
     def get_curve_header(self, curve):
         curve_index = int(curve)
         if not 1 <= curve_index <= 59:
-            self.log.warning(f"curve num must be between 1 and 59")
+            self.log.warning("curve num must be between 1 and 59")
             return
 
         return self.curves[curve_index].get_header()
@@ -528,7 +530,7 @@ class Lakeshore372_Simulator:
     def set_curve_header(self, curve, *args):
         curve_index = int(curve)
         if not 21 <= curve_index <= 59:
-            self.log.warning(f"curve num must be between 21 and 59")
+            self.log.warning("curve num must be between 21 and 59")
             return
 
         args = map(str, args)
@@ -537,7 +539,7 @@ class Lakeshore372_Simulator:
     def get_curve_data(self, curve, index):
         curve_index = int(curve)
         if not 1 <= curve_index <= 59:
-            self.log.warning(f"curve num must be between 1 and 59")
+            self.log.warning("curve num must be between 1 and 59")
             return
 
         return '{},{},{}'.format(str(self.curves[curve_index].data[int(index)][0]),
@@ -547,7 +549,7 @@ class Lakeshore372_Simulator:
     def set_curve_data(self, curve, index, units, kelvin, curvature=0):
         curve_index = int(curve)
         if not 21 <= curve_index <= 59:
-            self.log.warning(f"curve num must be between 21 and 59")
+            self.log.warning("curve num must be between 21 and 59")
             return
 
         self.curves[curve_index].data[int(index)][0] = float(units)
@@ -557,7 +559,7 @@ class Lakeshore372_Simulator:
     def delete_curve(self, curve):
         curve_index = int(curve)
         if not 21 <= curve_index <= 59:
-            self.log.warning(f"curve num must be between 21 and 59")
+            self.log.warning("curve num must be between 21 and 59")
             return
 
         for i in range(1, 201):
@@ -602,26 +604,26 @@ class ChannelSim:
         ])
 
     def set_intype(self, mode, excitation, autorange, rng, cs_shunt, units):
-        if mode in [0,1]:
+        if mode in [0, 1]:
             self.log.debug(f"Setting mode to {mode}")
             self.mode = mode
 
-        if excitation in range(1,13) and self.mode == 0:
+        if excitation in range(1, 13) and self.mode == 0:
             self.excitation = excitation
 
-        if excitation in range(1,23) and self.mode == 1:
+        if excitation in range(1, 23) and self.mode == 1:
             self.excitation = excitation
 
-        if autorange in [0,1,2]:
+        if autorange in [0, 1, 2]:
             self.autorange = autorange
 
-        if rng in range(1,23):
+        if rng in range(1, 23):
             self.rng = rng
 
-        if cs_shunt in [0,1]:
+        if cs_shunt in [0, 1]:
             self.cs_shunt = cs_shunt
 
-        if units in [1,2]:
+        if units in [1, 2]:
             self.units = units
 
     def set_value(self, value):
@@ -670,6 +672,7 @@ class ChannelSim:
 
         return str(pwr)
 
+
 class Heater:
     def __init__(self, output):
         self.output = output
@@ -695,9 +698,9 @@ class Heater:
 
         self.setpoint = 0
 
-        self.P = 0
-        self.I = 0
-        self.D = 0
+        self.p = 0
+        self.i = 0
+        self.d = 0
 
     def get_output_mode(self):
         return ','.join([
@@ -710,16 +713,16 @@ class Heater:
         ])
 
     def set_output_mode(self, output, mode, input, powerup, polarity, filter, delay):
-        if int(output) in [0,1,2]:
+        if int(output) in [0, 1, 2]:
             self.log.debug(f"Setting output to {output}")
             self.output = int(output)
 
-        if (int(output) == 0 and int(mode) in [0,2,3,5]) or (int(output) == 1 and int(mode) in [0,2,3,5,6]) or (int(output) == 2 and int(mode) in [0,1,2,4]):
+        if (int(output) == 0 and int(mode) in [0, 2, 3, 5]) or (int(output) == 1 and int(mode) in [0, 2, 3, 5, 6]) or (int(output) == 2 and int(mode) in [0, 1, 2, 4]):
             self.mode = int(mode)
 
         if input == 'A':
             self.input = input
-        elif int(input) in range(1,17):
+        elif int(input) in range(1, 17):
             self.input = int(input)
 
         if int(powerup) in [0, 1]:
@@ -728,10 +731,10 @@ class Heater:
         if int(polarity) in [0, 1] and int(output) != 1:
             self.polarity = int(polarity)
 
-        if int(filter) in [0,1]:
+        if int(filter) in [0, 1]:
             self.filter = int(filter)
 
-        if int(delay) in range(1,256):
+        if int(delay) in range(1, 256):
             self.delay = int(delay)
 
     def get_heater_setup(self):
@@ -743,20 +746,20 @@ class Heater:
         ])
 
     def set_heater_setup(self, output, resistance, max_current, max_user_current, display):
-        if output in [0,1]:
+        if output in [0, 1]:
             self.output = output
 
-        if (output == 0 and resistance in range(1,2001)) or (output == 1 and resistance in [1,2]):
+        if (output == 0 and resistance in range(1, 2001)) or (output == 1 and resistance in [1, 2]):
             self.resistance = resistance
 
-        if max_current in [0,1,2]:
+        if max_current in [0, 1, 2]:
             self.max_current = max_current
 
         # if max_user_current in []
         # not sure what condition to use
         self.max_user_current = max_user_current
 
-        if display in [1,2]:
+        if display in [1, 2]:
             self.display = display
 
 
@@ -774,8 +777,7 @@ class Curve:
         self.units = np.random.random([201])
         self.temp = np.random.random([201])
         self.curvature = 0
-        self.data = {i: [self.units[i], self.temp[i], self.curvature] for i in range(1,201)}
-
+        self.data = {i: [self.units[i], self.temp[i], self.curvature] for i in range(1, 201)}
 
     def get_header(self):
         return ','.join([
@@ -792,13 +794,13 @@ class Curve:
         if len(str(serial_number)) <= 10:
             self.serial_number = serial_number
 
-        if int(format) in [3,4,7]:
+        if int(format) in [3, 4, 7]:
             self.format = format
 
         if float(limit) in range(1000):
             self.limit = float(limit)
 
-        if int(coefficient) in [1,2]:
+        if int(coefficient) in [1, 2]:
             self.coefficient = int(coefficient)
 
 

@@ -19,7 +19,7 @@ to limit which tests run. Here are some examples.
 
 Run only one test file::
 
-    $ python3 -m pytest --cov agents/test_ls372_agent.py
+    $ python3 -m pytest --cov socs agents/test_ls372_agent.py
 
 Run tests based on test name(s)::
 
@@ -67,7 +67,7 @@ To obtain code coverage::
 
 You can then view the coverage report in the ``htmlcov/`` directory. Coverage
 for SOCS is also automatically reported to
-`coveralls.io <https://coveralls.io/github/simonsobs/socs?branch=develop>`_.
+`coveralls.io <https://coveralls.io/github/simonsobs/socs>`_.
 
 Testing Against Hardware
 ------------------------

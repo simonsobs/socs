@@ -1,3 +1,6 @@
+# iPython Notebooks
+*.ipynb
+
 # Crossbar stuff
 */dot_crossbar/key.priv
 */dot_crossbar/key.pub
@@ -120,6 +123,10 @@ ENV/
 # mypy
 .mypy_cache/
 
+# vscode
+*.code-workspace
+.vscode
+
 # Custom
 .crossbar/
 ocs/Lakeshore/ls.cfg
@@ -128,3 +135,7 @@ agents/aggregator/data/*
 agents/aggregator/data2/*
 key.*
 node.pid
+
+.DS_Store
+
+*.db

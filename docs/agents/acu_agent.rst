@@ -6,64 +6,132 @@
 ACU Agent
 =========
 
-The Antenna Control Unit (ACU) is an industrial PC with VxWorks installed.    
+The Antenna Control Unit (ACU) is an industrial PC with VxWorks installed.
 It is used for readout of encoder measurements and control of telescope
 platforms.
 
 .. argparse::
-    :filename: ../agents/acu/acu_agent.py
+    :filename: ../socs/agents/acu/agent.py
     :func: add_agent_args
-    :prog: python3 acu_agent.py
+    :prog: python3 agent.py
+
+.. _acu_deps:
 
 Dependencies
 ------------
 The `soaculib <https://github.com/simonsobs/soaculib>`_ package must be
-installed to use this Agent.
+installed to use this Agent. This can be installed via:
+
+.. code-block:: bash
+
+    $ pip install 'soaculib @ git+https://github.com/simonsobs/soaculib.git@master'
 
 Configuration File Examples
 ---------------------------
 Below are configuration examples for the ocs config file and for soaculib.
 
-ocs_config
-``````````
+OCS Site Config
+```````````````
+
 To configure the ACU Agent we need to add a block to the ocs configuration
 file. An example configuration block using all availabile arguments is below::
 
     {'agent-class': 'ACUAgent',
-     'instance-id': 'acu1',
-     'arguments': [['--acu_config', 'guess']],
+     'instance-id': 'acu-satp1',
+     'arguments': [['--acu-config', 'satp1']],
      }
 
 soaculib
 ````````
+
 We additionally need to add a block to the soaculib configuration file. An
 example configuration block is below::
 
-    ocs-acu-1: {
-        'base-url': 'http://192.168.1.109:8100',
-        'dev_url': 'http://192.168.1.109:8080',
+    'satp1': {
+        'base_url': 'http://192.168.1.111:8100',
+        'readonly_url': 'http://192.168.1.111:8110',
+        'dev_url': 'http://192.168.1.111:8080',
         'interface_ip': '192.168.1.110',
         'motion_waittime': 5.0,
         'streams': {
             'main': {
                 'acu_name': 'PositionBroadcast',
-                'port': 10001,
-                'schema': 'v1',
-                'active': True
+                'port': 10004,
+                'schema': 'v2'
             },
             'ext': {
                 'acu_name': 'PositionBroadcastExt',
-                'port': 10002,
-                'schema': 'v1'
-                'active': False
-            }
-        }
+                'port': 10005,
+                'active': False,
+            },
+        },
+        'status': {
+            'status_name': 'Datasets.StatusSATPDetailed8100',
+            },
+
+        'platform': 'satp',
+        'motion_limits': {
+            'azimuth': {
+                'lower': -90.0,
+                'upper': 480.0,
+            },
+            'elevation': {
+                'lower': 20.0,
+                'upper': 50.0,
+            },
+            'boresight': {
+                'lower': 0.0,
+                'upper': 360.,
+            },
+            'acc': (8./1.88),
+        },
     }
 
-Example Client
+
+Exercisor Mode
 --------------
+
+The agent can run itself through various motion patterns, using the
+Process ``exercise``.  This process is only visible if the agent is
+invoked with the ``--exercise-plan`` argument and a path to the
+exercise plan config file.  Here is an example config file:
+
+.. code-block:: yaml
+
+  satp1:
+    settings:
+      use_boresight: false
+    steps:
+    - type: 'elnod'
+      repeat: 2
+    - type: 'grid'
+      duration: 3600
+    - type: 'schedule'
+      files:
+        - /path/to/schedule1.txt
+        - /path/to/schedule2.txt
+      duration: 3600
+      dwell_time: 600
+    - type: 'grease'
+      duration: 900
+
+Note that the root level may contain multiple entries; the key
+corresponds to the ACU config block name, which would correspond to
+the ACU agent ``--acu-config`` argument.
+
+The exercisor writes some diagnostic and timing information to a feed
+called ``activity``.
+
+Agent API
+---------
+
+.. autoclass:: socs.agents.acu.agent.ACUAgent
+    :members:
+
+Example Clients
+---------------
 Below is an example client demonstrating a go-to task followed by a scan.
-Note that all tasks and the generate_scan process can be run while the data 
+Note that all tasks and the generate_scan process can be run while the data
 acquisition processes are running::
 
     from ocs.matched_client import MatchedClient
@@ -78,9 +146,8 @@ acquisition processes are running::
     if __name__ == '__main__':
         upload_track('linear_turnaround_sameends', True, (120., 160.), 35., 1., 4, 3)
 
-Agent API
----------
+Supporting APIs
+---------------
 
-.. autoclass:: agents.acu.acu_agent.ACUAgent
-    :members: start_monitor, start_udp_monitor, generate_scan, go_to,
-        run_specified_scan, set_boresight, stop_and_clear
+.. automodule:: socs.agents.acu.drivers
+    :members:

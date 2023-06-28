@@ -1,0 +1,9 @@
+pytest
+pytest-cov
+pytest-docker-compose
+pytest-dependency
+pytest-order
+so3g
+thola-snmpsim
+pytest-twisted
+http-server-mock

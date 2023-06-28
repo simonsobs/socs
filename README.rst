@@ -2,19 +2,27 @@
 SOCS - Simons Observatory Control System
 ========================================
 
-.. image:: https://img.shields.io/github/workflow/status/simonsobs/socs/Build%20Develop%20Images
-    :target: https://github.com/simonsobs/socs/actions?query=workflow%3A%22Build+Develop+Images%22
+.. image:: https://img.shields.io/github/actions/workflow/status/simonsobs/socs/develop.yml?branch=main
+    :target: https://github.com/simonsobs/socs/actions?query=workflow%3A%22Build+Test+Images%22
     :alt: GitHub Workflow Status
 
-.. image:: https://readthedocs.org/projects/socs/badge/?version=develop
-    :target: https://socs.readthedocs.io/en/develop/?badge=develop
+.. image:: https://readthedocs.org/projects/socs/badge/?version=main
+    :target: https://socs.readthedocs.io/en/main/?badge=main
     :alt: Documentation Status
 
-.. image:: https://coveralls.io/repos/github/simonsobs/socs/badge.svg?branch=develop
-    :target: https://coveralls.io/github/simonsobs/socs?branch=develop
+.. image:: https://coveralls.io/repos/github/simonsobs/socs/badge.svg
+    :target: https://coveralls.io/github/simonsobs/socs
 
 .. image:: https://img.shields.io/badge/dockerhub-latest-blue
     :target: https://hub.docker.com/r/simonsobs/ocs/tags
+
+.. image:: https://img.shields.io/pypi/v/socs
+   :target: https://pypi.org/project/socs/
+   :alt: PyPI Package
+
+.. image:: https://results.pre-commit.ci/badge/github/simonsobs/socs/main.svg
+   :target: https://results.pre-commit.ci/latest/github/simonsobs/socs/main
+   :alt: pre-commit.ci status
 
 Overview
 --------
@@ -29,13 +37,40 @@ by `OCS`_.
 Installation
 ------------
 
-To install SOCS, clone the repository and install with `pip`:
+Install and update with pip::
+
+    $ pip3 install -U socs
+
+You may install optional dependencies by including one or more agent group
+names on installation, for example::
+
+    $ pip3 install -U socs[labjack,synacc]
+
+For a complete list of agent groups see the `Installation Documentation`_.
+
+If you would like to install all optional dependencies use the special varient
+"all"::
+
+    $ pip3 install -U socs[all]
+
+**Note:** Not all optional dependencies can be installed this way. See the
+`Installation Documentation`_ for more info on specific agent dependencies.
+
+.. _`Installation Documentation`: https://socs.readthedocs.io/en/main/user/installation.html
+
+Installing from Source
+``````````````````````
+
+If you are considering contributing to SOCS, or would like to use an unreleased
+feature, you will want to install from source. To do so, clone this repository
+and install using pip:
 
 .. code-block:: bash
 
     git clone https://github.com/simonsobs/socs.git
     cd socs/
-    pip3 install -r requirements.txt .
+    pip3 install -r requirements.txt
+    pip3 install .
 
 In order for OCS tools to find these agents, you must add the full
 path to the agents directory, e.g. ``/home/simons/code/socs/agents/``,
@@ -51,7 +86,7 @@ configured host if it does not already exist:
 
 See the `ocs docs`_ for more details.
 
-.. _`ocs docs`: https://ocs.readthedocs.io/en/latest/site_config.html
+.. _`ocs docs`: https://ocs.readthedocs.io/en/main/developer/site_config.html
 
 Docker Images
 -------------
@@ -60,11 +95,11 @@ releases will be tagged with their release version, i.e. ``v0.1.0``. These are
 only built on release, and the ``latest`` tag will point to the latest of these
 released tags. These should be considered stable.
 
-Development images will be tagged with the latest released version tag, the
-number of commits ahead of that release, the latest commit hash, and the tag
-``-dev``, i.e.  ``v0.0.2-81-g9c10ba6-dev``. These get built on each commit to
-the ``develop`` branch, and are useful for testing and development, but should
-be considered unstable.
+Test images will be tagged with the latest released version tag, the number of
+commits ahead of that release, the latest commit hash, i.e.
+``v0.0.2-81-g9c10ba6-dev``. These get built on each commit to the ``main``
+branch, and are useful for testing and development, but should be considered
+unstable.
 
 .. _Docker Hub: https://hub.docker.com/u/simonsobs
 
@@ -93,17 +128,17 @@ The tests for SOCS are run using pytest, and should be run from the
 
 For more details see `tests/README.rst <tests_>`_.
 
-.. _tests: tests/README.rst
+.. _tests: https://github.com/simonsobs/socs/blob/main/tests/README.rst
 
 Contributing
 ------------
 For guidelines on how to contribute to OCS see `CONTRIBUTING.rst`_.
 
-.. _CONTRIBUTING.rst: CONTRIBUTING.rst
+.. _CONTRIBUTING.rst: https://github.com/simonsobs/socs/blob/main/CONTRIBUTING.rst
 
 License
 --------
-This project is licensed under the BSD 2-Clause License - see the 
+This project is licensed under the BSD 2-Clause License - see the
 `LICENSE.txt`_ file for details.
 
-.. _LICENSE.txt: LICENSE.txt
+.. _LICENSE.txt: https://github.com/simonsobs/socs/blob/main/LICENSE.txt

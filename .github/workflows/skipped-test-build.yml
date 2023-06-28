@@ -1,0 +1,19 @@
+name: Test Docker Build
+
+on:
+  pull_request:
+    paths:
+      - 'docs/**'
+      - '**.rst'
+      - '**.md'
+      - '.flake8'
+      - '.pre-commit-config.yaml'
+      - '.readthedocs.yaml'
+
+jobs:
+  build:
+    name: test image build
+    runs-on: ubuntu-latest
+
+    steps:
+      - run: 'echo "No build required" '
