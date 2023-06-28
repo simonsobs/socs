@@ -1350,7 +1350,6 @@ class Curve:
                 units = float(resp[0])
                 temperature = float(resp[1])
                 assert units == float(point[1]), "Point number %s not uploaded. Reuploading points." % point[0]
-
                 assert temperature == float(point[2]), "Point number %s not uploaded. Reuploading points." % point[0]
             # if AssertionError, tell 372 to re-upload points
             except AssertionError:
