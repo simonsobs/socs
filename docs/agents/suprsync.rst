@@ -39,7 +39,8 @@ transferred files after 7 days, or 604800 seconds::
            '--delete-local-after', '604800',
            '--max-copy-attempts', '10',
            '--copy-timeout', '60',
-           '--cmd-timeout', '5'
+           '--cmd-timeout', '5',
+           '--suprsync-file-root', '/data/so/suprsync',
            ]},
 
         {'agent-class': 'SupRsync',
@@ -53,7 +54,8 @@ transferred files after 7 days, or 604800 seconds::
            '--delete-local-after', '604800',
            '--max-copy-attempts', '10',
            '--copy-timeout', '20',
-           '--cmd-timeout', '5'
+           '--cmd-timeout', '5',
+           '--suprsync-file-root', '/data/so/suprsync',
            ]},
 
 .. note::
@@ -170,6 +172,62 @@ timestream files (using the archive name "timestreams"), as described in
 we'll be running one SupRsync agent for each of these two archives.
 
 
+Timecode Directories
+------------------------
+For data packaging, file destinations are usually grouped into *timecode
+directories*, based on the first 5-digits of the ctime at which the file was
+created. Destination paths (or remote_paths in the db) will typically look like::
+
+    <remote_basedir>/<5-digit timecode>/<any-number-of-subdirs>/<filename>
+
+where the remote-basedir is set in the suprsync site config, and everything
+after is what is registered as the ``remote_path`` in the suprsync database.
+
+With this schema, it is important to transmit information that will allow
+downstream processors to determine whether or not a timecode directory is
+complete, as opposed to not copied over yet.
+
+The SupRsync database will now automatically detect the timecode directory of
+new files that are added, and will track whether a timecode directory is
+*complete* (meaning suprsync expects no new files will be added) and *synced*
+(that all files in the timecode directory have been synced).
+
+Once a timecode directory is complete and fully synced, suprsync will write a
+finalization file::
+
+    <timestamp>_<archive_name>_<dir timecode>_finalized.yaml
+
+that will contain information about the timecode directory, including the
+number of files that this suprsync instance has synced over, the sub-directories
+that this suprsync instance has added to, the instance-id of the suprsync agent,
+and the finalization time. The directory on the local host that these files will
+be written to is set using the ``--suprsync-file-root`` argument, and the
+path on the remote host will be automatically generated.
+
+Timecode Dir Completion Requirements
+`````````````````````````````````````
+A timecode directory will be marked as complete if any of the following are true:
+
+ - There are files in the suprsync archive written to a newer timecode directory
+ - ``tc_now - tc_directory > 1``,  or we are roughly 1 day past when the timecode directory ended.
+
+Example
+```````````
+For example, say we have a suprsync agent running on ``smurf-srv20`` with
+instance-id ``smurf-sync-srv20``, with ``suprsync-file-root =
+/data/so/suprsync``. Suppose that at timestamp ``1686152766`` this agent detects
+that all files in the timecode directory ``16750`` of the ``smurf`` archive have
+been successfully synced.  This agent will write the local file::
+
+    /data/so/suprsync/16861/smurf-sync-srv20/1686152766_smurf_16750_finalized.yaml
+
+This file will be synced to the remote path::
+
+    <remote_basedir>/16861/suprsync/smurf-sync-srv20/1686152766_smurf_16750_finalized.yaml
+
+where it can be processed by downstream data packaging software.
+
+
 Agent API
 ---------
 
@@ -193,4 +251,12 @@ SupRsyncFiles Manager
 `````````````````````
 
 .. autoclass:: socs.db.suprsync.SupRsyncFilesManager
+    :members:
+
+.. _TimecodeDir:
+
+TimecodeDir Table
+```````````````````
+
+.. autoclass:: socs.db.suprsync.TimecodeDir
     :members:

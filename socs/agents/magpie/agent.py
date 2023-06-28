@@ -435,7 +435,7 @@ class FocalplaneConfig:
         return fp
 
     @classmethod
-    def from_csv(cls, stream_id, detmap_file, wafer_scale=1., offset=(0, 0)):
+    def from_csv(cls, stream_id, detmap_file, wafer_scale=1., offset=(0, 0), rotation=0.):
         """
         Creates a FocalplaneConfig object from a detmap csv file.
 
@@ -480,9 +480,10 @@ class FocalplaneConfig:
             except ValueError:
                 # Just skip detectors with unknown bandpass
                 continue
-            x, y = row['det_x'] * wafer_scale, row['det_y'] * wafer_scale
-            x += offset[0]
-            y += offset[1]
+
+            x0, y0 = row['det_x'] * wafer_scale, row['det_y'] * wafer_scale
+            x = x0 * np.cos(rotation) - y0 * np.sin(rotation) + offset[0]
+            y = x0 * np.sin(rotation) + y0 * np.cos(rotation) + offset[1]
 
             band, chan = row['smurf_band'], row['smurf_channel']
             if chan == -1:
@@ -559,7 +560,8 @@ class MagpieAgent:
         elif layout == 'wafer':
             if args.det_map is not None:
                 self.fp = FocalplaneConfig.from_csv(
-                    args.stream_id, args.det_map, wafer_scale=args.wafer_scale, offset=args.offset
+                    args.stream_id, args.det_map, wafer_scale=args.wafer_scale,
+                    offset=args.offset, rotation=args.rotation
                 )
             else:
                 raise ValueError("CSV file must be set using the det-map arg if "
@@ -1005,6 +1007,8 @@ def make_parser(parser=None):
     pgroup.add_argument('--offset', nargs=2, default=[0, 0], type=float,
                         help="Offset of detector coordinates with respect to "
                              "lyrebird coordinate system")
+    pgroup.add_argument('--rotation', default=0., type=float,
+                        help="Rotation of wafer about its center (rad)")
     pgroup.add_argument('--monitored-channels', nargs='+', type=int, default=[],
                         help="Readout channels to start monitoring on startup")
     pgroup.add_argument('--monitored-channel-rate', type=float, default=10,

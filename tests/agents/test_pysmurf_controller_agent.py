@@ -198,11 +198,31 @@ def agent():
     return agent
 
 
+def mock_uxm_setup(S, cfg, bands, **kwargs):
+    """Mock a typical valid response from uxm_relock."""
+    summary = {'timestamps': [('setup_amps', 1671048272.6197276),
+                              ('load_tune', 1671048272.6274314),
+                              ('tracking_setup', 1671048272.6286802),
+                              ('noise', 1671048272.7402556),
+                              ('end', 1671048272.7404766)],
+               'amps': {'success': True},
+               'reload_tune': None,
+               'tracking_setup_results': mock.MagicMock(),
+               'noise': {'noise_pars': 0,
+                         'bands': 0,
+                         'channels': 0,
+                         'band_medians': 0,
+                         'f': 0,
+                         'axx': 0,
+                         'bincenters': 0,
+                         'lowfn': 0,
+                         'low_f_10mHz': 0,
+                         'am': mock.MagicMock()}}
+    return True, summary
+
+
 @mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
-@mock.patch('numpy.save', mock_np_save())
-@mock.patch('matplotlib.figure.Figure.savefig', mock_plt_savefig())
-@mock.patch('sodetlib.noise.take_noise', mock_take_noise)
-@mock.patch('time.sleep', mock.MagicMock())
+@mock.patch('sodetlib.operations.uxm_setup.uxm_setup', mock_uxm_setup)
 def test_uxm_setup(agent):
     """test_uxm_setup()
 
@@ -263,7 +283,7 @@ def test_take_bgmap(agent):
     **Test** - Tests take_bgmap task.
     """
     session = create_session('take_bgmap')
-    res = agent.take_bgmap(session, {'kwargs': {'high_current_mode': False}})
+    res = agent.take_bgmap(session, {'kwargs': {'high_current_mode': False}, 'tag': None})
     assert res[0] is True
     assert session.data['nchans_per_bg'] == [NCHANS, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     assert session.data['filepath'] == 'bias_step_analysis.npy'
@@ -287,7 +307,7 @@ def test_take_iv(agent):
     **Test** - Tests take_iv task.
     """
     session = create_session('take_iv')
-    res = agent.take_iv(session, {'kwargs': {'run_analysis': False}})
+    res = agent.take_iv(session, {'kwargs': {'run_analysis': False}, 'tag': None})
     assert res[0] is True
     assert session.data['bands'] == np.zeros(NCHANS).tolist()
     assert session.data['channels'] == np.arange(NCHANS).tolist()
@@ -310,7 +330,7 @@ def test_take_bias_steps(agent):
     **Test** - Tests take_bias_steps task.
     """
     session = create_session('take_bias_steps')
-    res = agent.take_bias_steps(session, {'kwargs': None, 'rfrac_range': (0.3, 0.9)})
+    res = agent.take_bias_steps(session, {'kwargs': None, 'rfrac_range': (0.3, 0.9), 'tag': None})
     assert res[0] is True
     assert session.data['filepath'] == 'bias_step_analysis.npy'
 
@@ -324,7 +344,7 @@ def test_take_noise(agent):
     **Test** - Tests take_noise task.
     """
     session = create_session('take_noise')
-    res = agent.take_noise(session, {'duration': 30, 'kwargs': None})
+    res = agent.take_noise(session, {'duration': 30, 'kwargs': None, 'tag': None})
     assert res[0] is True
 
 
@@ -357,7 +377,9 @@ def test_stream(agent):
     **Test** - Tests stream process.
     """
     session = create_session('stream')
-    res = agent.stream(session, {'duration': None, 'load_tune': False, 'kwargs': None, 'test_mode': True})
+    res = agent.stream(session, {'duration': None, 'load_tune': False,
+                                 'kwargs': None, 'test_mode': True, 'tag': None,
+                                 'stream_type': 'obs', 'subtype': None})
     assert res[0] is True
 
 

@@ -67,7 +67,7 @@ To obtain code coverage::
 
 You can then view the coverage report in the ``htmlcov/`` directory. Coverage
 for SOCS is also automatically reported to
-`coveralls.io <https://coveralls.io/github/simonsobs/socs?branch=develop>`_.
+`coveralls.io <https://coveralls.io/github/simonsobs/socs>`_.
 
 Testing Against Hardware
 ------------------------

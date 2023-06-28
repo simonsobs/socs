@@ -106,10 +106,13 @@ def update_cache(get_result, timestamp):
     The cache consists of a dictionary, with the unique OIDs as keys, and
     another dictionary as the value. Each of these nested dictionaries contains the
     OID values, name, and description (decoded string). An example for a single OID::
+
         {"upsBatteryStatus":
             {"status": 2,
                 "description": "batteryNormal"}}
+
     Additionally there is connection status and timestamp information under::
+
         {"ups_connection":
             {"last_attempt": 1598543359.6326838,
             "connected": True}
@@ -123,24 +126,23 @@ def update_cache(get_result, timestamp):
         Timestamp for when the SNMP GET was issued.
     """
     oid_cache = {}
-    try:
-        for item in get_result:
-            field_name, oid_value, oid_description = _extract_oid_field_and_value(item)
-            if oid_value is None:
-                continue
-
-            # Update OID Cache for session.data
-            oid_cache[field_name] = {"status": oid_value}
-            oid_cache[field_name]["description"] = oid_description
-            oid_cache['ups_connection'] = {'last_attempt': time.time(),
-                                           'connected': True}
-            oid_cache['timestamp'] = timestamp
-    # This is a TypeError due to nothing coming back from the yield,
-    # so get_result is None here and can't be iterated.
-    except TypeError:
+    # Return disconnected if SNMP response is empty
+    if get_result is None:
         oid_cache['ups_connection'] = {'last_attempt': time.time(),
                                        'connected': False}
-        raise ConnectionError('No SNMP response. Check your connection.')
+        return oid_cache
+
+    for item in get_result:
+        field_name, oid_value, oid_description = _extract_oid_field_and_value(item)
+        if oid_value is None:
+            continue
+
+        # Update OID Cache for session.data
+        oid_cache[field_name] = {"status": oid_value}
+        oid_cache[field_name]["description"] = oid_description
+        oid_cache['ups_connection'] = {'last_attempt': time.time(),
+                                       'connected': True}
+        oid_cache['timestamp'] = timestamp
 
     return oid_cache
 
@@ -249,6 +251,15 @@ class UPSAgent:
             'upsOutputPercentLoad':
                 {'status': 25,
                  'description': 25}
+            'upsInputVoltage':
+                {'status': 120,
+                 'description': 120},
+            'upsInputCurrent':
+                {'status': 10,
+                 'description': 10},
+            'upsInputTruePower':
+                {'status': 120,
+                 'description': 120},
             'ups_connection':
                 {'last_attempt': 1656085022.680916,
                  'connected': True},
@@ -261,6 +272,9 @@ class UPSAgent:
                           batteryNormal(2),
                           batteryLow(3),
                           batteryDepleted(4)
+            upsSecondsOnBattery::
+                Note:: Zero shall be returned if the unit is not on
+                       battery power.
             upsEstimatedChargeRemaining::
                 Units:: percentage
             upsBatteryVoltage::
@@ -281,10 +295,17 @@ class UPSAgent:
                 Units:: RMS Volts
             upsOutputCurrent::
                 Units:: 0.1 RMS Amp
-            upsOutput Power::
+            upsOutputPower::
+                Units:: Watts
+            upsInputVoltage::
+                Units:: RMS Volts
+            upsInputCurrent::
+                Units:: 0.1 RMS Amp
+            upsInputTruePower::
                 Units:: Watts
         """
 
+        session.set_status('running')
         self.is_streaming = True
         while self.is_streaming:
             yield dsleep(1)
@@ -311,6 +332,20 @@ class UPSAgent:
             for oid in oids:
                 get_list.append(('UPS-MIB', oid, 0))
 
+            # Append input OIDs to GET list
+            input_oids = ['upsInputVoltage',
+                          'upsInputCurrent',
+                          'upsInputTruePower']
+
+            # Use number of input lines used to append correct number of input OIDs
+            num_lines = [('UPS-MIB', 'upsInputNumLines', 0)]
+            num_res = yield self.snmp.get(num_lines, self.version)
+            if num_res is not None:
+                inputs = num_res[0][1]._value
+                for i in range(inputs):
+                    for oid in input_oids:
+                        get_list.append(('UPS-MIB', oid, i + 1))
+
             # Append output OIDs to GET list
             output_oids = ['upsOutputVoltage',
                            'upsOutputCurrent',
@@ -334,8 +369,11 @@ class UPSAgent:
                 # Update session.data
                 session.data = update_cache(get_result, read_time)
                 self.log.debug("{data}", data=session.data)
-                self.lastGet = time.time()
 
+                if get_result is None:
+                    raise ConnectionError('No SNMP response. Check your connection.')
+
+                self.lastGet = time.time()
                 # Publish to feed
                 message = _build_message(get_result, read_time)
                 self.log.debug("{msg}", msg=message)
@@ -354,8 +392,12 @@ class UPSAgent:
         """_stop_acq()
         **Task** - Stop task associated with acq process.
         """
-        self.is_streaming = False
-        return True, "Stopping Recording"
+        if self.is_streaming:
+            session.set_status('stopping')
+            self.is_streaming = False
+            return True, "Stopping Recording"
+        else:
+            return False, "Acq is not currently running"
 
 
 def add_agent_args(parser=None):

@@ -41,12 +41,15 @@ API Reference        Full API documentation for core parts of the SOCS library.
     agents/bluefors_agent
     agents/cryomech_cpa
     agents/fts_agent
+    agents/generator
     agents/hwp_encoder
     agents/hwp_picoscope
-    agents/hwp_rotation_agent
+    agents/hwp_pid
+    agents/hwp_pmx
     agents/holo_fpga
     agents/holo_synth
     agents/ibootbar
+    agents/ifm_sbn246_flowmeter
     agents/labjack
     agents/lakeshore240
     agents/lakeshore336
@@ -62,6 +65,7 @@ API Reference        Full API documentation for core parts of the SOCS library.
     agents/pysmurf-monitor
     agents/scpi_psu
     agents/smurf_crate_monitor
+    agents/smurf_timing_card
     agents/suprsync
     agents/synacc
     agents/tektronix3021c
