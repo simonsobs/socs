@@ -7,22 +7,20 @@ import txaio
 
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
-from socs.agent.stm_enc_reader import StmEncReader, SERVER_IP, SERVER_PORT, LOCK_PATH
+from stm_enc_reader import StmEncReader, get_path_dev, PATH_LOCK
 
 
 class StmEncAgent:
     '''OCS agent class for stimulator encoder
     '''
-    def __init__(self, agent, ip=SERVER_IP, port=SERVER_PORT, lockpath=LOCK_PATH):
+    def __init__(self, agent, path_dev=None, path_lock=PATH_LOCK):
         '''
         Parameters
         ----------
-        ip : str
-            IP address
-        port : int
-            Port number
-        lockpath : str
-            Path to the lock file
+        path_dev : str or pathlib.Path
+            Path to the generic-uio device file for str_rd IP.
+        path_lock : str or pathlib.Path
+            Path to the lockfile.
         '''
         self.active = True
         self.agent = agent
@@ -30,10 +28,10 @@ class StmEncAgent:
         self.lock = TimeoutLock()
         self.take_data = False
 
-        self.device = None
-        self.ip = ip
-        self.port = port
-        self.lockpath = lockpath
+        if path_dev is None:
+            self._path_dev = get_path_dev()
+
+        self._dev = StmEncReader(self._path_dev, path_lock, verbose=False)
 
         self.initialized = False
 
@@ -43,13 +41,9 @@ class StmEncAgent:
                                  agg_params=agg_params,
                                  buffer_time=1)
 
-    def start_acq(self, session, params):
+    def acq(self, session, params):
         '''Starts acquiring data.
         '''
-        f_sample = params.get('sampling_frequency', 1)
-        sleep_time = 1/f_sample - 0.1
-        self.device = StmEncReader(ip_addr=self.ip, port=self.port, lockpath=self.lockpath)
-
         with self.lock.acquire_timeout(timeout=0, job='acq') as acquired:
             if not acquired:
                 self.log.warn(
@@ -60,32 +54,37 @@ class StmEncAgent:
 
             self.take_data = True
             session.data = {"fields": {}}
-            self.device.connect()
+
+            self._dev.run()
 
             while self.take_data:
                 # Data acquisition
                 current_time = time.time()
-                data = {'timestamp':current_time, 'block_name':'encoder', 'data':{}}
+                data = {'timestamps':[], 'block_name':'stm_enc', 'data':{}}
 
-                self.device.fill()
+                ts_list = []
+                en_st_list = []
 
-                data['data']['ts'] = self.device.ts_latest
-                data['data']['state'] = self.device.state_latest
+                while not self._dev.fifo.empty():
+                    _d = self._dev.fifo.get()
+                    ts_list.append(_d.time.utc)
+                    en_st_list.append(_d.state)
 
-                field_dict = {'stm_enc': {'ts': self.device.ts_latest,
-                                          'state': self.device.state_latest}}
-                session.data['fields'].update(field_dict)
+                if len(ts_list) != 0:
+                    data['timestamps'] = ts_list
+                    data['data']['state'] = en_st_list
 
-                self.agent.publish_to_feed('stm_enc', data)
-                session.data.update({'timestamp': current_time})
+                    field_dict = {'stm_enc': {'ts': ts_list[-1],
+                                              'state': en_st_list[-1]}}
 
-                time.sleep(sleep_time)
+                    session.data['fields'].update(field_dict)
 
-            self.agent.feeds['stm_enc'].flush_buffer()
+                    self.agent.publish_to_feed('stm_enc', data)
+                    session.data.update({'timestamp': current_time})
 
-        del self.device
-        self.device = None
+                time.sleep(0.01)
 
+        self.agent.feeds['stm_enc'].flush_buffer()
         return True, 'Acquisition exited cleanly.'
 
     def stop_acq(self, session, params=None):
@@ -94,6 +93,7 @@ class StmEncAgent:
         """
         if self.take_data:
             self.take_data = False
+            self._dev.stop()
             return True, 'requested to stop taking data.'
 
         return False, 'acq is not currently running.'
@@ -114,7 +114,7 @@ def main():
 
     agent_inst.register_process(
         'acq',
-        stm_enc_agent.start_acq,
+        stm_enc_agent.acq,
         stm_enc_agent.stop_acq,
         startup=True
     )
