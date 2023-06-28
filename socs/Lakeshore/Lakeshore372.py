@@ -1,13 +1,10 @@
 # Lakeshore372.py
 
-import logging
 import socket
 import sys
 import time
 
 import numpy as np
-
-logging.basicConfig(level=logging.INFO, format='%(levelname)s - %(message)s')
 
 # Lookup keys for command parameters.
 autorange_key = {'0': 'off',
@@ -1320,7 +1317,7 @@ class Curve:
         self._set_header(header[:-1])  # ignore num of breakpoints
 
         for point in values:
-            logging.info("uploading %s" % point)
+            print("uploading %s" % point)
             self._set_data_point(point[0], point[1], point[2])
             time.sleep(0.065)
 
@@ -1346,22 +1343,19 @@ class Curve:
         for i in range(9, len(content)):
             values.append(content[i].strip().split())  # data points that should have been uploaded
 
-        logging.info("checking that points uploaded successfully...")
         for j in range(1, len(values) + 1):
             try:
                 resp = self.get_data_point(j)  # response from the 372
                 point = values[j - 1]
                 units = float(resp[0])
                 temperature = float(resp[1])
-                assert units == float(point[1]), logging.debug("Point number %s not uploaded. Reuploading points." % point[0])
+                assert units == float(point[1]), "Point number %s not uploaded. Reuploading points." % point[0]
 
-                assert temperature == float(point[2]), logging.debug("Point number %s not uploaded. Reuploading points." % point[0])
+                assert temperature == float(point[2]), "Point number %s not uploaded. Reuploading points." % point[0]
             # if AssertionError, tell 372 to re-upload points
             except AssertionError:
                 if units != float(point[1]):
                     self.set_curve(_file)
-
-        logging.info("all points uploaded successfully!")
 
     def delete_curve(self):
         """Delete the curve using the CRVDEL command.
