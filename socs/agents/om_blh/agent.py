@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-'''OCS agent for BLE2 motor driver
+'''OCS agent for BLH motor driver
 '''
 import time
 import os
 import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
-from socs.agent.ble2 import BLE2
+from socs.agents.om_blh.drivers import BLH
 
 PORT_DEFAULT = '/dev/ttyACM0'
 LOCK_RELEASE_SEC = 1.
@@ -14,8 +14,8 @@ LOCK_RELEASE_TIMEOUT = 10
 ACQ_TIMEOUT = 100
 INIT_TIMEOUT = 100
 
-class BLE2Agent:
-    '''OCS agent class for BLE2 motor driver
+class BLHAgent:
+    '''OCS agent class for BLH motor driver
     '''
     def __init__(self, agent, port=PORT_DEFAULT):
         '''
@@ -30,7 +30,7 @@ class BLE2Agent:
         self.lock = TimeoutLock()
         self.take_data = False
 
-        self._ble2 = BLE2(port=port)
+        self._blh = BLH(port=port)
 
         self.initialized = False
 
@@ -40,12 +40,12 @@ class BLE2Agent:
                                  agg_params=agg_params,
                                  buffer_time=1)
 
-    def init_ble2(self, session, params=None):
-        '''Initialization of BLE2 motor driver'''
+    def init_blh(self, session, params=None):
+        '''Initialization of BLH motor driver'''
         if self.initialized:
             return True, 'Already initialized'
 
-        with self.lock.acquire_timeout(0, job='init_ble2') as acquired:
+        with self.lock.acquire_timeout(0, job='init_blh') as acquired:
             if not acquired:
                 self.log.warn('Could not start init because '
                               '{} is already running'.format(self.lock.job))
@@ -53,12 +53,12 @@ class BLE2Agent:
 
             session.set_status('starting')
 
-            self._ble2.connect()
-            session.add_message('BLE2 initialized.')
+            self._blh.connect()
+            session.add_message('BLH initialized.')
 
         self.initialized = True
 
-        return True, 'BLE2 module initialized.'
+        return True, 'BLH module initialized.'
 
 
     def start_acq(self, session, params):
@@ -71,7 +71,7 @@ class BLE2Agent:
         sleep_time = 1/f_sample - 0.1
 
         if not self.initialized:
-            self.agent.start('init_ble2')
+            self.agent.start('init_blh')
             for _ in range(INIT_TIMEOUT):
                 if self.initialized:
                     break
@@ -104,7 +104,7 @@ class BLE2Agent:
                 current_time = time.time()
                 data = {'timestamp':current_time, 'block_name':'motor', 'data':{}}
 
-                speed = self._ble2.get_status()
+                speed = self._blh.get_status()
                 data['data']['RPM'] = speed
 
                 field_dict = {f'motor': {'RPM': speed}}
@@ -130,7 +130,7 @@ class BLE2Agent:
         return False, 'acq is not currently running.'
 
     def set_values(self, session, params=None):
-        '''A task to set parameters for BLE2 motor driver
+        '''A task to set parameters for BLH motor driver
 
         Parameters
         ----------
@@ -152,17 +152,17 @@ class BLE2Agent:
 
             speed = params.get('speed')
             if not speed is None:
-                self._ble2.set_speed(speed)
+                self._blh.set_speed(speed)
 
             accl_time = params.get('accl_time')
             if not accl_time is None:
-                self._ble2.set_accl_time(accl_time, accl=True)
+                self._blh.set_accl_time(accl_time, accl=True)
 
             decl_time = params.get('decl_time')
             if not decl_time is None:
-                self._ble2.set_accl_time(decl_time, accl=False)
+                self._blh.set_accl_time(decl_time, accl=False)
 
-        return True, f'Set values for BLE2'
+        return True, f'Set values for BLH'
 
     def start_rotation(self, session, params=None):
         '''Start rotation
@@ -198,9 +198,9 @@ class BLE2Agent:
             if forward is None:
                 forward = True
 
-            self._ble2.start(forward=forward)
+            self._blh.start(forward=forward)
 
-        return True, f'BLE2 rotation started.'
+        return True, f'BLH rotation started.'
 
     def stop_rotation(self, session, params=None):
         '''Stop rotation'''
@@ -213,49 +213,45 @@ class BLE2Agent:
                               f'{self.lock.job} is already running')
                 return False, 'Could not acquire lock.'
 
-            self._ble2.stop()
+            self._blh.stop()
 
-        return True, f'BLE2 rotation stop command was published.'
+        return True, f'BLH rotation stop command was published.'
 
 
 def main():
     '''Boot OCS agent'''
     txaio.start_logging(level=os.environ.get('LOGLEVEL', 'info'))
-
-    parser = site_config.add_arguments()
-
-    args = parser.parse_args()
-    site_config.reparse_args(args, 'BLE2Agent')
+    
+    args = site_config.parse_args(agent_class='BLHAgent')
 
     agent_inst, runner = ocs_agent.init_site_agent(args)
 
-    ble2_agent = BLE2Agent(agent_inst)
+    blh_agent = BLHAgent(agent_inst)
 
     agent_inst.register_task(
         'set_values',
-        ble2_agent.set_values
+        blh_agent.set_values
     )
 
     agent_inst.register_task(
         'start_rotation',
-        ble2_agent.start_rotation
+        blh_agent.start_rotation
     )
 
     agent_inst.register_task(
         'stop_rotation',
-        ble2_agent.stop_rotation
+        blh_agent.stop_rotation
     )
 
     agent_inst.register_task(
-        'init_ble2',
-        ble2_agent.init_ble2
+        'init_blh',
+        blh_agent.init_blh
     )
 
     agent_inst.register_process(
         'acq',
-        ble2_agent.start_acq,
-        ble2_agent.stop_acq,
-        startup=True
+        blh_agent.start_acq,
+        blh_agent.stop_acq,
     )
 
     runner.run(agent_inst, auto_reconnect=True)

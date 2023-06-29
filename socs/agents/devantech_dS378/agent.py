@@ -6,7 +6,7 @@ import os
 import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
-from socs.agent.dS378 import dS378
+from socs.agents.devantech_dS378.drivers import dS378
 
 IP_DEFAULT = '192.168.215.241'
 PORT_DEFAULT = 17123

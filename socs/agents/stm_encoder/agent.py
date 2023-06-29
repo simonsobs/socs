@@ -7,7 +7,7 @@ import txaio
 
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
-from stm_enc_reader import StmEncReader, get_path_dev, PATH_LOCK
+from socs.agents.stm_encoder.drivers import StmEncReader, get_path_dev, PATH_LOCK
 
 
 class StmEncAgent:

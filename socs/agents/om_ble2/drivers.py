@@ -6,7 +6,7 @@ from time import sleep
 import numpy as np
 
 import serial
-from socs.agent.om_comm import MOVE_FWD, MOVE_BKW, STATUS, INIT_CMD, STOP
+from socs.agents.om_ble2.om_comm import MOVE_FWD, MOVE_BKW, STATUS, INIT_CMD, STOP
 
 
 DEV_NAME = '/dev/ttyACM0'

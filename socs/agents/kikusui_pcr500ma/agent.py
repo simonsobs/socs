@@ -6,7 +6,7 @@ import os
 import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
-from socs.agent.pcr500ma import PCR500MA, TIMEOUT_DEFAULT
+from socs.agents.kikusui_pcr500ma.drivers import PCR500MA, TIMEOUT_DEFAULT
 
 IP_DEFAULT = '192.168.215.80'  #Edit here!! Please write IP address for PCR500MA
 PORT_DEFAULT = 5025
