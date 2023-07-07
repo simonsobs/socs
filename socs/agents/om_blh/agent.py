@@ -39,6 +39,7 @@ class BLHAgent:
                                  record=True,
                                  agg_params=agg_params,
                                  buffer_time=1)
+        self.speed = 0.0
 
     def init_blh(self, session, params=None):
         '''Initialization of BLH motor driver'''
@@ -106,6 +107,7 @@ class BLHAgent:
 
                 speed = self._blh.get_status()
                 data['data']['RPM'] = speed
+                self.speed = speed
 
                 field_dict = {f'motor': {'RPM': speed}}
                 session.data['fields'].update(field_dict)
@@ -123,6 +125,10 @@ class BLHAgent:
         """
         Stops the data acquisiton.
         """
+        self.agent.start('stop_rotation')
+        while self.speed > 0.1:
+            time.sleep(1)
+
         if self.take_data:
             self.take_data = False
             return True, 'requested to stop taking data.'
@@ -252,6 +258,7 @@ def main():
         'acq',
         blh_agent.start_acq,
         blh_agent.stop_acq,
+        startup=True
     )
 
     runner.run(agent_inst, auto_reconnect=True)
