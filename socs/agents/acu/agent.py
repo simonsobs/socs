@@ -1358,7 +1358,7 @@ class ACUAgent:
             yield dsleep(0.5)
 
             # Values for mode are:
-            # - 'go' -- keep uploading points until trajectory is complete
+            # - 'go' -- keep uploading points (unless there are no more to upload).
             # - 'stop' -- do not request more points from generator; finish the ones you have.
             # - 'abort' -- do not upload more points; exit loop and clear stack.
             mode = 'go'
@@ -1390,18 +1390,27 @@ class ACUAgent:
                 if mode == 'abort':
                     lines = []
 
-                while mode == 'go' and len(lines) < 100:
-                    try:
-                        lines.extend(next(point_gen))
-                    except StopIteration:
-                        mode = 'stop'
+                # Is it time to upload more lines?
+                if free_positions >= STACK_REFILL_THRESHOLD:
+                    new_line_target = max(int(free_positions - STACK_TARGET), 1)
 
-                if len(lines) and free_positions >= STACK_REFILL_THRESHOLD:
+                    while mode == 'go' and (len(lines) < new_line_target or lines[-1][0] != 0):
+                        try:
+                            lines.extend(next(point_gen))
+                        except StopIteration:
+                            mode = 'stop'
 
-                    group_size = max(int(free_positions - STACK_TARGET), 1)
-                    lines, upload_lines = lines[group_size:], lines[:group_size]
-                    text = ''.join(upload_lines)
-                    yield self.acu_control.http.UploadPtStack(text)
+                    # Grab the minimum batch
+                    upload_lines, lines = lines[:new_line_target], lines[new_line_target:]
+
+                    # If the last line has a "group" flag, keep transferring lines.
+                    while len(lines) and len(upload_lines) and upload_lines[-1][0] != 0:
+                        upload_lines.append(lines.pop(0))
+
+                    if len(upload_lines):
+                        # Discard the group flag and upload all.
+                        text = ''.join([line for _flag, line in upload_lines])
+                        yield self.acu_control.http.UploadPtStack(text)
 
                 if len(lines) == 0 and free_positions >= FULL_STACK - 1:
                     break
