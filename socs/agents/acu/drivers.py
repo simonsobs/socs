@@ -9,7 +9,7 @@ import numpy as np
 DAY = 86400
 
 #: Minimum number of points to group together on the start of a new
-#leg, to not trigger programtrack error.
+# leg, to not trigger programtrack error.
 MIN_GROUP_NEW_LEG = 4
 
 
