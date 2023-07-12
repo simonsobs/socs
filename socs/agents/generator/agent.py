@@ -123,10 +123,10 @@ class ReadBlock(object):
                 return twos(registers[offset], 2)
         elif rconfig['read_as'] == '32U':
             def evaluator(registers):
-                return interp_unsigned_double_reg(registers[offset], registers[offset+1])
+                return interp_unsigned_double_reg(registers[offset], registers[offset + 1])
         elif rconfig['read_as'] == '32S':
             def evaluator(registers):
-                return interp_signed_double_reg(registers[offset], registers[offset+1])
+                return interp_signed_double_reg(registers[offset], registers[offset + 1])
         elif 'bin' in rconfig['read_as']:
             evaluator = make_bin_reader(offset, rconfig['read_as'])
         else:
