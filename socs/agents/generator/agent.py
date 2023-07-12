@@ -116,17 +116,22 @@ class ReadBlock(object):
         offset = rconfig['offset']
 
         if rconfig['read_as'] == '16U':
-            def evaluator(registers): return registers[offset]
+            def evaluator(registers):
+                return registers[offset]
         elif rconfig['read_as'] == '16S':
-            def evaluator(registers): return twos(registers[offset], 2)
+            def evaluator(registers):
+                return twos(registers[offset], 2)
         elif rconfig['read_as'] == '32U':
-            def evaluator(registers): return interp_unsigned_double_reg(registers[offset], registers[offset + 1])
+            def evaluator(registers):
+                return interp_unsigned_double_reg(registers[offset], registers[offset+1])
         elif rconfig['read_as'] == '32S':
-            def evaluator(registers): return interp_signed_double_reg(registers[offset], registers[offset + 1])
+            def evaluator(registers):
+                return interp_signed_double_reg(registers[offset], registers[offset+1])
         elif 'bin' in rconfig['read_as']:
             evaluator = make_bin_reader(offset, rconfig['read_as'])
         else:
-            def evaluator(registers): return self.error_val
+            def evaluator(registers):
+                return self.error_val
 
         def process(registers):
             val = evaluator(registers)
