@@ -1,8 +1,9 @@
 import argparse
 import os
+import os.path
 import sys
 import time
-import os.path
+
 import txaio
 import yaml
 from ocs import ocs_agent, site_config
@@ -10,6 +11,7 @@ from ocs.ocs_twisted import Pacemaker, TimeoutLock
 from pyModbusTCP.client import ModbusClient
 
 byteorder = sys.byteorder
+
 
 def load_configs(dir_name, config_extension='yaml'):
     '''Loads all register configuration files form the specified directory (path).
@@ -22,82 +24,90 @@ def load_configs(dir_name, config_extension='yaml'):
 
     ls = os.listdir(path)
 
-    #Make a filter so that we only try to end files ending in config_extension
+    # Make a filter so that we only try to end files ending in config_extension
     def filt(f_name):
         return f_name.endswith(config_extension)
-    #Filter
+    # Filter
     configs = filter(filt, ls)
-    #Load configurations from the remaining files
+    # Load configurations from the remaining files
     for f in configs:
         read_config = os.path.join(path, f)
         with open(read_config) as f:
             try:
                 data = yaml.load(f, Loader=yaml.SafeLoader)
-            except:
+            except BaseException:
                 pass
             all_configs.append(data)
     return all_configs
+
 
 def twos(val, bytes):
     '''Take an unsigned integer representation of a two's compilment integer and return the correctly signed integer'''
     b = val.to_bytes(bytes, byteorder=byteorder, signed=False)
     return int.from_bytes(b, byteorder=byteorder, signed=True)
 
+
 def interp_unsigned_double_reg(r1, r2):
     '''Take two 16 bit register values and combine them assuming we really wanted to read a 32 bit unsigned register'''
-    return (r1<<16)+r2
+    return (r1 << 16) + r2
+
 
 def interp_signed_double_reg(r1, r2):
     '''Take two 16 bit register values and combine them assuming we really wanted to read a 32 bit signed register'''
-    return twos(interp_unsigned_double_reg(r1,r2), 4)
+    return twos(interp_unsigned_double_reg(r1, r2), 4)
+
 
 def make_bin_reader(offset, spec):
     '''Read an individual bit or continuous range of bits out of the 2 byte register.
-    A single bit can be specified as a single number between 1 and 16, and a range can 
-    be specified with a dash, i.e. X-Y where both X and Y are in the range 
+    A single bit can be specified as a single number between 1 and 16, and a range can
+    be specified with a dash, i.e. X-Y where both X and Y are in the range
     1 to 16 and X < Y. In either case the bit or range of bits will be returned as an
     integer.'''
     spec = spec.split(' ')[1:]
     spec = spec[0].split('-')
     spec = [int(s) for s in spec]
     if len(spec) == 1:
-        #Process individual bit
+        # Process individual bit
         spec = spec[0]
-        #The mask leaves only the desired bit
-        mask = sum([1<<s for s in range(spec-1,spec)])
+        # The mask leaves only the desired bit
+        mask = sum([1 << s for s in range(spec - 1, spec)])
+
         def reader(val):
-            return (val[offset]&mask)>>spec-1
+            return (val[offset] & mask) >> spec - 1
         return reader
     elif len(spec) == 2:
-        #Process range
+        # Process range
         low = spec[0]
         high = spec[1]
         if low >= high:
             raise ValueError('First bit in range specification must be smaller than last.')
-        #The mask leaves only the desired bits
-        mask = sum([1<<s for s in range(low-1, high)])
+        # The mask leaves only the desired bits
+        mask = sum([1 << s for s in range(low - 1, high)])
+
         def reader(val):
-            return (val[offset]&mask)>>low-1
+            return (val[offset] & mask) >> low - 1
         return reader
     else:
         raise ValueError('Cannot read binary read_as specification; use single bit or continuous range.')
 
+
 class ReadBlock(object):
     '''An object for reading, converting, and evaluating information from a single contiouous block of registers'''
+
     def __init__(self, config, error_out_of_range=True, filter_errors=True):
         self.name = config['string_name']
 
         try:
             self.read_start = config['read_start']
         except KeyError:
-            self.read_start = config['page']*256
+            self.read_start = config['page'] * 256
 
         self.read_len = config['read_len']
         self.functions = []
         self.rconfig = config['registers']
         self.error_val = None
         self.error_out_of_range = error_out_of_range
-        self.filter_errors=filter_errors
+        self.filter_errors = filter_errors
         for i in self.rconfig:
             self.functions.append(self.build_reader_function(i, self.rconfig[i]))
 
@@ -106,58 +116,60 @@ class ReadBlock(object):
         offset = rconfig['offset']
 
         if rconfig['read_as'] == '16U':
-            evaluator = lambda registers: registers[offset]
+            def evaluator(registers): return registers[offset]
         elif rconfig['read_as'] == '16S':
-            evaluator = lambda registers: twos(registers[offset], 2)
+            def evaluator(registers): return twos(registers[offset], 2)
         elif rconfig['read_as'] == '32U':
-            evaluator = lambda registers: interp_unsigned_double_reg(registers[offset], registers[offset+1])
+            def evaluator(registers): return interp_unsigned_double_reg(registers[offset], registers[offset + 1])
         elif rconfig['read_as'] == '32S':
-            evaluator = lambda registers: interp_signed_double_reg(registers[offset], registers[offset+1])
+            def evaluator(registers): return interp_signed_double_reg(registers[offset], registers[offset + 1])
         elif 'bin' in rconfig['read_as']:
             evaluator = make_bin_reader(offset, rconfig['read_as'])
         else:
-            evaluator = lambda registers: self.error_val
+            def evaluator(registers): return self.error_val
 
         def process(registers):
             val = evaluator(registers)
             if 'scale' in rconfig:
-                val = val*rconfig['scale']
+                val = val * rconfig['scale']
 
             if self.error_out_of_range:
                 try:
                     if val < rconfig['min_val']:
                         val = self.error_val
-                except KeyError: pass
+                except KeyError:
+                    pass
 
                 try:
                     if val > rconfig['max_val']:
                         val = self.error_val
-                except KeyError: pass
+                except KeyError:
+                    pass
 
             if val != self.error_val or not self.filter_errors:
-                return {name:{'value':float(val), 'units':rconfig['units']}}
+                return {name: {'value': float(val), 'units': rconfig['units']}}
             else:
                 return None
 
         return process
 
     def read(self, client):
-        #Perform the read for the entire block
+        # Perform the read for the entire block
         registers = client.read_holding_registers(self.read_start, self.read_len)
         return_data = {}
         try:
-            #Iterate through the functions that convert and return the individual pieces of
-            #data from this block
+            # Iterate through the functions that convert and return the individual pieces of
+            # data from this block
             for f in self.functions:
                 this_data = f(registers)
-                if this_data!=None:
+                if this_data is not None:
                     return_data.update(this_data)
         except Exception as e:
             print(registers)
             print(f'Error in processing data: {e}')
- 
 
         return return_data
+
 
 class Generator:
     """Functions to communite with the Generator controller
@@ -172,18 +184,18 @@ class Generator:
         Sub-directory of .yaml configuration files that specify blocks of registers to read
         and specifies how to convert them into useable data.
     block_space_time : float
-        Amount of time (in seconds) to wait between issuing seperate read_multiple_registers 
-        commands to the device. DSE device appears to crash without this waiting period. 
+        Amount of time (in seconds) to wait between issuing seperate read_multiple_registers
+        commands to the device. DSE device appears to crash without this waiting period.
     close_port : boolean
        Whether or not to close the open port to the device while waiting for the next Pacemaker
        triggered read cycle. The idea here is that closing the port alllows DSEWebNet to function
-       in parallel with the agent. 
+       in parallel with the agent.
 
     Attributes
     ----------
     read_blocks : list
-        List of ReadBlock objects that represent the different continuous register locations to 
-        read from as specified in the config files. 
+        List of ReadBlock objects that represent the different continuous register locations to
+        read from as specified in the config files.
     client : ModbusClient
         ModbusClient object that initializes connection
     """
@@ -193,7 +205,7 @@ class Generator:
         self.port = port
         self.read_config = load_configs(config_dir)
         self._build_config()
-        self.close_port = close_port 
+        self.close_port = close_port
         self.block_space_time = block_space_time
         self.client = ModbusClient(self.host, self.port, auto_open=True, auto_close=False)
         self.client.open()
@@ -208,8 +220,8 @@ class Generator:
         for i, val in enumerate(self.read_blocks):
             data = self._read_regs(val)
             this_cycle_data.update(data)
-            time.sleep(self.block_space_time) #A gap in time is required between individual requests,
-            #i.e. a pause between reading each continuous block of registers.
+            time.sleep(self.block_space_time)  # A gap in time is required between individual requests,
+            # i.e. a pause between reading each continuous block of registers.
         return this_cycle_data
 
     def _read_regs(self, register_block_object):
@@ -279,7 +291,7 @@ class GeneratorAgent:
         Instantiates Generator object and check if client is open
         """
 
-        self.generator = Generator(self.host, self.port, config_dir = self.configdir)
+        self.generator = Generator(self.host, self.port, config_dir=self.configdir)
         if self.generator.client.is_open:
             self.initialized = True
         else:
@@ -460,7 +472,7 @@ def main(args=None):
     agent, runner = ocs_agent.init_site_agent(args)
 
     p = GeneratorAgent(agent,
-                       configdir = args.configdir,
+                       configdir=args.configdir,
                        host=args.host,
                        port=int(args.port))
 
