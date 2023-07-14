@@ -1,6 +1,5 @@
 import argparse
 import os
-import os.path
 import sys
 import time
 
@@ -11,7 +10,6 @@ from ocs.ocs_twisted import Pacemaker, TimeoutLock
 from pyModbusTCP.client import ModbusClient
 
 byteorder = sys.byteorder
-
 
 def load_configs(dir_name, config_extension='yaml'):
     '''Loads all register configuration files form the specified directory (path).
@@ -24,7 +22,7 @@ def load_configs(dir_name, config_extension='yaml'):
 
     ls = os.listdir(path)
 
-    # Make a filter so that we only try to end files ending in config_extension
+    # Make a filter so that we only try to load files ending in config_extension
     def filt(f_name):
         return f_name.endswith(config_extension)
     # Filter
@@ -95,7 +93,7 @@ class ReadBlock(object):
     '''An object for reading, converting, and evaluating information from a single contiouous block of registers'''
 
     def __init__(self, config, error_out_of_range=True, filter_errors=True):
-        self.name = config['string_name']
+        self.name = config['block_name']
 
         try:
             self.read_start = config['read_start']
@@ -170,7 +168,7 @@ class ReadBlock(object):
                 if this_data is not None:
                     return_data.update(this_data)
         except Exception as e:
-            print(registers)
+            #print(registers)
             print(f'Error in processing data: {e}')
 
         return return_data
@@ -226,7 +224,7 @@ class Generator:
             data = self._read_regs(val)
             this_cycle_data.update(data)
             time.sleep(self.block_space_time)  # A gap in time is required between individual requests,
-            # i.e. a pause between reading each continuous block of registers.
+            # i.e. a pause between reading each read_multiple_registers command.
         return this_cycle_data
 
     def _read_regs(self, register_block_object):
@@ -251,10 +249,15 @@ class GeneratorAgent:
     ----------
     agent : OCSAgent
         OCSAgent object which forms this Agent
+    configdir : str
+        Directory where .yaml configuration files specific to this generator instance 
+        are stored.
     host : str
         Address of the generator controller.
     port : int
         Port to generator controller, default to 5021.
+    sample_interval : float
+        Time between samples in seconds.
 
     Attributes
     ----------
@@ -267,7 +270,7 @@ class GeneratorAgent:
         txaio logger object, created by the OCSAgent
     """
 
-    def __init__(self, agent, configdir, host='localhost', port=5021):
+    def __init__(self, agent, configdir, host='localhost', port=5021, sample_interval = 10.):
 
         self.host = host
         self.port = port
@@ -277,6 +280,8 @@ class GeneratorAgent:
         self.lock = TimeoutLock()
 
         self.configdir = configdir
+
+        self.pacemaker_freq = 1./sample_interval
 
         self.initialized = False
         self.take_data = False
@@ -361,11 +366,6 @@ class GeneratorAgent:
              "address": 'localhost',
              "timestamp":1601925677.6914878}
 
-        Refer to the config file at `socs/agents/generator/config.yaml`_
-        for all possible fields and their respective min/max values and units.
-        Note: -1 will be returned for readings out of range.
-
-        .. _socs/agents/generator/config.yaml: https://github.com/simonsobs/socs/blob/main/socs/agents/generator/config.yaml
 
         """
 
@@ -381,7 +381,7 @@ class GeneratorAgent:
 
             session.data = {"fields": {}}
 
-            pm = Pacemaker(.1)
+            pm = Pacemaker(self.pacemaker_freq)
             while self.take_data:
                 pm.sleep()
 
@@ -452,6 +452,7 @@ def make_parser(parser=None):
     pgroup.add_argument('--mode', type=str, choices=['idle', 'init', 'acq'],
                         help="Starting action for the agent.")
     pgroup.add_argument("--configdir", type=str, help="Path to directory containing .yaml config files.")
+    pgroup.add_argument("--sample_interval", type=float, default=10., help="Time between samples in seconds.")
 
     return parser
 
@@ -479,7 +480,8 @@ def main(args=None):
     p = GeneratorAgent(agent,
                        configdir=args.configdir,
                        host=args.host,
-                       port=int(args.port))
+                       port=int(args.port),
+                       sample_interval=args.sample_interval)
 
     agent.register_task('init_generator', p.init_generator,
                         startup=init_params)
