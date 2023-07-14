@@ -350,9 +350,18 @@ def get_plan(config):
     return config
 
 
-def set_client(instance_id):
+def set_client(instance_id, args=None):
+    if args is not None:
+        # ocs.site_config.get_config either requires that --site-file
+        # is set, or else OCS_CONFIG_DIR is defined.  Catch and
+        # propagate any --site-file setting to make sure the config is
+        # the same one as the agent is using.
+        if args.site_file:
+            args = ['--site-file', args.site_file]
+        else:
+            args = None
     global c
-    c = OCSClient(instance_id)
+    c = OCSClient(instance_id, args=args)
     return c
 
 
