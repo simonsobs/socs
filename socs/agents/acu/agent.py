@@ -1478,7 +1478,7 @@ class ACUAgent:
         _publish_error(0)
 
         target_instance_id = self.agent.agent_address.split('.')[-1]
-        exercisor.set_client(target_instance_id)
+        exercisor.set_client(target_instance_id, self.agent.site_args)
         settings = super_plan.get('settings', {})
 
         plan_idx = 0
