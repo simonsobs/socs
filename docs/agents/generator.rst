@@ -29,9 +29,11 @@ using all of the available arguments::
       {'agent-class': 'GeneratorAgent',
        'instance-id': 'generator',
        'arguments': [['--host', '192.168.2.88'],
-                     ['--port', 502],
+                     ['--port', 5021],
                      ['--mode', 'acq'],
-                     ['--configdir', 'G1_config']]}
+                     ['--configdir', 'G1_config'],
+                     ['--sample-interval', 10]
+                     ]}
 
 .. note::
     The ``--host`` argument should be the IP address of the generator on the network.
@@ -100,7 +102,7 @@ contained in the registers that are read. There is no requirement to read all re
 returned in the block, and the same registers can be interpreted by multiple entries in
 the 'registers' key.
 
-An example 'registers' entry is contained below:
+An example 'registers' entry is contained below::
 
   Engine_fuel_level:
     max_val: 130.0
@@ -122,7 +124,7 @@ only 16 bits long. In this case binary corresponds to reading a value from an in
 bits within a single 16 bit register. A single bit can be read by specifying i.e. 'bin 2' which would
 correspond to reading the second most significant bit out of the register, and a range can be specified
 by i.e. 'bin 5-8'. The values specified by 'bin' are one-indexed, following the GenComm documentation
-specifications. An example of reading different binary values out of the same register follows:
+specifications. An example of reading different binary values out of the same register follows::
 
   Alarm_emergency_stop:
     offset: 1

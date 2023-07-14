@@ -413,7 +413,6 @@ class GeneratorAgent:
                             field_dict = {reg: regdata[reg]['value']}
                             session.data['fields'].update(field_dict)
                         session.data.update({'timestamp': current_time})
-                        print(data)
                     else:
                         self.log.info('Connection error or error in processing data.')
                         self.initialized = False
@@ -453,7 +452,7 @@ def make_parser(parser=None):
     pgroup.add_argument('--mode', type=str, choices=['idle', 'init', 'acq'],
                         help="Starting action for the agent.")
     pgroup.add_argument("--configdir", type=str, help="Path to directory containing .yaml config files.")
-    pgroup.add_argument("--sample_interval", type=float, default=10., help="Time between samples in seconds.")
+    pgroup.add_argument("--sample-interval", type=float, default=10., help="Time between samples in seconds.")
 
     return parser
 
