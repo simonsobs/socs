@@ -11,6 +11,7 @@ from pyModbusTCP.client import ModbusClient
 
 byteorder = sys.byteorder
 
+
 def load_configs(dir_name, config_extension='yaml'):
     '''Loads all register configuration files form the specified directory (path).
     The configurations are returned as a list of the configurations from individual files.'''
@@ -168,7 +169,7 @@ class ReadBlock(object):
                 if this_data is not None:
                     return_data.update(this_data)
         except Exception as e:
-            #print(registers)
+            # print(registers)
             print(f'Error in processing data: {e}')
 
         return return_data
@@ -250,7 +251,7 @@ class GeneratorAgent:
     agent : OCSAgent
         OCSAgent object which forms this Agent
     configdir : str
-        Directory where .yaml configuration files specific to this generator instance 
+        Directory where .yaml configuration files specific to this generator instance
         are stored.
     host : str
         Address of the generator controller.
@@ -270,7 +271,7 @@ class GeneratorAgent:
         txaio logger object, created by the OCSAgent
     """
 
-    def __init__(self, agent, configdir, host='localhost', port=5021, sample_interval = 10.):
+    def __init__(self, agent, configdir, host='localhost', port=5021, sample_interval=10.):
 
         self.host = host
         self.port = port
@@ -281,7 +282,7 @@ class GeneratorAgent:
 
         self.configdir = configdir
 
-        self.pacemaker_freq = 1./sample_interval
+        self.pacemaker_freq = 1. / sample_interval
 
         self.initialized = False
         self.take_data = False

@@ -36,7 +36,7 @@ using all of the available arguments::
 .. note::
     The ``--host`` argument should be the IP address of the generator on the network.
 
-    The '--configdir' argument specifies a directory name for configuration files 
+    The '--configdir' argument specifies a directory name for configuration files
     relative to the $OCS_CONFIG_DIR environment variable.
 
 Docker Compose
@@ -71,7 +71,7 @@ via Modbus. It queries registers and publishes data in an acquisition process. T
 agent has been tested with on-site generators.
 
 The Generator Agent requires a configuration directory which contains information on all
-registers that it queries from the generator controller. 
+registers that it queries from the generator controller.
 
 Agent Fields
 ````````````
@@ -82,22 +82,22 @@ Configuration
 `````````````
 A direcotry of .yaml configuration files is one of the arguments to the agent.
 A single .yaml file specifies meta-data about a continuous block of registers to
-read. The agent will interpret all .yaml files in the specified directory as 
+read. The agent will interpret all .yaml files in the specified directory as
 specifications of register blocks.
 
 A single .yaml file must contain keys that specify which registers to read and
 how to interpret the data contained in those registers. The key 'read_start' or
 'page' must be specified, where 'read_start' is the register offset to begin reading
-at, and 'page' is a shorthand for read_start = 256 * page because the DSE GenComm 
+at, and 'page' is a shorthand for read_start = 256 * page because the DSE GenComm
 documentation lists all registers as an offset from their page number. If both keys
-are specified, 'read_start' is given preference. 
+are specified, 'read_start' is given preference.
 
 The configuration file must also specify 'read_len', which is how many registers to read
-beyond the 'read_start' value. 
+beyond the 'read_start' value.
 
-The 'registers' key contains a dictionary with information about how to interpret the data 
-contained in the registers that are read. There is no requirement to read all registers 
-returned in the block, and the same registers can be interpreted by multiple entries in 
+The 'registers' key contains a dictionary with information about how to interpret the data
+contained in the registers that are read. There is no requirement to read all registers
+returned in the block, and the same registers can be interpreted by multiple entries in
 the 'registers' key.
 
 An example 'registers' entry is contained below:
@@ -111,17 +111,17 @@ An example 'registers' entry is contained below:
     units: '%'
 
 They key for each register entry is a description of what information the register contains.
-The sub-keys 'offset', 'read_as', 'scale', and 'units' are required entries, but 'max_val' and 
-'min_val' are optional. 
+The sub-keys 'offset', 'read_as', 'scale', and 'units' are required entries, but 'max_val' and
+'min_val' are optional.
 
 read_as must be one of 16U, 16S, 32U, 32S, or bin. These specify how the data in the register
-contained at the specified offset should be interpereted: 16 bit unsigned (16U), 16 bit signed (16S), 
+contained at the specified offset should be interpereted: 16 bit unsigned (16U), 16 bit signed (16S),
 32 bit unsigned (32U), 32 bit signed (32S) or binary (bin). When the 32 bit data types are used, it is
-implied that the register one byond the specified offset is also being read because each register is 
-only 16 bits long. In this case binary corresponds to reading a value from an individual bit or range of 
-bits within a single 16 bit register. A single bit can be read by specifying i.e. 'bin 2' which would 
-correspond to reading the second most significant bit out of the register, and a range can be specified 
-by i.e. 'bin 5-8'. The values specified by 'bin' are one-indexed, following the GenComm documentation 
+implied that the register one byond the specified offset is also being read because each register is
+only 16 bits long. In this case binary corresponds to reading a value from an individual bit or range of
+bits within a single 16 bit register. A single bit can be read by specifying i.e. 'bin 2' which would
+correspond to reading the second most significant bit out of the register, and a range can be specified
+by i.e. 'bin 5-8'. The values specified by 'bin' are one-indexed, following the GenComm documentation
 specifications. An example of reading different binary values out of the same register follows:
 
   Alarm_emergency_stop:
@@ -133,7 +133,7 @@ specifications. An example of reading different binary values out of the same re
     read_as: bin 9-12
     units: None
 
-Finally, the file must specify the 'block_name' key which is a description of what the continuous 
+Finally, the file must specify the 'block_name' key which is a description of what the continuous
 block of registers contains.
 
 Agent API
