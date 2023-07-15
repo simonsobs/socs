@@ -23,6 +23,10 @@ from socs.agents.acu import exercisor
 FULL_STACK = 10000
 
 
+#: Maximum update time (in s) for "monitor" process data, even with no changes
+MONITOR_MAX_TIME_DELTA = 2.
+
+
 class ACUAgent:
     """
     Agent to acquire data from an ACU and control telescope pointing with the
@@ -360,6 +364,7 @@ class ACUAgent:
 
         was_remote = False
         last_resp_rate = None
+        data_blocks = {}
 
         while session.status in ['running']:
 
@@ -477,66 +482,52 @@ class ACUAgent:
                                              }
                             self.agent.publish_to_feed('acu_commands_influx', acucommand_bs)
 
-            acustatus_summary = {'timestamp':
-                                 self.data['status']['summary']['ctime'],
-                                 'block_name': 'ACU_summary_output',
-                                 'data': self.data['status']['summary']
-                                 }
-            acustatus_axisfaults = {'timestamp': self.data['status']['summary']['ctime'],
-                                    'block_name': 'ACU_axis_faults',
-                                    'data': self.data['status']['axis_faults_errors_overages']
-                                    }
-            acustatus_poserrors = {'timestamp': self.data['status']['summary']['ctime'],
-                                   'block_name': 'ACU_position_errors',
-                                   'data': self.data['status']['position_errors']
-                                   }
-            acustatus_axislims = {'timestamp': self.data['status']['summary']['ctime'],
-                                  'block_name': 'ACU_axis_limits',
-                                  'data': self.data['status']['axis_limits']
-                                  }
-            acustatus_axiswarn = {'timestamp': self.data['status']['summary']['ctime'],
-                                  'block_name': 'ACU_axis_warnings',
-                                  'data': self.data['status']['axis_warnings']
-                                  }
-            acustatus_axisfail = {'timestamp': self.data['status']['summary']['ctime'],
-                                  'block_name': 'ACU_axis_failures',
-                                  'data': self.data['status']['axis_failures']
-                                  }
-            acustatus_axisstate = {'timestamp': self.data['status']['summary']['ctime'],
-                                   'block_name': 'ACU_axis_state',
-                                   'data': self.data['status']['axis_state']
-                                   }
-            acustatus_oscalarm = {'timestamp': self.data['status']['summary']['ctime'],
-                                  'block_name': 'ACU_oscillation_alarm',
-                                  'data': self.data['status']['osc_alarms']
-                                  }
-            acustatus_commands = {'timestamp': self.data['status']['summary']['ctime'],
-                                  'block_name': 'ACU_command_status',
-                                  'data': self.data['status']['commands']
-                                  }
-            acustatus_acufails = {'timestamp': self.data['status']['summary']['ctime'],
-                                  'block_name': 'ACU_general_errors',
-                                  'data': self.data['status']['ACU_failures_errors']
-                                  }
-            acustatus_platform = {'timestamp': self.data['status']['summary']['ctime'],
-                                  'block_name': 'ACU_platform_status',
-                                  'data': self.data['status']['platform_status']
-                                  }
-            acustatus_emergency = {'timestamp': self.data['status']['summary']['ctime'],
-                                   'block_name': 'ACU_emergency',
-                                   'data': self.data['status']['ACU_emergency']
-                                   }
+            new_blocks = {}
+            for block_name, data_key in [
+                    ('ACU_summary_output', 'summary'),
+                    ('ACU_axis_faults', 'axis_faults_errors_overages'),
+                    ('ACU_position_errors', 'position_errors'),
+                    ('ACU_axis_limits', 'axis_limits'),
+                    ('ACU_axis_warnings', 'axis_warnings'),
+                    ('ACU_axis_failures', 'axis_failures'),
+                    ('ACU_axis_state', 'axis_state'),
+                    ('ACU_oscillation_alarm', 'osc_alarms'),
+                    ('ACU_command_status', 'commands'),
+                    ('ACU_general_errors', 'ACU_failures_errors'),
+                    ('ACU_platform_status', 'platform_status'),
+                    ('ACU_emergency', 'ACU_emergency'),
+            ]:
+                new_blocks[block_name] = {
+                    'timestamp': self.data['status']['summary']['ctime'],
+                    'block_name': block_name,
+                    'data': self.data['status'][data_key],
+                }
+
+            # Only keep blocks that have changed or if  any new blocks
+            block_keys = list(new_blocks.keys())
+            for k in block_keys:
+                if k == 'summary':  # always store these, as a sort of reference tick.
+                    continue
+                if k not in data_blocks:
+                    continue
+                B, N = data_blocks[k], new_blocks[k]
+                if N['timestamp'] - B['timestamp'] > MONITOR_MAX_TIME_DELTA:
+                    continue
+                if any([B['data'][_k] != _v for _k, _v in N['data'].items()]):
+                    continue
+                del new_blocks[k]
+
+            print('Updating %i blocks' % len(new_blocks))
+            for block in new_blocks.values():
+                self.agent.publish_to_feed('acu_status', block)
+
+            data_blocks.update(new_blocks)
+
             acustatus_influx = {'timestamp':
                                 self.data['status']['summary']['ctime'],
                                 'block_name': 'ACU_status_INFLUX',
                                 'data': influx_status
                                 }
-            status_blocks = [acustatus_summary, acustatus_axisfaults, acustatus_poserrors,
-                             acustatus_axislims, acustatus_axiswarn, acustatus_axisfail,
-                             acustatus_axisstate, acustatus_oscalarm, acustatus_commands,
-                             acustatus_acufails, acustatus_platform, acustatus_emergency]
-            for block in status_blocks:
-                self.agent.publish_to_feed('acu_status', block)
             self.agent.publish_to_feed('acu_status_influx', acustatus_influx, from_reactor=True)
 
             prev_checkdata = {'ctime': self.data['status']['summary']['ctime'],
