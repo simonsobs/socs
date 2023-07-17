@@ -4,6 +4,7 @@ Utility script for interacting with the suprsync db.
 """
 import argparse
 import os
+import time
 
 from tqdm.auto import trange
 
@@ -57,7 +58,7 @@ def add_local_files_func(args):
         for file in files:
             path = os.path.join(root, file)
             path = os.path.abspath(path)
-            if path not in known_paths:
+            if path not in known_paths and now-os.stat(path).st_mtime>=args.last_edit:
                 local_paths.append(path)
                 remote_paths.append(os.path.relpath(path, args.local_root))
 
@@ -117,6 +118,8 @@ def main():
     add_local_files_parser.add_argument(
         'archive_name', help="Archive to add files to")
     add_local_files_parser.add_argument('--db', default=default_db)
+    add_local_files_parser.add_argument('--last_edit', default=60,
+        help="Only add files that were last edited more than some seconds ago. Default:60")
     add_local_files_parser.add_argument(
         '--create-db', action='store_true',
         help="Create the db if it doesn't exist"
