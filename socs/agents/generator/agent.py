@@ -424,7 +424,13 @@ class GeneratorAgent:
                     self.log.info('Trying to reconnect.')
                     continue
 
-                self.agent.publish_to_feed('generator', data)
+                for field, val in data['data'].items():
+                    _data = {
+                        'timestamp': current_time,
+                        'block_name': field,
+                        'data': {field: val}
+                    }
+                    self.agent.publish_to_feed('generator', _data)
 
             self.agent.feeds['generator'].flush_buffer()
 
