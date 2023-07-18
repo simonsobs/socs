@@ -12,7 +12,7 @@ pyasn1==0.4.8
 
 # common dependencies - used by multiple agents
 numpy
-markupsafe==2.0.1
+astropy>=5.0.0
 pyyaml>=6.0.1
 
 # acu agent
