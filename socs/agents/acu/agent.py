@@ -73,10 +73,12 @@ class ACUAgent:
         self.monitor_fields = status_keys.status_fields[self.acu_config['platform']]['status_fields']
         self.motion_limits = self.acu_config['motion_limits']
 
-        # These become the default scan params when calling
-        # generate_scan.  They can be changed during run time; they
-        # can also be overridden when calling generate_scan.
-        self.scan_params = dict(DEFAULT_SCAN_PARAMS[self.acu_config['platform']])
+        # This initializes self.scan_params; these become the default
+        # scan params when calling generate_scan.  They can be changed
+        # during run time; they can also be overridden when calling
+        # generate_scan.
+        self.scan_params = {}
+        self._set_default_scan_params()
 
         self.exercise_plan = exercise_plan
 
@@ -175,6 +177,9 @@ class ACUAgent:
                             self.go_to,
                             blocking=False,
                             aborter=self._simple_task_abort)
+        agent.register_task('set_scan_params',
+                            self.set_scan_params,
+                            blocking=False)
         agent.register_task('fromfile_scan',
                             self.fromfile_scan,
                             blocking=False,
@@ -1068,6 +1073,38 @@ class ACUAgent:
                                                     'Set3rdAxisMode', 'Stop')
 
         return ok, msg
+
+    def _set_default_scan_params(self):
+        # A reference to scan_params is cached in monitor, so copy
+        # individual items rather than creating a new dict here.
+        for k, v in DEFAULT_SCAN_PARAMS[self.acu_config['platform']].items():
+            self.scan_params[k] = v
+
+    @ocs_agent.param('az_speed', type=float, default=None)
+    @ocs_agent.param('az_accel', type=float, default=None)
+    @ocs_agent.param('reset', default=False, type=bool)
+    @inlineCallbacks
+    def set_scan_params(self, session, params):
+        """set_scan_params()
+
+        **Task** - Update the default scan parameters, used by
+        generate_scan if not passed explicitly.
+
+        Parameters:
+          az_speed (float): The azimuth scan speed.
+          az_accel (float): The (average) azimuth acceleration at turn-around.
+          reset (bool): If True, reset all params to default values
+            before applying any updates passed explicitly here.
+
+        """
+        if params['reset']:
+            self._set_default_scan_params()
+        for k in ['az_speed', 'az_accel']:
+            if params[k] is not None:
+                self.scan_params[k] = params[k]
+        self.log.info('Updated default scan params to {sp}', sp=self.scan_params)
+        yield
+        return True, 'Done'
 
     @inlineCallbacks
     def clear_faults(self, session, params):
