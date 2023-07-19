@@ -1317,6 +1317,8 @@ class ACUAgent:
         """
         az_endpoint1 = params['az_endpoint1']
         az_endpoint2 = params['az_endpoint2']
+        el_endpoint1 = params['el_endpoint1']
+        el_endpoint2 = params['el_endpoint2']
 
         # Params with defaults configured ...
         az_speed = params['az_speed']
@@ -1326,14 +1328,18 @@ class ACUAgent:
         if az_accel is None:
             az_accel = self.scan_params['az_accel']
 
-        el_endpoint1 = params.get('el_endpoint1')
+        # If el is not specified, drop in the current elevation.
+        if el_endpoint1 is None:
+            el_endpoint1 = self.data['status']['summary'][f'Elevation_current_position']
+        if el_endpoint2 is None:
+            el_endpoint2 = el_endpoint1
+
         azonly = params.get('az_only', True)
         scan_upload_len = params.get('scan_upload_length')
         scan_params = {k: params.get(k) for k in [
             'num_scans', 'num_batches', 'start_time',
             'wait_to_start', 'step_time', 'batch_size', 'az_start']
             if params.get(k) is not None}
-        el_endpoint2 = params.get('el_endpoint2', el_endpoint1)
         el_speed = params.get('el_speed', 0.0)
 
         plan = sh.plan_scan(az_endpoint1, az_endpoint2,
