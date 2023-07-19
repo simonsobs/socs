@@ -365,6 +365,7 @@ class ACUAgent:
         was_remote = False
         last_resp_rate = None
         data_blocks = {}
+        influx_blocks = {}
 
         while session.status in ['running']:
 
@@ -434,34 +435,41 @@ class ACUAgent:
                 if self.data['status']['summary'][axis_mode] != prev_checkdata[axis_mode]:
                     self.log.info(axis_mode + ' has changed to ' + self.data['status']['summary'][axis_mode])
 
-            # influx_status refers to all other self.data['status'] keys. Do not add
-            # more keys to any self.data['status'] categories beyond this point
-            influx_status = {}
+            # influx_blocks are constructed based on refers to all
+            # other self.data['status'] keys. Do not add more keys to
+            # any self.data['status'] categories beyond this point
+            new_influx_blocks = {}
             for category in self.data['status']:
+                new_influx_blocks[category] = {
+                    'timestamp': self.data['status']['summary']['ctime'],
+                    'block_name': category,
+                    'data': {}}
+
                 if category != 'commands':
                     for statkey, statval in self.data['status'][category].items():
                         if isinstance(statval, float):
-                            influx_status[statkey + '_influx'] = statval
+                            influx_val = statval
                         elif isinstance(statval, str):
                             if statval == 'None':
-                                influx_status[statkey + '_influx'] = float('nan')
+                                influx_val = float('nan')
                             elif statval in ['True', 'False']:
-                                influx_status[statkey + '_influx'] = tfn_key[statval]
+                                influx_val = tfn_key[statval]
                             elif statval in mode_key:
-                                influx_status[statkey + '_influx'] = mode_key[statval]
+                                influx_val = mode_key[statval]
                             elif statval in fault_key:
-                                influx_status[statkey + '_influx'] = fault_key[statval]
+                                influx_val = fault_key[statval]
                             elif statval in pin_key:
-                                influx_status[statkey + '_influx'] = pin_key[statval]
+                                influx_val = pin_key[statval]
                             else:
                                 raise ValueError('Could not convert value for %s="%s"' %
                                                  (statkey, statval))
                         elif isinstance(statval, int):
                             if statkey in ['Year', 'Free_upload_positions']:
-                                influx_status[statkey + '_influx'] = float(statval)
+                                influx_val = float(statval)
                             else:
-                                influx_status[statkey + '_influx'] = int(statval)
-                elif category == 'commands':
+                                influx_val = int(statval)
+                        new_influx_blocks[category]['data'][statkey + '_influx'] = influx_val
+                else:  #  i.e. category == 'commands':
                     if str(self.data['status']['commands']['Azimuth_commanded_position']) != 'nan':
                         acucommand_az = {'timestamp': self.data['status']['summary']['ctime'],
                                          'block_name': 'ACU_commanded_positions_az',
@@ -482,6 +490,23 @@ class ACUAgent:
                                              }
                             self.agent.publish_to_feed('acu_commands_influx', acucommand_bs)
 
+            # Only keep blocks that have changed or have new data.
+            block_keys = list(new_influx_blocks.keys())
+            for k in block_keys:
+                if k not in influx_blocks:
+                    continue
+                B, N = influx_blocks[k], new_influx_blocks[k]
+                if N['timestamp'] - B['timestamp'] > MONITOR_MAX_TIME_DELTA:
+                    continue
+                if any([B['data'][_k] != _v for _k, _v in N['data'].items()]):
+                    continue
+                del new_influx_blocks[k]
+
+            for block in new_influx_blocks.values():
+                self.agent.publish_to_feed('acu_status_influx', block)
+            influx_blocks.update(new_influx_blocks)
+
+            # Assemble data for aggregator ...
             new_blocks = {}
             for block_name, data_key in [
                     ('ACU_summary_output', 'summary'),
@@ -503,7 +528,7 @@ class ACUAgent:
                     'data': self.data['status'][data_key],
                 }
 
-            # Only keep blocks that have changed or if  any new blocks
+            # Only keep blocks that have changed or have new data.
             block_keys = list(new_blocks.keys())
             for k in block_keys:
                 if k == 'summary':  # always store these, as a sort of reference tick.
@@ -517,18 +542,10 @@ class ACUAgent:
                     continue
                 del new_blocks[k]
 
-            print('Updating %i blocks' % len(new_blocks))
             for block in new_blocks.values():
                 self.agent.publish_to_feed('acu_status', block)
 
             data_blocks.update(new_blocks)
-
-            acustatus_influx = {'timestamp':
-                                self.data['status']['summary']['ctime'],
-                                'block_name': 'ACU_status_INFLUX',
-                                'data': influx_status
-                                }
-            self.agent.publish_to_feed('acu_status_influx', acustatus_influx, from_reactor=True)
 
             prev_checkdata = {'ctime': self.data['status']['summary']['ctime'],
                               'Azimuth_mode': self.data['status']['summary']['Azimuth_mode'],
