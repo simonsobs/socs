@@ -971,11 +971,59 @@ class ACUAgent:
             msg = 'Irregularity during motion!'
         return success, msg
 
+    @inlineCallbacks
+    def _go_to_axes(self, session, el=None, az=None, third=None):
+        """Execute a movement along multiple axes, using "Preset" mode.  This
+        just launches _got_to_axis on each required axis, and collects
+        the results.
+
+        Args:
+          session: session object variable of the parent operation.
+          az (float): target for Azimuth axis (ignored if None).
+          el (float): target for Elevation axis (ignored if None).
+          third (float): target for Boresight axis (ignored if None).
+
+        Returns:
+          ok (bool): True if all motions completed successfully and
+            arrived at target position.
+          msg (str): success/error message (combined from each target
+            axis).
+
+        """
+        move_defs = []
+        for axis_name, short_name, target in [
+                ('Azimuth', 'az', az),
+                ('Elevation', 'el', el),
+                ('Boresight', 'third', third),
+        ]:
+            if target is not None:
+                move_defs.append(
+                    (short_name, self._go_to_axis(session, axis_name, target)))
+        if len(move_defs) is None:
+            return True, 'No motion requested.'
+
+        moves = yield DeferredList([d for n, d in move_defs])
+        all_ok, msgs = True, []
+        for _ok, result in moves:
+            if _ok:
+                all_ok = all_ok and result[0]
+                msgs.append(result[1])
+            else:
+                all_ok = False
+                msgs.append(f'Crash! {result}')
+
+        if all_ok:
+            msg = msgs[0]
+        else:
+            msg = ' '.join([f'{n}: {msg}' for (n, d), msg in zip(move_defs, msgs)])
+        return all_ok, msg
+
     @ocs_agent.param('az', type=float)
     @ocs_agent.param('el', type=float)
     @ocs_agent.param('end_stop', default=False, type=bool)
     @inlineCallbacks
     def go_to(self, session, params):
+
         """go_to(az=None, el=None, end_stop=False)
 
         **Task** - Move the telescope to a particular point (azimuth,
@@ -1010,24 +1058,7 @@ class ACUAgent:
             self.log.info(f'Commanded position: az={target_az}, el={target_el}')
             session.set_status('running')
 
-            moves = yield DeferredList([
-                self._go_to_axis(session, 'Azimuth', target_az),
-                self._go_to_axis(session, 'Elevation', target_el),
-            ])
-            all_ok, msgs = True, []
-            for _ok, result in moves:
-                if _ok:
-                    all_ok = all_ok and result[0]
-                    msgs.append(result[1])
-                else:
-                    all_ok = False
-                    msgs.append(f'Crash! {result}')
-
-            if all_ok:
-                msg = msgs[0]
-            else:
-                msg = f'az: {msgs[0]} el: {msgs[1]}'
-
+            all_ok, msg = yield self._go_to_axes(session, az=target_az, el=target_el)
             if all_ok and params['end_stop']:
                 yield self.acu_control.mode('Stop')
 
@@ -1329,8 +1360,11 @@ class ACUAgent:
             az_accel = self.scan_params['az_accel']
 
         # If el is not specified, drop in the current elevation.
+        init_el = None
         if el_endpoint1 is None:
             el_endpoint1 = self.data['status']['summary'][f'Elevation_current_position']
+        else:
+            init_el = el_endpoint1
         if el_endpoint2 is None:
             el_endpoint2 = el_endpoint1
 
@@ -1365,8 +1399,8 @@ class ACUAgent:
             return False, msg
 
         # Seek to starting position
-        self.log.info(f'Moving to start position, az={plan["init_az"]}')
-        ok, msg = yield self._go_to_axis(session, 'Azimuth', plan['init_az'])
+        self.log.info(f'Moving to start position, az={plan["init_az"]}, el={init_el}')
+        ok, msg = yield self._go_to_axes(session, az=plan['init_az'], el=init_el)
         if not ok:
             return False, f'Start position seek failed with message: {msg}'
 
