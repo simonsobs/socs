@@ -269,6 +269,10 @@ class ACUAgent:
             },
             "StatusResponseRate": 19.237531827325963,
             "PlatformType": "satp",
+            "DefaultScanParams": {
+              "az_speed": 2.0,
+              "az_accel": 1.0,
+            },
             "connected": True,
           }
 
@@ -282,12 +286,13 @@ class ACUAgent:
         session.set_status('running')
 
         # Note that session.data will get scanned, to assign data to
-        # feed blocks.  Items in session.data that are themselves
-        # dicts will parsed; but items (such as PlatformType and
-        # StatusResponseRate) which are simple strings or floats will
-        # be ignored for feed assignment.
+        # feed blocks.  We make an explicit list of items to ignore
+        # during that scan (not_data_keys).
         session.data = {'PlatformType': self.acu_config['platform'],
+                        'DefaultScanParams': self.scan_params,
+                        'StatusResponseRate': 0.,
                         'connected': False}
+        not_data_keys = list(session.data.keys())
 
         last_complaint = 0
         while True:
@@ -301,6 +306,7 @@ class ACUAgent:
                     self.log.error('monitor process failed to query version! Will keep trying.')
                     last_complaint = time.time()
                 yield dsleep(10)
+
         self.log.info(version)
         session.data['connected'] = True
 
@@ -425,18 +431,20 @@ class ACUAgent:
                 yield dsleep(1)
                 continue
             for k, v in session.data.items():
-                if isinstance(v, dict):
-                    for (key, value) in v.items():
-                        for category in self.monitor_fields:
-                            if key in self.monitor_fields[category]:
-                                if isinstance(value, bool):
-                                    self.data['status'][category][self.monitor_fields[category][key]] = int(value)
-                                elif isinstance(value, int) or isinstance(value, float):
-                                    self.data['status'][category][self.monitor_fields[category][key]] = value
-                                elif value is None:
-                                    self.data['status'][category][self.monitor_fields[category][key]] = float('nan')
-                                else:
-                                    self.data['status'][category][self.monitor_fields[category][key]] = str(value)
+                if k in not_data_keys:
+                    continue
+                for (key, value) in v.items():
+                    for category in self.monitor_fields:
+                        if key in self.monitor_fields[category]:
+                            if isinstance(value, bool):
+                                self.data['status'][category][self.monitor_fields[category][key]] = int(value)
+                            elif isinstance(value, int) or isinstance(value, float):
+                                self.data['status'][category][self.monitor_fields[category][key]] = value
+                            elif value is None:
+                                self.data['status'][category][self.monitor_fields[category][key]] = float('nan')
+                            else:
+                                self.data['status'][category][self.monitor_fields[category][key]] = str(value)
+
             self.data['status']['summary']['ctime'] =\
                 sh.timecode(self.data['status']['summary']['Time'])
             if self.data['status']['platform_status']['Remote_mode'] == 0:
