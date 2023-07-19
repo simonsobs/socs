@@ -26,6 +26,18 @@ FULL_STACK = 10000
 #: Maximum update time (in s) for "monitor" process data, even with no changes
 MONITOR_MAX_TIME_DELTA = 2.
 
+#: Default scan params by platform type
+DEFAULT_SCAN_PARAMS = {
+    'ccat': {
+        'az_speed': 2,
+        'az_accel': 1,
+    },
+    'satp': {
+        'az_speed': 1,
+        'az_accel': 1,
+    },
+}
+
 
 class ACUAgent:
     """
@@ -60,6 +72,11 @@ class ACUAgent:
         self.acu3rdaxis = self.acu_config['status'].get('3rdaxis_name')
         self.monitor_fields = status_keys.status_fields[self.acu_config['platform']]['status_fields']
         self.motion_limits = self.acu_config['motion_limits']
+
+        # These become the default scan params when calling
+        # generate_scan.  They can be changed during run time; they
+        # can also be overridden when calling generate_scan.
+        self.scan_params = dict(DEFAULT_SCAN_PARAMS[self.acu_config['platform']])
 
         self.exercise_plan = exercise_plan
 
@@ -1182,8 +1199,8 @@ class ACUAgent:
 
     @ocs_agent.param('az_endpoint1', type=float)
     @ocs_agent.param('az_endpoint2', type=float)
-    @ocs_agent.param('az_speed', type=float)
-    @ocs_agent.param('az_accel', type=float)
+    @ocs_agent.param('az_speed', type=float, default=None)
+    @ocs_agent.param('az_accel', type=float, default=None)
     @ocs_agent.param('el_endpoint1', type=float, default=None)
     @ocs_agent.param('el_endpoint2', type=float, default=None)
     @ocs_agent.param('el_speed', type=float, default=0.)
@@ -1253,10 +1270,17 @@ class ACUAgent:
                 reasonable.
 
         """
-        az_endpoint1 = params.get('az_endpoint1')
-        az_endpoint2 = params.get('az_endpoint2')
-        az_speed = params.get('az_speed')
-        az_accel = params.get('az_accel')
+        az_endpoint1 = params['az_endpoint1']
+        az_endpoint2 = params['az_endpoint2']
+
+        # Params with defaults configured ...
+        az_speed = params['az_speed']
+        az_accel = params['az_accel']
+        if az_speed is None:
+            az_speed = self.scan_params['az_speed']
+        if az_accel is None:
+            az_accel = self.scan_params['az_accel']
+
         el_endpoint1 = params.get('el_endpoint1')
         azonly = params.get('az_only', True)
         scan_upload_len = params.get('scan_upload_length')
