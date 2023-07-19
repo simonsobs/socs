@@ -499,7 +499,7 @@ class ACUAgent:
                             else:
                                 influx_val = int(statval)
                         new_influx_blocks[category]['data'][statkey + '_influx'] = influx_val
-                else:  #  i.e. category == 'commands':
+                else:  # i.e. category == 'commands':
                     if str(self.data['status']['commands']['Azimuth_commanded_position']) != 'nan':
                         acucommand_az = {'timestamp': self.data['status']['summary']['ctime'],
                                          'block_name': 'ACU_commanded_positions_az',
@@ -1023,7 +1023,6 @@ class ACUAgent:
     @ocs_agent.param('end_stop', default=False, type=bool)
     @inlineCallbacks
     def go_to(self, session, params):
-
         """go_to(az=None, el=None, end_stop=False)
 
         **Task** - Move the telescope to a particular point (azimuth,
@@ -1362,7 +1361,7 @@ class ACUAgent:
         # If el is not specified, drop in the current elevation.
         init_el = None
         if el_endpoint1 is None:
-            el_endpoint1 = self.data['status']['summary'][f'Elevation_current_position']
+            el_endpoint1 = self.data['status']['summary']['Elevation_current_position']
         else:
             init_el = el_endpoint1
         if el_endpoint2 is None:
