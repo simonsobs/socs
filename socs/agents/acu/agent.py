@@ -973,9 +973,9 @@ class ACUAgent:
 
     @inlineCallbacks
     def _go_to_axes(self, session, el=None, az=None, third=None):
-        """Execute a movement along multiple axes, using "Preset" mode.  This
-        just launches _got_to_axis on each required axis, and collects
-        the results.
+        """Execute a movement along multiple axes, using "Preset"
+        mode.  This just launches _go_to_axis on each required axis,
+        and collects the results.
 
         Args:
           session: session object variable of the parent operation.
@@ -1115,16 +1115,17 @@ class ACUAgent:
     @ocs_agent.param('reset', default=False, type=bool)
     @inlineCallbacks
     def set_scan_params(self, session, params):
-        """set_scan_params()
+        """set_scan_params(az_speed=None, az_accel=None, reset=False))
 
         **Task** - Update the default scan parameters, used by
         generate_scan if not passed explicitly.
 
         Parameters:
-          az_speed (float): The azimuth scan speed.
-          az_accel (float): The (average) azimuth acceleration at turn-around.
-          reset (bool): If True, reset all params to default values
-            before applying any updates passed explicitly here.
+          az_speed (float, optional): The azimuth scan speed.
+          az_accel (float, optional): The (average) azimuth
+            acceleration at turn-around.
+          reset (bool, optional): If True, reset all params to default
+            values before applying any updates passed explicitly here.
 
         """
         if params['reset']:
@@ -1291,7 +1292,7 @@ class ACUAgent:
     @inlineCallbacks
     def generate_scan(self, session, params):
         """generate_scan(az_endpoint1, az_endpoint2, \
-                         az_speed, az_accel, \
+                         az_speed=None, az_accel=None, \
                          el_endpoint1=None, el_endpoint2=None, \
                          el_speed=None, \
                          num_scans=None, start_time=None, \
@@ -1343,6 +1344,13 @@ class ACUAgent:
                 of uploaded points. If this is not specified, the
                 track manager will try to use as short a time as is
                 reasonable.
+
+        Notes:
+          Note that all parameters are optional except for
+          az_endpoint1 and az_endpoint2.  If only those two parameters
+          are passed, the Process will scan between those endpoints,
+          with the elevation axis held in Stop, indefinitely (until
+          Process .stop method is called)..
 
         """
         az_endpoint1 = params['az_endpoint1']
