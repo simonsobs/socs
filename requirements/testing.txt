@@ -1,6 +1,6 @@
 pytest
 pytest-cov
-pytest-docker-compose
+pytest-docker
 pytest-dependency
 pytest-order
 so3g
