@@ -1,5 +1,4 @@
 import argparse
-import enum
 import os
 import threading
 import time
@@ -254,8 +253,8 @@ class HWPState:
         else:
             raise ValueError('Could not find upsOutputSource OID')
 
-        for k, field in ups_keymap.items():
-            setattr(self, k, data[f'{field[0]}_{ups_oid}'][field[1]])
+        for k, f in ups_keymap.items():
+            setattr(self, k, data[f'{f[0]}_{ups_oid}'][f[1]])
 
         self.ups_last_connection_attempt = data['ups_connection']['last_attempt']
         self.ups_connected = data['ups_connection']['connected']
@@ -486,7 +485,7 @@ class ControlStateMachine:
             raise ControlClientError("op-start returned Error:\n  msg: " + msg)
 
         if status == ocs.TIMEOUT:
-            raise ControlClientError(f"op-start timed out")
+            raise ControlClientError("op-start timed out")
 
         status, msg, session = op.wait(timeout=timeout)
 
@@ -494,7 +493,7 @@ class ControlStateMachine:
             raise ControlClientError("op-wait returned Error:\n  msg: " + msg)
 
         if status == ocs.TIMEOUT:
-            raise ControlClientError(f"op-wait timed out")
+            raise ControlClientError("op-wait timed out")
 
         self.log.info("Completed op: name={name}, success={success}, kwargs={kw}",
                       name=session.get('op_name'), success=session.get('success'),
