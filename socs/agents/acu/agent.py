@@ -23,6 +23,22 @@ from socs.agents.acu import exercisor
 FULL_STACK = 10000
 
 
+#: Maximum update time (in s) for "monitor" process data, even with no changes
+MONITOR_MAX_TIME_DELTA = 2.
+
+#: Default scan params by platform type
+DEFAULT_SCAN_PARAMS = {
+    'ccat': {
+        'az_speed': 2,
+        'az_accel': 1,
+    },
+    'satp': {
+        'az_speed': 1,
+        'az_accel': 1,
+    },
+}
+
+
 class ACUAgent:
     """
     Agent to acquire data from an ACU and control telescope pointing with the
@@ -56,6 +72,13 @@ class ACUAgent:
         self.acu3rdaxis = self.acu_config['status'].get('3rdaxis_name')
         self.monitor_fields = status_keys.status_fields[self.acu_config['platform']]['status_fields']
         self.motion_limits = self.acu_config['motion_limits']
+
+        # This initializes self.scan_params; these become the default
+        # scan params when calling generate_scan.  They can be changed
+        # during run time; they can also be overridden when calling
+        # generate_scan.
+        self.scan_params = {}
+        self._set_default_scan_params()
 
         self.exercise_plan = exercise_plan
 
@@ -154,6 +177,9 @@ class ACUAgent:
                             self.go_to,
                             blocking=False,
                             aborter=self._simple_task_abort)
+        agent.register_task('set_scan_params',
+                            self.set_scan_params,
+                            blocking=False)
         agent.register_task('fromfile_scan',
                             self.fromfile_scan,
                             blocking=False,
@@ -172,7 +198,8 @@ class ACUAgent:
         # Automatic exercise program...
         if exercise_plan:
             agent.register_process(
-                'exercise', self.exercise, self._simple_process_stop)
+                'exercise', self.exercise, self._simple_process_stop,
+                stopper_blocking=False)
             # Use longer default frame length ... very low volume feed.
             self.agent.register_feed('activity',
                                      record=True,
@@ -247,6 +274,10 @@ class ACUAgent:
             },
             "StatusResponseRate": 19.237531827325963,
             "PlatformType": "satp",
+            "DefaultScanParams": {
+              "az_speed": 2.0,
+              "az_accel": 1.0,
+            },
             "connected": True,
           }
 
@@ -260,12 +291,13 @@ class ACUAgent:
         session.set_status('running')
 
         # Note that session.data will get scanned, to assign data to
-        # feed blocks.  Items in session.data that are themselves
-        # dicts will parsed; but items (such as PlatformType and
-        # StatusResponseRate) which are simple strings or floats will
-        # be ignored for feed assignment.
+        # feed blocks.  We make an explicit list of items to ignore
+        # during that scan (not_data_keys).
         session.data = {'PlatformType': self.acu_config['platform'],
+                        'DefaultScanParams': self.scan_params,
+                        'StatusResponseRate': 0.,
                         'connected': False}
+        not_data_keys = list(session.data.keys())
 
         last_complaint = 0
         while True:
@@ -279,6 +311,7 @@ class ACUAgent:
                     self.log.error('monitor process failed to query version! Will keep trying.')
                     last_complaint = time.time()
                 yield dsleep(10)
+
         self.log.info(version)
         session.data['connected'] = True
 
@@ -359,6 +392,8 @@ class ACUAgent:
 
         was_remote = False
         last_resp_rate = None
+        data_blocks = {}
+        influx_blocks = {}
 
         while session.status in ['running']:
 
@@ -401,18 +436,20 @@ class ACUAgent:
                 yield dsleep(1)
                 continue
             for k, v in session.data.items():
-                if isinstance(v, dict):
-                    for (key, value) in v.items():
-                        for category in self.monitor_fields:
-                            if key in self.monitor_fields[category]:
-                                if isinstance(value, bool):
-                                    self.data['status'][category][self.monitor_fields[category][key]] = int(value)
-                                elif isinstance(value, int) or isinstance(value, float):
-                                    self.data['status'][category][self.monitor_fields[category][key]] = value
-                                elif value is None:
-                                    self.data['status'][category][self.monitor_fields[category][key]] = float('nan')
-                                else:
-                                    self.data['status'][category][self.monitor_fields[category][key]] = str(value)
+                if k in not_data_keys:
+                    continue
+                for (key, value) in v.items():
+                    for category in self.monitor_fields:
+                        if key in self.monitor_fields[category]:
+                            if isinstance(value, bool):
+                                self.data['status'][category][self.monitor_fields[category][key]] = int(value)
+                            elif isinstance(value, int) or isinstance(value, float):
+                                self.data['status'][category][self.monitor_fields[category][key]] = value
+                            elif value is None:
+                                self.data['status'][category][self.monitor_fields[category][key]] = float('nan')
+                            else:
+                                self.data['status'][category][self.monitor_fields[category][key]] = str(value)
+
             self.data['status']['summary']['ctime'] =\
                 sh.timecode(self.data['status']['summary']['Time'])
             if self.data['status']['platform_status']['Remote_mode'] == 0:
@@ -428,34 +465,41 @@ class ACUAgent:
                 if self.data['status']['summary'][axis_mode] != prev_checkdata[axis_mode]:
                     self.log.info(axis_mode + ' has changed to ' + self.data['status']['summary'][axis_mode])
 
-            # influx_status refers to all other self.data['status'] keys. Do not add
-            # more keys to any self.data['status'] categories beyond this point
-            influx_status = {}
+            # influx_blocks are constructed based on refers to all
+            # other self.data['status'] keys. Do not add more keys to
+            # any self.data['status'] categories beyond this point
+            new_influx_blocks = {}
             for category in self.data['status']:
+                new_influx_blocks[category] = {
+                    'timestamp': self.data['status']['summary']['ctime'],
+                    'block_name': category,
+                    'data': {}}
+
                 if category != 'commands':
                     for statkey, statval in self.data['status'][category].items():
                         if isinstance(statval, float):
-                            influx_status[statkey + '_influx'] = statval
+                            influx_val = statval
                         elif isinstance(statval, str):
                             if statval == 'None':
-                                influx_status[statkey + '_influx'] = float('nan')
+                                influx_val = float('nan')
                             elif statval in ['True', 'False']:
-                                influx_status[statkey + '_influx'] = tfn_key[statval]
+                                influx_val = tfn_key[statval]
                             elif statval in mode_key:
-                                influx_status[statkey + '_influx'] = mode_key[statval]
+                                influx_val = mode_key[statval]
                             elif statval in fault_key:
-                                influx_status[statkey + '_influx'] = fault_key[statval]
+                                influx_val = fault_key[statval]
                             elif statval in pin_key:
-                                influx_status[statkey + '_influx'] = pin_key[statval]
+                                influx_val = pin_key[statval]
                             else:
                                 raise ValueError('Could not convert value for %s="%s"' %
                                                  (statkey, statval))
                         elif isinstance(statval, int):
                             if statkey in ['Year', 'Free_upload_positions']:
-                                influx_status[statkey + '_influx'] = float(statval)
+                                influx_val = float(statval)
                             else:
-                                influx_status[statkey + '_influx'] = int(statval)
-                elif category == 'commands':
+                                influx_val = int(statval)
+                        new_influx_blocks[category]['data'][statkey + '_influx'] = influx_val
+                else:  # i.e. category == 'commands':
                     if str(self.data['status']['commands']['Azimuth_commanded_position']) != 'nan':
                         acucommand_az = {'timestamp': self.data['status']['summary']['ctime'],
                                          'block_name': 'ACU_commanded_positions_az',
@@ -476,67 +520,62 @@ class ACUAgent:
                                              }
                             self.agent.publish_to_feed('acu_commands_influx', acucommand_bs)
 
-            acustatus_summary = {'timestamp':
-                                 self.data['status']['summary']['ctime'],
-                                 'block_name': 'ACU_summary_output',
-                                 'data': self.data['status']['summary']
-                                 }
-            acustatus_axisfaults = {'timestamp': self.data['status']['summary']['ctime'],
-                                    'block_name': 'ACU_axis_faults',
-                                    'data': self.data['status']['axis_faults_errors_overages']
-                                    }
-            acustatus_poserrors = {'timestamp': self.data['status']['summary']['ctime'],
-                                   'block_name': 'ACU_position_errors',
-                                   'data': self.data['status']['position_errors']
-                                   }
-            acustatus_axislims = {'timestamp': self.data['status']['summary']['ctime'],
-                                  'block_name': 'ACU_axis_limits',
-                                  'data': self.data['status']['axis_limits']
-                                  }
-            acustatus_axiswarn = {'timestamp': self.data['status']['summary']['ctime'],
-                                  'block_name': 'ACU_axis_warnings',
-                                  'data': self.data['status']['axis_warnings']
-                                  }
-            acustatus_axisfail = {'timestamp': self.data['status']['summary']['ctime'],
-                                  'block_name': 'ACU_axis_failures',
-                                  'data': self.data['status']['axis_failures']
-                                  }
-            acustatus_axisstate = {'timestamp': self.data['status']['summary']['ctime'],
-                                   'block_name': 'ACU_axis_state',
-                                   'data': self.data['status']['axis_state']
-                                   }
-            acustatus_oscalarm = {'timestamp': self.data['status']['summary']['ctime'],
-                                  'block_name': 'ACU_oscillation_alarm',
-                                  'data': self.data['status']['osc_alarms']
-                                  }
-            acustatus_commands = {'timestamp': self.data['status']['summary']['ctime'],
-                                  'block_name': 'ACU_command_status',
-                                  'data': self.data['status']['commands']
-                                  }
-            acustatus_acufails = {'timestamp': self.data['status']['summary']['ctime'],
-                                  'block_name': 'ACU_general_errors',
-                                  'data': self.data['status']['ACU_failures_errors']
-                                  }
-            acustatus_platform = {'timestamp': self.data['status']['summary']['ctime'],
-                                  'block_name': 'ACU_platform_status',
-                                  'data': self.data['status']['platform_status']
-                                  }
-            acustatus_emergency = {'timestamp': self.data['status']['summary']['ctime'],
-                                   'block_name': 'ACU_emergency',
-                                   'data': self.data['status']['ACU_emergency']
-                                   }
-            acustatus_influx = {'timestamp':
-                                self.data['status']['summary']['ctime'],
-                                'block_name': 'ACU_status_INFLUX',
-                                'data': influx_status
-                                }
-            status_blocks = [acustatus_summary, acustatus_axisfaults, acustatus_poserrors,
-                             acustatus_axislims, acustatus_axiswarn, acustatus_axisfail,
-                             acustatus_axisstate, acustatus_oscalarm, acustatus_commands,
-                             acustatus_acufails, acustatus_platform, acustatus_emergency]
-            for block in status_blocks:
+            # Only keep blocks that have changed or have new data.
+            block_keys = list(new_influx_blocks.keys())
+            for k in block_keys:
+                if k not in influx_blocks:
+                    continue
+                B, N = influx_blocks[k], new_influx_blocks[k]
+                if N['timestamp'] - B['timestamp'] > MONITOR_MAX_TIME_DELTA:
+                    continue
+                if any([B['data'][_k] != _v for _k, _v in N['data'].items()]):
+                    continue
+                del new_influx_blocks[k]
+
+            for block in new_influx_blocks.values():
+                self.agent.publish_to_feed('acu_status_influx', block)
+            influx_blocks.update(new_influx_blocks)
+
+            # Assemble data for aggregator ...
+            new_blocks = {}
+            for block_name, data_key in [
+                    ('ACU_summary_output', 'summary'),
+                    ('ACU_axis_faults', 'axis_faults_errors_overages'),
+                    ('ACU_position_errors', 'position_errors'),
+                    ('ACU_axis_limits', 'axis_limits'),
+                    ('ACU_axis_warnings', 'axis_warnings'),
+                    ('ACU_axis_failures', 'axis_failures'),
+                    ('ACU_axis_state', 'axis_state'),
+                    ('ACU_oscillation_alarm', 'osc_alarms'),
+                    ('ACU_command_status', 'commands'),
+                    ('ACU_general_errors', 'ACU_failures_errors'),
+                    ('ACU_platform_status', 'platform_status'),
+                    ('ACU_emergency', 'ACU_emergency'),
+            ]:
+                new_blocks[block_name] = {
+                    'timestamp': self.data['status']['summary']['ctime'],
+                    'block_name': block_name,
+                    'data': self.data['status'][data_key],
+                }
+
+            # Only keep blocks that have changed or have new data.
+            block_keys = list(new_blocks.keys())
+            for k in block_keys:
+                if k == 'summary':  # always store these, as a sort of reference tick.
+                    continue
+                if k not in data_blocks:
+                    continue
+                B, N = data_blocks[k], new_blocks[k]
+                if N['timestamp'] - B['timestamp'] > MONITOR_MAX_TIME_DELTA:
+                    continue
+                if any([B['data'][_k] != _v for _k, _v in N['data'].items()]):
+                    continue
+                del new_blocks[k]
+
+            for block in new_blocks.values():
                 self.agent.publish_to_feed('acu_status', block)
-            self.agent.publish_to_feed('acu_status_influx', acustatus_influx, from_reactor=True)
+
+            data_blocks.update(new_blocks)
 
             prev_checkdata = {'ctime': self.data['status']['summary']['ctime'],
                               'Azimuth_mode': self.data['status']['summary']['Azimuth_mode'],
@@ -932,6 +971,53 @@ class ACUAgent:
             msg = 'Irregularity during motion!'
         return success, msg
 
+    @inlineCallbacks
+    def _go_to_axes(self, session, el=None, az=None, third=None):
+        """Execute a movement along multiple axes, using "Preset"
+        mode.  This just launches _go_to_axis on each required axis,
+        and collects the results.
+
+        Args:
+          session: session object variable of the parent operation.
+          az (float): target for Azimuth axis (ignored if None).
+          el (float): target for Elevation axis (ignored if None).
+          third (float): target for Boresight axis (ignored if None).
+
+        Returns:
+          ok (bool): True if all motions completed successfully and
+            arrived at target position.
+          msg (str): success/error message (combined from each target
+            axis).
+
+        """
+        move_defs = []
+        for axis_name, short_name, target in [
+                ('Azimuth', 'az', az),
+                ('Elevation', 'el', el),
+                ('Boresight', 'third', third),
+        ]:
+            if target is not None:
+                move_defs.append(
+                    (short_name, self._go_to_axis(session, axis_name, target)))
+        if len(move_defs) is None:
+            return True, 'No motion requested.'
+
+        moves = yield DeferredList([d for n, d in move_defs])
+        all_ok, msgs = True, []
+        for _ok, result in moves:
+            if _ok:
+                all_ok = all_ok and result[0]
+                msgs.append(result[1])
+            else:
+                all_ok = False
+                msgs.append(f'Crash! {result}')
+
+        if all_ok:
+            msg = msgs[0]
+        else:
+            msg = ' '.join([f'{n}: {msg}' for (n, d), msg in zip(move_defs, msgs)])
+        return all_ok, msg
+
     @ocs_agent.param('az', type=float)
     @ocs_agent.param('el', type=float)
     @ocs_agent.param('end_stop', default=False, type=bool)
@@ -971,24 +1057,7 @@ class ACUAgent:
             self.log.info(f'Commanded position: az={target_az}, el={target_el}')
             session.set_status('running')
 
-            moves = yield DeferredList([
-                self._go_to_axis(session, 'Azimuth', target_az),
-                self._go_to_axis(session, 'Elevation', target_el),
-            ])
-            all_ok, msgs = True, []
-            for _ok, result in moves:
-                if _ok:
-                    all_ok = all_ok and result[0]
-                    msgs.append(result[1])
-                else:
-                    all_ok = False
-                    msgs.append(f'Crash! {result}')
-
-            if all_ok:
-                msg = msgs[0]
-            else:
-                msg = f'az: {msgs[0]} el: {msgs[1]}'
-
+            all_ok, msg = yield self._go_to_axes(session, az=target_az, el=target_el)
             if all_ok and params['end_stop']:
                 yield self.acu_control.mode('Stop')
 
@@ -1034,6 +1103,39 @@ class ACUAgent:
                                                     'Set3rdAxisMode', 'Stop')
 
         return ok, msg
+
+    def _set_default_scan_params(self):
+        # A reference to scan_params is cached in monitor, so copy
+        # individual items rather than creating a new dict here.
+        for k, v in DEFAULT_SCAN_PARAMS[self.acu_config['platform']].items():
+            self.scan_params[k] = v
+
+    @ocs_agent.param('az_speed', type=float, default=None)
+    @ocs_agent.param('az_accel', type=float, default=None)
+    @ocs_agent.param('reset', default=False, type=bool)
+    @inlineCallbacks
+    def set_scan_params(self, session, params):
+        """set_scan_params(az_speed=None, az_accel=None, reset=False))
+
+        **Task** - Update the default scan parameters, used by
+        generate_scan if not passed explicitly.
+
+        Parameters:
+          az_speed (float, optional): The azimuth scan speed.
+          az_accel (float, optional): The (average) azimuth
+            acceleration at turn-around.
+          reset (bool, optional): If True, reset all params to default
+            values before applying any updates passed explicitly here.
+
+        """
+        if params['reset']:
+            self._set_default_scan_params()
+        for k in ['az_speed', 'az_accel']:
+            if params[k] is not None:
+                self.scan_params[k] = params[k]
+        self.log.info('Updated default scan params to {sp}', sp=self.scan_params)
+        yield
+        return True, 'Done'
 
     @inlineCallbacks
     def clear_faults(self, session, params):
@@ -1173,8 +1275,8 @@ class ACUAgent:
 
     @ocs_agent.param('az_endpoint1', type=float)
     @ocs_agent.param('az_endpoint2', type=float)
-    @ocs_agent.param('az_speed', type=float)
-    @ocs_agent.param('az_accel', type=float)
+    @ocs_agent.param('az_speed', type=float, default=None)
+    @ocs_agent.param('az_accel', type=float, default=None)
     @ocs_agent.param('el_endpoint1', type=float, default=None)
     @ocs_agent.param('el_endpoint2', type=float, default=None)
     @ocs_agent.param('el_speed', type=float, default=0.)
@@ -1190,7 +1292,7 @@ class ACUAgent:
     @inlineCallbacks
     def generate_scan(self, session, params):
         """generate_scan(az_endpoint1, az_endpoint2, \
-                         az_speed, az_accel, \
+                         az_speed=None, az_accel=None, \
                          el_endpoint1=None, el_endpoint2=None, \
                          el_speed=None, \
                          num_scans=None, start_time=None, \
@@ -1243,19 +1345,42 @@ class ACUAgent:
                 track manager will try to use as short a time as is
                 reasonable.
 
+        Notes:
+          Note that all parameters are optional except for
+          az_endpoint1 and az_endpoint2.  If only those two parameters
+          are passed, the Process will scan between those endpoints,
+          with the elevation axis held in Stop, indefinitely (until
+          Process .stop method is called)..
+
         """
-        az_endpoint1 = params.get('az_endpoint1')
-        az_endpoint2 = params.get('az_endpoint2')
-        az_speed = params.get('az_speed')
-        az_accel = params.get('az_accel')
-        el_endpoint1 = params.get('el_endpoint1')
+        az_endpoint1 = params['az_endpoint1']
+        az_endpoint2 = params['az_endpoint2']
+        el_endpoint1 = params['el_endpoint1']
+        el_endpoint2 = params['el_endpoint2']
+
+        # Params with defaults configured ...
+        az_speed = params['az_speed']
+        az_accel = params['az_accel']
+        if az_speed is None:
+            az_speed = self.scan_params['az_speed']
+        if az_accel is None:
+            az_accel = self.scan_params['az_accel']
+
+        # If el is not specified, drop in the current elevation.
+        init_el = None
+        if el_endpoint1 is None:
+            el_endpoint1 = self.data['status']['summary']['Elevation_current_position']
+        else:
+            init_el = el_endpoint1
+        if el_endpoint2 is None:
+            el_endpoint2 = el_endpoint1
+
         azonly = params.get('az_only', True)
         scan_upload_len = params.get('scan_upload_length')
         scan_params = {k: params.get(k) for k in [
             'num_scans', 'num_batches', 'start_time',
             'wait_to_start', 'step_time', 'batch_size', 'az_start']
             if params.get(k) is not None}
-        el_endpoint2 = params.get('el_endpoint2', el_endpoint1)
         el_speed = params.get('el_speed', 0.0)
 
         plan = sh.plan_scan(az_endpoint1, az_endpoint2,
@@ -1281,8 +1406,8 @@ class ACUAgent:
             return False, msg
 
         # Seek to starting position
-        self.log.info(f'Moving to start position, az={plan["init_az"]}')
-        ok, msg = yield self._go_to_axis(session, 'Azimuth', plan['init_az'])
+        self.log.info(f'Moving to start position, az={plan["init_az"]}, el={init_el}')
+        ok, msg = yield self._go_to_axes(session, az=plan['init_az'], el=init_el)
         if not ok:
             return False, f'Start position seek failed with message: {msg}'
 
@@ -1358,7 +1483,7 @@ class ACUAgent:
             yield dsleep(0.5)
 
             # Values for mode are:
-            # - 'go' -- keep uploading points until trajectory is complete
+            # - 'go' -- keep uploading points (unless there are no more to upload).
             # - 'stop' -- do not request more points from generator; finish the ones you have.
             # - 'abort' -- do not upload more points; exit loop and clear stack.
             mode = 'go'
@@ -1390,18 +1515,27 @@ class ACUAgent:
                 if mode == 'abort':
                     lines = []
 
-                while mode == 'go' and len(lines) < 100:
-                    try:
-                        lines.extend(next(point_gen))
-                    except StopIteration:
-                        mode = 'stop'
+                # Is it time to upload more lines?
+                if free_positions >= STACK_REFILL_THRESHOLD:
+                    new_line_target = max(int(free_positions - STACK_TARGET), 1)
 
-                if len(lines) and free_positions >= STACK_REFILL_THRESHOLD:
+                    while mode == 'go' and (len(lines) < new_line_target or lines[-1][0] != 0):
+                        try:
+                            lines.extend(next(point_gen))
+                        except StopIteration:
+                            mode = 'stop'
 
-                    group_size = max(int(free_positions - STACK_TARGET), 1)
-                    lines, upload_lines = lines[group_size:], lines[:group_size]
-                    text = ''.join(upload_lines)
-                    yield self.acu_control.http.UploadPtStack(text)
+                    # Grab the minimum batch
+                    upload_lines, lines = lines[:new_line_target], lines[new_line_target:]
+
+                    # If the last line has a "group" flag, keep transferring lines.
+                    while len(lines) and len(upload_lines) and upload_lines[-1][0] != 0:
+                        upload_lines.append(lines.pop(0))
+
+                    if len(upload_lines):
+                        # Discard the group flag and upload all.
+                        text = ''.join([line for _flag, line in upload_lines])
+                        yield self.acu_control.http.UploadPtStack(text)
 
                 if len(lines) == 0 and free_positions >= FULL_STACK - 1:
                     break
@@ -1468,7 +1602,7 @@ class ACUAgent:
         _publish_error(0)
 
         target_instance_id = self.agent.agent_address.split('.')[-1]
-        exercisor.set_client(target_instance_id)
+        exercisor.set_client(target_instance_id, self.agent.site_args)
         settings = super_plan.get('settings', {})
 
         plan_idx = 0
@@ -1523,7 +1657,7 @@ class ACUAgent:
 
             plan, info = next(active_plan['iter'])
 
-            self.log.info(f'Launching next scan. plan={plan}')
+            self.log.info('Launching next scan. plan={plan}', plan=plan)
 
             _publish_activity(active_plan['driver'].code)
             ok = None
