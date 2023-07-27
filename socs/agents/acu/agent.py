@@ -334,7 +334,8 @@ class ACUAgent:
         # Automatic exercise program...
         if exercise_plan:
             agent.register_process(
-                'exercise', self.exercise, self._simple_process_stop)
+                'exercise', self.exercise, self._simple_process_stop,
+                stopper_blocking=False)
             # Use longer default frame length ... very low volume feed.
             self.agent.register_feed('activity',
                                      record=True,
@@ -2785,7 +2786,7 @@ class ACUAgent:
         _publish_error(0)
 
         target_instance_id = self.agent.agent_address.split('.')[-1]
-        exercisor.set_client(target_instance_id)
+        exercisor.set_client(target_instance_id, self.agent.site_args)
         settings = super_plan.get('settings', {})
 
         plan_idx = 0
@@ -2840,7 +2841,7 @@ class ACUAgent:
 
             plan, info = next(active_plan['iter'])
 
-            self.log.info(f'Launching next scan. plan={plan}')
+            self.log.info('Launching next scan. plan={plan}', plan=plan)
 
             _publish_activity(active_plan['driver'].code)
             ok = None
