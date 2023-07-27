@@ -8,6 +8,10 @@ import numpy as np
 #: The number of seconds in a day.
 DAY = 86400
 
+#: Minimum number of points to group together on the start of a new
+# leg, to not trigger programtrack error.
+MIN_GROUP_NEW_LEG = 4
+
 
 def constant_velocity_scanpoints(azpts, el, azvel, acc, ntimes):
     """
@@ -129,9 +133,8 @@ def from_file(filename):
 
 
 def ptstack_format(conctimes, concaz, concel, concva, concve, az_flags,
-                   el_flags, start_offset=0, absolute=False):
-    """
-    Produces a list of lines in the format necessary to upload to the ACU
+                   el_flags, group_flag=None, start_offset=0, absolute=False):
+    """Produces a list of lines in the format necessary to upload to the ACU
     to complete a scan. Params are the outputs of from_file,
     constant_velocity_scanpoints, or generate_constant_velocity_scan.
 
@@ -146,6 +149,9 @@ def ptstack_format(conctimes, concaz, concel, concva, concve, az_flags,
             conctimes
         el_flags (list): Flags associated with elevation motions at
             conctimes
+        group_flag (list): If not None, must be a list drawn from [0,
+            1] where 1 indicates that the point should not be uploaded
+            unless the subsequent point is also immediately uploaded.
         start_offset (float): Offset, in seconds, to apply to all
             timestamps.
         absolute (bool): If true, timestamps are taken at face value,
@@ -154,7 +160,10 @@ def ptstack_format(conctimes, concaz, concel, concva, concve, az_flags,
             is 0, then you will need to also pass start_offset > 0).
 
     Returns:
-        list: Lines in the correct format to upload to the ACU
+        list: Lines in the correct format to upload to the ACU.  If
+        group_flag was included, then each upload line is returned as
+        a tuple (group_flag, line_text).
+
     """
 
     fmt = '%j, %H:%M:%S'
@@ -170,6 +179,9 @@ def ptstack_format(conctimes, concaz, concel, concva, concve, az_flags,
                                 el=concel[n], azvel=concva[n], elvel=concve[n],
                                 azflag=az_flags[n], elflag=el_flags[n]))
                  for n in range(len(fmt_times))]
+
+    if group_flag is not None:
+        all_lines = [(i, line) for i, line in zip(group_flag, all_lines)]
 
     return all_lines
 
@@ -316,10 +328,12 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
     def check_num_scans():
         return num_scans is None or num_scans > 0
 
+    point_group_batch = 0
+
     i = 0
     while i < stop_iter and check_num_scans():
         i += 1
-        point_block = [[], [], [], [], [], [], []]
+        point_block = [[], [], [], [], [], [], [], []]
         for j in range(batch_size):
             point_block[0].append(t + t0)
             point_block[1].append(az)
@@ -328,7 +342,11 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
             point_block[4].append(el_vel)
             point_block[5].append(az_flag)
             point_block[6].append(el_flag)
+            point_block[7].append(int(point_group_batch > 0))
+
             t += step_time
+            if point_group_batch > 0:
+                point_group_batch -= 1
 
             if increasing:
                 if az <= (az_max - 2 * daz):
@@ -346,6 +364,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                     el_flag = 0
                     increasing = False
                     dec_num_scans()
+                    point_group_batch = MIN_GROUP_NEW_LEG - 1
                 else:
                     az_remaining = az_max - az
                     time_remaining = az_remaining / az_speed
@@ -372,6 +391,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                     el_flag = 0
                     increasing = True
                     dec_num_scans()
+                    point_group_batch = MIN_GROUP_NEW_LEG - 1
                 else:
                     az_remaining = az - az_min
                     time_remaining = az_remaining / az_speed
@@ -386,7 +406,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
             if not check_num_scans():
                 # Kill the velocity on the last point and exit -- this
                 # was recommended at LAT FAT for smoothly stopping the
-                # motino at end of program.
+                # motion at end of program.
                 point_block[3][-1] = 0
                 point_block[4][-1] = 0
                 break
@@ -395,12 +415,10 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
             yield ptstack_format(point_block[0], point_block[1],
                                  point_block[2], point_block[3],
                                  point_block[4], point_block[5],
-                                 point_block[6],
+                                 point_block[6], point_block[7],
                                  start_offset=3, absolute=True)
         else:
-            yield (point_block[0], point_block[1], point_block[2],
-                   point_block[3], point_block[4], point_block[5],
-                   point_block[6])
+            yield tuple(point_block)
 
 
 def plan_scan(az_end1, az_end2, el, v_az=1, a_az=1, az_start=None):
