@@ -8,55 +8,92 @@ import time
 import numpy as np
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
+from typing import Optional
 
 import socs.agents.hwp_gripper.drivers.gripper_client as cli
-import socs.agents.hwp_gripper.drivers.gripper_collector as col
 from socs.agents.hwp_supervisor.agent import get_op_data
 
 
 class GripperAgent:
-    """Agent for controlling/monitoring the HWP's three LEY32C-30 linear actuators.
-    Functions include issuing movement commands, monitoring actuator positions, and
-    handling limit switch activation
+    """
+    Agent for controlling/monitoring the HWP's three LEY32C-30 linear actuators.
+    This interfaces with the GripperServer running on the beaglebone
+    microcontroller (https://github.com/simonsobs/sobonelib/blob/main/hwp_gripper/control/gripper_server.py).
+
+    This agent will issue commands to the microcontroller via OCS, and publish
+    gripper position and limit switch states to grafana.
 
     Args:
-        mcu_ip (string): IP of the Beaglebone mircocontroller running adjacent code
-        pru_port (int): Port for pru packet communication arbitrary* but needs to be
-            changed in beaglebone code as well
-        control_port (int): Port for control commands sent to the Beaglebone. Arbitrary
-        supervisor_id (str): ID of HWP supervisor
-        no_data_timeout (float): Time (in seconds) to wait between receiving
-            'no_data' actions from the supervisor and triggering a shutdown
-        limit_pos (arr, float): Expected physical position of the limit switches in mm.
-            [Actuator 1 Cold, Actuator 1 Warm, Actuator 2, Cold, Actuator 2 Warm,
-             Actuator 3 Cold, Actuator 3 Warm]
+        mcu_ip (string):
+            IP of the Beaglebone microcontroller running adjacent code
+        control_port (int):
+            Port for control commands sent to the Beaglebone.
+        supervisor_id (str):
+            ID of HWP supervisor
+        no_data_timeout (float):
+            Time (in seconds) to wait between receiving 'no_data' actions from
+            the supervisor and triggering a shutdown
     """
-
-    def __init__(self, agent, mcu_ip, pru_port, control_port,
-                 supervisor_id=None, no_data_timeout=30 * 60):
+    def __init__(self, agent, mcu_ip, control_port, supervisor_id=None,
+                 no_data_timeout=30 * 60):
         self.agent = agent
         self.log = agent.log
-        self.lock = TimeoutLock()
+        self.client_lock = TimeoutLock()
 
         self._initialized = False
         self.mcu_ip = mcu_ip
-        self.pru_port = pru_port
         self.control_port = control_port
 
         self.shutdown_mode = False
         self.supervisor_id = supervisor_id
         self.no_data_timeout = no_data_timeout
 
-        self.client = None
+        self._gripper_state = None
+
+        self.client : Optional[cli.GripperClient] = None
 
         agg_params = {'frame_length': 60}
-        self.agent.register_feed('hwpgripper', record=True, agg_params=agg_params)
+        self.agent.register_feed('hwp_gripper', record=True, agg_params=agg_params)
         self.agent.register_feed('gripper_action', record=True)
+    
+    def _run_client_func(self, func, *args, lock_timeout=2, 
+                         job=None, check_shutdown=True, **kwargs):
+        if self.shutdown_mode and check_shutdown:
+            raise RuntimeError(
+                'Cannot run client function, shutdown mode is in effect'
+            )
+
+        lock_kw = {'timeout': lock_timeout}
+        if job is not None:
+            lock_kw['job'] = job
+        with self.client_lock.acquire_timeout(**lock_kw) as acquired:
+            if not acquired:
+                self.log.error(
+                    f"Could not acquire lock! Job {self.client_lock.job} is "
+                     "already running."
+                )
+                raise TimeoutError('Could not acquire lock')
+            
+            return_dict = func(*args, **kwargs)
+
+        for line in return_dict['log']:
+            self.log.info(line)
+
+        return return_dict
+    
+    def _get_hwp_freq(self):
+        if self.supervisor_id is None:
+            raise ValueError("No Supervisor ID set")
+        
+        res = get_op_data(self.supervisor_id, 'monitor')
+        return res['data']['hwp_state']['pid_current_freq']
 
     @ocs_agent.param('auto_acquire', default=True, type=bool)
     def init_connection(self, session, params):
         """init_connection(auto_acquire=False)
-        **Task** - Initialize connection to the Beaglebone microcontroller
+
+        **Task** - Initialize connection to the GripperServer on the BeagleBone
+        micro-controller
 
         Parameters:
             auto_acquire (bool, optional): Default is True. Starts data acquisition
@@ -78,81 +115,71 @@ class GripperAgent:
 
     @ocs_agent.param('state', default=True, type=bool)
     def power(self, session, params=None):
-        """power(state = True)
-        **Task** - Turns on/off power to the linear actuators. If brakes are on/off, turn them off/on
+        """power(state=True)
+
+        **Task** - If turning on, will power on the linear and disengage brakes.
+        If turning off, will cut power to the linear actuators and engage
+        brakes.
 
         Parameters:
             state (bool): State to set the actuator power to. Takes bool input
         """
-        with self.lock.acquire_timeout(0, job='power') as acquired:
-            if not acquired:
-                self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
-                return False, 'Could not acquire lock'
-
-            if self.shutdown_mode:
-                return False, 'Shutdown mode is in effect'
-
-            return_dict = self.client.POWER(params['state'])
-            [self.log.info(line) for line in return_dict['log']]
-
-            return return_dict['result'], f"Success: {return_dict['result']}"
+        return_dict = self._run_client_func(
+            self.client.power, params['state'], job='power'
+        )
+        session.data['response'] = return_dict
+        return return_dict['result'], f"Success: {return_dict['result']}"
 
     @ocs_agent.param('state', default=True, type=bool)
     @ocs_agent.param('actuator', default=0, type=int, check=lambda x: 0 <= x <= 3)
     def brake(self, session, params=None):
-        """brake(state = True, actuator = 0)
+        """brake(state=True, actuator=0)
+
         **Task** - Controls actuator brakes
 
         Parameters:
-            state (bool): State to set the actuator brake to. Takes bool input
-            actuator (int): Actuator number. Takes input of 0-3 with 1-3 controlling
-                and individual actuator and 0 controlling all three
+            state (bool):
+                State to set the actuator brake to. Takes bool input
+            actuator (int):
+                Actuator number. Takes input of 0-3 with 1-3 controlling and
+                individual actuator and 0 controlling all three
         """
-        with self.lock.acquire_timeout(0, job='brake') as acquired:
-            if not acquired:
-                self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
-                return False, 'Could not acquire lock'
-
-            if self.shutdown_mode:
-                return False, 'Shutdown mode is in effect'
-
-            return_dict = self.client.BRAKE(params['state'], params['actuator'])
-            [self.log.info(line) for line in return_dict['log']]
-
-            return return_dict['result'], f"Success: {return_dict['result']}"
+        return_dict = self._run_client_func(
+            self.client.brake, params['state'], params['actuator'], job='brake'
+        )
+        session.data['response'] = return_dict
+        return return_dict['result'], f"Success: {return_dict['result']}"
 
     @ocs_agent.param('mode', default='push', type=str, choices=['push', 'pos'])
     @ocs_agent.param('actuator', default=1, type=int, check=lambda x: 1 <= x <= 3)
     @ocs_agent.param('distance', default=0, type=float, check=lambda x: -10. <= x <= 10.)
     def move(self, session, params=None):
-        """move(mode = 'pos', actuator = 1, distance = 1.3)
+        """move(mode='pos', actuator=1, distance=1.3)
+
         **Task** - Move an actuator a specific distance
 
         Parameters:
-            mode (str): Movement mode. Takes inputs of 'pos' (positioning) or
-                'push' (pushing)
-            actuator (int): Actuator number 1-3
-            distance (float): Distance to move. Takes positive and negative numbers
-                for 'pos' mode. Takes only positive numbers for 'push' mode. Value
-                should be a multiple of 0.1
+            mode (str):
+                Movement mode. Takes inputs of 'pos' (positioning) or 'push'
+                (pushing)
+            actuator (int):
+                Actuator number 1-3
+            distance (float):
+                Distance to move (mm). Takes positive and negative numbers for
+                'pos' mode. Takes only positive numbers for 'push' mode. Value
+                should be a multiple of 0.1.
 
         Notes:
             Positioning mode is used when you want to position the actuators without
             gripping the rotor. Pushing mode is used when you want the grip the
             rotor.
         """
-        with self.lock.acquire_timeout(0, job='move') as acquired:
-            if not acquired:
-                self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
-                return False, 'Could not acquire lock'
-
-            if self.shutdown_mode:
-                return False, 'Shutdown mode is in effect'
-
-            return_dict = self.client.MOVE(params['mode'], params['actuator'], params['distance'])
-            [self.log.info(line) for line in return_dict['log']]
-
-            return return_dict['result'], f"Success: {return_dict['result']}"
+        return_dict = self._run_client_func(
+            self.client.move, params['mode'], params['actuator'],
+            params['distance'], job='move'
+        )
+        session.data['response'] = return_dict
+        return return_dict['result'], f"Success: {return_dict['result']}"
 
     def home(self, session, params=None):
         """home()
@@ -162,82 +189,58 @@ class GripperAgent:
             This action much be done first after a power cycle. Otherwise the
             controller will throw an error.
         """
-        with self.lock.acquire_timeout(0, job='home') as acquired:
-            if not acquired:
-                self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
-                return False, 'Could not acquire lock'
-
-            if self.shutdown_mode:
-                return False, 'Shutdown mode is in effect'
-
-            return_dict = self.client.HOME()
-            [self.log.info(line) for line in return_dict['log']]
-
-            return return_dict['result'], f"Success: {return_dict['result']}"
+        return_dict = self._run_client_func(self.client.home, job='home')
+        session.data['response'] = return_dict
+        return return_dict['result'], f"Success: {return_dict['result']}"
 
     def inp(self, session, params=None):
         """inp()
-        **Task** - Queries whether the actuators are in a known position
+
+        **Task** - Queries whether the actuators are in a known position. This
+        tells you whether the windows software has detected that the actuator
+        has been homed.
         """
-        with self.lock.acquire_timeout(0, job='inp') as acquired:
-            if not acquired:
-                self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
-                return False, 'Could not acquire lock'
-
-            return_dict = self.client.INP()
-            [self.log.info(line) for line in return_dict['log']]
-
-            return return_dict['result'], f"Success: {return_dict['result']}"
+        return_dict = self._run_client_func(
+            self.client.inp, job='INP', check_shutdown=False)
+        session.data['response'] = return_dict
+        return return_dict['result'], f"Success: {return_dict['result']}"
 
     def alarm(self, session, params=None):
         """alarm()
+
         **Task** - Queries the actuator controller alarm state
         """
-        with self.lock.acquire_timeout(0, job='alarm') as acquired:
-            if not acquired:
-                self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
-                return False, 'Could not acquire lock'
-
-            return_dict = self.client.ALARM()
-            [self.log.info(line) for line in return_dict['log']]
-
-            return return_dict['result'], f"Success: {return_dict['result']}"
+        return_dict = self._run_client_func(
+            self.client.alarm, job='alarm', check_shutdown=False)
+        session.data['response'] = return_dict
+        return return_dict['result'], f"Success: {return_dict['result']}"
 
     def reset(self, session, params=None):
         """reset()
         **Task** - Resets the current active controller alarm
         """
-        with self.lock.acquire_timeout(0, job='reset') as acquired:
-            if not acquired:
-                self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
-                return False, 'Could not acquire lock'
-
-            return_dict = self.client.RESET()
-            [self.log.info(line) for line in return_dict['log']]
-
-            return return_dict['result'], f"Success: {return_dict['result']}"
+        return_dict = self._run_client_func(self.client.reset, job='reset')
+        session.data['response'] = return_dict
+        return return_dict['result'], f"Success: {return_dict['result']}"
 
     @ocs_agent.param('actuator', default=1, type=int, check=lambda x: 1 <= x <= 3)
     def act(self, session, params=None):
-        """act(actuator = 1)
+        """act(actuator=1)
+
         **Task** - Queries whether an actuator is connected
 
         Parameters:
             actuator (int): Actuator number 1-3
         """
-        with self.lock.acquire_timeout(0, job='act') as acquired:
-            if not acquired:
-                self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
-                return False, 'Could not acquire lock'
+        return_dict = self._run_client_func(
+            self.client.act, params['actuator'], job='act', check_shutdown=False)
+        session.data['response'] = return_dict
+        return return_dict['result'], f"Success: {return_dict['result']}"
 
-            return_dict = self.client.ACT(params['actuator'])
-            [self.log.info(line) for line in return_dict['log']]
-
-            return return_dict['result'], f"Success: {return_dict['result']}"
-
-    @ocs_agent.param('value', default=False, type=bool)
+    @ocs_agent.param('value', type=bool)
     def is_cold(self, session, params=None):
-        """is_cold(value = False)
+        """is_cold(value=False)
+
         **Task** - Set the code to operate in warm/cold grip configuration
 
         Parameters:
@@ -247,20 +250,16 @@ class GripperAgent:
             Configures the software to query the correct set of limit switches. The
             maximum extension of the actuators depends on the cryostat temperature.
         """
-        with self.lock.acquire_timeout(0, job='is_cold') as acquired:
-            if not acquired:
-                self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
-                return False, 'Could not acquire lock'
-
-            return_dict = self.client.IS_COLD(params['value'])
-            [self.log.info(line) for line in return_dict['log']]
-
-            return return_dict['result'], f"Success: {return_dict['result']}"
+        return_dict = self._run_client_func(
+            self.client.is_cold, params['value'], job='is_cold')
+        session.data['response'] = return_dict
+        return return_dict['result'], f"Success: {return_dict['result']}"
 
     @ocs_agent.param('value', default=False, type=bool)
     def force(self, session, params=None):
-        """force(value = False)
-        **Tast** - Set the code to ignore limit switch information
+        """force(value=False)
+
+        **Task** - Set the code to ignore limit switch information
 
         Parameters:
             value (bool): Use limit switch information (False) or ignore limit
@@ -272,47 +271,29 @@ class GripperAgent:
             called to forcibly move the actuators even with a limit switch
             trigger.
         """
-        with self.lock.acquire_timeout(0, job='force') as acquired:
-            if not acquired:
-                self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
-                return False, 'Could not acquire lock'
-
-            return_dict = self.client.FORCE(params['value'])
-            [self.log.info(line) for line in return_dict['log']]
-
-            return return_dict['result'], f"Success: {return_dict['result']}"
-
-    def limit_state(self, session, params=None):
-        with self.lock.acquire_timeout(0, job='limit_state') as acquired:
-            if not acquired:
-                self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
-                return False, 'Could not acquire lock'
-
-            return_dict = self.client.LIMIT()
-            [self.log.info(line) for line in return_dict['log']]
-
-            return return_dict['result'], f"Success: {return_dict['result']}"
-
-    def position(self, session, params=None):
-        with self.lock.acquire_timeout(0, job='position') as acquired:
-            if not acquired:
-                self.log.warn('Could not perform action because {} is already running'.format(self.lock.job))
-                return False, 'Could not acquire lock'
-
-            return_dict = self.client.POSITION()
-            [self.log.info(line) for line in return_dict['log']]
-
-            return return_dict['result'], f"Success: {return_dict['result']}"
-
+        return_dict = self._run_client_func(
+            self.client.force, params['value'], job='force')
+        session.data['response'] = return_dict
+        return return_dict['result'], f"Success: {return_dict['result']}"
+    
     def shutdown(self, session, params=None):
         """shutdown()
-        **Task** - Series of commands executed during a shutdown
+        **Task** - Series of commands executed during a shutdown.
+        This will return grippers to their home position, then move them each
+        inwards incrementally.
 
         Notes:
             This function is called once a shutdown trigger has been given.
         """
-        self.log.warn('INITIATING SHUTDOWN')
 
+        # First check if the HWP is actually stopped
+        hwp_freq = self._get_hwp_freq()
+        if hwp_freq > 0.05:
+            raise RuntimeError("HWP is not stopped! Not performing shutdown")
+        
+        self.shutdown_mode = True
+
+        self.log.warn('INITIATING SHUTDOWN')
         with self.lock.acquire_timeout(10, job='shutdown') as acquired:
             if not acquired:
                 self.log.error('Could not acquire lock for shutdown')
@@ -322,97 +303,95 @@ class GripperAgent:
 
             time.sleep(5 * 60)
 
-            self.log.info(self.client.POWER(True))
+            self.log.info(self.client.power(True))
             time.sleep(1)
 
-            self.log.info(self.client.BRAKE(False))
+            self.log.info(self.client.brake(False))
             time.sleep(1)
 
-            self.log.info(self.client.HOME())
+            self.log.info(self.client.home())
             time.sleep(15)
 
-            for actuator in (1 + np.arange(3) % 3):
-                self.log.info(self.client.MOVE('POS', actuator, 10))
+            for actuator in [1, 2, 3]:
+                self.log.info(self.client.move('POS', actuator, 10))
                 time.sleep(5)
 
-            for actuator in (1 + np.arange(12) % 3):
-                self.log.info(self.client.MOVE('POS', actuator, 1))
+            for _ in range(4):
+                for actuator in [1, 2, 3]:
+                    self.log.info(self.client.move('POS', actuator, 1))
+                    time.sleep(3)
+
+                    self.log.info(self.client.reset())
+                    time.sleep(0.5)
+
+            for actuator in [1, 2, 3]:
+                self.log.info(self.client.move('POS', actuator, -1))
                 time.sleep(3)
 
-                self.log.info(self.client.RESET())
-                time.sleep(0.5)
-
-            for actuator in (1 + np.arange(3) % 3):
-                self.log.info(self.client.MOVE('POS', actuator, -1))
-                time.sleep(3)
-
-            self.log.info(self.client.BRAKE(True))
+            self.log.info(self.client.brake(True))
             time.sleep(1)
 
-            self.log.info(self.client.POWER(False))
+            self.log.info(self.client.power(False))
             time.sleep(1)
 
         return True, 'Shutdown completed'
 
-    def rev_shutdown(self, session, params=None):
-        """rev_shutdown()
+    def cancel_shutdown(self, session, params=None):
+        """cancel_shutdown()
         **Task** - Take the gripper agent out of shutdown mode
         """
         self.shutdown_mode = False
-        return True, 'Reversed shutdown mode'
+        return True, 'Cancelled shutdown mode'
+    
+    def monitor_state(self, session, params=None):
+        """monitor_state()
 
-    def acq(self, session, params=None):
-        """acq()
-        **Process** - Publishes gripper positions
-
-        Notes:
-            The most recent data collected  is stored in session data in the
-            structure::
-
-                >>> responce.session['data']
-                {'act1_a': 0,
-                 'act1_b': 0,
-                 'act2_a': 0,
-                 'act2_b': 0,
-                 'act3_a': 0,
-                 'act3_b': 0,
-                 'last_updated': 1649085992.719602}
+        **Process** - Process to monitor the gripper state
         """
         session.set_status('running')
+        sleep_time = 5
 
-        self._run_acq = True
-        while self._run_acq:
-            data = {'timestamp': time.time(),
-                    'block_name': 'HWPGripper_POS', 'data': {}}
+        while session.status in ['starting', 'running']:
+            return_dict = self._run_client_func(
+                self.client.get_state, job='get_state', check_shutdown=False
+            )
+            now = time.time()
 
-            # NEEDS TO BE UPDATED
-            # cur_pos = self._get_pos()
-            cur_pos = [0, 0, 0, 0, 0, 0]
+            # Dict of the 'GripperState' class from the pru_monitor
+            state = return_dict['result']
+            data = {
+                'last_packet_received': state['last_packet_received']
+            }
+            for act in state['actuators']:
+                axis = act['axis']
+                data.update({
+                    f'act{axis}_pos': act['pos'],
+                    f'act{axis}_calibrated': act['calibrated'],
+                    f'act{axis}_limit_cold_grip_state': act['limits']['cold_grip']['state'],
+                    f'act{axis}_limit_warm_grip_state': act['limits']['warm_grip']['state'],
+                })
+            
+            session.data = {
+                'state': data,
+                'last_updated': now,
+            }
+            _data = {
+                'block_name': 'gripper_state',
+                'timestamp': now,
+                'data': data,
+            }
+            self.agent.publish_to_feed('hwp_gripper', _data)
+            time.sleep(sleep_time)
 
-            data['data']['act1_a'] = cur_pos[0]
-            data['data']['act1_b'] = cur_pos[1]
-            data['data']['act2_a'] = cur_pos[2]
-            data['data']['act2_b'] = cur_pos[3]
-            data['data']['act3_a'] = cur_pos[4]
-            data['data']['act3_b'] = cur_pos[5]
-
-            self.agent.publish_to_feed('hwpgripper', data)
-
-            session.data = {'act1_a': cur_pos[0],
-                            'act1_b': cur_pos[1],
-                            'act2_a': cur_pos[2],
-                            'act2_b': cur_pos[3],
-                            'act3_a': cur_pos[4],
-                            'act3_b': cur_pos[5],
-                            'last_updated': time.time()}
-
-            time.sleep(1)
-
-        self.agent.feeds['hwpgripper'].flush_buffer()
+    def _stop_monitor_state(self, session, params=None):
         session.set_status('stopping')
-        return True, 'Aquisition exited cleanly'
+        return True, "Requesting monitor_state process to stop"
 
-    def monitor(self, session, params=None):
+    def _stop_monitor_supervisor(self, session, params=None):
+        session.set_status('stopping')
+        return True, "Requesting monitor_supervisor process to stop"
+
+    def monitor_supervisor(self, session, params=None):
         """monitor()
         **Process** - Monitor the shutdown of the agent
         """
@@ -466,21 +445,9 @@ class GripperAgent:
         session.set_status('stopping')
         return True, 'Gripper monitor exited cleanly'
 
-    def _stop_acq(self, session, params=None):
-        """
-        Stop acq process
-        """
-        if self._run_acq:
-            self._run_acq = False
-        return True, 'Stopping gripper acquisition'
-
-    def _stop_monitor(self, session, params=None):
-        """
-        Stop monitor process
-        """
-        if self._run_monitor:
-            self._run_monitor = False
-        return True, 'Stopping monitor'
+    def _stop_monitor_supervisor(self, session, params=None):
+        session.set_status('stopping')
+        return True, "Requesting monitor_supervisor process to stop"
 
 
 def make_parser(parser=None):
@@ -490,8 +457,6 @@ def make_parser(parser=None):
     pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--mcu_ip', type=str,
                         help='IP of Gripper Beaglebone')
-    pgroup.add_argument('--pru_port', type=int, default=8040,
-                        help='Arbitrary port for actuator encoders')
     pgroup.add_argument('--control_port', type=int, default=8041,
                         help='Arbitrary port for actuator control')
     pgroup.add_argument('--supervisor-id', type=str,
@@ -518,8 +483,10 @@ def main(args=None):
                                  no_data_timeout=args.no_data_timeout)
     agent.register_process('acq', gripper_agent.acq,
                            gripper_agent._stop_acq)
-    agent.register_process('monitor', gripper_agent.monitor,
-                           gripper_agent._stop_monitor)
+    agent.register_process('monitor_state', gripper_agent.monitor_state,
+                           gripper_agent._stop_monitor_state)
+    agent.register_process('monitor_supervisor', gripper_agent.monitor_state,
+                           gripper_agent._stop_monitor_supervisor)
     agent.register_task('init_connection', gripper_agent.init_connection,
                         startup=init_params)
     agent.register_task('power', gripper_agent.power)
@@ -532,10 +499,8 @@ def main(args=None):
     agent.register_task('act', gripper_agent.act)
     agent.register_task('is_cold', gripper_agent.is_cold)
     agent.register_task('force', gripper_agent.force)
-    agent.register_task('limit_state', gripper_agent.limit_state)
-    agent.register_task('position', gripper_agent.position)
     agent.register_task('shutdown', gripper_agent.shutdown)
-    agent.register_task('rev_shutdown', gripper_agent.rev_shutdown)
+    agent.register_task('cancel_shutdown', gripper_agent.cancel_shutdown)
 
     runner.run(agent, auto_reconnect=True)
 
