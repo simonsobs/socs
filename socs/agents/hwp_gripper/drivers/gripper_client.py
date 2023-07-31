@@ -13,7 +13,7 @@ class GripperClient(object):
 
         self.data = b''
 
-    def POWER(self, state):
+    def power(self, state):
         if not isinstance(state, bool):
             return False
 
@@ -22,10 +22,10 @@ class GripperClient(object):
         else:
             return self.send_command('OFF')
 
-    def HOME(self):
+    def home(self):
         return self.send_command('HOME')
 
-    def MOVE(self, mode, actuator, distance):
+    def move(self, mode, actuator, distance):
         if not isinstance(mode, str):
             return False
         elif mode.upper() not in ['POS', 'PUSH']:
@@ -39,7 +39,7 @@ class GripperClient(object):
 
         return self.send_command('MOVE ' + mode + ' ' + str(actuator) + ' ' + str(distance))
 
-    def BRAKE(self, state, actuator=0):
+    def brake(self, state, actuator=0):
         if not isinstance(state, bool):
             return False
 
@@ -57,7 +57,7 @@ class GripperClient(object):
             else:
                 return self.send_command('BRAKE OFF ' + str(actuator))
 
-    def EMG(self, state, actuator=0):
+    def emg(self, state, actuator=0):
         if not isinstance(state, bool):
             return False
 
@@ -75,38 +75,35 @@ class GripperClient(object):
             else:
                 return self.send_command('EMG OFF ' + str(actuator))
 
-    def ALARM(self):
+    def alarm(self):
         return self.send_command('ALARM')
 
-    def RESET(self):
+    def reset(self):
         return self.send_command('RESET')
 
-    def INP(self):
+    def inp(self):
         return self.send_command('INP')
 
-    def ACT(self, actuator):
+    def act(self, actuator):
         if actuator not in [1, 2, 3]:
             return False
 
         return self.send_command('ACT ' + str(actuator))
 
-    def IS_COLD(self, value):
+    def is_cold(self, value):
         if value:
             return self.send_command('IS_COLD 1')
         else:
             return self.send_command('IS_COLD 0')
 
-    def FORCE(self, value):
+    def force(self, value):
         if value:
             return self.send_command('FORCE 1')
         else:
             return self.send_command('FORCE 0')
-
-    def LIMIT(self):
-        return self.send_command('LIMIT')
-
-    def POSITION(self):
-        return self.send_command('POSITION')
+    
+    def get_state(self):
+        return self.send_command('GET_STATE')
 
     def send_command(self, command):
         if isinstance(command, str):
@@ -115,6 +112,7 @@ class GripperClient(object):
             self.s.sendall(command)
 
         return pkl.loads(self.s.recv(4096))
-
-    def __exit__(self):
+    
+    def close(self):
+        """Close socket connection"""
         self.s.close()
