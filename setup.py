@@ -102,7 +102,7 @@ setup(
         'ocs',
         'pyModbusTCP',
         'pyserial',
-        'pysnmp-lextudio',
+        'pysnmp',
         'pysmi',
         'pyyaml',
         'sqlalchemy>=1.4',
