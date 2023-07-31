@@ -101,7 +101,7 @@ class GripperClient(object):
             return self.send_command('FORCE 1')
         else:
             return self.send_command('FORCE 0')
-    
+
     def get_state(self):
         return self.send_command('GET_STATE')
 
@@ -112,7 +112,7 @@ class GripperClient(object):
             self.s.sendall(command)
 
         return pkl.loads(self.s.recv(4096))
-    
+
     def close(self):
         """Close socket connection"""
         self.s.close()

@@ -4,11 +4,11 @@ import argparse
 import ctypes
 import multiprocessing
 import time
+from typing import Optional
 
 import numpy as np
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
-from typing import Optional
 
 import socs.agents.hwp_gripper.drivers.gripper_client as cli
 from socs.agents.hwp_supervisor.agent import get_op_data
@@ -34,6 +34,7 @@ class GripperAgent:
             Time (in seconds) to wait between receiving 'no_data' actions from
             the supervisor and triggering a shutdown
     """
+
     def __init__(self, agent, mcu_ip, control_port, supervisor_id=None,
                  no_data_timeout=30 * 60):
         self.agent = agent
@@ -50,13 +51,13 @@ class GripperAgent:
 
         self._gripper_state = None
 
-        self.client : Optional[cli.GripperClient] = None
+        self.client: Optional[cli.GripperClient] = None
 
         agg_params = {'frame_length': 60}
         self.agent.register_feed('hwp_gripper', record=True, agg_params=agg_params)
         self.agent.register_feed('gripper_action', record=True)
-    
-    def _run_client_func(self, func, *args, lock_timeout=2, 
+
+    def _run_client_func(self, func, *args, lock_timeout=2,
                          job=None, check_shutdown=True, **kwargs):
         if self.shutdown_mode and check_shutdown:
             raise RuntimeError(
@@ -70,21 +71,21 @@ class GripperAgent:
             if not acquired:
                 self.log.error(
                     f"Could not acquire lock! Job {self.client_lock.job} is "
-                     "already running."
+                    "already running."
                 )
                 raise TimeoutError('Could not acquire lock')
-            
+
             return_dict = func(*args, **kwargs)
 
         for line in return_dict['log']:
             self.log.info(line)
 
         return return_dict
-    
+
     def _get_hwp_freq(self):
         if self.supervisor_id is None:
             raise ValueError("No Supervisor ID set")
-        
+
         res = get_op_data(self.supervisor_id, 'monitor')
         return res['data']['hwp_state']['pid_current_freq']
 
@@ -275,7 +276,7 @@ class GripperAgent:
             self.client.force, params['value'], job='force')
         session.data['response'] = return_dict
         return return_dict['result'], f"Success: {return_dict['result']}"
-    
+
     def shutdown(self, session, params=None):
         """shutdown()
         **Task** - Series of commands executed during a shutdown.
@@ -290,7 +291,7 @@ class GripperAgent:
         hwp_freq = self._get_hwp_freq()
         if hwp_freq > 0.05:
             raise RuntimeError("HWP is not stopped! Not performing shutdown")
-        
+
         self.shutdown_mode = True
 
         self.log.warn('INITIATING SHUTDOWN')
@@ -342,7 +343,7 @@ class GripperAgent:
         """
         self.shutdown_mode = False
         return True, 'Cancelled shutdown mode'
-    
+
     def monitor_state(self, session, params=None):
         """monitor_state()
 
@@ -370,7 +371,7 @@ class GripperAgent:
                     f'act{axis}_limit_cold_grip_state': act['limits']['cold_grip']['state'],
                     f'act{axis}_limit_warm_grip_state': act['limits']['warm_grip']['state'],
                 })
-            
+
             session.data = {
                 'state': data,
                 'last_updated': now,
