@@ -847,7 +847,7 @@ class LS372_Agent:
                 self.module.channels[channel].disable_autorange()
 
         return True, "Channel {} autorange status is {}".format(channel, state)
-    
+
     @ocs_agent.param('channel', type=int, check=lambda x: 0 <= x <= 16)
     @ocs_agent.param('curve_number', type=int, check=lambda x: 21 <= x <= 59)
     def set_calibration_curve(self, session, params):
