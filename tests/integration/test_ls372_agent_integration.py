@@ -234,6 +234,14 @@ def test_ls372_engage_channel(wait_for_crossbar, emulator, run_agent, client):
 
 
 @pytest.mark.integtest
+def test_ls372_engage_autorange(wait_for_crossbar, emulator, run_agent, client):
+    client.init_lakeshore()
+    resp = client.engage_autorange(channel=3, state='on')
+    assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
+
+@pytest.mark.integtest
 def test_ls372_set_calibration_curve(wait_for_crossbar, emulator, run_agent, client):
     client.init_lakeshore()
     resp = client.set_calibration_curve(channel=4, curve_number=28)
