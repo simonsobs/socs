@@ -310,6 +310,10 @@ class UPSAgent:
         self.is_streaming = True
         while self.is_streaming:
             yield dsleep(1)
+            if not self.connected:
+                self.log.error('No SNMP response. Check your connection.')
+                self.log.info('Trying to reconnect.')
+
             read_time = time.time()
 
             # Check if 60 seconds has passed before getting status
@@ -338,8 +342,8 @@ class UPSAgent:
             ups_get_result = yield self.snmp.get(get_list, self.version)
             if ups_get_result is None:
                 self.connected = False
-            else:
-                self.connected = True
+                continue
+            self.connected = True
 
             # Append input OIDs to GET list
             input_oids = ['upsInputVoltage',
@@ -351,17 +355,17 @@ class UPSAgent:
             num_res = yield self.snmp.get(input_num_lines, self.version)
             if num_res is None:
                 self.connected = False
-            else:
-                self.connected = True
-                input_get_results = []
-                inputs = num_res[0][1]._value
-                for i in range(inputs):
-                    get_list = []
-                    for oid in input_oids:
-                        main_get_list.append(('UPS-MIB', oid, i + 1))
-                        get_list.append(('UPS-MIB', oid, i + 1))
-                    input_get_result = yield self.snmp.get(get_list, self.version)
-                    input_get_results.append(input_get_result)
+                continue
+            self.connected = True
+            input_get_results = []
+            inputs = num_res[0][1]._value
+            for i in range(inputs):
+                get_list = []
+                for oid in input_oids:
+                    main_get_list.append(('UPS-MIB', oid, i + 1))
+                    get_list.append(('UPS-MIB', oid, i + 1))
+                input_get_result = yield self.snmp.get(get_list, self.version)
+                input_get_results.append(input_get_result)
 
             # Append output OIDs to GET list
             output_oids = ['upsOutputVoltage',
@@ -374,24 +378,24 @@ class UPSAgent:
             num_res = yield self.snmp.get(output_num_lines, self.version)
             if num_res is None:
                 self.connected = False
-            else:
-                self.connected = True
-                output_get_results = []
-                outputs = num_res[0][1]._value
-                for i in range(outputs):
-                    get_list = []
-                    for oid in output_oids:
-                        main_get_list.append(('UPS-MIB', oid, i + 1))
-                        get_list.append(('UPS-MIB', oid, i + 1))
-                    output_get_result = yield self.snmp.get(get_list, self.version)
-                    output_get_results.append(output_get_result)
+                continue
+            self.connected = True
+            output_get_results = []
+            outputs = num_res[0][1]._value
+            for i in range(outputs):
+                get_list = []
+                for oid in output_oids:
+                    main_get_list.append(('UPS-MIB', oid, i + 1))
+                    get_list.append(('UPS-MIB', oid, i + 1))
+                output_get_result = yield self.snmp.get(get_list, self.version)
+                output_get_results.append(output_get_result)
 
             # Issue SNMP GET command
             get_result = yield self.snmp.get(main_get_list, self.version)
             if get_result is None:
                 self.connected = False
-            else:
-                self.connected = True
+                continue
+            self.connected = True
 
             # Do not publish if UPS connection has dropped
             try:
