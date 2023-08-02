@@ -15,17 +15,15 @@ class UCSCRadiometerAgent:
         OCSAgent object which forms this Agent
     url : str
         url of the flask server on the internet
-    year : int
-        year for the corresponding Julian Day
+
     """
 
-    def __init__(self, agent, url, year):
+    def __init__(self, agent, url):
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
 
         self.url = url
-        self.year = year
 
         self.take_data = False
 
@@ -96,7 +94,6 @@ def add_agent_args(parser_in=None):
         parser_in = A()
     pgroup = parser_in.add_argument_group('Agent Options')
     pgroup.add_argument("--url", type=str, help="url for PWV flask server")
-    pgroup.add_argument("--year", type=int, help="year for Julian Day PWV measurement")
     return parser_in
 
 
