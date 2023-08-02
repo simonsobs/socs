@@ -14,7 +14,7 @@ class UCSCRadiometerAgent:
     agent : OCS Agent
         OCSAgent object which forms this Agent
     url : str
-        url of the flask server on the internet
+        url of the radiometer web server on the internet
 
     """
 
@@ -93,7 +93,7 @@ def add_agent_args(parser_in=None):
         from argparse import ArgumentParser as A
         parser_in = A()
     pgroup = parser_in.add_argument_group('Agent Options')
-    pgroup.add_argument("--url", type=str, help="url for PWV flask server")
+    pgroup.add_argument("--url", type=str, help="url for radiometer web server")
     return parser_in
 
 
