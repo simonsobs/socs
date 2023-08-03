@@ -78,7 +78,7 @@ def test_timecode_dirs(tmp_path):
                 finalize_files.append(os.path.join(root, f))
 
     print(f"Finalize timestamp: {srfm.get_finalized_until('test')}")
-    print(srfm.get_archive_stats())
+    print(srfm.get_archive_stats(archive_name))
 
     assert (len(finalize_files) == len(tcs) - 1)
 

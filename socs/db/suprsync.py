@@ -212,47 +212,42 @@ class SupRsyncFilesManager:
         if create_all:
             Base.metadata.create_all(self._engine)
 
-    def get_archive_stats(self, session=None):
+    def get_archive_stats(self, archive_name, session=None):
         if session is None:
             session = self.Session()
 
-        archive_names = session.query(SupRsyncFile.archive_name)\
-            .distinct().all()
+        files = session.query(SupRsyncFile).filter(
+            SupRsyncFile.archive_name == archive_name,
+        ).order_by(asc(SupRsyncFile.timestamp)).all()
 
-        stats = {}
-        for name, in archive_names:
-            files = session.query(SupRsyncFile).filter(
-                SupRsyncFile.archive_name == name,
-            ).order_by(asc(SupRsyncFile.timestamp)).all()
+        finalized_until = None
+        num_files_to_copy = 0
+        last_file_added = ''
+        last_file_copied = ''
 
-            finalized_until = None
-            num_files_to_copy = 0
-            last_file_added = ''
-            last_file_copied = ''
+        for f in files:
+            last_file_added = f.local_path
+            if (f.local_md5sum == f.remote_md5sum):
+                last_file_copied = f.local_path
 
-            for f in files:
-                last_file_added = f.local_path
-                if (f.local_md5sum == f.remote_md5sum):
-                    last_file_copied = f.local_path
+            if (not f.ignore) and (f.local_md5sum != f.remote_md5sum):
+                num_files_to_copy += 1
 
-                if (not f.ignore) and (f.local_md5sum != f.remote_md5sum):
-                    num_files_to_copy += 1
+            if finalized_until is None and not (f.ignore):
+                if f.local_md5sum != f.remote_md5sum:
+                    finalized_until = f.timestamp - 1
 
-                if finalized_until is None and not (f.ignore):
-                    if f.local_md5sum != f.remote_md5sum:
-                        finalized_until = f.timestamp - 1
+        # There are no more uncopied files that aren't ignored
+        if finalized_until is None:
+            finalized_until = time.time()
 
-            # There are no more uncopied files that aren't ignored
-            if finalized_until is None:
-                finalized_until = time.time()
-
-            stats[name] = {
-                'finalized_until': finalized_until,
-                'num_files': len(files),
-                'uncopied_files': len([f for f in files if f.copied is None]),
-                'last_file_added': last_file_added,
-                'last_file_copied': last_file_copied,
-            }
+        stats = {
+            'finalized_until': finalized_until,
+            'num_files': len(files),
+            'uncopied_files': len([f for f in files if f.copied is None]),
+            'last_file_added': last_file_added,
+            'last_file_copied': last_file_copied,
+        }
 
         return stats
 
@@ -260,6 +255,14 @@ class SupRsyncFilesManager:
         """
         Returns a timetamp for which all files preceding are either successfully
         copied, or ignored. If all files are copied, returns the current time.
+
+        Args
+        ------
+            archive_name : String
+                Archive name to get finalized_until for
+            session : sqlalchemy session
+                SQLAlchemy session to use. If none is passed, will create a new
+                session
         """
         if session is None:
             session = self.Session()

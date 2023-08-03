@@ -94,13 +94,13 @@ class SupRsync:
                     "files": [],
                     "stop_time": 1661284493.5398622
                   },
-                  'archive_stats': {
-                    'smurf': {
-                        'finalized_until': 1687797424.652119,
-                        'num_files': 3,
-                        'uncopied_files': 0,
-                        'last_file_added': '/path/to/file',
-                        'last_file_copied': '/path/to/file'
+                  "archive_stats": {
+                    "smurf": {
+                        "finalized_until": 1687797424.652119,
+                        "num_files": 3,
+                        "uncopied_files": 0,
+                        "last_file_added": "/path/to/file",
+                        "last_file_copied": "/path/to/file"
                     }
                   },
                   "counters": {
@@ -161,7 +161,7 @@ class SupRsync:
 
             now = time.time()
 
-            archive_stats = srfm.get_archive_stats().get(self.archive_name)
+            archive_stats = srfm.get_archive_stats(self.archive_name)
             if archive_stats is not None:
                 self.agent.publish_to_feed('archive_stats', {
                     'block_name': self.archive_name,
