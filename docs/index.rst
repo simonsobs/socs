@@ -41,6 +41,7 @@ API Reference        Full API documentation for core parts of the SOCS library.
     agents/bluefors_agent
     agents/cryomech_cpa
     agents/fts_agent
+    agents/generator
     agents/hwp_encoder
     agents/hwp_picoscope
     agents/hwp_pid

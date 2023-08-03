@@ -1,12 +1,11 @@
 import ocs
 import pytest
+from integration.util import docker_compose_file  # noqa: F401
 from integration.util import create_crossbar_fixture
 from ocs.base import OpCode
 from ocs.testing import create_agent_runner_fixture, create_client_fixture
 
 from socs.testing.device_emulator import create_device_emulator
-
-pytest_plugins = ("docker_compose")
 
 wait_for_crossbar = create_crossbar_fixture()
 run_agent = create_agent_runner_fixture(
@@ -147,7 +146,9 @@ def test_hwp_rotation_ign_ext(wait_for_crossbar, kikusui_emu, run_agent, client)
 @pytest.mark.integtest
 def test_hwp_rotation_acq(wait_for_crossbar, kikusui_emu, run_agent, client):
     responses = {'meas:volt?': '2',
-                 'meas:curr?': '1'}
+                 'meas:curr?': '1',
+                 ':system:error?': '+0,"No error"\n',
+                 'stat:ques?': '0'}
     kikusui_emu.define_responses(responses)
 
     client.init_connection.wait()  # wait for connection to be made

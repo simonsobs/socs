@@ -820,6 +820,34 @@ class LS372_Agent:
 
         return True, "Channel {} powered {}".format(channel, state)
 
+    @ocs_agent.param('channel', type=int)
+    @ocs_agent.param('state', type=str, choices=['on', 'off'])
+    def engage_autorange(self, session, params):
+        """engage_autorange(channel, state)
+
+        **Task** - Enables/disables autorange for a channel on the LS372
+
+        Parameters:
+            channel (int): Channel number for enabling autorange
+            state (str): Desired autorange state of channel: 'on' or 'off'
+        """
+        with self._lock.acquire_timeout(job='engage_channel') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            session.set_status('running')
+
+            channel = params['channel']
+            state = params['state']
+            if state == 'on':
+                self.module.channels[channel].enable_autorange()
+            else:
+                self.module.channels[channel].disable_autorange()
+
+        return True, "Channel {} autorange status is {}".format(channel, state)
+
     @ocs_agent.param('channel', type=int, check=lambda x: 0 <= x <= 16)
     @ocs_agent.param('curve_number', type=int, check=lambda x: 21 <= x <= 59)
     def set_calibration_curve(self, session, params):
@@ -1436,6 +1464,7 @@ def main(args=None):
     agent.register_task('set_dwell', lake_agent.set_dwell)
     agent.register_task('get_dwell', lake_agent.get_dwell)
     agent.register_task('engage_channel', lake_agent.engage_channel)
+    agent.register_task('engage_autorange', lake_agent.engage_autorange)
     agent.register_task('get_input_setup', lake_agent.get_input_setup)
     agent.register_task('set_calibration_curve', lake_agent.set_calibration_curve)
     agent.register_task('set_pid', lake_agent.set_pid)

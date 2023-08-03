@@ -48,6 +48,7 @@ class SupRsync:
 
     def __init__(self, agent, args):
         self.agent = agent
+        self.instance_id = args.instance_id
         self.log = txaio.make_logger()
         self.archive_name = args.archive_name
         self.ssh_host = args.ssh_host
@@ -63,6 +64,7 @@ class SupRsync:
         self.sleep_time = args.sleep_time
         self.compression = args.compression
         self.bwlimit = args.bwlimit
+        self.suprsync_file_root = args.suprsync_file_root
 
         # Feed for counting transfer errors, loop iterations.
         self.agent.register_feed('transfer_stats',
@@ -132,6 +134,7 @@ class SupRsync:
             counters['iterations'] += 1
 
             op = {'start_time': time.time()}
+
             try:
                 session.data['activity'] = 'copying'
                 op['files'] = handler.copy_files(max_copy_attempts=self.max_copy_attempts,
@@ -161,6 +164,10 @@ class SupRsync:
             if self.delete_after is not None:
                 session.data['activity'] = 'deleting'
                 handler.delete_files(self.delete_after)
+
+            # After handling files, update the timecode dirs
+            srfm.update_all_timecode_dirs(
+                self.archive_name, self.suprsync_file_root, self.instance_id)
 
             session.data['activity'] = 'idle'
             time.sleep(self.sleep_time)
@@ -210,6 +217,8 @@ def make_parser(parser=None):
                         help="Activate gzip on data transfer (rsync -z)")
     pgroup.add_argument('--bwlimit', type=str, default=None,
                         help="Bandwidth limit arg (passed through to rsync)")
+    pgroup.add_argument('--suprsync-file-root', type=str, required=True,
+                        help="Local path where agent will write suprsync files")
     return parser
 
 

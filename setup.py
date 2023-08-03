@@ -72,8 +72,12 @@ setup(
     package_data={'socs': [
         'agents/smurf_file_emulator/*.yaml',
         'agents/labjack/cal_curves/*.txt',
+        'agents/generator/*.yaml'
     ]},
     entry_points={
+        'console_scripts': [
+            'suprsync=socs.db.suprsync_cli:main'
+        ],
         'ocs.plugins': [
             'socs = socs.plugin',
         ],
@@ -96,8 +100,9 @@ setup(
         'autobahn[serialization]',
         'numpy',
         'ocs',
+        'pyModbusTCP',
         'pyserial',
-        'pysnmp-lextudio',
+        'pysnmp',
         'pysmi',
         'pyyaml',
         'sqlalchemy>=1.4',
