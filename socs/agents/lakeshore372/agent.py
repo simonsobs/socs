@@ -92,10 +92,13 @@ class LS372_Agent:
         enable_control_chan (bool, optional):
             If True, will read data from the control channel each iteration of
             the acq loop. Defaults to False.
+        configfile (str, optional):
+            Path to a LS372 config file. This will be loaded by default by
+            input_configfile by default
     """
 
     def __init__(self, agent, name, ip, fake_data=False, dwell_time_delay=0,
-                 enable_control_chan=False):
+                 enable_control_chan=False, configfile=None):
 
         # self._acq_proc_lock is held for the duration of the acq Process.
         # Tasks that require acq to not be running, at all, should use
@@ -120,6 +123,7 @@ class LS372_Agent:
         self.initialized = False
         self.take_data = False
         self.control_chan_enabled = enable_control_chan
+        self.configfile = configfile
 
         self.agent = agent
         # Registers temperature feeds
@@ -1309,21 +1313,25 @@ class LS372_Agent:
         settings.
 
         Parameters:
-            configfile (str): name of .yaml config file
-
+            configfile (str, optional):
+                name of .yaml config file. Defaults to the file set in the
+                site config
         """
+
+        configfile = params['configfile']
+        if configfile is None:
+            configfile = self.configfile
+        if configfile is None:
+            raise ValueError("No configfile specified")
+        configfile = os.path.join(os.environ['OCS_CONFIG_DIR'], configfile)
+
         with self._lock.acquire_timeout(job='input_configfile') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            # path to configfile in docker container
-            configpath = os.environ.get("OCS_CONFIG_DIR", "/config/")
-            configfile = params['configfile']
-
-            ls372configs = os.path.join(configpath, configfile)
-            with open(ls372configs) as f:
+            with open(configfile) as f:
                 config = yaml.safe_load(f)
 
             ls = self.module
@@ -1451,7 +1459,8 @@ def main(args=None):
     lake_agent = LS372_Agent(agent, args.serial_number, args.ip_address,
                              fake_data=args.fake_data,
                              dwell_time_delay=args.dwell_time_delay,
-                             enable_control_chan=args.enable_control_chan)
+                             enable_control_chan=args.enable_control_chan,
+                             configfile=args.configfile)
 
     agent.register_task('init_lakeshore', lake_agent.init_lakeshore,
                         startup=init_params)
