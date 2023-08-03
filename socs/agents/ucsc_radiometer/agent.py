@@ -1,3 +1,4 @@
+import argparse
 from os import environ
 
 import requests
@@ -93,13 +94,12 @@ class UCSCRadiometerAgent:
         return True, 'Stopping acq process'
 
 
-def add_agent_args(parser_in=None):
-    if parser_in is None:
-        from argparse import ArgumentParser as A
-        parser_in = A()
-    pgroup = parser_in.add_argument_group('Agent Options')
+def add_agent_args(parser=None):
+    if parser is None:
+        parser = argparse.ArgumentParser()
+    pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument("--url", type=str, help="url for radiometer web server")
-    return parser_in
+    return parser
 
 
 def main(args=None):
