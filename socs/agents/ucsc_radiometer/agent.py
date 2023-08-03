@@ -75,6 +75,11 @@ class UCSCRadiometerAgent:
                 self.agent.publish_to_feed('pwvs', pwvs)
                 self.last_published_reading = (last_pwv, last_timestamp)
 
+            session.data = {"timestamp": last_timestamp,
+                            "fields": {}}
+
+            session.data['fields']['pwv'] = last_pwv
+
             if params['test_mode']:
                 break
 
