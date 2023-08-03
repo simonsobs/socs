@@ -92,7 +92,7 @@ class LS372_Agent:
         enable_control_chan (bool, optional):
             If True, will read data from the control channel each iteration of
             the acq loop. Defaults to False.
-        configfile (str, optional): 
+        configfile (str, optional):
             Path to a LS372 config file. This will be loaded by default by
             input_configfile by default
     """
@@ -1313,7 +1313,7 @@ class LS372_Agent:
         settings.
 
         Parameters:
-            configfile (str, optional): 
+            configfile (str, optional):
                 name of .yaml config file. Defaults to the file set in the
                 site config
         """
