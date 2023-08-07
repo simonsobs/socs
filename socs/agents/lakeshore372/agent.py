@@ -934,12 +934,12 @@ class LS372_Agent:
     @ocs_agent.param('update_time', type=int)
     @ocs_agent.param('sample_heater_range', type=float, default=10e-3)
     @ocs_agent.param('test_mode', type=bool, default=False)
-    def start_custom_pid(self, session, params):
-        """start_custom_pid(setpoint, heater, channel, P, \
-                            I, update_time, sample_heater_range=10e-3, \
-                            test_mode=False)
+    def custom_pid(self, session, params):
+        """custom_pid(setpoint, heater, channel, P, \
+                      I, update_time, sample_heater_range=10e-3, \
+                      test_mode=False)
 
-        **Task** - Set custom software PID parameters for servo control of fridge
+        **Process** - Set custom software PID parameters for servo control of fridge
         using still or sample heater. Currently only P and I implemented.
 
         Parameters:
@@ -1486,7 +1486,7 @@ def main(args=None):
     agent.register_task('set_still_output', lake_agent.set_still_output)
     agent.register_task('get_still_output', lake_agent.get_still_output)
     agent.register_process('acq', lake_agent.acq, lake_agent._stop_acq)
-    agent.register_process('custom_pid', lake_agent.start_custom_pid, lake_agent._stop_custom_pid)
+    agent.register_process('custom_pid', lake_agent.custom_pid, lake_agent._stop_custom_pid)
     agent.register_task('enable_control_chan', lake_agent.enable_control_chan)
     agent.register_task('disable_control_chan', lake_agent.disable_control_chan)
     agent.register_task('input_configfile', lake_agent.input_configfile)
