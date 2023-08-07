@@ -1067,7 +1067,7 @@ class ACUAgent:
     @ocs_agent.param('end_stop', default=False, type=bool)
     @inlineCallbacks
     def set_boresight(self, session, params):
-        """set_boresight(b=None, end_stop=False)
+        """set_boresight(target=None, end_stop=False)
 
         **Task** - Move the telescope to a particular third-axis angle.
 
