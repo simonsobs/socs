@@ -252,7 +252,7 @@ class ibootbarAgent:
             if not self.connected:
                 self.log.error('No SNMP response. Check your connection!')
                 self.log.info('Trying to reconnect.')
-            
+
             read_time = time.time()
 
             # Check if sample period has passed before getting status
