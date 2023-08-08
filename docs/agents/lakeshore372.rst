@@ -83,6 +83,7 @@ Lakeshore 372 configuration file::
              excitation_mode: 'voltage'
              excitation_value: 2.0e-6
              autorange: 'on'
+             resistance_range: 2e3
              dwell: 15 # seconds
              pause: 10 # seconds
              calibration_curve_num: 33
@@ -92,6 +93,7 @@ Lakeshore 372 configuration file::
              excitation_mode: 'voltage'
              excitation_value: 2.0e-6
              autorange: 'off'
+             resistance_range: 2e3
              dwell: 10 # seconds
              pause: 3 # seconds
              calibruation_curve_num: 36
@@ -101,6 +103,7 @@ Lakeshore 372 configuration file::
              excitation_mode: 'voltage'
              excitation_value: 2.0e-6
              autorange: 'on'
+             resistance_range: 2e3
              dwell: 15 # seconds
              pause: 10 # seconds
              calibration_curve_num: 34
@@ -110,6 +113,7 @@ Lakeshore 372 configuration file::
              excitation_mode: 'voltage'
              excitation_value: 2.0e-6
              autorange: 'off'
+             resistance_range: 2e3
              dwell: 10 # seconds
              pause: 3 # seconds
              calibruation_curve_num: 35
