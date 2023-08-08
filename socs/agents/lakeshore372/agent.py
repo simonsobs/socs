@@ -1369,6 +1369,7 @@ class LS372_Agent:
                     # set to desired resistance range after disabling autorange
                     resistance_range = ls_chann_settings[i]['resistance_range']
                     ls.channels[i].set_resistance_range(resistance_range)
+                    self.log.info("resistance for CH.{channel} set to {res}".format(channel=i, res=resistance_range))
 
                 excitation_mode = ls_chann_settings[i]['excitation_mode']
                 ls.channels[i].set_excitation_mode(excitation_mode)
@@ -1377,8 +1378,6 @@ class LS372_Agent:
                 excitation_value = ls_chann_settings[i]['excitation_value']
                 ls.channels[i].set_excitation(excitation_value)
                 self.log.info("excitation for CH.{channel} set to {exc}".format(channel=i, exc=excitation_value))
-
-                self.log.info("resistance for CH.{channel} set to {res}".format(channel=i, res=resistance_range))
 
                 dwell = ls_chann_settings[i]['dwell']
                 ls.channels[i].set_dwell(dwell)
