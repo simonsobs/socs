@@ -1375,6 +1375,10 @@ class LS372_Agent:
                 ls.channels[i].set_excitation(excitation_value)
                 self.log.info("excitation for CH.{channel} set to {exc}".format(channel=i, exc=excitation_value))
 
+                resistance_range = ls_chann_settings[i]['resistance_range']
+                ls.channels[i].set_resistance_range(resistance_range)
+                self.log.info("resistance for CH.{channel} set to {res}".format(channel=i, res=resistance_range))
+
                 dwell = ls_chann_settings[i]['dwell']
                 ls.channels[i].set_dwell(dwell)
                 self.log.info("dwell for CH.{channel} is set to {dwell}".format(channel=i, dwell=dwell))
