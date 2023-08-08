@@ -72,7 +72,7 @@ Lakeshore 372 configuration file::
              resistance_range: 2e3
              dwell: 10 # seconds
              pause: 3 # seconds
-             calibruation_curve_num: 28
+             calibration_curve_num: 28
              temperature_coeff: 'negative'
     LSA2761:
         device_settings:
@@ -96,7 +96,7 @@ Lakeshore 372 configuration file::
              resistance_range: 2e3
              dwell: 10 # seconds
              pause: 3 # seconds
-             calibruation_curve_num: 36
+             calibration_curve_num: 36
              temperature_coeff: 'negative'
           3:
              enable: 'on'
@@ -116,13 +116,13 @@ Lakeshore 372 configuration file::
              resistance_range: 2e3
              dwell: 10 # seconds
              pause: 3 # seconds
-             calibruation_curve_num: 35
+             calibration_curve_num: 35
              temperature_coeff: 'negative'
 
 .. note::
    For setting a 372 channel to a specific resistance range, be sure to check
-   that autorange is set to 'off'. Else, the autorange resistance setting will
-   persist.
+   that autorange is set to 'off'. Else, the autorange setting will persist
+   over your desired resistance range.
 
 Docker Compose
 ``````````````
