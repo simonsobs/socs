@@ -170,7 +170,10 @@ class HWPPIDAgent:
                 return False, 'Could not acquire lock'
 
             freq = self.pid.get_freq()
-            session.data = {'freq': freq}
+            session.data = {
+                'freq': freq,
+                'timestamp': time.time(),
+            }
 
         return True, 'Current frequency = {}'.format(freq)
 
