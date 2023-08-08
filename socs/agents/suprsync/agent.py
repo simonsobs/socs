@@ -72,6 +72,7 @@ class SupRsync:
                                  agg_params={
                                      'exclude_aggregator': True,
                                  })
+        self.agent.register_feed('archive_stats', record=True)
 
     def run(self, session, params=None):
         """run()
@@ -92,6 +93,15 @@ class SupRsync:
                     "start_time": 1661284493.5333128,
                     "files": [],
                     "stop_time": 1661284493.5398622
+                  },
+                  "archive_stats": {
+                    "smurf": {
+                        "finalized_until": 1687797424.652119,
+                        "num_files": 3,
+                        "uncopied_files": 0,
+                        "last_file_added": "/path/to/file",
+                        "last_file_copied": "/path/to/file"
+                    }
                   },
                   "counters": {
                     "iterations": 1,
@@ -150,6 +160,16 @@ class SupRsync:
                 counters['errors_nonzero'] += 1
 
             now = time.time()
+
+            archive_stats = srfm.get_archive_stats(self.archive_name)
+            if archive_stats is not None:
+                self.agent.publish_to_feed('archive_stats', {
+                    'block_name': self.archive_name,
+                    'timestamp': now,
+                    'data': archive_stats
+                })
+            session.data['archive_stats'] = archive_stats
+
             op['stop_time'] = now
             session.data['last_copy'] = op
             session.data['timestamp'] = now
