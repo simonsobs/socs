@@ -435,6 +435,89 @@ class HWPPMXAgent:
         session.set_status('stopping')
         return True, "Stopping monitor shutdown."
 
+    def initiate_shutdown(self, session, params):
+        """ initiate_shutdown()
+
+        **Task** - Initiate the shutdown of the agent.
+        """
+        self.log.warn("INITIATING SHUTDOWN")
+
+        with self.lock.acquire_timeout(10, job='shutdown') as acquired:
+            if not acquired:
+                self.log.error("Could not acquire lock for shutdown.")
+                return False, "Could not acquire lock."
+
+            self.shutdown_mode = True
+            self.dev.turn_off()
+
+    def cancel_shutdown(self, session, params):
+        """cancel_shutdown()
+
+        **Task** - Cancels shutdown mode, allowing other tasks to update the power supply
+        """
+        self.shutdown_mode = False
+        return True, "Cancelled shutdown mode"
+
+    def monitor_supervisor(self, session, params):
+        """monitor_supervisor()
+
+        **Process** - This is a process that is constantly running to monitor the
+        HWP supervisor and the recommended course of action
+        course of action recommended by the HWP supervisor. If certain conditions
+        are met, this will trigger a shutdown and force the power supply to
+        power off.
+        """
+
+        session.set_status('running')
+        last_ok_time = time.time()
+
+        if self.supervisor_id is None:
+            return False, "No supervisor ID set"
+
+        while session.status in ['starting', 'running']:
+
+            res = get_op_data(self.supervisor_id, 'monitor')
+            if res['status'] != 'ok':
+                action = 'no_data'
+            else:
+                action = res['data']['actions']['rotation']
+
+            # If action is 'ok', update last_ok_time
+            if action == 'ok':
+                last_ok_time = time.time()
+
+            # If action is 'no_data', check if last_ok_time, and potentially
+            # trigger shutdown
+            elif action == 'no_data':
+                if (time.time() - last_ok_time) > self.no_data_timeout:
+                    if not self.shutdown_mode:
+                        self.agent.start('initiate_shutdown', params=None)
+
+            # If action is 'shutdown', trigger shutdown
+            elif action == 'stop':
+                if not self.shutdown_mode:
+                    self.agent.start('initiate_shutdown', params=None)
+
+            data = {
+                'data': {'rotation_action': action},
+                'block_name': 'rotation_action',
+                'timestamp': time.time()
+            }
+
+            self.agent.publish_to_feed('rotation_action', data)
+            session.data = {
+                'rotation_action': action,
+                'time': time.time()
+            }
+
+            time.sleep(0.2)
+
+        return True, 'Supervisor monitor has exited.'
+
+    def _stop_monitor_supervisor(self, session, params):
+        session.set_status('stopping')
+        return True, "Stopping monitor shutdown."
+
 
 def make_parser(parser=None):
     if parser is None:
