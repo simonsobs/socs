@@ -1366,6 +1366,10 @@ class LS372_Agent:
                 elif ls_chann_settings[i]['autorange'] == 'off':
                     ls.channels[i].disable_autorange()
                     self.log.info("autorange off")
+                    # set to desired resistance range after disabling autorange
+                    resistance_range = ls_chann_settings[i]['resistance_range']
+                    ls.channels[i].set_resistance_range(resistance_range)
+                    self.log.info("resistance range for CH.{channel} set to {get_res}, the closest valid range to {res}".format(channel=i, get_res=ls.channels[i].get_resistance_range(), res=resistance_range))
 
                 excitation_mode = ls_chann_settings[i]['excitation_mode']
                 ls.channels[i].set_excitation_mode(excitation_mode)
