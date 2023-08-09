@@ -295,18 +295,14 @@ class ibootbarAgent:
                 session.data = oid_cache
                 self.log.debug("{data}", data=session.data)
 
-                if not self.connected:
-                    raise ConnectionError('No SNMP response. Check your connection.')
-
                 self.lastGet = time.time()
                 # Publish to feed
                 message = _build_message(get_result, names, read_time)
                 self.log.debug("{msg}", msg=message)
                 session.app.publish_to_feed('ibootbar', message)
-            except ConnectionError as e:
+            except Exception as e:
                 self.log.error(f'{e}')
                 yield dsleep(1)
-                self.log.info('Trying to reconnect.')
 
             if params['test_mode']:
                 break
