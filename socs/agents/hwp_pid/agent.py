@@ -170,6 +170,10 @@ class HWPPIDAgent:
                 return False, 'Could not acquire lock'
 
             freq = self.pid.get_freq()
+            session.data = {
+                'freq': freq,
+                'timestamp': time.time(),
+            }
 
         return True, 'Current frequency = {}'.format(freq)
 
@@ -204,6 +208,7 @@ class HWPPIDAgent:
                 return False, 'Could not acquire lock'
 
             direction = self.pid.get_direction()
+            session.data = {'direction': direction}
 
         return True, 'Current direction = {}'.format(['Forward', 'Reverse'][direction])
 

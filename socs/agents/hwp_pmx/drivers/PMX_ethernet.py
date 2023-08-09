@@ -119,7 +119,7 @@ class PMX:
         self.sock.sendall(b'volt:ext:sour?\n')
         val = self.read()
         msg = "Source: " + val
-        return msg
+        return msg, val
 
     def use_external_voltage(self):
         """ Set PMX to use external voltage """

@@ -46,6 +46,7 @@ API Reference        Full API documentation for core parts of the SOCS library.
     agents/hwp_picoscope
     agents/hwp_pid
     agents/hwp_pmx
+    agents/hwp_supervisor_agent
     agents/holo_fpga
     agents/holo_synth
     agents/ibootbar
