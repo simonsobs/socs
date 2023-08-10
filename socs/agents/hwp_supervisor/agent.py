@@ -558,6 +558,9 @@ class ControlStateMachine:
 
             elif isinstance(self.state, ControlState.PmxOff):
                 self.run_and_validate(clients.pmx.set_off)
+                self.run_and_validate(clients.pid.declare_freq,
+                                      kwargs={'freq': 0})
+                self.run_and_validate(clients.pid.tune_freq)
                 self._set_state(ControlState.WaitForTargetFreq(
                     target_freq=0,
                     freq_tol=self.state.freq_tol,
