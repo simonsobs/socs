@@ -12,7 +12,7 @@ from sqlalchemy.orm import sessionmaker
 
 from socs.util import get_md5sum
 
-TABLE_VERSION = 0
+TABLE_VERSION = 1
 txaio.use_twisted()
 
 
@@ -79,7 +79,7 @@ class SupRsyncFile(Base):
         timestamp : Float
             Timestamp that file was added to db
         copied : Float, optional
-            Time at which file was transfered
+            Time at which file was transferred
         removed : Float, optional
             Time at which file was removed from local server.
         failed_copy_attempts : Int
