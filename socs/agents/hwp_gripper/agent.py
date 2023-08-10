@@ -78,8 +78,7 @@ class GripperAgent:
             return_dict = func(*args, **kwargs)
 
         for line in return_dict['log']:
-            self.log.info(line)
-
+            self.log.debug(line)
         return return_dict
 
     def _get_hwp_freq(self):
@@ -105,12 +104,7 @@ class GripperAgent:
             return True, 'Connection already initialized'
 
         self.client = cli.GripperClient(self.mcu_ip, self.control_port)
-
-        self.agent.start('monitor')
-
-        if params['auto_acquire']:
-            self.agent.start('acq')
-
+        self.log.info("Initialized Client")
         self._initialized = True
         return True, 'Processes started'
 
@@ -353,6 +347,12 @@ class GripperAgent:
         sleep_time = 5
 
         while session.status in ['starting', 'running']:
+            if self.client is None:
+                self.log.warn("Client not initialized")
+                time.sleep(1)
+                continue
+
+
             return_dict = self._run_client_func(
                 self.client.get_state, job='get_state', check_shutdown=False
             )
@@ -361,15 +361,28 @@ class GripperAgent:
             # Dict of the 'GripperState' class from the pru_monitor
             state = return_dict['result']
             data = {
-                'last_packet_received': state['last_packet_received']
+                'last_packet_received': state['last_packet_received'],
             }
+            
+            data.update({
+                'jxc_setup': int(state['jxc']['setup']),
+                'jxc_svon': int(state['jxc']['svon']),
+                'jxc_busy': int(state['jxc']['busy']),
+                'jxc_seton': int(state['jxc']['seton']),
+                'jxc_inp': int(state['jxc']['inp']),
+                'jxc_svre': int(state['jxc']['svre']),
+                'jxc_alarm': int(state['jxc']['alarm']),
+                'jxc_out': int(state['jxc']['out']),
+            })
+
             for act in state['actuators']:
                 axis = act['axis']
                 data.update({
                     f'act{axis}_pos': act['pos'],
-                    f'act{axis}_calibrated': act['calibrated'],
-                    f'act{axis}_limit_cold_grip_state': act['limits']['cold_grip']['state'],
-                    f'act{axis}_limit_warm_grip_state': act['limits']['warm_grip']['state'],
+                    f'act{axis}_limit_cold_grip_state': int(act['limits']['cold_grip']['state']),
+                    f'act{axis}_limit_warm_grip_state': int(act['limits']['warm_grip']['state']),
+                    f'act{axis}_brake': int(act['brake']),
+                    f'act{axis}_emg': int(act['emg']),
                 })
 
             session.data = {
@@ -388,10 +401,6 @@ class GripperAgent:
         session.set_status('stopping')
         return True, "Requesting monitor_state process to stop"
 
-    def _stop_monitor_supervisor(self, session, params=None):
-        session.set_status('stopping')
-        return True, "Requesting monitor_supervisor process to stop"
-
     def monitor_supervisor(self, session, params=None):
         """monitor()
         **Process** - Monitor the shutdown of the agent
@@ -403,8 +412,7 @@ class GripperAgent:
             return False, 'No supervisor ID set'
 
         self._inital_warning = True
-        self._run_monitor = True
-        while self._run_monitor:
+        while session.status in ['starting', 'running']:
             res = get_op_data(self.supervisor_id, 'monitor')
             if res['status'] != 'ok':
                 action = 'no_data'
@@ -456,9 +464,9 @@ def make_parser(parser=None):
         parser = argparse.ArgumentParser()
 
     pgroup = parser.add_argument_group('Agent Options')
-    pgroup.add_argument('--mcu_ip', type=str,
+    pgroup.add_argument('--mcu-ip', type=str,
                         help='IP of Gripper Beaglebone')
-    pgroup.add_argument('--control_port', type=int, default=8041,
+    pgroup.add_argument('--control-port', type=int, default=8041,
                         help='Arbitrary port for actuator control')
     pgroup.add_argument('--supervisor-id', type=str,
                         help='Instance ID for HWP Supervisor agent')
@@ -478,16 +486,13 @@ def main(args=None):
 
     agent, runner = ocs_agent.init_site_agent(args)
     gripper_agent = GripperAgent(agent, mcu_ip=args.mcu_ip,
-                                 pru_port=args.pru_port,
                                  control_port=args.control_port,
                                  supervisor_id=args.supervisor_id,
                                  no_data_timeout=args.no_data_timeout)
-    agent.register_process('acq', gripper_agent.acq,
-                           gripper_agent._stop_acq)
     agent.register_process('monitor_state', gripper_agent.monitor_state,
-                           gripper_agent._stop_monitor_state)
+                           gripper_agent._stop_monitor_state, startup=True)
     agent.register_process('monitor_supervisor', gripper_agent.monitor_state,
-                           gripper_agent._stop_monitor_supervisor)
+                           gripper_agent._stop_monitor_supervisor, startup=True)
     agent.register_task('init_connection', gripper_agent.init_connection,
                         startup=init_params)
     agent.register_task('power', gripper_agent.power)
