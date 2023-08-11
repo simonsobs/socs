@@ -14,7 +14,7 @@ SOCS - Simons Observatory Control System
     :target: https://coveralls.io/github/simonsobs/socs
 
 .. image:: https://img.shields.io/badge/dockerhub-latest-blue
-    :target: https://hub.docker.com/r/simonsobs/ocs/tags
+    :target: https://hub.docker.com/r/simonsobs/socs
 
 .. image:: https://img.shields.io/pypi/v/socs
    :target: https://pypi.org/project/socs/
