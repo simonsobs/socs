@@ -57,7 +57,7 @@ class HWPGripperAgent:
         self.agent.register_feed('hwp_gripper', record=True, agg_params=agg_params)
         self.agent.register_feed('gripper_action', record=True)
 
-    def _run_client_func(self, func, *args, lock_timeout=2,
+    def _run_client_func(self, func, *args, lock_timeout=10,
                          job=None, check_shutdown=True, **kwargs):
         if self.shutdown_mode and check_shutdown:
             raise RuntimeError(
@@ -287,47 +287,50 @@ class HWPGripperAgent:
             raise RuntimeError("HWP is not stopped! Not performing shutdown")
 
         self.shutdown_mode = True
-
         self.log.warn('INITIATING SHUTDOWN')
-        with self.lock.acquire_timeout(10, job='shutdown') as acquired:
-            if not acquired:
-                self.log.error('Could not acquire lock for shutdown')
-                return False, 'Could not acquire lock'
+        time.sleep(5 * 60)
 
-            self.shutdown_mode = True
+        session.data['response'] = self._run_client_func(
+            self.client.power, True, job='shutdown', check_shutdown=False)
 
-            time.sleep(5 * 60)
+        session.data['response'] = self._run_client_func(
+            self.client.brake, False, job='shutdown', check_shutdown=False)
 
-            self.log.info(self.client.power(True))
-            time.sleep(1)
+        session.data['response'] = self._run_client_func(
+            self.client.home, job='shutdown', check_shutdown=False)
 
-            self.log.info(self.client.brake(False))
-            time.sleep(1)
+        finished = [False, False, False]
+        for actuator, _ in enumerate(finished):
+            while not finished[actuator]:
+                session.data['response'] = self._run_client_func(
+                    self.client.move, 'POS', actuator+1, 0.2, job='shutdown', check_shutdown=False)
 
-            self.log.info(self.client.home())
-            time.sleep(15)
+                return_dict = self._run_client_func(
+                    self.client.reset, job='shutdown', check_shutdown=False)
+                session.data['response'] = return_dict
 
-            for actuator in [1, 2, 3]:
-                self.log.info(self.client.move('POS', actuator, 10))
-                time.sleep(5)
+                if return_dict['result']:
+                    session.data['response'] = self._run_client_func(
+                        self.client.is_cold, True, job='shutdown', check_shutdown=False)
+                    time.sleep(1)
 
-            for _ in range(4):
-                for actuator in [1, 2, 3]:
-                    self.log.info(self.client.move('POS', actuator, 1))
-                    time.sleep(3)
+                    session.data['response'] = self._run_client_func(
+                        self.client.move, 'POS', actuator+1, -0.5, job='shutdown', check_shutdown=False)
 
-                    self.log.info(self.client.reset())
-                    time.sleep(0.5)
+                    session.data['response'] = self._run_client_func(
+                        self.client.is_cold, False, job='shutdown', check_shutdown=False)
+                    time.sleep(1)
 
-            for actuator in [1, 2, 3]:
-                self.log.info(self.client.move('POS', actuator, -1))
-                time.sleep(3)
+                    finished[actuator] = True
+                    
 
-            self.log.info(self.client.brake(True))
-            time.sleep(1)
+        session.data['response'] = self._run_client_func(
+            self.client.brake, True, job='shutdown', check_shutdown=False)
+        time.sleep(1)
 
-            self.log.info(self.client.power(False))
-            time.sleep(1)
+        session.data['response'] = self._run_client_func(
+            self.client.power, False, job='shutdown', check_shutdown=False)
+        time.sleep(1)
 
         return True, 'Shutdown completed'
 
