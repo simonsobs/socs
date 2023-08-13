@@ -14,7 +14,7 @@ import socs.agents.hwp_gripper.drivers.gripper_client as cli
 from socs.agents.hwp_supervisor.agent import get_op_data
 
 
-class GripperAgent:
+class HWPGripperAgent:
     """
     Agent for controlling/monitoring the HWP's three LEY32C-30 linear actuators.
     This interfaces with the GripperServer running on the beaglebone
@@ -345,13 +345,11 @@ class GripperAgent:
         """
         session.set_status('running')
         sleep_time = 5
-
         while session.status in ['starting', 'running']:
             if self.client is None:
                 self.log.warn("Client not initialized")
                 time.sleep(1)
                 continue
-
 
             return_dict = self._run_client_func(
                 self.client.get_state, job='get_state', check_shutdown=False
@@ -485,16 +483,16 @@ def main(args=None):
     init_params = {'auto_acquire': True}
 
     agent, runner = ocs_agent.init_site_agent(args)
-    gripper_agent = GripperAgent(agent, mcu_ip=args.mcu_ip,
+    gripper_agent = HWPGripperAgent(agent, mcu_ip=args.mcu_ip,
                                  control_port=args.control_port,
                                  supervisor_id=args.supervisor_id,
                                  no_data_timeout=args.no_data_timeout)
-    agent.register_process('monitor_state', gripper_agent.monitor_state,
-                           gripper_agent._stop_monitor_state, startup=True)
-    agent.register_process('monitor_supervisor', gripper_agent.monitor_state,
-                           gripper_agent._stop_monitor_supervisor, startup=True)
     agent.register_task('init_connection', gripper_agent.init_connection,
                         startup=init_params)
+    agent.register_process('monitor_state', gripper_agent.monitor_state,
+                           gripper_agent._stop_monitor_state, startup=True)
+    agent.register_process('monitor_supervisor', gripper_agent.monitor_supervisor,
+                           gripper_agent._stop_monitor_supervisor, startup=True)
     agent.register_task('power', gripper_agent.power)
     agent.register_task('brake', gripper_agent.brake)
     agent.register_task('move', gripper_agent.move)
