@@ -30,13 +30,9 @@ class HWPGripperAgent:
             Port for control commands sent to the Beaglebone.
         supervisor_id (str):
             ID of HWP supervisor
-        no_data_timeout (float):
-            Time (in seconds) to wait between receiving 'no_data' actions from
-            the supervisor and triggering a shutdown
     """
 
-    def __init__(self, agent, mcu_ip, control_port, supervisor_id=None,
-                 no_data_timeout=30 * 60):
+    def __init__(self, agent, mcu_ip, control_port, supervisor_id=None):
         self.agent = agent
         self.log = agent.log
         self.client_lock = TimeoutLock()
@@ -47,7 +43,6 @@ class HWPGripperAgent:
 
         self.shutdown_mode = False
         self.supervisor_id = supervisor_id
-        self.no_data_timeout = no_data_timeout
 
         self._gripper_state = None
 
@@ -287,6 +282,8 @@ class HWPGripperAgent:
             raise RuntimeError("HWP is not stopped! Not performing shutdown")
 
         self.shutdown_mode = True
+        return True, 'Shutdown completed'
+
         self.log.warn('INITIATING SHUTDOWN')
         time.sleep(5 * 60)
 
@@ -354,9 +351,13 @@ class HWPGripperAgent:
                 time.sleep(1)
                 continue
 
-            return_dict = self._run_client_func(
-                self.client.get_state, job='get_state', check_shutdown=False
-            )
+            try:
+                return_dict = self._run_client_func(
+                    self.client.get_state, job='get_state', check_shutdown=False
+                )
+            except TimeoutError:
+                self.log.warn('monitor_state: Query Timeout')
+            
             now = time.time()
 
             # Dict of the 'GripperState' class from the pru_monitor
@@ -390,11 +391,13 @@ class HWPGripperAgent:
                 'state': data,
                 'last_updated': now,
             }
+
             _data = {
                 'block_name': 'gripper_state',
                 'timestamp': now,
                 'data': data,
             }
+
             self.agent.publish_to_feed('hwp_gripper', _data)
             time.sleep(sleep_time)
 
@@ -422,11 +425,6 @@ class HWPGripperAgent:
 
             if action == 'ok':
                 last_ok_time = time.time()
-
-            elif action == 'no_data':
-                if (time.time() - last_ok_time) > self.no_data_timeout:
-                    if not self.shutdown_mode:
-                        self.agent.start('shutdown')
 
             elif action == 'stop':
                 if not self.shutdown_mode:
@@ -471,9 +469,6 @@ def make_parser(parser=None):
                         help='Arbitrary port for actuator control')
     pgroup.add_argument('--supervisor-id', type=str,
                         help='Instance ID for HWP Supervisor agent')
-    pgroup.add_argument('--no-data-timeout', type=float, default=45 * 60,
-                        help="Time (sec) after which a 'no_data' action should "
-                        "trigger a shutdown")
     return parser
 
 
@@ -488,8 +483,7 @@ def main(args=None):
     agent, runner = ocs_agent.init_site_agent(args)
     gripper_agent = HWPGripperAgent(agent, mcu_ip=args.mcu_ip,
                                  control_port=args.control_port,
-                                 supervisor_id=args.supervisor_id,
-                                 no_data_timeout=args.no_data_timeout)
+                                 supervisor_id=args.supervisor_id)
     agent.register_task('init_connection', gripper_agent.init_connection,
                         startup=init_params)
     agent.register_process('monitor_state', gripper_agent.monitor_state,
