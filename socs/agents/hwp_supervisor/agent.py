@@ -102,6 +102,7 @@ class HWPClients:
     pid: Optional[OCSClient] = None
     ups: Optional[OCSClient] = None
     lakeshore: Optional[OCSClient] = None
+    iboot: Optional[OCSClient] = None
 
 
 @dataclass
@@ -133,6 +134,11 @@ class HWPState:
     enc_freq: Optional[float] = None
     last_quad: Optional[float] = None
     last_quad_time: Optional[float] = None
+
+    iboot_outlet1: Optional[int] = None
+    iboot_outlet2: Optional[int] = None
+    iboot_outlet1_state: Optional[int] = None
+    iboot_outlet2_state: Optional[int] = None
 
     def _update_from_keymap(self, op, keymap):
         if op['status'] != 'ok':
@@ -259,6 +265,28 @@ class HWPState:
         self.ups_last_connection_attempt = data['ups_connection']['last_attempt']
         self.ups_connected = data['ups_connection']['connected']
 
+    def update_iboot_state(self, op):
+        """
+        Updates state values from the IBoot acq operation results.
+
+        Args
+        -----
+        op : dict
+            Dict containing the operations (from get_op_data) from the IBoot
+            ``acq`` process
+        """
+        iboot_keymap = {
+            'iboot_outlet1_state': (f'outletStatus_{self.iboot_outlet1}', 'status'),
+            'iboot_outlet2_state': (f'outletStatus_{self.iboot_outlet2}', 'status'),
+        }
+
+        if op['status'] != 'ok':
+            for k in ups_keymap:
+                setattr(self, k, None)
+
+        for k, f in iboot_keymap.items():
+            setattr(self, k, op['data'][f[0]][f[1]])
+
     @property
     def pmx_action(self):
         """
@@ -272,8 +300,10 @@ class HWPState:
 
         min_remaining = self.ups_estimated_minutes_remaining
         min_remaining_thresh = self.ups_minutes_remaining_thresh
-        if min_remaining is not None and min_remaining_thresh is not None:
-            if min_remaining < min_remaining_thresh:
+        if min_remaining is not None and min_remaining_thresh is not None and \
+                self.ups_output_source is not None:
+            if min_remaining < min_remaining_thresh and \
+                    self.ups_output_source != 'normal':
                 return 'stop'
 
         # If either ybco_temp or ups state is None, return no_data
@@ -691,10 +721,15 @@ class HWPSupervisor:
         self.hwp_pid_id = args.hwp_pid_id
         self.ups_id = args.ups_id
 
+        self.iboot_id = args.iboot_id
+        self.iboot_outlets = eval(args.iboot_outlets)
+
         self.hwp_state = HWPState(
             temp_field=self.ybco_temp_field,
             temp_thresh=args.ybco_temp_thresh,
             ups_minutes_remaining_thresh=args.ups_minutes_remaining_thresh,
+            iboot_outlet1=int(self.iboot_outlets[0])-1,
+            iboot_outlet2=int(self.iboot_outlets[1])-1,
         )
         self.control_state_machine = ControlStateMachine()
         self.forward_is_cw = args.forward_dir == 'cw'
@@ -718,6 +753,7 @@ class HWPSupervisor:
             pid=get_client(self.hwp_pid_id),
             ups=get_client(self.ups_id),
             lakeshore=get_client(self.ybco_lakeshore_id),
+            iboot=get_client(self.iboot_id),
         )
 
     @ocs_agent.param('test_mode', type=bool, default=False)
@@ -754,7 +790,8 @@ class HWPSupervisor:
                     },
                     'rotation': {see above},
                     'temperature': {see above},
-                    'ups': {see above}},
+                    'ups': {see above}
+                    'iboot': {see above}},
                 # State data parsed from monitored sessions
                 'state': {
                     'hwp_freq': None,
@@ -794,13 +831,15 @@ class HWPSupervisor:
             pmx_op = get_op_data(self.hwp_pmx_id, 'acq', **kw)
             pid_op = get_op_data(self.hwp_pid_id, 'acq', **kw)
             ups_op = get_op_data(self.ups_id, 'acq', **kw)
+            iboot_op = get_op_data(self.iboot_id, 'acq', **kw)
 
             session.data['monitored_sessions'] = {
                 'temperature': temp_op,
                 'encoder': enc_op,
                 'pmx': pmx_op,
                 'pid': pid_op,
-                'ups': ups_op
+                'ups': ups_op,
+                'iboot': iboot_op
             }
 
             # gather state info
@@ -809,6 +848,7 @@ class HWPSupervisor:
             self.hwp_state.update_temp_state(temp_op)
             self.hwp_state.update_ups_state(ups_op)
             self.hwp_state.update_enc_state(enc_op)
+            self.hwp_state.update_iboot_state(iboot_op)
             session.data['hwp_state'] = asdict(self.hwp_state)
 
             # Get actions for each hwp subsystem
@@ -989,7 +1029,8 @@ def make_parser(parser=None):
     pgroup.add_argument('--ups-minutes-remaining-thresh', type=float,
                         help="Threshold for UPS minutes remaining before a "
                              "shutdown is triggered")
-
+    pgroup.add_argument('--iboot-id', help="Instance ID for IBoot-PDU agent")
+    pgroup.add_argument('--iboot-outlets', help="IBoot-PDU outlets connected  to bias power")
     pgroup.add_argument('--forward-dir', choices=['cw', 'ccw'], default="cw",
                         help="Whether the PID 'forward' direction is cw or ccw")
     return parser
