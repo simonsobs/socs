@@ -466,7 +466,7 @@ class LS372_Agent:
 
     @ocs_agent.param('_')
     def get_sample_output(self, session, params):
-        """get_heater_range(heater)
+        """get_sample_output()
 
         **Task** - Query the heater range for servoing cryostat.
 
