@@ -476,7 +476,9 @@ class LS372_Agent:
             object in the format::
 
               >>> response.session['data']
-              {"sample_resistance": 1000}
+              {'sample_resistance': 1020.0,
+               'display_mode': 'current',
+               'heater_power_percent': 0.0005}
 
         """
         with self._lock.acquire_timeout(job='get_sample_output') as acquired:
