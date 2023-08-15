@@ -468,11 +468,15 @@ class LS372_Agent:
     def get_sample_output(self, session, params):
         """get_sample_output()
 
-        **Task** - Query the heater range for servoing cryostat.
+        **Task** - Query sample heater ouput (res, display mode, output in %)
+        for servoing cryostat.
 
-        Parameters:
-            heater (str): Name of heater to get range for, either 'sample' or
-                'still'.
+        Notes:
+            The sample heater output is stored in the session data
+            object in the format::
+
+              >>> response.session['data']
+              {"sample_resistance": 1000}
 
         """
         with self._lock.acquire_timeout(job='get_sample_output') as acquired:
@@ -487,6 +491,10 @@ class LS372_Agent:
             heater_settings = self.module.sample_heater.get_heater_setup()
             res = float(heater_settings[0])
             display_mode = heater_display_key[heater_settings[3]]
+
+            session.data = {"sample_resistance": res,
+                            "display_mode": display_mode,
+                            "heater_power_percent": heater_perc}
 
         return True, 'Sample heater res {} ohms, display mode set to {} at {}%'.format(res, display_mode, heater_perc)
 
