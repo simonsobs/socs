@@ -258,6 +258,14 @@ def test_ls372_get_input_setup(wait_for_crossbar, emulator, run_agent, client):
 
 
 @pytest.mark.integtest
+def test_ls372_get_sample_output(wait_for_crossbar, emulator, run_agent, client):
+    client.init_lakeshore()
+    resp = client.get_sample_output()
+    assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
+
+@pytest.mark.integtest
 def test_ls372_sample_custom_pid(wait_for_crossbar, emulator, run_agent, client):
     client.init_lakeshore()
     response = {'SCAN?': '02, 0',
