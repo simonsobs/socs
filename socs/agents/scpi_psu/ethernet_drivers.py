@@ -1,5 +1,7 @@
 import socket
+
 print("Imported PSU-Ethernet Interface - If Your PSU uses GPIB verify args in default.yaml")
+
 
 class PsuInterface:
     def __init__(self, ip_address, port=5025, verbose=False, **kwargs):
@@ -8,7 +10,6 @@ class PsuInterface:
         self.port = port
         self.sock = None
         self.conn_socket()
-        
 
     def conn_socket(self):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -17,14 +18,13 @@ class PsuInterface:
 
     def write(self, msg):
         message = (msg + '\n').encode('utf-8')
-        
+
         try:
             self.sock.send(message)
         except socket.error as e:
             print(e)
             self.initialize()
             self.sock.send(message)
-
 
     def read(self):
 
@@ -36,7 +36,7 @@ class PsuInterface:
             output = self.sock.recv(128).decode("utf-8").rstrip('\n').rstrip('\r')
 
         return output
-    
+
     def enable(self, ch):
         '''
         Enables output for channel (1,2,3) but does not turn it on.
@@ -70,7 +70,7 @@ class PsuInterface:
         self.set_chan(ch)
         self.enable(ch)
         if isinstance(out, str):
-            self.write('CHAN:OUTP '+out)
+            self.write('CHAN:OUTP ' + out)
         elif out:
             self.write('CHAN:OUTP ON')
         else:
@@ -110,7 +110,7 @@ class PsuInterface:
         self.write('MEAS:CURR? CH' + str(ch))
         current = float(self.read())
         return current
-    
+
     def identify(self):
         self.write('*idn?')
         return self.read()

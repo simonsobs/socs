@@ -5,10 +5,9 @@ import time
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
+from socs.agents.scpi_psu.ethernet_drivers import \
+    PsuInterface as PsuEthernetInterface
 from socs.agents.scpi_psu.gpib_drivers import PsuInterface as PsuGpibInterface
-from socs.agents.scpi_psu.ethernet_drivers import PsuInterface as PsuEthernetInterface
-
-
 
 
 class ScpiPsuAgent:
@@ -60,7 +59,7 @@ class ScpiPsuAgent:
                     self.log.error("PSU timed out during connect")
                     return False, "Timeout"
 
-            self.idn = self.psu.identify()    
+            self.idn = self.psu.identify()
             self.log.info("Connected to psu: {}".format(self.idn))
 
         return True, 'Initialized PSU.'
@@ -210,9 +209,8 @@ def main(args=None):
     else:
         print("Connecting to GPIB: " + args.gpib_slot)
         print("Connecting to PSU via GPIB/Ethernet Interface")
-        
-    
-    #Test IP Formatting
+
+    # Test IP Formatting
     try:
         socket.inet_aton(args.ip_address)
         # legal
