@@ -300,7 +300,7 @@ class HWPGripperAgent:
         for actuator, _ in enumerate(finished):
             while not finished[actuator]:
                 session.data['response'] = self._run_client_func(
-                    self.client.move, 'POS', actuator+1, 0.2, job='shutdown', check_shutdown=False)
+                    self.client.move, 'POS', actuator + 1, 0.2, job='shutdown', check_shutdown=False)
 
                 return_dict = self._run_client_func(
                     self.client.reset, job='shutdown', check_shutdown=False)
@@ -312,14 +312,13 @@ class HWPGripperAgent:
                     time.sleep(1)
 
                     session.data['response'] = self._run_client_func(
-                        self.client.move, 'POS', actuator+1, -0.5, job='shutdown', check_shutdown=False)
+                        self.client.move, 'POS', actuator + 1, -0.5, job='shutdown', check_shutdown=False)
 
                     session.data['response'] = self._run_client_func(
                         self.client.is_cold, False, job='shutdown', check_shutdown=False)
                     time.sleep(1)
 
                     finished[actuator] = True
-                    
 
         session.data['response'] = self._run_client_func(
             self.client.brake, True, job='shutdown', check_shutdown=False)
@@ -357,7 +356,7 @@ class HWPGripperAgent:
                 )
             except TimeoutError:
                 self.log.warn('monitor_state: Query Timeout')
-            
+
             now = time.time()
 
             # Dict of the 'GripperState' class from the pru_monitor
@@ -365,7 +364,7 @@ class HWPGripperAgent:
             data = {
                 'last_packet_received': state['last_packet_received'],
             }
-            
+
             data.update({
                 'jxc_setup': int(state['jxc']['setup']),
                 'jxc_svon': int(state['jxc']['svon']),
@@ -482,8 +481,8 @@ def main(args=None):
 
     agent, runner = ocs_agent.init_site_agent(args)
     gripper_agent = HWPGripperAgent(agent, mcu_ip=args.mcu_ip,
-                                 control_port=args.control_port,
-                                 supervisor_id=args.supervisor_id)
+                                    control_port=args.control_port,
+                                    supervisor_id=args.supervisor_id)
     agent.register_task('init_connection', gripper_agent.init_connection,
                         startup=init_params)
     agent.register_process('monitor_state', gripper_agent.monitor_state,

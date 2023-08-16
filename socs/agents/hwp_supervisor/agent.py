@@ -725,8 +725,8 @@ class HWPSupervisor:
             temp_field=self.ybco_temp_field,
             temp_thresh=args.ybco_temp_thresh,
             ups_minutes_remaining_thresh=args.ups_minutes_remaining_thresh,
-            iboot_outlet1=int(self.iboot_outlets[0])-1,
-            iboot_outlet2=int(self.iboot_outlets[1])-1,
+            iboot_outlet1=int(self.iboot_outlets[0]) - 1,
+            iboot_outlet2=int(self.iboot_outlets[1]) - 1,
         )
         self.control_state_machine = ControlStateMachine()
         self.forward_is_cw = args.forward_dir == 'cw'
