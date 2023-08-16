@@ -5,7 +5,10 @@ import time
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
-from socs.agents.scpi_psu.drivers import PsuInterface
+from socs.agents.scpi_psu.gpib_drivers import PsuInterface as PsuGpibInterface
+from socs.agents.scpi_psu.ethernet_drivers import PsuInterface as PsuEthernetInterface
+
+
 
 
 class ScpiPsuAgent:
@@ -41,12 +44,23 @@ class ScpiPsuAgent:
             if not acquired:
                 return False, "Could not acquire lock"
 
-            try:
-                self.psu = PsuInterface(self.ip_address, self.gpib_slot)
-                self.idn = self.psu.identify()
-            except socket.timeout as e:
-                self.log.error(f"PSU timed out during connect: {e}")
-                return False, "Timeout"
+            if self.gpib_slot is not None:
+                print("Connecting to PSU via GPIB/Ethernet Connection")
+                self.gpib_slot = int(self.gpib_slot)
+                try:
+                    self.psu = PsuGpibInterface(self.ip_address, self.gpib_slot)
+                except socket.timeout as e:
+                    self.log.error("PSU timed out during connect")
+                    return False, "Timeout"
+            else:
+                try:
+                    print("Connecting to PSU via Ethernet Connection")
+                    self.psu = PsuEthernetInterface(self.ip_address)
+                except socket.timeout as e:
+                    self.log.error("PSU timed out during connect")
+                    return False, "Timeout"
+
+            self.idn = self.psu.identify()    
             self.log.info("Connected to psu: {}".format(self.idn))
 
         return True, 'Initialized PSU.'
@@ -190,8 +204,23 @@ def main(args=None):
                                   args=args)
 
     agent, runner = ocs_agent.init_site_agent(args)
+    print("Connecting to IP: " + args.ip_address)
+    if args.gpib_slot is None:
+        print("Connecting to PSU via Ethernet-only Interface")
+    else:
+        print("Connecting to GPIB: " + args.gpib_slot)
+        print("Connecting to PSU via GPIB/Ethernet Interface")
+        
+    
+    #Test IP Formatting
+    try:
+        socket.inet_aton(args.ip_address)
+        # legal
+    except socket.error:
+        # Not legal
+        print("Invalid IP Format")
 
-    p = ScpiPsuAgent(agent, args.ip_address, int(args.gpib_slot))
+    p = ScpiPsuAgent(agent, args.ip_address, args.gpib_slot)
 
     agent.register_task('init', p.init)
     agent.register_task('set_voltage', p.set_voltage)
