@@ -281,7 +281,7 @@ class HWPState:
         }
 
         if op['status'] != 'ok':
-            for k in ups_keymap:
+            for k in iboot_keymap:
                 setattr(self, k, None)
 
         for k, f in iboot_keymap.items():
