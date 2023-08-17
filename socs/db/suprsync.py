@@ -445,7 +445,9 @@ class SupRsyncFilesManager:
 
     def update_all_timecode_dirs(self, archive_name, file_root, sync_id):
         with self.Session.begin() as session:
-            tcdirs = session.query(TimecodeDir).all()
+            tcdirs = session.query(TimecodeDir).filter(
+                TimecodeDir.archive_name == archive_name,
+            ).all()
             for tcdir in tcdirs:
                 self._update_tcdir(tcdir, session, file_root, sync_id)
 
