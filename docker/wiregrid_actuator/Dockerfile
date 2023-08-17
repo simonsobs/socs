@@ -23,6 +23,3 @@ RUN apt-get update \
 COPY . .
 
 ENTRYPOINT ["./wg-actuator-entrypoint.sh"]
-
-CMD ["--site-hub=ws://crossbar:8001/ws", \
-     "--site-http=http://crossbar:8001/call"]
