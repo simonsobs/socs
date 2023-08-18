@@ -139,7 +139,7 @@ class WiregridKikusuiAgent:
             return False, msg
 
     def _connect_encoder(self):
-        site_http_env = os.env.get("SITE_HTTP")
+        site_http_env = os.environ.get("SITE_HTTP")
         if site_http_env:
             args = ['--site-http', site_http_env]
         if self.crossbar_http is not None:
