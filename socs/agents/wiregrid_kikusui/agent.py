@@ -1,4 +1,5 @@
 import argparse
+import os
 import time
 
 import numpy as np
@@ -26,11 +27,14 @@ class WiregridKikusuiAgent:
             Communicating device is determined
             by the ethernet port number of the converter.
         encoder_agent (str): Instance ID of the wiregrid encoder agent
+        crossbar_http (str): Crossbar site-http address for encoder client
+            connection. `SITE_HTTP` env var used by default. This argument
+            overrides `SITE_HTTP`.
         debug (bool): ON/OFF of writing a log file
     """
 
     def __init__(self, agent, kikusui_ip, kikusui_port,
-                 encoder_agent='wgencoder', debug=False):
+                 encoder_agent='wgencoder', crossbar_http=None, debug=False):
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
@@ -39,6 +43,7 @@ class WiregridKikusuiAgent:
         self.kikusui_ip = kikusui_ip
         self.kikusui_port = int(kikusui_port)
         self.encoder_agent = encoder_agent
+        self.crossbar_http = crossbar_http
         self.debug = debug
 
         self.position_path = '/data/wg-data/position.log'
@@ -134,7 +139,12 @@ class WiregridKikusuiAgent:
             return False, msg
 
     def _connect_encoder(self):
-        self.encoder_client = OCSClient(self.encoder_agent)
+        site_http_env = os.env.get("SITE_HTTP")
+        if site_http_env:
+            args = ['--site-http', site_http_env]
+        if self.crossbar_http is not None:
+            args = ['--site-http', self.crossbar_http]
+        self.encoder_client = OCSClient(self.encoder_agent, args=args)
 
     def _rotate_alittle(self, operation_time):
         if operation_time != 0.:
@@ -612,6 +622,11 @@ def make_parser(parser=None):
     pgroup.add_argument('--encoder-agent', dest='encoder_agent',
                         default='wgencoder',
                         help='Instance id of the wiregrid encoder agent')
+    # Avoiding --site-http name in case of interaction with actual argument
+    pgroup.add_argument('--crossbar-http', default=None,
+                        help='crossbar site-http address for encoder client '
+                             + 'connection. `SITE_HTTP` env var used by default. '
+                             + 'This argument overrides `SITE_HTTP`.')
     pgroup.add_argument('--debug', dest='debug',
                         action='store_true', default=False,
                         help='Write a log file for debug')
@@ -628,6 +643,7 @@ def main(args=None):
     kikusui_agent = WiregridKikusuiAgent(agent, kikusui_ip=args.kikusui_ip,
                                          kikusui_port=args.kikusui_port,
                                          encoder_agent=args.encoder_agent,
+                                         crossbar_http=args.crossbar_http,
                                          debug=args.debug)
     agent.register_process('IV_acq', kikusui_agent.IV_acq,
                            kikusui_agent.stop_IV_acq, startup=True)

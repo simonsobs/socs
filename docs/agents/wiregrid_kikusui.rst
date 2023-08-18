@@ -42,6 +42,8 @@ An example site-config-file block::
   Communicating device is determined by the ethernet port number of the converter.)
 - encoder-agent is an instance ID of the wiregrid encoder agent (wiregrid-encoder).
   This is necessary to get the position recorded by the encoder for controlling the rotation.
+- crossbar-http is available (but not shown here) and can be used to set the
+  crossbar address used for the OCSClient connection to the encoder agent.
 
 Docker Compose
 ``````````````
@@ -54,6 +56,8 @@ An example docker-compose configuration::
       network_mode: "host"
       command:
         - INSTANCE_ID=wgkikusui
+        - SITE_HUB=ws://127.0.0.1:8001/ws
+        - SITE_HTTP=http://127.0.0.1:8001/call
       volumes:
         - ${OCS_CONFIG_DIR}:/config:ro
         - "<local directory to record log file>:/data/wg-data"
