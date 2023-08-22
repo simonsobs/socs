@@ -34,7 +34,7 @@ def http_mock():
         else:
             assert False, "Bad query"
 
-    return app.run("127.0.0.1", 5002)
+    return app.run("127.0.0.1", 5000)
 
 
 @pytest.mark.integtest
