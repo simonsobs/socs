@@ -62,8 +62,3 @@ Agent API
 
 .. autoclass:: socs.agents.ucsc_radiometer.agent.UCSCRadiometerAgent
     :members:
-
-Supporting APIs
----------------
-
-.. autoclass:: socs.agents.ucsc_radiometer.agent.UCSCRadiometerAgent
