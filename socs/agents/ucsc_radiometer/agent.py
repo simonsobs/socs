@@ -51,6 +51,18 @@ class UCSCRadiometerAgent:
         test_mode : bool, option
             Run the Process loop only once. Meant only for testing.
             Default is False.
+
+        Notes
+        -----
+        The most recent data collected is stored in session data in the
+        following structure::
+
+            >>> response.session['data']
+            {'timestamp': 1678820419.0,
+             'fields':
+                {'pwv': 0.49253026985972237}
+            }
+
         """
         pm = Pacemaker(1 / 60, quantize=False)
 
@@ -113,7 +125,7 @@ def main(args=None):
     args = site_config.parse_args(agent_class='UCSCRadiometerAgent', parser=parser, args=args)
 
     agent, runner = ocs_agent.init_site_agent(args)
-    pwv_agent = UCSCRadiometerAgent(agent, args.url, args.year)
+    pwv_agent = UCSCRadiometerAgent(agent, args.url)
 
     agent.register_process('acq', pwv_agent.acq, pwv_agent._stop_acq, startup=True)
 
