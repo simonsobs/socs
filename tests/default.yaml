@@ -77,7 +77,8 @@ hosts:
        'arguments': [['--address', '127.0.0.1'],
                      ['--port', 1024],
                      ['--mode', 'test'],
-                     ['--snmp-version', 2]
+                     ['--snmp-version', 2],
+                     ['--lock-outlet', [1]]
                      ]
       },
       {'agent-class': 'SynaccessAgent',

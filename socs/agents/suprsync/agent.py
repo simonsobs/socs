@@ -48,6 +48,7 @@ class SupRsync:
 
     def __init__(self, agent, args):
         self.agent = agent
+        self.instance_id = args.instance_id
         self.log = txaio.make_logger()
         self.archive_name = args.archive_name
         self.ssh_host = args.ssh_host
@@ -63,6 +64,7 @@ class SupRsync:
         self.sleep_time = args.sleep_time
         self.compression = args.compression
         self.bwlimit = args.bwlimit
+        self.suprsync_file_root = args.suprsync_file_root
 
         # Feed for counting transfer errors, loop iterations.
         self.agent.register_feed('transfer_stats',
@@ -70,6 +72,7 @@ class SupRsync:
                                  agg_params={
                                      'exclude_aggregator': True,
                                  })
+        self.agent.register_feed('archive_stats', record=True)
 
     def run(self, session, params=None):
         """run()
@@ -90,6 +93,15 @@ class SupRsync:
                     "start_time": 1661284493.5333128,
                     "files": [],
                     "stop_time": 1661284493.5398622
+                  },
+                  "archive_stats": {
+                    "smurf": {
+                        "finalized_until": 1687797424.652119,
+                        "num_files": 3,
+                        "uncopied_files": 0,
+                        "last_file_added": "/path/to/file",
+                        "last_file_copied": "/path/to/file"
+                    }
                   },
                   "counters": {
                     "iterations": 1,
@@ -132,6 +144,7 @@ class SupRsync:
             counters['iterations'] += 1
 
             op = {'start_time': time.time()}
+
             try:
                 session.data['activity'] = 'copying'
                 op['files'] = handler.copy_files(max_copy_attempts=self.max_copy_attempts,
@@ -147,6 +160,16 @@ class SupRsync:
                 counters['errors_nonzero'] += 1
 
             now = time.time()
+
+            archive_stats = srfm.get_archive_stats(self.archive_name)
+            if archive_stats is not None:
+                self.agent.publish_to_feed('archive_stats', {
+                    'block_name': self.archive_name,
+                    'timestamp': now,
+                    'data': archive_stats
+                })
+            session.data['archive_stats'] = archive_stats
+
             op['stop_time'] = now
             session.data['last_copy'] = op
             session.data['timestamp'] = now
@@ -161,6 +184,10 @@ class SupRsync:
             if self.delete_after is not None:
                 session.data['activity'] = 'deleting'
                 handler.delete_files(self.delete_after)
+
+            # After handling files, update the timecode dirs
+            srfm.update_all_timecode_dirs(
+                self.archive_name, self.suprsync_file_root, self.instance_id)
 
             session.data['activity'] = 'idle'
             time.sleep(self.sleep_time)
@@ -210,6 +237,8 @@ def make_parser(parser=None):
                         help="Activate gzip on data transfer (rsync -z)")
     pgroup.add_argument('--bwlimit', type=str, default=None,
                         help="Bandwidth limit arg (passed through to rsync)")
+    pgroup.add_argument('--suprsync-file-root', type=str, required=True,
+                        help="Local path where agent will write suprsync files")
     return parser
 
 

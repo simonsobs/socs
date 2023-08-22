@@ -2,13 +2,12 @@ import os
 
 import ocs
 import pytest
+from integration.util import docker_compose_file  # noqa: F401
 from integration.util import create_crossbar_fixture
 from ocs.base import OpCode
 from ocs.testing import create_agent_runner_fixture, create_client_fixture
 
 from socs.testing.device_emulator import create_device_emulator
-
-pytest_plugins = ("docker_compose")
 
 # Set the OCS_CONFIG_DIR so we read the local default.yaml file always
 os.environ['OCS_CONFIG_DIR'] = os.getcwd()
@@ -230,6 +229,14 @@ def test_ls372_get_still_output(wait_for_crossbar, emulator, run_agent, client):
 def test_ls372_engage_channel(wait_for_crossbar, emulator, run_agent, client):
     client.init_lakeshore()
     resp = client.engage_channel(channel=2, state='on')
+    assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
+
+@pytest.mark.integtest
+def test_ls372_engage_autorange(wait_for_crossbar, emulator, run_agent, client):
+    client.init_lakeshore()
+    resp = client.engage_autorange(channel=3, state='on')
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 

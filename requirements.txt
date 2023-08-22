@@ -6,7 +6,7 @@ twisted
 
 # hardware communication
 pyserial
-pysnmp-lextudio
+pysnmp
 pysmi
 pyasn1==0.4.8
 
@@ -50,6 +50,9 @@ xy_stage_control @ git+https://github.com/kmharrington/xy_stage_control.git@main
 pysmurf @ git+https://github.com/slaclab/pysmurf.git@main
 sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master
 sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master
+
+# modbus
+pyModbusTCP
 
 # Docs
 # see docs/requirements.txt
