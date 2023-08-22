@@ -64,12 +64,8 @@ class UCSCRadiometerAgent:
             }
 
         """
-        pm = Pacemaker(1 / 60, quantize=False)
-
         self.take_data = True
         while self.take_data:
-            pm.sleep()
-
             r = requests.get(self.url)
             data = r.json()
             last_pwv = data['pwv']
@@ -95,6 +91,9 @@ class UCSCRadiometerAgent:
 
             if params['test_mode']:
                 break
+            else:
+                pm = Pacemaker(1 / 60, quantize=False)
+                pm.sleep()
 
         return True, 'Acquisition exited cleanly.'
 
