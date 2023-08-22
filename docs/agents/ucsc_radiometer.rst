@@ -6,7 +6,7 @@
 UCSC Radiometer Agent
 ==============
 
-The UCSC Radiometer agent uses HTTP queries to publish pwv data from a Flask server.
+The UCSC Radiometer Agent monitors the PWV through the UCSC Radiometer web server.
 
 .. argparse::
     :filename: ../socs/agents/ucsc_radiometer/agent.py
@@ -54,9 +54,8 @@ Description
 -----------
 
 The UCSC radiometer measures precipitable water vapor (pwv) of the atmosphere,
-and outputs the values to a textfile per day on a computer at the site where OCS
-is not setup. As a result, a Flask app is built to server textfiles from the
-radiometer server, where this Agent uses HTTP queries to publish pwv data to OCS.
+and outputs the values to disk on a computer at the site where OCS
+is not setup. A web server makes the PWV values available over HTTP. The Agent requests the PWV data and then publishes it to OCS.
 
 Agent API
 ---------
