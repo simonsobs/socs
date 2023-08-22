@@ -90,7 +90,7 @@ class WiregridActuatorAgent:
         if LSonoff:
             self.log.info(
                 '_move(): Stopped moving because '
-                'one of {} limit-switches is ON (LSL1={}, LSR1={})!'
+                'one of {} limit-switches is ON (LSL={}, LSR={})!'
                 .format(LSlabel, LSL, LSR))
         return True, \
             '_move(): Finish move(distance={}, speedrate={}, limit-switch={})'\
@@ -102,7 +102,7 @@ class WiregridActuatorAgent:
         if distance < 0.:
             distance = abs(distance)
         ret, msg, LSonoff = self._move(
-            distance, speedrate, 'LSL1', 'LSR1', 'inside')
+            distance, speedrate, 'LSL2', 'LSR2', 'inside')
         return ret, \
             '_forward(): '\
             'Finish forward(distance={}, speedrate={}, limit-switch={})'\
@@ -114,7 +114,7 @@ class WiregridActuatorAgent:
         if distance > 0.:
             distance = -1. * abs(distance)
         ret, msg, LSonoff = self._move(
-            distance, speedrate, 'LSL2', 'LSR2', 'outside')
+            distance, speedrate, 'LSL1', 'LSR1', 'outside')
         return ret, \
             '_backward(): '\
             'Finish backward(distance={}, speedrate={}, limit-switch={})'\
@@ -125,7 +125,7 @@ class WiregridActuatorAgent:
             self, main_distance=920, main_speedrate=1.0, is_insert=True):
         # Function label
         flabel = 'insert' if is_insert else 'eject'
-        initial_ls_names = ['LSL2', 'LSR2'] if is_insert else ['LSL1', 'LSR1']
+        initial_ls_names = ['LSL1', 'LSR1'] if is_insert else ['LSL2', 'LSR2']
         move_func = self._forward if is_insert else self._backward
 
         # Check connection
