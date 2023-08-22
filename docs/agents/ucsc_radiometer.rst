@@ -27,8 +27,7 @@ using all of the available arguments::
 
         {'agent-class': 'UCSCRadiometerAgent',
          'instance-id': 'pwvs',
-         'arguments':[['--url', 'http://127.0.0.1:5000'],
-                      ['--year', '2023']]},
+         'arguments':[['--url', 'http://127.0.0.1:5000']]},
 
 .. note::
    The ``--url`` argument should be the address of the Flask server on the
