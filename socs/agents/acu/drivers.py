@@ -273,26 +273,36 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
             True.
 
     """
-    az_min = min(az_endpoint1, az_endpoint2)
-    az_max = max(az_endpoint1, az_endpoint2)
-    if az_max == az_min:
+    def get_target_az(current_az, current_t, increasing):
+        if increasing:
+            target = max(az_endpoint1, az_endpoint2)
+        else:
+            target = min(az_endpoint1, az_endpoint2)
+        return target
+
+    if az_endpoint1 == az_endpoint2:
         raise ValueError('Generator requires two different az endpoints!')
+
+    # Note that starting scan direction gets modified, below,
+    # depending on az_start.
+    increasing = az_endpoint2 > az_endpoint1
+
     if az_start in ['az_endpoint1', 'az_endpoint2', 'end']:
         if az_start in ['az_endpoint1', 'end']:
             az = az_endpoint1
         else:
             az = az_endpoint2
-        increasing = (az == az_min)
+            increasing = not increasing
     elif az_start in ['mid_inc', 'mid_dec', 'mid']:
         az = (az_endpoint1 + az_endpoint2) / 2
         if az_start == 'mid':
-            increasing = az_endpoint2 > az_endpoint1
+            pass
         elif az_start == 'mid_inc':
             increasing = True
         else:
             increasing = False
     else:
-        raise ValueError('az_start value not supported. Choose from '
+        raise ValueError(f'az_start value "{az_start}" not supported. Choose from '
                          'az_endpoint1, az_endpoint2, mid_inc, mid_dec')
     az_vel = az_speed if increasing else -az_speed
 
@@ -318,7 +328,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
         stop_iter = float('inf')
     else:
         stop_iter = num_batches
-        batch_size = int(np.ceil((az_max - az_min) / daz))
+        batch_size = int(np.ceil(abs(az_endpoint2 - az_endpoint1) / daz))
 
     def dec_num_scans():
         nonlocal num_scans
@@ -328,6 +338,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
     def check_num_scans():
         return num_scans is None or num_scans > 0
 
+    target_az = get_target_az(az, t, increasing)
     point_group_batch = 0
 
     i = 0
@@ -348,61 +359,59 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                 point_group_batch -= 1
 
             if increasing:
-                if az <= (az_max - 2 * daz):
+                if az <= (target_az - 2 * daz):
                     t += step_time
                     az += daz
                     az_vel = az_speed
                     el_vel = el_speed
                     az_flag = 1
                     el_flag = 0
-                    increasing = True
-                elif az == az_max:
+                elif az == target_az:
+                    # Turn around.
                     t += turntime
                     az_vel = -1 * az_speed
                     el_vel = el_speed
                     az_flag = 1
                     el_flag = 0
                     increasing = False
+                    target_az = get_target_az(az, t, increasing)
                     dec_num_scans()
                     point_group_batch = MIN_GROUP_NEW_LEG - 1
                 else:
-                    az_remaining = az_max - az
-                    time_remaining = az_remaining / az_speed
-                    az = az_max
+                    time_remaining = (target_az - az) / az_speed
+                    az = target_az
                     t += time_remaining
                     az_vel = az_speed
                     el_vel = el_speed
                     az_flag = 2
                     el_flag = 0
-                    increasing = True
             else:
-                if az >= (az_min + 2 * daz):
+                if az >= (target_az + 2 * daz):
                     t += step_time
                     az -= daz
                     az_vel = -1 * az_speed
                     el_vel = el_speed
                     az_flag = 1
                     el_flag = 0
-                    increasing = False
-                elif az == az_min:
+                elif az == target_az:
+                    # Turn around.
                     t += turntime
                     az_vel = az_speed
                     el_vel = el_speed
                     az_flag = 1
                     el_flag = 0
                     increasing = True
+                    target_az = get_target_az(az, t, increasing)
                     dec_num_scans()
                     point_group_batch = MIN_GROUP_NEW_LEG - 1
                 else:
-                    az_remaining = az - az_min
-                    time_remaining = az_remaining / az_speed
-                    az = az_min
+                    time_remaining = (az - target_az) / az_speed
+                    az = target_az
                     t += time_remaining
                     az_vel = -1 * az_speed
                     el_vel = el_speed
                     az_flag = 2
                     el_flag = 0
-                    increasing = False
 
             if not check_num_scans():
                 # Kill the velocity on the last point and exit -- this
