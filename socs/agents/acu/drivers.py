@@ -344,12 +344,12 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
             point_block[6].append(el_flag)
             point_block[7].append(int(point_group_batch > 0))
 
-            t += step_time
             if point_group_batch > 0:
                 point_group_batch -= 1
 
             if increasing:
                 if az <= (az_max - 2 * daz):
+                    t += step_time
                     az += daz
                     az_vel = az_speed
                     el_vel = el_speed
@@ -369,7 +369,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                     az_remaining = az_max - az
                     time_remaining = az_remaining / az_speed
                     az = az_max
-                    t += (time_remaining - step_time)
+                    t += time_remaining
                     az_vel = az_speed
                     el_vel = el_speed
                     az_flag = 2
@@ -377,6 +377,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                     increasing = True
             else:
                 if az >= (az_min + 2 * daz):
+                    t += step_time
                     az -= daz
                     az_vel = -1 * az_speed
                     el_vel = el_speed
@@ -396,7 +397,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                     az_remaining = az - az_min
                     time_remaining = az_remaining / az_speed
                     az = az_min
-                    t += (time_remaining - step_time)
+                    t += time_remaining
                     az_vel = -1 * az_speed
                     el_vel = el_speed
                     az_flag = 2
