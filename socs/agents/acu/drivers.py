@@ -225,6 +225,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                                     batch_size=500,
                                     az_start='mid_inc',
                                     az_first_pos=None,
+                                    az_drift=None,
                                     ptstack_fmt=True):
     """Python generator to produce times, azimuth and elevation positions,
     azimuth and elevation velocities, azimuth and elevation flags for
@@ -266,6 +267,9 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
         az_first_pos (float): If not None, the first az scan will
             start at this position (but otherwise proceed in the same
             starting direction).
+        az_drift (float): The rate (deg / s) at which to shift the
+            scan endpoints in time.  This can be used to better track
+            celestial sources in targeted scans.
         ptstack_fmt (bool): determine whether values are produced with the
             necessary format to upload to the ACU. If False, this function will
             produce lists of time, azimuth, elevation, azimuth velocity,
@@ -274,10 +278,19 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
 
     """
     def get_target_az(current_az, current_t, increasing):
+        # Return the next endpoint azimuth, based on current (az, t)
+        # and whether to move in +ve or -ve az direction.
+        #
+        # Includes the effects of az_drift, to keep the scan endpoints
+        # (at least at the end of a scan) on the drifted trajectories.
         if increasing:
             target = max(az_endpoint1, az_endpoint2)
         else:
             target = min(az_endpoint1, az_endpoint2)
+        if az_drift is not None:
+            v = az_speed if increasing else -az_speed
+            target = target + az_drift / (v - az_drift) * (
+                (target - current_az + v * current_t))
         return target
 
     if az_endpoint1 == az_endpoint2:
