@@ -362,7 +362,7 @@ class WiregridKikusuiAgent:
                 v_val, c_val = self.cmd.user_input('VC?')
                 s_msg, s_val = self.cmd.user_input('O?')
 
-            return True,\
+            return True, \
                 'Get Kikusui voltage / current: {} V / {} A [status={}]'\
                 .format(v_val, c_val, s_val)
 
@@ -381,10 +381,10 @@ class WiregridKikusuiAgent:
 
             angle = self._get_position()
             if angle < 0.:
-                return False,\
+                return False, \
                     'Could not get the angle of the wire-grid rotation.'
 
-            return True,\
+            return True, \
                 'Get wire-grid rotation angle = {} deg'.format(angle)
 
     @ocs_agent.param('storepath', default='/data/wg-data/action/', type=str)
@@ -431,7 +431,7 @@ class WiregridKikusuiAgent:
 
             logfile.close()
 
-            return True,\
+            return True, \
                 'Micro step rotation of wire grid finished. '\
                 'Please calibrate and take feedback params.'
 
@@ -541,11 +541,11 @@ class WiregridKikusuiAgent:
                                 self.log.warn(
                                     'Failed to aquire the lock '
                                     'for IV_acq()!')
-                                return False,\
+                                return False, \
                                     'Could not re-acquire lock '\
                                     'for IV_acq() (timeout=-1)'
                         else:
-                            return False,\
+                            return False, \
                                 'Could not re-acquire lock '\
                                 'for IV_acq() (timeout=1000 sec)'
 
