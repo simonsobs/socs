@@ -349,7 +349,7 @@ class WiregridActuatorAgent:
                     'check_limitswitch(): '
                     'Lock could not be acquired because it is held by {}.'
                     .format(self.lock.job))
-                return False,\
+                return False, \
                     'check_limitswitch(): '\
                     'Could not acquire lock'
 
@@ -764,7 +764,7 @@ class WiregridActuatorAgent:
                             'acq(): '
                             'Could not re-acquire lock now held by {}.'
                             .format(self.lock.job))
-                        return False,\
+                        return False, \
                             'acq(): Could not re-acquire lock (timeout)'
 
                 current_time = time.time()
