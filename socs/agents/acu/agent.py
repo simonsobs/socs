@@ -54,7 +54,8 @@ class ACUAgent:
             feed will not be registered.
     """
 
-    def __init__(self, agent, acu_config='guess', exercise_plan=None):
+    def __init__(self, agent, acu_config='guess', exercise_plan=None,
+                 startup=False):
         # Separate locks for exclusive access to az/el, and boresight motions.
         self.azel_lock = TimeoutLock()
         self.boresight_lock = TimeoutLock()
@@ -120,12 +121,12 @@ class ACUAgent:
                                self.monitor,
                                self._simple_process_stop,
                                blocking=False,
-                               startup=True)
+                               startup=startup)
         agent.register_process('broadcast',
                                self.broadcast,
                                self._simple_process_stop,
                                blocking=False,
-                               startup=True)
+                               startup=startup)
         agent.register_process('generate_scan',
                                self.generate_scan,
                                self._simple_process_stop,
@@ -1682,6 +1683,8 @@ def add_agent_args(parser_in=None):
     pgroup = parser_in.add_argument_group('Agent Options')
     pgroup.add_argument("--acu-config")
     pgroup.add_argument("--exercise-plan")
+    pgroup.add_argument("--no-processes", action='store_true',
+                        default=False)
     return parser_in
 
 
@@ -1691,7 +1694,8 @@ def main(args=None):
                                   parser=parser,
                                   args=args)
     agent, runner = ocs_agent.init_site_agent(args)
-    _ = ACUAgent(agent, args.acu_config, args.exercise_plan)
+    _ = ACUAgent(agent, args.acu_config, args.exercise_plan,
+                 startup=not args.no_processes)
 
     runner.run(agent, auto_reconnect=True)
 
