@@ -101,7 +101,7 @@ class ACUAgent:
                                 'ACU_failures_errors': {},
                                 'platform_status': {},
                                 'ACU_emergency': {},
-                                'third_axis': {},
+                                'corotator': {},
                                 },
                      'broadcast': {},
                      }
@@ -380,6 +380,7 @@ class ACUAgent:
                           'Azimuth_mode': None,
                           'Elevation_mode': None,
                           'Boresight_mode': None,
+                          'Corotator_mode': None,
                           }
 
         j = yield self.acu_read.http.Values(self.acu8100)
@@ -462,9 +463,18 @@ class ACUAgent:
                 self.log.warn('ACU now in remote mode.')
             if self.data['status']['summary']['ctime'] == prev_checkdata['ctime']:
                 self.log.warn('ACU time has not changed from previous data point!')
-            for axis_mode in ['Azimuth_mode', 'Elevation_mode', 'Boresight_mode']:
-                if self.data['status']['summary'][axis_mode] != prev_checkdata[axis_mode]:
-                    self.log.info(axis_mode + ' has changed to ' + self.data['status']['summary'][axis_mode])
+
+            # Alert on any axis mode change.
+            for axis_mode in prev_checkdata.keys():
+                if not 'mode' in axis_mode:
+                    continue
+                v = self.data['status']['summary'].get(axis_mode)
+                if v is None:
+                    v = self.data['status']['corotator'].get(axis_mode)
+                if v != prev_checkdata[axis_mode]:
+                    self.log.info('{axis_mode} is now "{v}"',
+                                  axis_mode=axis_mode, v=v)
+                    prev_checkdata[axis_mode] = v
 
             # influx_blocks are constructed based on refers to all
             # other self.data['status'] keys. Do not add more keys to
@@ -578,11 +588,6 @@ class ACUAgent:
 
             data_blocks.update(new_blocks)
 
-            prev_checkdata = {'ctime': self.data['status']['summary']['ctime'],
-                              'Azimuth_mode': self.data['status']['summary']['Azimuth_mode'],
-                              'Elevation_mode': self.data['status']['summary']['Elevation_mode'],
-                              'Boresight_mode': self.data['status']['summary']['Boresight_mode'],
-                              }
         return True, 'Acquisition exited cleanly.'
 
     @ocs_agent.param('auto_enable', type=bool, default=True)
@@ -1159,51 +1164,44 @@ class ACUAgent:
         to Stop; also clear the ProgramTrack stack.
 
         """
-
-        session.set_status('running')
-        i = 0
-        while i < 5:
+        def _read_modes():
             modes = [self.data['status']['summary']['Azimuth_mode'],
-                     self.data['status']['summary']['Elevation_mode'],
-                     ]
+                     self.data['status']['summary']['Elevation_mode']]
             if self.acu_config['platform'] == 'satp':
                 modes.append(self.data['status']['summary']['Boresight_mode'])
             elif self.acu_config['platform'] in ['ccat', 'lat']:
-                modes.append(self.data['status']['third_axis']['Axis3_mode'])
-            if modes != ['Stop', 'Stop', 'Stop']:
+                modes.append(self.data['status']['corotator']['Corotator_mode'])
+            return modes
+
+        session.set_status('running')
+        for i in range(6):
+            if all([m == 'Stop' for m in _read_modes()]):
+                self.log.info('All axes in Stop mode')
+                break
+            else:
                 yield self.acu_control.stop()
                 self.log.info('Stop called (iteration %i)' % (i + 1))
                 yield dsleep(0.1)
                 i += 1
-            else:
-                self.log.info('All axes in Stop mode')
-                i = 5
-        modes = [self.data['status']['summary']['Azimuth_mode'],
-                 self.data['status']['summary']['Elevation_mode'],
-                 ]
-        if self.acu_config['platform'] == 'satp':
-            modes.append(self.data['status']['summary']['Boresight_mode'])
-        elif self.acu_config['platform'] in ['ccat', 'lat']:
-            modes.append(self.data['status']['third_axis']['Axis3_mode'])
-        if modes != ['Stop', 'Stop', 'Stop']:
-            self.log.error('Axes could not be set to Stop!')
-            return False, 'Could not set axes to Stop mode'
-        j = 0
-        while j < 5:
+        else:
+            msg = 'Failed to set all axes to Stop mode!'
+            self.log.error(msg)
+            return False, msg
+
+        for i in range(6):
             free_stack = self.data['status']['summary']['Free_upload_positions']
             if free_stack < FULL_STACK:
                 yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
                                                     'Clear Stack')
-                self.log.info('Clear Stack called (iteration %i)' % (j + 1))
+                self.log.info('Clear Stack called (iteration %i)' % (i + 1))
                 yield dsleep(0.1)
-                j += 1
             else:
                 self.log.info('Stack cleared')
-                j = 5
-        free_stack = self.data['status']['summary']['Free_upload_positions']
-        if free_stack < FULL_STACK:
-            self.log.warn('Stack not fully cleared!')
-            return False, 'Could not clear stack'
+                break
+        else:
+            msg = 'Failed to clear the ProgramTrack stack!'
+            self.log.warn(msg)
+            return False, msg
 
         session.set_status('stopping')
         return True, 'Job completed'
