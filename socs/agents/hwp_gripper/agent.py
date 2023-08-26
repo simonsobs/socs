@@ -1,12 +1,7 @@
-#!/usr/bin/env python3
-
 import argparse
-import ctypes
-import multiprocessing
 import time
 from typing import Optional
 
-import numpy as np
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
@@ -24,27 +19,22 @@ class HWPGripperAgent:
     gripper position and limit switch states to grafana.
 
     Args:
-        mcu_ip (string):
-            IP of the Beaglebone microcontroller running adjacent code
-        control_port (int):
-            Port for control commands sent to the Beaglebone.
-        supervisor_id (str):
-            ID of HWP supervisor
+        agent (ocs.ocs_agent.OCSAgent):
+            Agent instance
+        args (argparse.Namespace):
+            Parsed command line arguments namespace.
     """
-
-    def __init__(self, agent, mcu_ip, control_port, supervisor_id=None):
+    def __init__(self, agent, args):
         self.agent = agent
         self.log = agent.log
         self.client_lock = TimeoutLock()
 
         self._initialized = False
-        self.mcu_ip = mcu_ip
-        self.control_port = control_port
+        self.mcu_ip = args.mcu_ip
+        self.control_port = args.control_port
 
         self.shutdown_mode = False
-        self.supervisor_id = supervisor_id
-
-        self._gripper_state = None
+        self.supervisor_id = args.supervisor_id
 
         self.client: Optional[cli.GripperClient] = None
 
@@ -54,6 +44,21 @@ class HWPGripperAgent:
 
     def _run_client_func(self, func, *args, lock_timeout=10,
                          job=None, check_shutdown=True, **kwargs):
+        """
+        Args
+        ----
+        func (function):
+            Function to run
+        *args (positional args):
+            Additional args to pass to function
+        lock_timeout (float):
+            Time (sec) to wait to acquire client-lock before throwing an error.
+        job (str):
+            Name of job to attach to lock
+        check_shutdown (bool):
+            If true, will block the client function and throw an error if
+            shutdown mode is in effect.
+        """
         if self.shutdown_mode and check_shutdown:
             raise RuntimeError(
                 'Cannot run client function, shutdown mode is in effect'
@@ -82,17 +87,15 @@ class HWPGripperAgent:
 
         res = get_op_data(self.supervisor_id, 'monitor')
         return res['data']['hwp_state']['pid_current_freq']
+    
+    def _check_stopped(self):
+        return self._get_hwp_freq() < 0.1
 
-    @ocs_agent.param('auto_acquire', default=True, type=bool)
     def init_connection(self, session, params):
         """init_connection(auto_acquire=False)
 
         **Task** - Initialize connection to the GripperServer on the BeagleBone
         micro-controller
-
-        Parameters:
-            auto_acquire (bool, optional): Default is True. Starts data acquisition
-                after initialization if True
         """
         if self._initialized:
             self.log.info('Connection already initialized. Returning...')
@@ -101,7 +104,7 @@ class HWPGripperAgent:
         self.client = cli.GripperClient(self.mcu_ip, self.control_port)
         self.log.info("Initialized Client")
         self._initialized = True
-        return True, 'Processes started'
+        return True, 'Initialized connection to GripperServer'
 
     @ocs_agent.param('state', default=True, type=bool)
     def power(self, session, params=None):
@@ -146,7 +149,8 @@ class HWPGripperAgent:
     def move(self, session, params=None):
         """move(mode='pos', actuator=1, distance=1.3)
 
-        **Task** - Move an actuator a specific distance
+        **Task** - Move an actuator a specific distance. If the HWP is spinning,
+        this task will not run.
 
         Parameters:
             mode (str):
@@ -164,6 +168,11 @@ class HWPGripperAgent:
             gripping the rotor. Pushing mode is used when you want the grip the
             rotor.
         """
+
+        if self._get_hwp_freq() > 0.1:
+            self.log.warning("Not moving actuators while HWP is spinning")
+            return False, "HWP is spinning, not moving actuators" 
+
         return_dict = self._run_client_func(
             self.client.move, params['mode'], params['actuator'],
             params['distance'], job='move'
@@ -176,7 +185,7 @@ class HWPGripperAgent:
         **Task** - Homes and recalibrates the position of the actuators
 
         Note:
-            This action much be done first after a power cycle. Otherwise the
+            This action must be done first after a power cycle. Otherwise the
             controller will throw an error.
         """
         return_dict = self._run_client_func(self.client.home, job='home')
@@ -249,7 +258,8 @@ class HWPGripperAgent:
     def force(self, session, params=None):
         """force(value=False)
 
-        **Task** - Set the code to ignore limit switch information
+        **Task** - Enable or disable force mode in the GripperServer,
+        which will ignore limit switch information.
 
         Parameters:
             value (bool): Use limit switch information (False) or ignore limit
@@ -268,70 +278,102 @@ class HWPGripperAgent:
 
     def shutdown(self, session, params=None):
         """shutdown()
+
         **Task** - Series of commands executed during a shutdown.
-        This will return grippers to their home position, then move them each
-        inwards incrementally.
+        This will enable shutdown mode, which locks out other agent operations.
 
         Notes:
             This function is called once a shutdown trigger has been given.
         """
-
-        # First check if the HWP is actually stopped
-        hwp_freq = self._get_hwp_freq()
-        if hwp_freq > 0.05:
-            raise RuntimeError("HWP is not stopped! Not performing shutdown")
-
+        self.log.info("Enabling shutdown-mode, which will prevent grip "
+                      "operations from being performed")
         self.shutdown_mode = True
         return True, 'Shutdown completed'
+    
+    def grip_hwp(self, session, params=None):
+        """grip_hwp()
 
-        self.log.warn('INITIATING SHUTDOWN')
-        time.sleep(5 * 60)
+        **Task** - Series of commands to automatically grip the HWP. 
+        This will return grippers to their home position, then move them each
+        inwards incrementally. If the HWP is spinning, this will not run.
+        """
+        if self._get_hwp_freq() > 0.1:
+            return False, "Not gripping HWP because HWP is spinning"
 
-        session.data['response'] = self._run_client_func(
-            self.client.power, True, job='shutdown', check_shutdown=False)
+        self._grip_hwp(session, check_shutdown=True)
+        return True, "Finished gripping procedure"
 
-        session.data['response'] = self._run_client_func(
-            self.client.brake, False, job='shutdown', check_shutdown=False)
+    def _grip_hwp(self, session, check_shutdown=True):
+        """
+        Helper function to grip the HWP that can be called by the grip_hwp
+        task or by the shutdown procedure.  This will return grippers to their
+        home position, then move them each inwards incrementally.
 
-        session.data['response'] = self._run_client_func(
-            self.client.home, job='shutdown', check_shutdown=False)
+        Args
+        ------
+        session (OpSession):
+            Session object for current operation. This function will add to
+            session data.
+        """
+        data = {
+            'responses': [],
+        }
+        session.data = data
+
+        def run_and_append(func, *args, **kwargs):
+            return_dict = self._run_client_func(func, *args, **kwargs)
+            data['responses'].append(return_dict)
+            return return_dict
+
+        # Enable power to actuators
+        run_and_append(self.client.power, True, job='grip', check_shutdown=check_shutdown)
+
+        run_and_append(self.client.brake, False, job='grip', check_shutdown=check_shutdown)
+            
+        # Send grippers to their home position
+        run_and_append(self.client.home, job='grip', check_shutdown=check_shutdown)
 
         finished = [False, False, False]
         for actuator, _ in enumerate(finished):
             while not finished[actuator]:
-                session.data['response'] = self._run_client_func(
-                    self.client.move, 'POS', actuator + 1, 0.2, job='shutdown', check_shutdown=False)
+                # Move actuator inwards until warm-limit is hit
+                run_and_append(self.client.move, 'POS', actuator + 1, 0.2,
+                    job='grip', check_shutdown=check_shutdown)
 
-                return_dict = self._run_client_func(
-                    self.client.reset, job='shutdown', check_shutdown=False)
-                session.data['response'] = return_dict
+                # Reset alarms. If the warm-limit is hit, the alarm will be triggered
+                # and return_dict['result'] will be True
+                return_dict = run_and_append(self.client.reset, job='grip', check_shutdown=check_shutdown)
 
                 if return_dict['result']:
-                    session.data['response'] = self._run_client_func(
-                        self.client.is_cold, True, job='shutdown', check_shutdown=False)
+                    # If the warm-limit is hit, move the actuator outwards bit
+                    run_and_append(self.client.is_cold, True, job='grip',
+                       check_shutdown=check_shutdown)
                     time.sleep(1)
 
-                    session.data['response'] = self._run_client_func(
-                        self.client.move, 'POS', actuator + 1, -0.5, job='shutdown', check_shutdown=False)
+                    run_and_append(self.client.move, 'POS', actuator + 1, -0.5,
+                        job='grip', check_shutdown=check_shutdown)
 
-                    session.data['response'] = self._run_client_func(
-                        self.client.is_cold, False, job='shutdown', check_shutdown=False)
+                    run_and_append(self.client.is_cold, False, job='grip',
+                        check_shutdown=check_shutdown)
                     time.sleep(1)
 
                     finished[actuator] = True
 
-        session.data['response'] = self._run_client_func(
-            self.client.brake, True, job='shutdown', check_shutdown=False)
+        # Enable breaks
+        run_and_append(self.client.brake, True, job='grip',
+        check_shutdown=check_shutdown)
         time.sleep(1)
 
-        session.data['response'] = self._run_client_func(
-            self.client.power, False, job='shutdown', check_shutdown=False)
+        # Disable power to actuators
+        run_and_append(self.client.power, False, job='grip',
+            check_shutdown=check_shutdown)
         time.sleep(1)
 
-        return True, 'Shutdown completed'
+        return data
 
     def cancel_shutdown(self, session, params=None):
         """cancel_shutdown()
+
         **Task** - Take the gripper agent out of shutdown mode
         """
         self.shutdown_mode = False
@@ -404,9 +446,15 @@ class HWPGripperAgent:
         session.set_status('stopping')
         return True, "Requesting monitor_state process to stop"
 
+    @ocs_agent.param('no_data_warn_time', default=60, type=float)
+    @ocs_agent.param('no_data_shutdown_time', default=5*60, type=float)
     def monitor_supervisor(self, session, params=None):
-        """monitor()
-        **Process** - Monitor the shutdown of the agent
+        """monitor_supervisor()
+
+        **Process** - Monitor the hwp-supervisor state. If supervisor sends shutdown
+        signal, or if communication wtih supervisor is dropped for longer than
+        ``no_data_shutdown_time``, this will begin agent shutdown and disable access
+        to other dangerous gripper operations.
         """
         session.set_status('running')
         last_ok_time = time.time()
@@ -414,7 +462,7 @@ class HWPGripperAgent:
         if self.supervisor_id is None:
             return False, 'No supervisor ID set'
 
-        self._inital_warning = True
+        warning_issued = False
         while session.status in ['starting', 'running']:
             res = get_op_data(self.supervisor_id, 'monitor')
             if res['status'] != 'ok':
@@ -423,17 +471,30 @@ class HWPGripperAgent:
                 action = res['data']['actions']['gripper']
 
             if action == 'ok':
+                warning_issued = False
                 last_ok_time = time.time()
-
             elif action == 'stop':
                 if not self.shutdown_mode:
-                    cur_freq = res['data']['hwp_state']['pid_current_freq']
-                    if cur_freq is None and self._initial_warning:
-                        self._initial_warning = False
-                        self.log.error("Missing pid frequency data")
-                    elif cur_freq < 0.05:
-                        self._initial_warning = True
-                        self.agent.start('shutdown')
+                    self.shutdown_mode = True
+                    self.agent.start('shutdown')
+            
+            time_since_ok = time.time() - last_ok_time
+            if time_since_ok > params['no_data_warn_time'] and not warning_issued:
+                self.log.error(
+                    f"Have not received 'ok' in {time_since_ok/60:.2f} minutes."
+                    f"Will issue shutdown in "
+                    f"{params['no_data_shutdown_time']/60:.2f} minutes."
+                )
+                warning_issued=True
+            
+            if time_since_ok > params['no_data_shutdown_time']:
+                self.log.error(
+                    f"Have not received 'ok' in "
+                    f"{params['no_data_shutdown_time']/60:.2f} minutes. "
+                    "Issuing shutdown"
+                )
+                self.shutdown_mode = True
+                self.agent.start('shutdown')
 
             data = {
                 'data': {'gripper_action': action},
@@ -447,9 +508,7 @@ class HWPGripperAgent:
                 'time': time.time()
             }
 
-            time.sleep(0.2)
-
-        session.set_status('stopping')
+            time.sleep(1)
         return True, 'Gripper monitor exited cleanly'
 
     def _stop_monitor_supervisor(self, session, params=None):
@@ -468,6 +527,12 @@ def make_parser(parser=None):
                         help='Arbitrary port for actuator control')
     pgroup.add_argument('--supervisor-id', type=str,
                         help='Instance ID for HWP Supervisor agent')
+    pgroup.add_argument('--no-data-warn-time', type=float, default=60,
+                        help='Time (seconds) since last supervisor-ok signal to '
+                             'wait before issuing a warning')
+    pgroup.add_argument('--no-data-shutdown-time', type=float, default=5*60,
+                        help='Time (seconds) since last supervisor-ok signal to '
+                             'wait before entering shutdown mode')
     return parser
 
 
@@ -477,14 +542,12 @@ def main(args=None):
                                   parser=parser,
                                   args=args)
 
-    init_params = {'auto_acquire': True}
-
     agent, runner = ocs_agent.init_site_agent(args)
     gripper_agent = HWPGripperAgent(agent, mcu_ip=args.mcu_ip,
                                     control_port=args.control_port,
                                     supervisor_id=args.supervisor_id)
     agent.register_task('init_connection', gripper_agent.init_connection,
-                        startup=init_params)
+                        startup=True)
     agent.register_process('monitor_state', gripper_agent.monitor_state,
                            gripper_agent._stop_monitor_state, startup=True)
     agent.register_process('monitor_supervisor', gripper_agent.monitor_supervisor,
@@ -500,6 +563,7 @@ def main(args=None):
     agent.register_task('is_cold', gripper_agent.is_cold)
     agent.register_task('force', gripper_agent.force)
     agent.register_task('shutdown', gripper_agent.shutdown)
+    agent.register_task('grip', gripper_agent.grip)
     agent.register_task('cancel_shutdown', gripper_agent.cancel_shutdown)
 
     runner.run(agent, auto_reconnect=True)
