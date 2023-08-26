@@ -64,7 +64,7 @@ Shutdown mode
 
 If there is something wrong with the HWP, due to power or network outages, or cryogenic issues,
 it is no longer safe to operate the gripper, as we may not have an accurate understanding of
-whether or not the HWP is spinning. If the hwp-supervisor issues a shutdown signal, or if 
+whether or not the HWP is spinning. If the hwp-supervisor issues a shutdown signal, or if
 a sufficiently long time passes where the agent is unable to connect to the supervisor,
 the agent enters a shutdown mode in which potentially dangerous operations are blocked.
 

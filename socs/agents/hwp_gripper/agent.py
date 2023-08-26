@@ -87,7 +87,7 @@ class HWPGripperAgent:
 
         res = get_op_data(self.supervisor_id, 'monitor')
         return res['data']['hwp_state']['pid_current_freq']
-    
+
     def _check_stopped(self):
         return self._get_hwp_freq() < 0.1
 
@@ -171,7 +171,7 @@ class HWPGripperAgent:
 
         if self._get_hwp_freq() > 0.1:
             self.log.warning("Not moving actuators while HWP is spinning")
-            return False, "HWP is spinning, not moving actuators" 
+            return False, "HWP is spinning, not moving actuators"
 
         return_dict = self._run_client_func(
             self.client.move, params['mode'], params['actuator'],
@@ -289,11 +289,11 @@ class HWPGripperAgent:
                       "operations from being performed")
         self.shutdown_mode = True
         return True, 'Shutdown completed'
-    
+
     def grip_hwp(self, session, params=None):
         """grip_hwp()
 
-        **Task** - Series of commands to automatically grip the HWP. 
+        **Task** - Series of commands to automatically grip the HWP.
         This will return grippers to their home position, then move them each
         inwards incrementally. If the HWP is spinning, this will not run.
         """
@@ -329,7 +329,7 @@ class HWPGripperAgent:
         run_and_append(self.client.power, True, job='grip', check_shutdown=check_shutdown)
 
         run_and_append(self.client.brake, False, job='grip', check_shutdown=check_shutdown)
-            
+
         # Send grippers to their home position
         run_and_append(self.client.home, job='grip', check_shutdown=check_shutdown)
 
@@ -477,7 +477,7 @@ class HWPGripperAgent:
                 if not self.shutdown_mode:
                     self.shutdown_mode = True
                     self.agent.start('shutdown')
-            
+
             time_since_ok = time.time() - last_ok_time
             if time_since_ok > params['no_data_warn_time'] and not warning_issued:
                 self.log.error(
@@ -486,7 +486,7 @@ class HWPGripperAgent:
                     f"{params['no_data_shutdown_time']/60:.2f} minutes."
                 )
                 warning_issued=True
-            
+
             if time_since_ok > params['no_data_shutdown_time']:
                 self.log.error(
                     f"Have not received 'ok' in "
