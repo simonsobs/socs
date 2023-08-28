@@ -59,9 +59,7 @@ class UCSCRadiometerAgent:
 
             >>> response.session['data']
             {'timestamp': 1678820419.0,
-             'fields':
-                {'pwv': 0.49253026985972237}
-            }
+             'pwv': 0.49253026985972237}
 
         """
         self.take_data = True
@@ -85,9 +83,9 @@ class UCSCRadiometerAgent:
                 self.last_published_reading = (last_pwv, last_timestamp)
 
             session.data = {"timestamp": last_timestamp,
-                            "fields": {}}
+                            "pwv": {}}
 
-            session.data['fields']['pwv'] = last_pwv
+            session.data['pwv'] = last_pwv
 
             if params['test_mode']:
                 break
