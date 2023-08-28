@@ -62,8 +62,7 @@ class UCSCRadiometerAgent:
              'pwv': 0.49253026985972237}
 
         """
-        if params['test_mode'] is False:
-            pm = Pacemaker(1 / 60, quantize=False)
+        pm = Pacemaker(1 / 60, quantize=False)
 
         self.take_data = True
         while self.take_data:
@@ -90,6 +89,8 @@ class UCSCRadiometerAgent:
 
             session.data['pwv'] = last_pwv
 
+            print('hi')
+
             if params['test_mode']:
                 break
             else:
@@ -110,6 +111,7 @@ def add_agent_args(parser=None):
         parser = argparse.ArgumentParser()
     pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument("--url", type=str, help="url for radiometer web server")
+    pgroup.add_argument("--test_mode", type=str, help="either test or acq mode")
     return parser
 
 
@@ -123,10 +125,17 @@ def main(args=None):
     parser = add_agent_args()
     args = site_config.parse_args(agent_class='UCSCRadiometerAgent', parser=parser, args=args)
 
+    # test params
+    test_params = False
+    if args.test_mode:
+        test_params = {'acq_params': {'test_mode': True}}
+    elif not args.test_mode:
+        test_params = {'acq_params': {'test_mode': False}}
+
     agent, runner = ocs_agent.init_site_agent(args)
     pwv_agent = UCSCRadiometerAgent(agent, args.url)
 
-    agent.register_process('acq', pwv_agent.acq, pwv_agent._stop_acq, startup=True)
+    agent.register_process('acq', pwv_agent.acq, pwv_agent._stop_acq, startup=test_params)
 
     runner.run(agent, auto_reconnect=True)
 
