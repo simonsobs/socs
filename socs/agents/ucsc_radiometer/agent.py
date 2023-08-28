@@ -89,8 +89,6 @@ class UCSCRadiometerAgent:
 
             session.data['pwv'] = last_pwv
 
-            print('hi')
-
             if params['test_mode']:
                 break
             else:
