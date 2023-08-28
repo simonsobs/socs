@@ -39,7 +39,6 @@ def http_mock():
 @pytest.mark.integtest
 def test_ucsc_radiometer_acq(wait_for_crossbar, http_mock, run_agent, client):
     with http_mock:
-        resp = client.acq.stop()
         resp = client.acq.start(test_mode=True)
         resp = client.acq.wait()
         print(resp)
