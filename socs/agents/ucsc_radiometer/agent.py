@@ -109,7 +109,7 @@ def add_agent_args(parser=None):
         parser = argparse.ArgumentParser()
     pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument("--url", type=str, help="url for radiometer web server")
-    pgroup.add_argument("--test_mode", type=bool, help="True for setting agent in test_mode. Default is False.")
+    pgroup.add_argument("--test-mode", action='store_true', help="True for setting agent in test_mode. Default is False.")
     return parser
 
 
