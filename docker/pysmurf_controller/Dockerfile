@@ -1,4 +1,4 @@
-FROM simonsobs/sodetlib:v0.5.0-35-ga937bff
+FROM simonsobs/sodetlib:v0.5.2
 
 ENV OCS_CONFIG_DIR /config
 
