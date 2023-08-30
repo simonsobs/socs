@@ -13,6 +13,18 @@ The UCSC Radiometer Agent monitors the PWV through the UCSC Radiometer web serve
     :func: add_agent_args
     :prog: python3 agent.py
 
+Dependencies
+------------
+
+The UCSC Radiometer Agent requires the `UCSC Radiometer Server
+<https://github.com/simonsobs/ucscradiometer-server>`_. This can be
+installed by git cloning:
+
+.. code-block:: bash
+
+    $ git clone https://github.com/simonsobs/ucscradiometer-server.git
+
+
 Configuration File Examples
 ---------------------------
 
