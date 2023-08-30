@@ -126,9 +126,9 @@ def main(args=None):
     # test params
     test_params = False
     if args.test_mode:
-        test_params = {'acq_params': {'test_mode': True}}
+        test_params = {'test_params': {'test_mode': True}}
     elif not args.test_mode:
-        test_params = {'acq_params': {'test_mode': False}}
+        test_params = {'test_params': {'test_mode': False}}
 
     agent, runner = ocs_agent.init_site_agent(args)
     pwv_agent = UCSCRadiometerAgent(agent, args.url)
