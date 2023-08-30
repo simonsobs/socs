@@ -109,7 +109,9 @@ def add_agent_args(parser=None):
         parser = argparse.ArgumentParser()
     pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument("--url", type=str, help="url for radiometer web server")
-    pgroup.add_argument("--test-mode", action='store_true', help="True for setting agent in test_mode. Default is False.")
+    pgroup.add_argument("--test-mode", action='store_true',
+                        help="Determines whether agent runs in test mode."
+                        "Default is False.")
     return parser
 
 
@@ -124,11 +126,9 @@ def main(args=None):
     args = site_config.parse_args(agent_class='UCSCRadiometerAgent', parser=parser, args=args)
 
     # test params
-    test_params = False
+    test_params = {'test_mode': False}
     if args.test_mode:
-        test_params = {'test_params': {'test_mode': True}}
-    elif not args.test_mode:
-        test_params = {'test_params': {'test_mode': False}}
+        test_params = {'test_mode': True}
 
     agent, runner = ocs_agent.init_site_agent(args)
     pwv_agent = UCSCRadiometerAgent(agent, args.url)
