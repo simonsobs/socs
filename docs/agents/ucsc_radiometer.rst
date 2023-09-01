@@ -2,9 +2,9 @@
 
 .. _ucsc_radiometer:
 
-==============
+=====================
 UCSC Radiometer Agent
-==============
+=====================
 
 The UCSC Radiometer Agent monitors the PWV through the UCSC Radiometer web server.
 
@@ -17,13 +17,9 @@ Dependencies
 ------------
 
 The UCSC Radiometer Agent requires the `UCSC Radiometer Server
-<https://github.com/simonsobs/ucscradiometer-server>`_. This can be
-installed by git cloning:
-
-.. code-block:: bash
-
-    $ git clone https://github.com/simonsobs/ucscradiometer-server.git
-
+<https://github.com/simonsobs/ucscradiometer-server>`_. This server runs where
+the radiometer data files are written and makes readings available to the Agent
+over HTTP.
 
 Configuration File Examples
 ---------------------------
