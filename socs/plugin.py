@@ -36,6 +36,7 @@ agents = {
     'SynthAgent': {'module': 'socs.agents.holo_synth.agent', 'entry_point': 'main'},
     'TektronixAWGAgent': {'module': 'socs.agents.tektronix3021c.agent', 'entry_point': 'main'},
     'ThorlabsMC2000BAgent': {'module': 'socs.agents.thorlabs_mc2000b.agent', 'entry_point': 'main'},
+    'UCSCRadiometerAgent': {'module': 'socs.agents.ucsc_radiometer.agent', 'entry_point': 'main'},
     'UPSAgent': {'module': 'socs.agents.ups.agent', 'entry_point': 'main'},
     'VantagePro2Agent': {'module': 'socs.agents.vantagepro2.agent', 'entry_point': 'main'},
     'WiregridActuatorAgent': {'module': 'socs.agents.wiregrid_actuator.agent', 'entry_point': 'main'},

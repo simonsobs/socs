@@ -45,6 +45,7 @@ for n, f in [
         ('SynthAgent', 'holo_synth/agent.py'),
         ('TektronixAWGAgent', 'tektronix3021c/agent.py'),
         ('ThorlabsMC2000BAgent', 'thorlabs_mc2000b/agent.py'),
+        ('UCSCRadiometerAgent', 'ucsc_radiometer/agent.py'),
         ('UPSAgent', 'ups/agent.py'),
         ('VantagePro2Agent', 'vantagepro2/agent.py'),
         ('WiregridActuatorAgent', 'wiregrid_actuator/agent.py'),

@@ -71,6 +71,7 @@ API Reference        Full API documentation for core parts of the SOCS library.
     agents/synacc
     agents/tektronix3021c
     agents/thorlabs_mc2000b
+    agents/ucsc_radiometer
     agents/ups
     agents/vantage_pro2
     agents/wiregrid_actuator
