@@ -37,7 +37,7 @@ jobs:
         pip3 install so3g
 
     - name: clone socs
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Install socs
       run: |
