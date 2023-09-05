@@ -244,7 +244,7 @@ class SupRsyncFilesManager:
         stats = {
             'finalized_until': finalized_until,
             'num_files': len(files),
-            'uncopied_files': len([f for f in files if f.copied is None]),
+            'uncopied_files': num_files_to_copy,
             'last_file_added': last_file_added,
             'last_file_copied': last_file_copied,
         }
