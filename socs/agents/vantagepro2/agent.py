@@ -46,7 +46,7 @@ class VantagePro2Agent:
         self.agent.register_feed('weather_data',
                                  record=True,
                                  agg_params=agg_params)
-    
+
     def _initialize_module(self):
         """Initialize the VantagePro2 module."""
         try:
@@ -127,7 +127,7 @@ class VantagePro2Agent:
             while self.take_data:
                 pm.sleep()
 
-                if self.module is None: # Try to re-initialize module if it fails
+                if self.module is None:  # Try to re-initialize module if it fails
                     if not self._initialize_module():
                         time.sleep(30)  # wait 30 sec before trying to re-initialize
                         continue
