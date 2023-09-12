@@ -142,7 +142,6 @@ class VantagePro2Agent:
                 except TimeoutError as e:
                     self.log.warn(f"TimeoutError: {e}")
                     self.module = None
-                    time.sleep(30)
                     continue
 
                 self.agent.publish_to_feed('weather_data', data)
