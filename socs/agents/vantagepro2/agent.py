@@ -37,7 +37,6 @@ class VantagePro2Agent:
             sample_freq = 0.5
         self.sample_freq = sample_freq
 
-        self.initialized = False
         self.take_data = False
 
         # Registers weather data feed
@@ -47,6 +46,17 @@ class VantagePro2Agent:
         self.agent.register_feed('weather_data',
                                  record=True,
                                  agg_params=agg_params)
+
+    def _initialize_module(self):
+        """Initialize the VantagePro2 module."""
+        try:
+            self.module = VantagePro2(self.port)
+            self.log.info(f"Initialized Vantage Pro2 module: {self.module}")
+            return True
+        except Exception as e:
+            self.log.error(f"Failed to initialize Vantage Pro2 module: {e}")
+            self.module = None
+            return False
 
     @ocs_agent.param('auto_acquire', default=False, type=bool)
     def init(self, session, params=None):
@@ -59,7 +69,7 @@ class VantagePro2Agent:
                 initialization if True. Defaults to False.
 
         """
-        if self.initialized:
+        if self.module is not None:
             return True, "Already Initialized Module"
 
         with self.lock.acquire_timeout(0, job='init') as acquired:
@@ -70,11 +80,7 @@ class VantagePro2Agent:
 
             session.set_status('starting')
 
-            self.module = VantagePro2(self.port)
-            print("Initialized Vantage Pro2 module: {!s}".format(
-                self.module))
-
-        self.initialized = True
+            self._initialize_module()
 
         # Start data acquisition if requested
         if params['auto_acquire']:
@@ -120,12 +126,24 @@ class VantagePro2Agent:
 
             while self.take_data:
                 pm.sleep()
+
+                if self.module is None:  # Try to re-initialize module if it fails
+                    if not self._initialize_module():
+                        time.sleep(30)  # wait 30 sec before trying to re-initialize
+                        continue
+
                 data = {
                     'timestamp': time.time(),
                     'block_name': 'weather',
                     'data': {}
                 }
-                data['data'] = self.module.weather_daq()
+                try:
+                    data['data'] = self.module.weather_daq()
+                except TimeoutError as e:
+                    self.log.warn(f"TimeoutError: {e}")
+                    self.module = None
+                    continue
+
                 self.agent.publish_to_feed('weather_data', data)
                 time.sleep(wait_time)
 
