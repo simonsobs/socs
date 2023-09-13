@@ -466,7 +466,7 @@ class ACUAgent:
 
             # Alert on any axis mode change.
             for axis_mode in prev_checkdata.keys():
-                if not 'mode' in axis_mode:
+                if 'mode' not in axis_mode:
                     continue
                 v = self.data['status']['summary'].get(axis_mode)
                 if v is None:
