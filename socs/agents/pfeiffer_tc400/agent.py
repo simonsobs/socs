@@ -194,6 +194,31 @@ class PfeifferTC400Agent:
 
         return True, 'Turned turbo off'
 
+    @ocs_agent.param('state', type=str, choices=['on', 'off'])
+    def engage_turbo_heater(self, session, params):
+        """engage_turbo_heater(state)
+
+        **Task** - Enables/disables turbo heater
+
+        Parameters:
+            state (str): Desired power state of turbo heater; 'on' or 'off'
+
+        """
+        with self._lock.acquire_timeout(1, job='engage_turbo_heater') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            session.set_status('running')
+
+            state = params['state']
+            heater_state = self.turbo.engage_turbo_heater(state)
+            if not heater_state:
+                return False, f"Setting to set heater {state} failed."
+
+        return True, f"Turbo heater powered {state} is {heater_state}."
+
     @ocs_agent.param('_')
     def acknowledge_turbo_errors(self, session, params):
         """acknowledge_turbo_errors()

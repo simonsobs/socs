@@ -182,6 +182,33 @@ class PfeifferTC400:
         else:
             return turbo_response == "111111"
 
+    def engage_turbo_heater(self, state):
+        """Powers the turbo heater on or off.
+
+        Parameters
+        ----------
+        state
+            String for defining state of turbo heater: 'on' or 'off'
+
+        Returns
+        -------
+        bool
+            True for successful, False for failure.
+        """
+        # should assert that status is a string of yes or no
+
+        if state == 'on':
+            send_control_command(self.ser, self.turbo_address, 1, "111111")
+        elif state == 'off':
+            send_control_command(self.ser, self.turbo_address, 0, "000000")
+
+        addr, rw, param_num, turbo_response = read_gauge_response(self.ser)
+
+        if turbo_response not in PFEIFFER_BOOL:
+            raise ValueError(f"Unrecognized response from turbo: {turbo_response}")
+        else:
+            return turbo_response == "111111"
+
     def acknowledge_turbo_errors(self):
         """Acknowledges the turbo errors. This is analagous to clearing the errors.
         If the errors were fixed, the turbo will be able to be turned back on.
