@@ -1286,6 +1286,7 @@ class ACUAgent:
     @ocs_agent.param('az_start', default='end',
                      choices=['end', 'mid', 'az_endpoint1', 'az_endpoint2',
                               'mid_inc', 'mid_dec'])
+    @ocs_agent.param('az_drift', type=float, default=None)
     @ocs_agent.param('az_only', type=bool, default=True)
     @ocs_agent.param('scan_upload_length', type=float, default=None)
     @inlineCallbacks
@@ -1296,7 +1297,7 @@ class ACUAgent:
                          el_speed=None, \
                          num_scans=None, start_time=None, \
                          wait_to_start=None, step_time=None, \
-                         az_start='end', az_only=True, \
+                         az_start='end', az_drift=None, az_only=True, \
                          scan_upload_length=None)
 
         **Process** - Scan generator, currently only works for
@@ -1336,6 +1337,10 @@ class ACUAgent:
                 of the scan use 'mid_inc' (for first half-leg to have
                 positive az velocity), 'mid_dec' (negative az velocity),
                 or 'mid' (velocity oriented towards endpoint2).
+            az_drift (float): if set, this should be a drift velocity
+              in deg/s.  The scan extrema will move accordingly.  This
+              can be used to better follow compact sources as they
+              rise or set through the focal plane.
             az_only (bool): if True (the default), then only the
                 Azimuth axis is put in ProgramTrack mode, and the El axis
                 is put in Stop mode.
@@ -1378,7 +1383,8 @@ class ACUAgent:
         scan_upload_len = params.get('scan_upload_length')
         scan_params = {k: params.get(k) for k in [
             'num_scans', 'num_batches', 'start_time',
-            'wait_to_start', 'step_time', 'batch_size', 'az_start']
+            'wait_to_start', 'step_time', 'batch_size',
+            'az_start', 'az_drift']
             if params.get(k) is not None}
         el_speed = params.get('el_speed', 0.0)
 
