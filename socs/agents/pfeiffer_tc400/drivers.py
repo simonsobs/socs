@@ -194,9 +194,8 @@ class PfeifferTC400:
         -------
         bool
             True for successful, False for failure.
-        """
-        # should assert that status is a string of yes or no
 
+        """
         if state == 'on':
             send_control_command(self.ser, self.turbo_address, 1, "111111")
         elif state == 'off':
