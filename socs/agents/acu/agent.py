@@ -52,6 +52,10 @@ class ACUAgent:
             The full path to a scan config file describing motions to cycle
             through on the ACU.  If this is None, the associated process and
             feed will not be registered.
+       startup (bool):
+            If True, immediately start the main monitoring processes
+            for status and UDP data.
+
     """
 
     def __init__(self, agent, acu_config='guess', exercise_plan=None,
