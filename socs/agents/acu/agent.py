@@ -52,9 +52,14 @@ class ACUAgent:
             The full path to a scan config file describing motions to cycle
             through on the ACU.  If this is None, the associated process and
             feed will not be registered.
+       startup (bool):
+            If True, immediately start the main monitoring processes
+            for status and UDP data.
+
     """
 
-    def __init__(self, agent, acu_config='guess', exercise_plan=None):
+    def __init__(self, agent, acu_config='guess', exercise_plan=None,
+                 startup=False):
         # Separate locks for exclusive access to az/el, and boresight motions.
         self.azel_lock = TimeoutLock()
         self.boresight_lock = TimeoutLock()
@@ -100,7 +105,7 @@ class ACUAgent:
                                 'ACU_failures_errors': {},
                                 'platform_status': {},
                                 'ACU_emergency': {},
-                                'third_axis': {},
+                                'corotator': {},
                                 },
                      'broadcast': {},
                      }
@@ -120,12 +125,12 @@ class ACUAgent:
                                self.monitor,
                                self._simple_process_stop,
                                blocking=False,
-                               startup=True)
+                               startup=startup)
         agent.register_process('broadcast',
                                self.broadcast,
                                self._simple_process_stop,
                                blocking=False,
-                               startup=True)
+                               startup=startup)
         agent.register_process('generate_scan',
                                self.generate_scan,
                                self._simple_process_stop,
@@ -379,6 +384,7 @@ class ACUAgent:
                           'Azimuth_mode': None,
                           'Elevation_mode': None,
                           'Boresight_mode': None,
+                          'Corotator_mode': None,
                           }
 
         j = yield self.acu_read.http.Values(self.acu8100)
@@ -461,9 +467,18 @@ class ACUAgent:
                 self.log.warn('ACU now in remote mode.')
             if self.data['status']['summary']['ctime'] == prev_checkdata['ctime']:
                 self.log.warn('ACU time has not changed from previous data point!')
-            for axis_mode in ['Azimuth_mode', 'Elevation_mode', 'Boresight_mode']:
-                if self.data['status']['summary'][axis_mode] != prev_checkdata[axis_mode]:
-                    self.log.info(axis_mode + ' has changed to ' + self.data['status']['summary'][axis_mode])
+
+            # Alert on any axis mode change.
+            for axis_mode in prev_checkdata.keys():
+                if 'mode' not in axis_mode:
+                    continue
+                v = self.data['status']['summary'].get(axis_mode)
+                if v is None:
+                    v = self.data['status']['corotator'].get(axis_mode)
+                if v != prev_checkdata[axis_mode]:
+                    self.log.info('{axis_mode} is now "{v}"',
+                                  axis_mode=axis_mode, v=v)
+                    prev_checkdata[axis_mode] = v
 
             # influx_blocks are constructed based on refers to all
             # other self.data['status'] keys. Do not add more keys to
@@ -577,11 +592,6 @@ class ACUAgent:
 
             data_blocks.update(new_blocks)
 
-            prev_checkdata = {'ctime': self.data['status']['summary']['ctime'],
-                              'Azimuth_mode': self.data['status']['summary']['Azimuth_mode'],
-                              'Elevation_mode': self.data['status']['summary']['Elevation_mode'],
-                              'Boresight_mode': self.data['status']['summary']['Boresight_mode'],
-                              }
         return True, 'Acquisition exited cleanly.'
 
     @ocs_agent.param('auto_enable', type=bool, default=True)
@@ -1158,51 +1168,44 @@ class ACUAgent:
         to Stop; also clear the ProgramTrack stack.
 
         """
-
-        session.set_status('running')
-        i = 0
-        while i < 5:
+        def _read_modes():
             modes = [self.data['status']['summary']['Azimuth_mode'],
-                     self.data['status']['summary']['Elevation_mode'],
-                     ]
+                     self.data['status']['summary']['Elevation_mode']]
             if self.acu_config['platform'] == 'satp':
                 modes.append(self.data['status']['summary']['Boresight_mode'])
             elif self.acu_config['platform'] in ['ccat', 'lat']:
-                modes.append(self.data['status']['third_axis']['Axis3_mode'])
-            if modes != ['Stop', 'Stop', 'Stop']:
+                modes.append(self.data['status']['corotator']['Corotator_mode'])
+            return modes
+
+        session.set_status('running')
+        for i in range(6):
+            if all([m == 'Stop' for m in _read_modes()]):
+                self.log.info('All axes in Stop mode')
+                break
+            else:
                 yield self.acu_control.stop()
                 self.log.info('Stop called (iteration %i)' % (i + 1))
                 yield dsleep(0.1)
                 i += 1
-            else:
-                self.log.info('All axes in Stop mode')
-                i = 5
-        modes = [self.data['status']['summary']['Azimuth_mode'],
-                 self.data['status']['summary']['Elevation_mode'],
-                 ]
-        if self.acu_config['platform'] == 'satp':
-            modes.append(self.data['status']['summary']['Boresight_mode'])
-        elif self.acu_config['platform'] in ['ccat', 'lat']:
-            modes.append(self.data['status']['third_axis']['Axis3_mode'])
-        if modes != ['Stop', 'Stop', 'Stop']:
-            self.log.error('Axes could not be set to Stop!')
-            return False, 'Could not set axes to Stop mode'
-        j = 0
-        while j < 5:
+        else:
+            msg = 'Failed to set all axes to Stop mode!'
+            self.log.error(msg)
+            return False, msg
+
+        for i in range(6):
             free_stack = self.data['status']['summary']['Free_upload_positions']
             if free_stack < FULL_STACK:
                 yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
                                                     'Clear Stack')
-                self.log.info('Clear Stack called (iteration %i)' % (j + 1))
+                self.log.info('Clear Stack called (iteration %i)' % (i + 1))
                 yield dsleep(0.1)
-                j += 1
             else:
                 self.log.info('Stack cleared')
-                j = 5
-        free_stack = self.data['status']['summary']['Free_upload_positions']
-        if free_stack < FULL_STACK:
-            self.log.warn('Stack not fully cleared!')
-            return False, 'Could not clear stack'
+                break
+        else:
+            msg = 'Failed to clear the ProgramTrack stack!'
+            self.log.warn(msg)
+            return False, msg
 
         session.set_status('stopping')
         return True, 'Job completed'
@@ -1287,6 +1290,7 @@ class ACUAgent:
     @ocs_agent.param('az_start', default='end',
                      choices=['end', 'mid', 'az_endpoint1', 'az_endpoint2',
                               'mid_inc', 'mid_dec'])
+    @ocs_agent.param('az_drift', type=float, default=None)
     @ocs_agent.param('az_only', type=bool, default=True)
     @ocs_agent.param('scan_upload_length', type=float, default=None)
     @inlineCallbacks
@@ -1297,7 +1301,7 @@ class ACUAgent:
                          el_speed=None, \
                          num_scans=None, start_time=None, \
                          wait_to_start=None, step_time=None, \
-                         az_start='end', az_only=True, \
+                         az_start='end', az_drift=None, az_only=True, \
                          scan_upload_length=None)
 
         **Process** - Scan generator, currently only works for
@@ -1337,6 +1341,10 @@ class ACUAgent:
                 of the scan use 'mid_inc' (for first half-leg to have
                 positive az velocity), 'mid_dec' (negative az velocity),
                 or 'mid' (velocity oriented towards endpoint2).
+            az_drift (float): if set, this should be a drift velocity
+              in deg/s.  The scan extrema will move accordingly.  This
+              can be used to better follow compact sources as they
+              rise or set through the focal plane.
             az_only (bool): if True (the default), then only the
                 Azimuth axis is put in ProgramTrack mode, and the El axis
                 is put in Stop mode.
@@ -1379,7 +1387,8 @@ class ACUAgent:
         scan_upload_len = params.get('scan_upload_length')
         scan_params = {k: params.get(k) for k in [
             'num_scans', 'num_batches', 'start_time',
-            'wait_to_start', 'step_time', 'batch_size', 'az_start']
+            'wait_to_start', 'step_time', 'batch_size',
+            'az_start', 'az_drift']
             if params.get(k) is not None}
         el_speed = params.get('el_speed', 0.0)
 
@@ -1682,6 +1691,8 @@ def add_agent_args(parser_in=None):
     pgroup = parser_in.add_argument_group('Agent Options')
     pgroup.add_argument("--acu-config")
     pgroup.add_argument("--exercise-plan")
+    pgroup.add_argument("--no-processes", action='store_true',
+                        default=False)
     return parser_in
 
 
@@ -1691,7 +1702,8 @@ def main(args=None):
                                   parser=parser,
                                   args=args)
     agent, runner = ocs_agent.init_site_agent(args)
-    _ = ACUAgent(agent, args.acu_config, args.exercise_plan)
+    _ = ACUAgent(agent, args.acu_config, args.exercise_plan,
+                 startup=not args.no_processes)
 
     runner.run(agent, auto_reconnect=True)
 
