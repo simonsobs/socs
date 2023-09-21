@@ -412,6 +412,7 @@ class MeinbergM1000Agent:
             reactor.callFromThread(reactor.stop)
             return False, 'acq process failed - No connection to M1000'
 
+        session.set_status('running')
         self.is_streaming = True
 
         while self.is_streaming:
