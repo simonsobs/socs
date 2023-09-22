@@ -121,6 +121,7 @@ class PfeifferTC400Agent:
 
                     try:
                         data['data']["Turbo_Motor_Temp"] = self.turbo.get_turbo_motor_temperature()
+                        data['data']["Turbo_Heater_Temp"] = self.turbo.get_turbo_heater_temp()
                         data['data']["Rotation_Speed"] = self.turbo.get_turbo_actual_rotation_speed()
                         data['data']['Error_Code'] = self.turbo.get_turbo_error_code()
                     except ValueError as e:
@@ -204,7 +205,7 @@ class PfeifferTC400Agent:
             state (str): Desired power state of turbo heater; 'on' or 'off'
 
         """
-        with self._lock.acquire_timeout(1, job='engage_turbo_heater') as acquired:
+        with self.lock.acquire_timeout(1, job='engage_turbo_heater') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
                               f"{self._lock.job} is already running")
@@ -282,6 +283,7 @@ def main(args=None):
     agent.register_task('init', p.init, startup=init_params)
     agent.register_task('turn_turbo_on', p.turn_turbo_on)
     agent.register_task('turn_turbo_off', p.turn_turbo_off)
+    agent.register_task('engage_turbo_heater', p.engage_turbo_heater)
     agent.register_task('acknowledge_turbo_errors', p.acknowledge_turbo_errors)
     agent.register_process('acq', p.acq, p._stop_acq)
 
