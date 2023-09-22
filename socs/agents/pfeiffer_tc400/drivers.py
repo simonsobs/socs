@@ -182,6 +182,21 @@ class PfeifferTC400:
         else:
             return turbo_response == "111111"
 
+
+    def get_turbo_heater_temp(self):
+        """Gets temperature of turbo heater.
+
+        Returns
+        -------
+        FIX
+        
+        """
+        send_data_request(self.ser, self.turbo_address, 35)
+        addr, rw, param_num, heater_temp = read_gauge_response(self.ser)
+
+        return int(heater_temp)
+
+
     def engage_turbo_heater(self, state):
         """Powers the turbo heater on or off.
 
@@ -199,7 +214,7 @@ class PfeifferTC400:
         if state == 'on':
             send_control_command(self.ser, self.turbo_address, 1, "111111")
         elif state == 'off':
-            send_control_command(self.ser, self.turbo_address, 0, "000000")
+            send_control_command(self.ser, self.turbo_address, 1, "000000")
 
         addr, rw, param_num, turbo_response = read_gauge_response(self.ser)
 
