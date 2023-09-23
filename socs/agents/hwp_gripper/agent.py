@@ -24,6 +24,7 @@ class HWPGripperAgent:
         args (argparse.Namespace):
             Parsed command line arguments namespace.
     """
+
     def __init__(self, agent, args):
         self.agent = agent
         self.log = agent.log
@@ -110,7 +111,7 @@ class HWPGripperAgent:
     def power(self, session, params=None):
         """power(state=True)
 
-        **Task** - If turning on, will power on the linear actuators and disengage 
+        **Task** - If turning on, will power on the linear actuators and disengage
         brakes. If turning off, will cut power to the linear actuators and engage
         brakes.
 
@@ -491,7 +492,7 @@ class HWPGripperAgent:
                 {'last_updated': 1649085992.719602,
                  'state': {'last_packet_received': 1649085992.719602,
                            'jxc_setup': False,
-                           'jxc_svon': False, 
+                           'jxc_svon': False,
                            'jxc_busy': False,
                            'jxc_seton': False,
                            'jxc_inp': False,
@@ -610,7 +611,7 @@ class HWPGripperAgent:
                     f"Will issue shutdown in "
                     f"{params['no_data_shutdown_time']/60:.2f} minutes."
                 )
-                warning_issued=True
+                warning_issued = True
 
             if time_since_ok > params['no_data_shutdown_time']:
                 self.log.error(
@@ -675,7 +676,7 @@ def main(args=None):
     agent.register_process('monitor_state', gripper_agent.monitor_state,
                            gripper_agent._stop_monitor_state, startup=True)
     agent.register_process('monitor_supervisor', gripper_agent.monitor_supervisor,
-                           gripper_agent._stop_monitor_supervisor, 
+                           gripper_agent._stop_monitor_supervisor,
                            startup={'no_data_warn_time': args.no_data_warn_time,
                                     'no_data_shutdown_time': args.no_data_shutdown_time})
     agent.register_task('power', gripper_agent.power)
