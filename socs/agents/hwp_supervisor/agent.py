@@ -719,7 +719,7 @@ class HWPSupervisor:
         self.ups_id = args.ups_id
 
         self.iboot_id = args.iboot_id
-        self.iboot_outlets = eval(args.iboot_outlets)
+        self.iboot_outlets = args.iboot_outlets
 
         self.hwp_state = HWPState(
             temp_field=self.ybco_temp_field,

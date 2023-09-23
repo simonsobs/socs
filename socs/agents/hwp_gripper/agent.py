@@ -92,7 +92,7 @@ class HWPGripperAgent:
         return self._get_hwp_freq() < 0.1
 
     def init_connection(self, session, params):
-        """init_connection(auto_acquire=False)
+        """init_connection()
 
         **Task** - Initialize connection to the GripperServer on the BeagleBone
         micro-controller
@@ -110,12 +110,27 @@ class HWPGripperAgent:
     def power(self, session, params=None):
         """power(state=True)
 
-        **Task** - If turning on, will power on the linear and disengage brakes.
-        If turning off, will cut power to the linear actuators and engage
+        **Task** - If turning on, will power on the linear actuators and disengage 
+        brakes. If turning off, will cut power to the linear actuators and engage
         brakes.
 
         Parameters:
-            state (bool): State to set the actuator power to. Takes bool input
+            state (bool): State to set the actuator power to.
+
+        Notes:
+            The most recent data collected is stored in session data in the
+            structure:
+
+                >>> response.session['response']
+                {'result': True,
+                 'log': ["SVON turned on in Control.ON()",
+                         "Turned off BRAKE for axis 1 in Control.BRAKE()",
+                         "Turned off BRAKE for axis 2 in Control.BRAKE()",
+                         "Turned off BRAKE for axis 3 in Control.BRAKE()",
+                         "Successfully turned off BRAKE for axis 1 in Control.BRAKE()",
+                         "Successfully turned off BRAKE for axis 2 in Control.BRAKE()",
+                         "Successfully turned off BRAKE for axis 3 in Control.BRAKE()",
+                         "Disengaged brakes in Control.ON()"]}
         """
         return_dict = self._run_client_func(
             self.client.power, params['state'], job='power'
@@ -136,6 +151,15 @@ class HWPGripperAgent:
             actuator (int):
                 Actuator number. Takes input of 0-3 with 1-3 controlling and
                 individual actuator and 0 controlling all three
+
+        Notes:
+            The most recent data collected is stored in session data in the
+            structure:
+
+                >>> response.session['response']
+                {'result': True,
+                 'log': ["Turned off BRAKE for axis 1 in Control.BRAKE()",
+                         "Successfully turned off BRAKE for axis 1 in Control.BRAKE()"]}
         """
         return_dict = self._run_client_func(
             self.client.brake, params['state'], params['actuator'], job='brake'
@@ -147,7 +171,7 @@ class HWPGripperAgent:
     @ocs_agent.param('actuator', default=1, type=int, check=lambda x: 1 <= x <= 3)
     @ocs_agent.param('distance', default=0, type=float, check=lambda x: -10. <= x <= 10.)
     def move(self, session, params=None):
-        """move(mode='pos', actuator=1, distance=1.3)
+        """move(mode='push', actuator=1, distance=0)
 
         **Task** - Move an actuator a specific distance. If the HWP is spinning,
         this task will not run.
@@ -167,6 +191,14 @@ class HWPGripperAgent:
             Positioning mode is used when you want to position the actuators without
             gripping the rotor. Pushing mode is used when you want the grip the
             rotor.
+
+            The most recent data collected is stored in session data in the
+            structure:
+
+                >>> response.session['response']
+                {'result': True,
+                 'log': ["Control.STEP() operation finished for step 1",
+                         "MOVE in Gripper.MOVE() completed successfully"]}
         """
 
         if self._get_hwp_freq() > 0.1:
@@ -187,6 +219,15 @@ class HWPGripperAgent:
         Note:
             This action must be done first after a power cycle. Otherwise the
             controller will throw an error.
+
+            The most recent data collected is stored in session data in the
+            structure:
+
+                >>> response.session['response']
+                {'result': True,
+                 'log': ["SVON turned on in Control.ON()",
+                         "'HOME' operation finished in Control.HOME()",
+                         "HOME operation in Gripper.HOME() completed"]}
         """
         return_dict = self._run_client_func(self.client.home, job='home')
         session.data['response'] = return_dict
@@ -198,6 +239,14 @@ class HWPGripperAgent:
         **Task** - Queries whether the actuators are in a known position. This
         tells you whether the windows software has detected that the actuator
         has been homed.
+
+        Notes:
+            The most recent data collected is stored in session data in the
+            structure:
+
+                >>> response.session['response']
+                {'result': True,
+                 'log': []}
         """
         return_dict = self._run_client_func(
             self.client.inp, job='INP', check_shutdown=False)
@@ -208,6 +257,14 @@ class HWPGripperAgent:
         """alarm()
 
         **Task** - Queries the actuator controller alarm state
+
+        Notes:
+            The most recent data collected is stored in session data in the
+            structure:
+
+                >>> response.session['response']
+                {'result': True,
+                 'log': ["ALARM = False"]}
         """
         return_dict = self._run_client_func(
             self.client.alarm, job='alarm', check_shutdown=False)
@@ -217,6 +274,15 @@ class HWPGripperAgent:
     def reset(self, session, params=None):
         """reset()
         **Task** - Resets the current active controller alarm
+
+        Notes:
+            The most recent data collected is stored in session data in the
+            structure:
+
+                >>> response.session['response']
+                {'result': True,
+                 'log': ["Ignored Control.ALARM_GROUP(). No ALARM detected",
+                         "RESET aborted in Gripper.RESET() due to no detected alarm"]}
         """
         return_dict = self._run_client_func(self.client.reset, job='reset')
         session.data['response'] = return_dict
@@ -230,6 +296,14 @@ class HWPGripperAgent:
 
         Parameters:
             actuator (int): Actuator number 1-3
+
+        Notes:
+            The most recent data collected is stored in session data in the
+            structure:
+
+                >>> response.session['response']
+                {'result': True,
+                 'log': ["Actuator 1 is in state 1"]}
         """
         return_dict = self._run_client_func(
             self.client.act, params['actuator'], job='act', check_shutdown=False)
@@ -248,6 +322,14 @@ class HWPGripperAgent:
         Notes:
             Configures the software to query the correct set of limit switches. The
             maximum extension of the actuators depends on the cryostat temperature.
+
+            The most recent data collected is stored in session data in the
+            structure:
+
+                >>> response.session['response']
+                {'result': True,
+                 'log': ["Received request to change is_cold to True",
+                         "is_cold successfully changed"]}
         """
         return_dict = self._run_client_func(
             self.client.is_cold, params['value'], job='is_cold')
@@ -270,6 +352,14 @@ class HWPGripperAgent:
             on of the limit switches has been triggered. This function can be
             called to forcibly move the actuators even with a limit switch
             trigger.
+
+            The most recent data collected is stored in session data in the
+            structure:
+
+                >>> response.session['response']
+                {'result': True,
+                 'log': ["Received request to change force to True",
+                         "force successfully changed"]}
         """
         return_dict = self._run_client_func(
             self.client.force, params['value'], job='force')
@@ -314,6 +404,15 @@ class HWPGripperAgent:
         session (OpSession):
             Session object for current operation. This function will add to
             session data.
+
+        Notes:
+            The most recent data collected is stored in session data in the
+            structure:
+
+                >>> response.session['responses']
+                [{'result': True, 'log': [.., .., etc]},
+                                    ..
+                 {'result': True, 'log': [.., .., etc]}]
         """
         data = {
             'responses': [],
@@ -338,7 +437,7 @@ class HWPGripperAgent:
             while not finished[actuator]:
                 # Move actuator inwards until warm-limit is hit
                 run_and_append(self.client.move, 'POS', actuator + 1, 0.2,
-                    job='grip', check_shutdown=check_shutdown)
+                               job='grip', check_shutdown=check_shutdown)
 
                 # Reset alarms. If the warm-limit is hit, the alarm will be triggered
                 # and return_dict['result'] will be True
@@ -347,26 +446,26 @@ class HWPGripperAgent:
                 if return_dict['result']:
                     # If the warm-limit is hit, move the actuator outwards bit
                     run_and_append(self.client.is_cold, True, job='grip',
-                       check_shutdown=check_shutdown)
+                                   check_shutdown=check_shutdown)
                     time.sleep(1)
 
                     run_and_append(self.client.move, 'POS', actuator + 1, -0.5,
-                        job='grip', check_shutdown=check_shutdown)
+                                   job='grip', check_shutdown=check_shutdown)
 
                     run_and_append(self.client.is_cold, False, job='grip',
-                        check_shutdown=check_shutdown)
+                                   check_shutdown=check_shutdown)
                     time.sleep(1)
 
                     finished[actuator] = True
 
         # Enable breaks
         run_and_append(self.client.brake, True, job='grip',
-        check_shutdown=check_shutdown)
+                       check_shutdown=check_shutdown)
         time.sleep(1)
 
         # Disable power to actuators
         run_and_append(self.client.power, False, job='grip',
-            check_shutdown=check_shutdown)
+                       check_shutdown=check_shutdown)
         time.sleep(1)
 
         return data
@@ -383,6 +482,27 @@ class HWPGripperAgent:
         """monitor_state()
 
         **Process** - Process to monitor the gripper state
+
+        Notes:
+            The most recent data collected is stored in session data in the
+            structure:
+
+                >>> response.session
+                {'last_updated': 1649085992.719602,
+                 'state': {'last_packet_received': 1649085992.719602,
+                           'jxc_setup': False,
+                           'jxc_svon': False, 
+                           'jxc_busy': False,
+                           'jxc_seton': False,
+                           'jxc_inp': False,
+                           'jxc_svre': False,
+                           'jxc_alarm': False,
+                           'jxc_out': 0,
+                           'act{axis}_pos': 0,
+                           'act{axis}_limit_warm_grip_state': False,
+                           'act{axis}_limit_cold_grip_state': False,
+                           'act{axis}_emg': False,
+                           'act{axis}_brake': True}}
         """
         session.set_status('running')
         sleep_time = 5
@@ -447,7 +567,7 @@ class HWPGripperAgent:
         return True, "Requesting monitor_state process to stop"
 
     @ocs_agent.param('no_data_warn_time', default=60, type=float)
-    @ocs_agent.param('no_data_shutdown_time', default=5*60, type=float)
+    @ocs_agent.param('no_data_shutdown_time', default=300, type=float)
     def monitor_supervisor(self, session, params=None):
         """monitor_supervisor()
 
@@ -455,6 +575,12 @@ class HWPGripperAgent:
         signal, or if communication wtih supervisor is dropped for longer than
         ``no_data_shutdown_time``, this will begin agent shutdown and disable access
         to other dangerous gripper operations.
+
+        Parameters:
+            no_data_warn_time (int): Time in seconds to wait after communication failure
+                                     before generating a warning
+            no_data_shutdown_time (int): Time in seconds to wait after communication failure
+                                         before initiating shutdown
         """
         session.set_status('running')
         last_ok_time = time.time()
@@ -475,7 +601,6 @@ class HWPGripperAgent:
                 last_ok_time = time.time()
             elif action == 'stop':
                 if not self.shutdown_mode:
-                    self.shutdown_mode = True
                     self.agent.start('shutdown')
 
             time_since_ok = time.time() - last_ok_time
@@ -493,7 +618,6 @@ class HWPGripperAgent:
                     f"{params['no_data_shutdown_time']/60:.2f} minutes. "
                     "Issuing shutdown"
                 )
-                self.shutdown_mode = True
                 self.agent.start('shutdown')
 
             data = {
@@ -524,13 +648,13 @@ def make_parser(parser=None):
     pgroup.add_argument('--mcu-ip', type=str,
                         help='IP of Gripper Beaglebone')
     pgroup.add_argument('--control-port', type=int, default=8041,
-                        help='Arbitrary port for actuator control')
+                        help='Port for actuator control as set by the Beaglebone code')
     pgroup.add_argument('--supervisor-id', type=str,
                         help='Instance ID for HWP Supervisor agent')
     pgroup.add_argument('--no-data-warn-time', type=float, default=60,
                         help='Time (seconds) since last supervisor-ok signal to '
                              'wait before issuing a warning')
-    pgroup.add_argument('--no-data-shutdown-time', type=float, default=5*60,
+    pgroup.add_argument('--no-data-shutdown-time', type=float, default=300,
                         help='Time (seconds) since last supervisor-ok signal to '
                              'wait before entering shutdown mode')
     return parser
@@ -551,7 +675,9 @@ def main(args=None):
     agent.register_process('monitor_state', gripper_agent.monitor_state,
                            gripper_agent._stop_monitor_state, startup=True)
     agent.register_process('monitor_supervisor', gripper_agent.monitor_supervisor,
-                           gripper_agent._stop_monitor_supervisor, startup=True)
+                           gripper_agent._stop_monitor_supervisor, 
+                           startup={'no_data_warn_time': args.no_data_warn_time,
+                                    'no_data_shutdown_time': args.no_data_shutdown_time})
     agent.register_task('power', gripper_agent.power)
     agent.register_task('brake', gripper_agent.brake)
     agent.register_task('move', gripper_agent.move)

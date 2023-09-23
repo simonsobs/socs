@@ -1,6 +1,4 @@
-import errno
 import pickle as pkl
-import select
 import socket
 
 
@@ -43,7 +41,7 @@ class GripperClient(object):
         if not isinstance(state, bool):
             return False
 
-        if actuator is 0:
+        if actuator == 0:
             if state:
                 return self.send_command('BRAKE ON')
             else:
@@ -61,7 +59,7 @@ class GripperClient(object):
         if not isinstance(state, bool):
             return False
 
-        if actuator is 0:
+        if actuator == 0:
             if state:
                 return self.send_command('EMG ON')
             else:

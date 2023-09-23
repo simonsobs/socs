@@ -24,9 +24,9 @@ OCS Site Config
 
 An example site-config-file block::
 
-    {'agent-class': 'GripperAgent',
-     'instance-id': 'gripper',
-     'arguments': [ '--mcu_port', '10.10.10.115',
+    {'agent-class': 'HWPGripperAgent',
+     'instance-id': 'hwp-gripper',
+     'arguments': [ '--mcu_ip', '10.10.10.115',
                     '--control_port', 8041,
                     '--supervisor-id', 'hwp-supervisor',
                     '--no-data-warn-time', 60,
@@ -57,7 +57,7 @@ to move actuators, home actuators, check if they are in-position, etc.
 
 This agent has two long-running processes, one to regularly query the gripper
 server for the gripper-state, and the other to regularly check the hwp-supervisor for the
-overall HWP state
+overall HWP state.
 
 Shutdown mode
 ```````````````
