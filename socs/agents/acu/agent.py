@@ -228,19 +228,24 @@ class ACUAgent:
     def restart_idle(self, session, params):
         """restart_idle()
 
-        **Process** - Issue the 'RestartIdleTime' command at regular intervals.
-
-        In some ACU versions, this is required to prevent the antenna
-        from reverting to survival mode.
+        **Process** - To prevent LAT from going into Survival mode,
+        do something on the command interface every so often.  (The
+        default inactivity timeout is 5 minutes.)
 
         """
         session.set_status('running')
+        next_action = 0
         while session.status in ['running']:
-            resp = yield self.acu_control.http.Command('DataSets.CmdModeTransfer',
-                                                       'RestartIdleTime')
-            self.log.info('Sent RestartIdleTime')
-            self.log.info(resp)
-            yield dsleep(1. * 60.)
+            if time.time() < next_action:
+                yield dsleep(5.)
+                continue
+            self.log.info('Sending RestartIdleTime')
+            try:
+                resp = yield self.acu_read.http.Values(self.acu8100)
+            except Exception as e:
+                self.log.info(' -- failed to RestartIdleTime')
+            next_action = time.time() + 60
+
         return True, 'Process "restart_idle" exited cleanly.'
 
     @inlineCallbacks
@@ -850,6 +855,13 @@ class ACUAgent:
             def goto(target):
                 result = yield self.acu_control.go_3rd_axis(target)
                 return result
+
+            # For LAT 'Boresight' use special dataset.
+            if self.acu_config['platform'] in ['ccat', 'lat']:
+                def get_pos():
+                    return self.data['status']['corotator'][f'Corotator_current_position']
+                def get_mode():
+                    return self.data['status']['corotator']['Corotator_mode']
 
         else:
             return False, f"No configuration for axis={axis}"
