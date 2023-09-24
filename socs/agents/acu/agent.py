@@ -241,9 +241,9 @@ class ACUAgent:
                 continue
             self.log.info('Sending RestartIdleTime')
             try:
-                resp = yield self.acu_read.http.Values(self.acu8100)
+                yield self.acu_read.http.Values(self.acu8100)
             except Exception as e:
-                self.log.info(' -- failed to RestartIdleTime')
+                self.log.info(' -- failed to RestartIdleTime: {err}', err=e)
             next_action = time.time() + 60
 
         return True, 'Process "restart_idle" exited cleanly.'
@@ -823,47 +823,53 @@ class ACUAgent:
         State = Enum(f'{axis}State',
                      ['INIT', 'WAIT_MOVING', 'WAIT_STILL', 'FAIL', 'DONE'])
 
+
         # Specialization for different axis types.
-        # pos/mode are common:
-        def get_pos():
-            return self.data['status']['summary'][f'{axis}_current_position']
-
-        def get_mode():
-            return self.data['status']['summary'][f'{axis}_mode']
-
-        # vel/goto are different:
-        if axis in ['Azimuth', 'Elevation']:
-            def get_vel():
+        class AxisControl:
+            def get_pos(_self):
+                return self.data['status']['summary'][f'{axis}_current_position']
+            def get_mode(_self):
+                return self.data['status']['summary'][f'{axis}_mode']
+            def get_vel(_self):
                 return self.data['status']['summary'][f'{axis}_current_velocity']
 
-            if axis == 'Azimuth':
-                @inlineCallbacks
-                def goto(target):
-                    result = yield self.acu_control.go_to(az=target)
-                    return result
-            else:
-                @inlineCallbacks
-                def goto(target):
-                    result = yield self.acu_control.go_to(el=target)
-                    return result
-
-        elif axis in ['Boresight']:
-            def get_vel():
-                return 0.
-
+        class AzAxis(AxisControl):
             @inlineCallbacks
-            def goto(target):
+            def goto(_self, target):
+                result = yield self.acu_control.go_to(az=target)
+                return result
+
+        class ElAxis(AxisControl):
+            @inlineCallbacks
+            def goto(_self, target):
+                result = yield self.acu_control.go_to(el=target)
+                return result
+
+        class ThirdAxis(AxisControl):
+            def get_vel(_self):
+                return 0.
+            @inlineCallbacks
+            def goto(_self, target):
                 result = yield self.acu_control.go_3rd_axis(target)
                 return result
 
-            # For LAT 'Boresight' use special dataset.
-            if self.acu_config['platform'] in ['ccat', 'lat']:
-                def get_pos():
-                    return self.data['status']['corotator'][f'Corotator_current_position']
-                def get_mode():
-                    return self.data['status']['corotator']['Corotator_mode']
+        class LatCorotator(ThirdAxis):
+            def get_pos(_self):
+                return self.data['status']['corotator']['Corotator_current_position']
+            def get_mode(_self):
+                return self.data['status']['corotator']['Corotator_mode']
 
-        else:
+        ctrl = None
+        if axis == 'Azimuth':
+            ctrl = AzAxis()
+        elif axis == 'Elevation':
+            ctrl = ElAxis()
+        elif axis == 'Boresight':
+            if self.acu_config['platform'] in ['ccat', 'lat']:
+                ctrl = LatCorotator()
+            else:
+                ctrl = ThirdAxis()
+        if ctrl is None:
             return False, f"No configuration for axis={axis}"
 
         limit_func, _ = self._get_limit_func(axis)
@@ -896,7 +902,7 @@ class ACUAgent:
             motion_expected = time_since_start > MAX_STARTUP_TIME
 
             # Space ...
-            current_pos, current_vel = get_pos(), get_vel()
+            current_pos, current_vel = ctrl.get_pos(), ctrl.get_vel()
             distance = abs(target - current_pos)
             history.append(distance)
             if give_up_time is None:
@@ -910,7 +916,7 @@ class ACUAgent:
             has_never_moved = (has_never_moved and not moving)
 
             near_destination = distance < THERE_YET
-            mode_ok = (get_mode() == 'Preset')
+            mode_ok = (ctrl.get_mode() == 'Preset')
 
             # Log only on state changes
             if state != last_state:
@@ -934,7 +940,7 @@ class ACUAgent:
             # Main state machine
             if state == State.INIT:
                 # Set target position and change mode to Preset.
-                result = yield goto(target)
+                result = yield ctrl.goto(target)
                 if result == OK_RESPONSE:
                     state = State.WAIT_MOVING
                 else:
