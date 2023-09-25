@@ -164,12 +164,11 @@ class LogSimulator:
             f.flush()
 
     def write_flowmeter_file(self):
-        # Flow isn't necessarily sync'd to temps so lets not do that
         time_str = make_utc_time_string("%d-%m-%y,%H:%M:%S")
-        # print('writing to', k)
         data_str = random.randint(0, 100) / 100
         full_str = " {time},{data}".format(time=time_str, data=data_str)
         print(full_str)
+
         flowmeter_file = self._get_files_by_type('flowmeter')
         flowmeter_file.write(full_str + '\n')
         flowmeter_file.flush()
@@ -193,6 +192,7 @@ class LogSimulator:
                    f"CH5,       ,1, {data['CH5']},0,1,"\
                    f"CH6,       ,1, {data['CH6']},0,1,"
         print(full_str)
+
         maxigauge_file = self._get_files_by_type('maxigauge')
         maxigauge_file.write(full_str + '\n')
         maxigauge_file.flush()
@@ -210,6 +210,7 @@ class LogSimulator:
             random_state = random.randint(0, 1)
             full_str += f",{ch},{random_state}"
         print(full_str)
+
         channel_file = self._get_files_by_type('channel')
         channel_file.write(full_str + '\n')
         channel_file.flush()
@@ -247,10 +248,11 @@ class LogSimulator:
 
     def write_heater_file(self):
         # heater readings
-        time_str = make_utc_time_string("%d-%m-%y,%H:%M:%S")
-
         heater_channels = ["a1_u", "a1_r_lead", "a1_r_htr", "a2_u", "a2_r_lead",
                            "a2_r_htr", "htr", "htr_range"]
+
+        time_str = make_utc_time_string("%d-%m-%y,%H:%M:%S")
+
         data = {}
         for h_ch in heater_channels:
             data[h_ch] = '%.5E' % float(random.randint(0, 1000000) / 100000)
@@ -259,8 +261,8 @@ class LogSimulator:
         for ch in heater_channels:
             data_str += f",{ch},{data[ch]}"
         full_str = f"{time_str}{data_str}"
-
         print(full_str)
+
         heater_file = self._get_files_by_type('heater')
         heater_file.write(full_str + '\n')
         heater_file.flush()
