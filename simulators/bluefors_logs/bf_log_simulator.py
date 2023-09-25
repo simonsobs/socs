@@ -3,25 +3,22 @@ import random
 import time
 from datetime import datetime, timezone
 
+# Rules
+# Observations about the behavior of the log files. This is all reverse
+# engineered from the bluefors log output.
+#
+# * All Lakeshore measurements share timestamps.
+# * Channels can appear at any time, or not exist at all.
+# * Other logs do not share timestamps, this includes:
+#   * Channels
+#   * Flowmeter
+#   * Maxigauge
+
 
 def mkdir(directory):
     if not os.path.exists(directory):
         os.makedirs(directory)
 
-
-# Rules
-# All P/T/R measurements from the 372 share timestamps
-# Channels can appear at anytime, or not exist at all, depending on if states have changed
-# nothing else shares time stamps, so these are all separate
-    # Channels
-    # Flowmeter
-    # maxigauge
-
-
-# CH 1, 2, 3, 5, 6, 8
-# Channels
-# Flowmeter
-# maxigauge
 
 def make_therm_file_list(channels, date, directory=None):
     """Make list of files to create/open.
@@ -72,21 +69,32 @@ def make_utc_time_string(format_):
 
 
 class LogSimulator:
-    def __init__(self):
+    """Bluefors log simulator.
+
+    This object knows how to create a directory and files for "today" and write
+    random data to them in the Bluefors log format. This can be used to test
+    the Bluefors Agent.
+
+    Parameters
+    ----------
+    log_dir : str
+        Path for the directory to write log files to. Defaults to "./sim/".
+
+    """
+
+    def __init__(self, log_dir="./sim/"):
         self.file_objects = {}
+        self.create_file_objects(log_dir=log_dir)
 
-        self.create_file_objects()
-
-    def create_file_objects(self):
+    def create_file_objects(self, log_dir):
         # let's forego log rotation, so just make logs for today and only today
-        directory_str = make_utc_time_string("%y-%m-%d")
-        mkdir("./sim/%s/" % directory_str)
         file_date_str = make_utc_time_string("%y-%m-%d")
 
-        filepath = "./sim/%s/" % (directory_str)
-        thermometer_files = make_therm_file_list([1, 2, 5, 6, 8], file_date_str, filepath)
+        filepath = os.path.join(log_dir, file_date_str,)
+        mkdir(filepath)
 
         self.file_objects['thermometers'] = {}
+        thermometer_files = make_therm_file_list([1, 2, 5, 6, 8], file_date_str, filepath)
         for _file in thermometer_files:
             self.file_objects['thermometers'][_file] = open(_file, 'a')
 
@@ -214,20 +222,19 @@ class LogSimulator:
         self.file_objects['heaters'].flush()
 
 
-# main
 if __name__ == '__main__':
     interval = 1
-    flow_countdown = 10
+    countdown = 10
 
     simulator = LogSimulator()
 
     while True:
         simulator.write_thermometer_files()
 
-        # save every 10 seconds
-        flow_countdown -= 1
-        if flow_countdown == 0:
-            flow_countdown = 10
+        # Write every ten seconds
+        countdown -= 1
+        if countdown == 0:
+            countdown = 10
             simulator.write_flowmeter_file()
             simulator.write_maxigauge_file()
             simulator.write_channel_file()
