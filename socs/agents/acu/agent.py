@@ -823,13 +823,15 @@ class ACUAgent:
         State = Enum(f'{axis}State',
                      ['INIT', 'WAIT_MOVING', 'WAIT_STILL', 'FAIL', 'DONE'])
 
-
         # Specialization for different axis types.
+
         class AxisControl:
             def get_pos(_self):
                 return self.data['status']['summary'][f'{axis}_current_position']
+
             def get_mode(_self):
                 return self.data['status']['summary'][f'{axis}_mode']
+
             def get_vel(_self):
                 return self.data['status']['summary'][f'{axis}_current_velocity']
 
@@ -848,6 +850,7 @@ class ACUAgent:
         class ThirdAxis(AxisControl):
             def get_vel(_self):
                 return 0.
+
             @inlineCallbacks
             def goto(_self, target):
                 result = yield self.acu_control.go_3rd_axis(target)
@@ -856,6 +859,7 @@ class ACUAgent:
         class LatCorotator(ThirdAxis):
             def get_pos(_self):
                 return self.data['status']['corotator']['Corotator_current_position']
+
             def get_mode(_self):
                 return self.data['status']['corotator']['Corotator_mode']
 
