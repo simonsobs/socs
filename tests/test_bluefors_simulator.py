@@ -11,29 +11,39 @@ def logsim(tmp_path):
     yield sim
 
 
-def test_log_simulator(logsim):
-    print(logsim.log_dir)
+def check_written_logs(filename, line):
+    with open(filename, 'r') as f:
+        logline = f.readline()
+
+    assert logline == line
 
 
 def test_write_thermometer_files(logsim):
-    logsim.write_thermometer_files()
+    resp = logsim.write_thermometer_files()
+    for file in resp:
+        check_written_logs(*file)
 
 
 def test_write_flowmeter_file(logsim):
-    logsim.write_flowmeter_file()
+    resp = logsim.write_flowmeter_file()
+    check_written_logs(*resp[0])
 
 
 def test_write_maxigauge_file(logsim):
-    logsim.write_maxigauge_file()
+    resp = logsim.write_maxigauge_file()
+    check_written_logs(*resp[0])
 
 
 def test_write_channel_file(logsim):
-    logsim.write_channel_file()
+    resp = logsim.write_channel_file()
+    check_written_logs(*resp[0])
 
 
 def test_write_status_file(logsim):
-    logsim.write_status_file()
+    resp = logsim.write_status_file()
+    check_written_logs(*resp[0])
 
 
 def test_write_heater_file(logsim):
-    logsim.write_heater_file()
+    resp = logsim.write_heater_file()
+    check_written_logs(*resp[0])

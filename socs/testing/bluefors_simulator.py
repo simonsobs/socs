@@ -176,17 +176,23 @@ class LogSimulator:
         file = file_dict[filename]
         print(f"writing to {filename}")
         print(line)
-        file.write(line + '\n')
+        line = line + '\n'
+        file.write(line)
         file.flush()
+
+        return filename, line
 
     def write_thermometer_files(self):
         # all thermometers share a timestamp, so use a single time_str
         time_str = make_utc_time_string("%d-%m-%y,%H:%M:%S")
         thermometer_files = self._get_files_by_type('thermometer')
+        ret = []
         for file in thermometer_files:
             data_str = random.randint(0, 100) / 100
             full_str = " {time},{data}".format(time=time_str, data=data_str)
-            self._write_single_file(file, full_str)
+            ret.append(self._write_single_file(file, full_str))
+
+        return ret
 
     def write_flowmeter_file(self):
         time_str = make_utc_time_string("%d-%m-%y,%H:%M:%S")
@@ -194,7 +200,9 @@ class LogSimulator:
         full_str = " {time},{data}".format(time=time_str, data=data_str)
 
         file = self._get_files_by_type('flowmeter')
-        self._write_single_file(file, full_str)
+        ret = self._write_single_file(file, full_str)
+
+        return [ret]
 
     def write_maxigauge_file(self):
         # maxigauge readings
@@ -216,7 +224,9 @@ class LogSimulator:
                    f"CH6,       ,1, {data['CH6']},0,1,"
 
         file = self._get_files_by_type('maxigauge')
-        self._write_single_file(file, full_str)
+        ret = self._write_single_file(file, full_str)
+
+        return [ret]
 
     def write_channel_file(self):
         # channels
@@ -232,7 +242,9 @@ class LogSimulator:
             full_str += f",{ch},{random_state}"
 
         file = self._get_files_by_type('channel')
-        self._write_single_file(file, full_str)
+        ret = self._write_single_file(file, full_str)
+
+        return [ret]
 
     def write_status_file(self):
         # status readings
@@ -261,7 +273,9 @@ class LogSimulator:
         full_str = f"{time_str}{data_str}"
 
         file = self._get_files_by_type('status')
-        self._write_single_file(file, full_str)
+        ret = self._write_single_file(file, full_str)
+
+        return [ret]
 
     def write_heater_file(self):
         # heater readings
@@ -280,7 +294,9 @@ class LogSimulator:
         full_str = f"{time_str}{data_str}"
 
         file = self._get_files_by_type('heater')
-        self._write_single_file(file, full_str)
+        ret = self._write_single_file(file, full_str)
+
+        return [ret]
 
 
 if __name__ == '__main__':
