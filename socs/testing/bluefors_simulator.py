@@ -80,9 +80,22 @@ class LogSimulator:
     log_dir : str
         Path for the directory to write log files to. Defaults to "./sim/".
 
+    Attributes
+    ----------
+    log_dir : str
+        Path for the directory to write log files to.
+    file_objects : dict
+        A dictionary with the filenames as keys, and a dict as the value. Each
+        sub-dict has the following structure::
+
+            {'file_object': <>,
+             'file_type': 'thermometer'}
+
+
     """
 
     def __init__(self, log_dir="./sim/"):
+        self.log_dir = log_dir
         self.file_objects = {}
         self.create_file_objects(log_dir=log_dir)
 
