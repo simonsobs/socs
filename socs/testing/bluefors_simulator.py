@@ -20,7 +20,7 @@ def mkdir(directory):
         os.makedirs(directory)
 
 
-def make_therm_file_list(channels, date, directory=None):
+def _make_therm_file_list(channels, date, directory=None):
     """Make list of files to create/open.
 
     Parameters
@@ -106,7 +106,7 @@ class LogSimulator:
         filepath = os.path.join(log_dir, file_date_str,)
         mkdir(filepath)
 
-        thermometer_files = make_therm_file_list([1, 2, 5, 6, 8], file_date_str, filepath)
+        thermometer_files = _make_therm_file_list([1, 2, 5, 6, 8], file_date_str)
         for _file in thermometer_files:
             self._create_file(filepath, _file, 'thermometer')
 
@@ -118,7 +118,7 @@ class LogSimulator:
 
     def _create_file(self, dir_, filename, filetype):
         fullpath = os.path.join(dir_, filename)
-        self.file_objects[filename] = {"file_object": open(fullpath, 'a'),
+        self.file_objects[fullpath] = {"file_object": open(fullpath, 'a'),
                                        "file_type": filetype}
 
     def close_all_files(self):
@@ -152,7 +152,7 @@ class LogSimulator:
             if isinstance(d, dict):
                 type_ = d.get('file_type')
                 if type_ == filetype:
-                    print(f"{f} matched type {filetype}")
+                    # print(f"{f} matched type {filetype}")
                     files.append({f: d['file_object']})
 
         if len(files) == 1:

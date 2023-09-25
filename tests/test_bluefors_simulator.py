@@ -13,7 +13,6 @@ def logsim(tmp_path):
 
 def test_log_simulator(logsim):
     print(logsim.log_dir)
-    print(logsim.file_objects)
 
 
 def test_write_thermometer_files(logsim):
