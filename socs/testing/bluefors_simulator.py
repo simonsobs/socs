@@ -106,31 +106,57 @@ class LogSimulator:
         filepath = os.path.join(log_dir, file_date_str,)
         mkdir(filepath)
 
-        self.file_objects['thermometers'] = {}
         thermometer_files = make_therm_file_list([1, 2, 5, 6, 8], file_date_str, filepath)
         for _file in thermometer_files:
-            self.file_objects['thermometers'][_file] = open(_file, 'a')
+            self._create_file(filepath, _file, 'thermometer')
 
-        flowmeter_file = os.path.join(filepath, f'Flowmeter {file_date_str}.log')
-        self.file_objects['flowmeter'] = open(flowmeter_file, 'a')
+        self._create_file(filepath, f'Flowmeter {file_date_str}.log', 'flowmeter')
+        self._create_file(filepath, f'maxigauge {file_date_str}.log', 'maxigauge')
+        self._create_file(filepath, f'Channels {file_date_str}.log', 'channel')
+        self._create_file(filepath, f'Status_{file_date_str}.log', 'status')
+        self._create_file(filepath, f'heaters_{file_date_str}.log', 'heater')
 
-        maxigauge_file = os.path.join(filepath, f'maxigauge {file_date_str}.log')
-        self.file_objects['maxigauge'] = open(maxigauge_file, 'a')
+    def _create_file(self, dir_, filename, filetype):
+        fullpath = os.path.join(dir_, filename)
+        self.file_objects[filename] = {"file_object": open(fullpath, 'a'),
+                                       "file_type": filetype}
 
-        channel_state_file = os.path.join(filepath, f'Channels {file_date_str}.log')
-        self.file_objects['channels'] = open(channel_state_file, 'a')
+    def _get_files_by_type(self, filetype):
+        """Get a list of all files of a given type.
 
-        status_state_file = os.path.join(filepath, f'Status_{file_date_str}.log')
-        self.file_objects['status'] = open(status_state_file, 'a')
+        Parameters
+        ----------
+        filetype : str
+            File type to return file objects for.
 
-        heater_file = os.path.join(filepath, f'heaters_{file_date_str}.log')
-        self.file_objects['heaters'] = open(heater_file, 'a')
+        Returns
+        -------
+        files : list
+            List of files objects if multiple files match the type.
+        file : _io.TextIOWrapper
+            File object that matches the given type.
+
+        """
+        files = []
+        for f, d in self.file_objects.items():
+            if isinstance(d, dict):
+                type_ = d.get('file_type')
+                if type_ == filetype:
+                    print(f"{f} matched type {filetype}")
+                    files.append(d['file_object'])
+
+        if len(files) == 1:
+            return files[0]
+        else:
+            return files
 
     def write_thermometer_files(self):
         # all thermometers share a timestamp, so use a single time_str
         time_str = make_utc_time_string("%d-%m-%y,%H:%M:%S")
-        for k, f in self.file_objects['thermometers'].items():
-            print('writing to', k)
+        thermometer_files = self._get_files_by_type('thermometer')
+        # for k, f in self.file_objects['thermometers'].items():
+        for f in thermometer_files:
+            # print('writing to', k)
             data_str = random.randint(0, 100) / 100
             full_str = " {time},{data}".format(time=time_str, data=data_str)
             print(full_str)
@@ -144,8 +170,9 @@ class LogSimulator:
         data_str = random.randint(0, 100) / 100
         full_str = " {time},{data}".format(time=time_str, data=data_str)
         print(full_str)
-        self.file_objects['flowmeter'].write(full_str + '\n')
-        self.file_objects['flowmeter'].flush()
+        flowmeter_file = self._get_files_by_type('flowmeter')
+        flowmeter_file.write(full_str + '\n')
+        flowmeter_file.flush()
 
     def write_maxigauge_file(self):
         # maxigauge readings
@@ -166,8 +193,9 @@ class LogSimulator:
                    f"CH5,       ,1, {data['CH5']},0,1,"\
                    f"CH6,       ,1, {data['CH6']},0,1,"
         print(full_str)
-        self.file_objects['maxigauge'].write(full_str + '\n')
-        self.file_objects['maxigauge'].flush()
+        maxigauge_file = self._get_files_by_type('maxigauge')
+        maxigauge_file.write(full_str + '\n')
+        maxigauge_file.flush()
 
     def write_channel_file(self):
         # channels
@@ -182,8 +210,9 @@ class LogSimulator:
             random_state = random.randint(0, 1)
             full_str += f",{ch},{random_state}"
         print(full_str)
-        self.file_objects['channels'].write(full_str + '\n')
-        self.file_objects['channels'].flush()
+        channel_file = self._get_files_by_type('channel')
+        channel_file.write(full_str + '\n')
+        channel_file.flush()
 
     def write_status_file(self):
         # status readings
@@ -212,8 +241,9 @@ class LogSimulator:
         full_str = f"{time_str}{data_str}"
 
         print(full_str)
-        self.file_objects['status'].write(full_str + '\n')
-        self.file_objects['status'].flush()
+        status_file = self._get_files_by_type('status')
+        status_file.write(full_str + '\n')
+        status_file.flush()
 
     def write_heater_file(self):
         # heater readings
@@ -231,8 +261,9 @@ class LogSimulator:
         full_str = f"{time_str}{data_str}"
 
         print(full_str)
-        self.file_objects['heaters'].write(full_str + '\n')
-        self.file_objects['heaters'].flush()
+        heater_file = self._get_files_by_type('heater')
+        heater_file.write(full_str + '\n')
+        heater_file.flush()
 
 
 if __name__ == '__main__':
