@@ -132,9 +132,11 @@ class LogSimulator:
         Returns
         -------
         files : list
-            List of files objects if multiple files match the type.
-        file : _io.TextIOWrapper
-            File object that matches the given type.
+            List of simple dicts with {filename: file_object} if multiple files
+            match the type.
+        file : dict
+            Simple dict with {filename: file_object} that matches the given
+            type. Returned if there is only a single type match.
 
         """
         files = []
@@ -143,35 +145,42 @@ class LogSimulator:
                 type_ = d.get('file_type')
                 if type_ == filetype:
                     print(f"{f} matched type {filetype}")
-                    files.append(d['file_object'])
+                    files.append({f: d['file_object']})
 
         if len(files) == 1:
             return files[0]
         else:
             return files
 
+    def _write_single_file(self, filetype, line):
+        _f = self._get_files_by_type(filetype)
+        filename = list(_f.keys())[0]
+        file = _f[filename]
+        print(f"writing to {filename}")
+        print(line)
+        file.write(line + '\n')
+        file.flush()
+
     def write_thermometer_files(self):
         # all thermometers share a timestamp, so use a single time_str
         time_str = make_utc_time_string("%d-%m-%y,%H:%M:%S")
         thermometer_files = self._get_files_by_type('thermometer')
-        # for k, f in self.file_objects['thermometers'].items():
-        for f in thermometer_files:
-            # print('writing to', k)
+        for _f in thermometer_files:
+            filename = list(_f.keys())[0]
+            file = _f[filename]
+            print(f"writing to {filename}")
             data_str = random.randint(0, 100) / 100
             full_str = " {time},{data}".format(time=time_str, data=data_str)
             print(full_str)
-            f.write(full_str + '\n')
-            f.flush()
+            file.write(full_str + '\n')
+            file.flush()
 
     def write_flowmeter_file(self):
         time_str = make_utc_time_string("%d-%m-%y,%H:%M:%S")
         data_str = random.randint(0, 100) / 100
         full_str = " {time},{data}".format(time=time_str, data=data_str)
-        print(full_str)
 
-        flowmeter_file = self._get_files_by_type('flowmeter')
-        flowmeter_file.write(full_str + '\n')
-        flowmeter_file.flush()
+        self._write_single_file('flowmeter', full_str)
 
     def write_maxigauge_file(self):
         # maxigauge readings
@@ -191,11 +200,8 @@ class LogSimulator:
                    f"CH4,       ,1, {data['CH4']},0,1,"\
                    f"CH5,       ,1, {data['CH5']},0,1,"\
                    f"CH6,       ,1, {data['CH6']},0,1,"
-        print(full_str)
 
-        maxigauge_file = self._get_files_by_type('maxigauge')
-        maxigauge_file.write(full_str + '\n')
-        maxigauge_file.flush()
+        self._write_single_file('maxigauge', full_str)
 
     def write_channel_file(self):
         # channels
@@ -209,11 +215,8 @@ class LogSimulator:
         for ch in state_channels:
             random_state = random.randint(0, 1)
             full_str += f",{ch},{random_state}"
-        print(full_str)
 
-        channel_file = self._get_files_by_type('channel')
-        channel_file.write(full_str + '\n')
-        channel_file.flush()
+        self._write_single_file('channel', full_str)
 
     def write_status_file(self):
         # status readings
@@ -241,10 +244,7 @@ class LogSimulator:
             data_str += f",{ch},{data[ch]}"
         full_str = f"{time_str}{data_str}"
 
-        print(full_str)
-        status_file = self._get_files_by_type('status')
-        status_file.write(full_str + '\n')
-        status_file.flush()
+        self._write_single_file('status', full_str)
 
     def write_heater_file(self):
         # heater readings
@@ -261,11 +261,8 @@ class LogSimulator:
         for ch in heater_channels:
             data_str += f",{ch},{data[ch]}"
         full_str = f"{time_str}{data_str}"
-        print(full_str)
 
-        heater_file = self._get_files_by_type('heater')
-        heater_file.write(full_str + '\n')
-        heater_file.flush()
+        self._write_single_file('heater', full_str)
 
 
 if __name__ == '__main__':
