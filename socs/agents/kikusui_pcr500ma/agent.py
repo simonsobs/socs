@@ -130,7 +130,16 @@ class PCRAgent:
                               f'{self.lock.job} is already running')
                 return False, 'Could not acquire lock.'
 
-            self._dev.set_output(output=params['output'])
+            force = params.get('force', False)
+
+            if force:
+                self._dev.set_output(output=params['output'])
+            else:
+                volt_set = self._dev.get_volt_ac()
+                if volt_set != 0:
+                    return False, 'Voltage too high to turn on/off.'
+                self._dev.set_output(output=params['output'])
+
 
         return True, f'Set output for PCR: {params["output"]}'
 
