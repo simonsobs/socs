@@ -228,19 +228,24 @@ class ACUAgent:
     def restart_idle(self, session, params):
         """restart_idle()
 
-        **Process** - Issue the 'RestartIdleTime' command at regular intervals.
-
-        In some ACU versions, this is required to prevent the antenna
-        from reverting to survival mode.
+        **Process** - To prevent LAT from going into Survival mode,
+        do something on the command interface every so often.  (The
+        default inactivity timeout is 5 minutes.)
 
         """
         session.set_status('running')
+        next_action = 0
         while session.status in ['running']:
-            resp = yield self.acu_control.http.Command('DataSets.CmdModeTransfer',
-                                                       'RestartIdleTime')
-            self.log.info('Sent RestartIdleTime')
-            self.log.info(resp)
-            yield dsleep(1. * 60.)
+            if time.time() < next_action:
+                yield dsleep(5.)
+                continue
+            self.log.info('Sending RestartIdleTime')
+            try:
+                yield self.acu_read.http.Values(self.acu8100)
+            except Exception as e:
+                self.log.info(' -- failed to RestartIdleTime: {err}', err=e)
+            next_action = time.time() + 60
+
         return True, 'Process "restart_idle" exited cleanly.'
 
     @inlineCallbacks
@@ -366,10 +371,18 @@ class ACUAgent:
         }
         pin_key = {
             # Capitalization matches strings in ACU binary, not ICD.
+            # Are these needed for the SAT still?
             'Any Moving': 0,
             'All Inserted': 1,
             'All Retracted': 2,
             'Failure': 3,
+        }
+        lat_pin_key = {
+            # From "meta" output.
+            'Moving': 0,
+            'Inserted': 1,
+            'Retracted': 2,
+            'Error': 3,
         }
         tfn_key = {'None': float('nan'),
                    'False': 0,
@@ -495,16 +508,11 @@ class ACUAgent:
                         if isinstance(statval, float):
                             influx_val = statval
                         elif isinstance(statval, str):
-                            if statval == 'None':
-                                influx_val = float('nan')
-                            elif statval in ['True', 'False']:
-                                influx_val = tfn_key[statval]
-                            elif statval in mode_key:
-                                influx_val = mode_key[statval]
-                            elif statval in fault_key:
-                                influx_val = fault_key[statval]
-                            elif statval in pin_key:
-                                influx_val = pin_key[statval]
+                            for key_map in [tfn_key, mode_key, fault_key, pin_key,
+                                            lat_pin_key]:
+                                if statval in key_map:
+                                    influx_val = key_map[statval]
+                                    break
                             else:
                                 raise ValueError('Could not convert value for %s="%s"' %
                                                  (statkey, statval))
@@ -566,6 +574,7 @@ class ACUAgent:
                     ('ACU_general_errors', 'ACU_failures_errors'),
                     ('ACU_platform_status', 'platform_status'),
                     ('ACU_emergency', 'ACU_emergency'),
+                    ('ACU_corotator', 'corotator'),
             ]:
                 new_blocks[block_name] = {
                     'timestamp': self.data['status']['summary']['ctime'],
@@ -819,39 +828,56 @@ class ACUAgent:
                      ['INIT', 'WAIT_MOVING', 'WAIT_STILL', 'FAIL', 'DONE'])
 
         # Specialization for different axis types.
-        # pos/mode are common:
-        def get_pos():
-            return self.data['status']['summary'][f'{axis}_current_position']
 
-        def get_mode():
-            return self.data['status']['summary'][f'{axis}_mode']
+        class AxisControl:
+            def get_pos(_self):
+                return self.data['status']['summary'][f'{axis}_current_position']
 
-        # vel/goto are different:
-        if axis in ['Azimuth', 'Elevation']:
-            def get_vel():
+            def get_mode(_self):
+                return self.data['status']['summary'][f'{axis}_mode']
+
+            def get_vel(_self):
                 return self.data['status']['summary'][f'{axis}_current_velocity']
 
-            if axis == 'Azimuth':
-                @inlineCallbacks
-                def goto(target):
-                    result = yield self.acu_control.go_to(az=target)
-                    return result
-            else:
-                @inlineCallbacks
-                def goto(target):
-                    result = yield self.acu_control.go_to(el=target)
-                    return result
+        class AzAxis(AxisControl):
+            @inlineCallbacks
+            def goto(_self, target):
+                result = yield self.acu_control.go_to(az=target)
+                return result
 
-        elif axis in ['Boresight']:
-            def get_vel():
+        class ElAxis(AxisControl):
+            @inlineCallbacks
+            def goto(_self, target):
+                result = yield self.acu_control.go_to(el=target)
+                return result
+
+        class ThirdAxis(AxisControl):
+            def get_vel(_self):
                 return 0.
 
             @inlineCallbacks
-            def goto(target):
+            def goto(_self, target):
                 result = yield self.acu_control.go_3rd_axis(target)
                 return result
 
-        else:
+        class LatCorotator(ThirdAxis):
+            def get_pos(_self):
+                return self.data['status']['corotator']['Corotator_current_position']
+
+            def get_mode(_self):
+                return self.data['status']['corotator']['Corotator_mode']
+
+        ctrl = None
+        if axis == 'Azimuth':
+            ctrl = AzAxis()
+        elif axis == 'Elevation':
+            ctrl = ElAxis()
+        elif axis == 'Boresight':
+            if self.acu_config['platform'] in ['ccat', 'lat']:
+                ctrl = LatCorotator()
+            else:
+                ctrl = ThirdAxis()
+        if ctrl is None:
             return False, f"No configuration for axis={axis}"
 
         limit_func, _ = self._get_limit_func(axis)
@@ -884,7 +910,7 @@ class ACUAgent:
             motion_expected = time_since_start > MAX_STARTUP_TIME
 
             # Space ...
-            current_pos, current_vel = get_pos(), get_vel()
+            current_pos, current_vel = ctrl.get_pos(), ctrl.get_vel()
             distance = abs(target - current_pos)
             history.append(distance)
             if give_up_time is None:
@@ -898,7 +924,7 @@ class ACUAgent:
             has_never_moved = (has_never_moved and not moving)
 
             near_destination = distance < THERE_YET
-            mode_ok = (get_mode() == 'Preset')
+            mode_ok = (ctrl.get_mode() == 'Preset')
 
             # Log only on state changes
             if state != last_state:
@@ -922,7 +948,7 @@ class ACUAgent:
             # Main state machine
             if state == State.INIT:
                 # Set target position and change mode to Preset.
-                result = yield goto(target)
+                result = yield ctrl.goto(target)
                 if result == OK_RESPONSE:
                     state = State.WAIT_MOVING
                 else:
