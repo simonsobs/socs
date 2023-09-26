@@ -371,10 +371,18 @@ class ACUAgent:
         }
         pin_key = {
             # Capitalization matches strings in ACU binary, not ICD.
+            # Are these needed for the SAT still?
             'Any Moving': 0,
             'All Inserted': 1,
             'All Retracted': 2,
             'Failure': 3,
+        }
+        lat_pin_key = {
+            # From "meta" output.
+            'Moving': 0,
+            'Inserted': 1,
+            'Retracted': 2,
+            'Error': 3,
         }
         tfn_key = {'None': float('nan'),
                    'False': 0,
@@ -500,16 +508,11 @@ class ACUAgent:
                         if isinstance(statval, float):
                             influx_val = statval
                         elif isinstance(statval, str):
-                            if statval == 'None':
-                                influx_val = float('nan')
-                            elif statval in ['True', 'False']:
-                                influx_val = tfn_key[statval]
-                            elif statval in mode_key:
-                                influx_val = mode_key[statval]
-                            elif statval in fault_key:
-                                influx_val = fault_key[statval]
-                            elif statval in pin_key:
-                                influx_val = pin_key[statval]
+                            for key_map in [tfn_key, mode_key, fault_key, pin_key,
+                                            lat_pin_key]:
+                                if statval in key_map:
+                                    influx_val = key_map[statval]
+                                    break
                             else:
                                 raise ValueError('Could not convert value for %s="%s"' %
                                                  (statkey, statval))
@@ -571,6 +574,7 @@ class ACUAgent:
                     ('ACU_general_errors', 'ACU_failures_errors'),
                     ('ACU_platform_status', 'platform_status'),
                     ('ACU_emergency', 'ACU_emergency'),
+                    ('ACU_corotator', 'corotator'),
             ]:
                 new_blocks[block_name] = {
                     'timestamp': self.data['status']['summary']['ctime'],
