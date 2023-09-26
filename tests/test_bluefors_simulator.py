@@ -1,3 +1,5 @@
+import time
+
 import pytest
 
 from socs.testing.bluefors_simulator import LogSimulator
@@ -47,3 +49,11 @@ def test_write_status_file(logsim):
 def test_write_heater_file(logsim):
     resp = logsim.write_heater_file()
     check_written_logs(*resp[0])
+
+
+def test_run_stop(logsim):
+    logsim.run()
+    assert logsim._running is True
+    time.sleep(0.5)
+    logsim.stop()
+    assert logsim._running is False

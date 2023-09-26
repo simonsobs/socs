@@ -1,7 +1,9 @@
+import logging
 import os
 import random
 import time
 from datetime import datetime, timezone
+from threading import Thread
 
 # Rules
 # Observations about the behavior of the log files. This is all reverse
@@ -97,6 +99,8 @@ class LogSimulator:
     def __init__(self, log_dir="./sim/"):
         self.log_dir = log_dir
         self.file_objects = {}
+        self._running = False
+
         self.create_file_objects(log_dir=log_dir)
 
     def create_file_objects(self, log_dir):
@@ -124,7 +128,7 @@ class LogSimulator:
     def close_all_files(self):
         for k, v in self.file_objects.items():
             v['file_object'].close()
-            # print(f"Closed file: {k}")
+            logging.debug(f"Closed file: {k}")
 
     def __del__(self):
         self.close_all_files()
@@ -152,7 +156,7 @@ class LogSimulator:
             if isinstance(d, dict):
                 type_ = d.get('file_type')
                 if type_ == filetype:
-                    # print(f"{f} matched type {filetype}")
+                    logging.debug(f"{f} matched type {filetype}")
                     files.append({f: d['file_object']})
 
         if len(files) == 1:
@@ -174,8 +178,8 @@ class LogSimulator:
         """
         filename = list(file_dict.keys())[0]
         file = file_dict[filename]
-        print(f"writing to {filename}")
-        print(line)
+        logging.debug(f"writing to {filename}")
+        logging.debug(line)
         line = line + '\n'
         file.write(line)
         file.flush()
@@ -298,23 +302,42 @@ class LogSimulator:
 
         return [ret]
 
+    def run(self):
+        """Run the simulator. Thermometer logs are written every second, while
+        all other logs are written every ten seconds.
+
+        The main simulator loop runs in a separate thread.
+
+        """
+        self._running = True
+        t = Thread(target=self._run_loop)
+        t.start()
+
+    def _run_loop(self):
+        interval = 1
+        countdown = 10
+
+        simulator = LogSimulator()
+
+        while self._running:
+            simulator.write_thermometer_files()
+
+            # Write every ten seconds
+            countdown -= 1
+            if countdown == 0:
+                countdown = 10
+                simulator.write_flowmeter_file()
+                simulator.write_maxigauge_file()
+                simulator.write_channel_file()
+                simulator.write_status_file()
+
+            time.sleep(interval)
+
+    def stop(self):
+        """Stop the simulator."""
+        self._running = False
+
 
 if __name__ == '__main__':
-    interval = 1
-    countdown = 10
-
     simulator = LogSimulator()
-
-    while True:
-        simulator.write_thermometer_files()
-
-        # Write every ten seconds
-        countdown -= 1
-        if countdown == 0:
-            countdown = 10
-            simulator.write_flowmeter_file()
-            simulator.write_maxigauge_file()
-            simulator.write_channel_file()
-            simulator.write_status_file()
-
-        time.sleep(interval)
+    simulator.run()
