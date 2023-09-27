@@ -315,7 +315,7 @@ class LogSimulator:
 
     def _run_loop(self):
         interval = 1
-        countdown = 10
+        countdown = 1
 
         simulator = LogSimulator()
 
