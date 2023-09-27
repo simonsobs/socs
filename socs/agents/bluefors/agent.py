@@ -125,6 +125,7 @@ class LogTracker:
             Full path to filename to open
 
         """
+        self.file_objects[filename]['file_object'].close()
         self.file_objects[filename] = {"file_object": open(filename, 'r'),
                                        "stat_results": os.stat(filename)}
         lines = self.file_objects[filename]["file_object"].readlines()
