@@ -342,6 +342,7 @@ class LogSimulator:
                 self.write_maxigauge_file()
                 self.write_channel_file()
                 self.write_status_file()
+                self.write_heater_file()
 
             time.sleep(interval)
 
