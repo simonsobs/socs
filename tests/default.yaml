@@ -113,5 +113,9 @@ hosts:
       'arguments': ['--url', 'http://127.0.0.1:5000',
                     '--test-mode']
       },
+      {'agent-class': 'BlueforsAgent',
+       'instance-id': 'bluefors',
+       'arguments': [['--log-directory', '/tmp/bluefors/logs']]
+      },
     ]
   }
