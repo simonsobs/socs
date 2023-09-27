@@ -1,4 +1,5 @@
 import os
+import time
 
 import ocs
 import pytest
@@ -29,7 +30,13 @@ def test_bluefors_acq(wait_for_crossbar, simulator, run_agent, client):
     resp = client.change_log_dir(directory=str(simulator.log_dir))
     print(resp)
 
-    resp = client.acq.start(test_mode=True)
+    resp = client.acq.start()
+    time.sleep(0.5)  # make sure files are being tracked
+    # ensure a write will happen on all files within 1 second
+    simulator.reset_write_countdown()
+    time.sleep(1.5)
+
+    resp = client.acq.stop()
     resp = client.acq.wait()
 
     print(resp)

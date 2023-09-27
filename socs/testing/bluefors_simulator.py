@@ -25,6 +25,7 @@ def create_bluefors_simulator():
         d = tmp_path / "logs"
         d.mkdir()
         simulator = LogSimulator(d)
+        simulator.run()  # start writing logs
         yield simulator
         simulator.stop()
 
