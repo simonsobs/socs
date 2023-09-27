@@ -458,10 +458,17 @@ class BlueforsAgent:
         with self.lock:
             self.job = None
 
+    @ocs_agent.param('test_mode', default=False, type=bool)
     def acq(self, session, params=None):
-        """acq()
+        """acq(test_mode=False)
 
         **Process** - Monitor and publish data from the Bluefors log files.
+
+        Parameters
+        -----------
+        test_mode : bool, optional
+            Run the Process loop only once. This is meant only for testing.
+            Default is False.
 
         """
 
@@ -500,6 +507,10 @@ class BlueforsAgent:
             parser.read_and_publish_logs(session)
 
             time.sleep(0.01)
+
+            if params['test_mode']:
+                self.set_job_done()
+                break
 
         self.set_job_done()
         return True, 'Acquisition exited cleanly.'
