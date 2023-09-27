@@ -524,6 +524,34 @@ class BlueforsAgent:
         return (ok, {True: 'Requested process stop.',
                      False: 'Failed to request process stop.'}[ok])
 
+    @ocs_agent.param('directory', type=str)
+    def change_log_dir(self, session, params=None):
+        """change_log_dir(directory)
+
+        **Task** - Change the log directory that the agent is checking for
+        Bluefors logs.
+
+        In practice this is really only useful for testing the agent. If you
+        really do need to change the directory your Bluefors logs are stored
+        you should update your SCF and restart the agent.
+
+        Parameters
+        ----------
+        directory : str
+            Bluefors log directory.
+
+        """
+        ok, msg = self.try_set_job('dir')
+        if not ok:
+            return ok, msg
+
+        previous_dir = self.log_tracker.log_dir
+        self.log_tracker = LogTracker(params['directory'])
+        msg = f"Changed log directory from {previous_dir} to {params['directory']}"
+
+        self.set_job_done()
+        return True, msg
+
 
 def make_parser(parser=None):
     """Build the argument parser for the Agent. Allows sphinx to automatically
@@ -557,6 +585,7 @@ def main(args=None):
 
     agent.register_process('acq', bluefors_agent.acq,
                            bluefors_agent._stop_acq, startup=True)
+    agent.register_task('change_log_dir', bluefors_agent.change_log_dir)
 
     runner.run(agent, auto_reconnect=True)
 

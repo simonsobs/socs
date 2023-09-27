@@ -24,6 +24,10 @@ simulator = create_bluefors_simulator()
 @pytest.mark.integtest
 def test_bluefors_acq(wait_for_crossbar, simulator, run_agent, client):
     client.acq.stop()
+    client.acq.wait()
+
+    resp = client.change_log_dir(directory=str(simulator.log_dir))
+    print(resp)
 
     resp = client.acq.start(test_mode=True)
     resp = client.acq.wait()
