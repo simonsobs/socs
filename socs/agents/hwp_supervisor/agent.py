@@ -719,14 +719,15 @@ class HWPSupervisor:
         self.ups_id = args.ups_id
 
         self.iboot_id = args.iboot_id
-        self.iboot_outlets = args.iboot_outlets
+        self.iboot_outlet1 = args.iboot_outlet1
+        self.iboot_outlet2 = args.iboot_outlet2
 
         self.hwp_state = HWPState(
             temp_field=self.ybco_temp_field,
             temp_thresh=args.ybco_temp_thresh,
             ups_minutes_remaining_thresh=args.ups_minutes_remaining_thresh,
-            iboot_outlet1=int(self.iboot_outlets[0]) - 1,
-            iboot_outlet2=int(self.iboot_outlets[1]) - 1,
+            iboot_outlet1=int(self.iboot_outlet1) - 1,
+            iboot_outlet2=int(self.iboot_outlet2) - 1,
         )
         self.control_state_machine = ControlStateMachine()
         self.forward_is_cw = args.forward_dir == 'cw'
@@ -1008,14 +1009,12 @@ def make_parser(parser=None):
     pgroup = parser.add_argument_group('Agent Options')
 
     pgroup.add_argument('--sleep-time', type=float, default=2.)
-
     pgroup.add_argument('--ybco-lakeshore-id',
                         help="Instance ID for lakeshore reading out HWP temp")
     pgroup.add_argument('--ybco-temp-field',
                         help='Field name of lakeshore channel reading out HWP temp')
     pgroup.add_argument('--ybco-temp-thresh', type=float,
                         help="Threshold for HWP temp.")
-
     pgroup.add_argument('--hwp-encoder-id',
                         help="Instance id for HWP encoder agent")
     pgroup.add_argument('--hwp-pmx-id',
@@ -1027,7 +1026,10 @@ def make_parser(parser=None):
                         help="Threshold for UPS minutes remaining before a "
                              "shutdown is triggered")
     pgroup.add_argument('--iboot-id', help="Instance ID for IBoot-PDU agent")
-    pgroup.add_argument('--iboot-outlets', help="IBoot-PDU outlets connected  to bias power")
+    pgroup.add_argument('--iboot-outlet1', type=int,
+                        help="IBoot-PDU outlet connected to gripper drive")
+    pgroup.add_argument('--iboot-outlet2', type=int,
+                        help="IBoot-PDU outlet connected to gripper control")
     pgroup.add_argument('--forward-dir', choices=['cw', 'ccw'], default="cw",
                         help="Whether the PID 'forward' direction is cw or ccw")
     return parser

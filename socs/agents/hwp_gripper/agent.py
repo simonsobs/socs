@@ -569,7 +569,7 @@ class HWPGripperAgent:
     @ocs_agent.param('no_data_warn_time', default=60, type=float)
     @ocs_agent.param('no_data_shutdown_time', default=300, type=float)
     def monitor_supervisor(self, session, params=None):
-        """monitor_supervisor()
+        """monitor_supervisor(no_data_warn_time=60, no_data_shutdown_time=300)
 
         **Process** - Monitor the hwp-supervisor state. If supervisor sends shutdown
         signal, or if communication wtih supervisor is dropped for longer than
@@ -581,6 +581,14 @@ class HWPGripperAgent:
                                      before generating a warning
             no_data_shutdown_time (int): Time in seconds to wait after communication failure
                                          before initiating shutdown
+
+        Notes:
+            The most recent data collected is stored in session data in the
+            structure:
+
+                >>> response.session
+                {'time': 1649085992.719602,
+                 'gripper_action': 'ok'}
         """
         session.set_status('running')
         last_ok_time = time.time()
