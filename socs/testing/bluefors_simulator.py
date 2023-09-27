@@ -107,7 +107,7 @@ class LogSimulator:
     """
 
     def __init__(self, log_dir="./sim/"):
-        self.log_dir = log_dir
+        self.log_dir = str(log_dir)
         self.file_objects = {}
         self._running = False
         self._countdown = 1
