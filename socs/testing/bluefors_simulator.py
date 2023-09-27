@@ -40,12 +40,7 @@ def _make_therm_file_list(channels, date, directory=None):
     types = ['P', 'R', 'T']
     for channel in channels:
         for t in types:
-            if directory:
-                _file = f'CH{channel} {t} {date}.log'
-                _full_path = os.path.join(directory, _file)
-                files.append(_full_path)
-            else:
-                files.append(f'CH{channel} {t} {date}.log')
+            files.append(f'CH{channel} {t} {date}.log')
 
     return files
 
@@ -338,6 +333,6 @@ class LogSimulator:
         self._running = False
 
 
-if __name__ == '__main__':
+if __name__ == '__main__':  # pragma: no cover
     simulator = LogSimulator()
     simulator.run()
