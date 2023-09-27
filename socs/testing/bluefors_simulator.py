@@ -326,19 +326,17 @@ class LogSimulator:
         interval = 1
         countdown = 1
 
-        simulator = LogSimulator()
-
         while self._running:
-            simulator.write_thermometer_files()
+            self.write_thermometer_files()
 
             # Write every ten seconds
             countdown -= 1
             if countdown == 0:
                 countdown = 10
-                simulator.write_flowmeter_file()
-                simulator.write_maxigauge_file()
-                simulator.write_channel_file()
-                simulator.write_status_file()
+                self.write_flowmeter_file()
+                self.write_maxigauge_file()
+                self.write_channel_file()
+                self.write_status_file()
 
             time.sleep(interval)
 
