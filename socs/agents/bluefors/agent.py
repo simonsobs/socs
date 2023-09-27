@@ -64,6 +64,9 @@ class LogTracker:
         self.date = datetime.date.fromtimestamp(time.time())
         self.file_objects = {}
 
+    def __del__(self):
+        self.close_all_files()
+
     def _build_file_list(self):
         """Get list of files to open.
 
