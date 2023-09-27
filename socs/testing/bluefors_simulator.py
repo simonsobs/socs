@@ -192,7 +192,10 @@ class LogSimulator:
         logging.debug(line)
         line = line + '\n'
         file.write(line)
+
+        # Ensure write occurs
         file.flush()
+        os.fsync(file)
 
         return filename, line
 
