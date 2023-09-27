@@ -276,8 +276,8 @@ class HWPState:
             ``acq`` process
         """
         iboot_keymap = {
-            'iboot_outlet1_state': (f'outletStatus_{self.iboot_outlet1}', 'status'),
-            'iboot_outlet2_state': (f'outletStatus_{self.iboot_outlet2}', 'status'),
+            'iboot_outlet1_state': (f'outletStatus_{self.iboot_outlet1-1}', 'status'),
+            'iboot_outlet2_state': (f'outletStatus_{self.iboot_outlet2-1}', 'status'),
         }
 
         if op['status'] != 'ok':
@@ -726,8 +726,8 @@ class HWPSupervisor:
             temp_field=self.ybco_temp_field,
             temp_thresh=args.ybco_temp_thresh,
             ups_minutes_remaining_thresh=args.ups_minutes_remaining_thresh,
-            iboot_outlet1=self.iboot_outlet1 - 1,
-            iboot_outlet2=self.iboot_outlet2 - 1,
+            iboot_outlet1=self.iboot_outlet1,
+            iboot_outlet2=self.iboot_outlet2,
         )
         self.control_state_machine = ControlStateMachine()
         self.forward_is_cw = args.forward_dir == 'cw'
