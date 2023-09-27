@@ -5,6 +5,8 @@ import time
 from datetime import datetime, timezone
 from threading import Thread
 
+import pytest
+
 # Rules
 # Observations about the behavior of the log files. This is all reverse
 # engineered from the bluefors log output.
@@ -15,6 +17,18 @@ from threading import Thread
 #   * Channels
 #   * Flowmeter
 #   * Maxigauge
+
+
+def create_bluefors_simulator():
+    @pytest.fixture()
+    def create_simulator(tmp_path):
+        d = tmp_path / "logs"
+        d.mkdir()
+        simulator = LogSimulator(d)
+        yield simulator
+        simulator.stop()
+
+    return create_simulator
 
 
 def mkdir(directory):
