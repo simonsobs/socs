@@ -109,6 +109,7 @@ class LogSimulator:
         self.log_dir = log_dir
         self.file_objects = {}
         self._running = False
+        self._countdown = 1
 
         self.create_file_objects(log_dir=log_dir)
 
@@ -324,21 +325,24 @@ class LogSimulator:
 
     def _run_loop(self):
         interval = 1
-        countdown = 1
+        self._countdown = 1
 
         while self._running:
             self.write_thermometer_files()
 
             # Write every ten seconds
-            countdown -= 1
-            if countdown == 0:
-                countdown = 10
+            self._countdown -= 1
+            if self._countdown == 0:
+                self._countdown = 10
                 self.write_flowmeter_file()
                 self.write_maxigauge_file()
                 self.write_channel_file()
                 self.write_status_file()
 
             time.sleep(interval)
+
+    def reset_write_countdown(self):
+        self._countdown = 1
 
     def stop(self):
         """Stop the simulator."""
