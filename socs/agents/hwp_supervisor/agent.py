@@ -719,8 +719,8 @@ class HWPSupervisor:
         self.ups_id = args.ups_id
 
         self.iboot_id = args.iboot_id
-        self.iboot_outlet1 = args.iboot_outlet1
-        self.iboot_outlet2 = args.iboot_outlet2
+        self.iboot_outlet1 = args.iboot_outlet1 - 1
+        self.iboot_outlet2 = args.iboot_outlet2 - 1
 
         self.hwp_state = HWPState(
             temp_field=self.ybco_temp_field,
@@ -1026,9 +1026,9 @@ def make_parser(parser=None):
                         help="Threshold for UPS minutes remaining before a "
                              "shutdown is triggered")
     pgroup.add_argument('--iboot-id', help="Instance ID for IBoot-PDU agent")
-    pgroup.add_argument('--iboot-outlet1', type=int,
+    pgroup.add_argument('--iboot-outlet1', type=int, default=1,
                         help="IBoot-PDU outlet connected to gripper drive")
-    pgroup.add_argument('--iboot-outlet2', type=int,
+    pgroup.add_argument('--iboot-outlet2', type=int, default=2,
                         help="IBoot-PDU outlet connected to gripper control")
     pgroup.add_argument('--forward-dir', choices=['cw', 'ccw'], default="cw",
                         help="Whether the PID 'forward' direction is cw or ccw")
