@@ -276,8 +276,8 @@ class HWPState:
             ``acq`` process
         """
         iboot_keymap = {
-            'iboot_outlet1_state': (f'outletStatus_{outlet1}', 'status'),
-            'iboot_outlet2_state': (f'outletStatus_{outlet2}', 'status'),
+            'iboot_outlet1_state': (f'outletStatus_{self.iboot_outlet1}', 'status'),
+            'iboot_outlet2_state': (f'outletStatus_{self.iboot_outlet2}', 'status'),
         }
 
         if op['status'] != 'ok':
