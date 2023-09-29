@@ -29,13 +29,16 @@ Here is an example of a config block you can add to your ocs site-config file::
        {'agent-class': 'HWPSupervisor',
         'instance-id': 'hwp-supervisor',
         'arguments': [
-            '--sleep-time', 5,
-            '--hwp-lakeshore-id', 'LS240_test',
-            '--hwp-temp-field', 'Channel_06',
-            '--hwp-temp-thresh', 70,  # Kelvin
-            '--hwp-encoder-id', 'HBA0',
-            '--hwp-rotation-id', 'rotator',
-            '--hwp-ups-id', 'ups'
+            '--ybco-lakeshore-id', 'cryo-ls240-lsa2619',
+            '--ybco-temp-field', 'Channel_7',
+            '--ybco-temp-thresh', 75,
+            '--hwp-encoder-id', 'hwp-bbb-e1',
+            '--hwp-pmx-id', 'hwp-pmx',
+            '--hwp-pid-id', 'hwp-pid',
+            '--ups-id', 'power-ups-az',
+            '--ups-minutes-remaining-thresh', 45,
+            '--iboot-id', 'power-iboot-hwp-2',
+            '--iboot-outlets', [1,2]
         ]}
 
 
