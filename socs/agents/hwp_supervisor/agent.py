@@ -275,9 +275,20 @@ class HWPState:
             Dict containing the operations (from get_op_data) from the IBoot
             ``acq`` process
         """
+
+        if self.iboot_outlet1 is None:
+            outlet1 = 0
+        else:
+            outlet1 = self.iboot_outlet1
+
+        if self.iboot_outlet2 is None:
+            outlet2 = 1
+        else:
+            outlet2 = self.iboot_outlet2
+
         iboot_keymap = {
-            'iboot_outlet1_state': (f'outletStatus_{self.iboot_outlet1}', 'status'),
-            'iboot_outlet2_state': (f'outletStatus_{self.iboot_outlet2}', 'status'),
+            'iboot_outlet1_state': (f'outletStatus_{outlet1}', 'status'),
+            'iboot_outlet2_state': (f'outletStatus_{outlet2}', 'status'),
         }
 
         if op['status'] != 'ok':
