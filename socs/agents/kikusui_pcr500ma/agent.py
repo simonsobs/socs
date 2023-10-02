@@ -130,16 +130,24 @@ class PCRAgent:
                               f'{self.lock.job} is already running')
                 return False, 'Could not acquire lock.'
 
+            output_on = params['output']
             force = params.get('force', False)
+            # Use measurement value when checking turning off threshold.
+            use_meas_val = params.get('use_meas_val', not output_on)
 
             if force:
-                self._dev.set_output(output=params['output'])
+                self._dev.set_output(output=output_on)
             else:
-                volt_set = self._dev.get_volt_ac()
-                if volt_set != 0:
-                    return False, 'Voltage too high to turn on/off.'
-                self._dev.set_output(output=params['output'])
+                if use_meas_val:
+                    volt_ac = self._dev.meas_volt_ac()
+                    if volt_ac >= 0.2:
+                        return False, f'Voltage too high to turn on/off.'
+                else:
+                    volt_set = self._dev.get_volt_ac()
+                    if volt_set != 0:
+                        return False, 'Voltage too high to turn on/off.'
 
+                self._dev.set_output(output=output_on)
 
         return True, f'Set output for PCR: {params["output"]}'
 
