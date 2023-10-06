@@ -241,27 +241,27 @@ class VantagePro2:
         loop_data['packet_type'] = byte_data[4]
         loop_data['next_record'] = byte_data[5]
         loop_data['barometer'] = byte_data[6] / 1000.0
-        loop_data['temp_inside'] = byte_data[7] / 10.0
+        loop_data['temp_inside'] = (byte_data[7] / 10.0 - 32) * (5 / 9)
         loop_data['humidity_inside'] = byte_data[8]
-        loop_data['temp_outside'] = byte_data[9] / 10.0
+        loop_data['temp_outside'] = (byte_data[9] / 10.0 - 32) * (5 / 9)
         loop_data['wind_speed'] = byte_data[10]
         loop_data['avg_wind_speed'] = byte_data[11]
         loop_data['wind_dir'] = byte_data[12]
-        loop_data['extra_temp0'] = byte_data[13] - 90.0
-        loop_data['extra_temp1'] = byte_data[14] - 90.0
-        loop_data['extra_temp2'] = byte_data[15] - 90.0
-        loop_data['extra_temp3'] = byte_data[16] - 90.0
-        loop_data['extra_temp4'] = byte_data[17] - 90.0
-        loop_data['extra_temp5'] = byte_data[18] - 90.0
-        loop_data['extra_temp6'] = byte_data[19] - 90.0
-        loop_data['soil_temp0'] = byte_data[20] - 90.0
-        loop_data['soil_temp1'] = byte_data[21] - 90.0
-        loop_data['soil_temp2'] = byte_data[22] - 90.0
-        loop_data['soil_temp3'] = byte_data[23] - 90.0
-        loop_data['leaf_temp0'] = byte_data[24] - 90.0
-        loop_data['leaf_temp1'] = byte_data[25] - 90.0
-        loop_data['leaf_temp2'] = byte_data[26] - 90.0
-        loop_data['leaf_temp3'] = byte_data[27] - 90.0
+        loop_data['extra_temp0'] = (byte_data[13] - 90.0 - 32) * (5 / 9)
+        loop_data['extra_temp1'] = (byte_data[14] - 90.0 - 32) * (5 / 9)
+        loop_data['extra_temp2'] = (byte_data[15] - 90.0 - 32) * (5 / 9)
+        loop_data['extra_temp3'] = (byte_data[16] - 90.0 - 32) * (5 / 9)
+        loop_data['extra_temp4'] = (byte_data[17] - 90.0 - 32) * (5 / 9)
+        loop_data['extra_temp5'] = (byte_data[18] - 90.0 - 32) * (5 / 9)
+        loop_data['extra_temp6'] = (byte_data[19] - 90.0 - 32) * (5 / 9)
+        loop_data['soil_temp0'] = (byte_data[20] - 90.0 - 32) * (5 / 9)
+        loop_data['soil_temp1'] = (byte_data[21] - 90.0 - 32) * (5 / 9)
+        loop_data['soil_temp2'] = (byte_data[22] - 90.0 - 32) * (5 / 9)
+        loop_data['soil_temp3'] = (byte_data[23] - 90.0 - 32) * (5 / 9)
+        loop_data['leaf_temp0'] = (byte_data[24] - 90.0 - 32) * (5 / 9)
+        loop_data['leaf_temp1'] = (byte_data[25] - 90.0 - 32) * (5 / 9)
+        loop_data['leaf_temp2'] = (byte_data[26] - 90.0 - 32) * (5 / 9)
+        loop_data['leaf_temp3'] = (byte_data[27] - 90.0 - 32) * (5 / 9)
         loop_data['humidity_outside'] = byte_data[28]
         loop_data['extra_hum0'] = byte_data[29]
         loop_data['extra_hum1'] = byte_data[30]
@@ -311,6 +311,13 @@ class VantagePro2:
         loop_data['forecast_rule_num'] = byte_data[74]
         loop_data['time_sunrise'] = byte_data[75]
         loop_data['time_sunset'] = byte_data[76]
+
+        # Correct UV Index by a factor of 10 and fix overflow
+        uvi = loop_data['UV']
+        if uvi < 0:
+            uvi += 2**7
+        uvi /= 10
+        loop_data['UV'] = uvi
 
         # CRC check, data must be sent byte by byte
         pure_data = struct.unpack('=99b', info)
