@@ -315,7 +315,7 @@ class VantagePro2:
         # Correct UV Index by a factor of 10 and fix overflow
         uvi = loop_data['UV']
         if uvi < 0:
-            uvi += 2**7
+            uvi += 2**8
         uvi /= 10
         loop_data['UV'] = uvi
 
