@@ -1,5 +1,5 @@
-import time
 import socket
+import time
 
 protection_status_key = [
     'Over voltage',
@@ -42,7 +42,7 @@ class PMX:
     def close(self):
         self.conn.close()
 
-    def send_message(self, msg, read = True):
+    def send_message(self, msg, read=True):
         for attempt in range(2):
             try:
                 self.conn.sendall(msg)
@@ -58,7 +58,7 @@ class PMX:
                     print("Resetting connection")
                     self.conn.close()
                     self.conn = self._establish_connection(self.ip, int(self.port))
-                    return self.send_message(msg, read = read)
+                    return self.send_message(msg, read=read)
 
     def wait(self):
         time.sleep(self.wait_time)
@@ -84,17 +84,17 @@ class PMX:
 
     def clear_alarm(self):
         """ Clear alarm """
-        self.send_message(b'output:protection:clear\n', read = False)
+        self.send_message(b'output:protection:clear\n', read=False)
 
     def turn_on(self):
         """ Turn the PMX on """
-        self.send_message(b'output 1\n', read = False)
+        self.send_message(b'output 1\n', read=False)
         self.wait()
         return self.check_output()
 
     def turn_off(self):
         """ Turn the PMX off """
-        self.send_message(b'output 0\n', read = False)
+        self.send_message(b'output 0\n', read=False)
         self.wait()
         return self.check_output()
 
@@ -124,13 +124,13 @@ class PMX:
 
     def set_current(self, curr):
         """ Set the current """
-        self.send_message(b'curr %a\n' % curr, read = False)
+        self.send_message(b'curr %a\n' % curr, read=False)
         self.wait()
         return self.check_current()
 
     def set_voltage(self, vol):
         """ Set the voltage """
-        self.send_message(b'volt %a\n' % vol, read = False)
+        self.send_message(b'volt %a\n' % vol, read=False)
         self.wait()
         return self.check_voltage()
 
@@ -142,13 +142,13 @@ class PMX:
 
     def use_external_voltage(self):
         """ Set PMX to use external voltage """
-        self.send_message(b'volt:ext:sour volt\n', read = False)
+        self.send_message(b'volt:ext:sour volt\n', read=False)
         self.wait()
         return self.check_source()
 
     def ign_external_voltage(self):
         """ Set PMX to ignore external voltage """
-        self.send_message(b'volt:ext:sour none\n', read = False)
+        self.send_message(b'volt:ext:sour none\n', read=False)
         self.wait()
         return self.check_source()
 
@@ -162,7 +162,7 @@ class PMX:
 
     def set_voltage_limit(self, vol_lim):
         """ Set the PMX voltage limit """
-        self.send_message(b'volt:prot %a\n' % vol_lim, read = False)
+        self.send_message(b'volt:prot %a\n' % vol_lim, read=False)
         self.wait()
         val = float(self.send_message(b'volt:prot?\n'))
         msg = "Voltage Limit: {:.3f} V".format(val)

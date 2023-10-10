@@ -442,7 +442,7 @@ class HWPGripperAgent:
 
                 # Reset alarms. If the warm-limit is hit, the alarm will be triggered
                 # and return_dict['result'] will be True
-                return_dict = run_and_append(self.client.reset, job='grip', 
+                return_dict = run_and_append(self.client.reset, job='grip',
                                              check_shutdown=check_shutdown)
 
                 if return_dict['result']:
