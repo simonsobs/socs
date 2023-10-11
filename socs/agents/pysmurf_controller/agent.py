@@ -853,7 +853,7 @@ class PysmurfController:
         return True, "Finished Overbiasing TES"
     
     @ocs_agent.param('bgs', default=None)
-    @ocs_agent.params('bias', default=0)
+    @ocs_agent.params('bias')
     def set_biases(self, session, params):
         """set_biases(bg=None, bias=0)
 
@@ -892,6 +892,20 @@ class PysmurfController:
 
             return True, f"Finished setting biases to {params['biases']}"
 
+    @ocs_agent.param('bgs', default=None)
+    def zero_biases(self, session, params):
+        """
+        **Task** - Zeros TES biases for specified bias groups.
+
+        Args
+        -----
+        bg: int, list, optional
+            bg, or list of bgs to zero. If None, will zero all bgs.
+        """
+        params['bias'] = 0
+        self.agent.start('set_biases', params)
+        self.agent.wait('set_biases')
+        return True, 'Finished zeroing biases'
 
     @ocs_agent.param('rfrac', default=(0.3, 0.6))
     @ocs_agent.param('kwargs', default=None)
@@ -1029,6 +1043,7 @@ def main(args=None):
     agent.register_task('bias_dets', controller.bias_dets)
     agent.register_task('all_off', controller.all_off)
     agent.register_task('set_biases', controller.set_biases)
+    agent.register_task('zero_biases', controller.zero_biases)
 
     runner.run(agent, auto_reconnect=True)
 
