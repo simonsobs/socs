@@ -1076,6 +1076,10 @@ class ACUAgent:
             if not acquired:
                 return False, f"Operation failed: {self.azel_lock.job} is running."
 
+            self.log.info('Clearing faults to prepare for motion.')
+            yield self.acu_control.clear_faults()
+            yield dsleep(1)
+
             ok, msg = yield self._check_ready_motion(session)
             if not ok:
                 return False, msg
@@ -1434,6 +1438,13 @@ class ACUAgent:
             point_batch_count = scan_upload_len / step_time
 
         session.set_status('running')
+        self.log.info('Scan params: {params}', params=params)
+        self.log.info('The plan: {plan}', plan=plan)
+
+        # Clear faults.
+        self.log.info('Clearing faults to prepare for motion.')
+        yield self.acu_control.clear_faults()
+        yield dsleep(1)
 
         # Verify we're good to move
         ok, msg = yield self._check_ready_motion(session)
