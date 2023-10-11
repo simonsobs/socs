@@ -1510,6 +1510,14 @@ class ACUAgent:
         STACK_TARGET = FULL_STACK - \
             max(MIN_STACK_POP * 2 + LOOP_STEP / step_time, point_batch_count * 2)
 
+        # Special error bits to watch here
+        PTRACK_FAULT_KEYS = [
+            'ProgramTrack_position_failure',
+            'Track_start_too_early',
+            'Turnaround_accel_too_high',
+            'Turnaround_time_too_short',
+        ]
+
         with self.azel_lock.acquire_timeout(0, job='generate_scan') as acquired:
 
             if not acquired:
@@ -1536,6 +1544,7 @@ class ACUAgent:
 
             lines = []
             last_mode = None
+            faults = {}
 
             while True:
                 current_modes = {'Az': self.data['status']['summary']['Azimuth_mode'],
@@ -1546,6 +1555,11 @@ class ACUAgent:
                 if last_mode != mode:
                     self.log.info(f'scan mode={mode}, line_buffer={len(lines)}, track_free={free_positions}')
                     last_mode = mode
+
+                for k in PTRACK_FAULT_KEYS:
+                    if k not in faults and self.data['status']['ACU_failures_errors'].get(k):
+                        self.log.info('Fault during track: "{k}"', k=k)
+                        faults[k] = True
 
                 if mode != 'abort':
                     # Reasons we might decide to abort ...
