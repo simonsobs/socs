@@ -851,14 +851,14 @@ class PysmurfController:
             sdl.overbias_dets(S, cfg, **kw)
 
         return True, "Finished Overbiasing TES"
-    
+
     @ocs_agent.param('bgs', default=None)
     @ocs_agent.params('bias')
     def set_biases(self, session, params):
         """set_biases(bg=None, bias=0)
 
-        **Task** - Task used ot set TES biases. 
-        
+        **Task** - Task used ot set TES biases.
+
         Args
         -----
         bg: int, list, optional
@@ -872,14 +872,14 @@ class PysmurfController:
             bgs = np.arange(12)
         else:
             bgs = np.atleast_1d(params['bgs'])
-        
+
         if isinstance(params['bias'], (int, float)):
             biases = [params['bias'] for _ in bgs]
         else:
             if len(params['bias']) != len(bgs):
                 return False, "Number of biases must match number of bgs"
             biases = params['bias']
-        
+
         with self.lock.acquire_timeout(0, job='set_biases') as acquired:
             if not acquired:
                 return False, f"Operation failed: {self.lock.job} is running."
