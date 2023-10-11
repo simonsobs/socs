@@ -1391,6 +1391,8 @@ class ACUAgent:
           Process .stop method is called)..
 
         """
+        log.info('User scan params: {params}', params=params)
+
         az_endpoint1 = params['az_endpoint1']
         az_endpoint2 = params['az_endpoint2']
         el_endpoint1 = params['el_endpoint1']
@@ -1438,8 +1440,8 @@ class ACUAgent:
             point_batch_count = scan_upload_len / step_time
 
         session.set_status('running')
-        self.log.info('Scan params: {params}', params=params)
         self.log.info('The plan: {plan}', plan=plan)
+        self.log.info('The scan_params: {scan_params}', scan_params=scan_params)
 
         # Clear faults.
         self.log.info('Clearing faults to prepare for motion.')
@@ -1544,6 +1546,7 @@ class ACUAgent:
 
             lines = []
             last_mode = None
+            was_graceful_exit = True
             faults = {}
 
             while True:
@@ -1566,9 +1569,11 @@ class ACUAgent:
                     if current_modes['Az'] != 'ProgramTrack':
                         self.log.warn('Unexpected mode transition!')
                         mode = 'abort'
+                        was_graceful_exit = False
                     if current_modes['Remote'] == 0:
                         self.log.warn('ACU no longer in remote mode!')
                         mode = 'abort'
+                        was_graceful_exit = False
                     if session.status == 'stopping':
                         mode = 'abort'
 
@@ -1611,7 +1616,9 @@ class ACUAgent:
             yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
                                                 'Clear Stack')
 
-        return True, 'Track ended cleanly'
+        if not was_graceful_exit:
+            return False, 'Problems during scan'
+        return True, 'Scan ended cleanly'
 
     @ocs_agent.param('starting_index', type=int, default=0)
     def exercise(self, session, params):
