@@ -1391,7 +1391,7 @@ class ACUAgent:
           Process .stop method is called)..
 
         """
-        log.info('User scan params: {params}', params=params)
+        self.log.info('User scan params: {params}', params=params)
 
         az_endpoint1 = params['az_endpoint1']
         az_endpoint2 = params['az_endpoint2']
@@ -1405,6 +1405,16 @@ class ACUAgent:
             az_speed = self.scan_params['az_speed']
         if az_accel is None:
             az_accel = self.scan_params['az_accel']
+
+        # Do we need to limit the az_accel?  This limit comes from a
+        # maximum jerk parameter; the equation below (without the
+        # empirical 0.85 adjustment) is stated in the SATP ACU ICD.
+        min_turnaround_time = (0.85 * az_speed / 9 * 11.616)**.5
+        max_turnaround_accel = 2 * az_speed / min_turnaround_time
+        if az_accel > max_turnaround_accel:
+            self.log.warn('WARNING: user requested accel=%.2f; limiting to %.2f' %
+                          (az_accel, max_turnaround_accel))
+            az_accel = max_turnaround_accel
 
         # If el is not specified, drop in the current elevation.
         init_el = None
