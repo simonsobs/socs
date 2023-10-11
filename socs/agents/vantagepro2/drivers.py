@@ -51,11 +51,11 @@ def calc_crc(data):
         crc = crc % 65536
     return crc
 
+
 def F_to_C(temp):
     """Function to convert fahrenheit measurement to celsius"""
-   
-    return (temp - 32) * (5 / 9)
 
+    return (temp - 32) * (5 / 9)
 
 
 class VantagePro2:
