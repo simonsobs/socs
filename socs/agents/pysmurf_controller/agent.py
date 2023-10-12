@@ -853,7 +853,7 @@ class PysmurfController:
         return True, "Finished Overbiasing TES"
 
     @ocs_agent.param('bgs', default=None)
-    @ocs_agent.params('bias')
+    @ocs_agent.param('bias')
     def set_biases(self, session, params):
         """set_biases(bg=None, bias=0)
 
