@@ -1076,6 +1076,10 @@ class ACUAgent:
             if not acquired:
                 return False, f"Operation failed: {self.azel_lock.job} is running."
 
+            self.log.info('Clearing faults to prepare for motion.')
+            yield self.acu_control.clear_faults()
+            yield dsleep(1)
+
             ok, msg = yield self._check_ready_motion(session)
             if not ok:
                 return False, msg
@@ -1115,6 +1119,10 @@ class ACUAgent:
         with self.boresight_lock.acquire_timeout(0, job='set_boresight') as acquired:
             if not acquired:
                 return False, f"Operation failed: {self.boresight_lock.job} is running."
+
+            self.log.info('Clearing faults to prepare for motion.')
+            yield self.acu_control.clear_faults()
+            yield dsleep(1)
 
             ok, msg = yield self._check_ready_motion(session)
             if not ok:
@@ -1387,6 +1395,8 @@ class ACUAgent:
           Process .stop method is called)..
 
         """
+        self.log.info('User scan params: {params}', params=params)
+
         az_endpoint1 = params['az_endpoint1']
         az_endpoint2 = params['az_endpoint2']
         el_endpoint1 = params['el_endpoint1']
@@ -1399,6 +1409,16 @@ class ACUAgent:
             az_speed = self.scan_params['az_speed']
         if az_accel is None:
             az_accel = self.scan_params['az_accel']
+
+        # Do we need to limit the az_accel?  This limit comes from a
+        # maximum jerk parameter; the equation below (without the
+        # empirical 0.85 adjustment) is stated in the SATP ACU ICD.
+        min_turnaround_time = (0.85 * az_speed / 9 * 11.616)**.5
+        max_turnaround_accel = 2 * az_speed / min_turnaround_time
+        if az_accel > max_turnaround_accel:
+            self.log.warn('WARNING: user requested accel=%.2f; limiting to %.2f' %
+                          (az_accel, max_turnaround_accel))
+            az_accel = max_turnaround_accel
 
         # If el is not specified, drop in the current elevation.
         init_el = None
@@ -1434,6 +1454,13 @@ class ACUAgent:
             point_batch_count = scan_upload_len / step_time
 
         session.set_status('running')
+        self.log.info('The plan: {plan}', plan=plan)
+        self.log.info('The scan_params: {scan_params}', scan_params=scan_params)
+
+        # Clear faults.
+        self.log.info('Clearing faults to prepare for motion.')
+        yield self.acu_control.clear_faults()
+        yield dsleep(1)
 
         # Verify we're good to move
         ok, msg = yield self._check_ready_motion(session)
@@ -1499,6 +1526,14 @@ class ACUAgent:
         STACK_TARGET = FULL_STACK - \
             max(MIN_STACK_POP * 2 + LOOP_STEP / step_time, point_batch_count * 2)
 
+        # Special error bits to watch here
+        PTRACK_FAULT_KEYS = [
+            'ProgramTrack_position_failure',
+            'Track_start_too_early',
+            'Turnaround_accel_too_high',
+            'Turnaround_time_too_short',
+        ]
+
         with self.azel_lock.acquire_timeout(0, job='generate_scan') as acquired:
 
             if not acquired:
@@ -1525,6 +1560,8 @@ class ACUAgent:
 
             lines = []
             last_mode = None
+            was_graceful_exit = True
+            faults = {}
 
             while True:
                 current_modes = {'Az': self.data['status']['summary']['Azimuth_mode'],
@@ -1536,14 +1573,21 @@ class ACUAgent:
                     self.log.info(f'scan mode={mode}, line_buffer={len(lines)}, track_free={free_positions}')
                     last_mode = mode
 
+                for k in PTRACK_FAULT_KEYS:
+                    if k not in faults and self.data['status']['ACU_failures_errors'].get(k):
+                        self.log.info('Fault during track: "{k}"', k=k)
+                        faults[k] = True
+
                 if mode != 'abort':
                     # Reasons we might decide to abort ...
                     if current_modes['Az'] != 'ProgramTrack':
                         self.log.warn('Unexpected mode transition!')
                         mode = 'abort'
+                        was_graceful_exit = False
                     if current_modes['Remote'] == 0:
                         self.log.warn('ACU no longer in remote mode!')
                         mode = 'abort'
+                        was_graceful_exit = False
                     if session.status == 'stopping':
                         mode = 'abort'
 
@@ -1586,7 +1630,9 @@ class ACUAgent:
             yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
                                                 'Clear Stack')
 
-        return True, 'Track ended cleanly'
+        if not was_graceful_exit:
+            return False, 'Problems during scan'
+        return True, 'Scan ended cleanly'
 
     @ocs_agent.param('starting_index', type=int, default=0)
     def exercise(self, session, params):
