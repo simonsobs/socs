@@ -13,9 +13,10 @@ from autobahn.twisted.util import sleep as dsleep
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 from soaculib.twisted_backend import TwistedHttpBackend
-from twisted.internet import protocol, reactor
+from twisted.internet import protocol, reactor, threads
 from twisted.internet.defer import DeferredList, inlineCallbacks
 
+from socs.agents.acu import avoidance
 from socs.agents.acu import drivers as sh
 from socs.agents.acu import exercisor
 
@@ -62,11 +63,13 @@ class ACUAgent:
             list should be drawn from "az", "el", and "third".
         disable_idle_reset (bool):
             If True, don't auto-start idle_reset process for LAT.
+        solar_avoidance (float):
 
     """
 
     def __init__(self, agent, acu_config='guess', exercise_plan=None,
-                 startup=False, ignore_axes=None, disable_idle_reset=False):
+                 startup=False, ignore_axes=None, disable_idle_reset=False,
+                 solar_avoidance=None):
         # Separate locks for exclusive access to az/el, and boresight motions.
         self.azel_lock = TimeoutLock()
         self.boresight_lock = TimeoutLock()
@@ -101,6 +104,16 @@ class ACUAgent:
         self.ignore_axes = ignore_axes
         if len(self.ignore_axes):
             agent.log.warn('User requested ignore_axes={i}', i=self.ignore_axes)
+
+        self.solar_params = {
+            'active_avoidance': False,
+            'radius': 0,
+        }
+        if solar_avoidance is not None and solar_avoidance > 0:
+            self.solar_params.update({
+                'active_avoidance': True,
+                'radius': solar_avoidance,
+            })
 
         self.exercise_plan = exercise_plan
 
@@ -145,6 +158,11 @@ class ACUAgent:
                                startup=startup)
         agent.register_process('broadcast',
                                self.broadcast,
+                               self._simple_process_stop,
+                               blocking=False,
+                               startup=startup)
+        agent.register_process('solar_avoidance',
+                               self.solar_avoidance,
                                self._simple_process_stop,
                                blocking=False,
                                startup=startup)
@@ -215,6 +233,9 @@ class ACUAgent:
                             blocking=False)
         agent.register_task('clear_faults',
                             self.clear_faults,
+                            blocking=False)
+        agent.register_task('update_solar',
+                            self.update_solar,
                             blocking=False)
 
         # Automatic exercise program...
@@ -1169,10 +1190,22 @@ class ACUAgent:
                         f'{axis}={target} not in accepted range, '
                         f'[{limits[0]}, {limits[1]}].')
 
-            self.log.info(f'Commanded position: az={target_az}, el={target_el}')
+            self.log.info(f'Requested position: az={target_az}, el={target_el}')
             session.set_status('running')
 
-            all_ok, msg = yield self._go_to_axes(session, az=target_az, el=target_el)
+            legs, msg = yield self._get_sunsafe_moves(target_az, target_el)
+            if msg is not None:
+                self.log.error(msg)
+                return False, msg
+
+            if len(legs) > 1:
+                self.log.info(f'Executing move via {len(legs)} separate legs (sun optimized)')
+
+            for leg_az, leg_el in legs:
+                all_ok, msg = yield self._go_to_axes(session, az=leg_az, el=leg_el)
+                if not all_ok:
+                    break
+
             if all_ok and params['end_stop']:
                 yield self._set_modes(az='Stop', el='Stop')
 
@@ -1717,6 +1750,98 @@ class ACUAgent:
             return False, 'Problems during scan'
         return True, 'Scan ended cleanly'
 
+    #
+    # Sun Safety and Solar Avoidance
+    #
+
+    @inlineCallbacks
+    def solar_avoidance(self, session, params):
+        """solar_avoidance()
+
+        **Process** - Avoid the Sun.
+
+        """
+        # The main jobs of this process are:
+        # - track Sun and report its position
+        # - maintain a Sun Safety map for other ops to query.
+        # - guide the platform to Sun Safe position, if needed.
+
+        recomp = False
+
+        def _notify_recomputed(was_recomp, start_time):
+            nonlocal recomp
+            recomp = False
+            if was_recomp:
+                self.log.info('Recomputed Sun Safety Map (took %.1fs)' %
+                              (time.time() - start_time))
+
+        self.sun = avoidance.SunTracker()
+        session.data = {}
+        session.set_status('running')
+
+        while session.status in ['starting', 'running']:
+            try:
+                az, el = [self.data['status']['summary'][f'{ax}_current_position']
+                          for ax in ['Azimuth', 'Elevation']]
+                if az is None or el is None:
+                    raise KeyError
+            except KeyError:
+                session.data = {}
+                yield dsleep(1)
+                continue
+
+            info = self.sun.get_sun_pos(az, el)
+            session.data.update(info)
+
+            if not recomp:
+                recomp = True
+                threads.deferToThread(self.sun.reset, staleness=12 * 3600).addCallback(
+                    _notify_recomputed, time.time())
+
+            if self.sun.base_time is not None:
+                t = self.sun.check_trajectory([az], [el])['sun_time']
+                session.data['sun_safe_time'] = t if t > 0 else 0
+            yield dsleep(10)
+
+    @inlineCallbacks
+    def update_solar(self, session, params):
+        """update_solar()
+
+        **Task** - Update solar avoidance parameters.
+        """
+        pass
+
+    def _get_sun_policy(self, key):
+        return True
+
+    def _get_sunsafe_moves(self, target_az, target_el):
+        if not self._get_sun_policy('sunsafe_moves'):
+            return [(target_az, target_el)], None
+
+        if self.sun is None or self.sun.base_time is None:
+            return None, 'Sun Safety Map not computed; run the solar_avoidance process.'
+        # check for staleness!
+
+        # Check the target position and block it outright.
+        if self.sun.check_trajectory([target_az], [target_el])['sun_time'] <= 0:
+            return None, 'Requested target position is not Sun-Safe.'
+
+        # Ok, so where are we now ...
+        try:
+            az, el = [self.data['status']['summary'][f'{ax}_current_position']
+                      for ax in ['Azimuth', 'Elevation']]
+            if az is None or el is None:
+                raise KeyError
+        except KeyError:
+            return None, 'Current position could not be determined.'
+
+        moves = self.sun.analyze_paths(az, el, target_az, target_el)
+        move, decisions = avoidance.select_move(moves, {})
+        if move is None:
+            return None, 'No Sun-Safe moves could be identified!'
+
+        return list(move['moves'].nodes[1:]), None
+
     @ocs_agent.param('starting_index', type=int, default=0)
     def exercise(self, session, params):
         """exercise(starting_index=0)
@@ -1852,6 +1977,9 @@ def add_agent_args(parser_in=None):
                         nargs='+', help="One or more axes to ignore.")
     pgroup.add_argument("--disable-idle-reset", action='store_true',
                         help="Disable idle_reset, even for LAT.")
+    pgroup.add_argument("--solar-avoidance", type=float,
+                        help="If set (and > 0), enable active solar avoidance "
+                        "using this radius (in deg) for the exclusion zone.")
     return parser_in
 
 
@@ -1864,7 +1992,8 @@ def main(args=None):
     _ = ACUAgent(agent, args.acu_config, args.exercise_plan,
                  startup=not args.no_processes,
                  ignore_axes=args.ignore_axes,
-                 disable_idle_reset=args.disable_idle_reset)
+                 disable_idle_reset=args.disable_idle_reset,
+                 solar_avoidance=args.solar_avoidance)
 
     runner.run(agent, auto_reconnect=True)
 
