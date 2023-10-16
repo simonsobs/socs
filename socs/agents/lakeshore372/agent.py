@@ -929,9 +929,9 @@ class LS372_Agent:
     @ocs_agent.param('setpoint', type=float)
     @ocs_agent.param('heater', type=str)
     @ocs_agent.param('channel', type=int)
-    @ocs_agent.param('P', type=int)
+    @ocs_agent.param('P', type=float)
     @ocs_agent.param('I', type=float)
-    @ocs_agent.param('update_time', type=int)
+    @ocs_agent.param('update_time', type=float)
     @ocs_agent.param('sample_heater_range', type=float, default=10e-3)
     @ocs_agent.param('test_mode', type=bool, default=False)
     def custom_pid(self, session, params):
@@ -946,9 +946,9 @@ class LS372_Agent:
             setpoint (float): Setpoint in Kelvin
             heater (str): 'still' or 'sample'
             channel (int): LS372 Channel to PID off of
-            P (int): Proportional value in Watts/Kelvin
-            I (int): Integral Value in Hz
-            update_time (int): Time between PID updates in seconds
+            P (float): Proportional value in Watts/Kelvin
+            I (float): Integral Value in Hz
+            update_time (float): Time between PID updates in seconds
             sample_heater_range (float): Range for sample heater in Amps.
                                          Default is 10e-3.
             test_mode (bool, optional): Run the Process loop only once.
