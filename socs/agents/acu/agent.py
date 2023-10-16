@@ -1120,6 +1120,10 @@ class ACUAgent:
             if not acquired:
                 return False, f"Operation failed: {self.boresight_lock.job} is running."
 
+            self.log.info('Clearing faults to prepare for motion.')
+            yield self.acu_control.clear_faults()
+            yield dsleep(1)
+
             ok, msg = yield self._check_ready_motion(session)
             if not ok:
                 return False, msg
