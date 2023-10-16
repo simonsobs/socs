@@ -65,6 +65,8 @@ class UCSCRadiometerAgent:
         pm = Pacemaker(1 / 60, quantize=False)
 
         self.take_data = True
+        session.set_status('running')
+
         while self.take_data:
             r = requests.get(self.url)
             data = r.json()
