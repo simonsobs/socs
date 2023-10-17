@@ -1,8 +1,8 @@
 import array as arr
 import struct
 import time
-import numpy as np
 
+import numpy as np
 from serial import Serial
 
 # some commands require a CRC code (cyclic redundancy check) -
@@ -52,10 +52,12 @@ def calc_crc(data):
         crc = crc % 65536
     return crc
 
+
 def F_to_C(temp):
     """Function to convert fahrenheit measurement to celsius"""
 
     return (temp - 32) * (5 / 9)
+
 
 def wind_chill(temp, wind):
     """Function to calculate wind chill temperature. Only valid if temp < 50F.
@@ -66,8 +68,9 @@ def wind_chill(temp, wind):
         wind: Speed in miles per hour
     """
 
-    chill = 35.75 + 0.6215*temp - 35.75*np.power(wind,0.16) + 0.4275*temp*np.power(wind,0.16)
+    chill = 35.75 + 0.6215 * temp - 35.75 * np.power(wind, 0.16) + 0.4275 * temp * np.power(wind, 0.16)
     return chill
+
 
 class VantagePro2:
     """Allows communication to Vantage Pro 2 Weather Monitor Module.
