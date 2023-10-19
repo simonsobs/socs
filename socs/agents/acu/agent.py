@@ -40,8 +40,7 @@ DEFAULT_SCAN_PARAMS = {
 
 
 class ACUAgent:
-    """
-    Agent to acquire data from an ACU and control telescope pointing with the
+    """Agent to acquire data from an ACU and control telescope pointing with the
     ACU.
 
     Parameters:
@@ -52,7 +51,7 @@ class ACUAgent:
             The full path to a scan config file describing motions to cycle
             through on the ACU.  If this is None, the associated process and
             feed will not be registered.
-       startup (bool):
+        startup (bool):
             If True, immediately start the main monitoring processes
             for status and UDP data.
         ignore_axes (str or list of str):
@@ -62,11 +61,13 @@ class ACUAgent:
             action is assumed to have succeeded.  The values in this
             list should be drawn from "az", "el", and "third".  A single
             comma-delimited string (e.g. "az,el" is also accepted.
+        disable_idle_reset (bool):
+            If True, don't auto-start idle_reset process for LAT.
 
     """
 
     def __init__(self, agent, acu_config='guess', exercise_plan=None,
-                 startup=False, ignore_axes=None):
+                 startup=False, ignore_axes=None, disable_idle_reset=False):
         # Separate locks for exclusive access to az/el, and boresight motions.
         self.azel_lock = TimeoutLock()
         self.boresight_lock = TimeoutLock()
@@ -91,6 +92,9 @@ class ACUAgent:
         # generate_scan.
         self.scan_params = {}
         self._set_default_scan_params()
+
+        startup_idle_reset = (self.acu_config['platform'] in ['lat', 'ccat']
+                              and not disable_idle_reset)
 
         if isinstance(ignore_axes, str):
             ignore_axes = [x.strip() for x in ignore_axes.split(',')]
@@ -152,11 +156,11 @@ class ACUAgent:
                                self._simple_process_stop,
                                blocking=False,
                                startup=False)
-        agent.register_process('restart_idle',
-                               self.restart_idle,
+        agent.register_process('idle_reset',
+                               self.idle_reset,
                                self._simple_process_stop,
                                blocking=False,
-                               startup=False)
+                               startup=startup_idle_reset)
         basic_agg_params = {'frame_length': 60}
         fullstatus_agg_params = {'frame_length': 60,
                                  'exclude_influx': True,
@@ -241,28 +245,38 @@ class ACUAgent:
 
     @ocs_agent.param('_')
     @inlineCallbacks
-    def restart_idle(self, session, params):
-        """restart_idle()
+    def idle_reset(self, session, params):
+        """idle_reset()
 
         **Process** - To prevent LAT from going into Survival mode,
         do something on the command interface every so often.  (The
-        default inactivity timeout is 5 minutes.)
+        default inactivity timeout is 1 minute.)
 
         """
+        IDLE_RESET_TIMEOUT = 60  # The watchdog timeout in ACU
+
         session.set_status('running')
         next_action = 0
-        while session.status in ['running']:
-            if time.time() < next_action:
-                yield dsleep(5.)
-                continue
-            self.log.info('Sending RestartIdleTime')
-            try:
-                yield self.acu_read.http.Values(self.acu8100)
-            except Exception as e:
-                self.log.info(' -- failed to RestartIdleTime: {err}', err=e)
-            next_action = time.time() + 60
 
-        return True, 'Process "restart_idle" exited cleanly.'
+        while session.status in ['starting', 'running']:
+            if time.time() < next_action:
+                yield dsleep(IDLE_RESET_TIMEOUT / 10)
+                continue
+            success = True
+            try:
+                yield self.acu_control.http.Values(self.acu8100)
+            except Exception as e:
+                self.log.info(' -- failed to reset Idle Stow time: {err}', err=e)
+                success = False
+            session.data.update({
+                'timestamp': time.time(),
+                'reset_ok': success})
+            if not success:
+                next_action = time.time() + 4
+            else:
+                next_action = time.time() + IDLE_RESET_TIMEOUT / 2
+
+        return True, 'Process "idle_reset" exited cleanly.'
 
     @inlineCallbacks
     def monitor(self, session, params):
@@ -820,7 +834,6 @@ class ACUAgent:
         yield self._set_modes('Stop', 'Stop', 'Stop')
 
     def _get_limit_func(self, axis):
-
         """Construct a function limit(x) that will enforce that x is within
         the configured limits for axis.  Returns the funcion and the
         tuple of limits (lower, upper).
@@ -1837,8 +1850,11 @@ def add_agent_args(parser_in=None):
     pgroup.add_argument("--exercise-plan")
     pgroup.add_argument("--no-processes", action='store_true',
                         default=False)
-    pgroup.add_argument("--ignore-axes", help=
-                        "Comma-delimeted list of axes to ignore (el, az, third).")
+    pgroup.add_argument("--ignore-axes",
+                        help="Comma-delimited list of axes to ignore "
+                        "(el, az, third).")
+    pgroup.add_argument("--disable-idle-reset", action='store_true',
+                        help="Disable idle_reset, even for LAT.")
     return parser_in
 
 
@@ -1850,7 +1866,8 @@ def main(args=None):
     agent, runner = ocs_agent.init_site_agent(args)
     _ = ACUAgent(agent, args.acu_config, args.exercise_plan,
                  startup=not args.no_processes,
-                 ignore_axes=args.ignore_axes)
+                 ignore_axes=args.ignore_axes,
+                 disable_idle_reset=args.disable_idle_reset)
 
     runner.run(agent, auto_reconnect=True)
 
