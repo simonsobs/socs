@@ -991,7 +991,6 @@ class ACUAgent:
         yield self._set_modes('Stop', 'Stop', 'Stop')
 
     def _get_limit_func(self, axis):
-
         """Construct a function limit(x) that will enforce that x is within
         the configured limits for axis.  Returns the funcion and the
         tuple of limits (lower, upper).
