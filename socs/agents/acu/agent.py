@@ -40,8 +40,7 @@ DEFAULT_SCAN_PARAMS = {
 
 
 class ACUAgent:
-    """
-    Agent to acquire data from an ACU and control telescope pointing with the
+    """Agent to acquire data from an ACU and control telescope pointing with the
     ACU.
 
     Parameters:
@@ -52,14 +51,17 @@ class ACUAgent:
             The full path to a scan config file describing motions to cycle
             through on the ACU.  If this is None, the associated process and
             feed will not be registered.
-       startup (bool):
+        startup (bool):
             If True, immediately start the main monitoring processes
             for status and UDP data.
+        idle_stow_reset (float):
+            If positive, the reset_idle process is started with this
+            as the reset period.
 
     """
 
     def __init__(self, agent, acu_config='guess', exercise_plan=None,
-                 startup=False):
+                 startup=False, idle_stow_reset=0):
         # Separate locks for exclusive access to az/el, and boresight motions.
         self.azel_lock = TimeoutLock()
         self.boresight_lock = TimeoutLock()
@@ -84,6 +86,9 @@ class ACUAgent:
         # generate_scan.
         self.scan_params = {}
         self._set_default_scan_params()
+
+        self.idle_stow_reset = idle_stow_reset
+        startup_idle_stow = startup and (idle_stow_reset > 0)
 
         self.exercise_plan = exercise_plan
 
@@ -140,7 +145,7 @@ class ACUAgent:
                                self.restart_idle,
                                self._simple_process_stop,
                                blocking=False,
-                               startup=False)
+                               startup=startup_idle_stow)
         basic_agg_params = {'frame_length': 60}
         fullstatus_agg_params = {'frame_length': 60,
                                  'exclude_influx': True,
@@ -230,21 +235,34 @@ class ACUAgent:
 
         **Process** - To prevent LAT from going into Survival mode,
         do something on the command interface every so often.  (The
-        default inactivity timeout is 5 minutes.)
+        default inactivity timeout is 1 minute.)
 
         """
         session.set_status('running')
         next_action = 0
-        while session.status in ['running']:
+        while session.status in ['starting', 'running']:
             if time.time() < next_action:
                 yield dsleep(5.)
                 continue
-            self.log.info('Sending RestartIdleTime')
+            success = True
+#            try:
+#                assert self.data['status']['platform_status']['Remote_mode'] == 0
+#            except:
+#                next_action = time.time() + 5
+#                continue
+
             try:
-                yield self.acu_read.http.Values(self.acu8100)
+                yield self.acu_control.http.Values(self.acu8100)
             except Exception as e:
-                self.log.info(' -- failed to RestartIdleTime: {err}', err=e)
-            next_action = time.time() + 60
+                self.log.info(' -- failed to reset Idle Stow time: {err}', err=e)
+                success = False
+            session.data.update({
+                'timestamp': time.time(),
+                'reset_ok': success})
+            if not success:
+                next_action = time.time() + 4
+            else:
+                next_action = time.time() + 30
 
         return True, 'Process "restart_idle" exited cleanly.'
 
@@ -1765,6 +1783,9 @@ def add_agent_args(parser_in=None):
     pgroup.add_argument("--exercise-plan")
     pgroup.add_argument("--no-processes", action='store_true',
                         default=False)
+    pgroup.add_argument("--idle-stow-reset", type=float, default=0,
+                        help="If positive, launch restart_idle process "
+                        "with this value as the update time.")
     return parser_in
 
 
@@ -1775,7 +1796,8 @@ def main(args=None):
                                   args=args)
     agent, runner = ocs_agent.init_site_agent(args)
     _ = ACUAgent(agent, args.acu_config, args.exercise_plan,
-                 startup=not args.no_processes)
+                 startup=not args.no_processes,
+                 idle_stow_reset=args.idle_stow_reset)
 
     runner.run(agent, auto_reconnect=True)
 
