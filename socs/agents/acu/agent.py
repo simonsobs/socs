@@ -1486,8 +1486,14 @@ class ACUAgent:
             return False, msg
 
         # Seek to starting position
-        self.log.info(f'Moving to start position, az={plan["init_az"]}, el={init_el}')
-        ok, msg = yield self._go_to_axes(session, az=plan['init_az'], el=init_el)
+        if self.acu_config['platform'] in ['ccat', 'lat']:
+            # HACKAROUND
+            self.log.info(f'Moving to start position, az={plan["init_az"]}')
+            ok, msg = yield self._go_to_axes(session, az=plan['init_az'])
+        else:
+            self.log.info(f'Moving to start position, az={plan["init_az"]}, el={init_el}')
+            ok, msg = yield self._go_to_axes(session, az=plan['init_az'], el=init_el)
+
         if not ok:
             return False, f'Start position seek failed with message: {msg}'
 
