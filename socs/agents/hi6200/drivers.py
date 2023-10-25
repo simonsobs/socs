@@ -1,4 +1,5 @@
 import struct
+
 from pyModbusTCP.client import ModbusClient
 
 
