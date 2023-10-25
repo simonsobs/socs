@@ -40,18 +40,8 @@ class Hi6200Agent:
             if not acquired:
                 return False, "Could not acquire lock"
 
-
-<< << << < HEAD
             self.scale = Hi6200Interface(self.ip_address, self.tcp_port)
 
-== == == =
-            try:
-                self.scale = Hi6200Interface(self.ip_address, self.tcp_port)
-
-            except BaseException:
-                self.log.error(f"Some unknown error occurred initializing TCP Server")
-                return False, "TCP Failure"
->>>>>> > refs / remotes / origin / add_Hi6200_Agent
             self.log.info("Connected to scale.")
 
         return True, 'Initialized Scale.'
@@ -80,10 +70,6 @@ class Hi6200Agent:
                     }
 
                     try:
-<<<<<<< HEAD
-=======
-
->>>>>>> refs/remotes/origin/add_Hi6200_Agent
                         data['data']["Gross"] = self.scale.read_scale_gross_weight()
                         data['data']["Net"] = self.scale.read_scale_net_weight()
 
@@ -93,10 +79,6 @@ class Hi6200Agent:
                         session.data = data
 
                     except ValueError as e:
-<<<<<<< HEAD
-=======
-
->>>>>>> refs/remotes/origin/add_Hi6200_Agent
                         self.log.error(f"Scale responded with an anomolous number, ignorning: {e}")
 
                     except AttributeError as e:

@@ -1,20 +1,11 @@
 import struct
-
-<< << << < HEAD
-== == == =
 from pyModbusTCP.client import ModbusClient
-
->>>>>> > refs / remotes / origin / add_Hi6200_Agent
 
 
 class Hi6200Interface():
 
     """
     The Hi6200 Weight Processor uses a Modbus TCP Interface to communicate.
-<<<<<<< HEAD
-=======
-
->>>>>>> refs/remotes/origin/add_Hi6200_Agent
     The Gross and Net weight sensors are always available to read on the 8,9 and 6,7 registers respectively.
     """
 
@@ -22,10 +13,6 @@ class Hi6200Interface():
         """
             Connects to the Hi6200 weight sensor using a TCP Modbus Client with pyModbusTCP.
             This works ~similarly to a socket connection using a IP and port.
-<<<<<<< HEAD
-=======
-
->>>>>>> refs/remotes/origin/add_Hi6200_Agent
             ModbusClient will not throw errors upon incorrect ip_address!
             ModbusClient will also allow multiple recconects unlike a socket.
         """
