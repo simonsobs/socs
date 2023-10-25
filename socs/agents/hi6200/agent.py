@@ -1,5 +1,4 @@
 import argparse
-import socket
 import time
 
 from ocs import ocs_agent, site_config
@@ -41,18 +40,13 @@ class Hi6200Agent:
             if not acquired:
                 return False, "Could not acquire lock"
 
-            try:
-                self.scale = Hi6200Interface(self.ip_address, self.tcp_port)
-                
-            except:
-                self.log.error(f"Some unknown error occurred initializing TCP Server")
-                return False, "TCP Failure"
+            self.scale = Hi6200Interface(self.ip_address, self.tcp_port)
+
             self.log.info("Connected to scale.")
 
         return True, 'Initialized Scale.'
 
     @ocs_agent.param('wait', type=float, default=1)
-
     def monitor_weight(self, session, params=None):
         """
 
@@ -61,8 +55,6 @@ class Hi6200Agent:
         Parameters:
             wait (float, optional): Time to wait between measurements
                 [seconds].
-            test_mode (bool, optional): Exit process after single loop if True.
-                Defaults to False.
 
         """
         session.set_status('running')
@@ -78,24 +70,19 @@ class Hi6200Agent:
                     }
 
                     try:
-                        
                         data['data']["Gross"] = self.scale.read_scale_gross_weight()
                         data['data']["Net"] = self.scale.read_scale_net_weight()
-
-         #               self.log.info(f"Gross: {data['data']['Gross']} Net: {data['data']['Net']}")
 
                         self.agent.publish_to_feed('scale_output', data)
 
                         # Allow this process to be queried to return current data
                         session.data = data
 
-
                     except ValueError as e:
-                        
                         self.log.error(f"Scale responded with an anomolous number, ignorning: {e}")
 
                     except AttributeError as e:
-                        self.log.error("Scale dropped TCP connection momentarily, trying again: {e}")
+                        self.log.error(f"Scale dropped TCP connection momentarily, trying again: {e}")
 
                     # Allow this process to be queried to return current data
                     session.data = data
@@ -110,6 +97,7 @@ class Hi6200Agent:
     def stop_monitoring(self, session, params=None):
         self.monitor = False
         return True, "Stopping current monitor"
+
 
 def make_parser(parser=None):
     """Build the argument parser for the Agent. Allows sphinx to automatically
@@ -128,6 +116,7 @@ def make_parser(parser=None):
 
 
 def main(args=None):
+
     parser = make_parser()
     args = site_config.parse_args(agent_class='Hi6200Agent',
                                   parser=parser,
@@ -143,5 +132,6 @@ def main(args=None):
 
     runner.run(agent, auto_reconnect=True)
 
-if __name__ == '__main__': 
+
+if __name__ == '__main__':
     main()
