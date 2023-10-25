@@ -45,18 +45,15 @@ class SunTracker:
       exclusion_radius (float, deg): radius of circle around the Sun
         to consider as "unsafe".
       map_res (float, deg): resolution to use for the Sun Safety Map.
-      time_res (float, s): Time resolution at which to evaluate Sun
-        trajectory.
       site (str or None): Site to use (so3g site, defaults to so_lat).
 
     """
 
-    def __init__(self, exclusion_radius=20., map_res=0.5,
-                 time_res=300., site=None, horizon=0.):
+    def __init__(self, exclusion_radius=20., map_res=.5,
+                 site=None, horizon=0.):
         # Store in radians.
         self.exclusion_radius = exclusion_radius * DEG
         self.res = map_res * DEG
-        self.time_res = time_res
         self.horizon = horizon
 
         if site is None:
@@ -127,15 +124,20 @@ class SunTracker:
 
         # Get the map where each pixel says the time delay between
         # base_time and when the time when the sky coordinate will be
-        # in the Sun mask.  This is not terribly fast.  The Sun moves
-        # slowly enough that one could do a decent job of filling in
-        # the rest of the map based on the t=0 footprint.  Fix me.
-        for dt in np.arange(0, 24 * HOUR, self.time_res):
-            qsun = quat.rotation_lonlat(v.ra - dt / HOUR * 15. * DEG, v.dec)
-            qoff = ~qsun * map_q
-            r = quat.decompose_iso(qoff)[0].reshape(sun_times.shape)
-            mask = (sun_times < 0) * (r < self.exclusion_radius)
-            sun_times[mask] = dt
+        # in the Sun mask.
+        dt = -ra[0] * DAY / (2 * np.pi)
+        qsun = quat.rotation_lonlat(v.ra, v.dec)
+        qoff = ~qsun * map_q
+        r = quat.decompose_iso(qoff)[0].reshape(sun_times.shape)
+        sun_times[r < self.exclusion_radius] = 0.
+        for g in sun_times:
+            if (g < 0).all():
+                continue
+            # Identify pixel on the right of the masked region.
+            flips = ((g == 0) * np.hstack((g[:-1] != g[1:], g[-1] != g[0]))).nonzero()[0]
+            dt0 = dt[flips[0]]
+            _dt = (dt - dt0) % DAY
+            g[g < 0] = _dt[g < 0]
 
         # Fill in remaining -1 with NO_TIME.
         sun_times[sun_times < 0] = NO_TIME
