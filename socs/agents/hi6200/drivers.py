@@ -1,10 +1,11 @@
 import struct
 
-<<<<<<< HEAD
-=======
+<< << << < HEAD
+== == == =
 from pyModbusTCP.client import ModbusClient
 
->>>>>>> refs/remotes/origin/add_Hi6200_Agent
+>>>>>> > refs / remotes / origin / add_Hi6200_Agent
+
 
 class Hi6200Interface():
 

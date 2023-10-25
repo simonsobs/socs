@@ -40,17 +40,18 @@ class Hi6200Agent:
             if not acquired:
                 return False, "Could not acquire lock"
 
-<<<<<<< HEAD
+
+<< << << < HEAD
             self.scale = Hi6200Interface(self.ip_address, self.tcp_port)
 
-=======
+== == == =
             try:
                 self.scale = Hi6200Interface(self.ip_address, self.tcp_port)
 
             except BaseException:
                 self.log.error(f"Some unknown error occurred initializing TCP Server")
                 return False, "TCP Failure"
->>>>>>> refs/remotes/origin/add_Hi6200_Agent
+>>>>>> > refs / remotes / origin / add_Hi6200_Agent
             self.log.info("Connected to scale.")
 
         return True, 'Initialized Scale.'
