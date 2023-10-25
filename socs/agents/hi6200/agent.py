@@ -43,8 +43,8 @@ class Hi6200Agent:
 
             try:
                 self.scale = Hi6200Interface(self.ip_address, self.tcp_port)
-                
-            except:
+
+            except BaseException:
                 self.log.error(f"Some unknown error occurred initializing TCP Server")
                 return False, "TCP Failure"
             self.log.info("Connected to scale.")
@@ -52,7 +52,6 @@ class Hi6200Agent:
         return True, 'Initialized Scale.'
 
     @ocs_agent.param('wait', type=float, default=1)
-
     def monitor_weight(self, session, params=None):
         """
 
@@ -78,7 +77,7 @@ class Hi6200Agent:
                     }
 
                     try:
-                        
+
                         data['data']["Gross"] = self.scale.read_scale_gross_weight()
                         data['data']["Net"] = self.scale.read_scale_net_weight()
 
@@ -89,9 +88,8 @@ class Hi6200Agent:
                         # Allow this process to be queried to return current data
                         session.data = data
 
-
                     except ValueError as e:
-                        
+
                         self.log.error(f"Scale responded with an anomolous number, ignorning: {e}")
 
                     except AttributeError as e:
@@ -110,6 +108,7 @@ class Hi6200Agent:
     def stop_monitoring(self, session, params=None):
         self.monitor = False
         return True, "Stopping current monitor"
+
 
 def make_parser(parser=None):
     """Build the argument parser for the Agent. Allows sphinx to automatically
@@ -143,5 +142,6 @@ def main(args=None):
 
     runner.run(agent, auto_reconnect=True)
 
-if __name__ == '__main__': 
+
+if __name__ == '__main__':
     main()
