@@ -108,12 +108,14 @@ class ACUAgent:
         self.solar_params = {
             'active_avoidance': False,
             'radius': 0,
+            'next_drill': None,
         }
         if solar_avoidance is not None and solar_avoidance > 0:
             self.solar_params.update({
                 'active_avoidance': True,
                 'radius': solar_avoidance,
             })
+        self.avoidance_lockdown = False
 
         self.exercise_plan = exercise_plan
 
@@ -1172,6 +1174,9 @@ class ACUAgent:
             if not acquired:
                 return False, f"Operation failed: {self.azel_lock.job} is running."
 
+            if self.avoidance_lockdown:
+                return False, "Motion blocked; avoidance in progress."
+
             self.log.info('Clearing faults to prepare for motion.')
             yield self.acu_control.clear_faults()
             yield dsleep(1)
@@ -1510,6 +1515,9 @@ class ACUAgent:
           Process .stop method is called)..
 
         """
+        if self.avoidance_lockdown:
+            return False, "Motion blocked; avoidance in progress."
+
         self.log.info('User scan params: {params}', params=params)
 
         az_endpoint1 = params['az_endpoint1']
@@ -1769,18 +1777,23 @@ class ACUAgent:
         def _get_sun_map():
             # To run in thread ...
             start = time.time()
-            print(start)
             new_sun = avoidance.SunTracker()
             new_sun.reset()
             return new_sun, time.time() - start
 
         def _notify_recomputed(result):
+            nonlocal req_out
             new_sun, compute_time = result
             self.log.info('(Re-)computed Sun Safety Map (took %.1fs)' %
                           compute_time)
             self.sun = new_sun
+            req_out = False
 
+        req_out = False
         self.sun = None
+        state = 'init'
+        last_state = state
+
         session.data = {}
         session.set_status('running')
 
@@ -1795,19 +1808,79 @@ class ACUAgent:
                 yield dsleep(1)
                 continue
 
-            # if self.sun is None or (self.sun._now() - self.sun.base_time > 12 * avoidance.HOUR):
-            if self.sun is None or (self.sun._now() - self.sun.base_time > 60):
+            if not req_out and (self.sun is None
+                                or (self.sun._now() - self.sun.base_time > 12 * avoidance.HOUR)):
+                req_out = True
                 threads.deferToThread(_get_sun_map).addCallback(
                     _notify_recomputed)
 
             if self.sun is not None:
-                print(self.sun.base_time)
                 info = self.sun.get_sun_pos(az, el)
                 session.data.update(info)
                 t = self.sun.check_trajectory([az], [el])['sun_time']
                 session.data['sun_safe_time'] = t if t > 0 else 0
 
-            yield dsleep(10)
+            if state == 'init':
+                if self.sun is not None:
+                    state = 'idle'
+            elif state == 'idle':
+                if t < 3600:
+                    state = 'shelter-abort'
+                tnd = self.solar_params['next_drill']
+                if tnd is not None and tnd <= time.time():
+                    state = 'shelter-abort'
+                    self.solar_params['next_drill'] = None
+            elif state == 'shelter-abort':
+                # raise stop flags and issue stop on motion ops
+                self.avoidance_lockdown = True
+                for op in ['generate_scan', 'go_to']:
+                    self.agent.stop(op)
+                    self.agent.abort(op)
+                state = 'shelter-wait-idle'
+                timeout = 30
+            elif state == 'shelter-wait-idle':
+                for op in ['generate_scan', 'go_to']:
+                    ok, msg, _session = self.agent.status(op)
+                    if _session.get('status', 'done') != 'done':
+                        break
+                else:
+                    state = 'shelter-move'
+                timeout -= 1
+                if timeout < 0:
+                    state = 'shelter-stop'
+            elif state == 'shelter-stop':
+                yield self._stop()
+                state = 'shelter-move'
+
+            elif state == 'shelter-move':
+                paths = self.sun.find_escape_paths(az, el)
+                legs = paths[0]['moves'].nodes[1:]
+                state = 'shelter-move-legs'
+                leg_d = None
+
+            elif state == 'shelter-move-legs':
+                def _leg_done(result):
+                    all_ok, msg = result
+                    print('leg done', all_ok, msg)
+                    nonlocal leg_d
+                    leg_d = None
+                if leg_d is None:
+                    if len(legs) == 0:
+                        state = 'safe-i-guess'
+                    else:
+                        leg_az, leg_el = legs.pop(0)
+                        leg_d = self._go_to_axes(session, az=leg_az, el=leg_el)
+                        leg_d.addCallback(_leg_done)
+
+            elif state == 'safe-i-guess':
+                self.avoidance_lockdown = False
+                state = 'idle'
+
+            session.data['state'] = state
+            if state != last_state:
+                self.log.info('solar_avoidance: state is now "{state}"', state=state)
+                last_state = state
+            yield dsleep(1)
 
     @inlineCallbacks
     def update_solar(self, session, params):
@@ -1815,7 +1888,9 @@ class ACUAgent:
 
         **Task** - Update solar avoidance parameters.
         """
-        pass
+        self.solar_params['next_drill'] = time.time() + 10
+        yield
+        return True, 'Did a thing.'
 
     def _get_sun_policy(self, key):
         return True

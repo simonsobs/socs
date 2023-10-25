@@ -232,6 +232,10 @@ class SunTracker:
             return sun_delta, sun_dists
         return {
             'sun_time': sun_delta.min(),
+            'sun_time_start': sun_delta[0],
+            'sun_time_stop': sun_delta[-1],
+            'sun_dist_start': sun_dists[0],
+            'sun_dist_stop': sun_dists[-1],
             'sun_dist_min': sun_dists.min(),
             'sun_dist_mean': sun_dists.mean(),
         }
@@ -296,7 +300,12 @@ class SunTracker:
         return fig, axes, imgs
 
     def analyze_paths(self, az0, el0, az1, el1, t=None,
-                      plot_file=None, policy=None):
+                      plot_file=None, policy=None, dodging=True):
+        """Design and analyze a number of different paths between (az0, el0)
+        and (az1, el1).  Return the list, for further processing and
+        choice.
+
+        """
         if t is None:
             t = self._now()
 
@@ -322,9 +331,9 @@ class SunTracker:
             el_nodes = [el0]
         else:
             el_nodes = sorted([el0, el1])
-        if 10. < el_nodes[0]:
+        if dodging and (10. < el_nodes[0]):
             el_nodes.insert(0, 10.)
-        if 90. > el_nodes[-1]:
+        if dodging and (90. > el_nodes[-1]):
             el_nodes.append(90.)
 
         el_sep = 1.
@@ -386,6 +395,34 @@ class SunTracker:
             pl.savefig(plot_file)
         return all_moves
 
+    def find_escape_paths(self, az0, el0, t=None,
+                          plot_file=None, policy=None):
+        """Design and analyze a number of different paths that move from (az0,
+        el0) to a sun safe position.  Return the list, for further
+        processing and choice.
+
+        """
+        if t is None:
+            t = self._now()
+
+        # Preference is to not change altitude.  But we may need to
+        # lower it.
+        el1 = el0
+        paths = []
+        while len(paths) == 0 and el1 > 0:
+            paths1 = self.analyze_paths(az0, el0, 0., el1, t=t,
+                                        dodging=False)
+            paths2 = self.analyze_paths(az0, el0, 180., el1, t=t,
+                                        dodging=False)
+            best_path1, decisions = select_move(paths1, {},
+                                                escape=True)
+            best_path2, decisions = select_move(paths2, {},
+                                                escape=True)
+            paths = [bp for bp in [best_path1, best_path2] if bp is not None]
+            el1 -= 1.
+
+        return paths
+
 
 class MoveSequence:
     def __init__(self, *args, simplify=False):
@@ -441,7 +478,7 @@ DEFAULT_POLICY = {
 }
 
 
-def select_move(moves, policy):
+def select_move(moves, policy, escape=False):
     for k in policy.keys():
         assert k in DEFAULT_POLICY
     _p = dict(DEFAULT_POLICY)
@@ -461,9 +498,17 @@ def select_move(moves, policy):
 
         els = m['req_start'][1], m['req_stop'][1]
 
-        if m['sun_time'] < _p['min_sun_time']:
-            reject(d, 'Path too close to sun.')
-            continue
+        if escape and (m['sun_time_start'] < _p['min_sun_time']):
+            if m['sun_dist_min'] < m['sun_dist_start']:
+                reject(d, 'Path moves even closer to sun.')
+                continue
+            if m['sun_time_stop'] < _p['min_sun_time']:
+                reject(d, 'Path does not end in sun-safe location.')
+                continue
+        else:
+            if m['sun_time'] < _p['min_sun_time']:
+                reject(d, 'Path too close to sun.')
+                continue
 
         if m['travel_el'] < _p['min_el']:
             reject(d, 'Path goes below minimum el.')
