@@ -1766,16 +1766,21 @@ class ACUAgent:
         # - maintain a Sun Safety map for other ops to query.
         # - guide the platform to Sun Safe position, if needed.
 
-        recomp = False
+        def _get_sun_map():
+            # To run in thread ...
+            start = time.time()
+            print(start)
+            new_sun = avoidance.SunTracker()
+            new_sun.reset()
+            return new_sun, time.time() - start
 
-        def _notify_recomputed(was_recomp, start_time):
-            nonlocal recomp
-            recomp = False
-            if was_recomp:
-                self.log.info('Recomputed Sun Safety Map (took %.1fs)' %
-                              (time.time() - start_time))
+        def _notify_recomputed(result):
+            new_sun, compute_time = result
+            self.log.info('(Re-)computed Sun Safety Map (took %.1fs)' %
+                          compute_time)
+            self.sun = new_sun
 
-        self.sun = avoidance.SunTracker()
+        self.sun = None
         session.data = {}
         session.set_status('running')
 
@@ -1790,17 +1795,18 @@ class ACUAgent:
                 yield dsleep(1)
                 continue
 
-            info = self.sun.get_sun_pos(az, el)
-            session.data.update(info)
+            # if self.sun is None or (self.sun._now() - self.sun.base_time > 12 * avoidance.HOUR):
+            if self.sun is None or (self.sun._now() - self.sun.base_time > 60):
+                threads.deferToThread(_get_sun_map).addCallback(
+                    _notify_recomputed)
 
-            if not recomp:
-                recomp = True
-                threads.deferToThread(self.sun.reset, staleness=12 * 3600).addCallback(
-                    _notify_recomputed, time.time())
-
-            if self.sun.base_time is not None:
+            if self.sun is not None:
+                print(self.sun.base_time)
+                info = self.sun.get_sun_pos(az, el)
+                session.data.update(info)
                 t = self.sun.check_trajectory([az], [el])['sun_time']
                 session.data['sun_safe_time'] = t if t > 0 else 0
+
             yield dsleep(10)
 
     @inlineCallbacks
