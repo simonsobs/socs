@@ -448,7 +448,7 @@ class LabJackAgent:
                     # Apply unit conversion function for this channel
                     if ch in self.functions.keys():
                         new_ch_output, units = \
-                            self.ljf.unit_conversion(ch_output,
+                            self.ljf.unit_conversion(np.array(ch_output),
                                                      self.functions[ch])
                         data['data'][ch + units] = new_ch_output
 
