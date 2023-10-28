@@ -131,7 +131,7 @@ def update_cache(get_result, timestamp):
     # Return disconnected if SNMP response is empty
     if get_result is None:
         oid_cache['syncbox_connection'] = {'last_attempt': time.time(),
-                                            'connected': False}
+                                           'connected': False}
         return oid_cache
 
     for item in get_result:
@@ -143,7 +143,7 @@ def update_cache(get_result, timestamp):
         oid_cache[field_name] = {"status": oid_value}
         oid_cache[field_name]["description"] = oid_description
         oid_cache['syncbox_connection'] = {'last_attempt': time.time(),
-                                            'connected': True}
+                                           'connected': True}
         oid_cache['timestamp'] = timestamp
 
     return oid_cache
@@ -229,7 +229,7 @@ class MeinbergSyncboxAgent:
                 {'status': 'PTP',
                  'description': 'PTP'},
             'mbgSyncboxN2XPtpProfile_0':
-                {'status': 0, 
+                {'status': 0,
                  'description': 'none'},
             'mbgSyncboxN2XPtpNwProt_0':
                 {'status': 1,
@@ -498,9 +498,9 @@ def main(args=None):
 
     agent, runner = ocs_agent.init_site_agent(args)
     p = MeinbergSyncboxAgent(agent,
-                      address=args.address,
-                      port=int(args.port),
-                      version=int(args.snmp_version))
+                             address=args.address,
+                             port=int(args.port),
+                             version=int(args.snmp_version))
 
     agent.register_process("acq",
                            p.acq,
