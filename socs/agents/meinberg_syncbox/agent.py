@@ -72,10 +72,10 @@ def _build_message(get_result, time, blockname):
     ----------
     get_result : pysnmp.smi.rfc1902.ObjectType
         Result from a pysnmp GET command.
-    names : list
-        List of strings for outlet names
     time : float
         Timestamp for when the SNMP GET was issued.
+    blockname : string
+        Blockname for feed.
 
     Returns
     -------
@@ -111,11 +111,13 @@ def update_cache(get_result, timestamp):
     the OID values, name, and description (decoded string). An example for a
     single OID, with connection status and timestamp information::
 
-        {"outletStatus_0": {"status": 1,
-                            "name": Outlet-1,
-                            "description": "on"},
+        {"mbgSyncboxN2XCurrentRefSource_0": {"status": 'PTP',
+                                             "description": 'PTP'}}
+
+    Additionally there is connection status and timestamp information under::
+
          "syncbox_connection": {"last_attempt": 1598543359.6326838,
-                                 "connected": True},
+                                "connected": True},
          "timestamp": 1656085022.680916}
 
     Parameters
@@ -202,26 +204,146 @@ class MeinbergSyncboxAgent:
 
         **Process** - Fetch values from the syncbox via SNMP.
 
+        Parameters
+        ----------
+        test_mode : bool, optional
+            Run the Process loop only once. Meant only for testing.
+            Default is False.
+
         Notes
         -----
         The most recent data collected is stored in session.data in the
         structure::
 
             >>> response.session['data']
-            {'outletStatus_0':
+            {'mbgSyncboxN2XSerialNumber_0':
+                {'status': '009811006890',
+                 'description': '009811006890'},
+            'mbgSyncboxN2XFirmwareRevision_0':
+                {'status': '1.20 ',
+                 'description': '1.20 '},
+            'mbgSyncboxN2XSystemTime_0':
+                {'status': '2023-10-28 14:25:54 UTC',
+                 'description': '2023-10-28 14:25:54 UTC'},
+            'mbgSyncboxN2XCurrentRefSource_0':
+                {'status': 'PTP',
+                 'description': 'PTP'},
+            'mbgSyncboxN2XPtpProfile_0':
+                {'status': 0, 
+                 'description': 'none'},
+            'mbgSyncboxN2XPtpNwProt_0':
                 {'status': 1,
-                 'name': 'Outlet-1',
-                 'description': 'on'},
-             'outletStatus_1':
+                 'description': 'ipv4'},
+            'mbgSyncboxN2XPtpPortState_0':
+                {'status': 9,
+                 'description': 'slave'},
+            'mbgSyncboxN2XPtpDelayMechanism_0':
                 {'status': 0,
-                 'name': 'Outlet-2',
-                 'description': 'off'},
-             ...
+                 'description': 'e2e'},
+            'mbgSyncboxN2XPtpDelayRequestInterval_0':
+                {'status': 1,
+                 'description': '1'},
+            'mbgSyncboxN2XPtpTimescale_0':
+                {'status': 0,
+                 'description': 'tai'},
+            'mbgSyncboxN2XPtpUTCOffset_0':
+                {'status': '37 sec',
+                 'description': '37 sec'},
+            'mbgSyncboxN2XPtpLeapSecondAnnounced_0':
+                {'status': 'no',
+                 'description': 'no'},
+            'mbgSyncboxN2XPtpGrandmasterClockID_0':
+                {'status': 'EC:46:70:FF:FE:0A:AB:FE',
+                 'description': 'EC:46:70:FF:FE:0A:AB:FE'},
+            'mbgSyncboxN2XPtpGrandmasterTimesource_0':
+                {'status': 32,
+                 'description': 'gps'},
+            'mbgSyncboxN2XPtpGrandmasterPriority1_0':
+                {'status': 64,
+                 'description': '64'},
+            'mbgSyncboxN2XPtpGrandmasterClockClass_0':
+                {'status': 6,
+                 'description': '6'},
+            'mbgSyncboxN2XPtpGrandmasterClockAccuracy_0':
+                {'status': 33, 'description':
+                 'accurateToWithin100ns'},
+            'mbgSyncboxN2XPtpGrandmasterClockVariance_0':
+                {'status': 13563,
+                 'description': '13563'},
+            'mbgSyncboxN2XPtpOffsetToGrandmaster_0':
+                {'status': '10 ns',
+                 'description': '10 ns'},
+            'mbgSyncboxN2XPtpMeanPathDelay_0':
+                {'status': '875 ns',
+                 'description': '875 ns'},
+            'mbgSyncboxN2XOutputMode_1':
+                {'status': 4,
+                 'description': 'pulsePerSecond'},
              'syncbox_connection':
                 {'last_attempt': 1656085022.680916,
                  'connected': True},
              'timestamp': 1656085022.680916,
              'address': '10.10.10.50'}
+
+        Some relevant options and units for the above OIDs::
+
+            mbgSyncboxN2XPtpProfile::
+                Options:: none(0),
+                          power(1),
+                          telecom(2)
+            mbgSyncboxN2XPtpNwProt::
+                Options:: unknown(0),
+                          ipv4(1),
+                          ipv6(2),
+                          ieee802-3(3),
+                          deviceNet(4),
+                          controlNet(5),
+                          profiNet(6)
+            mbgSyncboxN2XPtpPortState::
+                Options:: uninitialized(0),
+                          initializing(1),
+                          faulty(2),
+                          disabled(3),
+                          listening(4),
+                          preMaster(5),
+                          master(6),
+                          passive(7),
+                          uncalibrated(8),
+                          slave(9)
+            mbgSyncboxN2XPtpDelayMechanism::
+                Options:: e2e(0),
+                          p2p(1)
+            mbgSyncboxN2XPtpTimescale::
+                Options:: tai(0),
+                          arb(1)
+            mbgSyncboxN2XPtpGrandmasterTimesource::
+                Options:: atomicClock(16),
+                          gps(32),
+                          terrestrialRadio(48),
+                          ptp(64),
+                          ntp(80),
+                          handSet(96),
+                          other(144),
+                          internalOscillator(160)
+            mbgSyncboxN2XPtpGrandmasterClockAccuracy::
+                Options:: accurateToWithin25ns(32),
+                          accurateToWithin100ns(33),
+                          accurateToWithin250ns(34),
+                          accurateToWithin1us(35),
+                          accurateToWithin2Point5us(36),
+                          accurateToWithin10us(37),
+                          accurateToWithin25us(38),
+                          accurateToWithin100us(39),
+                          accurateToWithin250us(40),
+                          accurateToWithin1ms(41),
+                          accurateToWithin2Point5ms(42),
+                          accurateToWithin10ms(43),
+                          accurateToWithin25ms(44),
+                          accurateToWithin100ms(45),
+                          accurateToWithin250ms(46),
+                          accurateToWithin1s(47),
+                          accurateToWithin10s(48),
+                          accurateToGreaterThan10s(49)
         """
 
         session.set_status('running')
