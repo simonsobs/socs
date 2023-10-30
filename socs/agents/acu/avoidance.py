@@ -213,19 +213,26 @@ class SunTracker:
 
     def check_trajectory(self, az, el, t=None, raw=False):
         """For a telescope trajectory (vectors az, el, in deg), assumed to
-        occur at time t, get the minimum value of the Sun Safety Map
-        traversed by that trajectory.  Also get the minimum value of
-        the Sun Distance map.
+        occur at time t (defaults to now), get the minimum value of
+        the Sun Safety Map traversed by that trajectory.  Also get the
+        minimum value of the Sun Distance map.
 
         This requires the Sun Safety Map to have been computed with a
         base_time of t - 24 hours or later.
 
-        Returns the Sun Safety time for the trajectory, in seconds,
-        and nearest Sun approach, in degrees.
+        Returns a dict with entries:
+
+        - ``'sun_time'``: Minimum Sun Safety Time on the traj.
+        - ``'sun_time_start'``: Sun Safety Time at first point.
+        - ``'sun_time_stop'``: Sun Safety Time at last point.
+        - ``'sun_dist_min'``: Minimum distance to Sun, in degrees.
+        - ``'sun_dist_mean'``: Mean distance to Sun.
+        - ``'sun_dist_start'``: Distance to Sun, at first point.
+        - ``'sun_dist_stop'``: Distance to Sun, at last point.
 
         """
         if t is None:
-            t = self.base_time
+            t = self._now()
         j, i = self._azel_pix(az, el, dt=t - self.base_time)
         sun_delta = self.sun_times[j, i]
         sun_dists = self.sun_dist[j, i]
@@ -421,10 +428,10 @@ class SunTracker:
                                         dodging=False)
             paths2 = self.analyze_paths(az0, el0, 180., el1, t=t,
                                         dodging=False)
-            best_path1, decisions = select_move(paths1, {},
-                                                escape=True)
-            best_path2, decisions = select_move(paths2, {},
-                                                escape=True)
+            best_path1, decisions1 = select_move(paths1, {},
+                                                 escape=True)
+            best_path2, decisions2 = select_move(paths2, {},
+                                                 escape=True)
             paths = [bp for bp in [best_path1, best_path2] if bp is not None]
             el1 -= 1.
 

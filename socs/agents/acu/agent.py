@@ -1109,7 +1109,8 @@ class ACUAgent:
         return success, msg
 
     @inlineCallbacks
-    def _go_to_axes(self, session, el=None, az=None, third=None):
+    def _go_to_axes(self, session, el=None, az=None, third=None,
+                    clear_faults=False):
         """Execute a movement along multiple axes, using "Preset"
         mode.  This just launches _go_to_axis on each required axis,
         and collects the results.
@@ -1119,6 +1120,7 @@ class ACUAgent:
           az (float): target for Azimuth axis (ignored if None).
           el (float): target for Elevation axis (ignored if None).
           third (float): target for Boresight axis (ignored if None).
+          clear_faults (bool): whether to clear ACU faults first.
 
         Returns:
           ok (bool): True if all motions completed successfully and
@@ -1138,6 +1140,10 @@ class ACUAgent:
                     (short_name, self._go_to_axis(session, axis_name, target)))
         if len(move_defs) is None:
             return True, 'No motion requested.'
+
+        if clear_faults:
+            yield self.acu_control.clear_faults()
+            yield dsleep(1)
 
         moves = yield DeferredList([d for n, d in move_defs])
         all_ok, msgs = True, []
@@ -1583,6 +1589,15 @@ class ACUAgent:
         self.log.info('The plan: {plan}', plan=plan)
         self.log.info('The scan_params: {scan_params}', scan_params=scan_params)
 
+        # Before any motion, check for sun safety.
+        ok, msg = self._check_scan_sunsafe(az_endpoint1, az_endpoint2, el_endpoint1,
+                                           az_speed, az_accel)
+        if ok:
+            self.log.info('Sun safety check passes: {msg}', msg=msg)
+        else:
+            self.log.error('Sun safety check fails: {msg}', msg=msg)
+            return False, 'Scan is not Sun Safe.'
+
         # Clear faults.
         self.log.info('Clearing faults to prepare for motion.')
         yield self.acu_control.clear_faults()
@@ -1835,7 +1850,7 @@ class ACUAgent:
                 if self.sun is not None:
                     state = 'idle'
             elif state == 'idle':
-                if t < 3600:
+                if t < 3600 and self._get_sun_policy('shelter_enabled'):
                     state = 'shelter-abort'
                 tnd = self.solar_params['next_drill']
                 if tnd is not None and tnd <= time.time():
@@ -1862,25 +1877,32 @@ class ACUAgent:
             elif state == 'shelter-stop':
                 yield self._stop()
                 state = 'shelter-move'
-
             elif state == 'shelter-move':
                 paths = self.sun.find_escape_paths(az, el)
+                if len(paths) == 0:
+                    print('failed to find escape paths @%.1f, az=%.3f el=%.3f' %
+                          (time.time(), az, el))
+
                 legs = paths[0]['moves'].nodes[1:]
                 state = 'shelter-move-legs'
                 leg_d = None
-
             elif state == 'shelter-move-legs':
                 def _leg_done(result):
+                    nonlocal state
                     all_ok, msg = result
-                    print('leg done', all_ok, msg)
-                    nonlocal leg_d
-                    leg_d = None
+                    if not all_ok:
+                        # Recompute the escape path.
+                        state = 'shelter-move-legs'
+                    else:
+                        nonlocal leg_d
+                        leg_d = None
                 if leg_d is None:
                     if len(legs) == 0:
                         state = 'safe-i-guess'
                     else:
                         leg_az, leg_el = legs.pop(0)
-                        leg_d = self._go_to_axes(session, az=leg_az, el=leg_el)
+                        leg_d = self._go_to_axes(session, az=leg_az, el=leg_el,
+                                                 clear_faults=True)
                         leg_d.addCallback(_leg_done)
 
             elif state == 'safe-i-guess':
@@ -1924,9 +1946,32 @@ class ACUAgent:
 
         if key == 'sunsafe_moves':
             return p['active_avoidance'] and (now >= p['disable_until'])
+        elif key == 'shelter_enabled':
+            return p['active_avoidance'] and (now >= p['disable_until'])
 
         else:
             return p[key]
+
+    def _check_scan_sunsafe(self, az1, az2, el, v_az, a_az):
+        # Include a bit of buffer for turn-arounds.
+        az1, az2 = min(az1, az2), max(az1, az2)
+        turn = v_az**2 / a_az
+        az1 -= turn
+        az2 += turn
+        n = max(2, int(np.ceil((az2 - az1) / 1.)))
+        azs = np.linspace(az1, az2, n)
+
+        info = self.sun.check_trajectory(azs, azs * 0 + el)
+        safe = info['sun_time'] >= 3600
+        if safe:
+            msg = 'Scan is safe for %.1f hours' % (info['sun_time'] / 3600)
+        else:
+            msg = 'Scan will be unsafe in %.1f hours' % (info['sun_time'] / 3600)
+
+        if self._get_sun_policy('sunsafe_moves'):
+            return safe, msg
+        else:
+            return True, 'Sun-safety not active; %s' % msg
 
     def _get_sunsafe_moves(self, target_az, target_el):
         if not self._get_sun_policy('sunsafe_moves'):
