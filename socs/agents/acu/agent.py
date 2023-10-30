@@ -242,6 +242,10 @@ class ACUAgent:
         agent.register_task('update_solar',
                             self.update_solar,
                             blocking=False)
+        agent.register_task('seek_sun_safety',
+                            self.seek_sun_safety,
+                            blocking=False,
+                            aborter=self._simple_task_abort)
 
         # Automatic exercise program...
         if exercise_plan:
@@ -1809,8 +1813,7 @@ class ACUAgent:
 
         req_out = False
         self.sun = None
-        state = 'init'
-        last_state = state
+        last_panic = 0
 
         session.data = {}
         session.set_status('running')
@@ -1846,73 +1849,40 @@ class ACUAgent:
                 t = self.sun.check_trajectory([az], [el])['sun_time']
                 session.data['sun_safe_time'] = t if t > 0 else 0
 
-            if state == 'init':
-                if self.sun is not None:
-                    state = 'idle'
-            elif state == 'idle':
-                if t < 3600 and self._get_sun_policy('shelter_enabled'):
-                    state = 'shelter-abort'
-                tnd = self.solar_params['next_drill']
-                if tnd is not None and tnd <= time.time():
-                    state = 'shelter-abort'
-                    self.solar_params['next_drill'] = None
-            elif state == 'shelter-abort':
-                # raise stop flags and issue stop on motion ops
-                self.avoidance_lockdown = True
-                for op in ['generate_scan', 'go_to']:
-                    self.agent.stop(op)
-                    self.agent.abort(op)
-                state = 'shelter-wait-idle'
-                timeout = 30
-            elif state == 'shelter-wait-idle':
-                for op in ['generate_scan', 'go_to']:
-                    ok, msg, _session = self.agent.status(op)
-                    if _session.get('status', 'done') != 'done':
-                        break
-                else:
-                    state = 'shelter-move'
-                timeout -= 1
-                if timeout < 0:
-                    state = 'shelter-stop'
-            elif state == 'shelter-stop':
-                yield self._stop()
-                state = 'shelter-move'
-            elif state == 'shelter-move':
-                paths = self.sun.find_escape_paths(az, el)
-                if len(paths) == 0:
-                    print('failed to find escape paths @%.1f, az=%.3f el=%.3f' %
-                          (time.time(), az, el))
+            # Are we currently in safe position?
+            safe_known = False
+            safe = False
+            if self.sun is not None:
+                safe_known = True
+                safe = t >= 3600
 
-                legs = paths[0]['moves'].nodes[1:]
-                state = 'shelter-move-legs'
-                leg_d = None
-            elif state == 'shelter-move-legs':
-                def _leg_done(result):
-                    nonlocal state
-                    all_ok, msg = result
-                    if not all_ok:
-                        # Recompute the escape path.
-                        state = 'shelter-move-legs'
-                    else:
-                        nonlocal leg_d
-                        leg_d = None
-                if leg_d is None:
-                    if len(legs) == 0:
-                        state = 'safe-i-guess'
-                    else:
-                        leg_az, leg_el = legs.pop(0)
-                        leg_d = self._go_to_axes(session, az=leg_az, el=leg_el,
-                                                 clear_faults=True)
-                        leg_d.addCallback(_leg_done)
+            # Has a drill been requested?
+            drill_req = (self.solar_params['next_drill'] is not None
+                         and self.solar_params['next_drill'] <= time.time())
 
-            elif state == 'safe-i-guess':
-                self.avoidance_lockdown = False
-                state = 'idle'
+            # Should we be doing a seek_sun_safety?
+            panic_for_real = safe_known and not safe and self._get_sun_policy('shelter_enabled')
+            panic_for_fun = drill_req
 
-            session.data['state'] = state
-            if state != last_state:
-                self.log.info('solar_avoidance: state is now "{state}"', state=state)
-                last_state = state
+            # Is seek_sun_safe running?
+            ok, msg, _session = self.agent.status('seek_sun_safety')
+            seek_running = (_session.get('status', 'done') != 'done')
+
+            # Block motion as long as we are not sun-safe.
+            self.avoidance_lockdown = panic_for_real or seek_running
+
+            session.data.update({
+                'danger_zone': panic_for_real,
+                'lockout': self.avoidance_lockdown,
+                'seek_is_running': seek_running,
+            })
+
+            if (panic_for_real or panic_for_fun) and (time.time() - last_panic > 60.):
+                self.log.warn('solar_avoidance is requesting seek_sun_safety.')
+                self.solar_params['next_drill'] = None
+                self.agent.start('seek_sun_safety')
+                last_panic = time.time()
+
             yield dsleep(1)
 
     @ocs_agent.param('trigger_panic', type=bool, default=False)
@@ -1925,6 +1895,9 @@ class ACUAgent:
         """
         do_recompute = False
         now = time.time()
+        self.log.info('update_solar params: {params}',
+                      params={k: v for k, v in params.items()
+                              if v is not None})
 
         if params['trigger_panic']:
             self.log.warn('Triggering solar avoidance panic drill in 10 seconds.')
@@ -1939,6 +1912,92 @@ class ACUAgent:
             self.solar_params['recompute'] = True
 
         return True, 'Params updated.'
+
+    @inlineCallbacks
+    def seek_sun_safety(self, session, params):
+        """seek_sun_safety()
+
+        **Task** - Move the platform to a Sun-Safe position.
+
+        """
+        state = 'init'
+        last_state = state
+
+        session.data = {'state': state,
+                        'timestamp': time.time()}
+        session.set_status('running')
+
+        while session.status in ['starting', 'running'] and state not in ['safe-i-guess']:
+            az, el = [self.data['status']['summary'][f'{ax}_current_position']
+                      for ax in ['Azimuth', 'Elevation']]
+
+            if state == 'init':
+                state = 'shelter-abort'
+            elif state == 'shelter-abort':
+                # raise stop flags and issue stop on motion ops
+                for op in ['generate_scan', 'go_to']:
+                    self.agent.stop(op)
+                    self.agent.abort(op)
+                state = 'shelter-wait-idle'
+                timeout = 30
+            elif state == 'shelter-wait-idle':
+                for op in ['generate_scan', 'go_to']:
+                    ok, msg, _session = self.agent.status(op)
+                    if _session.get('status', 'done') != 'done':
+                        break
+                else:
+                    state = 'shelter-move'
+                    last_move = time.time()
+                timeout -= 1
+                if timeout < 0:
+                    state = 'shelter-stop'
+            elif state == 'shelter-stop':
+                yield self._stop()
+                state = 'shelter-move'
+                last_move = time.time()
+            elif state == 'shelter-move':
+                paths = self.sun.find_escape_paths(az, el)
+                if len(paths) == 0:
+                    print('failed to find escape paths @%.1f, az=%.3f el=%.3f' %
+                          (time.time(), az, el))
+
+                legs = paths[0]['moves'].nodes[1:]
+                state = 'shelter-move-legs'
+                leg_d = None
+            elif state == 'shelter-move-legs':
+                def _leg_done(result):
+                    nonlocal state, last_move, leg_d
+                    all_ok, msg = result
+                    if not all_ok:
+                        print('leg failed:', leg_az, leg_el)
+                        # Recompute the escape path.
+                        if time.time() - last_move > 60:
+                            print('giving up for now')
+                            state = 'safe-i-guess'
+                        else:
+                            state = 'shelter-move'
+                    else:
+                        leg_d = None
+                        last_move = time.time()
+                if leg_d is None:
+                    if len(legs) == 0:
+                        state = 'safe-i-guess'
+                    else:
+                        leg_az, leg_el = legs.pop(0)
+                        leg_d = self._go_to_axes(session, az=leg_az, el=leg_el,
+                                                 clear_faults=True)
+                        leg_d.addCallback(_leg_done)
+
+            elif state == 'safe-i-guess':
+                pass
+
+            session.data['state'] = state
+            if state != last_state:
+                self.log.info('solar_avoidance: state is now "{state}"', state=state)
+                last_state = state
+            yield dsleep(1)
+
+        return True, "Exited."
 
     def _get_sun_policy(self, key):
         now = time.time()
