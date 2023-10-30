@@ -109,6 +109,9 @@ class ACUAgent:
             'active_avoidance': False,
             'radius': 0,
             'next_drill': None,
+            'shift_sun_hours': 0,
+            'do_recompute': False,
+            'disable_until': 0,
         }
         if solar_avoidance is not None and solar_avoidance > 0:
             self.solar_params.update({
@@ -1777,7 +1780,7 @@ class ACUAgent:
         def _get_sun_map():
             # To run in thread ...
             start = time.time()
-            new_sun = avoidance.SunTracker()
+            new_sun = avoidance.SunTracker(sun_time_shift=self.solar_params['shift_sun_hours'] * 3600.)
             new_sun.reset()
             return new_sun, time.time() - start
 
@@ -1808,9 +1811,17 @@ class ACUAgent:
                 yield dsleep(1)
                 continue
 
-            if not req_out and (self.sun is None
-                                or (self.sun._now() - self.sun.base_time > 12 * avoidance.HOUR)):
+            no_map = self.sun is None
+            old_map = (not no_map
+                       and self.sun._now() - self.sun.base_time > 12 * avoidance.HOUR)
+            do_recompute = (
+                not req_out
+                and (no_map or old_map or self.solar_params['recompute'])
+            )
+
+            if do_recompute:
                 req_out = True
+                self.solar_params['recompute'] = False
                 threads.deferToThread(_get_sun_map).addCallback(
                     _notify_recomputed)
 
@@ -1882,18 +1893,40 @@ class ACUAgent:
                 last_state = state
             yield dsleep(1)
 
-    @inlineCallbacks
+    @ocs_agent.param('trigger_panic', type=bool, default=False)
+    @ocs_agent.param('shift_sun_hours', type=float, default=None)
+    @ocs_agent.param('temporary_disable', type=float, default=None)
     def update_solar(self, session, params):
         """update_solar()
 
         **Task** - Update solar avoidance parameters.
         """
-        self.solar_params['next_drill'] = time.time() + 10
-        yield
-        return True, 'Did a thing.'
+        do_recompute = False
+        now = time.time()
+
+        if params['trigger_panic']:
+            self.log.warn('Triggering solar avoidance panic drill in 10 seconds.')
+            self.solar_params['next_drill'] = now + 10
+        if params['shift_sun_hours'] is not None:
+            self.solar_params['shift_sun_hours'] = params['shift_sun_hours']
+            do_recompute = True
+        if params['temporary_disable'] is not None:
+            self.solar_params['disable_until'] = params['temporary_disable'] + now
+
+        if do_recompute:
+            self.solar_params['recompute'] = True
+
+        return True, 'Params updated.'
 
     def _get_sun_policy(self, key):
-        return True
+        now = time.time()
+        p = self.solar_params
+
+        if key == 'sunsafe_moves':
+            return p['active_avoidance'] and (now >= p['disable_until'])
+
+        else:
+            return p[key]
 
     def _get_sunsafe_moves(self, target_az, target_el):
         if not self._get_sun_policy('sunsafe_moves'):

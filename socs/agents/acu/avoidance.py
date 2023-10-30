@@ -50,11 +50,12 @@ class SunTracker:
     """
 
     def __init__(self, exclusion_radius=20., map_res=.5,
-                 site=None, horizon=0.):
+                 sun_time_shift=0., site=None, horizon=0.):
         # Store in radians.
         self.exclusion_radius = exclusion_radius * DEG
         self.res = map_res * DEG
         self.horizon = horizon
+        self.sun_time_shift = sun_time_shift
 
         if site is None:
             # This is close enough.
@@ -71,6 +72,11 @@ class SunTracker:
         if self.fake_now:
             return self.fake_now
         return time.time()
+
+    def _sun(self, t):
+        self._site.date = \
+            datetime.datetime.utcfromtimestamp(t + self.sun_time_shift)
+        return ephem.Sun(self._site)
 
     def reset(self, base_time=None, staleness=None):
         """Compute and store the Sun Safety Map for a specific
@@ -113,9 +119,7 @@ class SunTracker:
         dec, ra = sun_times.posmap()
         map_q = quat.rotation_lonlat(ra.ravel(), dec.ravel())
 
-        self._site.date = \
-            datetime.datetime.utcfromtimestamp(base_time + 0)
-        v = ephem.Sun(self._site)
+        v = self._sun(base_time)
 
         # Get the map of angular distance to the Sun.
         qsun = quat.rotation_lonlat(v.ra, v.dec)
@@ -250,9 +254,7 @@ class SunTracker:
         """
         if t is None:
             t = self._now()
-        self._site.date = \
-            datetime.datetime.utcfromtimestamp(t)
-        v = ephem.Sun(self._site)
+        v = self._sun(t)
         qsun = quat.rotation_lonlat(v.ra, v.dec)
 
         qzen = coords.CelestialSightLine.naive_az_el(t, 0, np.pi / 2).Q
@@ -262,6 +264,9 @@ class SunTracker:
             'sun_radec': (v.ra / DEG, v.dec / DEG),
             'sun_azel': (-neg_zen_az / DEG, zen_el / DEG),
         }
+        if self.sun_time_shift != 0:
+            results['WARNING'] = 'Fake Sun Position is in use!'
+
         if az is not None:
             qtel = coords.CelestialSightLine.naive_az_el(
                 t, az * DEG, el * DEG).Q
