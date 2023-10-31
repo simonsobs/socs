@@ -40,6 +40,21 @@ DEFAULT_SCAN_PARAMS = {
 }
 
 
+#: Default Sun avoidance params by platform type (enabled, policy)
+SUN_POLICY = {
+    'ccat': (False, {}),
+    'satp': (True, {
+        'exclusion_radius': 20,
+        'el_horizon': 20,
+        'min_sun_time': 1800,
+        'response_time': 7200,
+    }),
+}
+
+#: How often to refresh to Sun Safety map (valid up to 2x this time)
+SUN_MAP_REFRESH = 6 * avoidance.HOUR
+
+
 class ACUAgent:
     """Agent to acquire data from an ACU and control telescope pointing with the
     ACU.
@@ -105,20 +120,7 @@ class ACUAgent:
         if len(self.ignore_axes):
             agent.log.warn('User requested ignore_axes={i}', i=self.ignore_axes)
 
-        self.solar_params = {
-            'active_avoidance': False,
-            'radius': 0,
-            'next_drill': None,
-            'shift_sun_hours': 0,
-            'do_recompute': False,
-            'disable_until': 0,
-        }
-        if solar_avoidance is not None and solar_avoidance > 0:
-            self.solar_params.update({
-                'active_avoidance': True,
-                'radius': solar_avoidance,
-            })
-        self.avoidance_lockdown = False
+        self.reset_sun_params()
 
         self.exercise_plan = exercise_plan
 
@@ -1187,8 +1189,8 @@ class ACUAgent:
             if not acquired:
                 return False, f"Operation failed: {self.azel_lock.job} is running."
 
-            if self.avoidance_lockdown:
-                return False, "Motion blocked; avoidance in progress."
+            if self._get_sun_policy('motion_blocked'):
+                return False, "Motion blocked; Sun avoidance in progress."
 
             self.log.info('Clearing faults to prepare for motion.')
             yield self.acu_control.clear_faults()
@@ -1528,8 +1530,8 @@ class ACUAgent:
           Process .stop method is called)..
 
         """
-        if self.avoidance_lockdown:
-            return False, "Motion blocked; avoidance in progress."
+        if self._get_sun_policy('motion_blocked'):
+            return False, "Motion blocked; Sun avoidance in progress."
 
         self.log.info('User scan params: {params}', params=params)
 
@@ -1784,6 +1786,69 @@ class ACUAgent:
     # Sun Safety and Solar Avoidance
     #
 
+    def reset_sun_params(self):
+        _p = {
+            # Global enable (but see "disable_until").
+            'active_avoidance': False,
+
+            # Can be set to a timestamp, in which case Sun Avoidance
+            # is disabled until that time has passed.
+            'disable_until': 0,
+
+            # Flag for indicating normal motions should be blocked
+            # (Sun Escape is active).
+            'block_motion': False,
+
+            # Flag for update_solar to indicate Sun map needs recomputed
+            'recompute_req': False,
+
+            # If set, should be a timestamp at which a seek_to_safe
+            # should be initiated.
+            'next_drill': None,
+
+            # Parameters for the Sun Safety Map computation.
+            'safety_map_kw': {
+                'sun_time_shift': 0,
+            },
+
+            # Avoidance policy, for use in avoidance decisions.
+            'policy': None,
+        }
+
+        # Populate default policy based on platform.
+        _enabled, _policy = SUN_POLICY[self.acu_config['platform']]
+        _p['active_avoidance'] = _enabled
+        _p['policy'] = dict(_policy)
+
+        # And add in platform limits
+        _p['policy'].update({
+            'min_az': self.motion_limits['azimuth']['lower'],
+            'max_az': self.motion_limits['azimuth']['upper'],
+            'min_el': self.motion_limits['elevation']['lower'],
+            'max_el': self.motion_limits['elevation']['upper'],
+        })
+
+        self.sun_params = _p
+
+    def _get_sun_policy(self, key):
+        now = time.time()
+        p = self.sun_params
+        active = (p['active_avoidance'] and (now >= p['disable_until']))
+
+        if key == 'motion_blocked':
+            return active and p['block_motion']
+        elif key == 'sunsafe_moves':
+            return active
+        elif key == 'shelter_enabled':
+            return active
+        elif key == 'map_valid':
+            return (self.sun is not None
+                    and self.sun.base_time is not None
+                    and self.sun.base_time <= now
+                    and self.sun.base_time >= now - 2 * SUN_MAP_REFRESH)
+        else:
+            return p[key]
+
     @inlineCallbacks
     def solar_avoidance(self, session, params):
         """solar_avoidance()
@@ -1799,8 +1864,8 @@ class ACUAgent:
         def _get_sun_map():
             # To run in thread ...
             start = time.time()
-            new_sun = avoidance.SunTracker(sun_time_shift=self.solar_params['shift_sun_hours'] * 3600.)
-            new_sun.reset()
+            new_sun = avoidance.SunTracker(policy=self.sun_params['policy'],
+                                           **self.sun_params['safety_map_kw'])
             return new_sun, time.time() - start
 
         def _notify_recomputed(result):
@@ -1831,15 +1896,15 @@ class ACUAgent:
 
             no_map = self.sun is None
             old_map = (not no_map
-                       and self.sun._now() - self.sun.base_time > 12 * avoidance.HOUR)
+                       and self.sun._now() - self.sun.base_time > SUN_MAP_REFRESH)
             do_recompute = (
                 not req_out
-                and (no_map or old_map or self.solar_params['recompute'])
+                and (no_map or old_map or self.sun_params['recompute_req'])
             )
 
             if do_recompute:
                 req_out = True
-                self.solar_params['recompute'] = False
+                self.sun_params['recompute_req'] = False
                 threads.deferToThread(_get_sun_map).addCallback(
                     _notify_recomputed)
 
@@ -1854,11 +1919,11 @@ class ACUAgent:
             safe = False
             if self.sun is not None:
                 safe_known = True
-                safe = t >= 3600
+                safe = t >= self.sun_params['policy']['min_sun_time']
 
             # Has a drill been requested?
-            drill_req = (self.solar_params['next_drill'] is not None
-                         and self.solar_params['next_drill'] <= time.time())
+            drill_req = (self.sun_params['next_drill'] is not None
+                         and self.sun_params['next_drill'] <= time.time())
 
             # Should we be doing a seek_sun_safety?
             panic_for_real = safe_known and not safe and self._get_sun_policy('shelter_enabled')
@@ -1869,22 +1934,23 @@ class ACUAgent:
             seek_running = (_session.get('status', 'done') != 'done')
 
             # Block motion as long as we are not sun-safe.
-            self.avoidance_lockdown = panic_for_real or seek_running
+            self.sun_params['block_motion'] = (panic_for_real or seek_running)
 
             session.data.update({
                 'danger_zone': panic_for_real,
-                'lockout': self.avoidance_lockdown,
+                'motion_blocked': self.sun_params['block_motion'],
                 'seek_is_running': seek_running,
             })
 
             if (panic_for_real or panic_for_fun) and (time.time() - last_panic > 60.):
                 self.log.warn('solar_avoidance is requesting seek_sun_safety.')
-                self.solar_params['next_drill'] = None
+                self.sun_params['next_drill'] = None
                 self.agent.start('seek_sun_safety')
                 last_panic = time.time()
 
             yield dsleep(1)
 
+    @ocs_agent.param('reset', type=bool, default=False)
     @ocs_agent.param('trigger_panic', type=bool, default=False)
     @ocs_agent.param('shift_sun_hours', type=float, default=None)
     @ocs_agent.param('temporary_disable', type=float, default=None)
@@ -1899,17 +1965,21 @@ class ACUAgent:
                       params={k: v for k, v in params.items()
                               if v is not None})
 
+        if params['reset']:
+            self.reset_sun_params()
+            do_recompute = True
         if params['trigger_panic']:
             self.log.warn('Triggering solar avoidance panic drill in 10 seconds.')
-            self.solar_params['next_drill'] = now + 10
+            self.sun_params['next_drill'] = now + 10
         if params['shift_sun_hours'] is not None:
-            self.solar_params['shift_sun_hours'] = params['shift_sun_hours']
+            self.sun_params['safety_map_kw']['sun_time_shift'] = \
+                params['shift_sun_hours'] * 3600
             do_recompute = True
         if params['temporary_disable'] is not None:
-            self.solar_params['disable_until'] = params['temporary_disable'] + now
+            self.sun_params['disable_until'] = params['temporary_disable'] + now
 
         if do_recompute:
-            self.solar_params['recompute'] = True
+            self.sun_params['recompute_req'] = True
 
         return True, 'Params updated.'
 
@@ -1956,12 +2026,13 @@ class ACUAgent:
                 state = 'shelter-move'
                 last_move = time.time()
             elif state == 'shelter-move':
-                paths = self.sun.find_escape_paths(az, el)
-                if len(paths) == 0:
-                    print('failed to find escape paths @%.1f, az=%.3f el=%.3f' %
+                escape_path = self.sun.find_escape_paths(az, el)
+                if escape_path is None:
+                    print('failed to find escape path @%.1f, az=%.3f el=%.3f' %
                           (time.time(), az, el))
-
-                legs = paths[0]['moves'].nodes[1:]
+                else:
+                    print('escaping to', escape_path['moves'].nodes[-1])
+                legs = escape_path['moves'].nodes[1:]
                 state = 'shelter-move-legs'
                 leg_d = None
             elif state == 'shelter-move-legs':
@@ -1979,6 +2050,8 @@ class ACUAgent:
                     else:
                         leg_d = None
                         last_move = time.time()
+                    if not self._get_sun_policy('shelter_enabled'):
+                        state = 'safe-i-guess'
                 if leg_d is None:
                     if len(legs) == 0:
                         state = 'safe-i-guess'
@@ -1999,18 +2072,6 @@ class ACUAgent:
 
         return True, "Exited."
 
-    def _get_sun_policy(self, key):
-        now = time.time()
-        p = self.solar_params
-
-        if key == 'sunsafe_moves':
-            return p['active_avoidance'] and (now >= p['disable_until'])
-        elif key == 'shelter_enabled':
-            return p['active_avoidance'] and (now >= p['disable_until'])
-
-        else:
-            return p[key]
-
     def _check_scan_sunsafe(self, az1, az2, el, v_az, a_az):
         # Include a bit of buffer for turn-arounds.
         az1, az2 = min(az1, az2), max(az1, az2)
@@ -2021,7 +2082,7 @@ class ACUAgent:
         azs = np.linspace(az1, az2, n)
 
         info = self.sun.check_trajectory(azs, azs * 0 + el)
-        safe = info['sun_time'] >= 3600
+        safe = info['sun_time'] >= self.sun_params['policy']['min_sun_time']
         if safe:
             msg = 'Scan is safe for %.1f hours' % (info['sun_time'] / 3600)
         else:
@@ -2036,9 +2097,8 @@ class ACUAgent:
         if not self._get_sun_policy('sunsafe_moves'):
             return [(target_az, target_el)], None
 
-        if self.sun is None or self.sun.base_time is None:
-            return None, 'Sun Safety Map not computed; run the solar_avoidance process.'
-        # check for staleness!
+        if not self._get_sun_policy('map_valid'):
+            return None, 'Sun Safety Map not computed or stale; run the solar_avoidance process.'
 
         # Check the target position and block it outright.
         if self.sun.check_trajectory([target_az], [target_el])['sun_time'] <= 0:
@@ -2054,7 +2114,7 @@ class ACUAgent:
             return None, 'Current position could not be determined.'
 
         moves = self.sun.analyze_paths(az, el, target_az, target_el)
-        move, decisions = avoidance.select_move(moves, {})
+        move, decisions = self.sun.select_move(moves)
         if move is None:
             return None, 'No Sun-Safe moves could be identified!'
 

@@ -40,7 +40,7 @@ DEFAULT_POLICY = {
     'min_az': -45,
     'max_az': 405,
     'el_horizon': 0,
-    'el_dodging': True,
+    'el_dodging': False,
     'min_sun_time': HOUR,
     'response_time': HOUR * 4,
 }
@@ -423,15 +423,17 @@ class SunTracker:
         # Preference is to not change altitude.  But we may need to
         # lower it.
         el1 = el0
-        paths = []
-        while len(paths) == 0 and el1 >= self.policy['min_el']:
+        path = None
+        while path is None and el1 >= self.policy['min_el']:
             paths = [self.analyze_paths(az0, el0, _az, el1, t=t, dodging=False)
                      for _az in az_cands]
             best_paths = [self.select_move(p, escape=True)[0] for p in paths]
-            paths = [bp for bp in best_paths if bp is not None]
+            best_paths = [p for p in best_paths if p is not None]
+            if len(best_paths):
+                path = self.select_move(best_paths, escape=True)[0]
             el1 -= 1.
 
-        return paths
+        return path
 
     def select_move(self, moves, escape=False):
         _p = self.policy
@@ -451,7 +453,9 @@ class SunTracker:
             els = m['req_start'][1], m['req_stop'][1]
 
             if escape and (m['sun_time_start'] < _p['min_sun_time']):
-                if m['sun_dist_min'] < m['sun_dist_start']:
+                # Test > res, rather than > 0... near the minimum this
+                # can be noisy.
+                if m['sun_dist_start'] - m['sun_dist_min'] > self.res / DEG:
                     reject(d, 'Path moves even closer to sun.')
                     continue
                 if m['sun_time_stop'] < _p['min_sun_time']:
@@ -484,6 +488,7 @@ class SunTracker:
 
         def priority_func(m):
             # Sorting key for move proposals.
+            azs = m['req_start'][0], m['req_stop'][0]
             els = m['req_start'][1], m['req_stop'][1]
             return (
                 m['sun_time'] if m['sun_time'] < _p['response_time'] else _p['response_time'],
@@ -491,6 +496,7 @@ class SunTracker:
                 m['sun_dist_min'],
                 m['sun_dist_mean'],
                 -(abs(m['travel_el'] - els[0]) + abs(m['travel_el'] - els[1])),
+                -abs(azs[1] - azs[0]),
                 m['travel_el'],
             )
         cands.sort(key=priority_func)
