@@ -33,6 +33,19 @@ DAY = 86400
 NO_TIME = DAY * 2
 
 
+DEFAULT_POLICY = {
+    'exclusion_radius': 20,
+    'min_el': 0,
+    'max_el': 90,
+    'min_az': -45,
+    'max_az': 405,
+    'el_horizon': 0,
+    'el_dodging': True,
+    'min_sun_time': HOUR,
+    'response_time': HOUR * 4,
+}
+
+
 class SunTracker:
     """Provide guidance on what horizion coordinate positions are
     sun-safe.
@@ -49,13 +62,23 @@ class SunTracker:
 
     """
 
-    def __init__(self, exclusion_radius=20., map_res=.5,
-                 sun_time_shift=0., site=None, horizon=0.):
-        # Store in radians.
-        self.exclusion_radius = exclusion_radius * DEG
+    def __init__(self, policy=None, site=None,
+                 map_res=.5, sun_time_shift=0., fake_now=None,
+                 compute=True, base_time=None):
+        # Note res is stored in radians.
         self.res = map_res * DEG
-        self.horizon = horizon
         self.sun_time_shift = sun_time_shift
+        self.fake_now = fake_now
+        self.base_time = base_time
+
+        # Process and store the instrument config and safety policy.
+        if policy is None:
+            policy = {}
+        for k in policy.keys():
+            assert k in DEFAULT_POLICY
+        _p = dict(DEFAULT_POLICY)
+        _p.update(policy)
+        self.policy = _p
 
         if site is None:
             # This is close enough.
@@ -65,8 +88,9 @@ class SunTracker:
         site_eph.lat = site.lat * DEG
         site_eph.elevation = site.elev
         self._site = site_eph
-        self.base_time = None
-        self.fake_now = None
+
+        if compute:
+            self.reset(base_time)
 
     def _now(self):
         if self.fake_now:
@@ -78,29 +102,18 @@ class SunTracker:
             datetime.datetime.utcfromtimestamp(t + self.sun_time_shift)
         return ephem.Sun(self._site)
 
-    def reset(self, base_time=None, staleness=None):
+    def reset(self, base_time=None):
         """Compute and store the Sun Safety Map for a specific
         timestamp.
 
         This basic computation is required prior to calling other
         functions that use the Sun Safety Map.
 
-        If staleness is provided, then the map is only updated if it
-        has not yet been computed, or if the requested base_time is
-        earlier than the base_time of the currently stored map, or if
-        the requested base_time is more than staleness seconds in the
-        future from the currently store map.
-
         """
         # Set a reference time -- the map of sun times is usable from
         # this reference time to at least 12 hours in the future.
         if base_time is None:
             base_time = self._now()
-
-        if self.base_time is not None and staleness is not None:
-            if ((base_time - self.base_time) > 0
-                    and (base_time - self.base_time) < staleness):
-                return False
 
         # Identify zenith (ra, dec) at base_time.
         Qz = coords.CelestialSightLine.naive_az_el(
@@ -132,8 +145,8 @@ class SunTracker:
         dt = -ra[0] * DAY / (2 * np.pi)
         qsun = quat.rotation_lonlat(v.ra, v.dec)
         qoff = ~qsun * map_q
-        r = quat.decompose_iso(qoff)[0].reshape(sun_times.shape)
-        sun_times[r < self.exclusion_radius] = 0.
+        r = quat.decompose_iso(qoff)[0].reshape(sun_times.shape) / DEG
+        sun_times[r <= self.policy['exclusion_radius']] = 0.
         for g in sun_times:
             if (g < 0).all():
                 continue
@@ -151,23 +164,6 @@ class SunTracker:
         self.sun_times = sun_times
         self.sun_dist = sun_dist
         self.map_q = map_q
-        return True
-
-    def _save(self, filename):
-        import pickle
-
-        # Pickle results of "reset"
-        pickle.dump((self.base_time, self.map_q, self.sun_dist.wcs,
-                     self.sun_dist, self.sun_times),
-                    open(filename, 'wb'))
-
-    def _load(self, filename):
-        import pickle
-        X = pickle.load(open(filename, 'rb'))
-        self.base_time = X[0]
-        self.sun_times = enmap.ndmap(X[4], wcs=X[2])
-        self.sun_dist = enmap.ndmap(X[3], wcs=X[2])
-        self.map_q = X[1]
 
     def _azel_pix(self, az, el, dt=0, round=True, segments=False):
         """Return the pixel indices of the Sun Safety Map that are
@@ -238,7 +234,7 @@ class SunTracker:
         sun_dists = self.sun_dist[j, i]
 
         # If sun is below horizon, rail sun_dist to 180 deg.
-        if self.get_sun_pos(t=t)['sun_azel'][1] < self.horizon:
+        if self.get_sun_pos(t=t)['sun_azel'][1] < self.policy['el_horizon']:
             sun_dists[:] = 180.
 
         if raw:
@@ -314,7 +310,7 @@ class SunTracker:
         return fig, axes, imgs
 
     def analyze_paths(self, az0, el0, az1, el1, t=None,
-                      plot_file=None, policy=None, dodging=True):
+                      plot_file=None, dodging=True):
         """Design and analyze a number of different paths between (az0, el0)
         and (az1, el1).  Return the list, for further processing and
         choice.
@@ -341,14 +337,15 @@ class SunTracker:
         }
 
         # Suitable list of test els.
+        el_lims = [self.policy[_k] for _k in ['min_el', 'max_el']]
         if el0 == el1:
             el_nodes = [el0]
         else:
             el_nodes = sorted([el0, el1])
-        if dodging and (10. < el_nodes[0]):
-            el_nodes.insert(0, 10.)
-        if dodging and (90. > el_nodes[-1]):
-            el_nodes.append(90.)
+        if dodging and (el_lims[0] < el_nodes[0]):
+            el_nodes.insert(0, el_lims[0])
+        if dodging and (el_lims[1] > el_nodes[-1]):
+            el_nodes.append(el_lims[1])
 
         el_sep = 1.
         el_cands = []
@@ -396,9 +393,7 @@ class SunTracker:
                                       (segments[-1], slice(-1, None), 'x')]:
                     ax.scatter(seg[1][rng], seg[0][rng], marker=mrk, color='blue')
             # Add the selected trajectory in green.
-            selected = None
-            if policy is not None:
-                selected = select_move(all_moves, policy)[0]
+            selected = self.select_move(all_moves)[0]
             if selected is not None:
                 traj = selected['moves'].get_traj()
                 segments = self._azel_pix(*traj, round=True, segments=True)
@@ -410,7 +405,7 @@ class SunTracker:
         return all_moves
 
     def find_escape_paths(self, az0, el0, t=None,
-                          plot_file=None, policy=None):
+                          plot_file=None):
         """Design and analyze a number of different paths that move from (az0,
         el0) to a sun safe position.  Return the list, for further
         processing and choice.
@@ -419,23 +414,87 @@ class SunTracker:
         if t is None:
             t = self._now()
 
+        az_cands = []
+        _az = math.ceil(self.policy['min_az'] / 180) * 180
+        while _az <= self.policy['max_az']:
+            az_cands.append(_az)
+            _az += 180.
+
         # Preference is to not change altitude.  But we may need to
         # lower it.
         el1 = el0
         paths = []
-        while len(paths) == 0 and el1 > 0:
-            paths1 = self.analyze_paths(az0, el0, 0., el1, t=t,
-                                        dodging=False)
-            paths2 = self.analyze_paths(az0, el0, 180., el1, t=t,
-                                        dodging=False)
-            best_path1, decisions1 = select_move(paths1, {},
-                                                 escape=True)
-            best_path2, decisions2 = select_move(paths2, {},
-                                                 escape=True)
-            paths = [bp for bp in [best_path1, best_path2] if bp is not None]
+        while len(paths) == 0 and el1 >= self.policy['min_el']:
+            paths = [self.analyze_paths(az0, el0, _az, el1, t=t, dodging=False)
+                     for _az in az_cands]
+            best_paths = [self.select_move(p, escape=True)[0] for p in paths]
+            paths = [bp for bp in best_paths if bp is not None]
             el1 -= 1.
 
         return paths
+
+    def select_move(self, moves, escape=False):
+        _p = self.policy
+
+        decisions = [{'rejected': False,
+                      'reason': None} for m in moves]
+
+        def reject(d, reason):
+            d['rejected'] = True
+            d['reason'] = reason
+
+        # According to policy, reject moves outright.
+        for m, d in zip(moves, decisions):
+            if d['rejected']:
+                continue
+
+            els = m['req_start'][1], m['req_stop'][1]
+
+            if escape and (m['sun_time_start'] < _p['min_sun_time']):
+                if m['sun_dist_min'] < m['sun_dist_start']:
+                    reject(d, 'Path moves even closer to sun.')
+                    continue
+                if m['sun_time_stop'] < _p['min_sun_time']:
+                    reject(d, 'Path does not end in sun-safe location.')
+                    continue
+            else:
+                if m['sun_time'] < _p['min_sun_time']:
+                    reject(d, 'Path too close to sun.')
+                    continue
+
+            if m['travel_el'] < _p['min_el']:
+                reject(d, 'Path goes below minimum el.')
+                continue
+
+            if m['travel_el'] > _p['max_el']:
+                reject(d, 'Path goes above maximum el.')
+                continue
+
+            if not _p['el_dodging']:
+                if m['travel_el'] < min(*els):
+                    reject(d, 'Path dodges (goes below necessary el range).')
+                    continue
+                if m['travel_el'] > max(*els):
+                    reject(d, 'Path dodges (goes above necessary el range).')
+
+        cands = [m for m, d in zip(moves, decisions)
+                 if not d['rejected']]
+        if len(cands) == 0:
+            return None, decisions
+
+        def priority_func(m):
+            # Sorting key for move proposals.
+            els = m['req_start'][1], m['req_stop'][1]
+            return (
+                m['sun_time'] if m['sun_time'] < _p['response_time'] else _p['response_time'],
+                m['direct'],
+                m['sun_dist_min'],
+                m['sun_dist_mean'],
+                -(abs(m['travel_el'] - els[0]) + abs(m['travel_el'] - els[1])),
+                m['travel_el'],
+            )
+        cands.sort(key=priority_func)
+        return cands[-1], decisions
 
 
 class MoveSequence:
@@ -481,79 +540,3 @@ class MoveSequence:
             xx.append(np.linspace(x0, x1, n))
             yy.append(np.linspace(y0, y1, n))
         return np.hstack(tuple(xx)), np.hstack(tuple(yy))
-
-
-DEFAULT_POLICY = {
-    'min_el': 0,
-    'max_el': 90,
-    'el_dodging': True,
-    'min_sun_time': HOUR,
-    'response_time': HOUR * 4,
-}
-
-
-def select_move(moves, policy, escape=False):
-    for k in policy.keys():
-        assert k in DEFAULT_POLICY
-    _p = dict(DEFAULT_POLICY)
-    _p.update(policy)
-
-    decisions = [{'rejected': False,
-                  'reason': None} for m in moves]
-
-    def reject(d, reason):
-        d['rejected'] = True
-        d['reason'] = reason
-
-    # According to policy, reject moves outright.
-    for m, d in zip(moves, decisions):
-        if d['rejected']:
-            continue
-
-        els = m['req_start'][1], m['req_stop'][1]
-
-        if escape and (m['sun_time_start'] < _p['min_sun_time']):
-            if m['sun_dist_min'] < m['sun_dist_start']:
-                reject(d, 'Path moves even closer to sun.')
-                continue
-            if m['sun_time_stop'] < _p['min_sun_time']:
-                reject(d, 'Path does not end in sun-safe location.')
-                continue
-        else:
-            if m['sun_time'] < _p['min_sun_time']:
-                reject(d, 'Path too close to sun.')
-                continue
-
-        if m['travel_el'] < _p['min_el']:
-            reject(d, 'Path goes below minimum el.')
-            continue
-
-        if m['travel_el'] > _p['max_el']:
-            reject(d, 'Path goes above maximum el.')
-            continue
-
-        if not _p['el_dodging']:
-            if m['travel_el'] < min(*els):
-                reject(d, 'Path dodges (goes below necessary el range).')
-                continue
-            if m['travel_el'] > max(*els):
-                reject(d, 'Path dodges (goes above necessary el range).')
-
-    cands = [m for m, d in zip(moves, decisions)
-             if not d['rejected']]
-    if len(cands) == 0:
-        return None, decisions
-
-    def priority_func(m):
-        # Sorting key for move proposals.
-        els = m['req_start'][1], m['req_stop'][1]
-        return (
-            m['sun_time'] if m['sun_time'] < _p['response_time'] else _p['response_time'],
-            m['direct'],
-            m['sun_dist_min'],
-            m['sun_dist_mean'],
-            -(abs(m['travel_el'] - els[0]) + abs(m['travel_el'] - els[1])),
-            m['travel_el'],
-        )
-    cands.sort(key=priority_func)
-    return cands[-1], decisions
