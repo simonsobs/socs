@@ -420,20 +420,25 @@ class SunTracker:
             az_cands.append(_az)
             _az += 180.
 
-        # Preference is to not change altitude.  But we may need to
-        # lower it.
-        el1 = el0
+        # Clip el0 into the allowed range.
+        el0 = np.clip(el0, self.policy['min_el'], self.policy['max_el'])
+
+        # Preference is to not change altitude; but allow for lowering.
+        n_els = math.ceil(el0 - self.policy['min_el']) + 1
+        els = np.linspace(el0, self.policy['min_el'], n_els)
+
         path = None
-        while path is None and el1 >= self.policy['min_el']:
+        for el1 in els:
             paths = [self.analyze_paths(az0, el0, _az, el1, t=t, dodging=False)
                      for _az in az_cands]
             best_paths = [self.select_move(p, escape=True)[0] for p in paths]
             best_paths = [p for p in best_paths if p is not None]
             if len(best_paths):
                 path = self.select_move(best_paths, escape=True)[0]
-            el1 -= 1.
+            if path is not None:
+                return path
 
-        return path
+        return None
 
     def select_move(self, moves, escape=False):
         _p = self.policy
@@ -546,3 +551,36 @@ class MoveSequence:
             xx.append(np.linspace(x0, x1, n))
             yy.append(np.linspace(y0, y1, n))
         return np.hstack(tuple(xx)), np.hstack(tuple(yy))
+
+
+class RollingMinimum:
+    def __init__(self, window, fallback=None):
+        self.window = window
+        self.subwindow = window / 10
+        self.fallback = fallback
+        self.records = []
+
+    def append(self, val, t=None):
+        if t is None:
+            t = time.time()
+        # Remove old data
+        while len(self.records) and (t - self.records[0][0]) > self.window:
+            self.records.pop(0)
+        # Add this to existing subwindow?
+        if len(self.records):
+            # Consider values up to subwindow ago.
+            _t, _val = self.records[-1]
+            if t - _t < self.subwindow:
+                if val <= _val:
+                    self.records[-1] = (t, val)
+                return
+        # Or start a new subwindow.
+        self.records.append((t, val))
+
+    def get(self, lookback=None):
+        if lookback is None:
+            lookback = self.window
+        recs = [v for t, v in self.records if (time.time() - t < lookback)]
+        if len(recs):
+            return min(recs)
+        return self.fallback

@@ -41,14 +41,20 @@ DEFAULT_SCAN_PARAMS = {
 
 
 #: Default Sun avoidance params by platform type (enabled, policy)
-SUN_POLICY = {
-    'ccat': (False, {}),
-    'satp': (True, {
-        'exclusion_radius': 20,
-        'el_horizon': 20,
-        'min_sun_time': 1800,
-        'response_time': 7200,
-    }),
+SUN_CONFIGS = {
+    'ccat': {
+        'enabled': False,
+        'policy': {},
+    },
+    'satp': {
+        'enabled': True,
+        'policy': {
+            'exclusion_radius': 20,
+            'el_horizon': 10,
+            'min_sun_time': 1800,
+            'response_time': 7200,
+        },
+    },
 }
 
 #: How often to refresh to Sun Safety map (valid up to 2x this time)
@@ -78,13 +84,24 @@ class ACUAgent:
             list should be drawn from "az", "el", and "third".
         disable_idle_reset (bool):
             If True, don't auto-start idle_reset process for LAT.
-        solar_avoidance (float):
+        min_el (float): If not None, override the default configured
+            elevation lower limit.
+        max_el (float): If not None, override the default configured
+            elevation upper limit.
+        solar_avoidance (bool): If set, override the default Sun
+            avoidance setting (i.e. force enable or disable the feature).
+        avoidance_radius (float): If set, override the default Sun
+            avoidance radius (i.e. the radius of the field of view, in
+            degrees, to use for Sun avoidance purposes).
 
     """
 
     def __init__(self, agent, acu_config='guess', exercise_plan=None,
                  startup=False, ignore_axes=None, disable_idle_reset=False,
-                 solar_avoidance=None):
+                 min_el=None, max_el=None,
+                 sun_avoidance=None, avoidance_radius=None):
+        self.log = agent.log
+
         # Separate locks for exclusive access to az/el, and boresight motions.
         self.azel_lock = TimeoutLock()
         self.boresight_lock = TimeoutLock()
@@ -103,6 +120,13 @@ class ACUAgent:
         self.monitor_fields = status_keys.status_fields[self.acu_config['platform']]['status_fields']
         self.motion_limits = self.acu_config['motion_limits']
 
+        if min_el:
+            self.log.warn(f'Override: min_el={min_el}')
+            self.motion_limits['elevation']['lower'] = min_el
+        if max_el:
+            self.log.warn(f'Override: max_el={max_el}')
+            self.motion_limits['elevation']['upper'] = max_el
+
         # This initializes self.scan_params; these become the default
         # scan params when calling generate_scan.  They can be changed
         # during run time; they can also be overridden when calling
@@ -120,11 +144,10 @@ class ACUAgent:
         if len(self.ignore_axes):
             agent.log.warn('User requested ignore_axes={i}', i=self.ignore_axes)
 
-        self.reset_sun_params()
+        self.reset_sun_params(enabled=sun_avoidance,
+                              radius=avoidance_radius)
 
         self.exercise_plan = exercise_plan
-
-        self.log = agent.log
 
         # self.data provides a place to reference data from the monitors.
         # 'status' is populated by the monitor operation
@@ -1786,7 +1809,15 @@ class ACUAgent:
     # Sun Safety and Solar Avoidance
     #
 
-    def reset_sun_params(self):
+    def reset_sun_params(self, enabled=None, radius=None):
+        config = SUN_CONFIGS[self.acu_config['platform']]
+
+        # These params update config for the entire run of agent.
+        if enabled is not None:
+            config['enabled'] = enabled
+        if radius is not None:
+            config['policy']['exclusion_radius'] = radius
+
         _p = {
             # Global enable (but see "disable_until").
             'active_avoidance': False,
@@ -1816,9 +1847,8 @@ class ACUAgent:
         }
 
         # Populate default policy based on platform.
-        _enabled, _policy = SUN_POLICY[self.acu_config['platform']]
-        _p['active_avoidance'] = _enabled
-        _p['policy'] = dict(_policy)
+        _p['active_avoidance'] = config['enabled']
+        _p['policy'] = config['policy']
 
         # And add in platform limits
         _p['policy'].update({
@@ -1950,10 +1980,12 @@ class ACUAgent:
 
             yield dsleep(1)
 
-    @ocs_agent.param('reset', type=bool, default=False)
-    @ocs_agent.param('trigger_panic', type=bool, default=False)
+    @ocs_agent.param('reset', type=bool, default=None)
+    @ocs_agent.param('enable', type=bool, default=None)
+    @ocs_agent.param('trigger_panic', type=bool, default=None)
     @ocs_agent.param('shift_sun_hours', type=float, default=None)
     @ocs_agent.param('temporary_disable', type=float, default=None)
+    @ocs_agent.param('avoidance_radius', type=float, default=None)
     def update_solar(self, session, params):
         """update_solar()
 
@@ -1968,6 +2000,12 @@ class ACUAgent:
         if params['reset']:
             self.reset_sun_params()
             do_recompute = True
+
+        if params['enable'] is not None:
+            self.sun_params['active_avoidance'] = params['enable']
+            self.sun_params['disable_until'] = 0
+        if params['temporary_disable'] is not None:
+            self.sun_params['disable_until'] = params['temporary_disable'] + now
         if params['trigger_panic']:
             self.log.warn('Triggering solar avoidance panic drill in 10 seconds.')
             self.sun_params['next_drill'] = now + 10
@@ -1975,8 +2013,10 @@ class ACUAgent:
             self.sun_params['safety_map_kw']['sun_time_shift'] = \
                 params['shift_sun_hours'] * 3600
             do_recompute = True
-        if params['temporary_disable'] is not None:
-            self.sun_params['disable_until'] = params['temporary_disable'] + now
+        if params['avoidance_radius'] is not None:
+            self.sun_params['policy']['exclusion_radius'] = \
+                params['avoidance_radius']
+            do_recompute = True
 
         if do_recompute:
             self.sun_params['recompute_req'] = True
@@ -2255,9 +2295,16 @@ def add_agent_args(parser_in=None):
                         nargs='+', help="One or more axes to ignore.")
     pgroup.add_argument("--disable-idle-reset", action='store_true',
                         help="Disable idle_reset, even for LAT.")
-    pgroup.add_argument("--solar-avoidance", type=float,
-                        help="If set (and > 0), enable active solar avoidance "
-                        "using this radius (in deg) for the exclusion zone.")
+    pgroup.add_argument("--min-el", type=float,
+                        help="Override the minimum el defined in platform config.")
+    pgroup.add_argument("--max-el", type=float,
+                        help="Override the maximum el defined in platform config.")
+    pgroup.add_argument("--sun-avoidance", type=int,
+                        help="Pass 0 or 1 to enable or disable sun-avoidance. "
+                        "Overrides the platform default config.")
+    pgroup.add_argument("--avoidance-radius", type=float,
+                        help="Override the default focal plane radius for "
+                        "Sun avoidance purposes.  Setting to zero disables.")
     return parser_in
 
 
@@ -2266,12 +2313,18 @@ def main(args=None):
     args = site_config.parse_args(agent_class='ACUAgent',
                                   parser=parser,
                                   args=args)
+    avoidance = (None if args.sun_avoidance is None
+                 else (args.sun_avoidance != 0))
+
     agent, runner = ocs_agent.init_site_agent(args)
     _ = ACUAgent(agent, args.acu_config, args.exercise_plan,
                  startup=not args.no_processes,
                  ignore_axes=args.ignore_axes,
                  disable_idle_reset=args.disable_idle_reset,
-                 solar_avoidance=args.solar_avoidance)
+                 sun_avoidance=avoidance,
+                 avoidance_radius=args.avoidance_radius,
+                 min_el=args.min_el,
+                 max_el=args.max_el)
 
     runner.run(agent, auto_reconnect=True)
 
