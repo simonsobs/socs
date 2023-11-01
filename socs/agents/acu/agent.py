@@ -88,9 +88,9 @@ class ACUAgent:
             elevation lower limit.
         max_el (float): If not None, override the default configured
             elevation upper limit.
-        solar_avoidance (bool): If set, override the default Sun
+        avoid_sun (bool): If set, override the default Sun
             avoidance setting (i.e. force enable or disable the feature).
-        avoidance_radius (float): If set, override the default Sun
+        fov_radius (float): If set, override the default Sun
             avoidance radius (i.e. the radius of the field of view, in
             degrees, to use for Sun avoidance purposes).
 
@@ -99,7 +99,7 @@ class ACUAgent:
     def __init__(self, agent, acu_config='guess', exercise_plan=None,
                  startup=False, ignore_axes=None, disable_idle_reset=False,
                  min_el=None, max_el=None,
-                 sun_avoidance=None, avoidance_radius=None):
+                 avoid_sun=None, fov_radius=None):
         self.log = agent.log
 
         # Separate locks for exclusive access to az/el, and boresight motions.
@@ -144,8 +144,8 @@ class ACUAgent:
         if len(self.ignore_axes):
             agent.log.warn('User requested ignore_axes={i}', i=self.ignore_axes)
 
-        self.reset_sun_params(enabled=sun_avoidance,
-                              radius=avoidance_radius)
+        self.reset_sun_params(enabled=avoid_sun,
+                              radius=fov_radius)
 
         self.exercise_plan = exercise_plan
 
@@ -191,8 +191,8 @@ class ACUAgent:
                                self._simple_process_stop,
                                blocking=False,
                                startup=startup)
-        agent.register_process('solar_avoidance',
-                               self.solar_avoidance,
+        agent.register_process('monitor_sun',
+                               self.monitor_sun,
                                self._simple_process_stop,
                                blocking=False,
                                startup=startup)
@@ -264,11 +264,11 @@ class ACUAgent:
         agent.register_task('clear_faults',
                             self.clear_faults,
                             blocking=False)
-        agent.register_task('update_solar',
-                            self.update_solar,
+        agent.register_task('update_sun',
+                            self.update_sun,
                             blocking=False)
-        agent.register_task('seek_sun_safety',
-                            self.seek_sun_safety,
+        agent.register_task('escape_sun_now',
+                            self.escape_sun_now,
                             blocking=False,
                             aborter=self._simple_task_abort)
 
@@ -1806,10 +1806,15 @@ class ACUAgent:
         return True, 'Scan ended cleanly'
 
     #
-    # Sun Safety and Solar Avoidance
+    # Sun Safety Monitoring and Active Avoidance
     #
 
     def reset_sun_params(self, enabled=None, radius=None):
+        """Resets self.sun_params based on defaults for this platform.  Note
+        if enabled or radius are specified here, they update the
+        defaults (so they endure for the life of the agent).
+
+        """
         config = SUN_CONFIGS[self.acu_config['platform']]
 
         # These params update config for the entire run of agent.
@@ -1830,11 +1835,11 @@ class ACUAgent:
             # (Sun Escape is active).
             'block_motion': False,
 
-            # Flag for update_solar to indicate Sun map needs recomputed
+            # Flag for update_sun to indicate Sun map needs recomputed
             'recompute_req': False,
 
-            # If set, should be a timestamp at which a seek_to_safe
-            # should be initiated.
+            # If set, should be a timestamp at which escape_sun_now
+            # will be initiated.
             'next_drill': None,
 
             # Parameters for the Sun Safety Map computation.
@@ -1869,7 +1874,7 @@ class ACUAgent:
             return active and p['block_motion']
         elif key == 'sunsafe_moves':
             return active
-        elif key == 'shelter_enabled':
+        elif key == 'escape_enabled':
             return active
         elif key == 'map_valid':
             return (self.sun is not None
@@ -1879,18 +1884,25 @@ class ACUAgent:
         else:
             return p[key]
 
+    @ocs_agent.param('_')
     @inlineCallbacks
-    def solar_avoidance(self, session, params):
-        """solar_avoidance()
+    def monitor_sun(self, session, params):
+        """monitor_sun()
 
-        **Process** - Avoid the Sun.
+        **Process** - Monitors and reports the position of the Sun;
+        maintains a Sun Safety Map for verifying that moves and scans
+        are Sun-safe; triggers a "Sun escape" if the boresight enters
+        an unsafe position.
+
+        The monitoring functions are always active (as long as this
+        process is running).  But the escape functionality must be
+        explicitly enabled (through the default platform
+        configuration, command line arguments, or the update_sun
+        task).
+
+        Session data contains lots of good stuff::
 
         """
-        # The main jobs of this process are:
-        # - track Sun and report its position
-        # - maintain a Sun Safety map for other ops to query.
-        # - guide the platform to Sun Safe position, if needed.
-
         def _get_sun_map():
             # To run in thread ...
             start = time.time()
@@ -1955,67 +1967,86 @@ class ACUAgent:
             drill_req = (self.sun_params['next_drill'] is not None
                          and self.sun_params['next_drill'] <= time.time())
 
-            # Should we be doing a seek_sun_safety?
-            panic_for_real = safe_known and not safe and self._get_sun_policy('shelter_enabled')
+            # Should we be doing a escape_sun_now?
+            panic_for_real = safe_known and not safe and self._get_sun_policy('escape_enabled')
             panic_for_fun = drill_req
 
-            # Is seek_sun_safe running?
-            ok, msg, _session = self.agent.status('seek_sun_safety')
-            seek_running = (_session.get('status', 'done') != 'done')
+            # Is escape_sun_now task running?
+            ok, msg, _session = self.agent.status('escape_sun_now')
+            escape_in_progress = (_session.get('status', 'done') != 'done')
 
             # Block motion as long as we are not sun-safe.
-            self.sun_params['block_motion'] = (panic_for_real or seek_running)
+            self.sun_params['block_motion'] = (panic_for_real or escape_in_progress)
 
             session.data.update({
                 'danger_zone': panic_for_real,
                 'motion_blocked': self.sun_params['block_motion'],
-                'seek_is_running': seek_running,
+                'escape_in_progress': escape_in_progress,
             })
 
             if (panic_for_real or panic_for_fun) and (time.time() - last_panic > 60.):
-                self.log.warn('solar_avoidance is requesting seek_sun_safety.')
+                self.log.warn('monitor_sun is requesting escape_sun_now.')
                 self.sun_params['next_drill'] = None
-                self.agent.start('seek_sun_safety')
+                self.agent.start('escape_sun_now')
                 last_panic = time.time()
 
             yield dsleep(1)
 
     @ocs_agent.param('reset', type=bool, default=None)
     @ocs_agent.param('enable', type=bool, default=None)
-    @ocs_agent.param('trigger_panic', type=bool, default=None)
-    @ocs_agent.param('shift_sun_hours', type=float, default=None)
     @ocs_agent.param('temporary_disable', type=float, default=None)
+    @ocs_agent.param('escape', type=bool, default=None)
     @ocs_agent.param('avoidance_radius', type=float, default=None)
-    def update_solar(self, session, params):
-        """update_solar()
+    @ocs_agent.param('shift_sun_hours', type=float, default=None)
+    def update_sun(self, session, params):
+        """update_sun()
 
-        **Task** - Update solar avoidance parameters.
+        **Task** - Update Sun monitoring and avoidance parameters.
+
+        Args:
+
+          reset (bool): If True, reset all sun_params to the platform
+            defaults.  (The "defaults" includes any overrides
+            specified on Agent command line.)
+          enable (bool): If True, enable active Sun avoidance.  If
+            avoidance was temporarily disable,d it is re-enabled.  If
+            False, disable active Sun avoidance (non-temporarily).
+          temporary_disable (float): If set, disable Sun avoidance for
+            this number of seconds.
+          escape (bool): If True, schedule an escape drill for 10
+            seconds from now.
+          avoidance_radius (float): If set, change the FOV radius
+            (degrees), for Sun avoidance purposes, to this number.
+          shift_sun_hours (float): If set, compute the Sun position as
+            though it were this many hours in the future.  This is for
+            debugging, testing, and work-arounds.  Pass zero to
+            cancel.
+
         """
         do_recompute = False
         now = time.time()
-        self.log.info('update_solar params: {params}',
+        self.log.info('update_sun params: {params}',
                       params={k: v for k, v in params.items()
                               if v is not None})
 
         if params['reset']:
             self.reset_sun_params()
             do_recompute = True
-
         if params['enable'] is not None:
             self.sun_params['active_avoidance'] = params['enable']
             self.sun_params['disable_until'] = 0
         if params['temporary_disable'] is not None:
             self.sun_params['disable_until'] = params['temporary_disable'] + now
-        if params['trigger_panic']:
-            self.log.warn('Triggering solar avoidance panic drill in 10 seconds.')
+        if params['escape']:
+            self.log.warn('Setting sun escape drill to start in 10 seconds.')
             self.sun_params['next_drill'] = now + 10
-        if params['shift_sun_hours'] is not None:
-            self.sun_params['safety_map_kw']['sun_time_shift'] = \
-                params['shift_sun_hours'] * 3600
-            do_recompute = True
         if params['avoidance_radius'] is not None:
             self.sun_params['policy']['exclusion_radius'] = \
                 params['avoidance_radius']
+            do_recompute = True
+        if params['shift_sun_hours'] is not None:
+            self.sun_params['safety_map_kw']['sun_time_shift'] = \
+                params['shift_sun_hours'] * 3600
             do_recompute = True
 
         if do_recompute:
@@ -2023,11 +2054,16 @@ class ACUAgent:
 
         return True, 'Params updated.'
 
+    @ocs_agent.param('_')
     @inlineCallbacks
-    def seek_sun_safety(self, session, params):
-        """seek_sun_safety()
+    def escape_sun_now(self, session, params):
+        """escape_sun_now()
 
-        **Task** - Move the platform to a Sun-Safe position.
+        **Task** - Take control of the platform, and move it to a
+        Sun-Safe position.  This will abort/stop any current go_to or
+        generate_scan, identify the safest possible path to North or
+        South (without changing elevation, if possible), and perform
+        the moves to get there.
 
         """
         state = 'init'
@@ -2037,76 +2073,78 @@ class ACUAgent:
                         'timestamp': time.time()}
         session.set_status('running')
 
-        while session.status in ['starting', 'running'] and state not in ['safe-i-guess']:
+        while session.status in ['starting', 'running'] and state not in ['escape-done']:
             az, el = [self.data['status']['summary'][f'{ax}_current_position']
                       for ax in ['Azimuth', 'Elevation']]
 
             if state == 'init':
-                state = 'shelter-abort'
-            elif state == 'shelter-abort':
+                state = 'escape-abort'
+            elif state == 'escape-abort':
                 # raise stop flags and issue stop on motion ops
                 for op in ['generate_scan', 'go_to']:
                     self.agent.stop(op)
                     self.agent.abort(op)
-                state = 'shelter-wait-idle'
+                state = 'escape-wait-idle'
                 timeout = 30
-            elif state == 'shelter-wait-idle':
+            elif state == 'escape-wait-idle':
                 for op in ['generate_scan', 'go_to']:
                     ok, msg, _session = self.agent.status(op)
                     if _session.get('status', 'done') != 'done':
                         break
                 else:
-                    state = 'shelter-move'
+                    state = 'escape-move'
                     last_move = time.time()
                 timeout -= 1
                 if timeout < 0:
-                    state = 'shelter-stop'
-            elif state == 'shelter-stop':
+                    state = 'escape-stop'
+            elif state == 'escape-stop':
                 yield self._stop()
-                state = 'shelter-move'
+                state = 'escape-move'
                 last_move = time.time()
-            elif state == 'shelter-move':
+            elif state == 'escape-move':
                 escape_path = self.sun.find_escape_paths(az, el)
                 if escape_path is None:
-                    print('failed to find escape path @%.1f, az=%.3f el=%.3f' %
-                          (time.time(), az, el))
+                    self.log.error('failed to find best escape path @(t, az, el) '
+                                   '= (%.1f, %.3f, %.3f) !' % (time.time(), az, el))
+                    self.log.info('Trying fallback, due South, low elevation.')
+                    legs = [(180., max(self.sun_params['policy']['min_el'], 0))]
                 else:
-                    print('escaping to', escape_path['moves'].nodes[-1])
-                legs = escape_path['moves'].nodes[1:]
-                state = 'shelter-move-legs'
+                    legs = escape_path['moves'].nodes[1:]
+                self.log.info('escaping to (az, el)={pos}', pos=legs[-1])
+                state = 'escape-move-legs'
                 leg_d = None
-            elif state == 'shelter-move-legs':
+            elif state == 'escape-move-legs':
                 def _leg_done(result):
                     nonlocal state, last_move, leg_d
                     all_ok, msg = result
                     if not all_ok:
-                        print('leg failed:', leg_az, leg_el)
+                        self.log.error('Leg failed.')
                         # Recompute the escape path.
                         if time.time() - last_move > 60:
-                            print('giving up for now')
-                            state = 'safe-i-guess'
+                            self.log.error('Too many failures -- giving up for now')
+                            state = 'escape-done'
                         else:
-                            state = 'shelter-move'
+                            state = 'escape-move'
                     else:
                         leg_d = None
                         last_move = time.time()
-                    if not self._get_sun_policy('shelter_enabled'):
-                        state = 'safe-i-guess'
+                    if not self._get_sun_policy('escape_enabled'):
+                        state = 'escape-done'
                 if leg_d is None:
                     if len(legs) == 0:
-                        state = 'safe-i-guess'
+                        state = 'escape-done'
                     else:
                         leg_az, leg_el = legs.pop(0)
                         leg_d = self._go_to_axes(session, az=leg_az, el=leg_el,
                                                  clear_faults=True)
                         leg_d.addCallback(_leg_done)
-
-            elif state == 'safe-i-guess':
+            elif state == 'escape-done':
+                # This block won't run -- loop will exit.
                 pass
 
             session.data['state'] = state
             if state != last_state:
-                self.log.info('solar_avoidance: state is now "{state}"', state=state)
+                self.log.info('escape_sun_now: state is now "{state}"', state=state)
                 last_state = state
             yield dsleep(1)
 
@@ -2134,11 +2172,25 @@ class ACUAgent:
             return True, 'Sun-safety not active; %s' % msg
 
     def _get_sunsafe_moves(self, target_az, target_el):
+        """Given a target position, find a Sun-safe way to get there.  This
+        will either be a direct move, or else an ordered slew in az
+        before el (or vice versa).
+
+        Returns (legs, msg).  If legs is None, it indicates that no
+        Sun-safe path could be found; msg is an error message.  If a
+        path can be found, the legs is a list of intermediate move
+        targets, ``[(az0, el0), (az1, el1) ...]``, terminating on
+        ``(target_az, target_el)``.  msg is None in that case.
+
+        When Sun avoidance is not enabled, this function returns as
+        though the direct path to the target is a safe one.
+
+        """
         if not self._get_sun_policy('sunsafe_moves'):
             return [(target_az, target_el)], None
 
         if not self._get_sun_policy('map_valid'):
-            return None, 'Sun Safety Map not computed or stale; run the solar_avoidance process.'
+            return None, 'Sun Safety Map not computed or stale; run the monitor_sun process.'
 
         # Check the target position and block it outright.
         if self.sun.check_trajectory([target_az], [target_el])['sun_time'] <= 0:
@@ -2299,12 +2351,12 @@ def add_agent_args(parser_in=None):
                         help="Override the minimum el defined in platform config.")
     pgroup.add_argument("--max-el", type=float,
                         help="Override the maximum el defined in platform config.")
-    pgroup.add_argument("--sun-avoidance", type=int,
-                        help="Pass 0 or 1 to enable or disable sun-avoidance. "
+    pgroup.add_argument("--avoid-sun", type=int,
+                        help="Pass 0 or 1 to enable or disable Sun avoidance. "
                         "Overrides the platform default config.")
-    pgroup.add_argument("--avoidance-radius", type=float,
-                        help="Override the default focal plane radius for "
-                        "Sun avoidance purposes.  Setting to zero disables.")
+    pgroup.add_argument("--fov-radius", type=float,
+                        help="Override the default field of view (radius in "
+                        "degrees, for Sun avoidance purposes.")
     return parser_in
 
 
@@ -2313,16 +2365,14 @@ def main(args=None):
     args = site_config.parse_args(agent_class='ACUAgent',
                                   parser=parser,
                                   args=args)
-    avoidance = (None if args.sun_avoidance is None
-                 else (args.sun_avoidance != 0))
 
     agent, runner = ocs_agent.init_site_agent(args)
     _ = ACUAgent(agent, args.acu_config, args.exercise_plan,
                  startup=not args.no_processes,
                  ignore_axes=args.ignore_axes,
                  disable_idle_reset=args.disable_idle_reset,
-                 sun_avoidance=avoidance,
-                 avoidance_radius=args.avoidance_radius,
+                 avoid_sun=args.avoid_sun,
+                 fov_radius=args.fov_radius,
                  min_el=args.min_el,
                  max_el=args.max_el)
 

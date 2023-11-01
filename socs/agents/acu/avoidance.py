@@ -265,7 +265,7 @@ class SunTracker:
 
         results = {
             'sun_radec': (v.ra / DEG, v.dec / DEG),
-            'sun_azel': (-neg_zen_az / DEG, zen_el / DEG),
+            'sun_azel': ((-neg_zen_az / DEG) % 360., zen_el / DEG),
         }
         if self.sun_time_shift != 0:
             results['WARNING'] = 'Fake Sun Position is in use!'
