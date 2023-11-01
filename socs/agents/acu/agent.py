@@ -1819,7 +1819,7 @@ class ACUAgent:
 
         # These params update config for the entire run of agent.
         if enabled is not None:
-            config['enabled'] = enabled
+            config['enabled'] = bool(enabled)
         if radius is not None:
             config['policy']['exclusion_radius'] = radius
 
@@ -1900,7 +1900,67 @@ class ACUAgent:
         configuration, command line arguments, or the update_sun
         task).
 
-        Session data contains lots of good stuff::
+        Session data looks like this::
+
+          {
+            "timestamp": 1698848292.5579932,
+            "active_avoidance": false,
+            "disable_until": 0,
+            "block_motion": false,
+            "recompute_req": false,
+            "next_drill": null,
+            "safety_map_kw": {
+              "sun_time_shift": 0
+            },
+            "policy": {
+              "exclusion_radius": 20,
+              "el_horizon": 10,
+              "min_sun_time": 1800,
+              "response_time": 7200,
+              "min_az": -90,
+              "max_az": 450,
+              "min_el": 18.5,
+              "max_el": 90
+            },
+            "sun_pos": {
+              "map_exists": true,
+              "map_is_old": false,
+              "map_ref_time": 1698848179.1123455,
+              "platform_azel": [
+                90.0158,
+                20.0022
+              ],
+              "sun_radec": [
+                216.50815789438036,
+                -14.461844389380719
+              ],
+              "sun_azel": [
+                78.24269024936028,
+                60.919554369324096
+              ],
+              "sun_dist": 41.75087242151837,
+              "sun_safe_time": 71760
+            },
+            "avoidance": {
+              "safety_unknown": false,
+              "warning_zone": false,
+              "danger_zone": false,
+              "escape_triggered": false,
+              "escape_active": false,
+              "last_escape_time": 0,
+              "sun_is_real": true
+            }
+          }
+
+        In debugging, the Sun position might be falsified.  In that
+        case the "sun_pos" subtree will contain an entry like this::
+
+          "WARNING": "Fake Sun Position is in use!",
+
+        and "avoidance": "sun_is_real" will be set to false.  (No
+        other functionality is changed when using a falsified Sun
+        position; flags are computed and actions decided based on the
+        false position.)
 
         """
         def _get_sun_map():
@@ -1926,15 +1986,18 @@ class ACUAgent:
         session.set_status('running')
 
         while session.status in ['starting', 'running']:
+            new_data = {
+                'timestamp': time.time(),
+            }
+            new_data.update(self.sun_params)
+
             try:
                 az, el = [self.data['status']['summary'][f'{ax}_current_position']
                           for ax in ['Azimuth', 'Elevation']]
                 if az is None or el is None:
                     raise KeyError
             except KeyError:
-                session.data = {}
-                yield dsleep(1)
-                continue
+                az, el = None, None
 
             no_map = self.sun is None
             old_map = (not no_map
@@ -1950,25 +2013,37 @@ class ACUAgent:
                 threads.deferToThread(_get_sun_map).addCallback(
                     _notify_recomputed)
 
+            new_data.update({
+                'sun_pos': {
+                    'map_exists': not no_map,
+                    'map_is_old': old_map,
+                    'map_ref_time': None if no_map else self.sun.base_time,
+                    'platform_azel': (az, el),
+                },
+            })
+
+            sun_is_real = True  # flags time shift during debugging.
             if self.sun is not None:
                 info = self.sun.get_sun_pos(az, el)
-                session.data.update(info)
-                t = self.sun.check_trajectory([az], [el])['sun_time']
-                session.data['sun_safe_time'] = t if t > 0 else 0
+                sun_is_real = ('WARNING' not in info)
+                new_data['sun_pos'].update(info)
+                if az is not None:
+                    t = self.sun.check_trajectory([az], [el])['sun_time']
+                    new_data['sun_pos']['sun_safe_time'] = t if t > 0 else 0
 
             # Are we currently in safe position?
-            safe_known = False
-            safe = False
+            safety_known, danger_zone, warning_zone = False, False, False
             if self.sun is not None:
-                safe_known = True
-                safe = t >= self.sun_params['policy']['min_sun_time']
+                safety_known = True
+                danger_zone = (t < self.sun_params['policy']['min_sun_time'])
+                warning_zone = (t < self.sun_params['policy']['response_time'])
 
             # Has a drill been requested?
             drill_req = (self.sun_params['next_drill'] is not None
                          and self.sun_params['next_drill'] <= time.time())
 
             # Should we be doing a escape_sun_now?
-            panic_for_real = safe_known and not safe and self._get_sun_policy('escape_enabled')
+            panic_for_real = safety_known and danger_zone and self._get_sun_policy('escape_enabled')
             panic_for_fun = drill_req
 
             # Is escape_sun_now task running?
@@ -1978,17 +2053,24 @@ class ACUAgent:
             # Block motion as long as we are not sun-safe.
             self.sun_params['block_motion'] = (panic_for_real or escape_in_progress)
 
-            session.data.update({
-                'danger_zone': panic_for_real,
-                'motion_blocked': self.sun_params['block_motion'],
-                'escape_in_progress': escape_in_progress,
-            })
+            new_data['avoidance'] = {
+                'safety_unknown': not safety_known,
+                'warning_zone': warning_zone,
+                'danger_zone': danger_zone,
+                'escape_triggered': panic_for_real,
+                'escape_active': escape_in_progress,
+                'last_escape_time': last_panic,
+                'sun_is_real': sun_is_real,
+            }
 
             if (panic_for_real or panic_for_fun) and (time.time() - last_panic > 60.):
                 self.log.warn('monitor_sun is requesting escape_sun_now.')
                 self.sun_params['next_drill'] = None
                 self.agent.start('escape_sun_now')
                 last_panic = time.time()
+
+            # Update session.
+            session.data.update(new_data)
 
             yield dsleep(1)
 
@@ -2102,15 +2184,17 @@ class ACUAgent:
                 state = 'escape-move'
                 last_move = time.time()
             elif state == 'escape-move':
+                self.log.info('Getting escape path for (t, az, el) = '
+                              '(%.1f, %.3f, %.3f)' % (time.time(), az, el))
                 escape_path = self.sun.find_escape_paths(az, el)
                 if escape_path is None:
-                    self.log.error('failed to find best escape path @(t, az, el) '
-                                   '= (%.1f, %.3f, %.3f) !' % (time.time(), az, el))
-                    self.log.info('Trying fallback, due South, low elevation.')
+                    self.log.error('Failed to find acceptable path; using '
+                                   'failsafe (South, low el).')
                     legs = [(180., max(self.sun_params['policy']['min_el'], 0))]
                 else:
                     legs = escape_path['moves'].nodes[1:]
-                self.log.info('escaping to (az, el)={pos}', pos=legs[-1])
+                self.log.info('Escaping to (az, el)={pos} ({n} moves)',
+                              pos=legs[-1], n=len(legs))
                 state = 'escape-move-legs'
                 leg_d = None
             elif state == 'escape-move-legs':
