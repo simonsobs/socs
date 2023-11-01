@@ -144,8 +144,8 @@ class ACUAgent:
         if len(self.ignore_axes):
             agent.log.warn('User requested ignore_axes={i}', i=self.ignore_axes)
 
-        self.reset_sun_params(enabled=avoid_sun,
-                              radius=fov_radius)
+        self._reset_sun_params(enabled=avoid_sun,
+                               radius=fov_radius)
 
         self.exercise_plan = exercise_plan
 
@@ -1815,7 +1815,7 @@ class ACUAgent:
     # Sun Safety Monitoring and Active Avoidance
     #
 
-    def reset_sun_params(self, enabled=None, radius=None):
+    def _reset_sun_params(self, enabled=None, radius=None):
         """Resets self.sun_params based on defaults for this platform.  Note
         if enabled or radius are specified here, they update the
         defaults (so they endure for the life of the agent).
@@ -2087,7 +2087,8 @@ class ACUAgent:
     @ocs_agent.param('avoidance_radius', type=float, default=None)
     @ocs_agent.param('shift_sun_hours', type=float, default=None)
     def update_sun(self, session, params):
-        """update_sun()
+        """update_sun(reset, enable, temporary_disable, escape,
+                      avoidance_radius, shift_sun_hours)
 
         **Task** - Update Sun monitoring and avoidance parameters.
 
@@ -2097,7 +2098,7 @@ class ACUAgent:
             defaults.  (The "defaults" includes any overrides
             specified on Agent command line.)
           enable (bool): If True, enable active Sun avoidance.  If
-            avoidance was temporarily disable,d it is re-enabled.  If
+            avoidance was temporarily disabled it is re-enabled.  If
             False, disable active Sun avoidance (non-temporarily).
           temporary_disable (float): If set, disable Sun avoidance for
             this number of seconds.
@@ -2118,7 +2119,7 @@ class ACUAgent:
                               if v is not None})
 
         if params['reset']:
-            self.reset_sun_params()
+            self._reset_sun_params()
             do_recompute = True
         if params['enable'] is not None:
             self.sun_params['active_avoidance'] = params['enable']
@@ -2442,11 +2443,11 @@ def add_agent_args(parser_in=None):
     pgroup.add_argument("--max-el", type=float,
                         help="Override the maximum el defined in platform config.")
     pgroup.add_argument("--avoid-sun", type=int,
-                        help="Pass 0 or 1 to enable or disable Sun avoidance. "
+                        help="Pass 0 or 1 to disable or enable Sun avoidance. "
                         "Overrides the platform default config.")
     pgroup.add_argument("--fov-radius", type=float,
-                        help="Override the default field of view (radius in "
-                        "degrees, for Sun avoidance purposes.")
+                        help="Override the default field-of-view (radius in "
+                        "degrees) for Sun avoidance purposes.")
     return parser_in
 
 

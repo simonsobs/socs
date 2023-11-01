@@ -1,17 +1,72 @@
-"""Sun Avoidance
+# Sun Avoidance
+#
+# The docstring below is intended for injection into the documentation
+# system.
 
-This module provides code to support Sun Avoidance in the ACU Agent.
-The basic idea is to create a map in equatorial coordinates where the
-value of the map indicates when that region of the sky will next be
-within the Sun Exclusion Zone (likely defined as some radius around
-the Sun).
+"""When considering Sun Safety of a boresight pointing, we consider an
+exclusion zone around the Sun with a user-specified radius. This is
+called the ``exclusion_radius`` or the field-of-view radius.
 
-Using that pre-computed map, any az-el pointings can be checked for
-Sun safety (i.e. whether they are safe positoins), at least for the
-following 24 hours.  The map can be used to identify safest routes
-between two az-el pointings.
+The Safety of the instrument at any given moment is parametrized
+by two numbers:
+
+  ``sun_dist``
+    The separation between the Sun and the boresight (az, el), in
+    degrees.
+
+  ``sun_time``
+    The minimum time, in seconds, which must elapse before the current
+    (az, el) pointing of the boresight will lie within the exclusion
+    radius of the Sun.
+
+While the ``sun_dist`` is an important indicator of whether the
+instrument is currently in immediate danger, the ``sun_time`` is
+helpful with looking forward and avoiding positions that will soon be
+dangerous.
+
+The user-defined policy for Sun Safety is captured in the following
+settings:
+
+  ``exclusion_radius``
+    The radius, in degres, of a disk centered on the Sun that must be
+    avoided by the boresight.
+
+  ``min_sun_time``
+    An (az, el) position is considered unsafe (danger zone) if the
+    ``sun_time`` is less than the ``min_sun_time``. (Expressed in
+    seconds.)
+
+  ``response_time``
+    An (az, el) position is considered vulnerable (warning zone) if
+    the ``sun_time`` is less than the ``response_time``. This is
+    intended to represent the maximum amount of time it could take an
+    operator to reach the instrument and secure it, were motion to
+    stall unexpectedly. (Expressed in seconds.)
+
+  ``el_horizon``
+    The elevation (in degrees) below which the Sun may be considered
+    as invisible to the instrument.
+
+  ``el_dodging``
+    This setting affects how point-to-point motions are executed, with
+    respect to what elevations may be used in intermediate legs of the
+    trajectory. When this is False, the platform is restricted to
+    travel only at elevations that lie between the initial and the
+    target elevation. When True, the platform is permitted to travel
+    at other elevations, all the way up to the limits of the
+    platform. Using True is helpful to find Sun-safe trajectories in
+    some circumstances. But False is helpful if excess elevation
+    changes are potentially disturbing to the cryogenics.  This
+    setting only affects point-to-point motions; "escape" paths will
+    always consider all available elevations.
+
+
+A "Sun-safe" position is a pointing of the boresight that currently
+has a ``sun_time`` that meets or exceeds the ``min_sun_time``
+parameter.
 
 """
+
 import datetime
 import math
 import time
@@ -47,26 +102,37 @@ DEFAULT_POLICY = {
 
 
 class SunTracker:
-    """Provide guidance on what horizion coordinate positions are
-    sun-safe.
-
-    Key concepts:
-    - Sun Safety Map
-    - Az-el trajectory
+    """Provide guidance on what horizion coordinate positions and
+    trajectories are sun-safe.
 
     Args:
-      exclusion_radius (float, deg): radius of circle around the Sun
-        to consider as "unsafe".
+      policy (dict): Exclusion policy parameters.  See module
+        docstring, and DEFAULT_POLICY.  The policy should also include
+        {min,max}\\_{el,az}, giving the limits supported by those axes.
+      site (EarthlySite or None): Site to use; default is the SO LAT.
+        If not None, pass an so3g.proj.EarthlySite or compatible.
       map_res (float, deg): resolution to use for the Sun Safety Map.
-      site (str or None): Site to use (so3g site, defaults to so_lat).
+      sun_time_shift (float, seconds): For debugging and testing,
+        compute the Sun's position as though it were this manys
+        seconds in the future.  If None or zero, this feature is
+        disabled.
+      fake_now (float, seconds): For debugging and testing, replace
+        the tracker's computation of the current time (time.time())
+        with this value.  If None, this testing feature is disabled.
+      compute (bool): If True, immediately compute the Sun Safety Map
+        by calling .reset().
+      base_time (unix timestamp): Store this base_time and, if compute
+        is True, pass it to .reset().
 
     """
 
     def __init__(self, policy=None, site=None,
-                 map_res=.5, sun_time_shift=0., fake_now=None,
+                 map_res=.5, sun_time_shift=None, fake_now=None,
                  compute=True, base_time=None):
         # Note res is stored in radians.
         self.res = map_res * DEG
+        if sun_time_shift is None:
+            sun_time_shift = 0.
         self.sun_time_shift = sun_time_shift
         self.fake_now = fake_now
         self.base_time = base_time
@@ -449,6 +515,28 @@ class SunTracker:
         return None
 
     def select_move(self, moves, raw=False):
+        """Given a list of possible "moves", select the best one.
+        The "moves" should be like the ones returned by
+        ``analyze_paths``.
+
+        The best move is determined by first screening out dangerous
+        paths (ones that pass close to Sun, move closer to Sun
+        unnecessarily, violate axis limits, etc.) and then identifying
+        paths that minimize danger (distance to Sun; Sun time) and
+        path length.
+
+        If raw=True, a debugging output is returned; see code.
+
+        Returns:
+          best_move (dict): The element of moves that is safest.  If
+            no safe move was found, None is returned.
+          decisions (list): The items in this list are dicts that
+            correspond one-to-one with the entries in moves.  Each
+            decision dict has entries 'rejected' (True or False) and
+            'reason' (string description of why the move was rejected
+            outright).
+
+        """
         _p = self.policy
 
         decisions = [{'rejected': False,
@@ -539,6 +627,19 @@ class SunTracker:
 
 class MoveSequence:
     def __init__(self, *args, simplify=False):
+        """Container for a series of (az, el) positions.  Pass the
+        positions to the constructor as (az, el) tuples::
+
+          MoveSequence((60, 180), (60, 90), (50, 90))
+
+        or equivalently as individual arguments::
+
+          MoveSequence(60, 180, 60, 90, 50, 90)
+
+        If simplify=True is passed, then any immediate position
+        repetitions are deleted.
+
+        """
         self.nodes = []
         if len(args) == 0:
             return
