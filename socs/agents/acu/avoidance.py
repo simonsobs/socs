@@ -214,7 +214,7 @@ class SunTracker:
         minimum value of the Sun Distance map.
 
         This requires the Sun Safety Map to have been computed with a
-        base_time of t - 24 hours or later.
+        base_time in the 24 hours before t.
 
         Returns a dict with entries:
 
@@ -376,12 +376,17 @@ class SunTracker:
                         a, = ax.plot(i, j, color=c, lw=1)
                 last_el = iel
 
-        # Include the "direct" path.
+        # Include the direct path, but put in "worst case" details
+        # based on all "confined" paths computed above.
         direct = dict(base)
         direct['moves'] = MoveSequence(az0, el0, az1, el1)
         traj_info = self.check_trajectory(*direct['moves'].get_traj(), t=t)
         direct.update(traj_info)
-        all_moves.append(direct)
+        conf = [m for m in all_moves if m['travel_el_confined']]
+        if len(conf):
+            for k in ['sun_time', 'sun_dist_min', 'sun_dist_mean']:
+                direct[k] = min([m[k] for m in conf])
+            all_moves.append(direct)
 
         if plot_file:
             # Add the direct traj, in blue.
@@ -431,19 +436,19 @@ class SunTracker:
         for el1 in els:
             paths = [self.analyze_paths(az0, el0, _az, el1, t=t, dodging=False)
                      for _az in az_cands]
-            best_paths = [self.select_move(p, escape=True)[0] for p in paths]
+            best_paths = [self.select_move(p)[0] for p in paths]
             best_paths = [p for p in best_paths if p is not None]
             if len(best_paths):
-                path = self.select_move(best_paths, escape=True)[0]
+                path = self.select_move(best_paths)[0]
                 if debug:
-                    cands, _ = self.select_move(best_paths, escape=True, raw=True)
+                    cands, _ = self.select_move(best_paths, raw=True)
                     return cands
             if path is not None:
                 return path
 
         return None
 
-    def select_move(self, moves, escape=False, raw=False):
+    def select_move(self, moves, raw=False):
         _p = self.policy
 
         decisions = [{'rejected': False,
@@ -460,7 +465,10 @@ class SunTracker:
 
             els = m['req_start'][1], m['req_stop'][1]
 
-            if escape and (m['sun_time_start'] < _p['min_sun_time']):
+            if (m['sun_time_start'] < _p['min_sun_time']):
+                # If the path is starting in danger zone, then only
+                # enforce that the move takes the platform to a better place.
+
                 # Test > res, rather than > 0... near the minimum this
                 # can be noisy.
                 if m['sun_dist_start'] - m['sun_dist_min'] > self.res / DEG:
@@ -469,10 +477,10 @@ class SunTracker:
                 if m['sun_time_stop'] < _p['min_sun_time']:
                     reject(d, 'Path does not end in sun-safe location.')
                     continue
-            else:
-                if m['sun_time'] < _p['min_sun_time']:
-                    reject(d, 'Path too close to sun.')
-                    continue
+
+            elif m['sun_time'] < _p['min_sun_time']:
+                reject(d, 'Path too close to sun.')
+                continue
 
             if m['travel_el'] < _p['min_el']:
                 reject(d, 'Path goes below minimum el.')
