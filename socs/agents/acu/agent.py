@@ -1639,10 +1639,14 @@ class ACUAgent:
 
         # Seek to starting position
         self.log.info(f'Moving to start position, az={plan["init_az"]}, el={init_el}')
-        ok, msg = yield self._go_to_axes(session, az=plan['init_az'], el=init_el)
-
-        if not ok:
-            return False, f'Start position seek failed with message: {msg}'
+        legs, msg = yield self._get_sunsafe_moves(plan['init_az'], init_el)
+        if msg is not None:
+            self.log.error(msg)
+            return False, msg
+        for leg_az, leg_el in legs:
+            ok, msg = yield self._go_to_axes(session, az=leg_az, el=leg_el)
+            if not ok:
+                return False, f'Start position seek failed with message: {msg}'
 
         # Prepare the point generator.
         g = sh.generate_constant_velocity_scan(az_endpoint1=az_endpoint1,
