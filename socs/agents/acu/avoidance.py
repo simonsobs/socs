@@ -405,7 +405,7 @@ class SunTracker:
         return all_moves
 
     def find_escape_paths(self, az0, el0, t=None,
-                          plot_file=None):
+                          debug=False):
         """Design and analyze a number of different paths that move from (az0,
         el0) to a sun safe position.  Return the list, for further
         processing and choice.
@@ -435,12 +435,15 @@ class SunTracker:
             best_paths = [p for p in best_paths if p is not None]
             if len(best_paths):
                 path = self.select_move(best_paths, escape=True)[0]
+                if debug:
+                    cands, _ = self.select_move(best_paths, escape=True, raw=True)
+                    return cands
             if path is not None:
                 return path
 
         return None
 
-    def select_move(self, moves, escape=False):
+    def select_move(self, moves, escape=False, raw=False):
         _p = self.policy
 
         decisions = [{'rejected': False,
@@ -491,20 +494,38 @@ class SunTracker:
         if len(cands) == 0:
             return None, decisions
 
-        def priority_func(m):
-            # Sorting key for move proposals.
+        def metric_func(m):
+            # Sorting key for move proposals.  More preferable paths
+            # should have higher sort order.
             azs = m['req_start'][0], m['req_stop'][0]
             els = m['req_start'][1], m['req_stop'][1]
             return (
+                # Low sun_time is bad, though anything longer
+                # than response_time is equivalent.
                 m['sun_time'] if m['sun_time'] < _p['response_time'] else _p['response_time'],
+
+                # Single leg moves are preferred, for simplicity.
                 m['direct'],
+
+                # Higher minimum sun distance is preferred.
                 m['sun_dist_min'],
-                m['sun_dist_mean'],
+
+                # Shorter paths (less total az / el motion) are preferred.
                 -(abs(m['travel_el'] - els[0]) + abs(m['travel_el'] - els[1])),
                 -abs(azs[1] - azs[0]),
+
+                # Larger mean Sun distance is preferred.  But this is
+                # subdominant to path length; otherwise spinning
+                # around a bunch of times can be used to lower the
+                # mean sun dist!
+                m['sun_dist_mean'],
+
+                # Prefer higher elevations for the move, all else being equal.
                 m['travel_el'],
             )
-        cands.sort(key=priority_func)
+        cands.sort(key=metric_func)
+        if raw:
+            return [(c, metric_func(c)) for c in cands], decisions
         return cands[-1], decisions
 
 
