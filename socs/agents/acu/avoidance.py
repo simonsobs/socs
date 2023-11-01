@@ -681,36 +681,3 @@ class MoveSequence:
             xx.append(np.linspace(x0, x1, n))
             yy.append(np.linspace(y0, y1, n))
         return np.hstack(tuple(xx)), np.hstack(tuple(yy))
-
-
-class RollingMinimum:
-    def __init__(self, window, fallback=None):
-        self.window = window
-        self.subwindow = window / 10
-        self.fallback = fallback
-        self.records = []
-
-    def append(self, val, t=None):
-        if t is None:
-            t = time.time()
-        # Remove old data
-        while len(self.records) and (t - self.records[0][0]) > self.window:
-            self.records.pop(0)
-        # Add this to existing subwindow?
-        if len(self.records):
-            # Consider values up to subwindow ago.
-            _t, _val = self.records[-1]
-            if t - _t < self.subwindow:
-                if val <= _val:
-                    self.records[-1] = (t, val)
-                return
-        # Or start a new subwindow.
-        self.records.append((t, val))
-
-    def get(self, lookback=None):
-        if lookback is None:
-            lookback = self.window
-        recs = [v for t, v in self.records if (time.time() - t < lookback)]
-        if len(recs):
-            return min(recs)
-        return self.fallback
