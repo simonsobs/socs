@@ -54,13 +54,12 @@ class ACUAgent:
         startup (bool):
             If True, immediately start the main monitoring processes
             for status and UDP data.
-        ignore_axes (str or list of str):
+        ignore_axes (list of str):
             List of axes to "ignore". "ignore" means that the axis
             will not be commanded.  If a user requests an action that
             would otherwise move the axis, it is not moved but the
             action is assumed to have succeeded.  The values in this
-            list should be drawn from "az", "el", and "third".  A single
-            comma-delimited string (e.g. "az,el" is also accepted.
+            list should be drawn from "az", "el", and "third".
         disable_idle_reset (bool):
             If True, don't auto-start idle_reset process for LAT.
 
@@ -96,8 +95,6 @@ class ACUAgent:
         startup_idle_reset = (self.acu_config['platform'] in ['lat', 'ccat']
                               and not disable_idle_reset)
 
-        if isinstance(ignore_axes, str):
-            ignore_axes = [x.strip() for x in ignore_axes.split(',')]
         if ignore_axes is None:
             ignore_axes = []
         assert all([x in ['az', 'el', 'third'] for x in ignore_axes])
@@ -314,6 +311,7 @@ class ACUAgent:
             },
             "StatusResponseRate": 19.237531827325963,
             "PlatformType": "satp",
+            "IgnoredAxes": [],
             "DefaultScanParams": {
               "az_speed": 2.0,
               "az_accel": 1.0,
@@ -1850,9 +1848,8 @@ def add_agent_args(parser_in=None):
     pgroup.add_argument("--exercise-plan")
     pgroup.add_argument("--no-processes", action='store_true',
                         default=False)
-    pgroup.add_argument("--ignore-axes",
-                        help="Comma-delimited list of axes to ignore "
-                        "(el, az, third).")
+    pgroup.add_argument("--ignore-axes", choices=['el', 'az', 'third'],
+                        nargs='+', help="One or more axes to ignore.")
     pgroup.add_argument("--disable-idle-reset", action='store_true',
                         help="Disable idle_reset, even for LAT.")
     return parser_in
