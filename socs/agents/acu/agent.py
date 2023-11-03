@@ -40,8 +40,7 @@ DEFAULT_SCAN_PARAMS = {
 
 
 class ACUAgent:
-    """
-    Agent to acquire data from an ACU and control telescope pointing with the
+    """Agent to acquire data from an ACU and control telescope pointing with the
     ACU.
 
     Parameters:
@@ -52,14 +51,22 @@ class ACUAgent:
             The full path to a scan config file describing motions to cycle
             through on the ACU.  If this is None, the associated process and
             feed will not be registered.
-       startup (bool):
+        startup (bool):
             If True, immediately start the main monitoring processes
             for status and UDP data.
+        ignore_axes (list of str):
+            List of axes to "ignore". "ignore" means that the axis
+            will not be commanded.  If a user requests an action that
+            would otherwise move the axis, it is not moved but the
+            action is assumed to have succeeded.  The values in this
+            list should be drawn from "az", "el", and "third".
+        disable_idle_reset (bool):
+            If True, don't auto-start idle_reset process for LAT.
 
     """
 
     def __init__(self, agent, acu_config='guess', exercise_plan=None,
-                 startup=False):
+                 startup=False, ignore_axes=None, disable_idle_reset=False):
         # Separate locks for exclusive access to az/el, and boresight motions.
         self.azel_lock = TimeoutLock()
         self.boresight_lock = TimeoutLock()
@@ -84,6 +91,16 @@ class ACUAgent:
         # generate_scan.
         self.scan_params = {}
         self._set_default_scan_params()
+
+        startup_idle_reset = (self.acu_config['platform'] in ['lat', 'ccat']
+                              and not disable_idle_reset)
+
+        if ignore_axes is None:
+            ignore_axes = []
+        assert all([x in ['az', 'el', 'third'] for x in ignore_axes])
+        self.ignore_axes = ignore_axes
+        if len(self.ignore_axes):
+            agent.log.warn('User requested ignore_axes={i}', i=self.ignore_axes)
 
         self.exercise_plan = exercise_plan
 
@@ -136,11 +153,11 @@ class ACUAgent:
                                self._simple_process_stop,
                                blocking=False,
                                startup=False)
-        agent.register_process('restart_idle',
-                               self.restart_idle,
+        agent.register_process('idle_reset',
+                               self.idle_reset,
                                self._simple_process_stop,
                                blocking=False,
-                               startup=False)
+                               startup=startup_idle_reset)
         basic_agg_params = {'frame_length': 60}
         fullstatus_agg_params = {'frame_length': 60,
                                  'exclude_influx': True,
@@ -225,28 +242,38 @@ class ACUAgent:
 
     @ocs_agent.param('_')
     @inlineCallbacks
-    def restart_idle(self, session, params):
-        """restart_idle()
+    def idle_reset(self, session, params):
+        """idle_reset()
 
         **Process** - To prevent LAT from going into Survival mode,
         do something on the command interface every so often.  (The
-        default inactivity timeout is 5 minutes.)
+        default inactivity timeout is 1 minute.)
 
         """
+        IDLE_RESET_TIMEOUT = 60  # The watchdog timeout in ACU
+
         session.set_status('running')
         next_action = 0
-        while session.status in ['running']:
-            if time.time() < next_action:
-                yield dsleep(5.)
-                continue
-            self.log.info('Sending RestartIdleTime')
-            try:
-                yield self.acu_read.http.Values(self.acu8100)
-            except Exception as e:
-                self.log.info(' -- failed to RestartIdleTime: {err}', err=e)
-            next_action = time.time() + 60
 
-        return True, 'Process "restart_idle" exited cleanly.'
+        while session.status in ['starting', 'running']:
+            if time.time() < next_action:
+                yield dsleep(IDLE_RESET_TIMEOUT / 10)
+                continue
+            success = True
+            try:
+                yield self.acu_control.http.Values(self.acu8100)
+            except Exception as e:
+                self.log.info(' -- failed to reset Idle Stow time: {err}', err=e)
+                success = False
+            session.data.update({
+                'timestamp': time.time(),
+                'reset_ok': success})
+            if not success:
+                next_action = time.time() + 4
+            else:
+                next_action = time.time() + IDLE_RESET_TIMEOUT / 2
+
+        return True, 'Process "idle_reset" exited cleanly.'
 
     @inlineCallbacks
     def monitor(self, session, params):
@@ -284,6 +311,7 @@ class ACUAgent:
             },
             "StatusResponseRate": 19.237531827325963,
             "PlatformType": "satp",
+            "IgnoredAxes": [],
             "DefaultScanParams": {
               "az_speed": 2.0,
               "az_accel": 1.0,
@@ -306,6 +334,7 @@ class ACUAgent:
         session.data = {'PlatformType': self.acu_config['platform'],
                         'DefaultScanParams': self.scan_params,
                         'StatusResponseRate': 0.,
+                        'IgnoredAxes': self.ignore_axes,
                         'connected': False}
         not_data_keys = list(session.data.keys())
 
@@ -767,6 +796,41 @@ class ACUAgent:
 
         return True, 'Agent state ok for motion.'
 
+    @inlineCallbacks
+    def _set_modes(self, az=None, el=None, third=None):
+        """Helper for changing individual axis modes.  Respects ignore_axes.
+
+        When setting one axis it is often necessary to write others as
+        well.  The current mode is first queried, and written back
+        unmodified.
+
+        """
+        modes = list((yield self.acu_control.mode(size=3)))
+        changes = [False, False, False]
+        for i, (k, v) in enumerate([('az', az), ('el', el), ('third', third)]):
+            if k not in self.ignore_axes and v is not None:
+                changes[i] = True
+                modes[i] = v
+        if not any(changes):
+            return
+        if not changes[2]:
+            yield self.acu_control.mode(modes[:2])
+        else:
+            yield self.acu_control.mode(modes)
+
+    @inlineCallbacks
+    def _stop(self, all_axes=False):
+        """Helper for putting all axes in Stop.  This will normally just issue
+        acu_control.stop(); but if any axes are being "ignored", and
+        the user has not passed all_axes=True, then it will avoid
+        changing the mode of those axes.
+
+        """
+        if all_axes or len(self.ignore_axes) == 0:
+            yield self.acu_control.stop()
+            return
+        yield self._set_modes('Stop', 'Stop', 'Stop')
+
     def _get_limit_func(self, axis):
         """Construct a function limit(x) that will enforce that x is within
         the configured limits for axis.  Returns the funcion and the
@@ -826,6 +890,17 @@ class ACUAgent:
         # Enum for the motion states
         State = Enum(f'{axis}State',
                      ['INIT', 'WAIT_MOVING', 'WAIT_STILL', 'FAIL', 'DONE'])
+
+        # If this axis is "ignore", skip it.
+        for _axis, short_name in [
+                ('Azimuth', 'az'),
+                ('Elevation', 'el'),
+                ('Boresight', 'third'),
+        ]:
+            if _axis == axis and short_name in self.ignore_axes:
+                self.log.warn('Ignoring requested motion on {axis}', axis=axis)
+                yield dsleep(1)
+                return True, 'axis successfully ignored'
 
         # Specialization for different axis types.
 
@@ -1099,7 +1174,7 @@ class ACUAgent:
 
             all_ok, msg = yield self._go_to_axes(session, az=target_az, el=target_el)
             if all_ok and params['end_stop']:
-                yield self.acu_control.mode('Stop')
+                yield self._set_modes(az='Stop', el='Stop')
 
         return all_ok, msg
 
@@ -1143,8 +1218,7 @@ class ACUAgent:
             ok, msg = yield self._go_to_axis(session, 'Boresight', target)
 
             if ok and params['end_stop']:
-                yield self.acu_control.http.Command('DataSets.CmdModeTransfer',
-                                                    'Set3rdAxisMode', 'Stop')
+                yield self._set_modes(third='Stop')
 
         return ok, msg
 
@@ -1194,12 +1268,17 @@ class ACUAgent:
         session.set_status('stopping')
         return True, 'Job completed.'
 
+    @ocs_agent.param('all_axes', default=False, type=bool)
     @inlineCallbacks
     def stop_and_clear(self, session, params):
-        """stop_and_clear()
+        """stop_and_clear(all_axes=False)
 
         **Task** - Change the azimuth, elevation, and 3rd axis modes
         to Stop; also clear the ProgramTrack stack.
+
+        Args:
+          all_axes (bool): Send Stop to all axes, even ones user has
+            requested to be ignored.
 
         """
         def _read_modes():
@@ -1213,14 +1292,17 @@ class ACUAgent:
 
         session.set_status('running')
         for i in range(6):
-            if all([m == 'Stop' for m in _read_modes()]):
+            for short_name, mode in zip(['az', 'el', 'third'],
+                                        _read_modes()):
+                if (params['all_axes'] or short_name not in self.ignore_axes) and mode != 'Stop':
+                    break
+            else:
                 self.log.info('All axes in Stop mode')
                 break
-            else:
-                yield self.acu_control.stop()
-                self.log.info('Stop called (iteration %i)' % (i + 1))
-                yield dsleep(0.1)
-                i += 1
+            yield self._stop(params['all_axes'])
+            self.log.info('Stop called (iteration %i)' % (i + 1))
+            yield dsleep(0.1)
+
         else:
             msg = 'Failed to set all axes to Stop mode!'
             self.log.error(msg)
@@ -1470,6 +1552,7 @@ class ACUAgent:
         # Seek to starting position
         self.log.info(f'Moving to start position, az={plan["init_az"]}, el={init_el}')
         ok, msg = yield self._go_to_axes(session, az=plan['init_az'], el=init_el)
+
         if not ok:
             return False, f'Start position seek failed with message: {msg}'
 
@@ -1546,9 +1629,9 @@ class ACUAgent:
             yield dsleep(0.2)
 
             if azonly:
-                yield self.acu_control.azmode('ProgramTrack')
+                yield self._set_modes(az='ProgramTrack')
             else:
-                yield self.acu_control.mode('ProgramTrack')
+                yield self._set_modes(az='ProgramTrack', el='ProgramTrack')
 
             yield dsleep(0.5)
 
@@ -1765,6 +1848,10 @@ def add_agent_args(parser_in=None):
     pgroup.add_argument("--exercise-plan")
     pgroup.add_argument("--no-processes", action='store_true',
                         default=False)
+    pgroup.add_argument("--ignore-axes", choices=['el', 'az', 'third'],
+                        nargs='+', help="One or more axes to ignore.")
+    pgroup.add_argument("--disable-idle-reset", action='store_true',
+                        help="Disable idle_reset, even for LAT.")
     return parser_in
 
 
@@ -1775,7 +1862,9 @@ def main(args=None):
                                   args=args)
     agent, runner = ocs_agent.init_site_agent(args)
     _ = ACUAgent(agent, args.acu_config, args.exercise_plan,
-                 startup=not args.no_processes)
+                 startup=not args.no_processes,
+                 ignore_axes=args.ignore_axes,
+                 disable_idle_reset=args.disable_idle_reset)
 
     runner.run(agent, auto_reconnect=True)
 
