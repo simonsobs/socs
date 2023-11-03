@@ -640,7 +640,9 @@ class ACUAgent:
                 del new_influx_blocks[k]
 
             for block in new_influx_blocks.values():
-                self.agent.publish_to_feed('acu_status_influx', block)
+                # Check that we have data (commands and corotator often don't)
+                if len(block['data']) > 0:
+                    self.agent.publish_to_feed('acu_status_influx', block)
             influx_blocks.update(new_influx_blocks)
 
             # Assemble data for aggregator ...
