@@ -11,7 +11,7 @@ import twisted.web.client as tclient
 import yaml
 from autobahn.twisted.util import sleep as dsleep
 from ocs import ocs_agent, site_config
-from ocs.ocs_twisted import TimeoutLock
+from ocs.ocs_twisted import Pacemaker, TimeoutLock
 from soaculib.twisted_backend import TwistedHttpBackend
 from twisted.internet import protocol, reactor, threads
 from twisted.internet.defer import DeferredList, inlineCallbacks
@@ -240,6 +240,10 @@ class ACUAgent:
                                  agg_params=influx_agg_params,
                                  buffer_time=1)
         self.agent.register_feed('acu_error',
+                                 record=True,
+                                 agg_params=basic_agg_params,
+                                 buffer_time=1)
+        self.agent.register_feed('sun',
                                  record=True,
                                  agg_params=basic_agg_params,
                                  buffer_time=1)
@@ -1984,6 +1988,28 @@ class ACUAgent:
             self.sun = new_sun
             req_out = False
 
+        def lookup(keys, tree):
+            if isinstance(keys, str):
+                keys = [keys]
+            if len(keys) == 0:
+                if isinstance(tree, (bool, np.bool_)):
+                    return int(tree)
+                return tree
+            return lookup(keys[1:], tree[keys[0]])
+
+        # Feed -- unpack some elements of session.data
+        feed_keys = {
+            'sun_avoidance': ('active_avoidance', int),
+            'sun_az': (('sun_pos', 'sun_azel', 0), float),
+            'sun_el': (('sun_pos', 'sun_azel', 1), float),
+            'sun_dist': (('sun_pos', 'sun_dist'), float),
+            'sun_safe_time': (('sun_pos', 'sun_safe_time'), float),
+        }
+        for k in ['warning_zone', 'danger_zone',
+                  'escape_triggered', 'escape_active']:
+            feed_keys[f'sun_{k}'] = (('avoidance', k), int)
+        feed_pacer = Pacemaker(.1)
+
         req_out = False
         self.sun = None
         last_panic = 0
@@ -2077,6 +2103,16 @@ class ACUAgent:
 
             # Update session.
             session.data.update(new_data)
+
+            # Publish -- only if we have the sun pos though..
+            if sun_is_real and safety_known and feed_pacer.next_sample <= time.time():
+                feed_pacer.sleep()  # should be instantaneous, just update counters
+                block = {'timestamp': time.time(),
+                         'block_name': 'sun0',
+                         'data': {}}
+                for kshort, (keys, cast) in feed_keys.items():
+                    block['data'][kshort] = cast(lookup(keys, new_data))
+                self.agent.publish_to_feed('sun', block)
 
             yield dsleep(1)
 
