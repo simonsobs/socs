@@ -3,22 +3,34 @@ import time
 
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
+from ocs.ocs_twisted import Pacemaker
 
 from socs.agents.hi6200.drivers import Hi6200Interface
 
 
 class Hi6200Agent:
+    """
+    Agent to connect to the Hi6200 weight controller that measures the weight
+    of the LN2 dewar on the SAT platform.
+    
+    Parameters:
+        ip_address (string): IP address set on the Hi6200
+        tcp_port (int): Modbus TCP port of the Hi6200. Default
+                    Default set on the device is 502.
+        scale (Hi6200Interface): A driver object that allows 
+                    for communication with the scale.
+    """
+    
     def __init__(self, agent, ip_address, tcp_port):
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
 
-        self.job = None
         self.ip_address = ip_address
         self.tcp_port = tcp_port
-        self.monitor = False
-
         self.scale = None
+        
+        self.monitor = False
 
         # Registers Scale Output
         agg_params = {
@@ -48,7 +60,7 @@ class Hi6200Agent:
 
     @ocs_agent.param('wait', type=float, default=1)
     def monitor_weight(self, session, params=None):
-        """
+        """monitor_weight(wait=1)
 
         **Process** - Continuously monitor scale gross and net weights.
 
@@ -59,8 +71,11 @@ class Hi6200Agent:
         """
         session.set_status('running')
         self.monitor = True
-
+        
+        pm = Pacemaker(1, quantize=True)
         while self.monitor:
+            
+            pm.sleep()
             with self.lock.acquire_timeout(1) as acquired:
                 if acquired:
                     data = {
@@ -75,17 +90,11 @@ class Hi6200Agent:
 
                         self.agent.publish_to_feed('scale_output', data)
 
-                        # Allow this process to be queried to return current data
-                        session.data = data
-
                     except ValueError as e:
                         self.log.error(f"Scale responded with an anomolous number, ignorning: {e}")
-
-                    except AttributeError as e:
-                        self.log.error(f"Scale dropped TCP connection momentarily, trying again: {e}")
-
-                    # Allow this process to be queried to return current data
-                    session.data = data
+                    
+                    except TypeError as e:
+                        self.log.error(f"Scale responded with 'None' and broke the hex decoding, trying again: {e}")
 
                 else:
                     self.log.warn("Could not acquire in monitor_weight")
