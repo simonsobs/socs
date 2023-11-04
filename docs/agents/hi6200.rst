@@ -8,7 +8,7 @@ Hi6200 Agent
 
 This agent uses Modbus TCP to communicate with the Hi6200 Weight Sensor.
 This agent uses ModbusClient from pyModbusTCP to facilitate the communication.
-The agent is able to communicate over ethernet to read and monitor the net and 
+The agent is able to communicate over ethernet to read and monitor the net and
 gross weights of the scale.
 
 .. argparse::
@@ -75,6 +75,6 @@ Below is an example client demonstrating full agent functionality.::
 
     # Begin Monitoring Weight
     scale.monitor_weight.start()
-    
+
     #Stop Monitoring Weight
     scale.stop_monitoring.start()
