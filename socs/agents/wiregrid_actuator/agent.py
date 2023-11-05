@@ -354,8 +354,8 @@ class WiregridActuatorAgent:
                     'Could not acquire lock'
 
             onoffs = self.actuator.ls.get_onoff(io_name)
-            io_names = self.actuator.ls.get_io_name(io_name)
-            io_labels = self.actuator.ls.get_label(io_name)
+            io_names = self.actuator.ls.io_names
+            io_labels = self.actuator.ls.io_labels
             for i, io_name in enumerate(io_names):
                 io_label = io_labels[i]
                 msg += 'check_limitswitch(): {:10s} ({:20s}) : {}\n'\
@@ -388,8 +388,8 @@ class WiregridActuatorAgent:
                 return False, 'check_stopper(): Could not acquire lock'
 
             onoffs = self.actuator.st.get_onoff(io_name)
-            io_names = self.actuator.st.get_io_name(io_name)
-            io_labels = self.actuator.st.get_label(io_name)
+            io_names = self.actuator.st.io_names
+            io_labels = self.actuator.st.io_labels
             for i, io_name in enumerate(io_names):
                 io_label = io_labels[i]
                 msg += 'check_stopper(): {:10s} ({:20s}) : {}\n'\
