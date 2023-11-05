@@ -340,7 +340,6 @@ class WiregridActuatorAgent:
         if params is None:
             params = {}
         io_name = params.get('io_name', None)
-        onoffs = []
         msg = ''
         with self.lock.acquire_timeout(timeout=3, job='check_limitswitch') \
                 as acquired:
@@ -353,13 +352,20 @@ class WiregridActuatorAgent:
                     'check_limitswitch(): '\
                     'Could not acquire lock'
 
-            onoffs = self.actuator.ls.get_onoff(io_name)
-            io_names = self.actuator.ls.io_names
-            io_labels = self.actuator.ls.io_labels
-            for i, io_name in enumerate(io_names):
-                io_label = io_labels[i]
+            onoff = self.actuator.ls.get_onoff(io_name)
+
+            if io_name is None:
+                io_name = self.actuator.ls.io_names
+            elif not hasattr(onoff, '__getitem__'):
+                io_name = [io_name]
+                onoff = [onoff]
+
+            label = self.actuator.ls.get_label(io_name)
+
+            for _io_name, _label, _onoff in zip(io_name, label, onoff):
                 msg += 'check_limitswitch(): {:10s} ({:20s}) : {}\n'\
-                    .format(io_name, io_label, 'ON' if onoffs[i] else 'OFF')
+                    .format(_io_name, _label, 'ON' if _onoff else 'OFF')
+
             self.log.info(msg)
             return True, msg
 
@@ -376,7 +382,6 @@ class WiregridActuatorAgent:
         if params is None:
             params = {}
         io_name = params.get('io_name', None)
-        onoffs = []
         msg = ''
         with self.lock.acquire_timeout(timeout=3, job='check_stopper') \
                 as acquired:
@@ -387,13 +392,20 @@ class WiregridActuatorAgent:
                     .format(self.lock.job))
                 return False, 'check_stopper(): Could not acquire lock'
 
-            onoffs = self.actuator.st.get_onoff(io_name)
-            io_names = self.actuator.st.io_names
-            io_labels = self.actuator.st.io_labels
-            for i, io_name in enumerate(io_names):
-                io_label = io_labels[i]
+            onoff = self.actuator.st.get_onoff(io_name)
+
+            if io_name is None:
+                io_name = self.actuator.st.io_names
+            elif not hasattr(onoff, '__getitem__'):
+                io_name = [io_name]
+                onoff = [onoff]
+
+            label = self.actuator.st.get_label(io_name)
+
+            for _io_name, _label, _onoff in zip(io_name, label, onoff):
                 msg += 'check_stopper(): {:10s} ({:20s}) : {}\n'\
-                    .format(io_name, io_label, 'ON' if onoffs[i] else 'OFF')
+                    .format(_io_name, _label, 'ON' if _onoff else 'OFF')
+
             self.log.info(msg)
             return True, msg
 

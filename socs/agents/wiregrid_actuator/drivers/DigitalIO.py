@@ -62,7 +62,7 @@ class DigitalIO:
             io_name (str or list): A string of a IO name or list of IO names.
 
         Returns:
-            list or str: A list of True/Falses or a single True/False depending
+            list or bool: A list of True/Falses or a single True/False depending
             on the value of `io_name`. If `io_name` is None, return a list of
             the ON/OFFs for all the IOs. If `io_name` is a list, return a list
             of the ON/OFFs for asked IOs.  If `io_name` is a string (one IO),
@@ -99,7 +99,7 @@ class DigitalIO:
     def get_label(self, io_name):
         if io_name is None:
             label = self.io_labels
-        elif isinstance(io_name, list):
+        elif hasattr(io_name, '__getitem__'):
             if not all([(name in self.io_names) for name in io_name]):
                 msg = \
                     'DigitalIO[{}]:get_label(): ERROR!: '\
@@ -111,7 +111,7 @@ class DigitalIO:
                     + 'DigitalIO[{}]:get_label():     '\
                       'Asked IO names    = {}'.format(self.name, io_name)
                 raise ValueError(msg)
-            label = [self.io_indices[name] for name in io_name]
+            label = [self.io_labels[self.io_indices[name]] for name in io_name]
         else:
             if not (io_name in self.io_names):
                 msg = \
@@ -121,7 +121,7 @@ class DigitalIO:
                     + 'DigitalIO[{}]:get_label():     '\
                       'Assigned IO names = {}'.format(self.name, self.io_names)
                 raise ValueError(msg)
-            label = self.io_label(io_name)
+            label = self.io_labels[self.io_indices[io_name]]
         return label
 
     def _set_onoff(self, onoff, io_name):
