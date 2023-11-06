@@ -26,6 +26,12 @@ installed to use this Agent. This can be installed via:
 
     $ pip install 'soaculib @ git+https://github.com/simonsobs/soaculib.git@master'
 
+Additionally, ``socs`` should be installed with the ``acu`` group:
+
+.. code-block:: bash
+
+    $ pip install -U socs[acu]
+
 Configuration File Examples
 ---------------------------
 Below are configuration examples for the ocs config file and for soaculib.

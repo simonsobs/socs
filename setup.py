@@ -7,7 +7,11 @@ with open("README.rst", "r", encoding="utf-8") as fh:
 
 # Optional Dependencies
 # ACU Agent
-# acu_deps = ['soaculib @ git+https://github.com/simonsobs/soaculib.git@master']
+acu_deps = [
+    # 'soaculib @ git+https://github.com/simonsobs/soaculib.git@master',
+    'pixell',
+    'so3g',
+]
 
 # Holography FPGA and Synthesizer Agents
 # holography_deps = [  # Note: supports python 3.8 only!
@@ -53,10 +57,9 @@ timing_master_deps = ['pyepics']
 #     'xy_stage_control @ git+https://github.com/kmharrington/xy_stage_control.git@main',
 # ]
 
-# Note: Not including the holograph deps, which are Python 3.8 only
-# all_deps = acu_deps + labjack_deps + magpie_deps + pfeiffer_deps + \
-#    pysmurf_deps + smurf_sim_deps + synacc_deps + xy_stage_deps
-all_deps = labjack_deps + magpie_deps + pfeiffer_deps + \
+# Note: Not including the holograph deps, which are Python 3.8 only. Also not
+# including any dependencies with only direct references.
+all_deps = acu_deps + labjack_deps + magpie_deps + pfeiffer_deps + \
     smurf_sim_deps + synacc_deps + timing_master_deps
 all_deps = list(set(all_deps))
 
@@ -111,7 +114,7 @@ setup(
     ],
     extras_require={
         'all': all_deps,
-        # 'acu': acu_deps,
+        'acu': acu_deps,
         # 'holography': holography_deps,
         'labjack': labjack_deps,
         'magpie': magpie_deps,

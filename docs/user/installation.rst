@@ -22,6 +22,8 @@ The different groups, and the agents they provide dependencies for are:
      - Supporting Agents
    * - ``all``
      - All Agents
+   * - ``acu``
+     - ACU Agent
    * - ``labjack``
      - Labjack Agent
    * - ``magpie``
