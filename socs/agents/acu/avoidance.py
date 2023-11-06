@@ -87,7 +87,9 @@ HOUR = 3600
 DAY = 86400
 NO_TIME = DAY * 2
 
-
+#: Default policy to apply when evaluating Sun-safety and planning
+#: trajectories.  Note the Agent code may apply different defaults,
+#: based on known platform details.
 DEFAULT_POLICY = {
     'exclusion_radius': 20,
     'min_el': 0,

@@ -105,10 +105,10 @@ determined like this:
   according to any command-line parameters passed in by the user.
 - Some parameters can be altered using the command line.
 
-The avoidance policy is defined by a few key parameters and concepts.
-
-.. automodule:: socs.agents.acu.avoidance
-
+The avoidance policy is defined by a few key parameters and concepts;
+please see the descriptions of ``sun_dist``, ``sun_time``,
+``exclusion_radius``, and more in the :mod:`socs.agents.acu.avoidance`
+module documentation.
 
 The ``exclusion_radius`` can be configured from the Agent command
 line, and also through the ``update_sun`` Task.
@@ -204,8 +204,14 @@ acquisition processes are running::
 Supporting APIs
 ---------------
 
+drivers (Scanning support)
+``````````````````````````
+
 .. automodule:: socs.agents.acu.drivers
     :members:
+
+avoidance (Sun Avoidance)
+`````````````````````````
 
 .. automodule:: socs.agents.acu.avoidance
     :members:
