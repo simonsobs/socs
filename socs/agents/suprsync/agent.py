@@ -171,6 +171,8 @@ class SupRsync:
                 srfm.create_all_timecode_dirs(
                     self.archive_name, min_ctime=now - (7*24*3600)
                 )
+                self.log.info("Finished creating tcdirs")
+                last_tcdir_update = now
 
             archive_stats = srfm.get_archive_stats(self.archive_name)
             if archive_stats is not None:
