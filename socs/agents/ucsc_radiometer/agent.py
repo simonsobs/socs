@@ -83,12 +83,9 @@ class UCSCRadiometerAgent:
                     }
 
             if self.last_published_reading is not None:
-                try:
-                    if last_timestamp > self.last_published_reading[1]:
-                        self.agent.publish_to_feed('pwvs', pwvs)
-                        self.last_published_reading = (last_pwv, last_timestamp)
-                except ValueError:
-                    pass
+                if last_timestamp > self.last_published_reading[1]:
+                    self.agent.publish_to_feed('pwvs', pwvs)
+                    self.last_published_reading = (last_pwv, last_timestamp)
             else:
                 self.agent.publish_to_feed('pwvs', pwvs)
                 self.last_published_reading = (last_pwv, last_timestamp)
