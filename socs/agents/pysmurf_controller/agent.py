@@ -855,14 +855,14 @@ class PysmurfController:
     @ocs_agent.param('bgs', default=None)
     @ocs_agent.param('bias')
     def set_biases(self, session, params):
-        """set_biases(bg=None, bias=0)
+        """set_biases(bg=None, bias)
 
-        **Task** - Task used ot set TES biases.
+        **Task** - Task used to set TES biases.
 
         Args
         -----
         bg: int, list, optional
-            bg, or list of bgs to set. If None, will set all bgs.
+            Bias group (bg), or list of bgs to set. If None, will set all bgs.
         bias: int, float, list
             Biases to set. If a float is passed, this will be used for all
             specified bgs. If a list of floats is passed, it must be the same
