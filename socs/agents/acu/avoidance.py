@@ -530,13 +530,15 @@ class SunTracker:
         If raw=True, a debugging output is returned; see code.
 
         Returns:
-          best_move (dict): The element of moves that is safest.  If
-            no safe move was found, None is returned.
-          decisions (list): The items in this list are dicts that
-            correspond one-to-one with the entries in moves.  Each
-            decision dict has entries 'rejected' (True or False) and
-            'reason' (string description of why the move was rejected
-            outright).
+          (dict, list): (best_move, decisions)
+
+          ``best_move`` -- the element of moves that is safest.  If no
+          safe move was found, None is returned.
+
+          ``decisions`` - List of dicts, in one-to-one correspondence
+          with ``moves``.  Each decision dict has entries 'rejected'
+          (True or False) and 'reason' (string description of why the
+          move was rejected outright).
 
         """
         _p = self.policy

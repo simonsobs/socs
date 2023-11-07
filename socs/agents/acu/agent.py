@@ -2087,7 +2087,8 @@ class ACUAgent:
     @ocs_agent.param('avoidance_radius', type=float, default=None)
     @ocs_agent.param('shift_sun_hours', type=float, default=None)
     def update_sun(self, session, params):
-        """update_sun(reset, enable, temporary_disable, escape, avoidance_radius, shift_sun_hours)
+        """update_sun(reset, enable, temporary_disable, escape, \
+                      avoidance_radius, shift_sun_hours)
 
         **Task** - Update Sun monitoring and avoidance parameters.
 
