@@ -405,6 +405,7 @@ class SupRsyncFilesManager:
             session : sqlalchemy session
                 Session to use to query files.
             min_ctime : float, optional
+                minimum ctime to use when querying files.
 
         """
         if session is None:
