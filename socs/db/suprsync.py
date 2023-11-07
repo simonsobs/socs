@@ -394,7 +394,7 @@ class SupRsyncFilesManager:
 
         return files
 
-    def get_known_files(self, archive_name, session=None):
+    def get_known_files(self, archive_name, session=None, min_ctime=None):
         """Gets all files.  This can be used to help avoid
         double-registering files.
 
@@ -404,12 +404,19 @@ class SupRsyncFilesManager:
                 Name of archive to pull files from
             session : sqlalchemy session
                 Session to use to query files.
+            min_ctime : float, optional
+                minimum ctime to use when querying files.
+
         """
         if session is None:
             session = self.Session()
 
+        if min_ctime is None:
+            min_ctime = 0
+
         query = session.query(SupRsyncFile).filter(
             SupRsyncFile.archive_name == archive_name,
+            SupRsyncFile.timestamp > min_ctime,
         ).order_by(asc(SupRsyncFile.timestamp))
 
         return list(query.all())
@@ -437,9 +444,10 @@ class SupRsyncFilesManager:
         session.add(tcdir)
         return tcdir
 
-    def create_all_timecode_dirs(self, archive_name):
+    def create_all_timecode_dirs(self, archive_name, min_ctime=None):
         with self.Session.begin() as session:
-            files = self.get_known_files(archive_name, session=session)
+            files = self.get_known_files(
+                archive_name, session=session, min_ctime=min_ctime)
             for file in files:
                 self._add_file_tcdir(file, session)
 
