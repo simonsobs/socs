@@ -40,10 +40,12 @@ An example site-config-file block::
 
     {'agent-class': 'WiregridEncoderAgent',
      'instance-id': 'wgencoder',
-     'arguments': [['--port', 50007]]},
+     'arguments': [['--port', 50007],
+                   ['--ip-address', '192.168.11.29']]},
 
 The port is used to receive the data from the BeagleBoneBlack.
 The port number is determined in the script running in the BeagleBoneBlack.
+The IP address is used to ping to the BeagleBoneBlack for connection check.
 
 Docker Compose
 ``````````````
