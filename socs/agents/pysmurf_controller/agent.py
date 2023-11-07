@@ -852,6 +852,61 @@ class PysmurfController:
 
         return True, "Finished Overbiasing TES"
 
+    @ocs_agent.param('bgs', default=None)
+    @ocs_agent.param('bias')
+    def set_biases(self, session, params):
+        """set_biases(bg=None, bias)
+
+        **Task** - Task used to set TES biases.
+
+        Args
+        -----
+        bg: int, list, optional
+            Bias group (bg), or list of bgs to set. If None, will set all bgs.
+        bias: int, float, list
+            Biases to set. If a float is passed, this will be used for all
+            specified bgs. If a list of floats is passed, it must be the same
+            size of the list of bgs.
+        """
+        if params['bgs'] is None:
+            bgs = np.arange(12)
+        else:
+            bgs = np.atleast_1d(params['bgs'])
+
+        if isinstance(params['bias'], (int, float)):
+            biases = [params['bias'] for _ in bgs]
+        else:
+            if len(params['bias']) != len(bgs):
+                return False, "Number of biases must match number of bgs"
+            biases = params['bias']
+
+        with self.lock.acquire_timeout(0, job='set_biases') as acquired:
+            if not acquired:
+                return False, f"Operation failed: {self.lock.job} is running."
+
+            session.set_status('running')
+            S, _ = self._get_smurf_control(session=session)
+
+            for bg, bias in zip(bgs, biases):
+                S.set_tes_bias_bipolar(bg, bias)
+
+            return True, f"Finished setting biases to {params['biases']}"
+
+    @ocs_agent.param('bgs', default=None)
+    def zero_biases(self, session, params):
+        """
+        **Task** - Zeros TES biases for specified bias groups.
+
+        Args
+        -----
+        bg: int, list, optional
+            bg, or list of bgs to zero. If None, will zero all bgs.
+        """
+        params['bias'] = 0
+        self.agent.start('set_biases', params)
+        self.agent.wait('set_biases')
+        return True, 'Finished zeroing biases'
+
     @ocs_agent.param('rfrac', default=(0.3, 0.6))
     @ocs_agent.param('kwargs', default=None)
     def bias_dets(self, session, params):
@@ -987,6 +1042,8 @@ def main(args=None):
     agent.register_task('take_noise', controller.take_noise)
     agent.register_task('bias_dets', controller.bias_dets)
     agent.register_task('all_off', controller.all_off)
+    agent.register_task('set_biases', controller.set_biases)
+    agent.register_task('zero_biases', controller.zero_biases)
 
     runner.run(agent, auto_reconnect=True)
 
