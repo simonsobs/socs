@@ -167,6 +167,7 @@ class SupRsync:
 
             if now - last_tcdir_update > tcdir_update_interval:
                 # add timecode-dirs for all files from the last week
+                self.log.info("Creating timecode dirs for recent files.....")
                 srfm.create_all_timecode_dirs(
                     self.archive_name, min_ctime=now - (7*24*3600)
                 )
