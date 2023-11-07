@@ -71,7 +71,6 @@ class UCSCRadiometerAgent:
             try:
                 r = requests.get(self.url)
             except ValueError:
-                self.log.info(f'Query to data failed due to request error: {r.status_code}')
                 pm.sleep()
                 continue
             data = r.json()
