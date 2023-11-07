@@ -68,7 +68,11 @@ class UCSCRadiometerAgent:
         session.set_status('running')
 
         while self.take_data:
-            r = requests.get(self.url)
+            try:
+                r = requests.get(self.url)
+            except ValueError:
+                self.log.info(f'Query to data failed due to request erro: {r.status_code}')
+                pass
             data = r.json()
             last_pwv = data['pwv']
             last_timestamp = data['timestamp']
@@ -79,9 +83,12 @@ class UCSCRadiometerAgent:
                     }
 
             if self.last_published_reading is not None:
-                if last_timestamp > self.last_published_reading[1]:
-                    self.agent.publish_to_feed('pwvs', pwvs)
-                    self.last_published_reading = (last_pwv, last_timestamp)
+                try:
+                    if last_timestamp > self.last_published_reading[1]:
+                        self.agent.publish_to_feed('pwvs', pwvs)
+                        self.last_published_reading = (last_pwv, last_timestamp)
+                except ValueError:
+                    pass
             else:
                 self.agent.publish_to_feed('pwvs', pwvs)
                 self.last_published_reading = (last_pwv, last_timestamp)
