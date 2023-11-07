@@ -16,6 +16,8 @@ pyyaml
 
 # acu agent
 soaculib @ git+https://github.com/simonsobs/soaculib.git@master
+so3g
+pixell
 
 # holography agent - python 3.8 only!
 # -r requirements/holography.txt
