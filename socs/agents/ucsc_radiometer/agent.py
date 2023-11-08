@@ -68,7 +68,11 @@ class UCSCRadiometerAgent:
         session.set_status('running')
 
         while self.take_data:
-            r = requests.get(self.url)
+            try:
+                r = requests.get(self.url)
+            except ValueError:
+                pm.sleep()
+                continue
             data = r.json()
             last_pwv = data['pwv']
             last_timestamp = data['timestamp']
@@ -87,9 +91,7 @@ class UCSCRadiometerAgent:
                 self.last_published_reading = (last_pwv, last_timestamp)
 
             session.data = {"timestamp": last_timestamp,
-                            "pwv": {}}
-
-            session.data['pwv'] = last_pwv
+                            "pwv": last_pwv}
 
             if params['test_mode']:
                 break
