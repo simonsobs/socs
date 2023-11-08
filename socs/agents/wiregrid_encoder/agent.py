@@ -353,11 +353,11 @@ class WiregridEncoderAgent:
 
         ret = ping(self.ip)
         if ret:
-            return True, 'Successfully ping to the BBB.'
+            return True, f'Successfully ping to the BBB({self.ip}).'
         elif ret is None:
-            return False, 'Failed to ping to the BBB (No response).'
+            return False, f'Failed to ping to the BBB({self.ip}). No response.'
         else:
-            return False, 'Failed to ping to the BBB (Unknown host).'
+            return False, f'Failed to ping to the BBB({self.ip}). Unknown host.'
 
 
 def make_parser(parser=None):
@@ -369,7 +369,7 @@ def make_parser(parser=None):
                         type=int, default=50007,
                         help='Port of the beaglebone '
                              'running wiregrid encoder DAQ')
-    pgroup.add_argument('--ip', dest='ip',
+    pgroup.add_argument('--ip-address', dest='ip_address',
                         type=str, default='192.168.11.29',
                         help='IP address of the beaglebone '
                              'running wiregrid encoder DAQ')
@@ -385,7 +385,7 @@ def main(args=None):
     agent, runner = ocs_agent.init_site_agent(args)
 
     wg_encoder_agent = WiregridEncoderAgent(
-        agent, bbport=args.port, bbip=args.ip)
+        agent, bbport=args.port, bbip=args.ip_address)
 
     agent.register_process('acq',
                            wg_encoder_agent.acq,
