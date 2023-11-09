@@ -897,7 +897,7 @@ class PysmurfController:
             for bg, bias in zip(bgs, biases):
                 S.set_tes_bias_bipolar(bg, bias)
 
-            return True, f"Finished setting biases to {params['biases']}"
+            return True, f"Finished setting biases to {params['bias']}"
 
     @ocs_agent.param('bgs', default=None)
     def zero_biases(self, session, params):
