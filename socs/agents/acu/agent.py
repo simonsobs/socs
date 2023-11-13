@@ -831,8 +831,7 @@ class ACUAgent:
                                       'block_name': 'ACU_broadcast',
                                       'data': self.data['broadcast']
                                       }
-                    self.agent.publish_to_feed('acu_udp_stream',
-                                               acu_udp_stream, from_reactor=True)
+                    self.agent.publish_to_feed('acu_udp_stream', acu_udp_stream)
                 influx_means = {}
                 for key in influx_data.keys():
                     influx_means[key] = np.mean(influx_data[key])
@@ -841,7 +840,7 @@ class ACUAgent:
                                         'block_name': 'ACU_bcast_influx',
                                         'data': influx_means,
                                         }
-                self.agent.publish_to_feed('acu_broadcast_influx', acu_broadcast_influx, from_reactor=True)
+                self.agent.publish_to_feed('acu_broadcast_influx', acu_broadcast_influx)
                 sd = {}
                 for ky in influx_means:
                     sd[ky.split('_bcast_influx')[0]] = influx_means[ky]
