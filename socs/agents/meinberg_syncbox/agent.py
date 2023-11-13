@@ -10,8 +10,11 @@ from twisted.internet.defer import inlineCallbacks
 
 from socs.snmp import SNMPTwister
 
+from guppy import hpy
+import asyncio
+
 # For logging
-txaio.use_twisted()
+# txaio.use_asyncio()
 
 
 def _extract_oid_field_and_value(get_result):
@@ -197,7 +200,8 @@ class MeinbergSyncboxAgent:
                                  buffer_time=0)
 
     @ocs_agent.param('test_mode', default=False, type=bool)
-    @inlineCallbacks
+    # @asyncio.coroutine
+    # @inlineCallbacks
     def acq(self, session, params=None):
         """acq()
 
@@ -387,12 +391,13 @@ class MeinbergSyncboxAgent:
             for oid in oids:
                 main_get_list.append(('MBG-SYNCBOX-N2X-MIB', oid, 0))
                 get_list.append(('MBG-SYNCBOX-N2X-MIB', oid, 0))
-
-            general_get_result = yield self.snmp.get(get_list, self.version)
-            if general_get_result is None:
-                self.connected = False
-                continue
-            self.connected = True
+            loop = asyncio.get_event_loop()
+            # general_get_result = loop.run_until_complete(self.snmp.run(get_list, self.version))
+            # if general_get_result is None:
+            #     self.connected = False
+            #     print("failed general")
+            #     continue
+            # self.connected = True
 
             output_oids = ['mbgSyncboxN2XOutputMode']
 
@@ -403,46 +408,57 @@ class MeinbergSyncboxAgent:
                 for oid in output_oids:
                     main_get_list.append(('MBG-SYNCBOX-N2X-MIB', oid, i + 1))
                     get_list.append(('MBG-SYNCBOX-N2X-MIB', oid, i + 1))
-                output_get_result = yield self.snmp.get(get_list, self.version)
-                output_get_results.append(output_get_result)
+                # output_get_result = loop.run_until_complete(self.snmp.run(get_list, self.version))
+                # output_get_results.append(output_get_result)
 
-            get_results = []
-            # Issue SNMP GET command
-            for get in main_get_list:
-                get_result = yield self.snmp.get([get], self.version)
-                if get_result is None:
-                    self.connected = False
-                    continue
-                self.connected = True
-                get_results.append(get_result[0])
+            # get_results = []
+            # # Issue SNMP GET command
+            # for get in main_get_list:
+            #     get_result = loop.run_until_complete(self.snmp.run([get], self.version))
+            #     if get_result is None:
+            #         self.connected = False
+            #         print("failed main")
+            #         continue
+            #     self.connected = True
+            #     get_results.append(get_result[0])
+
+            get_result = loop.run_until_complete(self.snmp.run(main_get_list, self.version))
+            if get_result is None:
+                self.connected = False
+                print("failed main")
+                continue
+            self.connected = True
 
             # Do not publish if syncbox connection has dropped
             try:
                 # Update session.data
-                session.data = update_cache(get_results, read_time)
+                session.data = update_cache(get_result, read_time)
                 # oid_cache['address'] = self.address
                 # session.data = oid_cache
-                self.log.debug("{data}", data=session.data)
+                self.log.info("{data}", data=session.data)
 
                 if not self.connected:
                     raise ConnectionError('No SNMP response. Check your connection.')
 
                 self.lastGet = time.time()
                 # Publish to feed
-                if general_get_result is not None:
-                    message = _build_message(general_get_result, read_time, 'syncbox')
-                    self.log.debug("{msg}", msg=message)
+                if get_result is not None:
+                    message = _build_message(get_result, read_time, 'syncbox')
+                    self.log.info("{msg}", msg=message)
                     session.app.publish_to_feed('syncbox', message)
-                for i, result in enumerate(output_get_results):
-                    if result is not None:
-                        blockname = f'output_{i}'
-                        message = _build_message(result, read_time, blockname)
-                        self.log.debug("{msg}", msg=message)
-                        session.app.publish_to_feed('syncbox', message)
+                # for i, result in enumerate(output_get_results):
+                #     if result is not None:
+                #         blockname = f'output_{i}'
+                #         message = _build_message(result, read_time, blockname)
+                #         self.log.debug("{msg}", msg=message)
+                #         session.app.publish_to_feed('syncbox', message)
             except ConnectionError as e:
                 self.log.error(f'{e}')
                 yield dsleep(1)
                 self.log.info('Trying to reconnect.')
+
+            h = hpy()
+            print(h.heap())
 
             if params['test_mode']:
                 break
