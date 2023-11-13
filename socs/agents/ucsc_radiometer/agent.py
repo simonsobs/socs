@@ -73,6 +73,9 @@ class UCSCRadiometerAgent:
             except ValueError:
                 pm.sleep()
                 continue
+            except requests.exceptions.ConnectionError:
+                pm.sleep()
+                continue
             data = r.json()
             last_pwv = data['pwv']
             last_timestamp = data['timestamp']
