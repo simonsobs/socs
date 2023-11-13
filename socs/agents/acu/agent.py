@@ -176,6 +176,14 @@ class ACUAgent:
 
         tclient._HTTP11ClientFactory.noisy = False
 
+        # Structure for the broadcast process to communicate state to
+        # the monitor process, for a data quality feed.
+        self._broadcast_qual = {
+            'timestamp': time.time(),
+            'active': False,
+            'time_offset': 0,
+        }
+
         self.acu_control = aculib.AcuControl(
             acu_config, backend=TwistedHttpBackend(persistent=False))
         self.acu_read = aculib.AcuControl(
@@ -246,7 +254,11 @@ class ACUAgent:
         self.agent.register_feed('sun',
                                  record=True,
                                  agg_params=basic_agg_params,
-                                 buffer_time=1)
+                                 buffer_time=0)
+        self.agent.register_feed('data_qual',
+                                 record=True,
+                                 agg_params=basic_agg_params,
+                                 buffer_time=0)
         agent.register_task('go_to',
                             self.go_to,
                             blocking=False,
@@ -497,6 +509,8 @@ class ACUAgent:
                              'Status3rdAxis': j2,
                              'StatusResponseRate': n_ok / (query_t - report_t)})
 
+        qual_pacer = Pacemaker(.1)
+
         was_remote = False
         last_resp_rate = None
         data_blocks = {}
@@ -518,6 +532,25 @@ class ACUAgent:
                 report_t = query_t
                 n_ok = 0
                 session.data.update({'StatusResponseRate': resp_rate})
+
+            if qual_pacer.next_sample <= time.time():
+                # Publish UDP data health feed
+                qual_pacer.sleep()  # should be instantaneous, just update counters
+                bq = self._broadcast_qual
+                bq_offset = bq['time_offset']
+                if bq_offset is None:
+                    bq_offset = 0.
+                bq_ok = (bq['active'] and (now - bq['timestamp'] < 5)
+                         and abs(bq_offset) < 1.)
+                block = {
+                    'timestamp': time.time(),
+                    'block_name': 'qual0',
+                    'data': {
+                        'Broadcast_stream_ok': int(bq_ok),
+                        'Broadcast_recv_offset': bq_offset,
+                    }
+                }
+                self.agent.publish_to_feed('data_qual', block)
 
             try:
                 j = yield self.acu_read.http.Values(self.acu8100)
@@ -740,6 +773,10 @@ class ACUAgent:
         FMT = self.udp_schema['format']
         FMT_LEN = struct.calcsize(FMT)
         UDP_PORT = self.udp['port']
+
+        # The udp_data list is used as a queue; it contains
+        # struct-unpacked samples from the UDP stream in the form
+        # (time_received, data).
         udp_data = []
         fields = self.udp_schema['fields']
         session.data = {}
@@ -749,11 +786,12 @@ class ACUAgent:
 
         class MonitorUDP(protocol.DatagramProtocol):
             def datagramReceived(self, data, src_addr):
+                now = time.time()
                 host, port = src_addr
                 offset = 0
                 while len(data) - offset >= FMT_LEN:
                     d = struct.unpack(FMT, data[offset:offset + FMT_LEN])
-                    udp_data.append(d)
+                    udp_data.append((now, d))
                     offset += FMT_LEN
 
         handler = reactor.listenUDP(int(UDP_PORT), MonitorUDP())
@@ -762,21 +800,28 @@ class ACUAgent:
         for i in range(2, len(fields)):
             influx_data[fields[i].replace(' ', '_') + '_bcast_influx'] = []
 
+        best_dt = None
+
         active = True
         last_packet_time = time.time()
 
         while session.status in ['running']:
             now = time.time()
+
             if len(udp_data) >= 200:
                 if not active:
                     self.log.info('UDP packets are being received.')
                     active = True
                 last_packet_time = now
+                best_dt = None
 
                 process_data = udp_data[:200]
                 udp_data = udp_data[200:]
-                for d in process_data:
+                for recv_time, d in process_data:
                     data_ctime = sh.timecode(d[0] + d[1] / sh.DAY)
+                    if best_dt is None or abs(recv_time - data_ctime) < best_dt:
+                        best_dt = recv_time - data_ctime
+
                     self.data['broadcast']['Time'] = data_ctime
                     influx_data['Time_bcast_influx'].append(data_ctime)
                     for i in range(2, len(d)):
@@ -814,9 +859,13 @@ class ACUAgent:
                     except Exception as err:
                         self.log.info('Exception while trying to enable stream: {err}', err=err)
                     next_reconfig += 60
-                yield dsleep(1)
 
-            yield dsleep(0.005)
+            self._broadcast_qual = {
+                'timestamp': now,
+                'active': active,
+                'time_offset': best_dt,
+            }
+            yield dsleep(.01)
 
         handler.stopListening()
         return True, 'Acquisition exited cleanly.'
