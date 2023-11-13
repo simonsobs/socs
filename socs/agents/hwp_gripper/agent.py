@@ -676,9 +676,7 @@ def main(args=None):
                                   args=args)
 
     agent, runner = ocs_agent.init_site_agent(args)
-    gripper_agent = HWPGripperAgent(agent, mcu_ip=args.mcu_ip,
-                                    control_port=args.control_port,
-                                    supervisor_id=args.supervisor_id)
+    gripper_agent = HWPGripperAgent(agent, args)
     agent.register_task('init_connection', gripper_agent.init_connection,
                         startup=True)
     agent.register_process('monitor_state', gripper_agent.monitor_state,
@@ -698,7 +696,7 @@ def main(args=None):
     agent.register_task('is_cold', gripper_agent.is_cold)
     agent.register_task('force', gripper_agent.force)
     agent.register_task('shutdown', gripper_agent.shutdown)
-    agent.register_task('grip', gripper_agent.grip)
+    agent.register_task('grip_hwp', gripper_agent.grip_hwp)
     agent.register_task('cancel_shutdown', gripper_agent.cancel_shutdown)
 
     runner.run(agent, auto_reconnect=True)
