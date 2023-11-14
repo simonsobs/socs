@@ -73,6 +73,10 @@ class UCSCRadiometerAgent:
             except ValueError:
                 pm.sleep()
                 continue
+            except requests.exceptions.ConnectionError:
+                self.log.warn("Unable to connect to radiometer server. Connection closed. Trying again..")
+                pm.sleep()
+                continue
             data = r.json()
             last_pwv = data['pwv']
             last_timestamp = data['timestamp']
