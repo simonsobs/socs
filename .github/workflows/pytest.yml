@@ -9,6 +9,7 @@ on:
       - '.flake8'
       - '.pre-commit-config.yaml'
       - '.readthedocs.yaml'
+      - '.github/dependabot.yml'
   workflow_call:
 
 jobs:
