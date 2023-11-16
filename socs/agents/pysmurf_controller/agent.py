@@ -265,7 +265,7 @@ class PysmurfController:
     @ocs_agent.param('poll_interval', type=float, default=10)
     @ocs_agent.param('test_mode', default=False, type=bool)
     def check_state(self, session, params=None):
-        """check_state(poll_interval=10)
+        """check_state(poll_interval=10, test_mode=False)
 
         **Process** - Continuously checks the current state of the smurf. This
         will not modify the smurf state, so this task can be run in conjunction
@@ -276,6 +276,9 @@ class PysmurfController:
         -----
         poll_interval : float
             Time (sec) between updates.
+        test_mode : bool, optional
+            Run the Process loop only once. This is meant only for testing.
+            Default is False.
 
         Notes
         -------
@@ -336,7 +339,8 @@ class PysmurfController:
     @ocs_agent.param('tag', default=None)
     @ocs_agent.param('test_mode', default=False, type=bool)
     def stream(self, session, params):
-        """stream(duration=None)
+        """stream(duration=None, kwargs=None, load_tune=True, \
+                  stream_type='obs', subtype=None, tag=None, test_mode=False)
 
         **Process** - Stream smurf data. If a duration is specified, stream
         will end after that amount of time. If unspecified, the stream will run
@@ -362,6 +366,9 @@ class PysmurfController:
         tag : string, optional
             Tag (or comma-separated list of tags) to attach to the G3 stream.
             This has precedence over the `tag` key in the kwargs dict.
+        test_mode : bool, optional
+            Run the Process loop only once. This is meant only for testing.
+            Default is False.
 
         Notes
         ------
@@ -554,7 +561,7 @@ class PysmurfController:
     @ocs_agent.param('kwargs', default=None)
     @ocs_agent.param('tag', default=None)
     def take_noise(self, session, params):
-        """take_noise(duration=30., kwargs=None)
+        """take_noise(duration=30., kwargs=None, tag=None)
 
         **Task** - Takes a short timestream and calculates noise statistics.
         Median white noise level for each band will be stored in the session
@@ -604,7 +611,7 @@ class PysmurfController:
     @ocs_agent.param('kwargs', default=None)
     @ocs_agent.param('tag', default=None)
     def take_bgmap(self, session, params):
-        """take_bgmap(kwargs=None)
+        """take_bgmap(kwargs=None, tag=None)
 
         **Task** - Takes a bias-group map. This will calculate the number of
         channels assigned to each bias group and put that into the session data
@@ -666,7 +673,7 @@ class PysmurfController:
     @ocs_agent.param('kwargs', default=None)
     @ocs_agent.param('tag', default=None)
     def take_iv(self, session, params):
-        """take_iv(kwargs=None)
+        """take_iv(kwargs=None, tag=None)
 
         **Task** - Takes an IV. This will add the normal resistance array and
         channel info to the session data object along with the analyzed IV
@@ -722,7 +729,7 @@ class PysmurfController:
     @ocs_agent.param('rfrac_range', default=(0.2, 0.9))
     @ocs_agent.param('tag', default=None)
     def take_bias_steps(self, session, params):
-        """take_bias_steps(kwargs=None, rfrac_range=(0.2, 0.9))
+        """take_bias_steps(kwargs=None, rfrac_range=(0.2, 0.9), tag=None)
 
         **Task** - Takes bias_steps and saves the output filepath to the
         session data object. See the `sodetlib bias step docs page
@@ -851,6 +858,61 @@ class PysmurfController:
             sdl.overbias_dets(S, cfg, **kw)
 
         return True, "Finished Overbiasing TES"
+
+    @ocs_agent.param('bgs', default=None)
+    @ocs_agent.param('bias')
+    def set_biases(self, session, params):
+        """set_biases(bg=None, bias)
+
+        **Task** - Task used to set TES biases.
+
+        Args
+        -----
+        bg: int, list, optional
+            Bias group (bg), or list of bgs to set. If None, will set all bgs.
+        bias: int, float, list
+            Biases to set. If a float is passed, this will be used for all
+            specified bgs. If a list of floats is passed, it must be the same
+            size of the list of bgs.
+        """
+        if params['bgs'] is None:
+            bgs = np.arange(12)
+        else:
+            bgs = np.atleast_1d(params['bgs'])
+
+        if isinstance(params['bias'], (int, float)):
+            biases = [params['bias'] for _ in bgs]
+        else:
+            if len(params['bias']) != len(bgs):
+                return False, "Number of biases must match number of bgs"
+            biases = params['bias']
+
+        with self.lock.acquire_timeout(0, job='set_biases') as acquired:
+            if not acquired:
+                return False, f"Operation failed: {self.lock.job} is running."
+
+            session.set_status('running')
+            S, _ = self._get_smurf_control(session=session)
+
+            for bg, bias in zip(bgs, biases):
+                S.set_tes_bias_bipolar(bg, bias)
+
+            return True, f"Finished setting biases to {params['bias']}"
+
+    @ocs_agent.param('bgs', default=None)
+    def zero_biases(self, session, params):
+        """
+        **Task** - Zeros TES biases for specified bias groups.
+
+        Args
+        -----
+        bg: int, list, optional
+            bg, or list of bgs to zero. If None, will zero all bgs.
+        """
+        params['bias'] = 0
+        self.agent.start('set_biases', params)
+        self.agent.wait('set_biases')
+        return True, 'Finished zeroing biases'
 
     @ocs_agent.param('rfrac', default=(0.3, 0.6))
     @ocs_agent.param('kwargs', default=None)
@@ -987,6 +1049,8 @@ def main(args=None):
     agent.register_task('take_noise', controller.take_noise)
     agent.register_task('bias_dets', controller.bias_dets)
     agent.register_task('all_off', controller.all_off)
+    agent.register_task('set_biases', controller.set_biases)
+    agent.register_task('zero_biases', controller.zero_biases)
 
     runner.run(agent, auto_reconnect=True)
 

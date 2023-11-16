@@ -278,6 +278,24 @@ class LabJackAgent:
             sampling_frequency (float):
                 Sampling frequency for data collection. Defaults to 2.5 Hz.
 
+        Notes:
+            An example of the session data is shown below. The keys in the
+            'data' dictionary correspond with configured channels from the
+            ``active_channels`` attribute::
+
+                >>> response.session['data']
+                {
+                  "block_name": "sens",
+                  "data": {
+                    "AIN0V": 0.0015984050696715713,
+                    "FIO0V": 1,
+                    "FIO1V": 1,
+                    "AIN55V": 0.00033546771737746894,
+                    "AIN116V": 0.000019733395674847998,
+                  },
+                  "timestamp": 1698439453.8471205
+                }
+
         """
         if params is None:
             params = {}
