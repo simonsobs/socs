@@ -303,7 +303,7 @@ class HWPPIDAgent:
                     data['data']['current_freq'] = current_freq
                     data['data']['target_freq'] = target_freq
                     data['data']['direction'] = direction
-                except:
+                except BaseException:
                     time.sleep(1)
                     continue
 

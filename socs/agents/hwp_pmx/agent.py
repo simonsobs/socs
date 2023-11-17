@@ -303,7 +303,7 @@ class HWPPMXAgent:
 
                     msg, src = self.dev.check_source()
                     data['data']['source'] = src
-                except:
+                except BaseException:
                     time.sleep(sleep_time)
                     continue
 
