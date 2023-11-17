@@ -49,13 +49,16 @@ class PID:
         conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         conn.settimeout(timeout)
         # unit tests might fail on first connection attempt
-        while True:
+        attempts = 3
+        for attempt in range(attempts):
             try:
                 conn.connect((ip, port))
                 break
             except (ConnectionRefusedError, OSError) as e:
                 print(f"Failed to connect to device at {ip}:{port}")
             time.sleep(5)
+        else:
+            raise RuntimeError('Could not connect to PID controller')
         return conn
 
     @staticmethod

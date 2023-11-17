@@ -30,13 +30,16 @@ class PMX:
     def _establish_connection(self, ip, port, timeout=5):
         conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         conn.settimeout(timeout)
-        while True:
+        attempts = 3
+        for attempt in range(attempts):
             try:
                 conn.connect((ip, port))
                 break
             except (ConnectionRefusedError, OSError) as e:
                 print(f"Failed to connect to device at {ip}:{port}")
             time.sleep(5)
+        else:
+            raise RuntimeError('Could not connect to PID controller')
         return conn
 
     def close(self):
