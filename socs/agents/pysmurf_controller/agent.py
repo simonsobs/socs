@@ -7,12 +7,12 @@ from twisted.python.failure import Failure
 
 matplotlib.use('Agg')
 import argparse
-import epics
 import os
 import sys
 import time
 from typing import Optional
 
+import epics
 import numpy as np
 import sodetlib as sdl
 from ocs import ocs_agent, site_config
