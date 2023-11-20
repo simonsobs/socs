@@ -27,7 +27,7 @@ class PMX:
         self.buffer_size = 128
         self.conn = self._establish_connection(self.ip, int(self.port))
 
-    def _establish_connection(self, ip, port, timeout=5):
+    def _establish_connection(self, ip, port, timeout=2):
         conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         conn.settimeout(timeout)
         attempts = 3
@@ -35,9 +35,8 @@ class PMX:
             try:
                 conn.connect((ip, port))
                 break
-            except (ConnectionRefusedError, OSError) as e:
+            except (ConnectionRefusedError, OSError):
                 print(f"Failed to connect to device at {ip}:{port}")
-            time.sleep(5)
         else:
             raise RuntimeError('Could not connect to PID controller')
         return conn
@@ -54,7 +53,7 @@ class PMX:
                     data = self.conn.recv(self.buffer_size).decode('utf-8')
                     return data
                 return
-            except (socket.timeout, OSError) as e:
+            except (socket.timeout, OSError):
                 print("Caught timeout waiting for responce from PMX. Trying again...")
                 time.sleep(1)
                 if attempt == 1:

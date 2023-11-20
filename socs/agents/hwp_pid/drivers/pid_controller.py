@@ -32,7 +32,7 @@ class PID:
         self.set_direction('0')
 
     @staticmethod
-    def _establish_connection(ip, port, timeout=5):
+    def _establish_connection(ip, port, timeout=2):
         """Connect to PID controller.
 
         Args:
@@ -54,9 +54,8 @@ class PID:
             try:
                 conn.connect((ip, port))
                 break
-            except (ConnectionRefusedError, OSError) as e:
+            except (ConnectionRefusedError, OSError):
                 print(f"Failed to connect to device at {ip}:{port}")
-            time.sleep(5)
         else:
             raise RuntimeError('Could not connect to PID controller')
         return conn
@@ -267,7 +266,7 @@ class PID:
                 time.sleep(0.5)  # Don't send messages too quickly
                 data = self.conn.recv(4096).decode().strip()
                 return data
-            except (socket.timeout, OSError) as e:
+            except (socket.timeout, OSError):
                 print("Caught timeout waiting for response from PID controller. "
                       + "Trying again...")
                 time.sleep(1)
