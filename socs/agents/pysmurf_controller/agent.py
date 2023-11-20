@@ -7,6 +7,7 @@ from twisted.python.failure import Failure
 
 matplotlib.use('Agg')
 import argparse
+import epics
 import os
 import sys
 import time
@@ -316,7 +317,7 @@ class PysmurfController:
                     stream_id=cfg.stream_id,
                 )
                 session.data.update(d)
-            except RuntimeError:
+            except (RuntimeError, epics.ca.ChannelAccessGetFailure):
                 self.log.warn("Could not connect to epics server! Waiting and "
                               "then trying again")
 
