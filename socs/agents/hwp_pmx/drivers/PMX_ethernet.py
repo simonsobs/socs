@@ -156,7 +156,7 @@ class PMX:
 
     def set_current_limit(self, curr_lim):
         """ Set the PMX current limit """
-        self.send_message(b'curr:prot %a\n' % curr_lim)
+        self.send_message(b'curr:prot %a\n' % curr_lim, read=False)
         self.wait()
         val = float(self.send_message(b'curr:prot?\n'))
         msg = "Current Limit: {:.3f} A".format(val)
