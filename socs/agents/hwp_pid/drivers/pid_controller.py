@@ -22,15 +22,17 @@ class PID:
 
     def __init__(self, ip, port, verb=False):
         self.verb = verb
+        self.ip = ip
+        self.port = port
         self.hex_freq = '00000'
         self.direction = None
         self.target = 0
         # Need to setup connection before setting direction
-        self.conn = self._establish_connection(ip, int(port))
+        self.conn = self._establish_connection(self.ip, int(self.port))
         self.set_direction('0')
 
     @staticmethod
-    def _establish_connection(ip, port, timeout=5):
+    def _establish_connection(ip, port, timeout=2):
         """Connect to PID controller.
 
         Args:
@@ -45,18 +47,17 @@ class PID:
 
         """
         conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        conn.settimeout(timeout)
         # unit tests might fail on first connection attempt
         attempts = 3
         for attempt in range(attempts):
             try:
                 conn.connect((ip, port))
                 break
-            except ConnectionRefusedError:
+            except (ConnectionRefusedError, OSError):
                 print(f"Failed to connect to device at {ip}:{port}")
-                print(f"Connection attempts remaining: {attempts-attempt-1}")
-            time.sleep(1)
-        conn.settimeout(timeout)
-
+        else:
+            raise RuntimeError('Could not connect to PID controller')
         return conn
 
     @staticmethod
@@ -259,20 +260,21 @@ class PID:
             str: Respnose from the controller.
 
         """
-        self.conn.sendall((msg + '\r\n').encode())
-        time.sleep(0.5)  # Don't send messages too quickly
         for attempt in range(2):
             try:
+                self.conn.sendall((msg + '\r\n').encode())
+                time.sleep(0.5)  # Don't send messages too quickly
                 data = self.conn.recv(4096).decode().strip()
-                break
-            except socket.timeout:
+                return data
+            except (socket.timeout, OSError):
                 print("Caught timeout waiting for response from PID controller. "
                       + "Trying again...")
                 time.sleep(1)
                 if attempt == 1:
-                    raise RuntimeError(
-                        'Response from PID controller timed out.')
-        return data
+                    print("Resetting connection")
+                    self.conn.close()
+                    self.conn = self._establish_connection(self.ip, int(self.port))
+                    return self.send_message(msg)
 
     def return_messages(self, msg):
         """Decode list of responses from PID controller and return useful

@@ -295,13 +295,17 @@ class HWPPIDAgent:
                 data = {'timestamp': time.time(),
                         'block_name': 'HWPPID', 'data': {}}
 
-                current_freq = self.pid.get_freq()
-                target_freq = self.pid.get_target()
-                direction = self.pid.get_direction()
+                try:
+                    current_freq = self.pid.get_freq()
+                    target_freq = self.pid.get_target()
+                    direction = self.pid.get_direction()
 
-                data['data']['current_freq'] = current_freq
-                data['data']['target_freq'] = target_freq
-                data['data']['direction'] = direction
+                    data['data']['current_freq'] = current_freq
+                    data['data']['target_freq'] = target_freq
+                    data['data']['direction'] = direction
+                except BaseException:
+                    time.sleep(1)
+                    continue
 
                 self.agent.publish_to_feed('hwppid', data)
 
