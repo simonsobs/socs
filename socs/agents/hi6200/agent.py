@@ -52,7 +52,14 @@ class Hi6200Agent:
                 return False, "Could not acquire lock"
 
             self.scale = Hi6200Interface(self.ip_address, self.tcp_port)
-
+            
+            #Try reading from the scale to make sure it actually connects correctly.
+            gross_weight = self.scale.read_scale_gross_weight()
+            
+            if gross_weight is None:
+                self.log.info(f"Initialization failed, could not connect to scale!") 
+                return False, 'Failed to Initialize Scale.'
+            
             self.log.info("Connected to scale.")
 
         return True, 'Initialized Scale.'
@@ -84,11 +91,22 @@ class Hi6200Agent:
                     }
 
                     try:
-                        data['data']["Gross"] = self.scale.read_scale_gross_weight()
-                        data['data']["Net"] = self.scale.read_scale_net_weight()
-
-                        self.agent.publish_to_feed('scale_output', data)
-
+                        #Grab the gross and net weights from the scale.
+                        gross_weight = self.scale.read_scale_gross_weight()
+                        net_weight = self.scale.read_scale_net_weight()
+                        
+                        #The above functions return None when an Attribute error is thrown.
+                        #If they did not return None and threw no errors, the data is good.
+                        if (gross_weight is not None) and (net_weight is not None):
+                            data['data']["Gross"] = gross_weight
+                            data['data']["Net"] = net_weight
+                        
+                            self.agent.publish_to_feed('scale_output', data)
+                        
+                        #If they did return None, we need to attempt to reconnect to the scale.
+                        else: 
+                            self.init()
+                            
                     except ValueError as e:
                         self.log.error(f"Scale responded with an anomolous number, ignorning: {e}")
 
