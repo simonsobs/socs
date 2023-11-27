@@ -30,6 +30,8 @@ The different groups, and the agents they provide dependencies for are:
      - Magpie Agent
    * - ``pfeiffer``
      - Pfeiffer TC 400 Agent
+   * - ``pysmurf``
+     - Pysmurf Controller Agent
    * - ``smurf_sim``
      - SMuRF File Emulator, SMuRF Stream Simulator
    * - ``synacc``

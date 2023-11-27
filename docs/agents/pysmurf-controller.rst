@@ -33,6 +33,12 @@ These can be installed via pip:
     $ python -m pip install 'sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master'
     $ python -m pip install 'sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master'
 
+Additionally, ``socs`` should be installed with the ``pysmurf`` group:
+
+.. code-block:: bash
+
+    $ pip install -U socs[pysmurf]
+
 Configuration File Examples
 -----------------------------------
 

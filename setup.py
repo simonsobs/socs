@@ -37,11 +37,12 @@ magpie_deps = [
 pfeiffer_deps = ['pfeiffer-vacuum-protocol==0.4']
 
 # Pysmurf Controller Agent
-# pysmurf_deps = [
-#     'pysmurf @ git+https://github.com/slaclab/pysmurf.git@main',
-#     'sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master',
-#     'sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master',
-# ]
+pysmurf_deps = [
+    'pyepics',
+    # 'pysmurf @ git+https://github.com/slaclab/pysmurf.git@main',
+    # 'sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master',
+    # 'sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master',
+]
 
 # SMuRF File Emulator, SMuRF Stream Simulator
 smurf_sim_deps = ['so3g']
@@ -60,7 +61,7 @@ timing_master_deps = ['pyepics']
 # Note: Not including the holograph deps, which are Python 3.8 only. Also not
 # including any dependencies with only direct references.
 all_deps = acu_deps + labjack_deps + magpie_deps + pfeiffer_deps + \
-    smurf_sim_deps + synacc_deps + timing_master_deps
+    pysmurf_deps + smurf_sim_deps + synacc_deps + timing_master_deps
 all_deps = list(set(all_deps))
 
 setup(
@@ -119,7 +120,7 @@ setup(
         'labjack': labjack_deps,
         'magpie': magpie_deps,
         'pfeiffer': pfeiffer_deps,
-        # 'pysmurf': pysmurf_deps,
+        'pysmurf': pysmurf_deps,
         'smurf_sim': smurf_sim_deps,
         'synacc': synacc_deps,
         'timing_master': timing_master_deps,
