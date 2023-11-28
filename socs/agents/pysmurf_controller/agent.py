@@ -12,6 +12,7 @@ import sys
 import time
 from typing import Optional
 
+import epics
 import numpy as np
 import sodetlib as sdl
 from ocs import ocs_agent, site_config
@@ -316,7 +317,7 @@ class PysmurfController:
                     stream_id=cfg.stream_id,
                 )
                 session.data.update(d)
-            except RuntimeError:
+            except (RuntimeError, epics.ca.ChannelAccessGetFailure):
                 self.log.warn("Could not connect to epics server! Waiting and "
                               "then trying again")
 

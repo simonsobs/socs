@@ -103,7 +103,9 @@ The parameter details are here:
 
 - distance: Actuator moving distance [mm] (default: 10)
 - speedrate: Actuator speed rate [0.0, 5.0] (default: 0.2)
-  DO NOT use speedrate > 1.0 if el != 90 deg!!
+
+.. warning::
+  DO NOT use ``speedrate > 1.0`` if ``el != 90 deg``!
 
 
 Hardware Configurations

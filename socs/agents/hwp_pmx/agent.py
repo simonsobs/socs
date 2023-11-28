@@ -281,26 +281,31 @@ class HWPPMXAgent:
                     'block_name': 'hwppmx',
                     'data': {}
                 }
-                msg, curr = self.dev.meas_current()
-                data['data']['current'] = curr
 
-                msg, volt = self.dev.meas_voltage()
-                data['data']['voltage'] = volt
+                try:
+                    msg, curr = self.dev.meas_current()
+                    data['data']['current'] = curr
 
-                msg, code = self.dev.check_error()
-                data['data']['err_code'] = code
-                data['data']['err_msg'] = msg
+                    msg, volt = self.dev.meas_voltage()
+                    data['data']['voltage'] = volt
 
-                prot_code = self.dev.check_prot()
-                if prot_code != 0:
-                    self.prot = prot_code
+                    msg, code = self.dev.check_error()
+                    data['data']['err_code'] = code
+                    data['data']['err_msg'] = msg
 
-                prot_msg = self.dev.get_prot_msg(self.prot)
-                data['data']['prot_code'] = self.prot
-                data['data']['prot_msg'] = prot_msg
+                    prot_code = self.dev.check_prot()
+                    if prot_code != 0:
+                        self.prot = prot_code
 
-                msg, src = self.dev.check_source()
-                data['data']['source'] = src
+                    prot_msg = self.dev.get_prot_msg(self.prot)
+                    data['data']['prot_code'] = self.prot
+                    data['data']['prot_msg'] = prot_msg
+
+                    msg, src = self.dev.check_source()
+                    data['data']['source'] = src
+                except BaseException:
+                    time.sleep(sleep_time)
+                    continue
 
                 self.agent.publish_to_feed('hwppmx', data)
                 session.data = {'curr': curr,

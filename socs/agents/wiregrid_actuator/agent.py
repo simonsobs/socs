@@ -278,18 +278,24 @@ class WiregridActuatorAgent:
 
     @ocs_agent.param('speedrate', default=1.0, type=float,
                      check=lambda x: 0.0 < x <= 5.0)
+    @ocs_agent.param('high_speed', default=False, type=bool)
     def insert(self, session, params=None):
-        """insert()
+        """insert(speedrate=1.0, high_speed=False)
 
         **Task** - Insert the wire-grid into the forebaffle interface above the
         SAT.
 
         Parameters:
             speedrate (float): Actuator speed rate [0.0, 5.0] (default: 1.0)
-                DO NOT use speedrate > 1.0 if el != 90 deg!!
+                DO NOT use ``speedrate > 1.0`` if ``el != 90 deg``!
+            high_speed (bool): If False, speedrate is limited to 1.0. Defaults
+                to False.
         """
         # Get parameters
         speedrate = params.get('speedrate')
+        high_speed = params.get('high_speed')
+        if not high_speed:
+            speedrate = min(speedrate, 1.0)
         self.log.info('insert(): set speed rate = {}'
                       .format(speedrate))
 
@@ -314,18 +320,24 @@ class WiregridActuatorAgent:
 
     @ocs_agent.param('speedrate', default=1.0, type=float,
                      check=lambda x: 0.0 < x <= 5.0)
+    @ocs_agent.param('high_speed', default=False, type=bool)
     def eject(self, session, params=None):
-        """eject()
+        """eject(speedrate=1.0, high_speed=False)
 
         **Task** - Eject the wire-grid from the forebaffle interface above the
         SAT.
 
         Parameters:
             speedrate (float): Actuator speed rate [0.0, 5.0] (default: 1.0)
-                DO NOT use speedrate > 1.0 if el != 90 deg!!
+                DO NOT use ``speedrate > 1.0`` if ``el != 90 deg``!
+            high_speed (bool): If False, speedrate is limited to 1.0. Defaults
+                to False.
         """
         # Get parameters
         speedrate = params.get('speedrate')
+        high_speed = params.get('high_speed')
+        if not high_speed:
+            speedrate = min(speedrate, 1.0)
         self.log.info('eject(): set speed rate = {}'
                       .format(speedrate))
 
@@ -472,8 +484,9 @@ class WiregridActuatorAgent:
     @ocs_agent.param('distance', default=10., type=float)
     @ocs_agent.param('speedrate', default=0.2, type=float,
                      check=lambda x: 0.0 < x <= 5.0)
+    @ocs_agent.param('high_speed', default=False, type=bool)
     def insert_test(self, session, params):
-        """insert_test(distance=10, speedrate=0.1)
+        """insert_test(distance=10, speedrate=0.2, high_speed=False)
 
         **Task** - Insert slowly the wire-grid into the forebaffle interface
         above the SAT with a small distance.
@@ -481,11 +494,16 @@ class WiregridActuatorAgent:
         Parameters:
             distance (float): Actuator moving distance [mm] (default: 10)
             speedrate (float): Actuator speed rate [0.0, 5.0] (default: 0.2)
-                DO NOT use speedrate > 1.0 if el != 90 deg!!
+                DO NOT use ``speedrate > 1.0`` if ``el != 90 deg``!
+            high_speed (bool): If False, speedrate is limited to 1.0. Defaults
+                to False.
         """
         # Get parameters
         distance = params.get('distance')
         speedrate = params.get('speedrate')
+        high_speed = params.get('high_speed')
+        if not high_speed:
+            speedrate = min(speedrate, 1.0)
         self.log.info('insert_test(): set distance   = {} mm'
                       .format(distance))
         self.log.info('insert_test(): set speed rate = {}'
@@ -524,8 +542,9 @@ class WiregridActuatorAgent:
     @ocs_agent.param('distance', default=10., type=float)
     @ocs_agent.param('speedrate', default=0.2, type=float,
                      check=lambda x: 0.0 < x <= 5.0)
+    @ocs_agent.param('high_speed', default=False, type=bool)
     def eject_test(self, session, params):
-        """eject_test(distance=10, speedrate=0.1)
+        """eject_test(distance=10, speedrate=0.2, high_speed=False)
 
         **Task** - Eject slowly the wire-grid from the forebaffle interface
         above the SAT with a small distance.
@@ -533,11 +552,16 @@ class WiregridActuatorAgent:
         Parameters:
             distance (float): Actuator moving distance [mm] (default: 10)
             speedrate (float): Actuator speed rate [0.0, 5.0] (default: 0.2)
-                DO NOT use speedrate > 1.0 if el != 90 deg!!
+                DO NOT use ``speedrate > 1.0`` if ``el != 90 deg``!
+            high_speed (bool): If False, speedrate is limited to 1.0. Defaults
+                to False.
         """
         # Get parameters
         distance = params.get('distance', 10)
         speedrate = params.get('speedrate', 0.2)
+        high_speed = params.get('high_speed')
+        if not high_speed:
+            speedrate = min(speedrate, 1.0)
         self.log.info('eject_test(): set distance   = {} mm'
                       .format(distance))
         self.log.info('eject_test(): set speed rate = {}'
