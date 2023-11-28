@@ -379,7 +379,7 @@ class HWPPMXAgent:
             if res['status'] != 'ok':
                 action = 'no_data'
             else:
-                action = res['data']['actions']['rotation']
+                action = res['data']['actions']['pmx']
 
             # If action is 'ok', update last_ok_time
             if action == 'ok':
