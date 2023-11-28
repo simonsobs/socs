@@ -69,12 +69,16 @@ class UCSCRadiometerAgent:
 
         while self.take_data:
             try:
-                r = requests.get(self.url)
+                r = requests.get(self.url, timeout=6)
             except ValueError:
                 pm.sleep()
                 continue
-            except requests.exceptions.ConnectionError:
-                self.log.warn("Unable to connect to radiometer server. Connection closed. Trying again..")
+            except requests.exceptions.ConnectionError as e:
+                self.log.warn(f"Connection error occured: {e}")
+                pm.sleep()
+                continue
+            except requests.exceptions.Timeout as e:
+                self.log.warn(f"Timeout exception occurred: {e}")
                 pm.sleep()
                 continue
             data = r.json()
