@@ -78,6 +78,7 @@ In the both of the functions, after the inserting/ejecting, the stopper locks th
 However, the motor power is not turned ON or OFF during the both functions.
 
 The parameter details are here:
+
 - speedrate: Actuator speed rate [0.0, 5.0] (default: 1.0)
 
 **Test Functions**
