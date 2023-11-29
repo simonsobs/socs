@@ -258,6 +258,9 @@ class ACUAgent:
                             self.set_boresight,
                             blocking=False,
                             aborter=self._simple_task_abort)
+        agent.register_task('set_speed_mode',
+                            self.set_speed_mode,
+                            blocking=False)
         agent.register_task('stop_and_clear',
                             self.stop_and_clear,
                             blocking=False)
@@ -1299,6 +1302,40 @@ class ACUAgent:
                 yield self._set_modes(third='Stop')
 
         return ok, msg
+
+    @ocs_agent.param('speed_mode', choices=['high', 'low'])
+    @inlineCallbacks
+    def set_speed_mode(self, session, params):
+        """set_speed_mode(speed_mode)
+
+        **Task** - Set the ACU Speed Mode.  This affects motion when
+        in Preset mode, such as when using go_to in this Agent.  It
+        should not affect the speed of scans done in ProgramTrack
+        mode.
+
+        Parameters:
+          speed_mode (str): 'high' or 'low'.
+
+        Notes:
+          The axes must be in Stop mode for this to work.  This task
+          will return an error if the command appears to have failed.
+
+          The actual speed and acceleration settings for the "high"
+          and "low" (perhaps called "aux") settings must be configured
+          on the ACU front panel.
+
+        """
+        http = aculib.streams.ModularHttpInterface(
+            self.acu_config['dev_url'], backend=TwistedHttpBackend())
+        data = 'Command=Set Speed ' + params['speed_mode'].capitalize()
+        resp_bytes = yield http.Post(data, 'DataSets.CmdGeneralTransfer', '3')
+        resp = resp_bytes.decode('utf8')
+        if '<p>Status: executed</p>' in resp:
+            return True, "Speed mode changed."
+        elif '<p>Status: not allowed</p>' in resp:
+            return False, "Mode change blocked (are you in Stop?)"
+        else:
+            return False, "Response was not as expected."
 
     def _set_default_scan_params(self):
         # A reference to scan_params is cached in monitor, so copy
