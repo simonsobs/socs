@@ -77,6 +77,10 @@ The main functions are ``insert()`` and ``eject()``.
 In the both of the functions, after the inserting/ejecting, the stopper locks the actuators again.
 However, the motor power is not turned ON or OFF during the both functions.
 
+The parameter details are here:
+
+- speedrate: Actuator speed rate [0.0, 5.0] (default: 1.0)
+
 **Test Functions**
  - check_limitswitch(): Check ON/OFF of the limit switches
  - check_stopper(): Check ON/OFF (lock/unlock) of the stoppers
@@ -99,9 +103,6 @@ The parameter details are here:
 
 - distance: Actuator moving distance [mm] (default: 10)
 - speedrate: Actuator speed rate [0.0, 5.0] (default: 0.2)
-
-.. warning::
-  DO NOT use ``speedrate > 1.0`` if ``el != 90 deg``!
 
 
 Hardware Configurations

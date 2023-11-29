@@ -212,12 +212,12 @@ class Actuator:
             msg = 'Actuator:move(): WARNING!: Did NOT move due to STOP flag.'
             print(msg)
             return False
-        if speedrate < 0. or speedrate > 1.:
+        if speedrate < 0. or speedrate > 5.:
             print('Actuator:move(): WARNING!: '
-                  'Speedrate should be between 0 and 1.')
+                  'Speedrate should be between 0 and 5.')
             print('Actuator:move(): WARNING!: '
-                  'Speedrate is sed to 0.1.')
-            speedrate = 0.1
+                  'Speedrate is set to 1.0.')
+            speedrate = 1.0
         speed = \
             int(speedrate * (self.speed_max - self.speed_min) + self.speed_min)
         # distance_count is an absolute value
