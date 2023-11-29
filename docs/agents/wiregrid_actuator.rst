@@ -79,7 +79,7 @@ However, the motor power is not turned ON or OFF during the both functions.
 
 The parameter details are here:
 
- - speedrate: Actuator speed rate [0.0, 5.0] (default: 1.0)
+- speedrate: Actuator speed rate [0.0, 5.0] (default: 1.0)
 
 **Test Functions**
  - check_limitswitch(): Check ON/OFF of the limit switches
