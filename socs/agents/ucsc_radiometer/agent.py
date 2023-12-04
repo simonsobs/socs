@@ -69,7 +69,7 @@ class UCSCRadiometerAgent:
 
         while self.take_data:
             try:
-                r = requests.get(self.url, timeout=6)
+                r = requests.get(self.url, timeout=60)
             except ValueError:
                 pm.sleep()
                 continue
