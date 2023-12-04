@@ -1720,7 +1720,7 @@ class ACUAgent:
         ok, msg = self._check_scan_sunsafe(az_endpoint1, az_endpoint2, el_endpoint1,
                                            az_speed, az_accel)
         if ok:
-            self.log.info('Sun safety check passes: {msg}', msg=msg)
+            self.log.info('Sun safety check: {msg}', msg=msg)
         else:
             self.log.error('Sun safety check fails: {msg}', msg=msg)
             return False, 'Scan is not Sun Safe.'
@@ -2370,6 +2370,17 @@ class ACUAgent:
         return True, "Exited."
 
     def _check_scan_sunsafe(self, az1, az2, el, v_az, a_az):
+        """This will return True if active avoidance is disabled.  If active
+        avoidance is enabled, then it will only return true if the
+        planned scan seems to currently be sun-safe.
+
+        """
+        if not self._get_sun_policy('sunsafe_moves'):
+            return True, 'Sun-safety checking is not enabled.'
+
+        if not self._get_sun_policy('map_valid'):
+            return False, 'Sun Safety Map not computed or stale; run the monitor_sun process.'
+
         # Include a bit of buffer for turn-arounds.
         az1, az2 = min(az1, az2), max(az1, az2)
         turn = v_az**2 / a_az
@@ -2385,10 +2396,7 @@ class ACUAgent:
         else:
             msg = 'Scan will be unsafe in %.1f hours' % (info['sun_time'] / 3600)
 
-        if self._get_sun_policy('sunsafe_moves'):
-            return safe, msg
-        else:
-            return True, 'Sun-safety not active; %s' % msg
+        return safe, msg
 
     def _get_sunsafe_moves(self, target_az, target_el):
         """Given a target position, find a Sun-safe way to get there.  This
