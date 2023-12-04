@@ -40,11 +40,18 @@ DEFAULT_SCAN_PARAMS = {
 }
 
 
-#: Default Sun avoidance params by platform type (enabled, policy)
+#: Default Sun avoidance params by platform type (enabled, policy). If
+#: either of escape *or* monitoring is enabled, then the full policy
+#: must be specified.
 SUN_CONFIGS = {
     'ccat': {
         'enabled': False,
-        'policy': {},
+        'policy': {
+            'exclusion_radius': 20,
+            'el_horizon': 10,
+            'min_sun_time': 1800,
+            'response_time': 7200,
+        },
     },
     'satp': {
         'enabled': True,
