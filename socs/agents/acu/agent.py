@@ -2208,6 +2208,8 @@ class ACUAgent:
 
             yield dsleep(1)
 
+        return True, 'monitor_sun exited cleanly.'
+
     @ocs_agent.param('reset', type=bool, default=None)
     @ocs_agent.param('enable', type=bool, default=None)
     @ocs_agent.param('temporary_disable', type=float, default=None)
