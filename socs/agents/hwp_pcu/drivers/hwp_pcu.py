@@ -6,7 +6,7 @@ class PCU:
 
     Args:
         port (str): Path to USB device in '/dev/'
-    
+
     Attributes:
         status (str): The status of the unit (off/on_1/on_2/hold)
     """
@@ -29,21 +29,21 @@ class PCU:
         cmd = "relay off " + str(channel) + "\n\r"
         self.port.write(cmd.encode('utf-8'))
         time.sleep(.1)
-    
+
     def relay_read(self, channel):
         cmd = "relay read " + str(channel) + "\n\r"
         self.port.write(cmd.encode('utf-8'))
-        response = self.port.read(21)
+        time.sleep(.1)
+        response = self.port.read(25)
+        time.sleep(.1)
         response = response.decode('utf-8')
         if response.find("on") > 0:
             return True
-    
         elif response.find("off") > 0:
             return False
-    
         else:
             return -1
-        
+    
     def get_status(self):
         """get_status()
 
@@ -52,11 +52,10 @@ class PCU:
         on_1:The compensation phase is +120 deg.
         on_2: The compensation phase is -120 deg.
         hold: Stop the HWP spin.
-
         """
         channel = [0, 1, 2, 5, 6, 7]
         channel_switch = []
-        
+
         for i in channel:
             channel_switch.append(self.relay_read(i))
         if channel_switch == [False, False, False, False, False, False]:
@@ -69,7 +68,3 @@ class PCU:
             return 'hold'
         else:
             return 'undefined'
-            
-
-
-
