@@ -1,5 +1,7 @@
-import serial
 import time
+
+import serial
+
 
 class PCU:
     """Class to communicate with the phase compensation unit.
@@ -10,6 +12,7 @@ class PCU:
     Attributes:
         status (str): The status of the unit (off/on_1/on_2/hold)
     """
+
     def __init__(self, port):
         self.port = serial.Serial(
             port,
@@ -43,7 +46,7 @@ class PCU:
             return False
         else:
             return -1
-    
+
     def get_status(self):
         """get_status()
 

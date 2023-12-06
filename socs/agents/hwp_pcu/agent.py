@@ -29,7 +29,7 @@ class HWPPCUAgent:
 
         agg_params = {'frame_length': 60}
         self.agent.register_feed(
-                'hwppcu', record=True, agg_params=agg_params)
+            'hwppcu', record=True, agg_params=agg_params)
 
     @ocs_agent.param('auto_acquire', default=False, type=bool)
     @ocs_agent.param('force', default=False, type=bool)
@@ -71,7 +71,6 @@ class HWPPCUAgent:
             self.agent.start('acq')
 
         return True, 'Connection to PCU established'
-
 
     @ocs_agent.param('command', default='off', type=str)
     def send_command(self, session, params):
@@ -175,7 +174,7 @@ class HWPPCUAgent:
                 data = {'timestamp': time.time(),
                         'block_name': 'hwppcu', 'data': {}}
 
-                #status = self.PCU.get_status()
+                # status = self.PCU.get_status()
                 status = self.status
                 data['data']['status'] = status
 
