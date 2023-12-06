@@ -3,8 +3,13 @@ import os
 import time
 import warnings
 from typing import Optional
-
+import queue
+from dataclasses import dataclass, field
+from enum import Enum
+from twisted.internet import defer
 import txaio
+txaio.use_twisted()
+from ocs.ocs_twisted import Pacemaker
 
 from socs.Lakeshore.Lakeshore240 import Module
 
@@ -14,70 +19,84 @@ if not on_rtd:
     from ocs.ocs_twisted import TimeoutLock
 
 
+class Actions:
+    class BaseAction:
+        def __post_init__(self):
+            self.defered = defer.Deferred()
+            self.log = txaio.make_logger()
+
+        def process(self, *args, **kwargs):
+            raise NotImplementedError
+
+    @dataclass
+    class UploadCalCurve(BaseAction):
+        channel: int
+        filename: str
+
+        def process(self, module, log=None):
+            if log is None:
+                log = self.log
+
+            log.info(f"Starting upload to channel {self.channel}...")
+            channel = module.channels[self.channel - 1]
+            channel.load_curve(self.filename)
+            time.sleep(0.1)
+            return True
+
+    @dataclass
+    class SetValues(BaseAction):
+        channel: int
+        sensor: Optional[int] = None
+        auto_range: Optional[int] = None
+        range: Optional[int] = None
+        current_reversal: Optional[int] = None
+        unit: Optional[int] = None
+        enabled: Optional[int] = None
+        name: Optional[str] = None
+
+        def process(self, module, log=None):
+            if log is None:
+                log = self.log
+
+            log.info(f"Setting values for channel {self.channel}...")
+            module.channels[self.channel - 1].set_values(
+                sensor=self.sensor,
+                auto_range=self.auto_range,
+                range=self.range,
+                current_reversal=self.current_reversal,
+                unit=self.unit,
+                enabled=self.enabled,
+                name=self.name,
+            )
+            time.sleep(0.1)
+            return True
+
 class LS240_Agent:
-
     def __init__(self, agent, port="/dev/ttyUSB0", f_sample=2.5):
-
         self.agent: ocs_agent.OCSAgent = agent
         self.log = agent.log
-        self.lock = TimeoutLock()
-
         self.port = port
-        self.module: Optional[Module] = None
-
         self.f_sample = f_sample
-
-        self.initialized = False
-        self.take_data = False
+        self.action_queue = queue.Queue()
 
         # Registers Temperature and Voltage feeds
         agg_params = {
             'frame_length': 60,
         }
-        self.agent.register_feed('temperatures',
-                                 record=True,
-                                 agg_params=agg_params,
-                                 buffer_time=1)
+        self.agent.register_feed(
+            'temperatures', record=True,
+            agg_params=agg_params, buffer_time=1
+        )
 
-    # Task functions.
-    def init_lakeshore(self, session, params=None):
-        """init_lakeshore(auto_acquire=False)
-
-        **Task** - Perform first time setup of the Lakeshore 240 Module.
-
-        Parameters:
-            auto_acquire (bool, optional): Starts data acquisition after
-                initialization if True. Defaults to False.
-
+    def _init_lakeshore(self):
         """
-        if params is None:
-            params = {}
+        Creates new lakeshore module
+        """
+        module = Module(port=self.port)
+        self.log.info("Lakeshore initialized with ID: %s" % module.inst_sn)
+        return module
 
-        auto_acquire = params.get('auto_acquire', False)
-
-        if self.initialized:
-            return True, "Already Initialized Module"
-
-        with self.lock.acquire_timeout(0, job='init') as acquired:
-            if not acquired:
-                self.log.warn("Could not start init because "
-                              "{} is already running".format(self.lock.job))
-                return False, "Could not acquire lock."
-
-            session.set_status('starting')
-
-            self.module = Module(port=self.port)
-            print("Initialized Lakeshore module: {!s}".format(self.module))
-            session.add_message("Lakeshore initialized with ID: %s" % self.module.inst_sn)
-
-        self.initialized = True
-
-        # Start data acquisition if requested
-        if auto_acquire:
-            self.agent.start('acq')
-
-        return True, 'Lakeshore module initialized.'
-
+    @defer.inlineCallbacks
     def set_values(self, session, params=None):
         """set_values(channel, sensor=None, auto_range=None, range=None,\
                 current_reversal=None, units=None, enabled=None, name=None)
@@ -112,27 +131,12 @@ class LS240_Agent:
                 Sets name of channel.
 
         """
-        if params is None:
-            params = {}
+        action = Actions.SetValues(**params)
+        self.action_queue.put(action)
+        session.data = yield action.defered
+        return True, f"Set values for channel {action.channel}"
 
-        with self.lock.acquire_timeout(0, job='set_values') as acquired:
-            if not acquired:
-                self.log.warn("Could not start set_values because "
-                              "{} is already running".format(self.lock.job))
-                return False, "Could not acquire lock."
-
-            self.module.channels[params['channel'] - 1].set_values(
-                sensor=params.get('sensor'),
-                auto_range=params.get('auto_range'),
-                range=params.get('range'),
-                current_reversal=params.get('current_reversal'),
-                unit=params.get('unit'),
-                enabled=params.get('enabled'),
-                name=params.get('name'),
-            )
-
-        return True, 'Set values for channel {}'.format(params['channel'])
-
+    @defer.inlineCallbacks
     def upload_cal_curve(self, session, params=None):
         """upload_cal_curve(channel, filename)
 
@@ -141,113 +145,87 @@ class LS240_Agent:
         Parameters:
             channel (int): Channel number, 1-8.
             filename (str): Filename for calibration curve.
-
         """
-        channel = params['channel']
-        filename = params['filename']
+        action = Actions.UploadCalCurve(**params)
+        self.action_queue.put(action)
+        session.data = yield action.defered
+        return True, f"Uploaded curve to channel {action.channel}"
 
-        with self.lock.acquire_timeout(0, job='upload_cal_curve') as acquired:
-            if not acquired:
-                self.log.warn("Could not start set_values because "
-                              "{} is already running".format(self.lock.job))
-                return False, "Could not acquire lock."
-
-            channel = self.module.channels[channel - 1]
-            self.log.info("Starting upload to channel {}...".format(channel))
-            channel.load_curve(filename)
-            self.log.info("Finished uploading.")
-
-        return True, "Uploaded curve to channel {}".format(channel)
-
-    def acq(self, session, params=None):
-        """acq(sampling_frequency=2.5)
-
-        **Process** - Start data acquisition.
-
-        Parameters:
-            sampling_frequency (float):
-                Sampling frequency for data collection. Defaults to 2.5 Hz
-
-
-        The most recent data collected is stored in session data in the
-        structure::
-
-            >>> response.session['data']
-            {"fields":
-                {"Channel_1": {"T": 99.26, "V": 99.42},
-                 "Channel_2": {"T": 99.54, "V": 101.06},
-                 "Channel_3": {"T": 100.11, "V":100.79},
-                 "Channel_4": {"T": 98.49, "V": 100.77},
-                 "Channel_5": {"T": 97.75, "V": 101.45},
-                 "Channel_6": {"T": 99.58, "V": 101.75},
-                 "Channel_7": {"T": 98.03, "V": 100.82},
-                 "Channel_8": {"T": 101.14, "V":101.01}},
-             "timestamp":1601925677.6914878}
-
+    def _get_and_pub_temp_data(self, module: Module, session: ocs_agent.OpSession):
         """
-        if params is None:
-            params = {}
-
-        f_sample = params.get('sampling_frequency')
-        # If f_sample is None, use value passed to Agent init
-        if f_sample is None:
-            f_sample = self.f_sample
-
-        sleep_time = 1 / f_sample - 0.01
-
-        with self.lock.acquire_timeout(0, job='acq') as acquired:
-            if not acquired:
-                self.log.warn("Could not start acq because {} is already running"
-                              .format(self.lock.job))
-                return False, "Could not acquire lock."
-
-            session.set_status('running')
-
-            self.take_data = True
-
-            session.data = {"fields": {}}
-
-            while self.take_data:
-                current_time = time.time()
-                data = {
-                    'timestamp': current_time,
-                    'block_name': 'temps',
-                    'data': {}
-                }
-
-                for chan in self.module.channels:
-                    # Read sensor on channel
-                    chan_string = "Channel_{}".format(chan.channel_num)
-                    temp_reading = chan.get_reading(unit='K')
-                    sensor_reading = chan.get_reading(unit='S')
-
-                    # For data feed
-                    data['data'][chan_string + '_T'] = temp_reading
-                    data['data'][chan_string + '_V'] = sensor_reading
-
-                    # For session.data
-                    field_dict = {chan_string: {"T": temp_reading, "V": sensor_reading}}
-                    session.data['fields'].update(field_dict)
-
-                self.agent.publish_to_feed('temperatures', data)
-
-                session.data.update({'timestamp': current_time})
-
-                time.sleep(sleep_time)
-
-            self.agent.feeds['temperatures'].flush_buffer()
-
-        return True, 'Acquisition exited cleanly.'
-
-    def _stop_acq(self, session, params=None):
+        Gets temperature data from the LS240, publishes to OCS feed, and updates
+        session.data
         """
-        Stops acq process.
+        current_time = time.time()
+        data = {
+            'timestamp': current_time,
+            'block_name': 'temps',
+            'data': {}
+        }
+        # Get Temps
+        field_dict = {}
+        for chan in module.channels:
+            # Read sensor on channel
+            chan_string = "Channel_{}".format(chan.channel_num)
+            temp_reading = chan.get_reading(unit='K')
+            sensor_reading = chan.get_reading(unit='S')
+
+            # For data feed
+            data['data'][chan_string + '_T'] = temp_reading
+            data['data'][chan_string + '_V'] = sensor_reading
+
+            # For session.data
+            field_dict[chan_string] = {"T": temp_reading, "V": sensor_reading}
+
+        session.data['fields'] = field_dict
+        self.agent.publish_to_feed('temperatures', data)
+        session.data['timestamp'] = current_time
+        return data
+
+    def _process_actions(self, module: Module):
+        while not self.action_queue.empty():
+            action = self.action_queue.get()
+            try:
+                self.log.info(f"Running action {action}")
+                res = action.process(module)
+                action.defered.callback(res)
+            except Exception as e:
+                self.log.error(f"Error processing action: {action}")
+                action.defered.errback(e)
+
+    def main(self, session: ocs_agent.OpSession, params=None):
         """
-        if self.take_data:
-            self.take_data = False
-            return True, 'requested to stop taking data.'
-        else:
-            return False, 'acq is not currently running'
+        **Process** - Main process for the Lakeshore240 agent.
+        Gets temperature data at specified sample rate, and processes commands.
+        """
+        module: Optional[Module] = None
+        session.set_status('running')
+        pm = Pacemaker(self.f_sample, quantize=False)
+        while session.status in ['starting', 'running']:
+            if module is None:
+                try:
+                    module = self._init_lakeshore()
+                except ConnectionRefusedError:
+                    self.log.error(
+                        "Could not connect to Lakeshore. "
+                        "Retrying after 30 sec..."
+                    )
+                    time.sleep(30)
+                    pm.sleep()
+                    continue
+
+            try:
+                self._get_and_pub_temp_data(module, session)
+                self._process_actions(module)
+            except (ConnectionError, TimeoutError):
+                self.log.error("Connection to Lakeshore lost. Attempting to reconnect...")
+                module = None
+
+        return True, "Ended main process"
+
+    def _stop_main(self, session, params=None):
+        session.set_status('stopping')
+        return True, 'Requesting to stop main process'
 
 
 def make_parser(parser=None):
@@ -290,12 +268,10 @@ def main(args=None):
         warnings.warn("WARNING: the --num-channels parameter is deprecated, please "
                       "remove from your site-config file", DeprecationWarning)
 
-    # Automatically acquire data if requested (default)
-    init_params = False
-    if args.mode == 'init':
-        init_params = {'auto_acquire': False}
-    elif args.mode == 'acq':
-        init_params = {'auto_acquire': True}
+    if args.mode is not None:
+        warnings.warn(
+            "WARNING: the --init-mode parameter is deprecated, please "
+            "remove from your site-config file", DeprecationWarning)
 
     device_port = None
     if args.port is not None:
@@ -328,12 +304,9 @@ def main(args=None):
         kwargs['f_sample'] = float(args.sampling_frequency)
 
     therm = LS240_Agent(agent, **kwargs)
-
-    agent.register_task('init_lakeshore', therm.init_lakeshore,
-                        startup=init_params)
-    agent.register_task('set_values', therm.set_values)
-    agent.register_task('upload_cal_curve', therm.upload_cal_curve)
-    agent.register_process('acq', therm.acq, therm._stop_acq)
+    agent.register_task('set_values', therm.set_values, blocking=False)
+    agent.register_task('upload_cal_curve', therm.upload_cal_curve, blocking=False)
+    agent.register_process('main', therm.main, therm._stop_main, startup=True)
 
     runner.run(agent, auto_reconnect=True)
 
