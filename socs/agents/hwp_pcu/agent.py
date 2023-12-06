@@ -6,7 +6,7 @@ import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
-import drivers.hwp_pcu as pcu
+import socs.agents.hwp_pcu.drivers.hwp_pcu as pcu
 
 
 class HWPPCUAgent:
