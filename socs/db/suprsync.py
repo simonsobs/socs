@@ -347,7 +347,8 @@ class SupRsyncFilesManager:
         query = session.query(SupRsyncFile).filter(
             SupRsyncFile.removed == None,  # noqa: E711
             SupRsyncFile.archive_name == archive_name,
-            SupRsyncFile.failed_copy_attempts < max_copy_attempts
+            SupRsyncFile.failed_copy_attempts < max_copy_attempts,
+            SupRsyncFile.ignore == False,  # noqa: E712
         )
 
         files = []
