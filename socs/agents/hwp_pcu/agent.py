@@ -6,7 +6,7 @@ import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
-import socs.agents.hwp_pcu.drivers.hwp_pcu as pcu
+import drivers.hwp_pcu as pcu
 
 
 class HWPPCUAgent:
@@ -63,7 +63,7 @@ class HWPPCUAgent:
                 self.log.error('Could not establish connection to PCU')
                 reactor.callFromThread(reactor.stop)
                 return False, 'Unable to connect to PCU'
-
+        self.status = self.PCU.get_status()
         self.initialized = True
 
         # Start 'acq' Process if requested
@@ -72,9 +72,10 @@ class HWPPCUAgent:
 
         return True, 'Connection to PCU established'
 
+
     @ocs_agent.param('command', default='off', type=str)
     def send_command(self, session, params):
-        """send_command(command='on_1')
+        """send_command(command)
 
         **Task** - Send commands to the phase compensation unit.
         off: The compensation phase is zero.
@@ -96,8 +97,9 @@ class HWPPCUAgent:
             off_channel = [0, 1, 2, 5, 6, 7]
             for i in off_channel:
                 self.PCU.relay_off(i)
+            self.status = 'off'
             msg = 'Phase compensation is "off".'
-            return 'off', msg
+            return True, msg
 
         elif command == 'on_1':
             on_channel = [0, 1, 2]
@@ -106,15 +108,17 @@ class HWPPCUAgent:
                 self.PCU.relay_on(i)
             for i in off_channel:
                 self.PCU.relay_off(i)
+            self.status = 'on_1'
             msg = 'Phase compensation operates "on_1".'
-            return 'on_1', msg
+            return True, msg
 
         elif command == 'on_2':
             on_channel = [0, 1, 2, 5, 6, 7]
             for i in on_channel:
                 self.PCU.relay_on(i)
+            self.status = 'on_2'
             msg = 'Phase compensation operates "on_2".'
-            return 'on_2', msg            
+            return True, msg
 
         elif command == 'hold':
             on_channel = [0, 1, 2, 5]
@@ -123,12 +127,17 @@ class HWPPCUAgent:
                 self.PCU.relay_on(i)
             for i in off_channel:
                 self.PCU.relay_off(i)
+            self.status = 'hold'
             msg = 'Phase compensation operates "hold".'
-            return 'hold', msg  
+            return True, msg
 
         else:
             print("Choose the command from 'off', 'on_1', 'on_2' and 'hold'.")
 
+    def get_status(self, session, params):
+        self.status = self.PCU.get_status()
+        msg = 'Current status is ' + self.status
+        return True, msg
 
     def acq(self, session, params):
         """acq()
@@ -156,7 +165,7 @@ class HWPPCUAgent:
 
             while self.take_data:
                 # Relinquish sampling lock occasionally.
-                if time.time() - last_release > 10.:
+                if time.time() - last_release > 1.:
                     last_release = time.time()
                     if not self.lock.release_and_acquire(timeout=10):
                         self.log.warn(f"Failed to re-acquire sampling lock, "
@@ -166,7 +175,8 @@ class HWPPCUAgent:
                 data = {'timestamp': time.time(),
                         'block_name': 'hwppcu', 'data': {}}
 
-                status = self.PCU.get_status()
+                #status = self.PCU.get_status()
+                status = self.status
                 data['data']['status'] = status
 
                 self.agent.publish_to_feed('hwppcu', data)
@@ -174,7 +184,7 @@ class HWPPCUAgent:
                 session.data = {'status': status,
                                 'last_updated': time.time()}
 
-                time.sleep(10)
+                time.sleep(1)
 
         self.agent.feeds['hwppcu'].flush_buffer()
         return True, 'Acqusition exited cleanly'
@@ -189,6 +199,7 @@ class HWPPCUAgent:
             return True, 'requested to stop taking data'
 
         return False, 'acq is not currently running'
+
 
 def make_parser(parser=None):
     """
@@ -206,6 +217,7 @@ def make_parser(parser=None):
                         help="Starting operation for the Agent.")
     return parser
 
+
 def main(args=None):
     parser = make_parser()
     args = site_config.parse_args(agent_class='HWPPCUAgent',
@@ -219,13 +231,14 @@ def main(args=None):
         init_params = {'auto_acquire': True}
 
     agent, runner = ocs_agent.init_site_agent(args)
-    hwppcu_agent = HWPPCUAgent(agent, 
+    hwppcu_agent = HWPPCUAgent(agent,
                                port=args.port)
     agent.register_task('init_connection', hwppcu_agent.init_connection,
                         startup=init_params)
     agent.register_process('acq', hwppcu_agent.acq,
                            hwppcu_agent._stop_acq)
     agent.register_task('send_command', hwppcu_agent.send_command)
+    agent.register_task('get_status', hwppcu_agent.get_status)
 
     runner.run(agent, auto_reconnect=True)
 
