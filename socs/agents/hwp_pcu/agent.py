@@ -1,10 +1,9 @@
 import argparse
-import os
 import time
 
-import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
+from twisted.internet import reactor
 
 import socs.agents.hwp_pcu.drivers.hwp_pcu as pcu
 
