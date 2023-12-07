@@ -115,9 +115,11 @@ class SiteCameraAgent:
                 date = datetime.now(timezone.utc)
                 date_string = date.strftime("%Y_%m_%d@%H%M%S")
                 filename = f"screenshots/{camera['address']}/{date_string}.jpg"
+                latest_filename = f"screenshots/{camera['address']}/latest.jpg"
 
                 with open(filename, 'wb') as out_file:
                     shutil.copyfileobj(response.raw, out_file)
+                shutil.copy2(filename, latest_filename)
                 del response
                 self.log.debug(f"Wrote {date_string}.jpg to /{camera['address']}.")
 
