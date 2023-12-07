@@ -1,7 +1,7 @@
 import argparse
 import os
-import time
 import signal
+import time
 
 import txaio
 from autobahn.twisted.util import sleep as dsleep
@@ -309,7 +309,7 @@ class UPSAgent:
 
         session.set_status('running')
         self.is_streaming = True
-        timeout = time.time() + 60*60 # exit loop in 60 minutes
+        timeout = time.time() + 60 * 60  # exit loop in 60 minutes
         while self.is_streaming:
             if time.time() > timeout:
                 break
