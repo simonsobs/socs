@@ -438,8 +438,9 @@ class UPSAgent:
 
         # Exit agent to release memory
         # Add "restart: unless-stopped" to docker-compose to automatically restart container
-        self.log.info('60 minutes have elasped. Exiting agent.')
-        os.kill(os.getppid(), signal.SIGHUP)
+        if not params['test_mode']:
+            self.log.info('60 minutes have elasped. Exiting agent.')
+            os.kill(os.getppid(), signal.SIGHUP)
 
         return True, "Finished Recording"
 
