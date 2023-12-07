@@ -21,12 +21,12 @@ class SiteCameraAgent:
     ----------
     agent : OCSAgent
         OCSAgent object which forms this Agent
-    address : str
-        Address of the UPS.
-    port : int
-        SNMP port to issue GETs to, default to 161.
-    version : int
-        SNMP version for communication (1, 2, or 3), defaults to 3.
+    camera_addresses : list
+        List of IP addresses (as strings) of cameras.
+    user : str
+        Username of cameras.
+    password : str
+        Password of cameras.
 
     Attributes
     ----------
@@ -73,6 +73,17 @@ class SiteCameraAgent:
         test_mode : bool, optional
             Run the Process loop only once. Meant only for testing.
             Default is False.
+
+        Notes
+        -----
+        The most recent data collected is stored in session.data in the
+        structure::
+
+            >>> response.session['data']
+            # for each camera
+            {'camera1_last_attempt': 1701983575.032506,
+             'camera1_connected': True,
+             'camera1_address': '10.10.10.41'}
         """
 
         session.set_status('running')
@@ -83,7 +94,8 @@ class SiteCameraAgent:
             # Check if 60 seconds has passed before getting screenshot
             if (current_time - self.lastGet) < 60:
                 continue
-
+            
+            # Use UTC
             timestamp = datetime.now(timezone.utc).replace(tzinfo=timezone.utc).timestamp()
             data = {
                 'block_name': 'cameras',
@@ -99,6 +111,8 @@ class SiteCameraAgent:
                            'SNAPSHOT': 'N640x480,100',
                            'DUMMY': count}
                 url = f"http://{camera['address']}/cgi-bin/encoder"
+
+                # If no response from camera, update connection status and continue
                 try:
                     response = requests.get(url, params=payload, stream=True, timeout=5)
                 except requests.exceptions.RequestException as e:
@@ -117,6 +131,7 @@ class SiteCameraAgent:
                 filename = f"screenshots/{camera['address']}/{date_string}.jpg"
                 latest_filename = f"screenshots/{camera['address']}/latest.jpg"
 
+                # Write screenshot to file and update latest file
                 with open(filename, 'wb') as out_file:
                     shutil.copyfileobj(response.raw, out_file)
                 shutil.copy2(filename, latest_filename)
@@ -126,6 +141,7 @@ class SiteCameraAgent:
                 data['data'][f"camera{i+1}_last_attempt"] = date.replace(tzinfo=timezone.utc).timestamp()
                 data['data'][f"camera{i+1}_connected"] = self.cameras[i]['connected']
 
+            # Update session.data and publish to feed
             session.data = data['data']
             session.app.publish_to_feed('cameras', data)
             for camera in self.cameras:
