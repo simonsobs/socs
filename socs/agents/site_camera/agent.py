@@ -112,6 +112,12 @@ class SiteCameraAgent:
                            'DUMMY': count}
                 url = f"http://{camera['address']}/cgi-bin/encoder"
 
+                Path(f"screenshots/{camera['address']}").mkdir(parents=True, exist_ok=True)
+                date = datetime.now(timezone.utc)
+                date_string = date.strftime("%Y_%m_%d@%H%M%S")
+                filename = f"screenshots/{camera['address']}/{date_string}.jpg"
+                latest_filename = f"screenshots/{camera['address']}/latest.jpg"
+
                 # If no response from camera, update connection status and continue
                 try:
                     response = requests.get(url, params=payload, stream=True, timeout=5)
@@ -124,12 +130,6 @@ class SiteCameraAgent:
                     continue
                 self.cameras[i]['connected'] = True
                 self.log.debug("Received screenshot from camera.")
-
-                Path(f"screenshots/{camera['address']}").mkdir(parents=True, exist_ok=True)
-                date = datetime.now(timezone.utc)
-                date_string = date.strftime("%Y_%m_%d@%H%M%S")
-                filename = f"screenshots/{camera['address']}/{date_string}.jpg"
-                latest_filename = f"screenshots/{camera['address']}/latest.jpg"
 
                 # Write screenshot to file and update latest file
                 with open(filename, 'wb') as out_file:
