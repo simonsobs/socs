@@ -1,18 +1,18 @@
 import argparse
 import os
+import shutil
 import time
+from datetime import datetime, timezone
+from pathlib import Path
 
+import requests
 import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
-from datetime import datetime, timezone
-import shutil
-import requests
-from pathlib import Path
-
 # For logging
 txaio.use_twisted()
+
 
 class SiteCameraAgent:
     """Grab screenshots from ACTi site cameras.
@@ -94,7 +94,7 @@ class SiteCameraAgent:
             # Check if 60 seconds has passed before getting screenshot
             if (current_time - self.lastGet) < 60:
                 continue
-            
+
             # Use UTC
             timestamp = datetime.now(timezone.utc).replace(tzinfo=timezone.utc).timestamp()
             data = {
@@ -145,7 +145,7 @@ class SiteCameraAgent:
             session.data = data['data']
             session.app.publish_to_feed('cameras', data)
             for camera in self.cameras:
-                session.data.update({f"camera{i+1}_address": camera['address']})    
+                session.data.update({f"camera{i+1}_address": camera['address']})
             self.log.debug("{data}", data=session.data)
 
             self.lastGet = time.time()
@@ -165,6 +165,7 @@ class SiteCameraAgent:
             return True, "Stopping Recording"
         else:
             return False, "Acq is not currently running"
+
 
 def add_agent_args(parser=None):
     """
