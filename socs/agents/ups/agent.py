@@ -1,6 +1,7 @@
 import argparse
 import os
 import time
+import signal
 
 import txaio
 from autobahn.twisted.util import sleep as dsleep
@@ -308,7 +309,10 @@ class UPSAgent:
 
         session.set_status('running')
         self.is_streaming = True
+        timeout = time.time() + 60*60 # exit loop in 60 minutes
         while self.is_streaming:
+            if time.time() > timeout:
+                break
             yield dsleep(1)
             if not self.connected:
                 self.log.error('No SNMP response. Check your connection.')
@@ -431,6 +435,11 @@ class UPSAgent:
 
             if params['test_mode']:
                 break
+
+        # Exit agent to release memory
+        # Add "restart: unless-stopped" to docker-compose to automatically restart container
+        self.log.info('60 minutes have elasped. Exiting agent.')
+        os.kill(os.getppid(), signal.SIGHUP)
 
         return True, "Finished Recording"
 

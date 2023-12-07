@@ -53,10 +53,13 @@ example docker-compose service configuration is shown here::
       - SITE_HUB=ws://127.0.0.1:8001/ws
       - SITE_HTTP=http://127.0.0.1:8001/call
       - LOGLEVEL=info
+    restart: unless-stopped
 
 
 The ``LOGLEVEL`` environment variable can be used to set the log level for
 debugging. The default level is "info".
+Since the agent exits in 60 minutes, we must set ``restart: unless-stopped``
+to automatically restart the docker container.
 
 Description
 -----------
