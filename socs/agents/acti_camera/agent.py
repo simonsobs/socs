@@ -8,7 +8,7 @@ from pathlib import Path
 import requests
 import txaio
 from ocs import ocs_agent, site_config
-from ocs.ocs_twisted import TimeoutLock
+from ocs.ocs_twisted import Pacemaker, TimeoutLock
 
 # For logging
 txaio.use_twisted()
@@ -33,8 +33,8 @@ class ACTiCameraAgent:
     agent : OCSAgent
         OCSAgent object which forms this Agent
     is_streaming : bool
-        Tracks whether or not the agent is actively issuing SNMP GET commands
-        to the UPS. Setting to false stops sending commands.
+        Tracks whether or not the agent is actively issuing requests to grab
+        screenshots from cameras. Setting to false stops sending commands.
     log : txaio.tx.Logger
         txaio logger object, created by the OCSAgent
     """
@@ -52,8 +52,6 @@ class ACTiCameraAgent:
         self.user = user
         self.password = password
 
-        self.lastGet = 0
-
         agg_params = {
             'frame_length': 10 * 60  # [sec]
         }
@@ -64,9 +62,9 @@ class ACTiCameraAgent:
 
     @ocs_agent.param('test_mode', default=False, type=bool)
     def acq(self, session, params=None):
-        """acq()
+        """acq(test_mode=False)
 
-        **Process** - Fetch values from the UPS via SNMP.
+        **Process** - Grab screenshots from ACTi cameras.
 
         Parameters
         ----------
@@ -85,18 +83,16 @@ class ACTiCameraAgent:
              'camera1_connected': True,
              'camera1_address': '10.10.10.41'}
         """
+        pm = Pacemaker(1 / 60, quantize=False)
 
         session.set_status('running')
         self.is_streaming = True
         count = 0
         while self.is_streaming:
             current_time = time.time()
-            # Check if 60 seconds has passed before getting screenshot
-            if (current_time - self.lastGet) < 60:
-                continue
 
             # Use UTC
-            timestamp = datetime.now(timezone.utc).replace(tzinfo=timezone.utc).timestamp()
+            timestamp = time.time()
             data = {
                 'block_name': 'cameras',
                 'timestamp': timestamp,
@@ -112,10 +108,11 @@ class ACTiCameraAgent:
                            'DUMMY': count}
                 url = f"http://{camera['address']}/cgi-bin/encoder"
 
+                # Format directory and filename
                 Path(f"screenshots/{camera['address']}").mkdir(parents=True, exist_ok=True)
-                date = datetime.now(timezone.utc)
-                date_string = date.strftime("%Y_%m_%d@%H%M%S")
-                filename = f"screenshots/{camera['address']}/{date_string}.jpg"
+                ctime = int(timestamp)
+                ctime_dir = int(str(timestamp)[:5])
+                filename = f"screenshots/{camera['address']}/{ctime_dir}/{ctime}.jpg"
                 latest_filename = f"screenshots/{camera['address']}/latest.jpg"
 
                 # If no response from camera, update connection status and continue
@@ -125,7 +122,7 @@ class ACTiCameraAgent:
                     self.log.error(f'{e}')
                     self.log.info("Unable to get response from camera.")
                     self.cameras[i]['connected'] = False
-                    data['data'][f"camera{i+1}_last_attempt"] = date.replace(tzinfo=timezone.utc).timestamp()
+                    data['data'][f"camera{i+1}_last_attempt"] = time.time()
                     data['data'][f"camera{i+1}_connected"] = self.cameras[i]['connected']
                     continue
                 self.cameras[i]['connected'] = True
@@ -134,11 +131,12 @@ class ACTiCameraAgent:
                 # Write screenshot to file and update latest file
                 with open(filename, 'wb') as out_file:
                     shutil.copyfileobj(response.raw, out_file)
+                self.log.debug(f"Wrote {ctime}.jpg to /{camera['address']}/{ctime_dir}.")
                 shutil.copy2(filename, latest_filename)
+                self.log.debug(f"Updated latest.jpg in /{camera['address']}.")
                 del response
-                self.log.debug(f"Wrote {date_string}.jpg to /{camera['address']}.")
 
-                data['data'][f"camera{i+1}_last_attempt"] = date.replace(tzinfo=timezone.utc).timestamp()
+                data['data'][f"camera{i+1}_last_attempt"] = time.time()
                 data['data'][f"camera{i+1}_connected"] = self.cameras[i]['connected']
 
             # Update session.data and publish to feed
@@ -152,6 +150,8 @@ class ACTiCameraAgent:
 
             if params['test_mode']:
                 break
+            else:
+                pm.sleep()
 
         return True, "Finished Recording"
 
@@ -207,7 +207,7 @@ def main(args=None):
     agent.register_process("acq",
                            p.acq,
                            p._stop_acq,
-                           startup=init_params, blocking=False)
+                           startup=init_params)
 
     runner.run(agent, auto_reconnect=True)
 
