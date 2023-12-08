@@ -1,13 +1,15 @@
 import argparse
 import os
+import queue
 import time
 import warnings
-from typing import Optional
-import queue
 from dataclasses import dataclass, field
 from enum import Enum
-from twisted.internet import defer
+from typing import Optional
+
 import txaio
+from twisted.internet import defer
+
 txaio.use_twisted()
 from ocs.ocs_twisted import Pacemaker
 
@@ -70,6 +72,7 @@ class Actions:
             )
             time.sleep(0.1)
             return True
+
 
 class LS240_Agent:
     def __init__(self, agent, port="/dev/ttyUSB0", f_sample=2.5):
