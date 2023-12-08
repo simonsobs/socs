@@ -22,7 +22,7 @@ if not on_rtd:
 class Actions:
     class BaseAction:
         def __post_init__(self):
-            self.defered = defer.Deferred()
+            self.deferred = defer.Deferred()
             self.log = txaio.make_logger()
 
         def process(self, *args, **kwargs):
@@ -129,11 +129,10 @@ class LS240_Agent:
                 Sets if channel is enabled.
             name (str, optional):
                 Sets name of channel.
-
         """
         action = Actions.SetValues(**params)
         self.action_queue.put(action)
-        session.data = yield action.defered
+        session.data = yield action.deferred
         return True, f"Set values for channel {action.channel}"
 
     @defer.inlineCallbacks
@@ -148,7 +147,7 @@ class LS240_Agent:
         """
         action = Actions.UploadCalCurve(**params)
         self.action_queue.put(action)
-        session.data = yield action.defered
+        session.data = yield action.deferred
         return True, f"Uploaded curve to channel {action.channel}"
 
     def _get_and_pub_temp_data(self, module: Module, session: ocs_agent.OpSession):
@@ -188,10 +187,10 @@ class LS240_Agent:
             try:
                 self.log.info(f"Running action {action}")
                 res = action.process(module)
-                action.defered.callback(res)
+                action.deferred.callback(res)
             except Exception as e:
                 self.log.error(f"Error processing action: {action}")
-                action.defered.errback(e)
+                action.deferred.errback(e)
 
     def main(self, session: ocs_agent.OpSession, params=None):
         """
@@ -200,6 +199,12 @@ class LS240_Agent:
         """
         module: Optional[Module] = None
         session.set_status('running')
+
+        # Clear pre-existing actions
+        while not self.action_queue.empty():
+            action = self.action_queue.get()
+            action.deferred.errback(Exception("Action cancelled"))
+
         pm = Pacemaker(self.f_sample, quantize=False)
         while session.status in ['starting', 'running']:
             if module is None:
