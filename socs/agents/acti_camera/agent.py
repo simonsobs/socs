@@ -79,7 +79,8 @@ class ACTiCameraAgent:
 
             >>> response.session['data']
             # for each camera
-            {'camera1': {'last_attempt': 1701983575.032506,
+            {'camera1': {'location': 'location1',
+                         'last_attempt': 1701983575.032506,
                          'connected': True,
                          'address': '10.10.10.41'},
              'camera2': ...
@@ -96,6 +97,7 @@ class ACTiCameraAgent:
 
             count += 1
             for i, camera in enumerate(self.cameras):
+                data[camera['location']] = {'location': camera['location']}
                 self.log.info(f"Grabbing screenshot from {camera['location']}")
                 payload = {'USER': self.user,
                            'PWD': self.password,
@@ -104,9 +106,9 @@ class ACTiCameraAgent:
                 url = f"http://{camera['address']}/cgi-bin/encoder"
 
                 # Format directory and filename
-                Path(f"screenshots/{camera['location']}").mkdir(parents=True, exist_ok=True)
                 ctime = int(timestamp)
                 ctime_dir = int(str(timestamp)[:5])
+                Path(f"screenshots/{camera['location']}/{ctime_dir}").mkdir(parents=True, exist_ok=True)
                 filename = f"screenshots/{camera['location']}/{ctime_dir}/{ctime}.jpg"
                 latest_filename = f"screenshots/{camera['location']}/latest.jpg"
 
@@ -137,7 +139,7 @@ class ACTiCameraAgent:
             # Update session.data and publish to feed
             for camera in self.cameras:
                 data[camera['location']]['address'] = camera['address']
-            session.data = data['data']
+            session.data = data
             self.log.debug("{data}", data=session.data)
 
             message = {
