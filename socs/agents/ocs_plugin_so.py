@@ -11,6 +11,7 @@ import ocs
 root = os.path.abspath(os.path.split(__file__)[0])
 
 for n, f in [
+        ('ACTiCameraAgent', 'acti_camera/agent.py'),
         ('ACUAgent', 'acu/agent.py'),
         ('BlueforsAgent', 'bluefors/agent.py'),
         ('CrateAgent', 'smurf_crate_monitor/agent.py'),
@@ -37,7 +38,6 @@ for n, f in [
         ('PysmurfController', 'pysmurf_controller/agent.py'),
         ('PysmurfMonitor', 'pysmurf_monitor/agent.py'),
         ('ScpiPsuAgent', 'scpi_psu/agent.py'),
-        ('SiteCameraAgent', 'site_camera/agent.py'),
         ('SmurfFileEmulator', 'smurf_file_emulator/agent.py'),
         ('SmurfStreamSimulator', 'smurf_stream_simulator/agent.py'),
         ('SmurfTimingCardAgent', 'smurf_timing_card/agent.py'),

@@ -14,8 +14,8 @@ from ocs.ocs_twisted import TimeoutLock
 txaio.use_twisted()
 
 
-class SiteCameraAgent:
-    """Grab screenshots from ACTi site cameras.
+class ACTiCameraAgent:
+    """Grab screenshots from ACTi cameras.
 
     Parameters
     ----------
@@ -189,7 +189,7 @@ def main(args=None):
     txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
 
     parser = add_agent_args()
-    args = site_config.parse_args(agent_class='SiteCameraAgent',
+    args = site_config.parse_args(agent_class='ACTiCameraAgent',
                                   parser=parser,
                                   args=args)
 
@@ -199,7 +199,7 @@ def main(args=None):
         init_params = False
 
     agent, runner = ocs_agent.init_site_agent(args)
-    p = SiteCameraAgent(agent,
+    p = ACTiCameraAgent(agent,
                         camera_addresses=args.camera_addresses,
                         user=args.user,
                         password=args.password,)
