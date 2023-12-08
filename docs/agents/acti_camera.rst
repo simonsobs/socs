@@ -31,12 +31,15 @@ using all of the available arguments::
        'instance-id': 'cameras',
        'arguments': [['--mode', 'acq'],
                      ['--camera-addresses', ['10.10.10.41', '10.10.10.42', '10.10.10.43']],
+                     ['--locations', ['location1', 'location2', 'location3']],
                      ['--user', 'admin'],
                      ['--password', 'password']]},
 
 .. note::
     The ``--camera-addresses`` argument should be a list of the IP addresses
     of the cameras on the network.
+    The ``--locations`` argument should be a list of names for camera locations.
+    This should be in the same order as the list of IP addresses.
 
 Docker Compose
 ``````````````

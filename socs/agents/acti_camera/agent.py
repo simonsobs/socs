@@ -2,7 +2,6 @@ import argparse
 import os
 import shutil
 import time
-from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
@@ -39,15 +38,16 @@ class ACTiCameraAgent:
         txaio logger object, created by the OCSAgent
     """
 
-    def __init__(self, agent, camera_addresses, user, password):
+    def __init__(self, agent, camera_addresses, locations, user, password):
         self.agent = agent
         self.is_streaming = False
         self.log = self.agent.log
         self.lock = TimeoutLock()
 
         self.cameras = []
-        for camera in camera_addresses:
-            self.cameras.append({'address': camera,
+        for i, (location, address) in enumerate(zip(locations, camera_addresses)):
+            self.cameras.append({'location': location,
+                                 'address': address,
                                  'connected': True})
         self.user = user
         self.password = password
@@ -79,9 +79,10 @@ class ACTiCameraAgent:
 
             >>> response.session['data']
             # for each camera
-            {'camera1_last_attempt': 1701983575.032506,
-             'camera1_connected': True,
-             'camera1_address': '10.10.10.41'}
+            {'camera1': {'last_attempt': 1701983575.032506,
+                         'connected': True,
+                         'address': '10.10.10.41'},
+             'camera2': ...
         """
         pm = Pacemaker(1 / 60, quantize=False)
 
@@ -89,19 +90,13 @@ class ACTiCameraAgent:
         self.is_streaming = True
         count = 0
         while self.is_streaming:
-            current_time = time.time()
-
             # Use UTC
             timestamp = time.time()
-            data = {
-                'block_name': 'cameras',
-                'timestamp': timestamp,
-                'data': {}
-            }
+            data = {}
 
             count += 1
             for i, camera in enumerate(self.cameras):
-                self.log.info(f"Grabbing screenshot from {camera['address']}")
+                self.log.info(f"Grabbing screenshot from {camera['location']}")
                 payload = {'USER': self.user,
                            'PWD': self.password,
                            'SNAPSHOT': 'N640x480,100',
@@ -109,11 +104,11 @@ class ACTiCameraAgent:
                 url = f"http://{camera['address']}/cgi-bin/encoder"
 
                 # Format directory and filename
-                Path(f"screenshots/{camera['address']}").mkdir(parents=True, exist_ok=True)
+                Path(f"screenshots/{camera['location']}").mkdir(parents=True, exist_ok=True)
                 ctime = int(timestamp)
                 ctime_dir = int(str(timestamp)[:5])
-                filename = f"screenshots/{camera['address']}/{ctime_dir}/{ctime}.jpg"
-                latest_filename = f"screenshots/{camera['address']}/latest.jpg"
+                filename = f"screenshots/{camera['location']}/{ctime_dir}/{ctime}.jpg"
+                latest_filename = f"screenshots/{camera['location']}/latest.jpg"
 
                 # If no response from camera, update connection status and continue
                 try:
@@ -122,8 +117,8 @@ class ACTiCameraAgent:
                     self.log.error(f'{e}')
                     self.log.info("Unable to get response from camera.")
                     self.cameras[i]['connected'] = False
-                    data['data'][f"camera{i+1}_last_attempt"] = time.time()
-                    data['data'][f"camera{i+1}_connected"] = self.cameras[i]['connected']
+                    data[camera['location']]['last_attempt'] = time.time()
+                    data[camera['location']]['connected'] = self.cameras[i]['connected']
                     continue
                 self.cameras[i]['connected'] = True
                 self.log.debug("Received screenshot from camera.")
@@ -131,22 +126,29 @@ class ACTiCameraAgent:
                 # Write screenshot to file and update latest file
                 with open(filename, 'wb') as out_file:
                     shutil.copyfileobj(response.raw, out_file)
-                self.log.debug(f"Wrote {ctime}.jpg to /{camera['address']}/{ctime_dir}.")
+                self.log.debug(f"Wrote {ctime}.jpg to /{camera['location']}/{ctime_dir}.")
                 shutil.copy2(filename, latest_filename)
-                self.log.debug(f"Updated latest.jpg in /{camera['address']}.")
+                self.log.debug(f"Updated latest.jpg in /{camera['location']}.")
                 del response
 
-                data['data'][f"camera{i+1}_last_attempt"] = time.time()
-                data['data'][f"camera{i+1}_connected"] = self.cameras[i]['connected']
+                data[camera['location']]['last_attempt'] = time.time()
+                data[camera['location']]['connected'] = self.cameras[i]['connected']
 
             # Update session.data and publish to feed
-            session.data = data['data']
-            session.app.publish_to_feed('cameras', data)
             for camera in self.cameras:
-                session.data.update({f"camera{i+1}_address": camera['address']})
+                data[camera['location']]['address'] = camera['address']
+            session.data = data['data']
             self.log.debug("{data}", data=session.data)
 
-            self.lastGet = time.time()
+            message = {
+                'block_name': 'cameras',
+                'timestamp': timestamp,
+                'data': {}
+            }
+            for camera in self.cameras:
+                message['data'][camera['location'] + "_connected"] = int(camera['connected'])
+            session.app.publish_to_feed('cameras', message)
+            self.log.debug("{msg}", msg=message)
 
             if params['test_mode']:
                 break
@@ -177,6 +179,7 @@ def add_agent_args(parser=None):
 
     pgroup = parser.add_argument_group("Agent Options")
     pgroup.add_argument("--camera-addresses", nargs='+', type=str, help="List of camera IP addresses.")
+    pgroup.add_argument("--locations", nargs='+', type=str, help="List of camera locations.")
     pgroup.add_argument("--user", help="Username of camera.")
     pgroup.add_argument("--password", help="Password of camera.")
     pgroup.add_argument("--mode", choices=['acq', 'test'])
@@ -201,6 +204,7 @@ def main(args=None):
     agent, runner = ocs_agent.init_site_agent(args)
     p = ACTiCameraAgent(agent,
                         camera_addresses=args.camera_addresses,
+                        locations=args.locations,
                         user=args.user,
                         password=args.password,)
 
