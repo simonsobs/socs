@@ -440,7 +440,7 @@ class UPSAgent:
         # Exit agent to release memory
         # Add "restart: unless-stopped" to docker-compose to automatically restart container
         if ((not params['test_mode']) and (timeout != 0) and (self.is_streaming)):
-            self.log.info(f"{timeout} minutes have elasped. Exiting agent.")
+            self.log.info(f"{self.restart} minutes have elasped. Exiting agent.")
             os.kill(os.getppid(), signal.SIGTERM)
 
         return True, "Finished Recording"
