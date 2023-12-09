@@ -47,11 +47,11 @@ Docker Compose
 The iBootbar Agent should be configured to run in a Docker container. An
 example docker-compose service configuration is shown here::
 
-  ocs-acti-camera:
+  ocs-cameras:
     image: simonsobs/socs:latest
     hostname: ocs-docker
     environment:
-      - INSTANCE_ID=camera-newburghlab
+      - INSTANCE_ID=cameras
       - SITE_HUB=ws://127.0.0.1:8001/ws
       - SITE_HTTP=http://127.0.0.1:8001/call
       - LOGLEVEL=info

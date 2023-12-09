@@ -45,7 +45,7 @@ class ACTiCameraAgent:
         self.lock = TimeoutLock()
 
         self.cameras = []
-        for i, (location, address) in enumerate(zip(locations, camera_addresses)):
+        for (location, address) in (zip(locations, camera_addresses)):
             self.cameras.append({'location': location,
                                  'address': address,
                                  'connected': True})
@@ -79,11 +79,12 @@ class ACTiCameraAgent:
 
             >>> response.session['data']
             # for each camera
-            {'camera1': {'location': 'location1',
+            {'location1': {'location': 'location1',
                          'last_attempt': 1701983575.032506,
                          'connected': True,
                          'address': '10.10.10.41'},
-             'camera2': ...
+             'location2': ...
+            }
         """
         pm = Pacemaker(1 / 60, quantize=False)
 
@@ -95,14 +96,12 @@ class ACTiCameraAgent:
             timestamp = time.time()
             data = {}
 
-            count += 1
-            for i, camera in enumerate(self.cameras):
+            for camera in self.cameras:
                 data[camera['location']] = {'location': camera['location']}
                 self.log.info(f"Grabbing screenshot from {camera['location']}")
                 payload = {'USER': self.user,
                            'PWD': self.password,
-                           'SNAPSHOT': 'N640x480,100',
-                           'DUMMY': count}
+                           'SNAPSHOT': 'N640x480,100'}
                 url = f"http://{camera['address']}/cgi-bin/encoder"
 
                 # Format directory and filename
@@ -118,11 +117,11 @@ class ACTiCameraAgent:
                 except requests.exceptions.RequestException as e:
                     self.log.error(f'{e}')
                     self.log.info("Unable to get response from camera.")
-                    self.cameras[i]['connected'] = False
+                    camera['connected'] = False
                     data[camera['location']]['last_attempt'] = time.time()
-                    data[camera['location']]['connected'] = self.cameras[i]['connected']
+                    data[camera['location']]['connected'] = camera['connected']
                     continue
-                self.cameras[i]['connected'] = True
+                camera['connected'] = True
                 self.log.debug("Received screenshot from camera.")
 
                 # Write screenshot to file and update latest file
@@ -134,7 +133,7 @@ class ACTiCameraAgent:
                 del response
 
                 data[camera['location']]['last_attempt'] = time.time()
-                data[camera['location']]['connected'] = self.cameras[i]['connected']
+                data[camera['location']]['connected'] = camera['connected']
 
             # Update session.data and publish to feed
             for camera in self.cameras:
@@ -154,8 +153,7 @@ class ACTiCameraAgent:
 
             if params['test_mode']:
                 break
-            else:
-                pm.sleep()
+            pm.sleep()
 
         return True, "Finished Recording"
 
@@ -208,7 +206,7 @@ def main(args=None):
                         camera_addresses=args.camera_addresses,
                         locations=args.locations,
                         user=args.user,
-                        password=args.password,)
+                        password=args.password)
 
     agent.register_process("acq",
                            p.acq,
