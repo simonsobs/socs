@@ -90,7 +90,6 @@ class ACTiCameraAgent:
 
         session.set_status('running')
         self.is_streaming = True
-        count = 0
         while self.is_streaming:
             # Use UTC
             timestamp = time.time()
