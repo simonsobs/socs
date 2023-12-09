@@ -31,10 +31,13 @@ using all of the available arguments::
        'arguments': [['--address', '10.10.10.50'],
                      ['--port', 161],
                      ['--mode', 'acq'],
-                     ['--snmp-version', 1]]},
+                     ['--snmp-version', 1],
+                     ['--restart-time', 60]]},
 
 .. note::
     The ``--address`` argument should be the address of the UPS on the network.
+    The ``--restart-time`` argument should be set to number of minutes before
+    exiting the agent. Setting to 0 (default) will not exit the agent.
 
 Docker Compose
 ``````````````
@@ -53,12 +56,11 @@ example docker-compose service configuration is shown here::
       - SITE_HUB=ws://127.0.0.1:8001/ws
       - SITE_HTTP=http://127.0.0.1:8001/call
       - LOGLEVEL=info
-    restart: unless-stopped
 
 
 The ``LOGLEVEL`` environment variable can be used to set the log level for
 debugging. The default level is "info".
-Since the agent exits in 60 minutes, we must set ``restart: unless-stopped``
+If not using HostManager, we must set ``restart: unless-stopped``
 to automatically restart the docker container.
 
 Description
