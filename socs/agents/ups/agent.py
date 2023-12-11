@@ -312,7 +312,7 @@ class UPSAgent:
         self.is_streaming = True
         timeout = time.time() + 60 * self.restart  # exit loop after self.restart minutes
         while self.is_streaming:
-            if ((timeout != 0) and (time.time() > timeout)):
+            if ((self.restart != 0) and (time.time() > timeout)):
                 break
             yield dsleep(1)
             if not self.connected:
