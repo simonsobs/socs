@@ -1,5 +1,6 @@
 import argparse
 import os
+import signal
 import time
 
 import txaio
@@ -172,7 +173,7 @@ class UPSAgent:
         txaio logger object, created by the OCSAgent
     """
 
-    def __init__(self, agent, address, port=161, version=1):
+    def __init__(self, agent, address, port=161, version=1, restart_time=0):
         self.agent = agent
         self.is_streaming = False
         self.log = self.agent.log
@@ -182,6 +183,7 @@ class UPSAgent:
         self.version = version
         self.snmp = SNMPTwister(address, port)
         self.connected = True
+        self.restart = restart_time
 
         self.lastGet = 0
 
@@ -308,7 +310,10 @@ class UPSAgent:
 
         session.set_status('running')
         self.is_streaming = True
+        timeout = time.time() + 60 * self.restart  # exit loop after self.restart minutes
         while self.is_streaming:
+            if ((self.restart != 0) and (time.time() > timeout)):
+                break
             yield dsleep(1)
             if not self.connected:
                 self.log.error('No SNMP response. Check your connection.')
@@ -432,6 +437,12 @@ class UPSAgent:
             if params['test_mode']:
                 break
 
+        # Exit agent to release memory
+        # Add "restart: unless-stopped" to docker-compose to automatically restart container
+        if ((not params['test_mode']) and (timeout != 0) and (self.is_streaming)):
+            self.log.info(f"{self.restart} minutes have elasped. Exiting agent.")
+            os.kill(os.getppid(), signal.SIGTERM)
+
         return True, "Finished Recording"
 
     def _stop_acq(self, session, params=None):
@@ -461,6 +472,8 @@ def add_agent_args(parser=None):
     pgroup.add_argument("--snmp-version", default='1', choices=['1', '2', '3'],
                         help="SNMP version for communication. Must match "
                              + "configuration on the UPS.")
+    pgroup.add_argument("--restart-time", default=0,
+                        help="Number of minutes before restarting agent.")
     pgroup.add_argument("--mode", choices=['acq', 'test'])
 
     return parser
@@ -484,7 +497,8 @@ def main(args=None):
     p = UPSAgent(agent,
                  address=args.address,
                  port=int(args.port),
-                 version=int(args.snmp_version))
+                 version=int(args.snmp_version),
+                 restart_time=int(args.restart_time))
 
     agent.register_process("acq",
                            p.acq,
