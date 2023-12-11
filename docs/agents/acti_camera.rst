@@ -79,5 +79,5 @@ using the Text panel in HTML mode.
 Agent API
 ---------
 
-.. autoclass:: socs.agents.site_camera.agent.ACTiCameraAgent
+.. autoclass:: socs.agents.acti_camera.agent.ACTiCameraAgent
     :members:
