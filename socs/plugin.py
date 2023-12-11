@@ -1,5 +1,6 @@
 package_name = 'socs'
 agents = {
+    'ACTiCameraAgent': {'module': 'socs.agents.acti_camera.agent', 'entry_point': 'main'},
     'ACUAgent': {'module': 'socs.agents.acu.agent', 'entry_point': 'main'},
     'BlueforsAgent': {'module': 'socs.agents.bluefors.agent', 'entry_point': 'main'},
     'CrateAgent': {'module': 'socs.agents.smurf_crate_monitor.agent', 'entry_point': 'main'},
