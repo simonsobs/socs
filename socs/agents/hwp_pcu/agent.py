@@ -133,9 +133,20 @@ class HWPPCUAgent:
             print("Choose the command from 'off', 'on_1', 'on_2' and 'hold'.")
 
     def get_status(self, session, params):
-        self.status = self.PCU.get_status()
-        msg = 'Current status is ' + self.status
-        return True, msg
+        """get_status()
+
+        **Task** - Return the status of the PCU.
+
+        """
+        with self.lock.acquire_timeout(3, job='get_status') as acquired:
+            if not acquired:
+                self.log.warn(
+                    'Could not get status because {} is already running'.format(self.lock.job))
+                return False, 'Could not acquire lock'
+
+            self.status = self.PCU.get_status()
+
+        return True, 'Current status is ' + self.status
 
     def acq(self, session, params):
         """acq()
