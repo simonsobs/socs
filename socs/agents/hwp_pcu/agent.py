@@ -62,6 +62,7 @@ class HWPPCUAgent:
                 self.log.error('Could not establish connection to PCU')
                 reactor.callFromThread(reactor.stop)
                 return False, 'Unable to connect to PCU'
+
         self.status = self.PCU.get_status()
         self.initialized = True
 
@@ -90,47 +91,43 @@ class HWPPCUAgent:
                 self.log.warn('Could not send command because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-        command = params['command']
-        if command == 'off':
-            off_channel = [0, 1, 2, 5, 6, 7]
-            for i in off_channel:
-                self.PCU.relay_off(i)
-            self.status = 'off'
-            msg = 'Phase compensation is "off".'
-            return True, msg
+            command = params['command']
+            if command == 'off':
+                off_channel = [0, 1, 2, 5, 6, 7]
+                for i in off_channel:
+                    self.PCU.relay_off(i)
+                self.status = 'off'
+                return True, 'Phase compensation is "off".'
 
-        elif command == 'on_1':
-            on_channel = [0, 1, 2]
-            off_channel = [5, 6, 7]
-            for i in on_channel:
-                self.PCU.relay_on(i)
-            for i in off_channel:
-                self.PCU.relay_off(i)
-            self.status = 'on_1'
-            msg = 'Phase compensation operates "on_1".'
-            return True, msg
+            elif command == 'on_1':
+                on_channel = [0, 1, 2]
+                off_channel = [5, 6, 7]
+                for i in on_channel:
+                    self.PCU.relay_on(i)
+                for i in off_channel:
+                    self.PCU.relay_off(i)
+                self.status = 'on_1'
+                return True, 'Phase compensation operates "on_1".'
 
-        elif command == 'on_2':
-            on_channel = [0, 1, 2, 5, 6, 7]
-            for i in on_channel:
-                self.PCU.relay_on(i)
-            self.status = 'on_2'
-            msg = 'Phase compensation operates "on_2".'
-            return True, msg
+            elif command == 'on_2':
+                on_channel = [0, 1, 2, 5, 6, 7]
+                for i in on_channel:
+                    self.PCU.relay_on(i)
+                self.status = 'on_2'
+                return True, 'Phase compensation operates "on_2".'
 
-        elif command == 'hold':
-            on_channel = [0, 1, 2, 5]
-            off_channel = [6, 7]
-            for i in on_channel:
-                self.PCU.relay_on(i)
-            for i in off_channel:
-                self.PCU.relay_off(i)
-            self.status = 'hold'
-            msg = 'Phase compensation operates "hold".'
-            return True, msg
+            elif command == 'hold':
+                on_channel = [0, 1, 2, 5]
+                off_channel = [6, 7]
+                for i in on_channel:
+                    self.PCU.relay_on(i)
+                for i in off_channel:
+                    self.PCU.relay_off(i)
+                self.status = 'hold'
+                return True, 'Phase compensation operates "hold".'
 
-        else:
-            print("Choose the command from 'off', 'on_1', 'on_2' and 'hold'.")
+            else:
+                return True, "Choose the command from 'off', 'on_1', 'on_2' and 'hold'."
 
     def get_status(self, session, params):
         """get_status()
