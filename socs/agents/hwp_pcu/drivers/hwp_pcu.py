@@ -17,7 +17,7 @@ class PCU:
         self.port = serial.Serial(
             port,
             baudrate=19200,
-            timeout=1
+            timeout=10,
         )
 
     def close(self):
@@ -52,7 +52,7 @@ class PCU:
 
         **Task** - Get the operation mode of the phase compensation unit.
         off: The compensation phase is zero.
-        on_1:The compensation phase is +120 deg.
+        on_1: The compensation phase is +120 deg.
         on_2: The compensation phase is -120 deg.
         hold: Stop the HWP spin.
         """

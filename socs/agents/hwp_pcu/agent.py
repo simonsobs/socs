@@ -49,7 +49,7 @@ class HWPPCUAgent:
             self.log.info("Connection already initialized. Returning...")
             return True, "Connection already initialized"
 
-        with self.lock.acquire_timeout(0, job='init_connection') as acquired:
+        with self.lock.acquire_timeout(3, job='init_connection') as acquired:
             if not acquired:
                 self.log.warn(
                     'Could not run init_connection because {} is already running'.format(self.lock.job))
@@ -71,13 +71,13 @@ class HWPPCUAgent:
 
         return True, 'Connection to PCU established'
 
-    @ocs_agent.param('command', default='off', type=str)
+    @ocs_agent.param('command', default='off', type=str, choices=['off', 'on_1', 'on_2', 'hold'])
     def send_command(self, session, params):
         """send_command(command)
 
         **Task** - Send commands to the phase compensation unit.
         off: The compensation phase is zero.
-        on_1:The compensation phase is +120 deg.
+        on_1: The compensation phase is +120 deg.
         on_2: The compensation phase is -120 deg.
         hold: Stop the HWP spin.
 
@@ -151,7 +151,7 @@ class HWPPCUAgent:
                  'last_updated': 1649085992.719602}
 
         """
-        with self.lock.acquire_timeout(timeout=0, job='acq') as acquired:
+        with self.lock.acquire_timeout(timeout=3, job='acq') as acquired:
             if not acquired:
                 self.log.warn('Could not start pcu acq because {} is already running'
                               .format(self.lock.job))
@@ -182,7 +182,7 @@ class HWPPCUAgent:
                 session.data = {'status': status,
                                 'last_updated': time.time()}
 
-                time.sleep(1)
+                time.sleep(5)
 
         self.agent.feeds['hwppcu'].flush_buffer()
         return True, 'Acqusition exited cleanly'
