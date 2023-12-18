@@ -2,11 +2,11 @@
 
 .. _hwp_pcu:
 
-==========================
-HWP Phase Compenation Unit
-==========================
+=============
+HWP PCU Agent
+=============
 
-The HWP phase compensation unit agent interfaces with a 8 channel USB relay module
+The HWP Phase Compensation Unit Agent interfaces with a 8 channel USB relay module
 (Numato Lab, product Number SKU:RL80001) to apply the discrete phase compensation in
 120-degree increments for the HWP motor drive circuit. When used in conjunction with
 a HWP pid controller, phase compensation in 60-degree increments can be achieved.
