@@ -1,34 +1,20 @@
 .. highlight:: rst
 
-.. _lakeshore240:
+.. _hwp_pcu:
 
-=============
-HWP phase compenation
-=============
+==========================
+HWP Phase Compenation Unit
+==========================
 
-The Lakeshore 240 is a 4-lead meausrement device used for readout of ROXes and
-Diodes at 1K and above.
+The HWP phase compensation unit agent interfaces with a 8 channel USB relay module
+(Numato Lab, product Number SKU:RL80001) to apply the discrete phase compensation in
+120-degree increments for the HWP motor drive circuit. When used in conjunction with
+a HWP pid controller, phase compensation in 60-degree increments can be achieved.
 
 .. argparse::
-    :filename: ../socs/agents/lakeshore240/agent.py
+    :filename: ../socs/agents/hwp_pcu/agent.py
     :func: make_parser
     :prog: python3 agent.py
-
-Dependencies
-------------
-
-The Lakeshore 240 requires USB drivers to be compiled for your machine. A
-private repository, `ls240_drivers`, with the required drivers is available on
-the Simons Observatory Github. This repository provides some other helpful
-tools, including a set of udev rules for setting the device address
-automatically when the 240s are connected to the computer.
-
-.. note::
-    The 240 drivers are compiled for the specific kernel you are running at
-    installation. If your kernel is updated the drivers will no longer work.
-    The DKMS module provided by the `ls24_drivers` repository attempts to solve
-    this problem, but does not currently appear to work. Please report any
-    difficulty with the drivers to Brian.
 
 Configuration File Examples
 ---------------------------
@@ -39,8 +25,8 @@ Agent in a docker container.
 OCS Site Config
 ```````````````
 
-To configure your Lakeshore 240 for use with OCS you need to add a
-Lakeshore240Agent block to your ocs configuration file. Here is an example
+To configure your HWP PCU Agent for use with OCS you need to add a
+HWPPCUAgent block to your ocs configuration file. Here is an example
 configuration block that will automatically start data acquisition::
 
   {'agent-class': 'HWPPCUAgent',
@@ -54,7 +40,7 @@ configs documentation for more details.
 Docker Compose
 ``````````````
 
-The Lakeshore 240 Agent can (and probably should) be configured to run in a
+The HWP PCU Agent can (and probably should) be configured to run in a
 Docker container. An example configuration is::
 
   ocs-hwp-pcu:
@@ -76,14 +62,7 @@ the OCS documentation.
 Example Clients
 ---------------
 
-Device Configuration
-````````````````````
-
-Out of the box, the Lakeshore 240 channels are not enabled or configured
-to correctly measure thermometers. To enable, you can use the
-:func:`agents.lakeshore240.LS240_agent.LS240_Agent.set_values` Task of the
-LS240 Agent to configure a particular channel. Below is an example of a
-client that sets Channel 1 of a 240 to read a diode::
+To apply 120-degree phase compensation::
 
     from ocs.matched_client import MatchedClient
 
@@ -91,14 +70,18 @@ client that sets Channel 1 of a 240 to read a diode::
 
     hwp_pcu_client.set_command(command='on_1')
 
+To apply 60 (= -120 + 180) degree phase compensation::
+
+    from ocs.matched_client import MatchedClient
+
+    hwp_pcu_client = MatchedClient("HWPPCU")
+    hwp_pid_client = MatchedClient("HWPPID")
+
+    hwp_pcu_client.set_command(command='on_2')
+    hwp_pid_client.set_direction(direction=1)
+
 Agent API
 ---------
 
-.. autoclass:: socs.agents.lakeshore240.agent.LS240_Agent
-    :members:
-
-Supporting APIs
----------------
-
-.. autoclass:: socs.Lakeshore.Lakeshore240.Module
+.. autoclass:: socs.agents.hwp_pcu.agent.HWPPCUAgent
     :members:
