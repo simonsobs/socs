@@ -1,10 +1,9 @@
 import argparse
-import os
 import time
 
-import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
+from twisted.internet import reactor
 
 import socs.agents.hwp_pcu.drivers.hwp_pcu as pcu
 
@@ -29,7 +28,7 @@ class HWPPCUAgent:
 
         agg_params = {'frame_length': 60}
         self.agent.register_feed(
-                'hwppcu', record=True, agg_params=agg_params)
+            'hwppcu', record=True, agg_params=agg_params)
 
     @ocs_agent.param('auto_acquire', default=False, type=bool)
     @ocs_agent.param('force', default=False, type=bool)
@@ -50,7 +49,7 @@ class HWPPCUAgent:
             self.log.info("Connection already initialized. Returning...")
             return True, "Connection already initialized"
 
-        with self.lock.acquire_timeout(0, job='init_connection') as acquired:
+        with self.lock.acquire_timeout(3, job='init_connection') as acquired:
             if not acquired:
                 self.log.warn(
                     'Could not run init_connection because {} is already running'.format(self.lock.job))
@@ -64,6 +63,7 @@ class HWPPCUAgent:
                 reactor.callFromThread(reactor.stop)
                 return False, 'Unable to connect to PCU'
 
+        self.status = self.PCU.get_status()
         self.initialized = True
 
         # Start 'acq' Process if requested
@@ -72,63 +72,78 @@ class HWPPCUAgent:
 
         return True, 'Connection to PCU established'
 
-    @ocs_agent.param('command', default='off', type=str)
+    @ocs_agent.param('command', default='off', type=str, choices=['off', '+120deg', '-120deg', 'hold'])
     def send_command(self, session, params):
-        """send_command(command='on_1')
+        """send_command(command)
 
         **Task** - Send commands to the phase compensation unit.
         off: The compensation phase is zero.
-        on_1:The compensation phase is +120 deg.
-        on_2: The compensation phase is -120 deg.
+        +120deg: The compensation phase is +120 deg.
+        -120deg: The compensation phase is -120 deg.
         hold: Stop the HWP spin.
 
         Parameters:
-            command (str): set the operation mode from 'off', 'on_1', 'on_2' or 'hold'.
+            command (str): set the operation mode from 'off', '+120deg', '-120deg' or 'hold'.
 
         """
-        with self.lock.acquire_timeout(3, job='send_command') as acquired:
+        with self.lock.acquire_timeout(10, job='send_command') as acquired:
             if not acquired:
                 self.log.warn('Could not send command because {} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-        command = params['command']
-        if command == 'off':
-            off_channel = [0, 1, 2, 5, 6, 7]
-            for i in off_channel:
-                self.PCU.relay_off(i)
-            msg = 'Phase compensation is "off".'
-            return 'off', msg
+            command = params['command']
+            if command == 'off':
+                off_channel = [0, 1, 2, 5, 6, 7]
+                for i in off_channel:
+                    self.PCU.relay_off(i)
+                self.status = 'off'
+                return True, 'Phase compensation is "off".'
 
-        elif command == 'on_1':
-            on_channel = [0, 1, 2]
-            off_channel = [5, 6, 7]
-            for i in on_channel:
-                self.PCU.relay_on(i)
-            for i in off_channel:
-                self.PCU.relay_off(i)
-            msg = 'Phase compensation operates "on_1".'
-            return 'on_1', msg
+            elif command == '+120deg':
+                on_channel = [0, 1, 2]
+                off_channel = [5, 6, 7]
+                for i in on_channel:
+                    self.PCU.relay_on(i)
+                for i in off_channel:
+                    self.PCU.relay_off(i)
+                self.status = '+120deg'
+                return True, 'Phase compensation operates "+120deg".'
 
-        elif command == 'on_2':
-            on_channel = [0, 1, 2, 5, 6, 7]
-            for i in on_channel:
-                self.PCU.relay_on(i)
-            msg = 'Phase compensation operates "on_2".'
-            return 'on_2', msg            
+            elif command == '-120deg':
+                on_channel = [0, 1, 2, 5, 6, 7]
+                for i in on_channel:
+                    self.PCU.relay_on(i)
+                self.status = '-120deg'
+                return True, 'Phase compensation operates "-120deg".'
 
-        elif command == 'hold':
-            on_channel = [0, 1, 2, 5]
-            off_channel = [6, 7]
-            for i in on_channel:
-                self.PCU.relay_on(i)
-            for i in off_channel:
-                self.PCU.relay_off(i)
-            msg = 'Phase compensation operates "hold".'
-            return 'hold', msg  
+            elif command == 'hold':
+                on_channel = [0, 1, 2, 5]
+                off_channel = [6, 7]
+                for i in on_channel:
+                    self.PCU.relay_on(i)
+                for i in off_channel:
+                    self.PCU.relay_off(i)
+                self.status = 'hold'
+                return True, 'Phase compensation operates "hold".'
 
-        else:
-            print("Choose the command from 'off', 'on_1', 'on_2' and 'hold'.")
+            else:
+                return True, "Choose the command from 'off', '+120deg', '-120deg' and 'hold'."
 
+    def get_status(self, session, params):
+        """get_status()
+
+        **Task** - Return the status of the PCU.
+
+        """
+        with self.lock.acquire_timeout(30, job='get_status') as acquired:
+            if not acquired:
+                self.log.warn(
+                    'Could not get status because {} is already running'.format(self.lock.job))
+                return False, 'Could not acquire lock'
+
+            self.status = self.PCU.get_status()
+
+        return True, 'Current status is ' + self.status
 
     def acq(self, session, params):
         """acq()
@@ -140,11 +155,11 @@ class HWPPCUAgent:
             structure::
 
                 >>> response.session['data']
-                {'status': 'on_1',
+                {'status': '+120deg',
                  'last_updated': 1649085992.719602}
 
         """
-        with self.lock.acquire_timeout(timeout=0, job='acq') as acquired:
+        with self.lock.acquire_timeout(timeout=3, job='acq') as acquired:
             if not acquired:
                 self.log.warn('Could not start pcu acq because {} is already running'
                               .format(self.lock.job))
@@ -156,7 +171,7 @@ class HWPPCUAgent:
 
             while self.take_data:
                 # Relinquish sampling lock occasionally.
-                if time.time() - last_release > 10.:
+                if time.time() - last_release > 1.:
                     last_release = time.time()
                     if not self.lock.release_and_acquire(timeout=10):
                         self.log.warn(f"Failed to re-acquire sampling lock, "
@@ -166,7 +181,8 @@ class HWPPCUAgent:
                 data = {'timestamp': time.time(),
                         'block_name': 'hwppcu', 'data': {}}
 
-                status = self.PCU.get_status()
+                # status = self.PCU.get_status()
+                status = self.status
                 data['data']['status'] = status
 
                 self.agent.publish_to_feed('hwppcu', data)
@@ -174,7 +190,7 @@ class HWPPCUAgent:
                 session.data = {'status': status,
                                 'last_updated': time.time()}
 
-                time.sleep(10)
+                time.sleep(5)
 
         self.agent.feeds['hwppcu'].flush_buffer()
         return True, 'Acqusition exited cleanly'
@@ -190,6 +206,7 @@ class HWPPCUAgent:
 
         return False, 'acq is not currently running'
 
+
 def make_parser(parser=None):
     """
     Build the argument parser for the Agent. Allows sphinx to automatically build documentation
@@ -200,11 +217,12 @@ def make_parser(parser=None):
 
     # Add options specific to this agent
     pgroup = parser.add_argument_group('Agent Options')
-    pgroup.add_argument('--port')
+    pgroup.add_argument('--port', type=str, help="Path to USB node for the lakeshore")
     pgroup.add_argument('--mode', type=str, default='acq',
                         choices=['init', 'acq'],
                         help="Starting operation for the Agent.")
     return parser
+
 
 def main(args=None):
     parser = make_parser()
@@ -219,13 +237,14 @@ def main(args=None):
         init_params = {'auto_acquire': True}
 
     agent, runner = ocs_agent.init_site_agent(args)
-    hwppcu_agent = HWPPCUAgent(agent, 
+    hwppcu_agent = HWPPCUAgent(agent,
                                port=args.port)
     agent.register_task('init_connection', hwppcu_agent.init_connection,
                         startup=init_params)
     agent.register_process('acq', hwppcu_agent.acq,
                            hwppcu_agent._stop_acq)
     agent.register_task('send_command', hwppcu_agent.send_command)
+    agent.register_task('get_status', hwppcu_agent.get_status)
 
     runner.run(agent, auto_reconnect=True)
 

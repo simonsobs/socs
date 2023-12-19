@@ -10,7 +10,7 @@ Install and update with pip::
 You may install optional dependencies by including one or more agent group
 names on installation, for example::
 
-    $ pip3 install -U socs[labjack,synacc]
+    $ pip3 install -U socs[labjack,pfeiffer]
 
 The different groups, and the agents they provide dependencies for are:
 
@@ -34,8 +34,6 @@ The different groups, and the agents they provide dependencies for are:
      - Pysmurf Controller Agent
    * - ``smurf_sim``
      - SMuRF File Emulator, SMuRF Stream Simulator
-   * - ``synacc``
-     - Synaccess Agent
    * - ``timing_master``
      - SMuRF Timing Card Agent
 

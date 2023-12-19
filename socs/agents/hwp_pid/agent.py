@@ -51,7 +51,7 @@ class HWPPIDAgent:
             self.log.info("Connection already initialized. Returning...")
             return True, "Connection already initialized"
 
-        with self.lock.acquire_timeout(0, job='init_connection') as acquired:
+        with self.lock.acquire_timeout(10, job='init_connection') as acquired:
             if not acquired:
                 self.log.warn(
                     'Could not run init_connection because {} is already running'.format(self.lock.job))
@@ -273,7 +273,7 @@ class HWPPIDAgent:
                  'last_updated': 1649085992.719602}
 
         """
-        with self.lock.acquire_timeout(timeout=0, job='acq') as acquired:
+        with self.lock.acquire_timeout(timeout=10, job='acq') as acquired:
             if not acquired:
                 self.log.warn('Could not start iv acq because {} is already running'
                               .format(self.lock.job))
@@ -314,7 +314,7 @@ class HWPPIDAgent:
                                 'direction': direction,
                                 'last_updated': time.time()}
 
-                time.sleep(1)
+                time.sleep(5)
 
         self.agent.feeds['hwppid'].flush_buffer()
         return True, 'Acqusition exited cleanly'
