@@ -64,6 +64,7 @@ class HWPPCUAgent:
         self.agent.register_feed(
             'hwppcu', record=True, agg_params=agg_params)
     
+    @defer.inlineCallbacks
     @ocs_agent.param('command', default='off', type=str, choices=['off', 'on_1', 'on_2', 'hold'])
     def send_command(self, session, params):
         """send_command(command)
