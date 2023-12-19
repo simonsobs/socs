@@ -3,12 +3,15 @@ import time
 from dataclasses import dataclass
 from queue import Queue
 
-from twisted.internet import defer
 import txaio
+from twisted.internet import defer
+
 txaio.use_twisted()
 
 from ocs import ocs_agent, site_config
+
 import socs.agents.hwp_pcu.drivers.hwp_pcu as pcu
+
 
 class Actions:
     class BaseAction:
@@ -35,7 +38,7 @@ def process_action(action, PCU: pcu.PCU):
         elif action.command == 'on_2':
             on_channel = [0, 1, 2, 5, 6, 7]
             off_channel = []
-        
+
         action.log.info(f"Command: {action.command}")
         action.log.info(f"  Off channels: {off_channel}")
         action.log.info(f"  On channels: {on_channel}")
@@ -54,6 +57,7 @@ class HWPPCUAgent:
         agent (ocs.ocs_agent.OCSAgent): Instantiated OCSAgent class for this agent
         port (str): Path to USB device in '/dev/'
     """
+
     def __init__(self, agent, port):
         self.agent: ocs_agent.OCSAgent = agent
         self.log = agent.log
@@ -63,7 +67,7 @@ class HWPPCUAgent:
         agg_params = {'frame_length': 60}
         self.agent.register_feed(
             'hwppcu', record=True, agg_params=agg_params)
-    
+
     @defer.inlineCallbacks
     @ocs_agent.param('command', default='off', type=str, choices=['off', 'on_1', 'on_2', 'hold'])
     def send_command(self, session, params):
@@ -83,7 +87,7 @@ class HWPPCUAgent:
         self.action_queue.put(action)
         session.data = yield action.deferred
         return True, f"Set relays for cmd={action.command}"
-    
+
     def _process_actions(self, PCU: pcu.PCU):
         while not self.action_queue.empty():
             action = self.action_queue.get()
@@ -94,7 +98,7 @@ class HWPPCUAgent:
             except Exception as e:
                 self.log.error(f"Error processing action: {action}")
                 action.deferred.errback(e)
-    
+
     def _get_and_publish_data(self, PCU: pcu.PCU, session):
         now = time.time()
         data = {'timestamp': now,
@@ -104,7 +108,7 @@ class HWPPCUAgent:
         data['data']['status'] = status
         self.agent.publish_to_feed('hwppcu', data)
         session.data = {'status': status, 'last_updated': now}
-    
+
     def main(self, session, params):
         """
         **Process** - Main process for PCU agent.
@@ -126,7 +130,7 @@ class HWPPCUAgent:
 
             self._process_actions(PCU)
             time.sleep(0.1)
-        
+
         PCU.close()
 
     def _stop_main(self, session, params):
@@ -163,7 +167,7 @@ def main(args=None):
     agent.register_task('send_command', hwppcu_agent.send_command, blocking=False)
     agent.register_process(
         'main', hwppcu_agent.main, hwppcu_agent._stop_main, startup=True)
-    
+
     runner.run(agent, auto_reconnect=True)
 
 
