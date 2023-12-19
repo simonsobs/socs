@@ -20,6 +20,7 @@ for n, f in [
         ('FPGAAgent', 'holo_fpga/agent.py'),
         ('FTSAerotechAgent', 'fts_aerotech/agent.py'),
         ('HWPBBBAgent', 'hwp_encoder/agent.py'),
+        ('HWPPCUAgent', 'hwp_pcu/agent.py'),
         ('HWPPicoscopeAgent', 'hwp_picoscope/agent.py'),
         ('HWPPIDAgent', 'hwp_pid/agent.py'),
         ('HWPPMXAgent', 'hwp_pmx/agent.py'),
