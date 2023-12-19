@@ -60,7 +60,7 @@ class HWPPCUAgent:
         self.port = port
         self.action_queue = Queue()
 
-        agg_params = {}
+        agg_params = {'frame_length': 60}
         self.agent.register_feed(
             'hwppcu', record=True, agg_params=agg_params)
     
