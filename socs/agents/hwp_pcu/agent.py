@@ -72,18 +72,18 @@ class HWPPCUAgent:
 
         return True, 'Connection to PCU established'
 
-    @ocs_agent.param('command', default='off', type=str, choices=['off', '+120deg', '-120deg', 'hold'])
+    @ocs_agent.param('command', default='off', type=str, choices=['off', 'on_1', 'on_2', 'hold'])
     def send_command(self, session, params):
         """send_command(command)
 
         **Task** - Send commands to the phase compensation unit.
         off: The compensation phase is zero.
-        +120deg: The compensation phase is +120 deg.
-        -120deg: The compensation phase is -120 deg.
+        on_1: The compensation phase is +120 deg.
+        on_2: The compensation phase is -120 deg.
         hold: Stop the HWP spin.
 
         Parameters:
-            command (str): set the operation mode from 'off', '+120deg', '-120deg' or 'hold'.
+            command (str): set the operation mode from 'off', 'on_1', 'on_2' or 'hold'.
 
         """
         with self.lock.acquire_timeout(10, job='send_command') as acquired:
@@ -99,22 +99,22 @@ class HWPPCUAgent:
                 self.status = 'off'
                 return True, 'Phase compensation is "off".'
 
-            elif command == '+120deg':
+            elif command == 'on_1':
                 on_channel = [0, 1, 2]
                 off_channel = [5, 6, 7]
                 for i in on_channel:
                     self.PCU.relay_on(i)
                 for i in off_channel:
                     self.PCU.relay_off(i)
-                self.status = '+120deg'
-                return True, 'Phase compensation operates "+120deg".'
+                self.status = 'on_1'
+                return True, 'Phase compensation operates "on_1".'
 
-            elif command == '-120deg':
+            elif command == 'on_2':
                 on_channel = [0, 1, 2, 5, 6, 7]
                 for i in on_channel:
                     self.PCU.relay_on(i)
-                self.status = '-120deg'
-                return True, 'Phase compensation operates "-120deg".'
+                self.status = 'on_2'
+                return True, 'Phase compensation operates "on_2".'
 
             elif command == 'hold':
                 on_channel = [0, 1, 2, 5]
@@ -127,7 +127,7 @@ class HWPPCUAgent:
                 return True, 'Phase compensation operates "hold".'
 
             else:
-                return True, "Choose the command from 'off', '+120deg', '-120deg' and 'hold'."
+                return True, "Choose the command from 'off', 'on_1', 'on_2' and 'hold'."
 
     def get_status(self, session, params):
         """get_status()
@@ -155,7 +155,7 @@ class HWPPCUAgent:
             structure::
 
                 >>> response.session['data']
-                {'status': '+120deg',
+                {'status': 'on_1',
                  'last_updated': 1649085992.719602}
 
         """
