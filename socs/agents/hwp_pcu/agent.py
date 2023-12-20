@@ -38,6 +38,9 @@ def process_action(action, PCU: pcu.PCU):
         elif action.command == 'on_2':
             on_channel = [0, 1, 2, 5, 6, 7]
             off_channel = []
+        elif action.command == 'hold':
+            on_channel = [1, 2, 5]
+            off_channel = [0, 6, 7]
 
         action.log.info(f"Command: {action.command}")
         action.log.info(f"  Off channels: {off_channel}")
