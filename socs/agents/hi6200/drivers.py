@@ -23,7 +23,7 @@ class Hi6200Interface():
 
         self.scale = ModbusClient(host=ip_address, port=tcp_port, auto_open=True, auto_close=False)
 
-    def decode_scale_weight_registers(register_a, register_b):
+    def decode_scale_weight_registers(self, register_a, register_b):
         """
             Decodes the scales weight registers and returns a single weight value (float).
 
@@ -38,7 +38,7 @@ class Hi6200Interface():
 
         # Concatenate the hex bits in cdab order.
         hex_weight = hex_b + hex_a
-        
+
         # This struct function converts the concatenated hex bits to a float.
         return struct.unpack('!f', bytes.fromhex(hex_weight))[0]
 
@@ -46,14 +46,14 @@ class Hi6200Interface():
         """
             Returns the current gross weight reading of the scale in the sensors chosen unit (kg)
         """
-        
+
         try:
             # The gross weight is always available on the 8,9 registers.
             # Reading these registers will return an int.
             a, b = self.scale.read_holding_registers(8, 2)
 
-            return decode_scale_weight_registers(a, b)
-        
+            return self.decode_scale_weight_registers(a, b)
+
         except AttributeError:
             return None
 
@@ -61,13 +61,13 @@ class Hi6200Interface():
         """
             Returns the current net weight reading of the scale in the sensors chosen unit (kg)
         """
-        
+
         try:
             # The gross weight is always available on the 6,7 registers.
             # Reading these registers will return an int.
             a, b = self.scale.read_holding_registers(6, 2)
 
-            return decode_scale_weight_registers(a, b)
-        
-        except AttibuteError:
+            return self.decode_scale_weight_registers(a, b)
+
+        except AttributeError:
             return None
