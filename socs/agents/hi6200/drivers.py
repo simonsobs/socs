@@ -23,7 +23,7 @@ class Hi6200Interface():
 
         self.scale = ModbusClient(host=ip_address, port=tcp_port, auto_open=True, auto_close=False)
 
-    def decode_scale_weight_registers(self, register_a, register_b):
+    def _decode_scale_weight_registers(self, register_a, register_b):
         """
             Decodes the scales weight registers and returns a single weight value (float).
 
@@ -52,7 +52,7 @@ class Hi6200Interface():
             # Reading these registers will return an int.
             a, b = self.scale.read_holding_registers(8, 2)
 
-            return self.decode_scale_weight_registers(a, b)
+            return self._decode_scale_weight_registers(a, b)
 
         except AttributeError:
             return None
@@ -67,7 +67,7 @@ class Hi6200Interface():
             # Reading these registers will return an int.
             a, b = self.scale.read_holding_registers(6, 2)
 
-            return self.decode_scale_weight_registers(a, b)
+            return self._decode_scale_weight_registers(a, b)
 
         except AttributeError:
             return None

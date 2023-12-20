@@ -12,7 +12,7 @@ The agent is able to communicate over ethernet to read and monitor the net and
 gross weights of the scale.
 
 .. argparse::
-    :filename: ../socs/agents/Hi6200/agent.py
+    :filename: ../socs/agents/hi6200/agent.py
     :func: make_parser
     :prog: python3 agent.py
 
@@ -46,7 +46,7 @@ Docker Compose
 The SCPI PSU Agent should be configured to run in a Docker container.
 An example docker-compose service configuration is shown here::
 
-  ocs-Hi6200:
+  ocs-hi6200:
     image: simonsobs/socs:latest
     hostname: ocs-docker
     network_mode: "host"
@@ -69,7 +69,7 @@ Below is an example client demonstrating full agent functionality.::
     from ocs.ocs_client import OCSClient
 
     # Initialize the power supply
-    scale = OCSClient('hi6200', args=[])
+    scale = OCSClient('hi6200')
     scale.init.start()
     scale.init.wait()
 

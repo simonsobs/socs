@@ -14,7 +14,7 @@ class Hi6200Agent:
 
     Parameters:
         ip_address (string): IP address set on the Hi6200
-        tcp_port (int): Modbus TCP port of the Hi6200. Default
+        tcp_port (int): Modbus TCP port of the Hi6200.
                     Default set on the device is 502.
         scale (Hi6200Interface): A driver object that allows
                     for communication with the scale.
@@ -95,14 +95,10 @@ class Hi6200Agent:
                             data['data']["Net"] = net_weight
                             self.agent.publish_to_feed('scale_output', data)
 
-                        # If they did return None, we need to attempt to reconnect to the scale.
-                        else:
-                            self.init()
-
                     # Occurs when the scale disconnects.
                     except AttributeError as e:
-                        self.log.error(f"Scale was disconnected. Attempting to reinitialize scale: {e}")
-                        self.init()
+                        self.log.error(f"Connection with scale failed. Check that the scale is connected: {e}")
+                        return False, "Monitoring weight failed"
 
                     except ValueError as e:
                         self.log.error(f"Scale responded with an anomolous number, ignorning: {e}")
@@ -112,8 +108,6 @@ class Hi6200Agent:
 
                 else:
                     self.log.warn("Could not acquire in monitor_weight")
-
-            time.sleep(params['wait'])
 
         return True, "Finished monitoring weight"
 
