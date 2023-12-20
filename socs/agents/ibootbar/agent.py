@@ -199,6 +199,7 @@ class ibootbarAgent:
         self.version = version
         self.address = address
         self.snmp = SNMPTwister(address, port)
+        self.connected = True
 
         self.lastGet = 0
         self.sample_period = 60
@@ -248,6 +249,10 @@ class ibootbarAgent:
         self.is_streaming = True
         while self.is_streaming:
             yield dsleep(1)
+            if not self.connected:
+                self.log.error('No SNMP response. Check your connection!')
+                self.log.info('Trying to reconnect.')
+
             read_time = time.time()
 
             # Check if sample period has passed before getting status
@@ -263,14 +268,24 @@ class ibootbarAgent:
                 get_list.append(('IBOOTPDU-MIB', 'outletStatus', i))
                 name_list.append(('IBOOTPDU-MIB', 'outletName', i))
 
-            # Issue SNMP GET command
+            # Issue SNMP GET commands
             get_result = yield self.snmp.get(get_list, self.version)
-            name_result = yield self.snmp.get(name_list, self.version)
+            if get_result is None:
+                self.connected = False
+                session.data['ibootbar_connection'] = {'last_attempt': time.time(),
+                                                       'connected': False}
+                continue
+            self.connected = True
 
-            # If device gets disconnected, name_result is None
-            if name_result is not None:
-                for item in name_result:
-                    names.append(item[1].prettyPrint())
+            name_result = yield self.snmp.get(name_list, self.version)
+            if name_result is None:
+                self.connected = False
+                session.data['ibootbar_connection'] = {'last_attempt': time.time(),
+                                                       'connected': False}
+                continue
+            self.connected = True
+            for item in name_result:
+                names.append(item[1].prettyPrint())
 
             # Do not publish if ibootbar connection has dropped
             try:
@@ -280,18 +295,14 @@ class ibootbarAgent:
                 session.data = oid_cache
                 self.log.debug("{data}", data=session.data)
 
-                if get_result is None:
-                    raise ConnectionError('No SNMP response. Check your connection.')
-
                 self.lastGet = time.time()
                 # Publish to feed
                 message = _build_message(get_result, names, read_time)
                 self.log.debug("{msg}", msg=message)
                 session.app.publish_to_feed('ibootbar', message)
-            except ConnectionError as e:
+            except Exception as e:
                 self.log.error(f'{e}')
                 yield dsleep(1)
-                self.log.info('Trying to reconnect.')
 
             if params['test_mode']:
                 break

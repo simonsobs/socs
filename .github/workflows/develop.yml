@@ -10,6 +10,7 @@ on:
       - '.flake8'
       - '.pre-commit-config.yaml'
       - '.readthedocs.yaml'
+      - '.github/dependabot.yml'
 
 jobs:
   test:
@@ -23,7 +24,7 @@ jobs:
     steps:
     # Fetch all history for all tags and branches
     - name: clone socs
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
@@ -33,7 +34,7 @@ jobs:
         docker-compose build
 
     - name: Login to Docker Hub
-      uses: docker/login-action@v2
+      uses: docker/login-action@v3
       with:
         username: ${{ secrets.REGISTRY_USER }}
         password: ${{ secrets.REGISTRY_PASSWORD }}
@@ -61,12 +62,12 @@ jobs:
 
     steps:
     - name: Set up Python 3.8
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: 3.8
 
     - name: clone socs
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: install build dependencies
       run: |

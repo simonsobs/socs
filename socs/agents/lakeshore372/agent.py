@@ -92,10 +92,13 @@ class LS372_Agent:
         enable_control_chan (bool, optional):
             If True, will read data from the control channel each iteration of
             the acq loop. Defaults to False.
+        configfile (str, optional):
+            Path to a LS372 config file. This will be loaded by default by
+            input_configfile by default
     """
 
     def __init__(self, agent, name, ip, fake_data=False, dwell_time_delay=0,
-                 enable_control_chan=False):
+                 enable_control_chan=False, configfile=None):
 
         # self._acq_proc_lock is held for the duration of the acq Process.
         # Tasks that require acq to not be running, at all, should use
@@ -120,6 +123,7 @@ class LS372_Agent:
         self.initialized = False
         self.take_data = False
         self.control_chan_enabled = enable_control_chan
+        self.configfile = configfile
 
         self.agent = agent
         # Registers temperature feeds
@@ -820,6 +824,34 @@ class LS372_Agent:
 
         return True, "Channel {} powered {}".format(channel, state)
 
+    @ocs_agent.param('channel', type=int)
+    @ocs_agent.param('state', type=str, choices=['on', 'off'])
+    def engage_autorange(self, session, params):
+        """engage_autorange(channel, state)
+
+        **Task** - Enables/disables autorange for a channel on the LS372
+
+        Parameters:
+            channel (int): Channel number for enabling autorange
+            state (str): Desired autorange state of channel: 'on' or 'off'
+        """
+        with self._lock.acquire_timeout(job='engage_channel') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            session.set_status('running')
+
+            channel = params['channel']
+            state = params['state']
+            if state == 'on':
+                self.module.channels[channel].enable_autorange()
+            else:
+                self.module.channels[channel].disable_autorange()
+
+        return True, "Channel {} autorange status is {}".format(channel, state)
+
     @ocs_agent.param('channel', type=int, check=lambda x: 0 <= x <= 16)
     @ocs_agent.param('curve_number', type=int, check=lambda x: 21 <= x <= 59)
     def set_calibration_curve(self, session, params):
@@ -897,26 +929,26 @@ class LS372_Agent:
     @ocs_agent.param('setpoint', type=float)
     @ocs_agent.param('heater', type=str)
     @ocs_agent.param('channel', type=int)
-    @ocs_agent.param('P', type=int)
+    @ocs_agent.param('P', type=float)
     @ocs_agent.param('I', type=float)
-    @ocs_agent.param('update_time', type=int)
+    @ocs_agent.param('update_time', type=float)
     @ocs_agent.param('sample_heater_range', type=float, default=10e-3)
     @ocs_agent.param('test_mode', type=bool, default=False)
-    def start_custom_pid(self, session, params):
-        """start_custom_pid(setpoint, heater, channel, P, \
-                            I, update_time, sample_heater_range=10e-3, \
-                            test_mode=False)
+    def custom_pid(self, session, params):
+        """custom_pid(setpoint, heater, channel, P, \
+                      I, update_time, sample_heater_range=10e-3, \
+                      test_mode=False)
 
-        **Task** - Set custom software PID parameters for servo control of fridge
+        **Process** - Set custom software PID parameters for servo control of fridge
         using still or sample heater. Currently only P and I implemented.
 
         Parameters:
             setpoint (float): Setpoint in Kelvin
             heater (str): 'still' or 'sample'
             channel (int): LS372 Channel to PID off of
-            P (int): Proportional value in Watts/Kelvin
-            I (int): Integral Value in Hz
-            update_time (int): Time between PID updates in seconds
+            P (float): Proportional value in Watts/Kelvin
+            I (float): Integral Value in Hz
+            update_time (float): Time between PID updates in seconds
             sample_heater_range (float): Range for sample heater in Amps.
                                          Default is 10e-3.
             test_mode (bool, optional): Run the Process loop only once.
@@ -1281,21 +1313,25 @@ class LS372_Agent:
         settings.
 
         Parameters:
-            configfile (str): name of .yaml config file
-
+            configfile (str, optional):
+                name of .yaml config file. Defaults to the file set in the
+                site config
         """
+
+        configfile = params['configfile']
+        if configfile is None:
+            configfile = self.configfile
+        if configfile is None:
+            raise ValueError("No configfile specified")
+        configfile = os.path.join(os.environ['OCS_CONFIG_DIR'], configfile)
+
         with self._lock.acquire_timeout(job='input_configfile') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            # path to configfile in docker container
-            configpath = os.environ.get("OCS_CONFIG_DIR", "/config/")
-            configfile = params['configfile']
-
-            ls372configs = os.path.join(configpath, configfile)
-            with open(ls372configs) as f:
+            with open(configfile) as f:
                 config = yaml.safe_load(f)
 
             ls = self.module
@@ -1330,6 +1366,10 @@ class LS372_Agent:
                 elif ls_chann_settings[i]['autorange'] == 'off':
                     ls.channels[i].disable_autorange()
                     self.log.info("autorange off")
+                    # set to desired resistance range after disabling autorange
+                    resistance_range = ls_chann_settings[i]['resistance_range']
+                    ls.channels[i].set_resistance_range(resistance_range)
+                    self.log.info("resistance range for CH.{channel} set to {get_res}, the closest valid range to {res}".format(channel=i, get_res=ls.channels[i].get_resistance_range(), res=resistance_range))
 
                 excitation_mode = ls_chann_settings[i]['excitation_mode']
                 ls.channels[i].set_excitation_mode(excitation_mode)
@@ -1423,7 +1463,8 @@ def main(args=None):
     lake_agent = LS372_Agent(agent, args.serial_number, args.ip_address,
                              fake_data=args.fake_data,
                              dwell_time_delay=args.dwell_time_delay,
-                             enable_control_chan=args.enable_control_chan)
+                             enable_control_chan=args.enable_control_chan,
+                             configfile=args.configfile)
 
     agent.register_task('init_lakeshore', lake_agent.init_lakeshore,
                         startup=init_params)
@@ -1436,6 +1477,7 @@ def main(args=None):
     agent.register_task('set_dwell', lake_agent.set_dwell)
     agent.register_task('get_dwell', lake_agent.get_dwell)
     agent.register_task('engage_channel', lake_agent.engage_channel)
+    agent.register_task('engage_autorange', lake_agent.engage_autorange)
     agent.register_task('get_input_setup', lake_agent.get_input_setup)
     agent.register_task('set_calibration_curve', lake_agent.set_calibration_curve)
     agent.register_task('set_pid', lake_agent.set_pid)
@@ -1448,7 +1490,7 @@ def main(args=None):
     agent.register_task('set_still_output', lake_agent.set_still_output)
     agent.register_task('get_still_output', lake_agent.get_still_output)
     agent.register_process('acq', lake_agent.acq, lake_agent._stop_acq)
-    agent.register_process('custom_pid', lake_agent.start_custom_pid, lake_agent._stop_custom_pid)
+    agent.register_process('custom_pid', lake_agent.custom_pid, lake_agent._stop_custom_pid)
     agent.register_task('enable_control_chan', lake_agent.enable_control_chan)
     agent.register_task('disable_control_chan', lake_agent.disable_control_chan)
     agent.register_task('input_configfile', lake_agent.input_configfile)

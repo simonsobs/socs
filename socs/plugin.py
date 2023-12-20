@@ -1,5 +1,6 @@
 package_name = 'socs'
 agents = {
+    'ACTiCameraAgent': {'module': 'socs.agents.acti_camera.agent', 'entry_point': 'main'},
     'ACUAgent': {'module': 'socs.agents.acu.agent', 'entry_point': 'main'},
     'BlueforsAgent': {'module': 'socs.agents.bluefors.agent', 'entry_point': 'main'},
     'CrateAgent': {'module': 'socs.agents.smurf_crate_monitor.agent', 'entry_point': 'main'},
@@ -9,9 +10,12 @@ agents = {
     'FTSAerotechAgent': {'module': 'socs.agents.fts_aerotech.agent', 'entry_point': 'main'},
     'GeneratorAgent': {'module': 'socs.agents.generator.agent', 'entry_point': 'main'},
     'HWPBBBAgent': {'module': 'socs.agents.hwp_encoder.agent', 'entry_point': 'main'},
+    'HWPGripperAgent': {'module': 'socs.agents.hwp_gripper.agent', 'entry_point': 'main'},
+    'HWPPCUAgent': {'module': 'socs.agents.hwp_pcu.agent', 'entry_point': 'main'},
     'HWPPicoscopeAgent': {'module': 'socs.agents.hwp_picoscope.agent', 'entry_point': 'main'},
     'HWPPIDAgent': {'module': 'socs.agents.hwp_pid.agent', 'entry_point': 'main'},
     'HWPPMXAgent': {'module': 'socs.agents.hwp_pmx.agent', 'entry_point': 'main'},
+    'HWPSupervisor': {'module': 'socs.agents.hwp_supervisor.agent', 'entry_point': 'main'},
     'ibootbarAgent': {'module': 'socs.agents.ibootbar.agent', 'entry_point': 'main'},
     'LabJackAgent': {'module': 'socs.agents.labjack.agent', 'entry_point': 'main'},
     'Lakeshore240Agent': {'module': 'socs.agents.lakeshore240.agent', 'entry_point': 'main'},
@@ -35,6 +39,7 @@ agents = {
     'SynthAgent': {'module': 'socs.agents.holo_synth.agent', 'entry_point': 'main'},
     'TektronixAWGAgent': {'module': 'socs.agents.tektronix3021c.agent', 'entry_point': 'main'},
     'ThorlabsMC2000BAgent': {'module': 'socs.agents.thorlabs_mc2000b.agent', 'entry_point': 'main'},
+    'UCSCRadiometerAgent': {'module': 'socs.agents.ucsc_radiometer.agent', 'entry_point': 'main'},
     'UPSAgent': {'module': 'socs.agents.ups.agent', 'entry_point': 'main'},
     'VantagePro2Agent': {'module': 'socs.agents.vantagepro2.agent', 'entry_point': 'main'},
     'WiregridActuatorAgent': {'module': 'socs.agents.wiregrid_actuator.agent', 'entry_point': 'main'},

@@ -37,15 +37,19 @@ API Reference        Full API documentation for core parts of the SOCS library.
     :caption: Agent Reference
     :maxdepth: 2
 
+    agents/acti_camera
     agents/acu_agent
     agents/bluefors_agent
     agents/cryomech_cpa
     agents/fts_agent
     agents/generator
     agents/hwp_encoder
+    agents/hwp_gripper
+    agents/hwp_pcu
     agents/hwp_picoscope
     agents/hwp_pid
     agents/hwp_pmx
+    agents/hwp_supervisor_agent
     agents/holo_fpga
     agents/holo_synth
     agents/ibootbar
@@ -70,6 +74,7 @@ API Reference        Full API documentation for core parts of the SOCS library.
     agents/synacc
     agents/tektronix3021c
     agents/thorlabs_mc2000b
+    agents/ucsc_radiometer
     agents/ups
     agents/vantage_pro2
     agents/wiregrid_actuator

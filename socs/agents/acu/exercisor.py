@@ -350,9 +350,11 @@ def get_plan(config):
     return config
 
 
-def set_client(instance_id):
+def set_client(instance_id, args=None):
+    # It's a good idea to pass in args in case user has overridden the
+    # default site config file.
     global c
-    c = OCSClient(instance_id)
+    c = OCSClient(instance_id, args=args)
     return c
 
 

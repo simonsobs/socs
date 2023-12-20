@@ -9,6 +9,7 @@ on:
       - '.flake8'
       - '.pre-commit-config.yaml'
       - '.readthedocs.yaml'
+      - '.github/dependabot.yml'
   workflow_call:
 
 jobs:
@@ -18,7 +19,7 @@ jobs:
 
     steps:
     - name: Cancel Previous Runs
-      uses: styfle/cancel-workflow-action@0.11.0
+      uses: styfle/cancel-workflow-action@0.12.0
       with:
         access_token: ${{ github.token }}
 
@@ -27,7 +28,7 @@ jobs:
         sudo apt-get install -y socat
 
     - name: Set up Python 3.8
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: 3.8
 
@@ -37,7 +38,7 @@ jobs:
         pip3 install so3g
 
     - name: clone socs
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Install socs
       run: |

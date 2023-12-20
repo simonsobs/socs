@@ -51,7 +51,7 @@ class HWPPIDAgent:
             self.log.info("Connection already initialized. Returning...")
             return True, "Connection already initialized"
 
-        with self.lock.acquire_timeout(0, job='init_connection') as acquired:
+        with self.lock.acquire_timeout(10, job='init_connection') as acquired:
             if not acquired:
                 self.log.warn(
                     'Could not run init_connection because {} is already running'.format(self.lock.job))
@@ -170,6 +170,10 @@ class HWPPIDAgent:
                 return False, 'Could not acquire lock'
 
             freq = self.pid.get_freq()
+            session.data = {
+                'freq': freq,
+                'timestamp': time.time(),
+            }
 
         return True, 'Current frequency = {}'.format(freq)
 
@@ -204,6 +208,7 @@ class HWPPIDAgent:
                 return False, 'Could not acquire lock'
 
             direction = self.pid.get_direction()
+            session.data = {'direction': direction}
 
         return True, 'Current direction = {}'.format(['Forward', 'Reverse'][direction])
 
@@ -268,7 +273,7 @@ class HWPPIDAgent:
                  'last_updated': 1649085992.719602}
 
         """
-        with self.lock.acquire_timeout(timeout=0, job='acq') as acquired:
+        with self.lock.acquire_timeout(timeout=10, job='acq') as acquired:
             if not acquired:
                 self.log.warn('Could not start iv acq because {} is already running'
                               .format(self.lock.job))
@@ -290,13 +295,17 @@ class HWPPIDAgent:
                 data = {'timestamp': time.time(),
                         'block_name': 'HWPPID', 'data': {}}
 
-                current_freq = self.pid.get_freq()
-                target_freq = self.pid.get_target()
-                direction = self.pid.get_direction()
+                try:
+                    current_freq = self.pid.get_freq()
+                    target_freq = self.pid.get_target()
+                    direction = self.pid.get_direction()
 
-                data['data']['current_freq'] = current_freq
-                data['data']['target_freq'] = target_freq
-                data['data']['direction'] = direction
+                    data['data']['current_freq'] = current_freq
+                    data['data']['target_freq'] = target_freq
+                    data['data']['direction'] = direction
+                except BaseException:
+                    time.sleep(1)
+                    continue
 
                 self.agent.publish_to_feed('hwppid', data)
 
@@ -305,7 +314,7 @@ class HWPPIDAgent:
                                 'direction': direction,
                                 'last_updated': time.time()}
 
-                time.sleep(1)
+                time.sleep(5)
 
         self.agent.feeds['hwppid'].flush_buffer()
         return True, 'Acqusition exited cleanly'
