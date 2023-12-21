@@ -38,7 +38,7 @@ def process_action(action, PCU: pcu.PCU):
         elif action.command == 'on_2':
             on_channel = [0, 1, 2, 5, 6, 7]
             off_channel = []
-        elif action.command == 'hold':
+        elif action.command == 'stop':
             on_channel = [1, 2, 5]
             off_channel = [0, 6, 7]
 
@@ -72,7 +72,7 @@ class HWPPCUAgent:
             'hwppcu', record=True, agg_params=agg_params)
 
     @defer.inlineCallbacks
-    @ocs_agent.param('command', default='off', type=str, choices=['off', 'on_1', 'on_2', 'hold'])
+    @ocs_agent.param('command', default='off', type=str, choices=['off', 'on_1', 'on_2', 'stop'])
     def send_command(self, session, params):
         """send_command(command)
 
@@ -80,10 +80,10 @@ class HWPPCUAgent:
         off: The compensation phase is zero.
         on_1: The compensation phase is +120 deg.
         on_2: The compensation phase is -120 deg.
-        hold: Stop the HWP spin.
+        stop: Stop the HWP spin.
 
         Parameters:
-            command (str): set the operation mode from 'off', 'on_1', 'on_2' or 'hold'.
+            command (str): set the operation mode from 'off', 'on_1', 'on_2' or 'stop'.
 
         """
         action = Actions.SendCommand(**params)
