@@ -1280,14 +1280,14 @@ class ACUAgent:
     @ocs_agent.param('end_stop', default=False, type=bool)
     @inlineCallbacks
     def go_to(self, session, params):
-        """go_to(az=None, el=None, end_stop=False)
+        """go_to(az, el, end_stop=False)
 
         **Task** - Move the telescope to a particular point (azimuth,
         elevation) in Preset mode. When motion has ended and the telescope
         reaches the preset point, it returns to Stop mode and ends.
 
         Parameters:
-            az (float): destination angle for the azimuthal axis
+            az (float): destination angle for the azimuth axis
             el (float): destination angle for the elevation axis
             end_stop (bool): put the telescope in Stop mode at the end of
                 the motion
@@ -1344,7 +1344,7 @@ class ACUAgent:
     @ocs_agent.param('end_stop', default=False, type=bool)
     @inlineCallbacks
     def set_boresight(self, session, params):
-        """set_boresight(target=None, end_stop=False)
+        """set_boresight(target, end_stop=False)
 
         **Task** - Move the telescope to a particular third-axis angle.
 
@@ -1478,6 +1478,7 @@ class ACUAgent:
         yield
         return True, 'Done'
 
+    @ocs_agent.param('_')
     @inlineCallbacks
     def clear_faults(self, session, params):
         """clear_faults()
@@ -1554,7 +1555,7 @@ class ACUAgent:
     @ocs_agent.param('azonly', type=bool, default=True)
     @inlineCallbacks
     def fromfile_scan(self, session, params=None):
-        """fromfile_scan(filename=None, adjust_times=True, azonly=True)
+        """fromfile_scan(filename, adjust_times=True, azonly=True)
 
         **Task** - Upload and execute a scan pattern from numpy file.
 
@@ -2266,13 +2267,15 @@ class ACUAgent:
     @ocs_agent.param('avoidance_radius', type=float, default=None)
     @ocs_agent.param('shift_sun_hours', type=float, default=None)
     def update_sun(self, session, params):
-        """update_sun(reset, enable, temporary_disable, escape, \
-                      avoidance_radius, shift_sun_hours)
+        """update_sun(reset=None, enable=None, temporary_disable=None,
+                      escape=None, avoidance_radius=None,
+                      shift_sun_hours=None)
 
         **Task** - Update Sun monitoring and avoidance parameters.
 
-        Args:
+        All arguments are optional.
 
+        Args:
           reset (bool): If True, reset all sun_params to the platform
             defaults.  (The "defaults" includes any overrides
             specified on Agent command line.)
