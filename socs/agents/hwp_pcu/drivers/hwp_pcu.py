@@ -10,7 +10,7 @@ class PCU:
         port (str): Path to USB device in '/dev/'
 
     Attributes:
-        status (str): The status of the unit (off/on_1/on_2/hold)
+        status (str): The status of the unit (off/on_1/on_2/stop)
     """
 
     def __init__(self, port):
