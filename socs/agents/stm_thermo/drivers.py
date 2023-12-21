@@ -4,6 +4,7 @@
 
 from pathlib import Path
 
+
 class StmThermoError(Exception):
     '''Exception raised by stimulator thermometer.'''
 
@@ -16,12 +17,13 @@ class Iio:
     path : str or pathlib.Path
         Path to the iio device directory.
     '''
+
     def __init__(self, path):
         self._path = Path(path)
 
     def read(self, name):
         '''Read the file in the iio directory.
-        
+
         Parameters
         ----------
         name : str
@@ -38,7 +40,7 @@ class Iio:
     @property
     def name(self):
         '''Read name of the iio device.
-        
+
         Returns
         -------
         name : str
@@ -68,7 +70,7 @@ class Max31856(Iio):
 
     def get_temp_raw(self):
         '''Get raw temperature.
-        
+
         Returns
         -------
         temp_raw : int
@@ -78,17 +80,17 @@ class Max31856(Iio):
 
     def get_temp(self):
         '''Get temperature in degrees Celsius.
-        
+
         Returns
         -------
         temp : float
             Temperature in degrees Celsius.
         '''
-        return self.get_temp_raw()/2**7
+        return self.get_temp_raw() / 2**7
 
     def get_temp_abmient_raw(self):
         '''Get raw ambient temperature.
-        
+
         Returns
         -------
         temp_ambient_raw : int
@@ -98,13 +100,13 @@ class Max31856(Iio):
 
     def get_temp_ambient(self):
         '''Get ambient temperature in degrees Celsius.
-        
+
         Returns
         -------
         temp_ambient : float
             Ambient temperature in degrees Celsius.
         '''
-        return self.get_temp_abmient_raw()/2**6
+        return self.get_temp_abmient_raw() / 2**6
 
 
 class Max31865(Iio):
@@ -121,7 +123,7 @@ class Max31865(Iio):
 
     def get_temp_raw(self):
         '''Get raw temperature.
-        
+
         Returns
         -------
         temp_raw : int
@@ -131,20 +133,20 @@ class Max31865(Iio):
 
     def get_temp(self):
         '''Get temperature in degrees Celsius.
-        
+
         Returns
         -------
         temp : float
             Temperature in degrees Celsius.
         '''
-        r_rtd = self.R_REF * self.get_temp_raw()/32768
+        r_rtd = self.R_REF * self.get_temp_raw() / 32768
 
-        return (r_rtd/self.R_0 - 1)/self.ALPHA
+        return (r_rtd / self.R_0 - 1) / self.ALPHA
 
 
 def from_spi_node_path(path):
     '''Return device class from path to the SPI directory.
-    
+
     Paramter
     --------
     path : str or pathlib.Path
@@ -159,9 +161,9 @@ def from_spi_node_path(path):
     path_iio = list(Path(path).glob('iio*'))
     if len(path_iio) != 1:
         raise StmThermoError(f'IIO definition not found: {path_iio}')
-    
+
     dev_iio = Iio(path_iio[0])
-    
+
     name_dev = dev_iio.name
 
     if name_dev == 'max31856':
@@ -184,6 +186,7 @@ def main():
         print(dev.get_temp())
         if isinstance(dev, Max31856):
             print(dev.get_temp_ambient())
+
 
 if __name__ == '__main__':
     main()

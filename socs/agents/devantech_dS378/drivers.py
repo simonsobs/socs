@@ -3,21 +3,24 @@
 import socket
 from enum import IntEnum
 
-GET_STATUS   = 0x30, 8
-SET_RELAY    = 0x31, 1
-SET_OUTPUT   = 0x32, 1
-GET_RELAYS   = 0x33, 5
-GET_INPUTS   = 0x34, 2
-GET_ANALOG   = 0x35, 14
+GET_STATUS = 0x30, 8
+SET_RELAY = 0x31, 1
+SET_OUTPUT = 0x32, 1
+GET_RELAYS = 0x33, 5
+GET_INPUTS = 0x34, 2
+GET_ANALOG = 0x35, 14
 GET_COUNTERS = 0x36, 8
+
 
 class RelayStatus(IntEnum):
     '''Relay status'''
     on = 1
     off = 0
 
+
 class dS378:
     '''dS378 ethernet relay'''
+
     def __init__(self, ip, port, timeout=10):
         self._com = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._com.connect((ip, port))
@@ -53,8 +56,8 @@ class dS378:
         d_status['module_id'] = ret_bytes[0]
         d_status['firm_ver'] = f'{ret_bytes[1]}.{ret_bytes[2]}'
         d_status['app_ver'] = f'{ret_bytes[3]}.{ret_bytes[4]}'
-        d_status['V_sppl'] = ret_bytes[5]/10
-        d_status['T_int'] = int.from_bytes(ret_bytes[6:8], signed=True, byteorder='big')/10
+        d_status['V_sppl'] = ret_bytes[5] / 10
+        d_status['T_int'] = int.from_bytes(ret_bytes[6:8], signed=True, byteorder='big') / 10
 
         return d_status
 
@@ -115,9 +118,9 @@ class dS378:
         self._send(bytearray([GET_RELAYS[0], 1]))
         ret_bytes = self._recv(GET_RELAYS[1])
 
-        d_status = [None]*32
+        d_status = [None] * 32
         for i in range(32):
-            d_status[i] = RelayStatus((ret_bytes[4-int(i/8)] >> (i%8)) & 1)
+            d_status[i] = RelayStatus((ret_bytes[4 - int(i / 8)] >> (i % 8)) & 1)
 
         return d_status
 
@@ -132,7 +135,7 @@ class dS378:
         self._send(bytearray([GET_INPUTS[0], 1]))
         ret_bytes = self._recv(GET_RELAYS[1])
 
-        d_status = [None]*7
+        d_status = [None] * 7
         for i in range(7):
             d_status[i] = RelayStatus((ret_bytes[1] >> i) & 1)
 
@@ -149,9 +152,9 @@ class dS378:
         self._send1(GET_ANALOG[0])
         ret_bytes = self._recv(GET_ANALOG[1])
 
-        values = [None]*7
+        values = [None] * 7
         for i in range(7):
-            values[i] = int.from_bytes(ret_bytes[2*i:2*i+2], byteorder='big')
+            values[i] = int.from_bytes(ret_bytes[2 * i:2 * i + 2], byteorder='big')
 
         return values
 
@@ -178,14 +181,16 @@ class dS378:
 
         return c_current, c_reg
 
+
 def main():
     '''Main function'''
-    ds_dev = dS378('192.168.215.241', 17123)  #Edit here!! Please write IP address for dS378
+    ds_dev = dS378('192.168.215.241', 17123)
     print(ds_dev.get_status())
     ds_dev.set_relay(7, RelayStatus.off)
     print(ds_dev.get_relays()[:8])
     print(ds_dev.get_analog())
     print(ds_dev.get_inputs())
+
 
 if __name__ == '__main__':
     main()

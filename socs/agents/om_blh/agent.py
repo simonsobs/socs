@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 '''OCS agent for BLH motor driver
 '''
-import time
 import os
+import time
+
 import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
+
 from socs.agents.om_blh.drivers import BLH
 
 PORT_DEFAULT = '/dev/ttyACM0'
@@ -14,9 +16,11 @@ LOCK_RELEASE_TIMEOUT = 10
 ACQ_TIMEOUT = 100
 INIT_TIMEOUT = 100
 
+
 class BLHAgent:
     '''OCS agent class for BLH motor driver
     '''
+
     def __init__(self, agent, port=PORT_DEFAULT):
         '''
         Parameters
@@ -61,7 +65,6 @@ class BLHAgent:
 
         return True, 'BLH module initialized.'
 
-
     def start_acq(self, session, params):
         '''Starts acquiring data.
         '''
@@ -69,7 +72,7 @@ class BLHAgent:
             params = {}
 
         f_sample = params.get('sampling_frequency', 2.5)
-        sleep_time = 1/f_sample - 0.1
+        sleep_time = 1 / f_sample - 0.1
 
         if not self.initialized:
             self.agent.start('init_blh')
@@ -103,13 +106,13 @@ class BLHAgent:
 
                 # Data acquisition
                 current_time = time.time()
-                data = {'timestamp':current_time, 'block_name':'motor', 'data':{}}
+                data = {'timestamp': current_time, 'block_name': 'motor', 'data': {}}
 
                 speed = self._blh.get_status()
                 data['data']['RPM'] = speed
                 self.speed = speed
 
-                field_dict = {f'motor': {'RPM': speed}}
+                field_dict = {'motor': {'RPM': speed}}
                 session.data['fields'].update(field_dict)
 
                 self.agent.publish_to_feed('motor', data)
@@ -157,18 +160,18 @@ class BLHAgent:
                 return False, 'Could not acquire lock.'
 
             speed = params.get('speed')
-            if not speed is None:
+            if speed is not None:
                 self._blh.set_speed(speed)
 
             accl_time = params.get('accl_time')
-            if not accl_time is None:
+            if accl_time is not None:
                 self._blh.set_accl_time(accl_time, accl=True)
 
             decl_time = params.get('decl_time')
-            if not decl_time is None:
+            if decl_time is not None:
                 self._blh.set_accl_time(decl_time, accl=False)
 
-        return True, f'Set values for BLH'
+        return True, 'Set values for BLH'
 
     def start_rotation(self, session, params=None):
         '''Start rotation
@@ -206,7 +209,7 @@ class BLHAgent:
 
             self._blh.start(forward=forward)
 
-        return True, f'BLH rotation started.'
+        return True, 'BLH rotation started.'
 
     def stop_rotation(self, session, params=None):
         '''Stop rotation'''
@@ -221,13 +224,13 @@ class BLHAgent:
 
             self._blh.stop()
 
-        return True, f'BLH rotation stop command was published.'
+        return True, 'BLH rotation stop command was published.'
 
 
 def main():
     '''Boot OCS agent'''
     txaio.start_logging(level=os.environ.get('LOGLEVEL', 'info'))
-    
+
     args = site_config.parse_args(agent_class='BLHAgent')
 
     agent_inst, runner = ocs_agent.init_site_agent(args)

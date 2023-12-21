@@ -3,14 +3,16 @@
 
 from datetime import datetime, timezone
 from time import sleep
+
 import numpy as np
-
 import serial
-from socs.agents.om_ble2.om_comm import MOVE_FWD, MOVE_BKW, STATUS, INIT_CMD, STOP
 
+from socs.agents.om_ble2.om_comm import (INIT_CMD, MOVE_BKW, MOVE_FWD, STATUS,
+                                         STOP)
 
 DEV_NAME = '/dev/ttyACM0'
 UTC = timezone.utc
+
 
 def calc_parity(data):
     '''Parity calculation'''
@@ -19,6 +21,7 @@ def calc_parity(data):
 
 class BLE2:
     '''BLE2 motor driver controller'''
+
     def __init__(self, port=DEV_NAME):
         self._ser = serial.Serial(port, 9600, timeout=0.1)
         self._packet_index = 0
@@ -52,7 +55,7 @@ class BLE2:
 
         # Duration from the connection establishment
         ds_td = tmpdt - self._start_dt
-        ds_int = int((ds_td.total_seconds()*1e3)%65536)
+        ds_int = int((ds_td.total_seconds() * 1e3) % 65536)
         ds_b = ds_int.to_bytes(2, 'little')
 
         # Packet index modulo 256
@@ -80,9 +83,9 @@ class BLE2:
         '''
         assert 0 <= num < 16
         mark_0 = (((0b110 << 4) + num) << 5).to_bytes(2, 'little')
-        mark_1 = (((num+4)%8) << 5) + (5 - int(num/8))
+        mark_1 = (((num + 4) % 8) << 5) + (5 - int(num / 8))
         data = bytearray([0x03, 0x00, 0x01, 0x0a, 0x00, 0x86, 0x01]) + mark_0
-        data += bytearray([0x04, 0x00, 0x00, mark_1]) + bytearray([0]*22)
+        data += bytearray([0x04, 0x00, 0x00, mark_1]) + bytearray([0] * 22)
 
         return self._wr(data)
 
@@ -98,11 +101,11 @@ class BLE2:
 
         data = bytearray([0x03, 0x00, 0x01, 0x0c, 0x00, 0x81, 0x00, 0xc4, 0x01])
         data += speed.to_bytes(2, 'little')
-        data += bytearray([0]*3)
+        data += bytearray([0] * 3)
 
         # parity byte inside the packet.
         p_check = calc_parity(data[3:])
-        data += bytearray([p_check] + [0]*20)
+        data += bytearray([p_check] + [0] * 20)
 
         return self._wr(data)
 
@@ -121,12 +124,12 @@ class BLE2:
         assert 0.5 <= sec <= 15.0
 
         data = bytearray([0x03, 0x00, 0x01, 0x0c, 0x00, 0x81, 0x00, 0xc5 if accl else 0xc6, 0x01])
-        data += int(sec*10).to_bytes(1, 'little')
-        data += bytearray([0]*4)
+        data += int(sec * 10).to_bytes(1, 'little')
+        data += bytearray([0] * 4)
 
         # parity byte inside the packet
         p_check = calc_parity(data[3:])
-        data += bytearray([p_check] + [0]*20)
+        data += bytearray([p_check] + [0] * 20)
         return self._wr(data)
 
     def get_status(self):

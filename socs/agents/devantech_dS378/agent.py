@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 '''OCS agent for dS378 ethernet relay
 '''
-import time
 import os
+import time
+
 import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
+
 from socs.agents.devantech_dS378.drivers import dS378
 
 IP_DEFAULT = '192.168.215.241'
@@ -19,6 +21,7 @@ ACQ_TIMEOUT = 100
 class dS378Agent:
     '''OCS agent class for dS378 ethernet relay
     '''
+
     def __init__(self, agent, ip=IP_DEFAULT, port=17123):
         '''
         Parameters
@@ -52,7 +55,7 @@ class dS378Agent:
             params = {}
 
         f_sample = params.get('sampling_frequency', 0.5)
-        sleep_time = 1/f_sample - 0.1
+        sleep_time = 1 / f_sample - 0.1
 
         with self.lock.acquire_timeout(timeout=0, job='acq') as acquired:
             if not acquired:
@@ -76,7 +79,7 @@ class dS378Agent:
 
                 # Data acquisition
                 current_time = time.time()
-                data = {'timestamp':current_time, 'block_name':'relay', 'data':{}}
+                data = {'timestamp': current_time, 'block_name': 'relay', 'data': {}}
 
                 d_status = self._dev.get_status()
                 relay_list = self._dev.get_relays()
@@ -85,8 +88,8 @@ class dS378Agent:
                 for i in range(8):
                     data['data'][f'Relay_{i+1}'] = relay_list[i]
 
-                field_dict = {f'relay': {'V_sppl': d_status['V_sppl'],
-                                         'T_int': d_status['T_int']}}
+                field_dict = {'relay': {'V_sppl': d_status['V_sppl'],
+                                        'T_int': d_status['T_int']}}
                 session.data['fields'].update(field_dict)
 
                 self.agent.publish_to_feed('relay', data)
@@ -136,7 +139,7 @@ class dS378Agent:
                                 on_off=params['on_off'],
                                 pulse_time=params['pulse_time'])
 
-        return True, f'Set values'
+        return True, 'Set values'
 
     def get_relays(self, session, params=None):
         ''' Get relay states'''
@@ -152,7 +155,7 @@ class dS378Agent:
             d_status = self._dev.get_relays()
             session.data = {f'Relay_{i+1}': d_status[i] for i in range(8)}
 
-        return True, f'Got relay status'
+        return True, 'Got relay status'
 
 
 def main():

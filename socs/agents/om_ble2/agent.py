@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 '''OCS agent for BLE2 motor driver
 '''
-import time
 import os
+import time
+
 import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
+
 from socs.agents.om_ble2.drivers import BLE2
 
 PORT_DEFAULT = '/dev/ttyACM0'
@@ -14,9 +16,11 @@ LOCK_RELEASE_TIMEOUT = 10
 ACQ_TIMEOUT = 100
 INIT_TIMEOUT = 100
 
+
 class BLE2Agent:
     '''OCS agent class for BLE2 motor driver
     '''
+
     def __init__(self, agent, port=PORT_DEFAULT):
         '''
         Parameters
@@ -60,7 +64,6 @@ class BLE2Agent:
 
         return True, 'BLE2 module initialized.'
 
-
     def start_acq(self, session, params):
         '''Starts acquiring data.
         '''
@@ -68,7 +71,7 @@ class BLE2Agent:
             params = {}
 
         f_sample = params.get('sampling_frequency', 2.5)
-        sleep_time = 1/f_sample - 0.1
+        sleep_time = 1 / f_sample - 0.1
 
         if not self.initialized:
             self.agent.start('init_ble2')
@@ -102,12 +105,12 @@ class BLE2Agent:
 
                 # Data acquisition
                 current_time = time.time()
-                data = {'timestamp':current_time, 'block_name':'motor', 'data':{}}
+                data = {'timestamp': current_time, 'block_name': 'motor', 'data': {}}
 
                 speed = self._ble2.get_status()
                 data['data']['RPM'] = speed
 
-                field_dict = {f'motor': {'RPM': speed}}
+                field_dict = {'motor': {'RPM': speed}}
                 session.data['fields'].update(field_dict)
 
                 self.agent.publish_to_feed('motor', data)
@@ -151,18 +154,18 @@ class BLE2Agent:
                 return False, 'Could not acquire lock.'
 
             speed = params.get('speed')
-            if not speed is None:
+            if speed is not None:
                 self._ble2.set_speed(speed)
 
             accl_time = params.get('accl_time')
-            if not accl_time is None:
+            if accl_time is not None:
                 self._ble2.set_accl_time(accl_time, accl=True)
 
             decl_time = params.get('decl_time')
-            if not decl_time is None:
+            if decl_time is not None:
                 self._ble2.set_accl_time(decl_time, accl=False)
 
-        return True, f'Set values for BLE2'
+        return True, 'Set values for BLE2'
 
     def start_rotation(self, session, params=None):
         '''Start rotation
@@ -200,7 +203,7 @@ class BLE2Agent:
 
             self._ble2.start(forward=forward)
 
-        return True, f'BLE2 rotation started.'
+        return True, 'BLE2 rotation started.'
 
     def stop_rotation(self, session, params=None):
         '''Stop rotation'''
@@ -215,7 +218,7 @@ class BLE2Agent:
 
             self._ble2.stop()
 
-        return True, f'BLE2 rotation stop command was published.'
+        return True, 'BLE2 rotation stop command was published.'
 
 
 def main():
