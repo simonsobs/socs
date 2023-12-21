@@ -1300,7 +1300,8 @@ class ACUAgent:
             self.log.info(f'Requested position: az={target_az}, el={target_el}')
             session.set_status('running')
 
-            legs, msg = yield self._get_sunsafe_moves(target_az, target_el)
+            legs, msg = yield self._get_sunsafe_moves(target_az, target_el,
+                                                      zero_legs_ok=False)
             if msg is not None:
                 self.log.error(msg)
                 return False, msg
@@ -1737,7 +1738,8 @@ class ACUAgent:
 
         # Seek to starting position
         self.log.info(f'Moving to start position, az={plan["init_az"]}, el={init_el}')
-        legs, msg = yield self._get_sunsafe_moves(plan['init_az'], init_el)
+        legs, msg = yield self._get_sunsafe_moves(plan['init_az'], init_el,
+                                                  zero_legs_ok=True)
         if msg is not None:
             self.log.error(msg)
             return False, msg
@@ -2400,7 +2402,7 @@ class ACUAgent:
 
         return safe, msg
 
-    def _get_sunsafe_moves(self, target_az, target_el):
+    def _get_sunsafe_moves(self, target_az, target_el, zero_legs_ok=True):
         """Given a target position, find a Sun-safe way to get there.  This
         will either be a direct move, or else an ordered slew in az
         before el (or vice versa).
@@ -2410,6 +2412,11 @@ class ACUAgent:
         path can be found, the legs is a list of intermediate move
         targets, ``[(az0, el0), (az1, el1) ...]``, terminating on
         ``(target_az, target_el)``.  msg is None in that case.
+
+        In the case that platform is already at the target position,
+        an empty list of legs will be returned unless zero_legs_ok is
+        False in which case a 1-entry list of legs is returned, with
+        the target position in it.
 
         When Sun avoidance is not enabled, this function returns as
         though the direct path to the target is a safe one.
@@ -2439,7 +2446,10 @@ class ACUAgent:
         if move is None:
             return None, 'No Sun-Safe moves could be identified!'
 
-        return list(move['moves'].nodes[1:]), None
+        legs = list(move['moves'].nodes)
+        if len(legs) == 1 and not zero_legs_ok:
+            return legs, None
+        return legs[1:], None
 
     @ocs_agent.param('starting_index', type=int, default=0)
     def exercise(self, session, params):
