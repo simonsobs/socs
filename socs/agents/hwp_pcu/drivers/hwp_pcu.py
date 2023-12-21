@@ -69,5 +69,7 @@ class PCU:
             return 'on_2'
         elif channel_switch == [False, True, True, True, False, False]:
             return 'stop'
+        elif -1 in channel_switch:
+            return 'failed'
         else:
             return 'undefined'
