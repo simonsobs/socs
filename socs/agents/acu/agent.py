@@ -413,6 +413,12 @@ class ACUAgent:
             "StatusResponseRate": 19.237531827325963,
             "PlatformType": "satp",
             "IgnoredAxes": [],
+            "NamedPositions": {
+              "home": [
+                180,
+                40
+              ]
+            },
             "DefaultScanParams": {
               "az_speed": 2.0,
               "az_accel": 1.0,
