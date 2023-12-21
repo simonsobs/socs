@@ -1,20 +1,24 @@
 #!/usr/bin/env python3
 '''OCS agent for MAX31856 board in the stimulator box
 '''
-import time
-import os
-import txaio
 import argparse
+import os
+import time
+
+import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
-from socs.agents.stm_thermo.drivers import from_spi_node_path, Max31856
+
+from socs.agents.stm_thermo.drivers import Max31856, from_spi_node_path
 
 LOCK_RELEASE_SEC = 1.
 LOCK_RELEASE_TIMEOUT = 10
 
+
 class StmThermometerAgent:
     '''OCS agent class for stimulator thermometer.
     '''
+
     def __init__(self, agent, devices):
         '''
         Parameters
@@ -40,7 +44,7 @@ class StmThermometerAgent:
 
     def acq(self, session, params):
         f_sample = params.get('sampling_frequency', 1)
-        sleep_time = 1/f_sample - 0.1
+        sleep_time = 1 / f_sample - 0.1
 
         with self.lock.acquire_timeout(timeout=0, job='acq') as acquired:
             if not acquired:
@@ -62,7 +66,7 @@ class StmThermometerAgent:
                         return False, 'Could not re-acquire lock.'
 
                 current_time = time.time()
-                data = {'timestamp':current_time, 'block_name':'temps', 'data':{}}
+                data = {'timestamp': current_time, 'block_name': 'temps', 'data': {}}
 
                 for ch_num, dev in enumerate(self.devices):
                     chan_string = f'Channel_{ch_num}'
@@ -96,6 +100,7 @@ class StmThermometerAgent:
 
         return False, 'acq is not currently running.'
 
+
 def main():
     '''Boot OCS agent'''
     txaio.start_logging(level=os.environ.get('LOGLEVEL', 'info'))
@@ -122,6 +127,7 @@ def main():
     )
 
     runner.run(agent_inst, auto_reconnect=True)
+
 
 if __name__ == '__main__':
     main()

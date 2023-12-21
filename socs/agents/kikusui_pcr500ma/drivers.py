@@ -10,16 +10,20 @@ BUFFSIZE = 4096
 # software limits
 VOLT_ULIM_SOFT = 51
 
+
 class PCRException(Exception):
     pass
+
 
 class PCRCoupling(Enum):
     AC = 'AC'
     DC = 'DC'
     ACDC = 'ACDC'
 
+
 class PCR500MA:
     '''PCR500MA'''
+
     def __init__(self, ip_addr, port=PORT, timeout=TIMEOUT_DEFAULT):
         '''Initialize PCR500MA interface
 
@@ -306,9 +310,10 @@ class PCR500MA:
         message = self._query('MEAS:FREQ?')
         return float(message)
 
+
 def main():
     '''Main function'''
-    inst = PCR500MA('192.168.215.80')  #Edit here!! Please write IP address for PCR500MA
+    inst = PCR500MA('192.168.215.80')  # Edit here!! Please write IP address for PCR500MA
     print(inst.get_idn())
     print(inst.get_output())
     print(inst.get_coupling())
@@ -320,6 +325,7 @@ def main():
     print(inst.meas_current_ac())
     print(inst.meas_power_ac())
     print(inst.meas_freq())
+
 
 if __name__ == '__main__':
     main()

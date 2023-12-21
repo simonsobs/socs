@@ -1,28 +1,29 @@
 #!/usr/bin/env python3
 '''Module to read stimulator encoder.
 '''
+import fcntl
+import mmap
+import os
 import selectors
 import sys
-import fcntl
-import os
-import mmap
-import numpy as np
-
 from pathlib import Path
 from queue import Queue
 from threading import Thread
 from time import sleep
 
+import numpy as np
 
 ADDR_AXI = 0x80020000
 PATH_DEV_BASE = Path(f'/sys/devices/platform/axi/{ADDR_AXI:08x}.str_rd/uio')
 PATH_LOCK = Path(__file__).parent.joinpath('.lock')
 LEAP_OFFSET = 37
 
+
 class StmEncError(Exception):
     '''
     Exception rased by stimulator encoder reader.
     '''
+
 
 class StmEncTime:
     '''
@@ -34,6 +35,7 @@ class StmEncTime:
         Raw time format from TSU.
         [sec 48 bits][nsec 30 bits][sub-nsec 16 bits]
     '''
+
     def __init__(self, time_raw):
         self._time_raw = time_raw
 
@@ -60,7 +62,7 @@ class StmEncTime:
             Nano-sec part of timestamp.
         '''
         return (0x_00000000_00003fff_ffff0000 & self._time_raw) >> 16
-    
+
     @property
     def tai(self):
         '''
@@ -71,13 +73,13 @@ class StmEncTime:
         tai : float
             Seconds from TAI epoch.
         '''
-        return self.sec + (self.nsec/1e9)
+        return self.sec + (self.nsec / 1e9)
 
     @property
     def utc(self):
         '''
         Time in seconds in UTC.
-        
+
         Returns
         -------
         utc : float
@@ -89,13 +91,13 @@ class StmEncTime:
     def g3(self):
         '''
         G3Time.
-        
+
         Returns
         -------
         time_g3 : np.int64
             G3Time
         '''
-        time_g3 = np.floor((self.utc)*1e8)
+        time_g3 = np.floor((self.utc) * 1e8)
 
         return np.int64(time_g3)
 
@@ -109,6 +111,7 @@ class StmEncData:
     data_raw : ndarray
         Raw data from PL FIFO.
     '''
+
     def __init__(self, data_bytes):
         self._data_bytes = data_bytes
         self._data_int = int(data_bytes[0]) + (int(data_bytes[1]) << 32) + (int(data_bytes[2]) << 64)
@@ -116,11 +119,11 @@ class StmEncData:
     @property
     def state(self):
         return (self._data_int & 0xC0_00_00_00_00000000_00000000) >> 94
-    
+
     @property
     def time_raw(self):
         '''94 bit TSU timestamp.
-        
+
         Returns
         -------
         time_raw : int
@@ -139,7 +142,7 @@ class StmEncData:
             TSU timestamp abstraction.
         '''
         return StmEncTime(self.time_raw)
-    
+
     def __str__(self):
         return f'time={int(self.time.g3)/1e8:.8f} data={self.state:02b}'
 
@@ -164,7 +167,7 @@ def get_path_dev():
 
 class StmEncReader:
     '''Class to read encoder data.
-    
+
     Parameters
     ----------
     path_dev : str or pathlib.Path
@@ -172,6 +175,7 @@ class StmEncReader:
     path_lock : str or pathlib.Path
         Path to the lockfile.
     '''
+
     def __init__(self, path_dev, path_lock=PATH_LOCK, verbose=True):
         # Verbose level
         self._verbose = verbose
@@ -249,7 +253,7 @@ class StmEncReader:
     def stop(self):
         if not self._running:
             raise StmEncError('Not started yet.')
-        
+
         self._running = False
         self._thread.join()
 
@@ -268,7 +272,7 @@ def main():
                 print(data)
                 fd.write(str(data) + '\n')
             sleep(0.1)
-        except:
+        except BaseException:
             stm_enc.stop()
             fd.close()
             break

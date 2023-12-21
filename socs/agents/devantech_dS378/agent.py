@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 '''OCS agent for dS378 ethernet relay
 '''
-import time
 import os
+import time
+
 import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
+
 from socs.agents.devantech_dS378.drivers import dS378
 
 IP_DEFAULT = '192.168.215.241'
@@ -19,6 +21,7 @@ ACQ_TIMEOUT = 100
 class dS378Agent:
     '''OCS agent class for dS378 ethernet relay
     '''
+
     def __init__(self, agent, ip=IP_DEFAULT, port=17123):
         '''
         Parameters
@@ -52,7 +55,7 @@ class dS378Agent:
             params = {}
 
         f_sample = params.get('sampling_frequency', 0.5)
-        sleep_time = 1/f_sample - 0.1
+        sleep_time = 1 / f_sample - 0.1
 
         with self.lock.acquire_timeout(timeout=0, job='acq') as acquired:
             if not acquired:
@@ -76,7 +79,7 @@ class dS378Agent:
 
                 # Data acquisition
                 current_time = time.time()
-                data = {'timestamp':current_time, 'block_name':'relay', 'data':{}}
+                data = {'timestamp': current_time, 'block_name': 'relay', 'data': {}}
 
                 d_status = self._dev.get_status()
                 relay_list = self._dev.get_relays()

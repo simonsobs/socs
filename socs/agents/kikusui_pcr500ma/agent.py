@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 '''OCS agent for dS378 ethernet relay
 '''
-import time
 import os
+import time
+
 import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
+
 from socs.agents.kikusui_pcr500ma.drivers import PCR500MA, TIMEOUT_DEFAULT
 
-IP_DEFAULT = '192.168.215.80'  #Edit here!! Please write IP address for PCR500MA
+IP_DEFAULT = '192.168.215.80'  # Edit here!! Please write IP address for PCR500MA
 PORT_DEFAULT = 5025
 
 LOCK_RELEASE_SEC = 1.
@@ -19,6 +21,7 @@ ACQ_TIMEOUT = 20
 class PCRAgent:
     '''OCS agent class for PCR500MA current source
     '''
+
     def __init__(self, agent, ip_addr=IP_DEFAULT, port=PORT_DEFAULT, timeout=TIMEOUT_DEFAULT):
         '''
         Parameters
@@ -52,7 +55,7 @@ class PCRAgent:
             params = {}
 
         f_sample = params.get('sampling_frequency', 0.2)
-        sleep_time = 1/f_sample - 0.1
+        sleep_time = 1 / f_sample - 0.1
 
         with self.lock.acquire_timeout(timeout=0, job='acq') as acquired:
             if not acquired:
@@ -76,7 +79,7 @@ class PCRAgent:
 
                 # Data acquisition
                 current_time = time.time()
-                data = {'timestamp':current_time, 'block_name':'heater_source', 'data':{}}
+                data = {'timestamp': current_time, 'block_name': 'heater_source', 'data': {}}
 
                 i_ac = self._dev.meas_current_ac()
                 v_ac = self._dev.meas_volt_ac()

@@ -1,18 +1,21 @@
 #!/usr/bin/env python3
 '''OCS agent for stimulator encoder
 '''
-import time
 import os
-import txaio
+import time
 
+import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
-from socs.agents.stm_encoder.drivers import StmEncReader, get_path_dev, PATH_LOCK
+
+from socs.agents.stm_encoder.drivers import (PATH_LOCK, StmEncReader,
+                                             get_path_dev)
 
 
 class StmEncAgent:
     '''OCS agent class for stimulator encoder
     '''
+
     def __init__(self, agent, path_dev=None, path_lock=PATH_LOCK):
         '''
         Parameters
@@ -60,7 +63,7 @@ class StmEncAgent:
             while self.take_data:
                 # Data acquisition
                 current_time = time.time()
-                data = {'timestamps':[], 'block_name':'stm_enc', 'data':{}}
+                data = {'timestamps': [], 'block_name': 'stm_enc', 'data': {}}
 
                 ts_list = []
                 en_st_list = []
@@ -99,7 +102,6 @@ class StmEncAgent:
         return False, 'acq is not currently running.'
 
 
-
 def main():
     '''Boot OCS agent'''
     txaio.start_logging(level=os.environ.get('LOGLEVEL', 'info'))
@@ -120,6 +122,7 @@ def main():
     )
 
     runner.run(agent_inst, auto_reconnect=True)
+
 
 if __name__ == '__main__':
     main()

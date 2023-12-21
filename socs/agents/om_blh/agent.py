@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 '''OCS agent for BLH motor driver
 '''
-import time
 import os
+import time
+
 import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
+
 from socs.agents.om_blh.drivers import BLH
 
 PORT_DEFAULT = '/dev/ttyACM0'
@@ -14,9 +16,11 @@ LOCK_RELEASE_TIMEOUT = 10
 ACQ_TIMEOUT = 100
 INIT_TIMEOUT = 100
 
+
 class BLHAgent:
     '''OCS agent class for BLH motor driver
     '''
+
     def __init__(self, agent, port=PORT_DEFAULT):
         '''
         Parameters
@@ -61,7 +65,6 @@ class BLHAgent:
 
         return True, 'BLH module initialized.'
 
-
     def start_acq(self, session, params):
         '''Starts acquiring data.
         '''
@@ -69,7 +72,7 @@ class BLHAgent:
             params = {}
 
         f_sample = params.get('sampling_frequency', 2.5)
-        sleep_time = 1/f_sample - 0.1
+        sleep_time = 1 / f_sample - 0.1
 
         if not self.initialized:
             self.agent.start('init_blh')
@@ -103,7 +106,7 @@ class BLHAgent:
 
                 # Data acquisition
                 current_time = time.time()
-                data = {'timestamp':current_time, 'block_name':'motor', 'data':{}}
+                data = {'timestamp': current_time, 'block_name': 'motor', 'data': {}}
 
                 speed = self._blh.get_status()
                 data['data']['RPM'] = speed
@@ -157,15 +160,15 @@ class BLHAgent:
                 return False, 'Could not acquire lock.'
 
             speed = params.get('speed')
-            if not speed is None:
+            if speed is not None:
                 self._blh.set_speed(speed)
 
             accl_time = params.get('accl_time')
-            if not accl_time is None:
+            if accl_time is not None:
                 self._blh.set_accl_time(accl_time, accl=True)
 
             decl_time = params.get('decl_time')
-            if not decl_time is None:
+            if decl_time is not None:
                 self._blh.set_accl_time(decl_time, accl=False)
 
         return True, f'Set values for BLH'
@@ -227,7 +230,7 @@ class BLHAgent:
 def main():
     '''Boot OCS agent'''
     txaio.start_logging(level=os.environ.get('LOGLEVEL', 'info'))
-    
+
     args = site_config.parse_args(agent_class='BLHAgent')
 
     agent_inst, runner = ocs_agent.init_site_agent(args)
