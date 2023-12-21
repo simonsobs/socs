@@ -54,7 +54,7 @@ class PCU:
         off: The compensation phase is zero.
         on_1: The compensation phase is +120 deg.
         on_2: The compensation phase is -120 deg.
-        hold: Stop the HWP spin.
+        stop: Stop the HWP spin.
         """
         channel = [0, 1, 2, 5, 6, 7]
         channel_switch = []
@@ -67,7 +67,7 @@ class PCU:
             return 'on_1'
         elif channel_switch == [True, True, True, True, True, True]:
             return 'on_2'
-        elif channel_switch == [True, True, True, True, False, False]:
-            return 'hold'
+        elif channel_switch == [False, True, True, True, False, False]:
+            return 'stop'
         else:
             return 'undefined'
