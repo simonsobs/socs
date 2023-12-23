@@ -10,7 +10,7 @@ class PCU:
         port (str): Path to USB device in '/dev/'
 
     Attributes:
-        status (str): The status of the unit (off/on_1/on_2/hold)
+        status (str): The status of the unit (off/on_1/on_2/stop)
     """
 
     def __init__(self, port):
@@ -54,7 +54,7 @@ class PCU:
         off: The compensation phase is zero.
         on_1: The compensation phase is +120 deg.
         on_2: The compensation phase is -120 deg.
-        hold: Stop the HWP spin.
+        stop: Stop the HWP spin.
         """
         channel = [0, 1, 2, 5, 6, 7]
         channel_switch = []
@@ -67,7 +67,9 @@ class PCU:
             return 'on_1'
         elif channel_switch == [True, True, True, True, True, True]:
             return 'on_2'
-        elif channel_switch == [True, True, True, True, False, False]:
-            return 'hold'
+        elif channel_switch == [False, True, True, True, False, False]:
+            return 'stop'
+        elif -1 in channel_switch:
+            return 'failed'
         else:
             return 'undefined'
