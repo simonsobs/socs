@@ -1,17 +1,108 @@
 import argparse
-import os
 import time
+from dataclasses import dataclass
+from queue import Queue
 
 import txaio
-from ocs import ocs_agent, site_config
-from ocs.ocs_twisted import TimeoutLock
-from twisted.internet import reactor
-
-import socs.agents.hwp_pmx.drivers.PMX_ethernet as pmx
-from socs.agents.hwp_supervisor.agent import get_op_data
+from twisted.internet import defer
 
 txaio.use_twisted()
 
+from ocs import ocs_agent, site_config
+
+import socs.agents.hwp_pmx.drivers.PMX_ethernet as pmx
+
+class Actions:
+    class BaseAction:
+        def __post_init__(self):
+            self.deferred = defer.Deferred()
+            self.log = txaio.make_logger()
+
+    def process(self, *args, **kwargs):
+            raise NotImplementedError
+
+    @dataclass
+    class SetOn(BaseAction):
+        def process(self, module, log=None):
+            if log is None:
+                log = self.log
+
+            log.info("Setting PMX on...")
+            self.dev.turn_off()
+
+    class SetOff(BaseAction):
+        def process(self, module, log=None):
+            if log is None:
+                log = self.log
+
+            log.info("Setting PMX off...")
+            self.dev.turn_off()
+
+    class UseExt(BaseAction):
+        def process(self, module, log=None):
+            if log is None:
+                log = self.log
+
+            log.info("Setting PMX Kikusui to PID control...")
+            self.dev.use_external_voltage()
+        return True
+
+    class IgnExt(BaseAction):
+        def process(self, module, log=None):
+            if log is None:
+                log = self.log
+
+            log.info("Setting PMX Kikusui to direct control...")
+            self.dev.ign_external_voltage()
+        return True
+
+    class ClearAlarm(BaseAction):
+        def process(self, module, log=None):
+            if log is None:
+                log = self.log
+
+            log.info("Clear PMX alarm...")
+            self.dev.clear_alarm()
+
+    class SetI(BaseAction):
+        curr: float
+
+        def process(self, module, log=None):
+            if log is None:
+                log = self.log
+
+        msg, val = self.dev.set_current(curr)
+        return True
+
+    class SetV(BaseAction):
+        volt: float
+
+        def process(self, module, log=None):
+            if log is None:
+                log = self.log
+
+        msg, val = self.dev.set_voltage(volt)
+        return True
+
+    class SetILim(BaseAction):
+        curr: float
+
+        def process(self, module, log=None):
+            if log is None:
+                log = self.log
+
+        msg, val = self.dev.set_current_limit(curr)
+        return True
+
+    class SetVLim(BaseAction):
+        volt: float
+
+        def process(self, module, log=None):
+            if log is None:
+                log = self.log
+
+        msg, val = self.dev.set_voltage_limit(volt)
+        return True
 
 class HWPPMXAgent:
     """Agent for interfacing with a PMX Kikusui power supply
@@ -52,84 +143,74 @@ class HWPPMXAgent:
 
         self.agent.register_feed('rotation_action', record=True)
 
-    @ocs_agent.param('auto_acquire', default=False, type=bool)
-    def init_connection(self, session, params=None):
-        """init_connection(auto_acquire=False)
-        **Task** - Initialize connection to PMX
-
-        Parameters:
-            auto_acquire (bool, optional): Default is False. Starts data
-                acquisition after initialization if True.
-        """
-        if self._initialized:
-            self.log.info("Connection already initialized. Returning...")
-            return True, "Connection already initialized"
-
-        with self.lock.acquire_timeout(0, job='init_connection') as acquired:
-            if not acquired:
-                self.log.warn(
-                    'Could not run init_connection because {} is already running'.format(self.lock.job))
-                return False, 'Could not acquire lock'
-
-            try:
-                self.dev = pmx.PMX(ip=self.ip, port=self.port)
-                self.log.info('Connected to PMX Kikusui')
-            except BrokenPipeError:
-                self.log.error('Could not establish connection to PMX Kikusui')
-                reactor.callFromThread(reactor.stop)
-                return False, 'Unable to connect to PMX Kikusui'
-
-        if params['auto_acquire']:
-            self.agent.start('acq')
-
-        return True, 'Connection to PMX established'
-
+    @defer.inlineCallbacks
     def set_on(self, session, params):
         """set_on()
         **Task** - Turn on the PMX Kikusui.
         """
-        with self.lock.acquire_timeout(3, job='set_on') as acquired:
-            if not acquired:
-                self.log.warn(
-                    'Could not set on because {} is already running'.format(self.lock.job))
-                return False, 'Could not acquire lock'
+        if self.shutdown_mode:
+            return False, "Shutdown mode is in effect"
 
-            if self.shutdown_mode:
-                return False, "Shutdown mode is in effect"
-
-            self.dev.turn_on()
+        action = Actions.SetOn(**params)
+        self.action_queue.put(action)
+        session.data = yield action.deferred
         return True, 'Set PMX Kikusui on'
 
+    @defer.inlineCallbacks
     def set_off(self, session, params):
         """set_off()
         **Task** - Turn off the PMX Kikusui.
         """
-        with self.lock.acquire_timeout(3, job='set_off') as acquired:
-            if not acquired:
-                self.log.warn(
-                    'Could not set on because {} is already running'.format(self.lock.job))
-                return False, 'Could not acquire lock'
+        if self.shutdown_mode:
+            return False, "Shutdown mode is in effect"
 
-            if self.shutdown_mode:
-                return False, "Shutdown mode is in effect"
-
-            self.dev.turn_off()
+        action = Actions.SetOff(**params)
+        self.action_queue.put(action)
+        session.data = yield action.deferred
         return True, 'Set PMX Kikusui off'
 
+    @defer.inlineCallbacks
     def clear_alarm(self, session, params):
         """clear_alarm()
         **Task** - Clear alarm and exit protection mode.
         """
-        with self.lock.acquire_timeout(3, job='clear_alarm') as acquired:
-            if not acquired:
-                self.log.warn(
-                    'Could not clear alarm because {} is already running'.format(self.lock.job))
-                return False, 'Could not acquire lock'
-            self.dev.clear_alarm()
-            self.prot = 0
+        action = Actions.ClearAlarm(**params)
+        self.action_queue.put(action)
+        session.data = yield action.deferred
         return True, 'Clear alarm'
 
+    @defer.inlineCallbacks
+    def use_ext(self, session, params):
+        """use_ext()
+        **Task** - Set the PMX Kikusui to use an external voltage control. Doing so
+        enables PID control.
+        """
+
+        if self.shutdown_mode:
+            return False, "Shutdown mode is in effect"
+
+        action = Actions.UseExt(**params)
+        self.action_queue.put(action)
+        session.data = yield action.deferred
+        return True, 'Set PMX Kikusui to PID control'
+
+    @defer.inlineCallbacks
+    def ign_ext(self, session, params):
+        """ign_ext()
+        **Task** - Set the PMX Kiksui to ignore external voltage control. Doing so
+        disables the PID and switches to direct control.
+        """
+
+        if self.shutdown_mode:
+            return False, "Shutdown mode is in effect"
+
+        action = Actions.IgnExt(**params)
+        self.action_queue.put(action)
+        session.data = yield action.deferred
+        return True, 'Set PMX Kikusui to direct control'
+
     @ocs_agent.param('curr', default=0, type=float, check=lambda x: 0 <= x <= 3)
+    @defer.inlineCallbacks
     def set_i(self, session, params):
         """set_i(curr=0)
         **Task** - Set the current.
@@ -137,19 +218,16 @@ class HWPPMXAgent:
         Parameters:
             curr (float): set current
         """
-        with self.lock.acquire_timeout(3, job='set_i') as acquired:
-            if not acquired:
-                self.log.warn(
-                    'Could not set i because {} is already running'.format(self.lock.job))
-                return False, 'Could not acquire lock'
+        if self.shutdown_mode:
+            return False, "Shutdown mode is in effect"
 
-            if self.shutdown_mode:
-                return False, "Shutdown mode is in effect"
-
-            msg, val = self.dev.set_current(params['curr'])
-        return True, msg
+        action = Actions.SetI(**params)
+        self.action_queue.put(action)
+        session.data = yield action.deferred
+        return True, 'Set current is done'
 
     @ocs_agent.param('volt', default=0, type=float, check=lambda x: 0 <= x <= 35)
+    @defer.inlineCallbacks
     def set_v(self, session, params):
         """set_v(volt=0)
         **Task** - Set the voltage.
@@ -157,19 +235,16 @@ class HWPPMXAgent:
         Parameters:
             volt (float): set voltage
         """
-        with self.lock.acquire_timeout(3, job='set_v') as acquired:
-            if not acquired:
-                self.log.warn(
-                    'Could not set v because {} is already running'.format(self.lock.job))
-                return False, 'Could not acquire lock'
+        if self.shutdown_mode:
+            return False, "Shutdown mode is in effect"
 
-            if self.shutdown_mode:
-                return False, "Shutdown mode is in effect"
-
-            msg, val = self.dev.set_voltage(params['volt'])
-        return True, msg
+        action = Actions.SetV(**params)
+        self.action_queue.put(action)
+        session.data = yield action.deferred
+        return True, 'Set voltage is done'
 
     @ocs_agent.param('curr', default=1., type=float, check=lambda x: 0. <= x <= 3.)
+    @defer.inlineCallbacks
     def set_i_lim(self, session, params):
         """set_i_lim(curr=1)
         **Task** - Set the drive current limit.
@@ -177,15 +252,13 @@ class HWPPMXAgent:
         Parameters:
             curr (float): limit current
         """
-        with self.lock.acquire_timeout(3, job='set_i_lim') as acquired:
-            if not acquired:
-                self.log.warn(
-                    'Could not set v lim because {} is already running'.format(self.lock.job))
-                return False, 'Could not acquire lock'
-            msg = self.dev.set_current_limit(params['curr'])
-        return True, msg
+        action = Actions.SetILim(**params)
+        self.action_queue.put(action)
+        session.data = yield action.deferred
+        return True, 'Set voltage limit is done'
 
     @ocs_agent.param('volt', default=32., type=float, check=lambda x: 0. <= x <= 35.)
+    @defer.inlineCallbacks
     def set_v_lim(self, session, params):
         """set_v_lim(volt=32)
         **Task** - Set the drive voltage limit.
@@ -193,50 +266,12 @@ class HWPPMXAgent:
         Parameters:
             volt (float): limit voltage
         """
-        with self.lock.acquire_timeout(3, job='set_v_lim') as acquired:
-            if not acquired:
-                self.log.warn(
-                    'Could not set v lim because {} is already running'.format(self.lock.job))
-                return False, 'Could not acquire lock'
-            msg = self.dev.set_voltage_limit(params['volt'])
-        return True, msg
+        action = Actions.SetVLim(**params)
+        self.action_queue.put(action)
+        session.data = yield action.deferred
+        return True, 'Set current limit is done'
 
-    def use_ext(self, session, params):
-        """use_ext()
-        **Task** - Set the PMX Kikusui to use an external voltage control. Doing so
-        enables PID control.
-        """
-        with self.lock.acquire_timeout(3, job='use_ext') as acquired:
-            if not acquired:
-                self.log.warn(
-                    'Could not use external voltage because {} is already running'.format(self.lock.job))
-                return False, 'Could not acquire lock'
-
-            if self.shutdown_mode:
-                return False, "Shutdown mode is in effect"
-
-            self.dev.use_external_voltage()
-        return True, 'Set PMX Kikusui to PID control'
-
-    def ign_ext(self, session, params):
-        """ign_ext()
-        **Task** - Set the PMX Kiksui to ignore external voltage control. Doing so
-        disables the PID and switches to direct control.
-        """
-        with self.lock.acquire_timeout(3, job='ign_ext') as acquired:
-            if not acquired:
-                self.log.warn(
-                    'Could not ignore external voltage because {} is already running'.format(self.lock.job))
-                return False, 'Could not acquire lock'
-
-            if self.shutdown_mode:
-                return False, "Shutdown mode is in effect"
-
-            self.dev.ign_external_voltage()
-        return True, 'Set PMX Kikusui to direct control'
-
-    @ocs_agent.param('test_mode', default=False, type=bool)
-    def acq(self, session, params):
+    def main(self, session, params):
         """acq(test_mode=False)
 
         **Process** - Start data acquisition.
@@ -256,84 +291,77 @@ class HWPPMXAgent:
                  'last_updated': 1649085992.719602}
 
         """
+        try:
+            self.dev = pmx.PMX(ip=self.ip, port=self.port)
+            self.log.info('Connected to PMX Kikusui')
+        except BrokenPipeError:
+            self.log.error('Could not establish connection to PMX Kikusui')
+            reactor.callFromThread(reactor.stop)
         sleep_time = 1 / self.f_sample - 0.01
 
-        with self.lock.acquire_timeout(0, job='acq') as acquired:
-            if not acquired:
-                self.log.warn("Could not start acq because {} is already running"
-                              .format(self.lock.job))
-                return False, "Could not acquire lock."
+        session.set_status('running')
+        while not self.action_queue.empty():
+            action = self.action_queue.get()
+            action.deferred.errback(Exception("Action cancelled"))
 
-            session.set_status('running')
-            self.take_data = True
+        last_daq = 0
+        while session.status in ['starting', 'running']:
+            now = time.time()
+            if now - last_daq > 5:
+                self._get_and_publish_data(PMX, session)
+                last_daq = now
 
-            last_release = time.time()
-            while self.take_data:
-                current_time = time.time()
-                if current_time - last_release > 1.:
-                    last_release = time.time()
-                    if not self.lock.release_and_acquire(timeout=10):
-                        self.log.warn(f"Failed to re-acquire lock, currently held by {self.lock.job}.")
-                        continue
+            self._process_actions(PMX)
+            time.sleep(0.1)
 
-                data = {
-                    'timestamp': current_time,
-                    'block_name': 'hwppmx',
-                    'data': {}
-                }
+        PCU.close()
 
-                try:
-                    msg, curr = self.dev.meas_current()
-                    data['data']['current'] = curr
-
-                    msg, volt = self.dev.meas_voltage()
-                    data['data']['voltage'] = volt
-
-                    msg, code = self.dev.check_error()
-                    data['data']['err_code'] = code
-                    data['data']['err_msg'] = msg
-
-                    prot_code = self.dev.check_prot()
-                    if prot_code != 0:
-                        self.prot = prot_code
-
-                    prot_msg = self.dev.get_prot_msg(self.prot)
-                    data['data']['prot_code'] = self.prot
-                    data['data']['prot_msg'] = prot_msg
-
-                    msg, src = self.dev.check_source()
-                    data['data']['source'] = src
-                except BaseException:
-                    time.sleep(sleep_time)
-                    continue
-
-                self.agent.publish_to_feed('hwppmx', data)
-                session.data = {'curr': curr,
-                                'volt': volt,
-                                'prot': self.prot,
-                                'prot_msg': prot_msg,
-                                'source': src,
-                                'last_updated': current_time}
-
-                time.sleep(sleep_time)
-
-                if params['test_mode']:
-                    break
-
-            self.agent.feeds['hwppmx'].flush_buffer()
-
-        return True, 'Acquisition exited cleanly.'
-
-    def _stop_acq(self, session, params=None):
+    def _stop_main(self, session, params):
         """
         Stop acq process.
         """
-        if self.take_data:
-            self.take_data = False
-            return True, 'requested to stop taking data.'
-        else:
-            return False, 'acq is not currently running'
+        session.set_status('stopping')
+        return True, 'Set main status to stopping'
 
+    def _get_and_publish_data(self, PCU: pcu.PCU, session):
+        now = time.time()
+        data = {'timestamp': current_time,
+                'block_name': 'hwppmx',
+                'data': {}}
+
+        try:
+            msg, curr = self.dev.meas_current()
+            data['data']['current'] = curr
+
+            msg, volt = self.dev.meas_voltage()
+            data['data']['voltage'] = volt
+
+            msg, code = self.dev.check_error()
+            data['data']['err_code'] = code
+            data['data']['err_msg'] = msg
+
+            prot_code = self.dev.check_prot()
+            if prot_code != 0:
+                self.prot = prot_code
+
+            prot_msg = self.dev.get_prot_msg(self.prot)
+            data['data']['prot_code'] = self.prot
+            data['data']['prot_msg'] = prot_msg
+
+            msg, src = self.dev.check_source()
+            data['data']['source'] = src
+        except BaseException:
+            continue
+
+        self.agent.publish_to_feed('hwppmx', data)
+        session.data = {'curr': curr,
+                        'volt': volt,
+                        'prot': self.prot,
+                        'prot_msg': prot_msg,
+                        'source': src,
+                        'last_updated': current_time}
+
+    @defer.inlineCallbacks
     def initiate_shutdown(self, session, params):
         """ initiate_shutdown()
 
@@ -341,14 +369,12 @@ class HWPPMXAgent:
         """
         self.log.warn("INITIATING SHUTDOWN")
 
-        with self.lock.acquire_timeout(10, job='shutdown') as acquired:
-            if not acquired:
-                self.log.error("Could not acquire lock for shutdown.")
-                return False, "Could not acquire lock."
+        self.shutdown_mode = True
+        action = Actions.SetOff(**params)
+        self.action_queue.put(action)
+        session.data = yield action.deferred
 
-            self.shutdown_mode = True
-            self.dev.turn_off()
-
+    @defer.inlineCallbacks
     def cancel_shutdown(self, session, params):
         """cancel_shutdown()
 
@@ -427,9 +453,7 @@ def make_parser(parser=None):
                         help="ip address for kikusui PMX")
     pgroup.add_argument('--port', type=int,
                         help="port for kikusui PMX")
-    pgroup.add_argument('--mode', type=str, default='acq', choices=['init', 'acq'],
-                        help="Starting action for the agent.")
-    pgroup.add_argument('--sampling-frequency', type=float,
+    pgroup.add_argument('--sampling-frequency', type=float, default = 2,
                         help="Sampling frequency for data acquisition")
     pgroup.add_argument('--supervisor-id', type=str,
                         help="Instance ID for HWP Supervisor agent")
@@ -448,11 +472,6 @@ def main(args=None):
                                   args=args)
 
     agent, runner = ocs_agent.init_site_agent(args)
-    if args.mode == 'init':
-        init_params = {'auto_acquire': False}
-    elif args.mode == 'acq':
-        init_params = {'auto_acquire': True}
-
     kwargs = {'ip': args.ip, 'port': args.port,
               'supervisor_id': args.supervisor_id,
               'no_data_timeout': args.no_data_timeout, }
@@ -460,8 +479,7 @@ def main(args=None):
         kwargs['f_sample'] = args.sampling_frequency
     PMX = HWPPMXAgent(agent, **kwargs)
 
-    agent.register_task('init_connection', PMX.init_connection, startup=init_params)
-    agent.register_process('acq', PMX.acq, PMX._stop_acq)
+    agent.register_process('main', PMX.main, PMX._stop_main, startp=True)
     agent.register_process(
         'monitor_supervisor', PMX.monitor_supervisor, PMX._stop_monitor_supervisor,
         startup=True)
@@ -477,7 +495,6 @@ def main(args=None):
     agent.register_task('initiate_shutdown', PMX.initiate_shutdown)
     agent.register_task('cancel_shutdown', PMX.cancel_shutdown)
     runner.run(agent, auto_reconnect=True)
-
 
 if __name__ == '__main__':
     main()
