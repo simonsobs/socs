@@ -12,6 +12,7 @@ from ocs import ocs_agent, site_config
 
 import socs.agents.hwp_pmx.drivers.PMX_ethernet as pmx
 
+
 class Actions:
     class BaseAction:
         def __post_init__(self):
@@ -19,7 +20,7 @@ class Actions:
             self.log = txaio.make_logger()
 
     def process(self, *args, **kwargs):
-            raise NotImplementedError
+        raise NotImplementedError
 
     @dataclass
     class SetOn(BaseAction):
@@ -80,7 +81,7 @@ class Actions:
                 log = self.log
 
             msg, val = module.set_current(self.curr)
-            log.info(msg+"...")
+            log.info(msg + "...")
             return True
 
     @dataclass
@@ -92,7 +93,7 @@ class Actions:
                 log = self.log
 
             msg, val = module.set_voltage(self.volt)
-            log.info(msg+"...")
+            log.info(msg + "...")
             return True
 
     @dataclass
@@ -104,7 +105,7 @@ class Actions:
                 log = self.log
 
             msg, val = module.set_current_limit(self.curr)
-            log.info(msg+"...")
+            log.info(msg + "...")
             return True
 
     @dataclass
@@ -116,8 +117,9 @@ class Actions:
                 log = self.log
 
             msg, val = module.set_voltage_limit(self.volt)
-            log.info(msg+"...")
+            log.info(msg + "...")
             return True
+
 
 class HWPPMXAgent:
     """Agent for interfacing with a PMX Kikusui power supply
@@ -460,7 +462,7 @@ def make_parser(parser=None):
                         help="ip address for kikusui PMX")
     pgroup.add_argument('--port', type=int,
                         help="port for kikusui PMX")
-    pgroup.add_argument('--sampling-frequency', type=float, default = 2,
+    pgroup.add_argument('--sampling-frequency', type=float, default=2,
                         help="Sampling frequency for data acquisition")
     pgroup.add_argument('--supervisor-id', type=str,
                         help="Instance ID for HWP Supervisor agent")
@@ -500,6 +502,7 @@ def main(args=None):
     agent.register_task('initiate_shutdown', PMX.initiate_shutdown)
     agent.register_task('cancel_shutdown', PMX.cancel_shutdown)
     runner.run(agent, auto_reconnect=True)
+
 
 if __name__ == '__main__':
     main()
