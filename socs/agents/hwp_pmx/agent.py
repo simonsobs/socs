@@ -28,42 +28,50 @@ class Actions:
                 log = self.log
 
             log.info("Setting PMX on...")
-            self.dev.turn_off()
+            module.turn_off()
+            return True
 
+    @dataclass
     class SetOff(BaseAction):
         def process(self, module, log=None):
             if log is None:
                 log = self.log
 
             log.info("Setting PMX off...")
-            self.dev.turn_off()
+            module.turn_off()
+            return True
 
+    @dataclass
     class UseExt(BaseAction):
         def process(self, module, log=None):
             if log is None:
                 log = self.log
 
             log.info("Setting PMX Kikusui to PID control...")
-            self.dev.use_external_voltage()
-        return True
+            module.use_external_voltage()
+            return True
 
+    @dataclass
     class IgnExt(BaseAction):
         def process(self, module, log=None):
             if log is None:
                 log = self.log
 
             log.info("Setting PMX Kikusui to direct control...")
-            self.dev.ign_external_voltage()
-        return True
+            module.ign_external_voltage()
+            return True
 
+    @dataclass
     class ClearAlarm(BaseAction):
         def process(self, module, log=None):
             if log is None:
                 log = self.log
 
             log.info("Clear PMX alarm...")
-            self.dev.clear_alarm()
+            module.clear_alarm()
+            return True
 
+    @dataclass
     class SetI(BaseAction):
         curr: float
 
@@ -71,9 +79,11 @@ class Actions:
             if log is None:
                 log = self.log
 
-        msg, val = self.dev.set_current(curr)
-        return True
+            msg, val = module.set_current(self.curr)
+            log.info(msg+"...")
+            return True
 
+    @dataclass
     class SetV(BaseAction):
         volt: float
 
@@ -81,9 +91,11 @@ class Actions:
             if log is None:
                 log = self.log
 
-        msg, val = self.dev.set_voltage(volt)
-        return True
+            msg, val = module.set_voltage(self.volt)
+            log.info(msg+"...")
+            return True
 
+    @dataclass
     class SetILim(BaseAction):
         curr: float
 
@@ -91,9 +103,11 @@ class Actions:
             if log is None:
                 log = self.log
 
-        msg, val = self.dev.set_current_limit(curr)
-        return True
+            msg, val = module.set_current_limit(self.curr)
+            log.info(msg+"...")
+            return True
 
+    @dataclass
     class SetVLim(BaseAction):
         volt: float
 
@@ -101,8 +115,9 @@ class Actions:
             if log is None:
                 log = self.log
 
-        msg, val = self.dev.set_voltage_limit(volt)
-        return True
+            msg, val = module.set_voltage_limit(self.volt)
+            log.info(msg+"...")
+            return True
 
 class HWPPMXAgent:
     """Agent for interfacing with a PMX Kikusui power supply
@@ -122,10 +137,10 @@ class HWPPMXAgent:
 
         self.agent: ocs_agent.OCSAgent = agent
         self.log = agent.log
-        self.lock = TimeoutLock()
 
         self.ip = ip
         self.port = port
+        self.action_queue = Queue()
 
         self.f_sample = f_sample
 
@@ -143,7 +158,6 @@ class HWPPMXAgent:
 
         self.agent.register_feed('rotation_action', record=True)
 
-    @defer.inlineCallbacks
     def set_on(self, session, params):
         """set_on()
         **Task** - Turn on the PMX Kikusui.
@@ -153,10 +167,8 @@ class HWPPMXAgent:
 
         action = Actions.SetOn(**params)
         self.action_queue.put(action)
-        session.data = yield action.deferred
         return True, 'Set PMX Kikusui on'
 
-    @defer.inlineCallbacks
     def set_off(self, session, params):
         """set_off()
         **Task** - Turn off the PMX Kikusui.
@@ -166,20 +178,16 @@ class HWPPMXAgent:
 
         action = Actions.SetOff(**params)
         self.action_queue.put(action)
-        session.data = yield action.deferred
         return True, 'Set PMX Kikusui off'
 
-    @defer.inlineCallbacks
     def clear_alarm(self, session, params):
         """clear_alarm()
         **Task** - Clear alarm and exit protection mode.
         """
         action = Actions.ClearAlarm(**params)
         self.action_queue.put(action)
-        session.data = yield action.deferred
         return True, 'Clear alarm'
 
-    @defer.inlineCallbacks
     def use_ext(self, session, params):
         """use_ext()
         **Task** - Set the PMX Kikusui to use an external voltage control. Doing so
@@ -191,10 +199,8 @@ class HWPPMXAgent:
 
         action = Actions.UseExt(**params)
         self.action_queue.put(action)
-        session.data = yield action.deferred
         return True, 'Set PMX Kikusui to PID control'
 
-    @defer.inlineCallbacks
     def ign_ext(self, session, params):
         """ign_ext()
         **Task** - Set the PMX Kiksui to ignore external voltage control. Doing so
@@ -206,11 +212,9 @@ class HWPPMXAgent:
 
         action = Actions.IgnExt(**params)
         self.action_queue.put(action)
-        session.data = yield action.deferred
         return True, 'Set PMX Kikusui to direct control'
 
     @ocs_agent.param('curr', default=0, type=float, check=lambda x: 0 <= x <= 3)
-    @defer.inlineCallbacks
     def set_i(self, session, params):
         """set_i(curr=0)
         **Task** - Set the current.
@@ -223,11 +227,9 @@ class HWPPMXAgent:
 
         action = Actions.SetI(**params)
         self.action_queue.put(action)
-        session.data = yield action.deferred
         return True, 'Set current is done'
 
     @ocs_agent.param('volt', default=0, type=float, check=lambda x: 0 <= x <= 35)
-    @defer.inlineCallbacks
     def set_v(self, session, params):
         """set_v(volt=0)
         **Task** - Set the voltage.
@@ -240,11 +242,9 @@ class HWPPMXAgent:
 
         action = Actions.SetV(**params)
         self.action_queue.put(action)
-        session.data = yield action.deferred
         return True, 'Set voltage is done'
 
     @ocs_agent.param('curr', default=1., type=float, check=lambda x: 0. <= x <= 3.)
-    @defer.inlineCallbacks
     def set_i_lim(self, session, params):
         """set_i_lim(curr=1)
         **Task** - Set the drive current limit.
@@ -254,11 +254,9 @@ class HWPPMXAgent:
         """
         action = Actions.SetILim(**params)
         self.action_queue.put(action)
-        session.data = yield action.deferred
         return True, 'Set voltage limit is done'
 
     @ocs_agent.param('volt', default=32., type=float, check=lambda x: 0. <= x <= 35.)
-    @defer.inlineCallbacks
     def set_v_lim(self, session, params):
         """set_v_lim(volt=32)
         **Task** - Set the drive voltage limit.
@@ -268,7 +266,6 @@ class HWPPMXAgent:
         """
         action = Actions.SetVLim(**params)
         self.action_queue.put(action)
-        session.data = yield action.deferred
         return True, 'Set current limit is done'
 
     def main(self, session, params):
@@ -292,7 +289,7 @@ class HWPPMXAgent:
 
         """
         try:
-            self.dev = pmx.PMX(ip=self.ip, port=self.port)
+            PMX = pmx.PMX(ip=self.ip, port=self.port)
             self.log.info('Connected to PMX Kikusui')
         except BrokenPipeError:
             self.log.error('Could not establish connection to PMX Kikusui')
@@ -307,14 +304,14 @@ class HWPPMXAgent:
         last_daq = 0
         while session.status in ['starting', 'running']:
             now = time.time()
-            if now - last_daq > 5:
+            if now - last_daq > sleep_time:
                 self._get_and_publish_data(PMX, session)
                 last_daq = now
 
             self._process_actions(PMX)
             time.sleep(0.1)
 
-        PCU.close()
+        PMX.close()
 
     def _stop_main(self, session, params):
         """
@@ -323,35 +320,47 @@ class HWPPMXAgent:
         session.set_status('stopping')
         return True, 'Set main status to stopping'
 
-    def _get_and_publish_data(self, PCU: pcu.PCU, session):
+    def _process_actions(self, PMX: pmx.PMX):
+        while not self.action_queue.empty():
+            action = self.action_queue.get()
+            try:
+                self.log.info(f"Running action {action}")
+                res = action.process(PMX)
+                action.deferred.callback(res)
+            except Exception as e:
+                self.log.error(f"Error processing action: {action}")
+                action.deferred.errback(e)
+
+    def _get_and_publish_data(self, PMX: pmx.PMX, session):
         now = time.time()
-        data = {'timestamp': current_time,
+        data = {'timestamp': now,
                 'block_name': 'hwppmx',
                 'data': {}}
 
         try:
-            msg, curr = self.dev.meas_current()
+            msg, curr = PMX.meas_current()
             data['data']['current'] = curr
 
-            msg, volt = self.dev.meas_voltage()
+            msg, volt = PMX.meas_voltage()
             data['data']['voltage'] = volt
 
-            msg, code = self.dev.check_error()
+            msg, code = PMX.check_error()
             data['data']['err_code'] = code
             data['data']['err_msg'] = msg
 
-            prot_code = self.dev.check_prot()
+            prot_code = PMX.check_prot()
             if prot_code != 0:
                 self.prot = prot_code
 
-            prot_msg = self.dev.get_prot_msg(self.prot)
+            prot_msg = PMX.get_prot_msg(self.prot)
             data['data']['prot_code'] = self.prot
             data['data']['prot_msg'] = prot_msg
 
-            msg, src = self.dev.check_source()
+            msg, src = PMX.check_source()
             data['data']['source'] = src
         except BaseException:
-            continue
+            self.log.warning("Exception in getting data")
+            return
 
         self.agent.publish_to_feed('hwppmx', data)
         session.data = {'curr': curr,
@@ -359,9 +368,8 @@ class HWPPMXAgent:
                         'prot': self.prot,
                         'prot_msg': prot_msg,
                         'source': src,
-                        'last_updated': current_time}
+                        'last_updated': now}
 
-    @defer.inlineCallbacks
     def initiate_shutdown(self, session, params):
         """ initiate_shutdown()
 
@@ -372,9 +380,8 @@ class HWPPMXAgent:
         self.shutdown_mode = True
         action = Actions.SetOff(**params)
         self.action_queue.put(action)
-        session.data = yield action.deferred
+        return True, "Initiated shutdown mode"
 
-    @defer.inlineCallbacks
     def cancel_shutdown(self, session, params):
         """cancel_shutdown()
 
@@ -464,8 +471,6 @@ def make_parser(parser=None):
 
 
 def main(args=None):
-    txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
-
     parser = make_parser()
     args = site_config.parse_args(agent_class='HWPPMXAgent',
                                   parser=parser,
@@ -479,7 +484,7 @@ def main(args=None):
         kwargs['f_sample'] = args.sampling_frequency
     PMX = HWPPMXAgent(agent, **kwargs)
 
-    agent.register_process('main', PMX.main, PMX._stop_main, startp=True)
+    agent.register_process('main', PMX.main, PMX._stop_main, startup=True)
     agent.register_process(
         'monitor_supervisor', PMX.monitor_supervisor, PMX._stop_monitor_supervisor,
         startup=True)
