@@ -13,6 +13,7 @@ from ocs import ocs_agent, site_config
 import socs.agents.hwp_pmx.drivers.PMX_ethernet as pmx
 from socs.agents.hwp_supervisor.agent import get_op_data
 
+
 class Actions:
     class BaseAction:
         def __post_init__(self):
@@ -119,6 +120,7 @@ class Actions:
             msg, val = module.set_voltage_limit(self.volt)
             log.info(msg + "...")
             return True
+
 
 class HWPPMXAgent:
     """Agent for interfacing with a PMX Kikusui power supply
@@ -501,6 +503,7 @@ def main(args=None):
     agent.register_task('initiate_shutdown', PMX.initiate_shutdown)
     agent.register_task('cancel_shutdown', PMX.cancel_shutdown)
     runner.run(agent, auto_reconnect=True)
+
 
 if __name__ == '__main__':
     main()
