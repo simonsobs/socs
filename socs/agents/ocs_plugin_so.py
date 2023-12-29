@@ -14,6 +14,7 @@ for n, f in [
         ('ACTiCameraAgent', 'acti_camera/agent.py'),
         ('ACUAgent', 'acu/agent.py'),
         ('BlueforsAgent', 'bluefors/agent.py'),
+        ('CameraRTSPAgent', 'camera_rtsp/agent.py'),
         ('CrateAgent', 'smurf_crate_monitor/agent.py'),
         ('CryomechCPAAgent', 'cryomech_cpa/agent.py'),
         ('FlowmeterAgent', 'ifm_sbn246_flowmeter/agent.py'),
