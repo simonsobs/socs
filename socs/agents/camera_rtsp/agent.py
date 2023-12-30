@@ -5,17 +5,18 @@
 
 import os
 import glob
-import shutil
 import re
 import time
 from datetime import datetime, timezone
 
 import numpy as np
 import cv2
+import imutils
 import txaio
 
 from collections import deque
 
+import ocs
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import Pacemaker, TimeoutLock
 
@@ -148,7 +149,7 @@ class CircularMediaBuffer:
         )
 
         # We could sort by modification time, but if files were copied that could
-        # be unreliable.  Instead we sort by date/time encoded in the filename.
+        # be unreliable.  Instead we sort by ISO date/time encoded in the filename.
         self._deque = deque()
         for file in sorted(existing_files):
             self._deque.append((file, None))
@@ -225,6 +226,167 @@ class CircularMediaBuffer:
         return datetime.datetime.fromisoformat(iso)
 
 
+class MotionDetector:
+    """Class to process images in sequence and look for changes.
+
+    This uses the (stateful) helper tools from OpenCV to detect when an
+    image contains changes from previous ones.
+
+    Args:
+        blur (int):  The odd number of pixels for blurring width
+        threshold (int):  The grayscale threshold (0-255) for considering
+            image changes in the blurred images.
+        dilation (int):  The dilation iterations on the thresholded image.
+        min_frac (float):  The minimum fraction of pixels that must change
+            to count as a detection.
+        max_frac (float):  The maximum fraction of pixels that can change
+            to still count as a detection (rather than a processing error).
+
+    """
+
+    def __init__(
+        self,
+        blur=51,
+        threshold=100,
+        dilation=2,
+        min_frac=0.005,
+        max_frac=0.9,
+    ):
+        if blur % 2 == 0:
+            raise ValueError("blur must be an odd integer")
+        self.blur = blur
+        if threshold < 0 or threshold > 255:
+            raise ValueError("threshold should be between 0-255")
+        self.thresh = int(threshold)
+        if dilation > 10:
+            raise ValueError("dilation should be a small, positive integer")
+        self.dilation = dilation
+        self.min_frac = min_frac
+        self.max_frac = max_frac
+        self._backsub = cv2.createBackgroundSubtractorMOG2()
+
+    def reset(self):
+        """Reset the background subtraction."""
+        self._backsub = cv2.createBackgroundSubtractorMOG2()
+
+    def process(self, data, skip=False):
+        """Process image data and look for changes.
+
+        Args:
+            data (array):  The image data.
+            skip (bool):  If True, accumulate image to background model, but
+                do not look for motion.
+
+        Returns:
+            (tuple):  The (image, detection).
+
+        """
+        gray = cv2.cvtColor(data, cv2.COLOR_BGR2GRAY)
+        blurred = cv2.GaussianBlur(gray, (self.blur, self.blur), 0)
+
+        mask = self._backsub.apply(blurred)
+        if skip:
+            return (data, False)
+
+        thresholded = cv2.threshold(mask, self.thresh, 255, cv2.THRESH_BINARY)[1]
+        dilated = cv2.dilate(thresholded, None, iterations=self.dilation)
+        cnts = cv2.findContours(
+            dilated.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+        )
+        cnts = imutils.grab_contours(cnts)
+
+        # loop over the contours
+        img_area = thresholded.shape[0] * thresholded.shape[1]
+        min_area = self.min_frac * img_area
+        max_area = self.max_frac * img_area
+        detection = False
+        for c in cnts:
+            # if the contour is too small or too large, ignore it
+            area = cv2.contourArea(c)
+            if area < min_area:
+                continue
+            if area > max_area:
+                continue
+            # compute the bounding box for the contour, draw it on the frame,
+            # and update the text
+            detection = True
+            (x, y, w, h) = cv2.boundingRect(c)
+            cv2.rectangle(data, (x, y), (x + w, y + h), (0, 255, 0), 2)
+        return (data, detection)
+
+
+class FakeCamera:
+    """Class used generate image data on demand for testing.
+
+    Args:
+        width (int):  Width of each frame in pixels.
+        height (int):  Height of each frame in pixels.
+        fps (float):  The frames per second of the stream.
+
+    """
+
+    def __init__(self, width=1280, height=720, fps=20.0):
+        self.width = width
+        self.height = height
+        self.fps = fps
+
+        # The number of frames to hold fixed before switching
+        self.fixed_frames = int(60 * self.fps)
+
+        # The size of a square to randomly place in the field of view
+        self.square_dim = 100
+        self.sq_half = self.square_dim // 2
+        self._random_sq_pos()
+
+        self.current = None
+        self.frame_count = 0
+
+    def isOpened(self):
+        return True
+
+    def _random_sq_pos(self):
+        sq_y = int(self.height * np.random.random_sample(size=1)[0])
+        sq_x = int(self.width * np.random.random_sample(size=1)[0])
+        if sq_y > self.height - self.sq_half:
+            sq_y = self.height - self.sq_half
+        if sq_y < self.sq_half:
+            sq_y = self.sq_half
+        if sq_x > self.width - self.sq_half:
+            sq_x = self.width - self.sq_half
+        if sq_x < self.sq_half:
+            sq_x = self.sq_half
+        self.sq_x = sq_x
+        self.sq_y = sq_y
+
+    def grab(self):
+        img = np.zeros((self.height, self.width, 3), dtype=np.uint8)
+        img[:, :, 0] = 127
+        img[:, :, 1] = 127
+        img[:, :, 2] = 127
+        if self.frame_count % self.fixed_frames == 0:
+            self._random_sq_pos()
+        img[
+            self.sq_y - self.sq_half : self.sq_y + self.sq_half,
+            self.sq_x - self.sq_half : self.sq_x + self.sq_half,
+            0,
+        ] = 255
+        self.current = img
+        self.frame_count += 1
+        return True
+
+    def retrieve(self):
+        img = np.array(self.current)
+        self.current = None
+        return True, img
+
+    def read(self):
+        _ = self.grab()
+        return self.retrieve()
+
+    def release(self):
+        pass
+
+
 class CameraRTSPAgent:
     """Agent to support image capture from RTSP cameras.
 
@@ -241,9 +403,13 @@ class CameraRTSPAgent:
         port (int): The RTSP port to use (default is standard 554).
         urlpath (str): The remaining URL for the camera, which might include
             options like channel and subtype.  This will depend on the manufacturer.
-        quality (int): The JPEG quality for output images (0-100).
-        max_buffer_files (int): The maximum number of files to keep in the image
-            buffer directory.
+        jpeg_quality (int): The JPEG quality for snapshot images (0-100).
+        max_snapshot_files (int): The maximum number of snapshots to keep.
+        record_fps (float): The frames per second for recorded video.
+        record_duration (int): The number of seconds for each recorded video.
+        max_record_files (int): The maximum number of recordings to keep.
+        fake (bool): If True, ignore camera settings and generate fake video
+            for testing.
 
     Attributes:
         agent (OCSAgent): OCSAgent object from :func:`ocs.ocs_agent.init_site_agent`.
@@ -269,6 +435,7 @@ class CameraRTSPAgent:
         record_fps=20.0,
         record_duration=60,
         max_record_files=100,
+        fake=False,
     ):
         self.agent = agent
         self.topdir = directory
@@ -281,6 +448,7 @@ class CameraRTSPAgent:
         self.password = password
         self.seconds = seconds
         self.urlpath = urlpath
+        self.fake = fake
 
         if self.urlpath is None:
             # Try the string for the Dahua cameras at the site
@@ -364,18 +532,19 @@ class CameraRTSPAgent:
         self.is_streaming = True
 
         # Open camera stream
-        cap = cv2.VideoCapture(self.connection)
+        if self.fake:
+            cap = FakeCamera()
+        else:
+            cap = cv2.VideoCapture(self.connection)
         if not cap.isOpened():
             self.log.error(f"Cannot open RTSP stream at {self.connection}")
             return False, "Could not open RTSP stream"
 
-        # Tracking state of whether we are already recording motion detection
+        # Tracking state of whether we are currently recording motion detection
         detecting = False
         detect_start = None
         record_frames = int(self.record_fps * self.record_duration)
-        # backsub = cv2.createBackgroundSubtractorMOG2()
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-        backsub = cv2.bgsegm.createBackgroundSubtractorGMG()
+        motion_detector = MotionDetector()
 
         snap_count = 0
         while self.is_streaming:
@@ -393,17 +562,30 @@ class CameraRTSPAgent:
                 self.log.error(msg)
                 return False, "Broken stream"
 
-            # Motion detection.  Get the recent images and use them to define
-            # the background.  Extract pixels with movement and if a large
-            # enough region is detected, trigger the recording task.
-
-            mask = backsub.apply(image)
-            mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel) 
-            image_write_callback(mask, os.path.join(self.img_dir, f"mask_{snap_count}.jpg"))
-
-            if snap_count > 4:
-                # We have enough frames to trust the result
-                pass
+            # Motion detection.  We ignore the first few snapshots and also
+            # any changes that happen while we are already recording.
+            if snap_count < 4:
+                skip = True
+            else:
+                skip = False
+            if detecting:
+                if (snap_count - detect_start) * frames_per_snapshot > record_frames:
+                    # We must have finished recording
+                    detecting = False
+                    skip = False
+                else:
+                    # We are still recording
+                    skip = True
+            image, movement = motion_detector.process(image, skip=skip)
+            if movement:
+                # Start recording
+                detecting = True
+                detect_start = snap_count
+                rec_stat, rec_msg, _ = self.agent.start(
+                    "record", params={"test_mode": False}
+                )
+                if rec_stat != ocs.OK:
+                    self.log.error(f"Problem with motion capture: {rec_msg}")
 
             # Save to circular buffer
             self.img_buffer.store(image)
@@ -442,7 +624,6 @@ class CameraRTSPAgent:
 
         # Release stream
         cap.release()
-
         return True, "Acquisition finished"
 
     def _stop_acq(self, session, params=None):
@@ -460,11 +641,10 @@ class CameraRTSPAgent:
     def record(self, session, params=None):
         """Record video stream.
 
-        **Task** - Record video at specified framerate for fixed timespan.
+        **Task** - Record video for fixed timespan.
 
         Parameters:
-            auto_acquire (bool): Automatically start acq process after
-                initialization. Defaults to False.
+            None
 
         """
         if params["test_mode"]:
@@ -473,38 +653,44 @@ class CameraRTSPAgent:
         else:
             duration = self.record_duration
 
+        session.set_status("running")
+
         with self.lock.acquire_timeout(0, job="record") as acquired:
             if not acquired:
                 self.log.warn(
                     "Could not start recording because "
                     "{} is already running".format(self.lock.job)
                 )
-                return False, "Could not acquire lock."
-
-            session.set_status("starting")
+                return False, "Only one simultaneous recording per camera allowed"
 
             pm = Pacemaker(self.record_fps, quantize=True)
 
             # Open camera stream
-            cap = cv2.VideoCapture(self.connection)
+            self.log.info("Recording:  opening camera stream")
+            if self.fake:
+                cap = FakeCamera()
+            else:
+                cap = cv2.VideoCapture(self.connection)
             if not cap.isOpened():
                 self.log.error(f"Cannot open RTSP stream at {self.connection}")
-                return False, "Could not open RTSP stream"
-            
+                return False, "Cannot connect to camera"
+
             # Total number of frames
             total_frames = int(self.record_fps * duration)
-        
-            self.log.info(f"Recording {total_frames} frames ({duration}s at {self.record_fps}fps)")
 
-            self.log.info(f"Begin recording")
+            msg = f"Recording:  starting {total_frames} frames "
+            msg += f"({duration}s at {self.record_fps}fps)"
+            self.log.info(msg)
 
             frames = list()
             for iframe in range(total_frames):
+                if session.status != "running":
+                    return False, "Aborted recording"
                 pm.sleep()
                 # Grab an image
                 success, image = cap.read()
                 if not success:
-                    msg = f"Broken stream at frame {iframe}, ending recording"
+                    msg = f"Recording:  broken stream at frame {iframe}, ending"
                     self.log.error(msg)
                     break
                 frames.append(image)
@@ -514,10 +700,16 @@ class CameraRTSPAgent:
 
             # Get the saved path
             path = self.vid_buffer.fetch_index(-1)[0]
+            self.log.info(f"Recording:  finished {path}")
 
-            self.log.info(f"Finished recording {path}")
+            # Cleanup
+            cap.release()
 
         return True, "Recording finished."
+
+    def _abort_record(self, session, params):
+        if session.status == "running":
+            session.set_status("stopping")
 
 
 def add_agent_args(parser=None):
@@ -609,7 +801,7 @@ def add_agent_args(parser=None):
         "--max_snapshot_files",
         type=int,
         required=False,
-        default=17280, # 2 days at 10s per snapshot
+        default=17280,  # 2 days at 10s per snapshot
         help="Maximum number of images to keep in the circular buffer",
     )
 
@@ -635,6 +827,14 @@ def add_agent_args(parser=None):
         required=False,
         default=100,
         help="Maximum number of images to keep in the circular buffer",
+    )
+
+    pgroup.add_argument(
+        "--fake",
+        action="store_true",
+        required=False,
+        default=False,
+        help="Use an internal fake camera for acquisition",
     )
 
     return parser
@@ -674,9 +874,12 @@ def main(args=None):
         record_fps=args.record_fps,
         record_duration=args.record_duration,
         max_record_files=args.max_record_files,
+        fake=args.fake,
     )
     agent.register_process("acq", cam.acq, cam._stop_acq, startup=acq_params)
-    agent.register_task("record", cam.record, startup=rec_params)
+    agent.register_task(
+        "record", cam.record, aborter=cam._abort_record
+    )
     runner.run(agent, auto_reconnect=True)
 
 
