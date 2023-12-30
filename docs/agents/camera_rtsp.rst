@@ -35,7 +35,7 @@ common arguments. Many options do not normally need to be changed::
                      ['--user', 'ocs'],
                      ['--password', '<password>'],
                      ['--seconds', '10'],
-                     ['--record_duration', '30']]},
+                     ['--record_duration', '60']]},
 
 Docker Compose
 ``````````````
