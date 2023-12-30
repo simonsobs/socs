@@ -435,6 +435,7 @@ class CameraRTSPAgent:
         record_fps=20.0,
         record_duration=60,
         max_record_files=100,
+        disable_motion=False,
         fake=False,
     ):
         self.agent = agent
@@ -449,6 +450,7 @@ class CameraRTSPAgent:
         self.seconds = seconds
         self.urlpath = urlpath
         self.fake = fake
+        self.motion_detect = not disable_motion
 
         if self.urlpath is None:
             # Try the string for the Dahua cameras at the site
@@ -576,16 +578,17 @@ class CameraRTSPAgent:
                 else:
                     # We are still recording
                     skip = True
-            image, movement = motion_detector.process(image, skip=skip)
-            if movement:
-                # Start recording
-                detecting = True
-                detect_start = snap_count
-                rec_stat, rec_msg, _ = self.agent.start(
-                    "record", params={"test_mode": False}
-                )
-                if rec_stat != ocs.OK:
-                    self.log.error(f"Problem with motion capture: {rec_msg}")
+            if self.motion_detect:
+                image, movement = motion_detector.process(image, skip=skip)
+                if movement:
+                    # Start recording
+                    detecting = True
+                    detect_start = snap_count
+                    rec_stat, rec_msg, _ = self.agent.start(
+                        "record", params={"test_mode": False}
+                    )
+                    if rec_stat != ocs.OK:
+                        self.log.error(f"Problem with motion capture: {rec_msg}")
 
             # Save to circular buffer
             self.img_buffer.store(image)
@@ -741,7 +744,7 @@ def add_agent_args(parser=None):
         "--directory",
         type=str,
         required=True,
-        help="Directory for circular image buffer",
+        help="Directory for media buffers (snapshots and recordings)",
     )
 
     pgroup.add_argument(
@@ -837,6 +840,14 @@ def add_agent_args(parser=None):
         help="Use an internal fake camera for acquisition",
     )
 
+    pgroup.add_argument(
+        "--disable_motion",
+        action="store_true",
+        required=False,
+        default=False,
+        help="Disable motion detection",
+    )
+
     return parser
 
 
@@ -875,6 +886,7 @@ def main(args=None):
         record_duration=args.record_duration,
         max_record_files=args.max_record_files,
         fake=args.fake,
+        disable_motion=args.disable_motion,
     )
     agent.register_process("acq", cam.acq, cam._stop_acq, startup=acq_params)
     agent.register_task(
