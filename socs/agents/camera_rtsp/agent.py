@@ -3,20 +3,18 @@
 """Agent to capture images from cameras which support the RTSP protocol.
 """
 
-import os
 import glob
+import os
 import re
 import time
+from collections import deque
 from datetime import datetime, timezone
 
-import numpy as np
 import cv2
 import imutils
-import txaio
-
-from collections import deque
-
+import numpy as np
 import ocs
+import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import Pacemaker, TimeoutLock
 
@@ -214,7 +212,7 @@ class CircularMediaBuffer:
 
     def _media_time(self, path):
         file = os.path.basename(path)
-        pat = re.compile(f"{self.root}_(.*)\.{self.suffix}")
+        pat = re.compile(f"{self.root}_(.*)\\.{self.suffix}")
         mat = pat.match(file)
         iso = mat.group(1)
         return self._iso_to_dt(iso)
@@ -366,8 +364,8 @@ class FakeCamera:
         if self.frame_count % self.fixed_frames == 0:
             self._random_sq_pos()
         img[
-            self.sq_y - self.sq_half : self.sq_y + self.sq_half,
-            self.sq_x - self.sq_half : self.sq_x + self.sq_half,
+            self.sq_y - self.sq_half: self.sq_y + self.sq_half,
+            self.sq_x - self.sq_half: self.sq_x + self.sq_half,
             0,
         ] = 255
         self.current = img
@@ -821,7 +819,7 @@ def add_agent_args(parser=None):
         "--max_record_files",
         type=int,
         required=False,
-        default=120, # Most recent 2 hours of motion capture
+        default=120,  # Most recent 2 hours of motion capture
         help="Maximum number of images to keep in the circular buffer",
     )
 
