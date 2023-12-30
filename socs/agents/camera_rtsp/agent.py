@@ -640,7 +640,6 @@ class CameraRTSPAgent:
         else:
             return False, "Acq is not currently running"
 
-    @ocs_agent.param("test_mode", default=False, type=bool)
     def record(self, session, params=None):
         """Record video stream.
 
@@ -650,12 +649,6 @@ class CameraRTSPAgent:
             None
 
         """
-        if params["test_mode"]:
-            # Only record for a few seconds
-            duration = 5
-        else:
-            duration = self.record_duration
-
         session.set_status("running")
 
         with self.lock.acquire_timeout(0, job="record") as acquired:
@@ -679,10 +672,10 @@ class CameraRTSPAgent:
                 return False, "Cannot connect to camera"
 
             # Total number of frames
-            total_frames = int(self.record_fps * duration)
+            total_frames = int(self.record_fps * self.record_duration)
 
             msg = f"Recording:  starting {total_frames} frames "
-            msg += f"({duration}s at {self.record_fps}fps)"
+            msg += f"({self.record_duration}s at {self.record_fps}fps)"
             self.log.info(msg)
 
             frames = list()
@@ -828,7 +821,7 @@ def add_agent_args(parser=None):
         "--max_record_files",
         type=int,
         required=False,
-        default=100,
+        default=120, # Most recent 2 hours of motion capture
         help="Maximum number of images to keep in the circular buffer",
     )
 
@@ -863,11 +856,9 @@ def main(args=None):
     )
 
     if args.mode == "acq":
-        acq_params = {"test_mode": False}
-        rec_params = {"test_mode": False}
+        init_params = {"test_mode": False}
     elif args.mode == "test":
-        acq_params = {"test_mode": True}
-        rec_params = {"test_mode": True}
+        init_params = {"test_mode": True}
 
     agent, runner = ocs_agent.init_site_agent(args)
 
@@ -888,7 +879,7 @@ def main(args=None):
         fake=args.fake,
         disable_motion=args.disable_motion,
     )
-    agent.register_process("acq", cam.acq, cam._stop_acq, startup=acq_params)
+    agent.register_process("acq", cam.acq, cam._stop_acq, startup=init_params)
     agent.register_task(
         "record", cam.record, aborter=cam._abort_record
     )
