@@ -40,7 +40,7 @@ common arguments. Many options do not normally need to be changed::
 Docker Compose
 ``````````````
 
-The iBootbar Agent should be configured to run in a Docker container. An
+The RTSP camera Agent should be configured to run in a Docker container. An
 example docker-compose service configuration is shown here::
 
   ocs-camera-c3:
