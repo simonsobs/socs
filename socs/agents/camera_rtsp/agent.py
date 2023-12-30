@@ -174,8 +174,7 @@ class CircularMediaBuffer:
         if len(self._deque) > self.recent and self.recent > 0:
             pos = -(self.recent + 1)
             file = self._deque[pos][0]
-            past = self._deque[pos][1]
-            del past
+            del self._deque[pos][1]
             self._deque[pos] = (file, None)
 
         # Update latest symlink
