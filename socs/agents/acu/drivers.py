@@ -296,6 +296,12 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
     if az_endpoint1 == az_endpoint2:
         raise ValueError('Generator requires two different az endpoints!')
 
+    # Force the el_speed to 0.  It matters because an el_speed in
+    # ProgramTrack data that exceeds the ACU limits will cause the
+    # point to be rejected, even if there's no motion in el planned
+    # (which, at the time of this writing, there is not).
+    el_speed = 0.
+
     # Note that starting scan direction gets modified, below,
     # depending on az_start.
     increasing = az_endpoint2 > az_endpoint1

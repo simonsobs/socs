@@ -5,6 +5,7 @@ import time
 from enum import Enum
 
 import numpy as np
+import ocs
 import soaculib as aculib
 import soaculib.status_keys as status_keys
 import twisted.web.client as tclient
@@ -100,13 +101,18 @@ class ACUAgent:
         fov_radius (float): If set, override the default Sun
             avoidance radius (i.e. the radius of the field of view, in
             degrees, to use for Sun avoidance purposes).
+        named_positions (list of str): Names and target positions to
+            register for use with go_to_named task.  If provided, each
+            entry in the list should be of the form "name=az,el" with
+            az and el parseable as floats; e.g. "home=180,45.1".
 
     """
 
     def __init__(self, agent, acu_config='guess', exercise_plan=None,
                  startup=False, ignore_axes=None, disable_idle_reset=False,
                  min_el=None, max_el=None,
-                 avoid_sun=None, fov_radius=None):
+                 avoid_sun=None, fov_radius=None,
+                 named_positions=None):
         self.log = agent.log
 
         # Separate locks for exclusive access to az/el, and boresight motions.
@@ -153,6 +159,17 @@ class ACUAgent:
 
         self._reset_sun_params(enabled=avoid_sun,
                                radius=fov_radius)
+
+        self.named_positions = {}
+        if named_positions:
+            for text in named_positions:
+                try:
+                    name, target = text.split('=')
+                    _az, _el = target.split(',')
+                    self.named_positions[name] = (float(_az), float(_el))
+                except Exception as e:
+                    agent.log.error('Failed to parse named_position string: {text}', text=text)
+                    raise e
 
         self.exercise_plan = exercise_plan
 
@@ -270,6 +287,9 @@ class ACUAgent:
                             self.go_to,
                             blocking=False,
                             aborter=self._simple_task_abort)
+        agent.register_task('go_to_named',
+                            self.go_to_named,
+                            blocking=False)
         agent.register_task('set_scan_params',
                             self.set_scan_params,
                             blocking=False)
@@ -393,6 +413,12 @@ class ACUAgent:
             "StatusResponseRate": 19.237531827325963,
             "PlatformType": "satp",
             "IgnoredAxes": [],
+            "NamedPositions": {
+              "home": [
+                180,
+                40
+              ]
+            },
             "DefaultScanParams": {
               "az_speed": 2.0,
               "az_accel": 1.0,
@@ -416,6 +442,7 @@ class ACUAgent:
                         'DefaultScanParams': self.scan_params,
                         'StatusResponseRate': 0.,
                         'IgnoredAxes': self.ignore_axes,
+                        'NamedPositions': self.named_positions,
                         'connected': False}
         not_data_keys = list(session.data.keys())
 
@@ -1259,14 +1286,14 @@ class ACUAgent:
     @ocs_agent.param('end_stop', default=False, type=bool)
     @inlineCallbacks
     def go_to(self, session, params):
-        """go_to(az=None, el=None, end_stop=False)
+        """go_to(az, el, end_stop=False)
 
         **Task** - Move the telescope to a particular point (azimuth,
         elevation) in Preset mode. When motion has ended and the telescope
         reaches the preset point, it returns to Stop mode and ends.
 
         Parameters:
-            az (float): destination angle for the azimuthal axis
+            az (float): destination angle for the azimuth axis
             el (float): destination angle for the elevation axis
             end_stop (bool): put the telescope in Stop mode at the end of
                 the motion
@@ -1300,7 +1327,8 @@ class ACUAgent:
             self.log.info(f'Requested position: az={target_az}, el={target_el}')
             session.set_status('running')
 
-            legs, msg = yield self._get_sunsafe_moves(target_az, target_el)
+            legs, msg = yield self._get_sunsafe_moves(target_az, target_el,
+                                                      zero_legs_ok=False)
             if msg is not None:
                 self.log.error(msg)
                 return False, msg
@@ -1322,7 +1350,7 @@ class ACUAgent:
     @ocs_agent.param('end_stop', default=False, type=bool)
     @inlineCallbacks
     def set_boresight(self, session, params):
-        """set_boresight(target=None, end_stop=False)
+        """set_boresight(target, end_stop=False)
 
         **Task** - Move the telescope to a particular third-axis angle.
 
@@ -1361,6 +1389,33 @@ class ACUAgent:
                 yield self._set_modes(third='Stop')
 
         return ok, msg
+
+    @ocs_agent.param('target')
+    @ocs_agent.param('end_stop', default=True, type=bool)
+    @inlineCallbacks
+    def go_to_named(self, session, params):
+        """go_to_named(target, end_stop=True)
+
+        **Task** - Move the telescope to a named position,
+        e.g. "home", that has been configured through command line args.
+
+        Parameters:
+          target (str): name of the target position.
+          end_stop (bool): put axes in Stop mode after motion
+
+        """
+        target = self.named_positions.get(params['target'])
+        if target is None:
+            return False, 'Position "%s" is not configured.' % params['target']
+
+        session.set_status('running')
+
+        ok, msg, _session = self.agent.start('go_to', {'az': target[0], 'el': target[1],
+                                                       'end_stop': params['end_stop']})
+        if ok == ocs.ERROR:
+            return False, 'Failed to start go_to task.'
+        ok, msg, _session = yield self.agent.wait('go_to')
+        return (ok == ocs.OK), msg
 
     @ocs_agent.param('speed_mode', choices=['high', 'low'])
     @inlineCallbacks
@@ -1429,6 +1484,7 @@ class ACUAgent:
         yield
         return True, 'Done'
 
+    @ocs_agent.param('_')
     @inlineCallbacks
     def clear_faults(self, session, params):
         """clear_faults()
@@ -1505,7 +1561,7 @@ class ACUAgent:
     @ocs_agent.param('azonly', type=bool, default=True)
     @inlineCallbacks
     def fromfile_scan(self, session, params=None):
-        """fromfile_scan(filename=None, adjust_times=True, azonly=True)
+        """fromfile_scan(filename, adjust_times=True, azonly=True)
 
         **Task** - Upload and execute a scan pattern from numpy file.
 
@@ -1696,7 +1752,6 @@ class ACUAgent:
             'az_start', 'az_drift']
             if params.get(k) is not None}
         el_speed = params.get('el_speed', 0.0)
-
         plan = sh.plan_scan(az_endpoint1, az_endpoint2,
                             el=el_endpoint1, v_az=az_speed, a_az=az_accel,
                             az_start=scan_params.get('az_start'))
@@ -1737,7 +1792,8 @@ class ACUAgent:
 
         # Seek to starting position
         self.log.info(f'Moving to start position, az={plan["init_az"]}, el={init_el}')
-        legs, msg = yield self._get_sunsafe_moves(plan['init_az'], init_el)
+        legs, msg = yield self._get_sunsafe_moves(plan['init_az'], init_el,
+                                                  zero_legs_ok=True)
         if msg is not None:
             self.log.error(msg)
             return False, msg
@@ -2217,13 +2273,15 @@ class ACUAgent:
     @ocs_agent.param('avoidance_radius', type=float, default=None)
     @ocs_agent.param('shift_sun_hours', type=float, default=None)
     def update_sun(self, session, params):
-        """update_sun(reset, enable, temporary_disable, escape, \
-                      avoidance_radius, shift_sun_hours)
+        """update_sun(reset=None, enable=None, temporary_disable=None,
+                      escape=None, avoidance_radius=None,
+                      shift_sun_hours=None)
 
         **Task** - Update Sun monitoring and avoidance parameters.
 
-        Args:
+        All arguments are optional.
 
+        Args:
           reset (bool): If True, reset all sun_params to the platform
             defaults.  (The "defaults" includes any overrides
             specified on Agent command line.)
@@ -2400,7 +2458,7 @@ class ACUAgent:
 
         return safe, msg
 
-    def _get_sunsafe_moves(self, target_az, target_el):
+    def _get_sunsafe_moves(self, target_az, target_el, zero_legs_ok=True):
         """Given a target position, find a Sun-safe way to get there.  This
         will either be a direct move, or else an ordered slew in az
         before el (or vice versa).
@@ -2410,6 +2468,11 @@ class ACUAgent:
         path can be found, the legs is a list of intermediate move
         targets, ``[(az0, el0), (az1, el1) ...]``, terminating on
         ``(target_az, target_el)``.  msg is None in that case.
+
+        In the case that platform is already at the target position,
+        an empty list of legs will be returned unless zero_legs_ok is
+        False in which case a 1-entry list of legs is returned, with
+        the target position in it.
 
         When Sun avoidance is not enabled, this function returns as
         though the direct path to the target is a safe one.
@@ -2439,7 +2502,10 @@ class ACUAgent:
         if move is None:
             return None, 'No Sun-Safe moves could be identified!'
 
-        return list(move['moves'].nodes[1:]), None
+        legs = list(move['moves'].nodes)
+        if len(legs) == 1 and not zero_legs_ok:
+            return legs, None
+        return legs[1:], None
 
     @ocs_agent.param('starting_index', type=int, default=0)
     def exercise(self, session, params):
@@ -2586,6 +2652,9 @@ def add_agent_args(parser_in=None):
     pgroup.add_argument("--fov-radius", type=float,
                         help="Override the default field-of-view (radius in "
                         "degrees) for Sun avoidance purposes.")
+    pgroup.add_argument("--named-positions", nargs='+',
+                        help="Define named positions, for go_to_named; e.g. 'home=180,60'.")
+
     return parser_in
 
 
@@ -2603,7 +2672,8 @@ def main(args=None):
                  avoid_sun=args.avoid_sun,
                  fov_radius=args.fov_radius,
                  min_el=args.min_el,
-                 max_el=args.max_el)
+                 max_el=args.max_el,
+                 named_positions=args.named_positions)
 
     runner.run(agent, auto_reconnect=True)
 
