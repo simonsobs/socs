@@ -1394,7 +1394,7 @@ class ACUAgent:
     @ocs_agent.param('end_stop', default=True, type=bool)
     @inlineCallbacks
     def go_to_named(self, session, params):
-        """go_to_named(position, end_stop=True)
+        """go_to_named(target, end_stop=True)
 
         **Task** - Move the telescope to a named position,
         e.g. "home", that has been configured through command line args.
