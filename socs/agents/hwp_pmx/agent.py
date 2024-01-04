@@ -271,8 +271,9 @@ class HWPPMXAgent:
         self.action_queue.put(action)
         return True, 'Set current limit is done'
 
+    @ocs_agent.param('test_mode', default=False, type=bool)
     def main(self, session, params):
-        """acq(test_mode=False)
+        """main(test_mode=False)
 
         **Process** - Start data acquisition.
 
@@ -312,6 +313,8 @@ class HWPPMXAgent:
                 last_daq = now
 
             self._process_actions(PMX)
+            if params['test_mode']:
+                break
             time.sleep(0.1)
 
         PMX.close()

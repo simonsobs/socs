@@ -153,9 +153,9 @@ def test_hwp_rotation_acq(wait_for_crossbar, kikusui_emu, run_agent, client):
     kikusui_emu.define_responses(responses)
 
     client.init_connection.wait()  # wait for connection to be made
-    resp = client.acq.start(test_mode=True)
+    resp = client.main.start(test_mode=True)
     assert resp.status == ocs.OK
 
-    resp = client.acq.wait(timeout=20)
+    resp = client.main.wait(timeout=20)
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
