@@ -141,9 +141,9 @@ class HWPEmulator:
                 return f"{self.state.pmx.voltage}\n"
 
             # Error codes
-            elif cmd == ':system:error?': # Error codes
+            elif cmd == ':system:error?':  # Error codes
                 return '0,"No error"\n'
-            elif cmd == 'stat:ques?': # Status Codes
+            elif cmd == 'stat:ques?':  # Status Codes
                 return '0'
             elif cmd == 'volt:ext:sour?':
                 return f'{self.state.pmx.source}\n'
