@@ -1,11 +1,11 @@
 """
 HWP Emulation module
 """
-from dataclasses import dataclass
 import logging
+import threading
 import time
 from copy import deepcopy
-import threading
+from dataclasses import dataclass
 
 from socs.testing import device_emulator
 

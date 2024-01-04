@@ -1,18 +1,18 @@
 import argparse
+import queue
 import time
 
+import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
-from twisted.internet import reactor, defer
-import queue
-
-import txaio
+from twisted.internet import defer, reactor
 
 txaio.use_twisted()
 
 
-import socs.agents.hwp_pid.drivers.pid_controller as pd
 from dataclasses import dataclass
+
+import socs.agents.hwp_pid.drivers.pid_controller as pd
 
 
 class Actions:

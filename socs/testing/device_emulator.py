@@ -1,9 +1,9 @@
+import logging
 import shutil
 import socket
 import subprocess
 import threading
 import time
-import logging
 
 import pytest
 import serial
