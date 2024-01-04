@@ -44,7 +44,7 @@ class HWPState:
     lock = threading.Lock()
 
 
-def _create_logger(name, log_level=logging.DEBUG):
+def _create_logger(name, log_level=logging.INFO):
     logger = logging.getLogger(name)
     logger.setLevel(log_level)
     formatter = logging.Formatter("%(name)s: %(message)s")
@@ -97,12 +97,58 @@ class HWPEmulator:
         cmd = data.split(" ")[0].strip()
         self.logger.debug(cmd)
         with self.state.lock:
-            if cmd == "meas:curr?":
+
+            # Output commands
+            if cmd == 'output':
+                val = int(data.split(" ")[1].strip())
+                self.logger.info("Setting output to %d", val)
+                self.state.pmx.output = bool(val)
+            elif cmd == 'output:protection:clear':
+                self.logger.info("Commanded to clear alarms")
+            elif cmd == 'output?':
+                return str(int(self.state.pmx.output))
+
+            # Current (limit) commands
+            elif cmd == 'curr':
+                val = float(data.split(" ")[1].strip())
+                self.logger.info("Setting current to %.3f", val)
+                self.state.pmx.current = val
+            elif cmd == 'curr:prot':
+                val = float(data.split(" ")[1].strip())
+                self.logger.info("Setting current limit to %.3f", val)
+                self.state.pmx.current_limit = val
+            elif cmd == 'curr?':
                 return f"{self.state.pmx.current}\n"
+            elif cmd == 'curr:prot?':
+                return f"{self.state.pmx.current_limit}\n"
+            elif cmd == "meas:curr?":
+                return f"{self.state.pmx.current}\n"
+
+            # Voltage (limit) commands
+            elif cmd == 'volt':
+                val = float(data.split(" ")[1].strip())
+                self.logger.info("Setting current to %.3f", val)
+                self.state.pmx.voltage = val
+            elif cmd == 'volt:prot':
+                val = float(data.split(" ")[1].strip())
+                self.logger.info("Setting voltage limit to %.3f", val)
+                self.state.pmx.voltage_limit = val
+            elif cmd == 'volt:prot?':
+                return f"{self.state.pmx.voltage_limit}\n"
+            elif cmd == 'volt?':
+                return f"{self.state.pmx.voltage}\n"
             elif cmd == "meas:volt?":
                 return f"{self.state.pmx.voltage}\n"
+
+            # Error codes
+            elif cmd == ':system:error?': # Error codes
+                return '0,"No error"\n'
+            elif cmd == 'stat:ques?': # Status Codes
+                return '0'
+            elif cmd == 'volt:ext:sour?':
+                return f'{self.state.pmx.source}\n'
             else:
-                self.logger.info("Unknown cmd: %s", cmd)
+                self.logger.info("Unknown cmd: %s", data)
                 if "?" in cmd:
                     return "unknown"
 
