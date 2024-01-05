@@ -26,7 +26,7 @@ An example site-config-file block::
        'instance-id': 'hwp-pmx',
        'arguments': [['--ip', '10.10.10.100'],
                      ['--port', '5025'],
-                     ['--sampling-frequency', 2],
+                     ['--sampling-frequency', 1],
                      ['--supervisor-id', 'hwp-supervisor']]},
 
 Docker Compose
