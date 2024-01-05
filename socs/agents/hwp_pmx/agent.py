@@ -372,7 +372,6 @@ class HWPPMXAgent:
                         'source': src,
                         'last_updated': now}
 
-
     def monitor_supervisor(self, session, params):
         """monitor_supervisor()
 
