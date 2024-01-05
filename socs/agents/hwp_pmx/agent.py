@@ -27,7 +27,7 @@ class Actions:
     class SetOn(BaseAction):
         def process(self, module):
             self.log.info("Setting PMX on...")
-            module.turn_off()
+            module.turn_on()
 
     @dataclass
     class SetOff(BaseAction):
@@ -79,7 +79,7 @@ class Actions:
         curr: float
 
         def process(self, module):
-            msg, val = module.set_current_limit(self.curr)
+            msg = module.set_current_limit(self.curr)
             self.log.info(msg + "...")
 
     @dataclass
@@ -87,7 +87,7 @@ class Actions:
         volt: float
 
         def process(self, module):
-            msg, val = module.set_voltage_limit(self.volt)
+            msg = module.set_voltage_limit(self.volt)
             self.log.info(msg + "...")
 
 
@@ -262,15 +262,10 @@ class HWPPMXAgent:
         self.shutdown_mode = False
         return True, "Cancelled shutdown mode"
 
-    @ocs_agent.param('test_mode', default=False, type=bool)
     def main(self, session, params):
-        """main(test_mode=False)
+        """main()
 
         **Process** - Start data acquisition.
-
-        Parameters:
-            test_mode (bool, optional): Run the Process loop only once.
-                This is meant only for testing. Default is False.
 
         Notes:
             The most recent data collected is stored in session data in the
@@ -308,11 +303,10 @@ class HWPPMXAgent:
                 last_daq = now
 
             self._process_actions(PMX)
-            if params['test_mode']:
-                break
             time.sleep(0.1)
 
         PMX.close()
+        return True, 'Stopped main'
 
     def _stop_main(self, session, params):
         """
@@ -369,17 +363,17 @@ class HWPPMXAgent:
 
             msg, src = PMX.check_source()
             data['data']['source'] = src
+            self.agent.publish_to_feed('hwppmx', data)
+            session.data = {'curr': curr,
+                            'volt': volt,
+                            'prot': self.prot,
+                            'prot_msg': prot_msg,
+                            'source': src,
+                            'last_updated': now}
         except BaseException:
             self.log.warn("Exception in getting data")
             return
 
-        self.agent.publish_to_feed('hwppmx', data)
-        session.data = {'curr': curr,
-                        'volt': volt,
-                        'prot': self.prot,
-                        'prot_msg': prot_msg,
-                        'source': src,
-                        'last_updated': now}
 
     def monitor_supervisor(self, session, params):
         """monitor_supervisor()
@@ -468,9 +462,10 @@ def main(args=None):
                                   args=args)
 
     agent, runner = ocs_agent.init_site_agent(args)
-    kwargs = {'ip': args.ip, 'port': args.port,
-              'supervisor_id': args.supervisor_id,
-              'no_data_timeout': args.no_data_timeout, }
+    kwargs = {
+        'ip': args.ip, 'port': args.port, 'supervisor_id': args.supervisor_id,
+        'no_data_timeout': args.no_data_timeout
+    }
     if args.sampling_frequency is not None:
         kwargs['f_sample'] = args.sampling_frequency
     PMX = HWPPMXAgent(agent, **kwargs)
