@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from queue import Queue
 
 import txaio
-from twisted.internet import defer, reactor
+from twisted.internet import defer
 
 txaio.use_twisted()
 
