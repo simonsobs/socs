@@ -324,7 +324,7 @@ class HWPPMXAgent:
     def _process_actions(self, PMX: pmx.PMX):
         while not self.action_queue.empty():
             action = self.action_queue.get()
-            if action.__class__.__name__ in ['SetOn', 'SetOff', 'SetI', 'SetV', 'UseExt', 'UseIgn']:
+            if action.__class__.__name__ in ['SetOn', 'SetOff', 'SetI', 'SetV', 'UseExt', 'IgnExt']:
                 if self.shutdown_mode:
                     self.log.warn("Shutdown mode is in effect")
                     action.deferred.errback(Exception("Action cancelled by shutdown mode"))
