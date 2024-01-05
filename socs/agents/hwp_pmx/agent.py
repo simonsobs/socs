@@ -283,21 +283,25 @@ class HWPPMXAgent:
                  'last_updated': 1649085992.719602}
 
         """
-        try:
-            PMX = pmx.PMX(ip=self.ip, port=self.port)
-            self.log.info('Connected to PMX Kikusui')
-        except BrokenPipeError:
-            self.log.error('Could not establish connection to PMX Kikusui')
-            reactor.callFromThread(reactor.stop)
-        sleep_time = 1 / self.f_sample - 0.01
-
+        PMX = None
         session.set_status('running')
-        while not self.action_queue.empty():
-            action = self.action_queue.get()
-            action.deferred.errback(Exception("Action cancelled"))
 
+        self._clear_queue()
+
+        sleep_time = 1 / self.f_sample - 0.01
         last_daq = 0
         while session.status in ['starting', 'running']:
+            if PMX is None:
+                try:
+                    PMX = pmx.PMX(ip=self.ip, port=self.port)
+                except ConnectionRefusedError:
+                    self.log.error(
+                        "Could not connect to PMX. "
+                        "Retrying after 30 sec..."
+                    )
+                    time.sleep(30)
+                    continue
+
             now = time.time()
             if now - last_daq > sleep_time:
                 self._get_and_publish_data(PMX, session)
@@ -323,7 +327,7 @@ class HWPPMXAgent:
             if action.__class__.__name__ in ['SetOn', 'SetOff', 'SetI', 'SetV', 'UseExt', 'UseIgn']:
                 if self.shutdown_mode:
                     self.log.warn("Shutdown mode is in effect")
-                    action.deferred.callback(None)
+                    action.deferred.errback(Exception("Action cancelled by shutdown mode"))
                     return
             try:
                 self.log.info(f"Running action {action}")
@@ -332,6 +336,11 @@ class HWPPMXAgent:
             except Exception as e:
                 self.log.error(f"Error processing action: {action}")
                 action.deferred.errback(e)
+
+    def _clear_queue(self):
+        while not self.action_queue.empty():
+            action = self.action_queue.get()
+            action.deferred.errback(Exception("Action cancelled"))
 
     def _get_and_publish_data(self, PMX: pmx.PMX, session):
         now = time.time()
