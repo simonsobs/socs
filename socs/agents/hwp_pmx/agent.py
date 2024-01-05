@@ -374,7 +374,6 @@ class HWPPMXAgent:
             self.log.warn("Exception in getting data")
             return
 
-
     def monitor_supervisor(self, session, params):
         """monitor_supervisor()
 

@@ -22,6 +22,7 @@ default_responses = {
     'volt:ext:sour?': 'source_name'
 }
 
+
 @pytest.mark.integtest
 def test_testing(wait_for_crossbar):
     """Just a quick test to make sure we can bring up crossbar."""
@@ -38,7 +39,6 @@ def test_hwp_rotation_main(wait_for_crossbar, kikusui_emu, run_agent, client):
     assert resp.session['data']['curr'] == 1.0
     assert resp.status == ocs.OK
     assert resp.session['success']
-
 
 
 @pytest.mark.integtest
@@ -74,7 +74,7 @@ def test_hwp_rotation_set_off(wait_for_crossbar, kikusui_emu, run_agent, client)
 def test_hwp_rotation_set_i(wait_for_crossbar, kikusui_emu, run_agent, client):
     responses = default_responses.copy()
     responses.update({'curr 1.000000': '',
-                 'curr?': '1.000000'})
+                      'curr?': '1.000000'})
     kikusui_emu.define_responses(responses)
     resp = client.set_i(curr=1)
     print(resp)
@@ -87,7 +87,7 @@ def test_hwp_rotation_set_i(wait_for_crossbar, kikusui_emu, run_agent, client):
 def test_hwp_rotation_set_i_lim(wait_for_crossbar, kikusui_emu, run_agent, client):
     responses = default_responses.copy()
     responses.update({'curr:prot 2.000000': '',
-                 'curr:prot?': '2.000000'})
+                      'curr:prot?': '2.000000'})
     kikusui_emu.define_responses(responses)
     resp = client.set_i_lim(curr=2)
     print(resp)
@@ -100,7 +100,7 @@ def test_hwp_rotation_set_i_lim(wait_for_crossbar, kikusui_emu, run_agent, clien
 def test_hwp_rotation_set_v(wait_for_crossbar, kikusui_emu, run_agent, client):
     responses = default_responses.copy()
     responses.update({'volt 1.000000': '',
-                 'volt?': '1.000000'})
+                      'volt?': '1.000000'})
     kikusui_emu.define_responses(responses)
     resp = client.set_v(volt=1)
     print(resp)
@@ -128,7 +128,7 @@ def test_hwp_rotation_set_v_lim(wait_for_crossbar, kikusui_emu, run_agent, clien
 def test_hwp_rotation_use_ext(wait_for_crossbar, kikusui_emu, run_agent, client):
     responses = default_responses.copy()
     responses.update({'volt:ext:sour VOLT': '',
-                 'volt:ext:sour?': 'source_name'})
+                      'volt:ext:sour?': 'source_name'})
     kikusui_emu.define_responses(responses)
     resp = client.use_ext()
     print(resp)
@@ -141,7 +141,7 @@ def test_hwp_rotation_use_ext(wait_for_crossbar, kikusui_emu, run_agent, client)
 def test_hwp_rotation_ign_ext(wait_for_crossbar, kikusui_emu, run_agent, client):
     responses = default_responses.copy()
     responses.update({'volt:ext:sour NONE': '',
-                 'volt:ext:sour?': 'False'})
+                      'volt:ext:sour?': 'False'})
     kikusui_emu.define_responses(responses)
 
     resp = client.ign_ext()
