@@ -54,6 +54,11 @@ class Actions:
             module.clear_alarm()
 
     @dataclass
+    class CancelShutdown(BaseAction):
+        def process(self, module):
+            self.log.info("Cancel shutdown...")
+
+    @dataclass
     class SetI(BaseAction):
         curr: float
 
@@ -130,9 +135,6 @@ class HWPPMXAgent:
         """set_on()
         **Task** - Turn on the PMX Kikusui.
         """
-        if self.shutdown_mode:
-            return False, "Shutdown mode is in effect"
-
         action = Actions.SetOn(**params)
         self.action_queue.put(action)
         session.data = yield action.deferred
@@ -143,9 +145,6 @@ class HWPPMXAgent:
         """set_off()
         **Task** - Turn off the PMX Kikusui.
         """
-        if self.shutdown_mode:
-            return False, "Shutdown mode is in effect"
-
         action = Actions.SetOff(**params)
         self.action_queue.put(action)
         session.data = yield action.deferred
@@ -167,10 +166,6 @@ class HWPPMXAgent:
         **Task** - Set the PMX Kikusui to use an external voltage control. Doing so
         enables PID control.
         """
-
-        if self.shutdown_mode:
-            return False, "Shutdown mode is in effect"
-
         action = Actions.UseExt(**params)
         self.action_queue.put(action)
         session.data = yield action.deferred
@@ -182,10 +177,6 @@ class HWPPMXAgent:
         **Task** - Set the PMX Kiksui to ignore external voltage control. Doing so
         disables the PID and switches to direct control.
         """
-
-        if self.shutdown_mode:
-            return False, "Shutdown mode is in effect"
-
         action = Actions.IgnExt(**params)
         self.action_queue.put(action)
         session.data = yield action.deferred
@@ -200,9 +191,6 @@ class HWPPMXAgent:
         Parameters:
             curr (float): set current
         """
-        if self.shutdown_mode:
-            return False, "Shutdown mode is in effect"
-
         action = Actions.SetI(**params)
         self.action_queue.put(action)
         session.data = yield action.deferred
@@ -217,9 +205,6 @@ class HWPPMXAgent:
         Parameters:
             volt (float): set voltage
         """
-        if self.shutdown_mode:
-            return False, "Shutdown mode is in effect"
-
         action = Actions.SetV(**params)
         self.action_queue.put(action)
         session.data = yield action.deferred
@@ -252,6 +237,30 @@ class HWPPMXAgent:
         self.action_queue.put(action)
         session.data = yield action.deferred
         return True, 'Set current limit is done'
+
+    @defer.inlineCallbacks
+    def initiate_shutdown(self, session, params):
+        """ initiate_shutdown()
+        **Task** - Initiate the shutdown of the agent.
+        """
+        self.log.warn("INITIATING SHUTDOWN")
+
+        action = Actions.SetOff(**params)
+        self.action_queue.put(action)
+        session.data = yield action.deferred
+        self.shutdown_mode = True
+        return True, "Initiated shutdown mode"
+
+    @defer.inlineCallbacks
+    def cancel_shutdown(self, session, params):
+        """cancel_shutdown()
+        **Task** - Cancels shutdown mode, allowing other tasks to update the power supply
+        """
+        action = Actions.CancelShutdown(**params)
+        self.action_queue.put(action)
+        session.data = yield action.deferred
+        self.shutdown_mode = False
+        return True, "Cancelled shutdown mode"
 
     @ocs_agent.param('test_mode', default=False, type=bool)
     def main(self, session, params):
@@ -311,6 +320,11 @@ class HWPPMXAgent:
     def _process_actions(self, PMX: pmx.PMX):
         while not self.action_queue.empty():
             action = self.action_queue.get()
+            if action.__class__.__name__ in ['SetOn', 'SetOff', 'SetI', 'SetV', 'UseExt', 'UseIgn']:
+                if self.shutdown_mode:
+                    self.log.warn("Shutdown mode is in effect")
+                    action.deferred.callback(None)
+                    return
             try:
                 self.log.info(f"Running action {action}")
                 res = action.process(PMX)
@@ -347,7 +361,7 @@ class HWPPMXAgent:
             msg, src = PMX.check_source()
             data['data']['source'] = src
         except BaseException:
-            self.log.warning("Exception in getting data")
+            self.log.warn("Exception in getting data")
             return
 
         self.agent.publish_to_feed('hwppmx', data)
@@ -358,25 +372,6 @@ class HWPPMXAgent:
                         'source': src,
                         'last_updated': now}
 
-    def initiate_shutdown(self, session, params):
-        """ initiate_shutdown()
-
-        **Task** - Initiate the shutdown of the agent.
-        """
-        self.log.warn("INITIATING SHUTDOWN")
-
-        self.shutdown_mode = True
-        action = Actions.SetOff(**params)
-        self.action_queue.put(action)
-        return True, "Initiated shutdown mode"
-
-    def cancel_shutdown(self, session, params):
-        """cancel_shutdown()
-
-        **Task** - Cancels shutdown mode, allowing other tasks to update the power supply
-        """
-        self.shutdown_mode = False
-        return True, "Cancelled shutdown mode"
 
     def monitor_supervisor(self, session, params):
         """monitor_supervisor()
