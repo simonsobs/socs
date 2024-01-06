@@ -12,6 +12,7 @@ from ocs import ocs_agent, site_config
 
 import socs.agents.hwp_pcu.drivers.hwp_pcu as pcu
 
+
 class Actions:
     class BaseAction:
         def __post_init__(self):
@@ -22,11 +23,13 @@ class Actions:
     class SendCommand (BaseAction):
         command: str
 
+
 def process_action(action, PCU: pcu.PCU):
     """Process an action with PCU hardware"""
     if isinstance(action, Actions.SendCommand):
         PCU.send_command(action.command)
         action.log.info(f"Command: {action.command}")
+
 
 class HWPPCUAgent:
     """Agent to phase compensation improve the CHWP motor efficiency

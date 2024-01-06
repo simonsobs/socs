@@ -1,4 +1,5 @@
 import time
+
 import serial
 
 patterns = {
@@ -68,7 +69,7 @@ class PCU:
 
     def send_command(self, command):
         pattern = patterns[command]
-        for i, p in zip([0,1,2,5,6,7], pattern):
+        for i, p in zip([0, 1, 2, 5, 6, 7], pattern):
             if p:
                 self.relay_on(i)
             else:
