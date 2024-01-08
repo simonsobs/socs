@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from queue import Queue
 
 import txaio
-from twisted.internet import defer
+from twisted.internet import defer, reactor
 
 txaio.use_twisted()
 
@@ -326,10 +326,10 @@ class HWPPMXAgent:
             try:
                 self.log.info(f"Running action {action}")
                 res = action.process(PMX)
-                action.deferred.callback(res)
+                reactor.callFromThread(action.deferred.callback, res)
             except Exception as e:
                 self.log.error(f"Error processing action: {action}")
-                action.deferred.errback(e)
+                reactor.callFromThread(action.deferred.errback, e)
 
     def _clear_queue(self):
         while not self.action_queue.empty():
