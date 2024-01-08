@@ -50,7 +50,7 @@ class PMX:
                 self.conn.sendall(msg)
                 time.sleep(0.5)
                 if read:
-                    data = self.conn.recv(self.buffer_size).decode('utf-8')
+                    data = self.conn.recv(self.buffer_size).strip().decode('utf-8')
                     return data
                 return
             except (socket.timeout, OSError):
