@@ -435,28 +435,64 @@ class HWPPMXAgent:
         session.set_status('stopping')
         return True, "Stopping monitor shutdown."
 
-    def initiate_shutdown(self, session, params):
-        """ initiate_shutdown()
+    def _process_actions(self, PMX: pmx.PMX):
+        while not self.action_queue.empty():
+            action = self.action_queue.get()
+            if action.__class__.__name__ in ['SetOn', 'SetOff', 'SetI', 'SetV', 'UseExt', 'IgnExt']:
+                if self.shutdown_mode:
+                    self.log.warn("Shutdown mode is in effect")
+                    action.deferred.errback(Exception("Action cancelled by shutdown mode"))
+                    return
+            try:
+                self.log.info(f"Running action {action}")
+                res = action.process(PMX)
+                reactor.callFromThread(action.deferred.callback, res)
+            except Exception as e:
+                self.log.error(f"Error processing action: {action}")
+                reactor.callFromThread(action.deferred.errback, e)
 
-        **Task** - Initiate the shutdown of the agent.
-        """
-        self.log.warn("INITIATING SHUTDOWN")
+    def _clear_queue(self):
+        while not self.action_queue.empty():
+            action = self.action_queue.get()
+            action.deferred.errback(Exception("Action cancelled"))
 
-        with self.lock.acquire_timeout(10, job='shutdown') as acquired:
-            if not acquired:
-                self.log.error("Could not acquire lock for shutdown.")
-                return False, "Could not acquire lock."
+    def _get_and_publish_data(self, PMX: pmx.PMX, session):
+        now = time.time()
+        data = {'timestamp': now,
+                'block_name': 'hwppmx',
+                'data': {}}
 
-            self.shutdown_mode = True
-            self.dev.turn_off()
+        try:
+            msg, curr = PMX.meas_current()
+            data['data']['current'] = curr
 
-    def cancel_shutdown(self, session, params):
-        """cancel_shutdown()
+            msg, volt = PMX.meas_voltage()
+            data['data']['voltage'] = volt
 
-        **Task** - Cancels shutdown mode, allowing other tasks to update the power supply
-        """
-        self.shutdown_mode = False
-        return True, "Cancelled shutdown mode"
+            msg, code = PMX.check_error()
+            data['data']['err_code'] = code
+            data['data']['err_msg'] = msg
+
+            prot_code = PMX.check_prot()
+            if prot_code != 0:
+                self.prot = prot_code
+
+            prot_msg = PMX.get_prot_msg(self.prot)
+            data['data']['prot_code'] = self.prot
+            data['data']['prot_msg'] = prot_msg
+
+            msg, src = PMX.check_source()
+            data['data']['source'] = src
+            self.agent.publish_to_feed('hwppmx', data)
+            session.data = {'curr': curr,
+                            'volt': volt,
+                            'prot': self.prot,
+                            'prot_msg': prot_msg,
+                            'source': src,
+                            'last_updated': now}
+        except BaseException:
+            self.log.warn("Exception in getting data")
+            return
 
     def monitor_supervisor(self, session, params):
         """monitor_supervisor()

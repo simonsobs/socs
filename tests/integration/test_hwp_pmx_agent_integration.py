@@ -22,6 +22,14 @@ responses = {
 }
 kikusui_emu = create_device_emulator(responses, relay_type='tcp', port=5025)
 
+default_responses = {
+    'meas:volt?': '2',
+    'meas:curr?': '1',
+    ':system:error?': '+0,"No error"\n',
+    'stat:ques?': '0',
+    'volt:ext:sour?': 'source_name'
+}
+
 
 @pytest.mark.integtest
 def test_testing(wait_for_crossbar):
