@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from queue import Queue
 
 import txaio
-from twisted.internet import defer, reactor
+from twisted.internet import defer, reactor, threads
 
 txaio.use_twisted()
 
@@ -281,7 +281,7 @@ class HWPPMXAgent:
         PMX = None
         session.set_status('running')
 
-        self._clear_queue()
+        threads.blockingCallFromThread(reactor, self._clear_queue)
 
         sleep_time = 1 / self.f_sample - 0.01
         last_daq = 0
