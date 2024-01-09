@@ -59,6 +59,7 @@ class PCU:
         self.port.write(cmd.encode('utf-8'))
         self.sleep()
         response = self.read()
+        response = self.read()
         if response == "on":
             return 1
         elif response == "off":
