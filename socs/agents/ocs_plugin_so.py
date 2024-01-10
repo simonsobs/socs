@@ -34,6 +34,7 @@ for n, f in [
         ('LATRtXYStageAgent', 'xy_stage/agent.py'),
         ('MagpieAgent', 'magpie/agent.py'),
         ('MeinbergM1000Agent', 'meinberg_m1000/agent.py'),
+        ('MeinbergSyncboxAgent', 'meinberg_syncbox/agent.py'),
         ('PfeifferAgent', 'pfeiffer_tpg366/agent.py'),
         ('PfeifferTC400Agent', 'pfeiffer_tc400/agent.py'),
         ('PysmurfController', 'pysmurf_controller/agent.py'),
