@@ -386,7 +386,7 @@ class WiregridKikusuiAgent:
             return True, \
                 'Get wire-grid rotation angle = {} deg'.format(angle)
 
-    def calibrate_wg(self, session, params):
+    def calibrate_wg(self, session, params=None):
         """calibrate_wg()
 
         **Task** - Run rotation-motor calibration for wire-grid.
