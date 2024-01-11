@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from queue import Queue
 
 import txaio
-from twisted.internet import defer
+from twisted.internet import defer, reactor, threads
 
 txaio.use_twisted()
 
@@ -107,7 +107,7 @@ class HWPPCUAgent:
         PCU = None
         session.set_status('running')
 
-        self._clear_queue()
+        threads.blockingCallFromThread(reactor, self._clear_queue)
 
         last_daq = 0
         while session.status in ['starting', 'running']:
