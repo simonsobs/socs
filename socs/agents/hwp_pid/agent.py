@@ -273,24 +273,15 @@ class HWPPIDAgent:
                  'last_updated': 1649085992.719602}
 
         """
-        with self.lock.acquire_timeout(timeout=10, job='acq') as acquired:
-            if not acquired:
-                self.log.warn('Could not start iv acq because {} is already running'
-                              .format(self.lock.job))
-                return False, 'Could not acquire lock'
+        session.set_status('running')
+        self.take_data = True
 
-            session.set_status('running')
-            last_release = time.time()
-            self.take_data = True
-
-            while self.take_data:
-                # Relinquish sampling lock occasionally.
-                if time.time() - last_release > 1.:
-                    last_release = time.time()
-                    if not self.lock.release_and_acquire(timeout=10):
-                        self.log.warn(f"Failed to re-acquire sampling lock, "
-                                      f"currently held by {self.lock.job}.")
-                        continue
+        while self.take_data:
+            with self.lock.acquire_timeout(timeout=10, job='acq') as acquired:
+                if not acquired:
+                    self.log.warn('Could not take iv acq because {} is already running'
+                                  .format(self.lock.job))
+                    continue
 
                 data = {'timestamp': time.time(),
                         'block_name': 'HWPPID', 'data': {}}
@@ -314,7 +305,7 @@ class HWPPIDAgent:
                                 'direction': direction,
                                 'last_updated': time.time()}
 
-                time.sleep(5)
+            time.sleep(5)
 
         self.agent.feeds['hwppid'].flush_buffer()
         return True, 'Acqusition exited cleanly'
