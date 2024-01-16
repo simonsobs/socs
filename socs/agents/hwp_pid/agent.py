@@ -5,7 +5,7 @@ import time
 import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
-from twisted.internet import defer
+from twisted.internet import defer, threads, reactor
 
 txaio.use_twisted()
 
@@ -14,6 +14,18 @@ from dataclasses import dataclass
 
 import socs.agents.hwp_pid.drivers.pid_controller as pd
 
+
+def parse_action_result(res):
+    """
+    Parses the result of an action to ensure it is a dictionary so it can be
+    stored in session.data
+    """
+    if res is None:
+        return {}
+    elif isinstance(res, dict):
+        return res
+    else:
+        return {'result': res}
 
 class Actions:
     @dataclass
@@ -116,10 +128,14 @@ class HWPPIDAgent:
             try:
                 self.log.info(f"Running action {action}")
                 res = action.process(pid)
-                action.deferred.callback(res)
+                threads.blockingCallFromThread(
+                    reactor, action.deferred.callback, res
+                )
             except Exception as e:
                 self.log.error(f"Error processing action: {action}")
-                action.deferred.errback(e)
+                threads.blockingCallFromThread(
+                    reactor, action.deferred.errback, e
+                )
 
     def _clear_queue(self):
         while not self.action_queue.empty():
@@ -176,7 +192,8 @@ class HWPPIDAgent:
         """
         action = Actions.TuneStop(**params)
         self.action_queue.put(action)
-        session.data = yield action.deferred
+        res = yield action.deferred
+        session.data = parse_action_result(res)
         return True, f"Completed: {str(action)}"
 
     @defer.inlineCallbacks
@@ -189,7 +206,8 @@ class HWPPIDAgent:
         """
         action = Actions.TuneFreq(**params)
         self.action_queue.put(action)
-        session.data = yield action.deferred
+        res = yield action.deferred
+        session.data = parse_action_result(res)
         return True, f"Completed: {str(action)}"
 
     @defer.inlineCallbacks
@@ -206,7 +224,8 @@ class HWPPIDAgent:
         """
         action = Actions.DeclareFreq(**params)
         self.action_queue.put(action)
-        session.data = yield action.deferred
+        res = yield action.deferred
+        session.data = parse_action_result(res)
         return True, f"Completed: {str(action)}"
 
     @defer.inlineCallbacks
@@ -227,7 +246,8 @@ class HWPPIDAgent:
         """
         action = Actions.DeclareFreq(**params)
         self.action_queue.put(action)
-        session.data = yield action.deferred
+        res = yield action.deferred
+        session.data = parse_action_result(res)
         return True, f"Completed: {str(action)}"
 
     @defer.inlineCallbacks
@@ -243,7 +263,8 @@ class HWPPIDAgent:
         """
         action = Actions.SetDirection(**params)
         self.action_queue.put(action)
-        session.data = yield action.deferred
+        res = yield action.deferred
+        session.data = parse_action_result(res)
         return True, f"Completed: {str(action)}"
 
     @defer.inlineCallbacks
@@ -266,7 +287,8 @@ class HWPPIDAgent:
         """
         action = Actions.SetScale(**params)
         self.action_queue.put(action)
-        session.data = yield action.deferred
+        res = yield action.deferred
+        session.data = parse_action_result(res)
         return True, f"Completed: {str(action)}"
 
 
