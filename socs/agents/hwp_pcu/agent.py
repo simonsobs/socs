@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from queue import Queue
 
 import txaio
-from twisted.internet import defer
+from twisted.internet import defer, reactor, threads
 
 txaio.use_twisted()
 
@@ -27,30 +27,8 @@ class Actions:
 def process_action(action, PCU: pcu.PCU):
     """Process an action with PCU hardware"""
     if isinstance(action, Actions.SendCommand):
-        off_channel = []
-        on_channel = []
-        if action.command == 'off':
-            off_channel = [0, 1, 2, 5, 6, 7]
-            on_channel = []
-        elif action.command == 'on_1':
-            off_channel = [5, 6, 7]
-            on_channel = [0, 1, 2]
-        elif action.command == 'on_2':
-            on_channel = [0, 1, 2, 5, 6, 7]
-            off_channel = []
-        elif action.command == 'stop':
-            on_channel = [1, 2, 5]
-            off_channel = [0, 6, 7]
-
+        PCU.send_command(action.command)
         action.log.info(f"Command: {action.command}")
-        action.log.info(f"  Off channels: {off_channel}")
-        action.log.info(f"  On channels: {on_channel}")
-        for i in off_channel:
-            PCU.relay_off(i)
-        for i in on_channel:
-            PCU.relay_on(i)
-
-        return dict(off_channel=off_channel, on_channel=on_channel)
 
 
 class HWPPCUAgent:
@@ -108,24 +86,44 @@ class HWPPCUAgent:
                 'block_name': 'hwppcu',
                 'data': {}}
         status = PCU.get_status()
+
         data['data']['status'] = status
         self.agent.publish_to_feed('hwppcu', data)
         session.data = {'status': status, 'last_updated': now}
+
+        if status in ['failed', 'undefined']:
+            PCU.clear_buffer()
+            self.log.warn(f'Status is {status}, cleared buffer')
+
+    def _clear_queue(self):
+        while not self.action_queue.empty():
+            action = self.action_queue.get()
+            action.deferred.errback(Exception("Action cancelled"))
 
     def main(self, session, params):
         """
         **Process** - Main process for PCU agent.
         """
-        PCU = pcu.PCU(port=self.port)
-        self.log.info('Connected to PCU')
-
+        PCU = None
         session.set_status('running')
-        while not self.action_queue.empty():
-            action = self.action_queue.get()
-            action.deferred.errback(Exception("Action cancelled"))
+
+        threads.blockingCallFromThread(reactor, self._clear_queue)
 
         last_daq = 0
         while session.status in ['starting', 'running']:
+            if PCU is None:
+                try:
+                    PCU = pcu.PCU(port=self.port)
+                    self.log.info('Connected to PCU')
+                    PCU.clear_buffer()
+                    self.log.info('Cleared buffer')
+                except ConnectionRefusedError:
+                    self.log.error(
+                        "Could not connect to PCU. "
+                        "Retrying after 30 sec..."
+                    )
+                    time.sleep(30)
+                    continue
             now = time.time()
             if now - last_daq > 5:
                 self._get_and_publish_data(PCU, session)

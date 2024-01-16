@@ -2,6 +2,13 @@ import time
 
 import serial
 
+patterns = {
+    'off': [0, 0, 0, 0, 0, 0],
+    'on_1': [1, 1, 1, 0, 0, 0],
+    'on_2': [1, 1, 1, 1, 1, 1],
+    'stop': [0, 1, 1, 1, 0, 0],
+}
+
 
 class PCU:
     """Class to communicate with the phase compensation unit.
@@ -17,35 +24,58 @@ class PCU:
         self.port = serial.Serial(
             port,
             baudrate=19200,
-            timeout=10,
+            timeout=1,
+            bytesize=serial.EIGHTBITS,
+            stopbits=serial.STOPBITS_ONE,
         )
 
     def close(self):
         self.port.close()
 
+    def sleep(self):
+        time.sleep(0.1)
+
+    def read(self):
+        return self.port.read_until(b'\n\r').strip().decode()
+
+    def clear_buffer(self):
+        while True:
+            res = self.read()
+            if len(res) == 0:
+                break
+
     def relay_on(self, channel):
         cmd = "relay on " + str(channel) + "\n\r"
         self.port.write(cmd.encode('utf-8'))
-        time.sleep(.1)
+        self.sleep()
 
     def relay_off(self, channel):
         cmd = "relay off " + str(channel) + "\n\r"
         self.port.write(cmd.encode('utf-8'))
-        time.sleep(.1)
+        self.sleep()
 
     def relay_read(self, channel):
         cmd = "relay read " + str(channel) + "\n\r"
         self.port.write(cmd.encode('utf-8'))
-        time.sleep(.1)
-        response = self.port.read(25)
-        time.sleep(.1)
-        response = response.decode('utf-8')
-        if response.find("on") > 0:
-            return True
-        elif response.find("off") > 0:
-            return False
+        self.sleep()
+        response = self.read()
+        response = self.read()
+        if response == "on":
+            return 1
+        elif response == "off":
+            return 0
         else:
             return -1
+
+    def send_command(self, command):
+        pattern = patterns[command]
+        for i, p in zip([0, 1, 2, 5, 6, 7], pattern):
+            if p:
+                self.relay_on(i)
+            else:
+                self.relay_off(i)
+            self.sleep()
+            self.read()
 
     def get_status(self):
         """get_status()
@@ -61,15 +91,9 @@ class PCU:
 
         for i in channel:
             channel_switch.append(self.relay_read(i))
-        if channel_switch == [False, False, False, False, False, False]:
-            return 'off'
-        elif channel_switch == [True, True, True, False, False, False]:
-            return 'on_1'
-        elif channel_switch == [True, True, True, True, True, True]:
-            return 'on_2'
-        elif channel_switch == [False, True, True, True, False, False]:
-            return 'stop'
-        elif -1 in channel_switch:
+        if -1 in channel_switch:
             return 'failed'
-        else:
-            return 'undefined'
+        for command, pattern in patterns.items():
+            if channel_switch == pattern:
+                return command
+        return 'undefined'
