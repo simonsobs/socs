@@ -90,10 +90,11 @@ class DeviceEmulator:
 
         self.logger = logging.getLogger(self.__class__.__name__)
         self.logger.setLevel(logging.DEBUG)
-        formatter = logging.Formatter("%(name)s: %(message)s")
-        handler = logging.StreamHandler()
-        handler.setFormatter(formatter)
-        self.logger.addHandler(handler)
+        if len(self.logger.handlers) == 0:
+            formatter = logging.Formatter("%(name)s: %(message)s")
+            handler = logging.StreamHandler()
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
 
     @staticmethod
     def _setup_socat():
@@ -140,7 +141,7 @@ class DeviceEmulator:
                                     target=self._read_serial)
         bkg_read.start()
 
-    def _get_response(self, msg):
+    def get_response(self, msg):
         """Determine the response to a given message.
 
         Args:
@@ -182,7 +183,7 @@ class DeviceEmulator:
                     msg = msg.strip().decode(self.encoding)
                 self.logger.debug(f"msg='{msg}'")
 
-                response = self._get_response(msg)
+                response = self.get_response(msg)
 
                 # Avoid user providing bytes-like response
                 if isinstance(response, bytes) and self.encoding is not None:
@@ -257,7 +258,7 @@ class DeviceEmulator:
             if msg:
                 self.logger.debug(f"msg='{msg}'")
 
-                response = self._get_response(msg)
+                response = self.get_response(msg)
 
                 # Avoid user providing bytes-like response
                 if isinstance(response, bytes) and self.encoding is not None:

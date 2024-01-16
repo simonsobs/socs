@@ -4,20 +4,15 @@ HWP Emulation module
 import logging
 import threading
 import time
-from copy import deepcopy
 from dataclasses import dataclass
 
 from socs.testing import device_emulator
+from socs.agents.hwp_pid.drivers.pid_controller import PID
 
 
 def hex_str_to_dec(hex_value, decimal=3):
     """Converts a hex string to a decimal float"""
     return float(int(hex_value, 16)) / 10**decimal
-
-
-def float_to_hex_str(value, decimal=3):
-    """Converts a decimal float to a hex string"""
-    return "0000" + str(hex(int(value * 10**decimal)))[2:]
 
 
 @dataclass
@@ -66,11 +61,11 @@ class HWPEmulator:
         self.state = HWPState()
 
         self.pid_device = device_emulator.DeviceEmulator([])
-        self.pid_device._get_response = self.process_pid_msg
+        self.pid_device.get_response = self.process_pid_msg
         self.pid_device.logger = _create_logger("PID")
 
         self.pmx_device = device_emulator.DeviceEmulator([])
-        self.pmx_device._get_response = self.process_pmx_msg
+        self.pmx_device.get_response = self.process_pmx_msg
         self.pmx_device.logger = _create_logger("PMX")
 
         self.logger = _create_logger("HWP")
@@ -174,14 +169,13 @@ class HWPEmulator:
             elif cmd == "*X01":  # Get frequency
                 return f"X01{self.state.cur_freq:0.3f}"
             elif cmd == "*R01":  # Get Target
-                return f"R{float_to_hex_str(self.state.pid.freq_setpoint, 3)}"
+                return f"R{PID._convert_to_hex(self.state.pid.freq_setpoint, 3)}"
             else:
                 self.logger.info("Unknown cmd: %s", cmd)
                 return "unknown"
 
 
 try:
-    # pmx_server = PMXEmulator('localhost', 8002)
     hwp_em = HWPEmulator()
     hwp_em.start()
 

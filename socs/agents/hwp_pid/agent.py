@@ -5,7 +5,7 @@ import time
 import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
-from twisted.internet import defer, reactor
+from twisted.internet import defer
 
 txaio.use_twisted()
 
