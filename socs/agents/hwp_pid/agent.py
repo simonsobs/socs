@@ -5,7 +5,7 @@ import time
 import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
-from twisted.internet import defer, threads, reactor
+from twisted.internet import defer, reactor, threads
 
 txaio.use_twisted()
 
@@ -26,6 +26,7 @@ def parse_action_result(res):
         return res
     else:
         return {'result': res}
+
 
 class Actions:
     @dataclass

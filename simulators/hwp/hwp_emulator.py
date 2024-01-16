@@ -6,8 +6,8 @@ import threading
 import time
 from dataclasses import dataclass
 
-from socs.testing import device_emulator
 from socs.agents.hwp_pid.drivers.pid_controller import PID
+from socs.testing import device_emulator
 
 
 def hex_str_to_dec(hex_value, decimal=3):
