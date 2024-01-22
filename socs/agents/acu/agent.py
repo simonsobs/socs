@@ -1846,6 +1846,9 @@ class ACUAgent:
         # The approximate loop time
         LOOP_STEP = 0.1  # seconds
 
+        # Time to allow for initial ProgramTrack transition.
+        MAX_PROGTRACK_SET_TIME = 5.
+
         # Minimum number of points to have in the stack.  While the
         # docs strictly require 4, this number should be at least 1
         # more than that to allow for rounding when we are setting the
@@ -1895,9 +1898,12 @@ class ACUAgent:
             lines = []
             last_mode = None
             was_graceful_exit = True
+            start_time = time.time()
+            got_progtrack = False
             faults = {}
 
             while True:
+                now = time.time()
                 current_modes = {'Az': self.data['status']['summary']['Azimuth_mode'],
                                  'El': self.data['status']['summary']['Elevation_mode'],
                                  'Remote': self.data['status']['platform_status']['Remote_mode']}
@@ -1914,10 +1920,17 @@ class ACUAgent:
 
                 if mode != 'abort':
                     # Reasons we might decide to abort ...
-                    if current_modes['Az'] != 'ProgramTrack':
-                        self.log.warn('Unexpected mode transition!')
-                        mode = 'abort'
-                        was_graceful_exit = False
+                    if current_modes['Az'] == 'ProgramTrack':
+                        got_progtrack = True
+                    else:
+                        if got_progtrack:
+                            self.log.warn('Unexpected exit from ProgramTrack mode!')
+                            mode = 'abort'
+                            was_graceful_exit = False
+                        elif now - start_time > MAX_PROGTRACK_SET_TIME:
+                            self.log.warn('Failed to set ProgramTrack mode in a timely fashion.')
+                            mode = 'abort'
+                            was_graceful_exit = False
                     if current_modes['Remote'] == 0:
                         self.log.warn('ACU no longer in remote mode!')
                         mode = 'abort'
