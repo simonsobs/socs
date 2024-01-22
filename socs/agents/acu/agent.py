@@ -1026,9 +1026,14 @@ class ACUAgent:
         # can be as long as 12 seconds.
         MAX_STARTUP_TIME = 13.
 
-        # Velocity to assume when computing maximum time a move should take (to bail
-        # out in unforeseen circumstances).
-        UNREASONABLE_VEL = 0.5
+        # Velocity to assume when computing maximum time a move should
+        # take (to bail out in unforeseen circumstances).  There are
+        # other checks in place to catch when the platform has not
+        # started moving or has stopped at the wrong place.  So the
+        # timeout computed from this should only activate in cases
+        # where some other commander has taken over and then kept the
+        # platform moving around.
+        UNREASONABLE_VEL = 0.1
 
         # Positive acknowledgment of AcuControl.go_to
         OK_RESPONSE = b'OK, Command executed.'
