@@ -2124,7 +2124,8 @@ class ACUAgent:
               "escape_triggered": false,
               "escape_active": false,
               "last_escape_time": 0,
-              "sun_is_real": true
+              "sun_is_real": true,
+              "platform_is_moveable": true
             }
           }
 
@@ -2197,6 +2198,13 @@ class ACUAgent:
             except KeyError:
                 az, el = None, None
 
+            try:
+                moveable = [bool(self.data['status']['platform_status'][k])
+                            for k in ['Safe_mode', 'Remote_mode']]
+                moveable = (not moveable[0]) and moveable[1]
+            except KeyError:
+                moveable = False
+
             no_map = self.sun is None
             old_map = (not no_map
                        and self.sun._now() - self.sun.base_time > SUN_MAP_REFRESH)
@@ -2259,13 +2267,21 @@ class ACUAgent:
                 'escape_active': escape_in_progress,
                 'last_escape_time': last_panic,
                 'sun_is_real': sun_is_real,
+                'platform_is_moveable': moveable,
             }
 
-            if (panic_for_real or panic_for_fun) and (time.time() - last_panic > 60.):
-                self.log.warn('monitor_sun is requesting escape_sun_now.')
-                self.sun_params['next_drill'] = None
-                self.agent.start('escape_sun_now')
-                last_panic = time.time()
+            if (panic_for_real or panic_for_fun):
+                now = time.time()
+                # Different retry conditions for moveable / not moveable
+                if moveable and (now - last_panic > 60.):
+                    self.log.warn('monitor_sun is requesting escape_sun_now.')
+                    self.sun_params['next_drill'] = None
+                    self.agent.start('escape_sun_now')
+                    last_panic = now
+                elif not moveable and (now - last_panic > 600.):
+                    self.log.warn('monitor_sun cannot request escape_sun_now, '
+                                  'because platform not moveable by remote.')
+                    last_panic = now
 
             # Update session.
             session.data.update(new_data)
