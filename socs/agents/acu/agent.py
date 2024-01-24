@@ -1004,6 +1004,13 @@ class ACUAgent:
             arrived at target position.
           msg (str): success/error message.
 
+        Notes:
+          This has various checks to ensure the movement executes as
+          expected and in a timely fashion.  In the case that the
+          warning horn sounds, this function should block until that
+          completes, even if the requested position has been achieved
+          (i.e. no actual motion was needed).
+
         """
         # Step time in event loop.
         TICK_TIME = 0.1
@@ -1025,6 +1032,15 @@ class ACUAgent:
         # (SATP), but in "cold" cases where siren needs to sound, this
         # can be as long as 12 seconds.
         MAX_STARTUP_TIME = 13.
+
+        # How long does it take to sound the warning horn?  It takes
+        # 10 seconds.  Don't wait longer than this.
+        WARNING_HORN_TOO_LONG = 15.
+
+        # How long after mode change to Preset should we expect to see
+        # brakes released, except in case that warning horn is
+        # sounding?  3 seconds should be enough.
+        WARNING_HORN_DETECT = 3.
 
         # Velocity to assume when computing maximum time a move should
         # take (to bail out in unforeseen circumstances).  There are
@@ -1064,6 +1080,11 @@ class ACUAgent:
 
             def get_vel(_self):
                 return self.data['status']['summary'][f'{axis}_current_velocity']
+
+            def get_active(_self):
+                return bool(
+                    self.data['status']['axis_state'][f'{axis}_brakes_released']
+                    and not self.data['status']['axis_state'][f'{axis}_axis_stop'])
 
         class AzAxis(AxisControl):
             @inlineCallbacks
@@ -1126,6 +1147,7 @@ class ACUAgent:
         motion_completed = False
         give_up_time = None
         has_never_moved = True
+        warning_horn = False
 
         while session.status in ['starting', 'running', 'stopping']:
             # Time ...
@@ -1141,7 +1163,8 @@ class ACUAgent:
             history.append(distance)
             if give_up_time is None:
                 give_up_time = now + distance / UNREASONABLE_VEL \
-                    + MAX_STARTUP_TIME + 2 * PROFILE_TIME
+                    + MAX_STARTUP_TIME + 2 * PROFILE_TIME \
+                    + WARNING_HORN_TOO_LONG
 
             # Do we seem to be moving / not moving?
             ok, _d = get_history(PROFILE_TIME)
@@ -1151,6 +1174,7 @@ class ACUAgent:
 
             near_destination = distance < THERE_YET
             mode_ok = (ctrl.get_mode() == 'Preset')
+            active_now = ctrl.get_active()
 
             # Log only on state changes
             if state != last_state:
@@ -1188,7 +1212,14 @@ class ACUAgent:
                 # Position and mode change requested, now wait for
                 # either mode change or clear failure of motion.
                 if mode_ok:
-                    state = state.WAIT_STILL
+                    if active_now:
+                        state = state.WAIT_STILL
+                    elif time_since_start > WARNING_HORN_TOO_LONG:
+                        self.log.error('Warning horn too long!')
+                        state = state.FAIL
+                    elif time_since_start > WARNING_HORN_DETECT and not warning_horn:
+                        warning_horn = True
+                        self.log.info('Warning horn is probably sounding.')
                 elif still and motion_expected:
                     self.log.error(f'Motion did not start within {MAX_STARTUP_TIME:.1f} s.')
                     state = state.FAIL
@@ -1795,10 +1826,14 @@ class ACUAgent:
         if not ok:
             return False, msg
 
-        # Seek to starting position
+        # Seek to starting position.  Note we ask for at least one leg
+        # here, because go_to_axes knows how to wait for the warning
+        # horn to finish before returning, which relieves us from
+        # handling that delay in the (already onerous) scan point
+        # timing.
         self.log.info(f'Moving to start position, az={plan["init_az"]}, el={init_el}')
         legs, msg = yield self._get_sunsafe_moves(plan['init_az'], init_el,
-                                                  zero_legs_ok=True)
+                                                  zero_legs_ok=False)
         if msg is not None:
             self.log.error(msg)
             return False, msg
