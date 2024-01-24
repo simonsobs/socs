@@ -18,6 +18,15 @@ motors the same.
     :func: make_parser
     :prog: python3 agent.py
 
+Dependencies
+------------
+
+The PCU device shows up on the system as /dev/ttyACMx where x is not guaranteed to be consistent. To solve this issue we should create a udev rule for the PCU device. The Lakeshore240's have solved the same issue by making udev rules in simonsobs/ls240-drivers repository. We can make the udev rule for PCU in the same way. The example is as follows::
+
+$ SUBSYSTEM == "tty", ATTRS{idVendor} == "2a19", ATTRS{idProduct} == "0c02", MODE = "0666", SYMLINK = "PCU"
+
+If your devices were plugged in already you will need to unplug and replug them for the udev rules to properly recognize the devices and set the path and permissions appropriately. Once you complete this step they will be recongized on reboots, and the udev rules will not need to be reinstalled unless you add a new device.
+
 Configuration File Examples
 ---------------------------
 
