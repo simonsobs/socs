@@ -1915,14 +1915,14 @@ class ACUAgent:
 
             yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
                                                 'Clear Stack')
-            yield dsleep(0.2)
+            yield dsleep(0.5)
 
             if azonly:
                 yield self._set_modes(az='ProgramTrack')
             else:
                 yield self._set_modes(az='ProgramTrack', el='ProgramTrack')
 
-            yield dsleep(0.5)
+            yield dsleep(0.1)
 
             # Values for mode are:
             # - 'go' -- keep uploading points (unless there are no more to upload).
@@ -2309,14 +2309,19 @@ class ACUAgent:
                 now = time.time()
                 # Different retry conditions for moveable / not moveable
                 if moveable and (now - last_panic > 60.):
+                    # When moveable, only attempt escape every 1 minute.
                     self.log.warn('monitor_sun is requesting escape_sun_now.')
-                    self.sun_params['next_drill'] = None
                     self.agent.start('escape_sun_now')
                     last_panic = now
                 elif not moveable and (now - last_panic > 600.):
+                    # When not moveable, only print complaint message every 10 minutes.
                     self.log.warn('monitor_sun cannot request escape_sun_now, '
-                                  'because platform not moveable by remote.')
+                                  'because platform not moveable by remote!')
                     last_panic = now
+
+                # Regardless, clear the drill indicator -- we don't
+                # want that to occur randomly later.
+                self.sun_params['next_drill'] = None
 
             # Update session.
             session.data.update(new_data)
