@@ -21,19 +21,24 @@ motors the same.
 Dependencies
 ------------
 
-The PCU device shows up on the system as /dev/ttyACMx where x is not guaranteed
-to be consistent. To solve this issue we should create a udev rule for the PCU
-device. The Lakeshore240's have solved the same issue by making udev rules in
-simonsobs/ls240-drivers repository. We can make the udev rule for PCU in the
-same way. The example is as follows::
+The PCU device shows up on the system as ``/dev/ttyACMx`` where ``x`` is not
+guaranteed to be consistent. To solve this issue we should create a udev rule
+for the PCU device. Establish the udev rule by creating a file in
+``/etc/udev/rules.d/`` with the following contents::
 
-$ SUBSYSTEM == "tty", ATTRS{idVendor} == "2a19", ATTRS{idProduct} == "0c02", MODE = "0666", SYMLINK = "PCU"
+  SUBSYSTEM=="tty", ATTRS{idVendor}=="2a19", ATTRS{idProduct}=="0c02", MODE="0666", SYMLINK="PCU"
 
-If your devices were plugged in already you will need to unplug and replug them
-for the udev rules to properly recognize the devices and set the path and
-permissions appropriately. Once you complete this step they will be recongized
-on reboots, and the udev rules will not need to be reinstalled unless you add a
-new device.
+.. note::
+    If multiple PCU devices are connected to the same computer you will want to
+    include the serial number in the rules, which you can add with
+    ``ATTRS{serial}=="<serial number of PCU>"``.
+
+If the PCU was connected to the computer already you will need to unplug and
+replug it for the udev rule to properly recognize the device, create the
+symlink, and set the permissions appropriately. Once you complete this step the
+device will be recongized on reboot, and the udev rules will not need to be
+reinstalled unless you add a new device. The PCU should now be available at
+``/dev/PCU``.
 
 Configuration File Examples
 ---------------------------
