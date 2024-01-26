@@ -1991,7 +1991,6 @@ class ACUAgent:
                        and (now - first_upload_time > 10):
                         self.log.warn('ACU seems to be dumping our track. Vel too high?')
                         mode = 'abort'
-                        was_graceful_exit = False
                     if current_modes['Remote'] == 0:
                         self.log.warn('ACU no longer in remote mode!')
                         mode = 'abort'
