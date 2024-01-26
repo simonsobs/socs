@@ -1004,6 +1004,13 @@ class ACUAgent:
             arrived at target position.
           msg (str): success/error message.
 
+        Notes:
+          This has various checks to ensure the movement executes as
+          expected and in a timely fashion.  In the case that the
+          warning horn sounds, this function should block until that
+          completes, even if the requested position has been achieved
+          (i.e. no actual motion was needed).
+
         """
         # Step time in event loop.
         TICK_TIME = 0.1
@@ -1026,9 +1033,23 @@ class ACUAgent:
         # can be as long as 12 seconds.
         MAX_STARTUP_TIME = 13.
 
-        # Velocity to assume when computing maximum time a move should take (to bail
-        # out in unforeseen circumstances).
-        UNREASONABLE_VEL = 0.5
+        # How long does it take to sound the warning horn?  It takes
+        # 10 seconds.  Don't wait longer than this.
+        WARNING_HORN_TOO_LONG = 15.
+
+        # How long after mode change to Preset should we expect to see
+        # brakes released, except in case that warning horn is
+        # sounding?  3 seconds should be enough.
+        WARNING_HORN_DETECT = 3.
+
+        # Velocity to assume when computing maximum time a move should
+        # take (to bail out in unforeseen circumstances).  There are
+        # other checks in place to catch when the platform has not
+        # started moving or has stopped at the wrong place.  So the
+        # timeout computed from this should only activate in cases
+        # where some other commander has taken over and then kept the
+        # platform moving around.
+        UNREASONABLE_VEL = 0.1
 
         # Positive acknowledgment of AcuControl.go_to
         OK_RESPONSE = b'OK, Command executed.'
@@ -1059,6 +1080,11 @@ class ACUAgent:
 
             def get_vel(_self):
                 return self.data['status']['summary'][f'{axis}_current_velocity']
+
+            def get_active(_self):
+                return bool(
+                    self.data['status']['axis_state'][f'{axis}_brakes_released']
+                    and not self.data['status']['axis_state'][f'{axis}_axis_stop'])
 
         class AzAxis(AxisControl):
             @inlineCallbacks
@@ -1121,6 +1147,7 @@ class ACUAgent:
         motion_completed = False
         give_up_time = None
         has_never_moved = True
+        warning_horn = False
 
         while session.status in ['starting', 'running', 'stopping']:
             # Time ...
@@ -1136,7 +1163,8 @@ class ACUAgent:
             history.append(distance)
             if give_up_time is None:
                 give_up_time = now + distance / UNREASONABLE_VEL \
-                    + MAX_STARTUP_TIME + 2 * PROFILE_TIME
+                    + MAX_STARTUP_TIME + 2 * PROFILE_TIME \
+                    + WARNING_HORN_TOO_LONG
 
             # Do we seem to be moving / not moving?
             ok, _d = get_history(PROFILE_TIME)
@@ -1146,6 +1174,7 @@ class ACUAgent:
 
             near_destination = distance < THERE_YET
             mode_ok = (ctrl.get_mode() == 'Preset')
+            active_now = ctrl.get_active()
 
             # Log only on state changes
             if state != last_state:
@@ -1183,7 +1212,14 @@ class ACUAgent:
                 # Position and mode change requested, now wait for
                 # either mode change or clear failure of motion.
                 if mode_ok:
-                    state = state.WAIT_STILL
+                    if active_now:
+                        state = state.WAIT_STILL
+                    elif time_since_start > WARNING_HORN_TOO_LONG:
+                        self.log.error('Warning horn too long!')
+                        state = state.FAIL
+                    elif time_since_start > WARNING_HORN_DETECT and not warning_horn:
+                        warning_horn = True
+                        self.log.info('Warning horn is probably sounding.')
                 elif still and motion_expected:
                     self.log.error(f'Motion did not start within {MAX_STARTUP_TIME:.1f} s.')
                     state = state.FAIL
@@ -1790,10 +1826,14 @@ class ACUAgent:
         if not ok:
             return False, msg
 
-        # Seek to starting position
+        # Seek to starting position.  Note we ask for at least one leg
+        # here, because go_to_axes knows how to wait for the warning
+        # horn to finish before returning, which relieves us from
+        # handling that delay in the (already onerous) scan point
+        # timing.
         self.log.info(f'Moving to start position, az={plan["init_az"]}, el={init_el}')
         legs, msg = yield self._get_sunsafe_moves(plan['init_az'], init_el,
-                                                  zero_legs_ok=True)
+                                                  zero_legs_ok=False)
         if msg is not None:
             self.log.error(msg)
             return False, msg
@@ -1841,6 +1881,9 @@ class ACUAgent:
         # The approximate loop time
         LOOP_STEP = 0.1  # seconds
 
+        # Time to allow for initial ProgramTrack transition.
+        MAX_PROGTRACK_SET_TIME = 5.
+
         # Minimum number of points to have in the stack.  While the
         # docs strictly require 4, this number should be at least 1
         # more than that to allow for rounding when we are setting the
@@ -1872,14 +1915,14 @@ class ACUAgent:
 
             yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
                                                 'Clear Stack')
-            yield dsleep(0.2)
+            yield dsleep(0.5)
 
             if azonly:
                 yield self._set_modes(az='ProgramTrack')
             else:
                 yield self._set_modes(az='ProgramTrack', el='ProgramTrack')
 
-            yield dsleep(0.5)
+            yield dsleep(0.1)
 
             # Values for mode are:
             # - 'go' -- keep uploading points (unless there are no more to upload).
@@ -1890,13 +1933,24 @@ class ACUAgent:
             lines = []
             last_mode = None
             was_graceful_exit = True
+            start_time = time.time()
+            got_progtrack = False
             faults = {}
+            got_points_in = False
+            first_upload_time = None
 
             while True:
+                now = time.time()
                 current_modes = {'Az': self.data['status']['summary']['Azimuth_mode'],
                                  'El': self.data['status']['summary']['Elevation_mode'],
                                  'Remote': self.data['status']['platform_status']['Remote_mode']}
                 free_positions = self.data['status']['summary']['Free_upload_positions']
+
+                # Use this var to detect case where we're uploading
+                # points but ACU is quietly dumping them because the
+                # vel is too high.
+                got_points_in = got_points_in \
+                    or (got_progtrack and free_positions < FULL_STACK)
 
                 if last_mode != mode:
                     self.log.info(f'scan mode={mode}, line_buffer={len(lines)}, track_free={free_positions}')
@@ -1909,10 +1963,21 @@ class ACUAgent:
 
                 if mode != 'abort':
                     # Reasons we might decide to abort ...
-                    if current_modes['Az'] != 'ProgramTrack':
-                        self.log.warn('Unexpected mode transition!')
+                    if current_modes['Az'] == 'ProgramTrack':
+                        got_progtrack = True
+                    else:
+                        if got_progtrack:
+                            self.log.warn('Unexpected exit from ProgramTrack mode!')
+                            mode = 'abort'
+                            was_graceful_exit = False
+                        elif now - start_time > MAX_PROGTRACK_SET_TIME:
+                            self.log.warn('Failed to set ProgramTrack mode in a timely fashion.')
+                            mode = 'abort'
+                            was_graceful_exit = False
+                    if not got_points_in and (first_upload_time is not None) \
+                       and (now - first_upload_time > 10):
+                        self.log.warn('ACU seems to be dumping our track. Vel too high?')
                         mode = 'abort'
-                        was_graceful_exit = False
                     if current_modes['Remote'] == 0:
                         self.log.warn('ACU no longer in remote mode!')
                         mode = 'abort'
@@ -1927,7 +1992,12 @@ class ACUAgent:
                 if free_positions >= STACK_REFILL_THRESHOLD:
                     new_line_target = max(int(free_positions - STACK_TARGET), 1)
 
-                    while mode == 'go' and (len(lines) < new_line_target or lines[-1][0] != 0):
+                    # Make sure that you get one more line than you
+                    # need (len(lines) > new_line_target), so that
+                    # after "grabbing the minimum batch", below, there
+                    # is still >= 1 line left.  The lines-is-empty
+                    # check is used to decide we're done.
+                    while mode == 'go' and (len(lines) <= new_line_target or lines[-1][0] != 0):
                         try:
                             lines.extend(next(point_gen))
                         except StopIteration:
@@ -1943,7 +2013,11 @@ class ACUAgent:
                     if len(upload_lines):
                         # Discard the group flag and upload all.
                         text = ''.join([line for _flag, line in upload_lines])
+                        # This seems to return b'Ok.' no matter ~what,
+                        # so not much point checking it.
                         yield self.acu_control.http.UploadPtStack(text)
+                        if first_upload_time is None:
+                            first_upload_time = time.time()
 
                 if len(lines) == 0 and free_positions >= FULL_STACK - 1:
                     break
@@ -2106,7 +2180,8 @@ class ACUAgent:
               "escape_triggered": false,
               "escape_active": false,
               "last_escape_time": 0,
-              "sun_is_real": true
+              "sun_is_real": true,
+              "platform_is_moveable": true
             }
           }
 
@@ -2179,6 +2254,13 @@ class ACUAgent:
             except KeyError:
                 az, el = None, None
 
+            try:
+                moveable = [bool(self.data['status']['platform_status'][k])
+                            for k in ['Safe_mode', 'Remote_mode']]
+                moveable = (not moveable[0]) and moveable[1]
+            except KeyError:
+                moveable = False
+
             no_map = self.sun is None
             old_map = (not no_map
                        and self.sun._now() - self.sun.base_time > SUN_MAP_REFRESH)
@@ -2241,13 +2323,26 @@ class ACUAgent:
                 'escape_active': escape_in_progress,
                 'last_escape_time': last_panic,
                 'sun_is_real': sun_is_real,
+                'platform_is_moveable': moveable,
             }
 
-            if (panic_for_real or panic_for_fun) and (time.time() - last_panic > 60.):
-                self.log.warn('monitor_sun is requesting escape_sun_now.')
+            if (panic_for_real or panic_for_fun):
+                now = time.time()
+                # Different retry conditions for moveable / not moveable
+                if moveable and (now - last_panic > 60.):
+                    # When moveable, only attempt escape every 1 minute.
+                    self.log.warn('monitor_sun is requesting escape_sun_now.')
+                    self.agent.start('escape_sun_now')
+                    last_panic = now
+                elif not moveable and (now - last_panic > 600.):
+                    # When not moveable, only print complaint message every 10 minutes.
+                    self.log.warn('monitor_sun cannot request escape_sun_now, '
+                                  'because platform not moveable by remote!')
+                    last_panic = now
+
+                # Regardless, clear the drill indicator -- we don't
+                # want that to occur randomly later.
                 self.sun_params['next_drill'] = None
-                self.agent.start('escape_sun_now')
-                last_panic = time.time()
 
             # Update session.
             session.data.update(new_data)
