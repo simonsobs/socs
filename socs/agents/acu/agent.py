@@ -1936,6 +1936,8 @@ class ACUAgent:
             start_time = time.time()
             got_progtrack = False
             faults = {}
+            got_points_in = False
+            first_upload_time = None
 
             while True:
                 now = time.time()
@@ -1943,6 +1945,12 @@ class ACUAgent:
                                  'El': self.data['status']['summary']['Elevation_mode'],
                                  'Remote': self.data['status']['platform_status']['Remote_mode']}
                 free_positions = self.data['status']['summary']['Free_upload_positions']
+
+                # Use this var to detect case where we're uploading
+                # points but ACU is quietly dumping them because the
+                # vel is too high.
+                got_points_in = got_points_in \
+                    or (got_progtrack and free_positions < FULL_STACK)
 
                 if last_mode != mode:
                     self.log.info(f'scan mode={mode}, line_buffer={len(lines)}, track_free={free_positions}')
@@ -1966,6 +1974,10 @@ class ACUAgent:
                             self.log.warn('Failed to set ProgramTrack mode in a timely fashion.')
                             mode = 'abort'
                             was_graceful_exit = False
+                    if not got_points_in and (first_upload_time is not None) \
+                       and (now - first_upload_time > 10):
+                        self.log.warn('ACU seems to be dumping our track. Vel too high?')
+                        mode = 'abort'
                     if current_modes['Remote'] == 0:
                         self.log.warn('ACU no longer in remote mode!')
                         mode = 'abort'
@@ -1996,7 +2008,11 @@ class ACUAgent:
                     if len(upload_lines):
                         # Discard the group flag and upload all.
                         text = ''.join([line for _flag, line in upload_lines])
+                        # This seems to return b'Ok.' no matter ~what,
+                        # so not much point checking it.
                         yield self.acu_control.http.UploadPtStack(text)
+                        if first_upload_time is None:
+                            first_upload_time = time.time()
 
                 if len(lines) == 0 and free_positions >= FULL_STACK - 1:
                     break
