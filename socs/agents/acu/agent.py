@@ -1992,7 +1992,12 @@ class ACUAgent:
                 if free_positions >= STACK_REFILL_THRESHOLD:
                     new_line_target = max(int(free_positions - STACK_TARGET), 1)
 
-                    while mode == 'go' and (len(lines) < new_line_target or lines[-1][0] != 0):
+                    # Make sure that you get one more line than you
+                    # need (len(lines) > new_line_target), so that
+                    # after "grabbing the minimum batch", below, there
+                    # is still >= 1 line left.  The lines-is-empty
+                    # check is used to decide we're done.
+                    while mode == 'go' and (len(lines) <= new_line_target or lines[-1][0] != 0):
                         try:
                             lines.extend(next(point_gen))
                         except StopIteration:
