@@ -27,6 +27,12 @@ def parse_action_result(res):
     else:
         return {'result': res}
 
+def get_pid_state(pid: pd.PID):
+    return {
+        "current_freq": pid.get_freq(),
+        "target_freq": pid.get_target(),
+        "direction": pid.get_direction(),
+    }
 
 class Actions:
     @dataclass
@@ -77,6 +83,11 @@ class Actions:
         def process(self, pid: pd.PID):
             pid.set_scale(self.slope, self.offset)
 
+    @dataclass
+    class GetState(BaseAction):
+        def process(self, pid: pd.PID):
+            return get_pid_state(pid)
+
 
 class HWPPIDAgent:
     """Agent to PID control the rotation speed of the CHWP
@@ -102,25 +113,14 @@ class HWPPIDAgent:
         agg_params = {"frame_length": 60}
         self.agent.register_feed("hwppid", record=True, agg_params=agg_params)
 
+
     def _get_data_and_publish(self, pid: pd.PID, session: ocs_agent.OpSession):
         data = {"timestamp": time.time(), "block_name": "HWPPID", "data": {}}
 
-        current_freq = pid.get_freq()
-        target_freq = pid.get_target()
-        direction = pid.get_direction()
-
-        data["data"]["current_freq"] = current_freq
-        data["data"]["target_freq"] = target_freq
-        data["data"]["direction"] = direction
-
-        session.data.update(
-            {
-                "current_freq": current_freq,
-                "target_freq": target_freq,
-                "direction": direction,
-                "last_updated": time.time(),
-            }
-        )
+        pid_state = get_pid_state(pid)
+        data['data'].update(pid_state)
+        session.data.update(pid_state)
+        session.data['last_updated'] = time.time()
         self.agent.publish_to_feed("hwppid", data)
 
     def _process_actions(self, pid):
@@ -245,7 +245,7 @@ class HWPPIDAgent:
             i (int): Integral PID value
             d (float): Derivative PID value
         """
-        action = Actions.DeclareFreq(**params)
+        action = Actions.SetPID(**params)
         self.action_queue.put(action)
         res = yield action.deferred
         session.data = parse_action_result(res)
@@ -287,6 +287,18 @@ class HWPPIDAgent:
 
         """
         action = Actions.SetScale(**params)
+        self.action_queue.put(action)
+        res = yield action.deferred
+        session.data = parse_action_result(res)
+        return True, f"Completed: {str(action)}"
+
+    @defer.inlineCallbacks
+    def get_state(self, session, params):
+        """get_state()
+
+        **Task** - Polls hardware for the current the PID state.
+        """
+        action = Actions.GetState(**params)
         self.action_queue.put(action)
         res = yield action.deferred
         session.data = parse_action_result(res)
@@ -337,6 +349,7 @@ def main(args=None):
     agent.register_task("set_pid", hwppid_agent.set_pid, blocking=False)
     agent.register_task("set_direction", hwppid_agent.set_direction, blocking=False)
     agent.register_task("set_scale", hwppid_agent.set_scale, blocking=False)
+    agent.register_task("get_state", hwppid_agent.get_state, blocking=False)
     runner.run(agent, auto_reconnect=True)
 
 
