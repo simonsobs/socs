@@ -27,12 +27,14 @@ def parse_action_result(res):
     else:
         return {'result': res}
 
+
 def get_pid_state(pid: pd.PID):
     return {
         "current_freq": pid.get_freq(),
         "target_freq": pid.get_target(),
         "direction": pid.get_direction(),
     }
+
 
 class Actions:
     @dataclass
@@ -112,7 +114,6 @@ class HWPPIDAgent:
 
         agg_params = {"frame_length": 60}
         self.agent.register_feed("hwppid", record=True, agg_params=agg_params)
-
 
     def _get_data_and_publish(self, pid: pd.PID, session: ocs_agent.OpSession):
         data = {"timestamp": time.time(), "block_name": "HWPPID", "data": {}}

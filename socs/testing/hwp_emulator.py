@@ -5,6 +5,7 @@ import logging
 import threading
 import time
 from dataclasses import dataclass
+
 import pytest
 
 from socs.agents.hwp_pid.drivers.pid_controller import PID

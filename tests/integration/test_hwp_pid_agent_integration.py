@@ -1,11 +1,13 @@
+import logging
+
 import ocs
 import pytest
 from integration.util import docker_compose_file  # noqa: F401
 from integration.util import create_crossbar_fixture
 from ocs.base import OpCode
 from ocs.testing import create_agent_runner_fixture, create_client_fixture
+
 from socs.testing.hwp_emulator import create_hwp_emulator_fixture
-import logging
 
 wait_for_crossbar = create_crossbar_fixture()
 run_agent = create_agent_runner_fixture(
@@ -14,7 +16,6 @@ run_agent_idle = create_agent_runner_fixture(
     '../socs/agents/hwp_pid/agent.py', 'hwp_pid_agent', args=['--mode', 'init', '--log-dir', './logs/'])
 client = create_client_fixture('hwp-pid')
 hwp_emu = create_hwp_emulator_fixture(pid_port=2000, log_level=logging.DEBUG)
-
 
 
 @pytest.mark.integtest
