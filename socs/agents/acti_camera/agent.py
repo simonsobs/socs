@@ -184,7 +184,7 @@ def add_agent_args(parser=None):
     pgroup = parser.add_argument_group("Agent Options")
     pgroup.add_argument("--camera-addresses", nargs='+', type=str, help="List of camera IP addresses.")
     pgroup.add_argument("--locations", nargs='+', type=str, help="List of camera locations.")
-    pgroup.add_argument("--resolutions", nargs='+', type=str, 
+    pgroup.add_argument("--resolutions", nargs='+', type=str,
                         help="List of resolution and quality. Ex: N640x480,100 where 100 is quality %.")
     pgroup.add_argument("--user", help="Username of camera.")
     pgroup.add_argument("--password", help="Password of camera.")
