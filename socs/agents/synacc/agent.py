@@ -17,13 +17,18 @@ class SynaccessAgent:
         password(str): Password credential to login to device.
     """
 
-    def __init__(self, agent, ip_address, username, password):
+    def __init__(self, agent, ip_address, username, password, outlet_names=None):
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
         self.ip_address = ip_address
         self.user = username
         self.passw = password
+
+        if outlet_names is None:
+            self.outlet_names = ['outlet1', 'outlet2', 'outlet3', 'outlet4', 'outlet5']
+        else:
+            self.outlet_names = outlet_names
 
         agg_params = {'frame_length': 60}
         self.agent.register_feed(
@@ -138,11 +143,16 @@ class SynaccessAgent:
                 >>> response.session['data']
                 {"fields":
                     {synaccess:
-                        {0: 0 or 1, (0: OFF, 1:ON)
-                         1: 0 or 1, (0: OFF, 1:ON)
-                         2: 0 or 1, (0: OFF, 1:ON)
-                         3: 0 or 1, (0: OFF, 1:ON)
-                         4: 0 or 1, (0: OFF, 1:ON)
+                        {"0": {"status": 0 or 1, (0: OFF, 1:ON)
+                               "name": "outlet1"},
+                         "1": {"status": 0 or 1, (0: OFF, 1:ON)
+                               "name": "outlet2"},
+                         "2": {"status": 0 or 1, (0: OFF, 1:ON)
+                               "name": "outlet3"},
+                         "3": {"status": 0 or 1, (0: OFF, 1:ON)
+                               "name": "outlet4"},
+                         "4": {"status": 0 or 1, (0: OFF, 1:ON)
+                               "name": "outlet5"},
                         }
                     }
                 }
@@ -184,7 +194,8 @@ class SynaccessAgent:
                     else:
                         status = 0
                     data['data']['synaccess_%d' % i] = status
-                    status_dict['%d' % i] = status
+                    status_dict['%d' % i] = {'status': status}
+                    status_dict['%d' % i]['name'] = self.outlet_names[i]
                 self.agent.publish_to_feed('synaccess', data)
                 field_dict = {'synaccess': status_dict}
                 session.data['timestamp'] = current_time
@@ -217,6 +228,8 @@ def make_parser(parser=None):
     pgroup.add_argument('--ip-address', help='IP address for the device.')
     pgroup.add_argument('--username', help='Username credential to login to device.')
     pgroup.add_argument('--password', help='Password credential to login to device.')
+    pgroup.add_argument('--outlet-names', nargs='+', type=str,
+                        help="List of outlet names.")
     return parser
 
 
@@ -231,7 +244,8 @@ def main(args=None):
     p = SynaccessAgent(agent,
                        ip_address=args.ip_address,
                        username=args.username,
-                       password=args.password)
+                       password=args.password,
+                       outlet_names=args.outlet_names)
     agent.register_process('status_acq', p.status_acq,
                            p.stop_status_acq, startup=True)
     agent.register_task('get_status', p.get_status, startup={})
