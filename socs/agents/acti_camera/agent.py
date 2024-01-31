@@ -47,6 +47,10 @@ class ACTiCameraAgent:
         # Default resolution if none provided
         if resolutions is None:
             resolutions = ['N640x480,100'] * len(camera_addresses)
+        else:
+            for i in range(len(camera_addresses)):
+                if len(resolutions) <= i:
+                    resolutions.append('N640x480,100')
 
         self.cameras = []
         for (location, address, resolution) in (zip(locations, camera_addresses, resolutions)):
