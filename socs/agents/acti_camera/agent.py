@@ -38,16 +38,25 @@ class ACTiCameraAgent:
         txaio logger object, created by the OCSAgent
     """
 
-    def __init__(self, agent, camera_addresses, locations, user, password):
+    def __init__(self, agent, camera_addresses, locations, user, password, resolutions=None):
         self.agent = agent
         self.is_streaming = False
         self.log = self.agent.log
         self.lock = TimeoutLock()
 
+        # Default resolution if none provided
+        if resolutions is None:
+            resolutions = ['N640x480,100'] * len(camera_addresses)
+        else:
+            for i in range(len(camera_addresses)):
+                if len(resolutions) <= i:
+                    resolutions.append('N640x480,100')
+
         self.cameras = []
-        for (location, address) in (zip(locations, camera_addresses)):
+        for (location, address, resolution) in (zip(locations, camera_addresses, resolutions)):
             self.cameras.append({'location': location,
                                  'address': address,
+                                 'resolution': resolution,
                                  'connected': True})
         self.user = user
         self.password = password
@@ -100,7 +109,7 @@ class ACTiCameraAgent:
                 self.log.info(f"Grabbing screenshot from {camera['location']}")
                 payload = {'USER': self.user,
                            'PWD': self.password,
-                           'SNAPSHOT': 'N640x480,100'}
+                           'SNAPSHOT': camera['resolution']}
                 url = f"http://{camera['address']}/cgi-bin/encoder"
 
                 # Format directory and filename
@@ -179,6 +188,8 @@ def add_agent_args(parser=None):
     pgroup = parser.add_argument_group("Agent Options")
     pgroup.add_argument("--camera-addresses", nargs='+', type=str, help="List of camera IP addresses.")
     pgroup.add_argument("--locations", nargs='+', type=str, help="List of camera locations.")
+    pgroup.add_argument("--resolutions", nargs='+', type=str,
+                        help="List of resolution and quality. Ex: N640x480,100 where 100 is quality %.")
     pgroup.add_argument("--user", help="Username of camera.")
     pgroup.add_argument("--password", help="Password of camera.")
     pgroup.add_argument("--mode", choices=['acq', 'test'])
@@ -204,6 +215,7 @@ def main(args=None):
     p = ACTiCameraAgent(agent,
                         camera_addresses=args.camera_addresses,
                         locations=args.locations,
+                        resolutions=args.resolutions,
                         user=args.user,
                         password=args.password)
 
