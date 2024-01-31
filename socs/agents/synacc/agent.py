@@ -30,7 +30,7 @@ class SynaccessAgent:
         else:
             for i in range(5):
                 if len(outlet_names) <= i:
-                    outlet_names.append('outlet%i' % (i+1))
+                    outlet_names.append('outlet%i' % (i + 1))
             self.outlet_names = outlet_names
 
         agg_params = {'frame_length': 60}
