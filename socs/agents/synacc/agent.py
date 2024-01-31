@@ -28,6 +28,9 @@ class SynaccessAgent:
         if outlet_names is None:
             self.outlet_names = ['outlet1', 'outlet2', 'outlet3', 'outlet4', 'outlet5']
         else:
+            for i in range(5):
+                if len(outlet_names) <= i:
+                    outlet_names.append('outlet%i' % (i+1))
             self.outlet_names = outlet_names
 
         agg_params = {'frame_length': 60}
@@ -131,8 +134,8 @@ class SynaccessAgent:
                 return False, "Could not acquire lock"
 
     @ocs_agent.param('_')
-    def status_acq(self, session, params=None):
-        """status_acq()
+    def acq(self, session, params=None):
+        """acq()
 
         **Process** - Start data acquisition.
 
@@ -142,24 +145,22 @@ class SynaccessAgent:
 
                 >>> response.session['data']
                 {"fields":
-                    {synaccess:
-                        {"0": {"status": 0 or 1, (0: OFF, 1:ON)
-                               "name": "outlet1"},
-                         "1": {"status": 0 or 1, (0: OFF, 1:ON)
-                               "name": "outlet2"},
-                         "2": {"status": 0 or 1, (0: OFF, 1:ON)
-                               "name": "outlet3"},
-                         "3": {"status": 0 or 1, (0: OFF, 1:ON)
-                               "name": "outlet4"},
-                         "4": {"status": 0 or 1, (0: OFF, 1:ON)
-                               "name": "outlet5"},
-                        }
+                    {"0": {"status": 0 or 1, (0: OFF, 1:ON)
+                           "name": "outlet1"},
+                     "1": {"status": 0 or 1, (0: OFF, 1:ON)
+                           "name": "outlet2"},
+                     "2": {"status": 0 or 1, (0: OFF, 1:ON)
+                           "name": "outlet3"},
+                     "3": {"status": 0 or 1, (0: OFF, 1:ON)
+                           "name": "outlet4"},
+                     "4": {"status": 0 or 1, (0: OFF, 1:ON)
+                           "name": "outlet5"},
                     }
                 }
 
         """
 
-        with self.lock.acquire_timeout(timeout=3, job='status_acq')\
+        with self.lock.acquire_timeout(timeout=3, job='acq')\
                 as acquired:
             if not acquired:
                 self.log.warn(
@@ -197,9 +198,8 @@ class SynaccessAgent:
                     status_dict['%d' % i] = {'status': status}
                     status_dict['%d' % i]['name'] = self.outlet_names[i]
                 self.agent.publish_to_feed('synaccess', data)
-                field_dict = {'synaccess': status_dict}
                 session.data['timestamp'] = current_time
-                session.data['fields'] = field_dict
+                session.data['fields'] = status_dict
 
                 time.sleep(1)  # DAQ interval
                 # End of while loop
@@ -207,7 +207,7 @@ class SynaccessAgent:
         self.agent.feeds['synaccess'].flush_buffer()
         return True, 'Acqusition exited cleanly'
 
-    def stop_status_acq(self, session, params=None):
+    def stop_acq(self, session, params=None):
         if self.take_data:
             self.take_data = False
             return True, 'requested to stop taking data'
@@ -246,8 +246,8 @@ def main(args=None):
                        username=args.username,
                        password=args.password,
                        outlet_names=args.outlet_names)
-    agent.register_process('status_acq', p.status_acq,
-                           p.stop_status_acq, startup=True)
+    agent.register_process('acq', p.acq,
+                           p.stop_acq, startup=True)
     agent.register_task('get_status', p.get_status, startup={})
     agent.register_task('reboot', p.reboot)
     agent.register_task('set_outlet', p.set_outlet)
