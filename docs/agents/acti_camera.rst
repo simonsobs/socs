@@ -32,6 +32,7 @@ using all of the available arguments::
        'arguments': [['--mode', 'acq'],
                      ['--camera-addresses', ['10.10.10.41', '10.10.10.42', '10.10.10.43']],
                      ['--locations', ['location1', 'location2', 'location3']],
+                     ['--resolutions', ['N640x480,100', 'N640x480,100', 'N640x480,100']],
                      ['--user', 'admin'],
                      ['--password', 'password']]},
 
@@ -40,6 +41,8 @@ using all of the available arguments::
     of the cameras on the network.
     The ``--locations`` argument should be a list of names for camera locations.
     This should be in the same order as the list of IP addresses.
+    The ``--resolutions`` argument should be a list of resolutions for each camera.
+    For example, ``N640x480,100`` gives a 640x480 image with 100% quality.
 
 Docker Compose
 ``````````````
