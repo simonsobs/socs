@@ -254,6 +254,13 @@ class DeviceEmulator:
         while self._read:
             try:
                 msg = self._conn.recv(4096)
+                if not msg:
+                    # attempt to reconnect
+                    self.logger.info("Client disconnected, waiting for new connection")
+                    self._conn, client_address = self._sock.accept()
+                    self.logger.info(f"Client connection made from {client_address}")
+                    continue
+
             # Was seeing this on tests in the cryomech agent
             except ConnectionResetError:
                 self.logger.info('Caught connection reset on Agent clean up')
