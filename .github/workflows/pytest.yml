@@ -1,6 +1,7 @@
 name: Run Tests
 
 on:
+  push:
   pull_request:
     paths-ignore:
       - 'docs/**'
@@ -59,7 +60,7 @@ jobs:
     - name: Run integration tests
       working-directory: ./tests
       run: |
-        COVERAGE_FILE=.coverage.int python3 -m pytest --cov -m 'integtest'
+        COVERAGE_FILE=.coverage.int python3 -m pytest --cov -m 'integtest' integration/test_hwp_pmx_agent_integration.py -s -v
 
     # Coverage
     - name: Report test coverage
