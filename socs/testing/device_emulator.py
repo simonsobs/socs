@@ -1,4 +1,3 @@
-import logging
 import shutil
 import socket
 import subprocess
@@ -88,14 +87,6 @@ class DeviceEmulator:
         self._read = True
         self._conn = None
 
-        self.logger = logging.getLogger(self.__class__.__name__)
-        self.logger.setLevel(logging.DEBUG)
-        if len(self.logger.handlers) == 0:
-            formatter = logging.Formatter("%(name)s: %(message)s")
-            handler = logging.StreamHandler()
-            handler.setFormatter(formatter)
-            self.logger.addHandler(handler)
-
     @staticmethod
     def _setup_socat():
         """Setup a data relay with socat.
@@ -164,7 +155,7 @@ class DeviceEmulator:
             else:
                 response = self.responses[msg]
         except Exception as e:
-            self.logger.info(f"encountered error {e}")
+            print(f"encountered error {e}")
             response = None
 
         return response
@@ -181,7 +172,7 @@ class DeviceEmulator:
                 msg = self.ser.readline()
                 if self.encoding:
                     msg = msg.strip().decode(self.encoding)
-                self.logger.debug(f"msg='{msg}'")
+                print(f"msg='{msg}'")
 
                 response = self.get_response(msg)
 
@@ -192,7 +183,7 @@ class DeviceEmulator:
                 if response is None:
                     continue
 
-                self.logger.debug(f"response='{response}'")
+                print(f"response='{response}'")
                 if self.encoding:
                     response = (response + '\r\n').encode(self.encoding)
                 self.ser.write(response)
@@ -239,24 +230,24 @@ class DeviceEmulator:
                 self._sock.bind(('127.0.0.1', port))
                 self._sock_bound = True
             except OSError:
-                self.logger.error(f"Failed to bind to port {port}, trying again...")
+                print(f"Failed to bind to port {port}, trying again...")
                 time.sleep(1)
         self._sock.listen(1)
-        self.logger.info("Device emulator waiting for tcp client connection")
+        print("Device emulator waiting for tcp client connection")
         self._conn, client_address = self._sock.accept()
-        self.logger.info(f"Client connection made from {client_address}")
+        print(f"Client connection made from {client_address}")
 
         while self._read:
             try:
                 msg = self._conn.recv(4096)
             # Was seeing this on tests in the cryomech agent
             except ConnectionResetError:
-                self.logger.info('Caught connection reset on Agent clean up')
+                print('Caught connection reset on Agent clean up')
                 break
             if self.encoding:
                 msg = msg.strip().decode(self.encoding)
             if msg:
-                self.logger.debug(f"msg='{msg}'")
+                print(f"msg='{msg}'")
 
                 response = self.get_response(msg)
 
@@ -267,7 +258,7 @@ class DeviceEmulator:
                 if response is None:
                     continue
 
-                self.logger.debug(f"response='{response}'")
+                print(f"response='{response}'")
                 if self.encoding:
                     response = response.encode(self.encoding)
                 self._conn.sendall(response)
@@ -333,7 +324,7 @@ class DeviceEmulator:
             ``encoding=None``.
 
         """
-        self.logger.info(f"responses set to {responses}")
+        print(f"responses set to {responses}")
         self.responses = responses
-        self.logger.info(f"default response set to '{default_response}'")
+        print(f"default response set to '{default_response}'")
         self.default_response = default_response
