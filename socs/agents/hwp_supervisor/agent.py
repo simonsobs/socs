@@ -345,8 +345,8 @@ class ControlState:
             self.start_time = time.time()
         
         def encode(self):
-            d = asdict(self)
-            d['class'] = self.__class__.__name__
+            d = {'class': self.__class__.__name__}
+            d.update(asdict(self))
             return d
         
     @dataclass
@@ -480,8 +480,7 @@ class ControlState:
         start_time : float
             Time that the state was entered
         """
-        freq_tol: float = 0.05
-        freq_tol_duration: float = 20
+        success: bool = True
 
     @dataclass
     class Abort(Base):
@@ -520,7 +519,7 @@ class ControlAction:
             self.completed = True
         if isinstance(state, ControlState.Done):
             self.success = state.success
-    
+        
     def encode(self):
         """Encodes this as a dict"""
         return dict(
@@ -530,7 +529,25 @@ class ControlAction:
             cur_state=self.cur_state.encode(),
             state_history=[s.encode() for s in self.state_history],
         )
+    
+    def sleep_until_complete(self, session=None, dt=1):
+        """
+        Sleeps until the action is complete. 
 
+        Args
+        -----
+        session: OpSession, optional
+            If specified, this will set `session.data['action']` to the encoded
+            action on each iteration to keep session data up to date
+        dt: float, optional
+            Time to sleep between iterations.
+        """
+        while True:
+            if session is not None:
+                session.data.update({'action': self.encode()})
+            if self.completed:
+                return
+            time.sleep(dt)
 
 class ControlStateMachine:
     def __init__(self):
@@ -638,11 +655,7 @@ class ControlStateMachine:
                 self.run_and_validate(clients.pid.declare_freq,
                                       kwargs={'freq': 0})
                 self.run_and_validate(clients.pid.tune_freq)
-                self.action.set_state(ControlState.WaitForTargetFreq(
-                    target_freq=0,
-                    freq_tol=state.freq_tol,
-                    freq_tol_duration=state.freq_tol_duration,
-                ))
+                self.action.set_state(ControlState.Done(success=state.success))
 
             elif isinstance(state, ControlState.Brake):
                 init_quad = hwp_state.last_quad
@@ -651,14 +664,14 @@ class ControlStateMachine:
                 if init_quad is None or init_quad_time is None:
                     self.log.warn("Could not determine direction from Encoder agent")
                     self.log.warn("Setting PMX Off")
-                    self.action.set_state(ControlState.PmxOff())
+                    self.action.set_state(ControlState.PmxOff(success=False))
                     return
 
                 quad_last_updated = time.time() - init_quad_time
                 if quad_last_updated > 10.0:
                     self.log.warn(f"Quad has not been updated in last {quad_last_updated} sec")
                     self.log.warn("Setting PMX Off, since can't confirm direction")
-                    self.action.set_state(ControlState.PmxOff())
+                    self.action.set_state(ControlState.PmxOff(success=False))
                     return
 
                 self.run_and_validate(clients.pmx.ign_ext)
@@ -982,8 +995,8 @@ class HWPSupervisor:
             direction=d
         )
         action = self.control_state_machine.request_new_action(state)
-        session.data['action'] = action.encode()
-        return True, f"Set state to {state}"
+        action.sleep_until_complete(session=session)
+        return True, f"Completed with state: {action.cur_state}"
 
     @ocs_agent.param('voltage', type=float)
     @ocs_agent.param('direction', type=str, choices=['cw', 'ccw'], default='cw')
@@ -1010,8 +1023,8 @@ class HWPSupervisor:
             direction=d
         )
         action = self.control_state_machine.request_new_action(state)
-        session.data['action'] = action.encode()
-        return True, f"Set state to {state}"
+        action.sleep_until_complete(session=session)
+        return True, f"Completed with state: {action.cur_state}"
 
     @ocs_agent.param('freq_tol', type=float, default=0.05)
     @ocs_agent.param('freq_tol_duration', type=float, default=10)
@@ -1033,11 +1046,9 @@ class HWPSupervisor:
             freq_tol_duration=params['freq_tol_duration']
         )
         action = self.control_state_machine.request_new_action(state)
-        session.data['action'] = action
-        return True, f"Set state to {state}"
+        action.sleep_until_complete(session=session)
+        return True, f"Completed with state: {action.cur_state}"
 
-    @ocs_agent.param('freq_tol', type=float, default=None)
-    @ocs_agent.param('freq_tol_duration', type=float, default=None)
     def pmx_off(self, session, params):
         """pmx_off()
 
@@ -1049,11 +1060,11 @@ class HWPSupervisor:
                 kw[p] = params[p]
         state = ControlState.PmxOff(**kw)
         action = self.control_state_machine.request_new_action(state)
-        session.data['action'] = action.encode()
-        return True, f"Set state to {state}"
+        action.sleep_until_complete(session=session)
+        return True, f"Completed with state: {action.cur_state}"
 
     def abort_action(self, session, params):
-        """pmx_off()
+        """abort_action()
 
         **Task** - Sets the control state to turn off the PMX.
         """
@@ -1061,27 +1072,6 @@ class HWPSupervisor:
         action = self.control_state_machine.request_new_action(state)
         session.data['action'] = action.encode()
         return True, "Set state to idle"
-
-    @ocs_agent.param('action_id', type=int, default=None)
-    def get_action_data(self, session, params):
-        """get_action_data(action_id=None)
-
-        **Task** - Get data for a particular action id.
-
-        Args
-        -------
-        action_id : int, optional
-            Action id of action to get data for. If not given, will return data
-            for the current action.
-        """
-        if params['action_id'] is None:
-            action = self.control_state_machine.action
-        else:
-            for action in self.control_state_machine.action_history:
-                if action.action_id == params['action_id']:
-                    break
-        session.data['action'] = action.encode()
-        return True, "Action complete"
 
 
 def make_parser(parser=None):
@@ -1134,9 +1124,6 @@ def main(args=None):
     agent.register_task('brake', hwp.brake)
     agent.register_task('pmx_off', hwp.pmx_off)
     agent.register_task('abort_action', hwp.abort_action)
-    agent.register_task(
-        'get_action_data', hwp.get_action_data, blocking=False
-    )
 
     runner.run(agent, auto_reconnect=True)
 

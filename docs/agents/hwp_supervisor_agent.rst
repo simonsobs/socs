@@ -67,12 +67,88 @@ This agent has two main purposes:
 - Serve as a host for high-level HWP operations that require coordinated control
   of various HWP subsystems, such as "Begin rotating at 2 Hz"
 
-Right now only the first point is implemented, but operations can be added here
-as we need them.
+For the first point, the supervisor agent implements the ``monitor`` process,
+which monitors HWP-related to compile full state info for the HWP, and uses
+that to make a determination if the HWP should be shutdown.
 
-HWP subsystems should implement a ``monitor_shutdown`` process that uses the
-``get_op_data`` function to get the hwp-supervisor's session data, and check
-the ``action`` field to determine if shutdown should be initiated.
+For high-level control, the HWP supervisor implements a state machine that
+is used to perform complex actions with HWP agents that depend on the global
+
+Running actions
+`````````````````
+HWP supervisor actions such as ``pid_to_freq``, ``set_const_voltage``,
+``brake``, and ``pmx_off`` request that the corresponding is run by the main
+``spin_control`` process.  Control tasks like these will sleep until the
+corresponding action enters an end- state such as Done, Error, or Abort.
+
+You can run an action and make sure it is complete by running the task and
+waiting for it to complete. The session-data that is returned will contain the
+encoded action, including the state chain, and whether the action was successful
+or not. For example, to spin up to a particular frequency, you can run:
+
+.. code-block:: python
+
+    supervisor = OCSClient("hwp-supervisor")
+
+    result = supervisor.pid_to_freq(target_freq=2.0)
+    print(result.session['data']['action'])
+
+    >> {'action_id': 6,
+        'completed': True,
+        'cur_state': {'class': 'Done', 'msg': None, 'success': True},
+        'state_history': [{'class': 'PIDToFreq',
+                            'direction': '0',
+                            'freq_tol': 0.05,
+                            'freq_tol_duration': 10.0,
+                            'target_freq': 2.0},
+                          {'class': 'WaitForTargetFreq',
+                            'freq_tol': 0.05,
+                            'freq_tol_duration': 10.0,
+                            'freq_within_tol_start': 1706829677.7613404,
+                            'target_freq': 2.0},
+                      {'class': 'Done', 'msg': None, 'success': True}],
+          'success': True}
+
+To stop an action while its running, you can use the ``abort_action`` task, 
+which will set the state of the current action to ``Abort``, and put the
+supervisor into the Idle state.
+
+.. code-block:: python
+
+    supervisor = OCSClient("hwp-supervisor")
+
+    supervisor.pid_to_freq.start(target_freq=2.0)
+    supervisor.abort_action()
+    res1 = supervisor.pid_to_freq.wait()
+    res2 = supervisor.pmx_off()
+
+    print("Result 1:")
+    print(res1.session['data']['action'])
+    print("Result 2: ")
+    print(res2.session['data']['action'])
+
+    >> 
+    Result 1:
+    {'action_id': 1,
+    'completed': True,
+    'cur_state': {'class': 'Abort'},
+    'state_history': [{'class': 'PIDToFreq',
+                        'direction': '0',
+                        'freq_tol': 0.05,
+                        'freq_tol_duration': 10.0,
+                        'target_freq': 2.0},
+                      {'class': 'Abort'}],
+    'success': False}
+    Result 2: 
+    {'action_id': 3,
+    'completed': True,
+    'cur_state': {'class': 'Done', 'msg': None, 'success': True},
+    'state_history': [{'class': 'PmxOff', 'success': True},
+                      {'class': 'Done', 'msg': None, 'success': True}],
+    'success': True}
+
+
+
 
 
 Agent API
