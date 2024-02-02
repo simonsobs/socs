@@ -310,6 +310,10 @@ class DeviceEmulator:
         while not self._sock_bound:
             time.sleep(0.1)
 
+    def update_responses(self, responses):
+        self.responses.update(responses)
+        self.logger.info(f"responses set to {self.responses}")
+
     def define_responses(self, responses, default_response=None):
         """Define what responses are available to reply with on the configured
         communication relay.
