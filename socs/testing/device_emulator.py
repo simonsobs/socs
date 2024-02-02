@@ -4,6 +4,7 @@ import socket
 import subprocess
 import threading
 import time
+import traceback as tb
 
 import pytest
 import serial
@@ -165,6 +166,7 @@ class DeviceEmulator:
                 response = self.responses[msg]
         except Exception as e:
             self.logger.info(f"encountered error {e}")
+            self.logger.info(tb.format_exc())
             response = None
 
         return response
