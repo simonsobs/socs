@@ -92,7 +92,7 @@ class DeviceEmulator:
         self.logger = logging.getLogger(self.__class__.__name__)
         self.logger.setLevel(logging.DEBUG)
         if len(self.logger.handlers) == 0:
-            formatter = logging.Formatter("%(name)s: %(message)s")
+            formatter = logging.Formatter("%(asctime)s - %(name)s: %(message)s")
             handler = logging.StreamHandler()
             handler.setFormatter(formatter)
             self.logger.addHandler(handler)
