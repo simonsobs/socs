@@ -4,7 +4,7 @@ import threading
 import time
 import traceback
 from dataclasses import asdict, dataclass, field
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 import numpy as np
 import ocs
@@ -15,6 +15,7 @@ from ocs.ocs_client import OCSClient, OCSReply
 from ocs.ocs_twisted import Pacemaker
 
 
+client_cache = {}
 def get_op_data(agent_id, op_name, log=None, test_mode=False):
     """
     Process data from an agent operation, and formats it for the ``monitor``
@@ -78,7 +79,12 @@ def get_op_data(agent_id, op_name, log=None, test_mode=False):
     if 'SITE_HTTP' in os.environ:
         args += [f"--site-http={os.environ['SITE_HTTP']}"]
 
-    client = site_config.get_control_client(agent_id, args=args)
+    if agent_id in client_cache:
+        client = client_cache[agent_id]
+    else:
+        client = site_config.get_control_client(agent_id, args=args)
+        client_cache[agent_id] = client
+
     try:
         _, _, session = OCSReply(*client.request('status', op_name))
     except client_http.ControlClientError as e:
@@ -102,7 +108,32 @@ class HWPClients:
     pid: Optional[OCSClient] = None
     ups: Optional[OCSClient] = None
     lakeshore: Optional[OCSClient] = None
-    iboot: Optional[OCSClient] = None
+    gripper_iboot: Optional[OCSClient] = None
+    driver_iboot: Optional[OCSClient] = None
+
+
+@dataclass
+class IBootState:
+    instance_id: str
+    outlets: List[int]
+    outlet_state: Dict[int, Optional[int]] = None
+    op_data: Optional[Dict] = None
+
+    def __post_init__(self):
+        self.outlet_state = {o: None for o in self.outlets}
+        self.outlet_labels = {o: f'outletStatus_{o}' for o in self.outlets}
+
+    def update(self):
+        op = get_op_data(self.instance_id, 'acq', test_mode=False)
+        self.op_data = op
+        if op['status'] != 'ok':
+            self.outlet_state = {o: None for o in self.outlets}
+            return
+
+        self.outlet_state = {
+            outlet: op['data'][label]['status']
+            for outlet, label in self.outlet_labels.items()
+        }
 
 
 @dataclass
@@ -135,10 +166,21 @@ class HWPState:
     last_quad: Optional[float] = None
     last_quad_time: Optional[float] = None
 
-    iboot_outlet1: Optional[int] = None
-    iboot_outlet2: Optional[int] = None
-    iboot_outlet1_state: Optional[int] = None
-    iboot_outlet2_state: Optional[int] = None
+    gripper_iboot: Optional[IBootState] = None
+    driver_iboot: Optional[IBootState] = None
+
+    @classmethod
+    def from_args(cls, args: argparse.Namespace):
+        self = cls(
+            temp_field=args.ybco_temp_field,
+            temp_thresh=args.ybco_temp_thresh,
+            ups_minutes_remaining_thresh=args.ups_minutes_remaining_thresh,
+        )
+        if args.gripper_iboot_id is not None:
+            self.gripper_iboot = IBootState(args.gripper_iboot_id, args.gripper_iboot_outlets)
+        if args.driver_iboot_id is not None:
+            self.driver_iboot = IBootState(args.driver_iboot_id, args.driver_iboot_outlets)
+        return self
 
     def _update_from_keymap(self, op, keymap):
         if op['status'] != 'ok':
@@ -264,29 +306,6 @@ class HWPState:
 
         self.ups_last_connection_attempt = data['ups_connection']['last_attempt']
         self.ups_connected = data['ups_connection']['connected']
-
-    def update_iboot_state(self, op):
-        """
-        Updates state values from the IBoot acq operation results.
-
-        Args
-        -----
-        op : dict
-            Dict containing the operations (from get_op_data) from the IBoot
-            ``acq`` process
-        """
-        iboot_keymap = {
-            'iboot_outlet1_state': (f'outletStatus_{self.iboot_outlet1}', 'status'),
-            'iboot_outlet2_state': (f'outletStatus_{self.iboot_outlet2}', 'status'),
-        }
-
-        if op['status'] != 'ok':
-            for k in iboot_keymap:
-                setattr(self, k, None)
-            return
-
-        for k, f in iboot_keymap.items():
-            setattr(self, k, op['data'][f[0]][f[1]])
 
     @property
     def pmx_action(self):
@@ -790,17 +809,9 @@ class HWPSupervisor:
         self.hwp_pid_id = args.hwp_pid_id
         self.ups_id = args.ups_id
 
-        self.iboot_id = args.iboot_id
-        self.iboot_outlet1 = args.iboot_outlet1 - 1
-        self.iboot_outlet2 = args.iboot_outlet2 - 1
-
-        self.hwp_state = HWPState(
-            temp_field=self.ybco_temp_field,
-            temp_thresh=args.ybco_temp_thresh,
-            ups_minutes_remaining_thresh=args.ups_minutes_remaining_thresh,
-            iboot_outlet1=self.iboot_outlet1,
-            iboot_outlet2=self.iboot_outlet2,
-        )
+        self.hwp_state = HWPState.from_args(args)
+        self.gripper_iboot_id = args.gripper_iboot_id
+        self.driver_iboot_id = args.driver_iboot_id
         self.control_state_machine = ControlStateMachine()
         self.forward_is_cw = args.forward_dir == 'cw'
 
@@ -823,7 +834,8 @@ class HWPSupervisor:
             pid=get_client(self.hwp_pid_id),
             ups=get_client(self.ups_id),
             lakeshore=get_client(self.ybco_lakeshore_id),
-            iboot=get_client(self.iboot_id),
+            gripper_iboot=get_client(self.gripper_iboot_id),
+            driver_iboot=get_client(self.driver_iboot_id),
         )
 
     @ocs_agent.param('test_mode', type=bool, default=False)
@@ -902,7 +914,6 @@ class HWPSupervisor:
             pmx_op = get_op_data(self.hwp_pmx_id, 'acq', **kw)
             pid_op = get_op_data(self.hwp_pid_id, 'main', **kw)
             ups_op = get_op_data(self.ups_id, 'acq', **kw)
-            iboot_op = get_op_data(self.iboot_id, 'acq', **kw)
 
             session.data['monitored_sessions'] = {
                 'temperature': temp_op,
@@ -910,7 +921,6 @@ class HWPSupervisor:
                 'pmx': pmx_op,
                 'pid': pid_op,
                 'ups': ups_op,
-                'iboot': iboot_op
             }
 
             # gather state info
@@ -919,7 +929,12 @@ class HWPSupervisor:
             self.hwp_state.update_temp_state(temp_op)
             self.hwp_state.update_ups_state(ups_op)
             self.hwp_state.update_enc_state(enc_op)
-            self.hwp_state.update_iboot_state(iboot_op)
+
+            if self.hwp_state.driver_iboot is not None:
+                self.hwp_state.driver_iboot.update()
+            if self.hwp_state.gripper_iboot is not None:
+                self.hwp_state.gripper_iboot.update()
+
             session.data['hwp_state'] = asdict(self.hwp_state)
 
             # Get actions for each hwp subsystem
@@ -1054,11 +1069,7 @@ class HWPSupervisor:
 
         **Task** - Sets the control state to turn off the PMX.
         """
-        kw = {}
-        for p in ['freq_tol', 'freq_tol_duration']:
-            if params[p] is not None:
-                kw[p] = params[p]
-        state = ControlState.PmxOff(**kw)
+        state = ControlState.PmxOff()
         action = self.control_state_machine.request_new_action(state)
         action.sleep_until_complete(session=session)
         return True, f"Completed with state: {action.cur_state}"
@@ -1066,7 +1077,7 @@ class HWPSupervisor:
     def abort_action(self, session, params):
         """abort_action()
 
-        **Task** - Sets the control state to turn off the PMX.
+        **Task** - Aborts the current action, setting the control state to Idle
         """
         state = ControlState.Idle()
         action = self.control_state_machine.request_new_action(state)
@@ -1096,11 +1107,21 @@ def make_parser(parser=None):
     pgroup.add_argument('--ups-minutes-remaining-thresh', type=float,
                         help="Threshold for UPS minutes remaining before a "
                              "shutdown is triggered")
-    pgroup.add_argument('--iboot-id', help="Instance ID for IBoot-PDU agent")
-    pgroup.add_argument('--iboot-outlet1', type=int, default=1,
-                        help="IBoot-PDU outlet connected to gripper drive")
-    pgroup.add_argument('--iboot-outlet2', type=int, default=2,
-                        help="IBoot-PDU outlet connected to gripper control")
+
+    pgroup.add_argument(
+        '--driver-iboot-id', 
+        help="Instance ID for IBoot-PDU agent that powers the HWP Driver board")
+    pgroup.add_argument(
+        '--driver-iboot-outlets', nargs='+', type=int, 
+        help="Outlets for driver iboot power")
+
+    pgroup.add_argument(
+        '--gripper-iboot-id', 
+        help="Instance ID for IBoot-PDU agent that powers the gripper controller")
+    pgroup.add_argument(
+        '--gripper-iboot-outlets', nargs='+', type=int, 
+        help="Outlets for gripper iboot power")
+
     pgroup.add_argument('--forward-dir', choices=['cw', 'ccw'], default="cw",
                         help="Whether the PID 'forward' direction is cw or ccw")
     return parser
