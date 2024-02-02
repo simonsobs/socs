@@ -43,7 +43,6 @@ def test_hwp_rotation_set_off(wait_for_crossbar, kikusui_emu, run_agent, client)
     kikusui_emu.update_responses({
         'output 0': '', 'output?': '0',
     })
-    kikusui_emu.define_responses(responses)
     resp = client.set_off()
     print(resp)
     print(resp.session)
@@ -65,10 +64,9 @@ def test_hwp_rotation_set_on(wait_for_crossbar, kikusui_emu, run_agent, client):
 
 @pytest.mark.integtest
 def test_hwp_rotation_set_i(wait_for_crossbar, kikusui_emu, run_agent, client):
-    responses = default_responses.copy()
-    responses.update({'curr 1.000000': '',
-                      'curr?': '1.000000'})
-    kikusui_emu.define_responses(responses)
+    kikusui_emu.update_responses(
+        {'curr 1.000000': '', 'curr?': '1.000000'}
+    )
     resp = client.set_i(curr=1)
     print(resp)
     print(resp.session)
@@ -78,10 +76,8 @@ def test_hwp_rotation_set_i(wait_for_crossbar, kikusui_emu, run_agent, client):
 
 @pytest.mark.integtest
 def test_hwp_rotation_set_i_lim(wait_for_crossbar, kikusui_emu, run_agent, client):
-    responses = default_responses.copy()
-    responses.update({'curr:prot 2.000000': '',
-                      'curr:prot?': '2.000000'})
-    kikusui_emu.define_responses(responses)
+    kikusui_emu.update_responses(
+        {'curr:prot 2.000000': '', 'curr:prot?': '2.000000'})
     resp = client.set_i_lim(curr=2)
     print(resp)
     print(resp.session)
@@ -91,10 +87,8 @@ def test_hwp_rotation_set_i_lim(wait_for_crossbar, kikusui_emu, run_agent, clien
 
 @pytest.mark.integtest
 def test_hwp_rotation_set_v(wait_for_crossbar, kikusui_emu, run_agent, client):
-    responses = default_responses.copy()
-    responses.update({'volt 1.000000': '',
-                      'volt?': '1.000000'})
-    kikusui_emu.define_responses(responses)
+    kikusui_emu.update_responses(
+        {'volt 1.000000': '', 'volt?': '1.000000'})
     resp = client.set_v(volt=1)
     print(resp)
     print(resp.session)
@@ -104,12 +98,10 @@ def test_hwp_rotation_set_v(wait_for_crossbar, kikusui_emu, run_agent, client):
 
 @pytest.mark.integtest
 def test_hwp_rotation_set_v_lim(wait_for_crossbar, kikusui_emu, run_agent, client):
-    responses = default_responses.copy()
-    responses.update({
+    kikusui_emu.update_responses({
         'volt:prot 10.0': '',
         'volt:prot?': '10.000000'
     })
-    kikusui_emu.define_responses(responses)
     resp = client.set_v_lim(volt=10)
     print(resp)
     print(resp.session)
@@ -119,10 +111,10 @@ def test_hwp_rotation_set_v_lim(wait_for_crossbar, kikusui_emu, run_agent, clien
 
 @pytest.mark.integtest
 def test_hwp_rotation_use_ext(wait_for_crossbar, kikusui_emu, run_agent, client):
-    responses = default_responses.copy()
-    responses.update({'volt:ext:sour VOLT': '',
-                      'volt:ext:sour?': 'source_name'})
-    kikusui_emu.define_responses(responses)
+    kikusui_emu.update_responses({
+        'volt:ext:sour VOLT': '',
+        'volt:ext:sour?': 'source_name',
+    })
     resp = client.use_ext()
     print(resp)
     print(resp.session)
@@ -132,11 +124,10 @@ def test_hwp_rotation_use_ext(wait_for_crossbar, kikusui_emu, run_agent, client)
 
 @pytest.mark.integtest
 def test_hwp_rotation_ign_ext(wait_for_crossbar, kikusui_emu, run_agent, client):
-    responses = default_responses.copy()
-    responses.update({'volt:ext:sour NONE': '',
-                      'volt:ext:sour?': 'False'})
-    kikusui_emu.define_responses(responses)
-
+    kikusui_emu.update_responses({
+        'volt:ext:sour NONE': '',
+        'volt:ext:sour?': 'False',
+    })
     resp = client.ign_ext()
     print(resp)
     print(resp.session)

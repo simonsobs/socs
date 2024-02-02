@@ -5,6 +5,7 @@ import subprocess
 import threading
 import time
 import traceback as tb
+from copy import deepcopy
 
 import pytest
 import serial
@@ -82,7 +83,7 @@ class DeviceEmulator:
     """
 
     def __init__(self, responses, encoding='utf-8'):
-        self.responses = responses
+        self.responses = deepcopy(responses)
         self.default_response = None
         self.encoding = encoding
         self._type = None
@@ -341,6 +342,6 @@ class DeviceEmulator:
 
         """
         self.logger.info(f"responses set to {responses}")
-        self.responses = responses
+        self.responses = deepcopy(responses)
         self.logger.info(f"default response set to '{default_response}'")
         self.default_response = default_response
