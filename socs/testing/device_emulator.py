@@ -165,6 +165,7 @@ class DeviceEmulator:
             else:
                 response = self.responses[msg]
         except Exception as e:
+            self.logger.info(f"Responses: {self.responses}")
             self.logger.info(f"encountered error {e}")
             self.logger.info(tb.format_exc())
             response = None

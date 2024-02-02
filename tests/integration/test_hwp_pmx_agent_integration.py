@@ -45,9 +45,15 @@ def test_hwp_rotation_main(wait_for_crossbar, kikusui_emu, run_agent, client):
 
 @pytest.mark.integtest
 def test_hwp_rotation_set_off(wait_for_crossbar, kikusui_emu, run_agent, client):
-    responses = default_responses.copy()
+    # responses = default_responses.copy()
+    responses = {}
     responses.update({
-        'output 0': '', 'output?': '0'
+        'output 0': '', 'output?': '0',
+        'meas:volt?': '2',
+        'meas:curr?': '1',
+        ':system:error?': '+0,"No error"\n',
+        'stat:ques?': '0',
+        'volt:ext:sour?': 'source_name'
     })
     kikusui_emu.define_responses(responses)
     resp = client.set_off()
