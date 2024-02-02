@@ -4,7 +4,7 @@ HWP Emulation module
 import logging
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import pytest
 
@@ -39,8 +39,8 @@ class PIDState:
 class HWPState:
     """State of the HWP Emulator"""
     cur_freq: float = 0.0
-    pmx: PMXState = PMXState()
-    pid: PIDState = PIDState()
+    pmx: PMXState = field(default_factory=PMXState)
+    pid: PIDState = field(default_factory=PIDState)
     lock = threading.Lock()
 
 
