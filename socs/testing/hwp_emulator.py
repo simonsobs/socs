@@ -1,6 +1,7 @@
 """
 HWP Emulation module
 """
+import argparse
 import logging
 import threading
 import time

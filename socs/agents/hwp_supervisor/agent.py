@@ -4,7 +4,7 @@ import threading
 import time
 import traceback
 from dataclasses import asdict, dataclass, field
-from typing import Optional, List, Dict
+from typing import Dict, List, Optional
 
 import numpy as np
 import ocs
@@ -14,8 +14,9 @@ from ocs.client_http import ControlClientError
 from ocs.ocs_client import OCSClient, OCSReply
 from ocs.ocs_twisted import Pacemaker
 
-
 client_cache = {}
+
+
 def get_op_data(agent_id, op_name, log=None, test_mode=False):
     """
     Process data from an agent operation, and formats it for the ``monitor``
@@ -362,12 +363,12 @@ class ControlState:
         def __init__(self):
             super().__init__()
             self.start_time = time.time()
-        
+
         def encode(self):
             d = {'class': self.__class__.__name__}
             d.update(asdict(self))
             return d
-        
+
     @dataclass
     class Idle(Base):
         """Does nothing"""
@@ -506,7 +507,8 @@ class ControlState:
         """Abort current action"""
         pass
 
-    completed_states = ( Done, Error, Abort, Idle )
+    completed_states = (Done, Error, Abort, Idle)
+
 
 class ControlAction:
     """
@@ -526,7 +528,7 @@ class ControlAction:
         self.success = False
         self.state_history = []
         self.set_state(state)
-    
+
     def set_state(self, state: ControlState.Base):
         """
         Sets state for the current action. If this is a `completed_state`,
@@ -538,7 +540,7 @@ class ControlAction:
             self.completed = True
         if isinstance(state, ControlState.Done):
             self.success = state.success
-        
+
     def encode(self):
         """Encodes this as a dict"""
         return dict(
@@ -548,10 +550,10 @@ class ControlAction:
             cur_state=self.cur_state.encode(),
             state_history=[s.encode() for s in self.state_history],
         )
-    
+
     def sleep_until_complete(self, session=None, dt=1):
         """
-        Sleeps until the action is complete. 
+        Sleeps until the action is complete.
 
         Args
         -----
@@ -567,6 +569,7 @@ class ControlAction:
             if self.completed:
                 return
             time.sleep(dt)
+
 
 class ControlStateMachine:
     def __init__(self):
@@ -1109,17 +1112,17 @@ def make_parser(parser=None):
                              "shutdown is triggered")
 
     pgroup.add_argument(
-        '--driver-iboot-id', 
+        '--driver-iboot-id',
         help="Instance ID for IBoot-PDU agent that powers the HWP Driver board")
     pgroup.add_argument(
-        '--driver-iboot-outlets', nargs='+', type=int, 
+        '--driver-iboot-outlets', nargs='+', type=int,
         help="Outlets for driver iboot power")
 
     pgroup.add_argument(
-        '--gripper-iboot-id', 
+        '--gripper-iboot-id',
         help="Instance ID for IBoot-PDU agent that powers the gripper controller")
     pgroup.add_argument(
-        '--gripper-iboot-outlets', nargs='+', type=int, 
+        '--gripper-iboot-outlets', nargs='+', type=int,
         help="Outlets for gripper iboot power")
 
     pgroup.add_argument('--forward-dir', choices=['cw', 'ccw'], default="cw",

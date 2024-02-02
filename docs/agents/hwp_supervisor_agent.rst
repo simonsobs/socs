@@ -109,7 +109,7 @@ or not. For example, to spin up to a particular frequency, you can run:
                       {'class': 'Done', 'msg': None, 'success': True}],
           'success': True}
 
-To stop an action while its running, you can use the ``abort_action`` task, 
+To stop an action while its running, you can use the ``abort_action`` task,
 which will set the state of the current action to ``Abort``, and put the
 supervisor into the Idle state.
 
@@ -127,7 +127,7 @@ supervisor into the Idle state.
     print("Result 2: ")
     print(res2.session['data']['action'])
 
-    >> 
+    >>
     Result 1:
     {'action_id': 1,
     'completed': True,
@@ -139,7 +139,7 @@ supervisor into the Idle state.
                         'target_freq': 2.0},
                       {'class': 'Abort'}],
     'success': False}
-    Result 2: 
+    Result 2:
     {'action_id': 3,
     'completed': True,
     'cur_state': {'class': 'Done', 'msg': None, 'success': True},
