@@ -41,19 +41,6 @@ def test_hwp_rotation_main(wait_for_crossbar, kikusui_emu, run_agent, client):
     assert resp.session['success']
 
 
-@pytest.mark.integtest
-def test_hwp_rotation_set_on(wait_for_crossbar, kikusui_emu, run_agent, client):
-    responses = default_responses.copy()
-    responses.update({
-        'output 1': '',
-        'output?': '1'
-    })
-    kikusui_emu.define_responses(responses)
-    resp = client.set_on()
-    print(resp)
-    print(resp.session)
-    assert resp.status == ocs.OK
-    assert resp.session['success']
 
 
 @pytest.mark.integtest
@@ -64,6 +51,21 @@ def test_hwp_rotation_set_off(wait_for_crossbar, kikusui_emu, run_agent, client)
     })
     kikusui_emu.define_responses(responses)
     resp = client.set_off()
+    print(resp)
+    print(resp.session)
+    assert resp.status == ocs.OK
+    assert resp.session['success']
+
+
+@pytest.mark.integtest
+def test_hwp_rotation_set_on(wait_for_crossbar, kikusui_emu, run_agent, client):
+    responses = default_responses.copy()
+    responses.update({
+        'output 1': '',
+        'output?': '1'
+    })
+    kikusui_emu.define_responses(responses)
+    resp = client.set_on()
     print(resp)
     print(resp.session)
     assert resp.status == ocs.OK
