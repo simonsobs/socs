@@ -6,6 +6,7 @@ import threading
 import time
 import traceback as tb
 from copy import deepcopy
+from typing import Dict
 
 import pytest
 import serial
@@ -311,7 +312,15 @@ class DeviceEmulator:
         while not self._sock_bound:
             time.sleep(0.1)
 
-    def update_responses(self, responses):
+    def update_responses(self, responses: Dict):
+        """
+        Updates the current responses. See ``define_responses`` for more detail.
+
+        Args
+        ------
+        responses: dict
+            Dict of commands to use to update the current responses.
+        """
         self.responses.update(responses)
         self.logger.info(f"responses set to {self.responses}")
 
