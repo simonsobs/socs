@@ -316,7 +316,7 @@ class WiregridEncoderAgent:
                 }
                 session.data['timestamp'] = current_time
                 session.data['fields']['irig_data'] = irig_field_dict
-                session.data['fields']['enc_data'] = enc_field_dict
+                session.data['fields']['encoder_data'] = enc_field_dict
                 # End of loop
             # End of lock acquiring
 

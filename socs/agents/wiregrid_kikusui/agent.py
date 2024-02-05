@@ -169,7 +169,7 @@ class WiregridKikusuiAgent:
 
         try:
             position = (float)(
-                response.session['data']['fields']['enc_data']['reference_degree'][-1])
+                response.session['data']['fields']['encoder_data']['reference_degree'][-1])
         except Exception as e:
             self.log.warn(
                 'Failed to get encoder position | '
