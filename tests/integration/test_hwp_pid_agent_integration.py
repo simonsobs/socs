@@ -1,8 +1,8 @@
 import logging
+import time
 
 import ocs
 import pytest
-import time
 from integration.util import docker_compose_file  # noqa: F401
 from integration.util import create_crossbar_fixture
 from ocs.base import OpCode
@@ -17,6 +17,7 @@ run_agent_idle = create_agent_runner_fixture(
     '../socs/agents/hwp_pid/agent.py', 'hwp_pid_agent', args=['--mode', 'init', '--log-dir', './logs/'])
 client = create_client_fixture('hwp-pid')
 hwp_emu = create_hwp_emulator_fixture(pid_port=2000, log_level=logging.DEBUG)
+
 
 def wait_for_main(client):
     while True:
