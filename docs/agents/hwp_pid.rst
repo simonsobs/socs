@@ -25,8 +25,7 @@ An example site-config-file block::
       {'agent-class': 'HWPPIDAgent',
        'instance-id': 'hwp-pid',
        'arguments': [['--ip', '10.10.10.101'],
-                     ['--port', '2000'],
-                     ['--mode', 'acq']]},
+                     ['--port', '2000']]},
 
 Docker Compose
 ``````````````
