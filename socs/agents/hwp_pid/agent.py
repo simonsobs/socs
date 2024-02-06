@@ -223,6 +223,11 @@ class HWPPIDAgent:
         Parameters:
             freq (float): Desired HWP rotation frequency
 
+        Notes:
+            Session data is structured as follows::
+
+                >>> response.session['data']
+                {'declared_freq': 2.0}
         """
         action = Actions.DeclareFreq(**params)
         self.action_queue.put(action)
@@ -298,6 +303,14 @@ class HWPPIDAgent:
         """get_state()
 
         **Task** - Polls hardware for the current the PID state.
+
+        Notes:
+            Session data for this operation is as follows::
+
+                >>> response.session['data']
+                {'current_freq': 0,
+                 'target_freq': 0,
+                 'direction': 1}
         """
         action = Actions.GetState(**params)
         self.action_queue.put(action)
