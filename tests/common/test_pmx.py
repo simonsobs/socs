@@ -7,15 +7,17 @@ from socs.testing.device_emulator import create_device_emulator
 
 tcp_emulator = create_device_emulator({'ping': 'pong\r',
                                        'SYST:REM': 'test'},
-                                      'tcp', 19002)
+                                      'tcp', 0)  # bind to random port
 
 
 # Tried this as a fixture, but connections weren't cleaning up properly.
-def create_command():
+def create_command(emulator):
+    port = emulator._sock.getsockname()[1]  # get random port number
+
     # Connection might not work on first attempt
     for i in range(5):
         try:
-            pmx = PMX(tcp_ip='127.0.0.1', tcp_port=19002, timeout=0.1)
+            pmx = PMX(tcp_ip='127.0.0.1', tcp_port=port, timeout=0.1)
             cmd = Command(pmx)
             break
         except ConnectionRefusedError:
@@ -26,18 +28,18 @@ def create_command():
 
 @pytest.mark.integtest
 def test_pmx_create_command(tcp_emulator):
-    create_command()
+    create_command(tcp_emulator)
 
 
 @pytest.mark.integtest
 def test_pmx_destructor(tcp_emulator):
-    cmd = create_command()
+    cmd = create_command(tcp_emulator)
     del cmd
 
 
 @pytest.mark.integtest
 def test_pmx_cmd_on(tcp_emulator):
-    cmd = create_command()
+    cmd = create_command(tcp_emulator)
     tcp_emulator.define_responses({'OUTP ON': '',
                                    'OUTP?': 'on'})
 
@@ -46,7 +48,7 @@ def test_pmx_cmd_on(tcp_emulator):
 
 @pytest.mark.integtest
 def test_pmx_cmd_off(tcp_emulator):
-    cmd = create_command()
+    cmd = create_command(tcp_emulator)
     tcp_emulator.define_responses({'OUTP OFF': '',
                                    'OUTP?': 'off'})
 
@@ -55,7 +57,7 @@ def test_pmx_cmd_off(tcp_emulator):
 
 @pytest.mark.integtest
 def test_pmx_cmd_set_voltage(tcp_emulator):
-    cmd = create_command()
+    cmd = create_command(tcp_emulator)
     tcp_emulator.define_responses({'VOLT 1': '',
                                    'VOLT?': '1'})
 
@@ -64,7 +66,7 @@ def test_pmx_cmd_set_voltage(tcp_emulator):
 
 @pytest.mark.integtest
 def test_pmx_cmd_set_current(tcp_emulator):
-    cmd = create_command()
+    cmd = create_command(tcp_emulator)
     tcp_emulator.define_responses({'CURR 1': '',
                                    'CURR?': '1'})
 
@@ -73,7 +75,7 @@ def test_pmx_cmd_set_current(tcp_emulator):
 
 @pytest.mark.integtest
 def test_pmx_cmd_set_voltage_limit(tcp_emulator):
-    cmd = create_command()
+    cmd = create_command(tcp_emulator)
     tcp_emulator.define_responses({'VOLT:PROT 1': '',
                                    'VOLT:PROT?': '1'})
 
@@ -82,7 +84,7 @@ def test_pmx_cmd_set_voltage_limit(tcp_emulator):
 
 @pytest.mark.integtest
 def test_pmx_cmd_set_current_limit(tcp_emulator):
-    cmd = create_command()
+    cmd = create_command(tcp_emulator)
     tcp_emulator.define_responses({'CURR:PROT 1': '',
                                    'CURR:PROT?': '1'})
 
@@ -91,7 +93,7 @@ def test_pmx_cmd_set_current_limit(tcp_emulator):
 
 @pytest.mark.integtest
 def test_pmx_cmd_use_external_voltage(tcp_emulator):
-    cmd = create_command()
+    cmd = create_command(tcp_emulator)
     tcp_emulator.define_responses({'VOLT:EXT:SOUR VOLT': '',
                                    'VOLT:EXT:SOUR?': 'source_name'})
 
@@ -100,7 +102,7 @@ def test_pmx_cmd_use_external_voltage(tcp_emulator):
 
 @pytest.mark.integtest
 def test_pmx_cmd_ignore_external_voltage(tcp_emulator):
-    cmd = create_command()
+    cmd = create_command(tcp_emulator)
     tcp_emulator.define_responses({'VOLT:EXT:SOUR NONE': '',
                                    'VOLT:EXT:SOUR?': 'False'})
 
@@ -109,7 +111,7 @@ def test_pmx_cmd_ignore_external_voltage(tcp_emulator):
 
 @pytest.mark.integtest
 def test_pmx_cmd_check_voltage(tcp_emulator):
-    cmd = create_command()
+    cmd = create_command(tcp_emulator)
     tcp_emulator.define_responses({'MEAS:VOLT?': '1'})
 
     msg, val = cmd.user_input('V?')
@@ -118,7 +120,7 @@ def test_pmx_cmd_check_voltage(tcp_emulator):
 
 @pytest.mark.integtest
 def test_pmx_cmd_check_current(tcp_emulator):
-    cmd = create_command()
+    cmd = create_command(tcp_emulator)
     tcp_emulator.define_responses({'MEAS:CURR?': '1'})
 
     msg, val = cmd.user_input('C?')
@@ -127,7 +129,7 @@ def test_pmx_cmd_check_current(tcp_emulator):
 
 @pytest.mark.integtest
 def test_pmx_cmd_check_voltage_current(tcp_emulator):
-    cmd = create_command()
+    cmd = create_command(tcp_emulator)
     tcp_emulator.define_responses({'MEAS:VOLT?': '2',
                                    'MEAS:CURR?': '1'})
 
@@ -138,7 +140,7 @@ def test_pmx_cmd_check_voltage_current(tcp_emulator):
 
 @pytest.mark.integtest
 def test_pmx_cmd_check_output(tcp_emulator):
-    cmd = create_command()
+    cmd = create_command(tcp_emulator)
     tcp_emulator.define_responses({'OUTP?': '0'})
     msg, val = cmd.user_input('O?')
     assert val == 0
