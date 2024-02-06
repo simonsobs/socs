@@ -1,11 +1,94 @@
 import argparse
+import queue
 import time
 
+import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
-from twisted.internet import reactor
+from twisted.internet import defer, reactor, threads
+
+txaio.use_twisted()
+
+
+from dataclasses import dataclass
 
 import socs.agents.hwp_pid.drivers.pid_controller as pd
+
+
+def parse_action_result(res):
+    """
+    Parses the result of an action to ensure it is a dictionary so it can be
+    stored in session.data
+    """
+    if res is None:
+        return {}
+    elif isinstance(res, dict):
+        return res
+    else:
+        return {'result': res}
+
+
+def get_pid_state(pid: pd.PID):
+    return {
+        "current_freq": pid.get_freq(),
+        "target_freq": pid.get_target(),
+        "direction": pid.get_direction(),
+    }
+
+
+class Actions:
+    @dataclass
+    class BaseAction:
+        def __post_init__(self):
+            self.deferred = defer.Deferred()
+            self.log = txaio.make_logger()
+
+    @dataclass
+    class TuneStop(BaseAction):
+        def process(self, pid: pd.PID):
+            pid.tune_stop()
+
+    @dataclass
+    class TuneFreq(BaseAction):
+        def process(self, pid: pd.PID):
+            pid.tune_freq()
+
+    @dataclass
+    class DeclareFreq(BaseAction):
+        freq: float
+
+        def process(self, pid: pd.PID):
+            pid.declare_freq(self.freq)
+            return {"declared_freq": self.freq}
+
+    @dataclass
+    class SetPID(BaseAction):
+        p: float
+        i: int
+        d: float
+
+        def process(self, pid: pd.PID):
+            pid.set_pid([self.p, self.i, self.d])
+
+    @dataclass
+    class SetDirection(BaseAction):
+        direction: str
+
+        def process(self, pid: pd.PID):
+            pid.set_direction(self.direction)
+
+    @dataclass
+    class SetScale(BaseAction):
+        slope: float
+        offset: float
+
+        def process(self, pid: pd.PID):
+            pid.set_scale(self.slope, self.offset)
+
+    @dataclass
+    class GetState(BaseAction):
+        def process(self, pid: pd.PID):
+            return get_pid_state(pid)
 
 
 class HWPPIDAgent:
@@ -27,53 +110,81 @@ class HWPPIDAgent:
         self.ip = ip
         self.port = port
         self._verbosity = verbosity > 0
+        self.action_queue = queue.Queue()
 
-        agg_params = {'frame_length': 60}
-        self.agent.register_feed(
-            'hwppid', record=True, agg_params=agg_params)
+        agg_params = {"frame_length": 60}
+        self.agent.register_feed("hwppid", record=True, agg_params=agg_params)
 
-    @ocs_agent.param('auto_acquire', default=False, type=bool)
-    @ocs_agent.param('force', default=False, type=bool)
-    def init_connection(self, session, params):
-        """init_connection(auto_acquire=False, force=False)
+    def _get_data_and_publish(self, pid: pd.PID, session: ocs_agent.OpSession):
+        data = {"timestamp": time.time(), "block_name": "HWPPID", "data": {}}
 
-        **Task** - Initialize connection to PID
-        Controller.
+        pid_state = get_pid_state(pid)
+        data['data'].update(pid_state)
+        session.data.update(pid_state)
+        session.data['last_updated'] = time.time()
+        self.agent.publish_to_feed("hwppid", data)
 
-        Parameters:
-            auto_acquire (bool, optional): Default is False. Starts data
-                acquisition after initialization if True.
-            force (bool, optional): Force initialization, even if already
-                initialized. Defaults to False.
-
-        """
-        if self._initialized and not params['force']:
-            self.log.info("Connection already initialized. Returning...")
-            return True, "Connection already initialized"
-
-        with self.lock.acquire_timeout(10, job='init_connection') as acquired:
-            if not acquired:
-                self.log.warn(
-                    'Could not run init_connection because {} is already running'.format(self.lock.job))
-                return False, 'Could not acquire lock'
-
+    def _process_actions(self, pid):
+        while not self.action_queue.empty():
+            action = self.action_queue.get()
             try:
-                self.pid = pd.PID(ip=self.ip, port=self.port,
-                                  verb=self._verbosity)
-                self.log.info('Connected to PID controller')
-            except BrokenPipeError:
-                self.log.error('Could not establish connection to PID controller')
-                reactor.callFromThread(reactor.stop)
-                return False, 'Unable to connect to PID controller'
+                self.log.info(f"Running action {action}")
+                res = action.process(pid)
+                threads.blockingCallFromThread(
+                    reactor, action.deferred.callback, res
+                )
+            except Exception as e:
+                self.log.error(f"Error processing action: {action}")
+                threads.blockingCallFromThread(
+                    reactor, action.deferred.errback, e
+                )
 
-        self._initialized = True
+    def _clear_queue(self):
+        while not self.action_queue.empty():
+            action = self.action_queue.get()
+            action.deferred.errback(Exception("Action cancelled"))
 
-        # Start 'acq' Process if requested
-        if params['auto_acquire']:
-            self.agent.start('acq')
+    def main(self, session, params):
+        """main()
 
-        return True, 'Connection to PID controller established'
+        **Process** - Main Process for PID agent. Periodically queries PID
+            controller for data, and executes requested actions.
 
+        Notes:
+            The most recent data collected is stored in the session data in the
+            structure::
+
+                >>> response.session['data']
+                {'current_freq': 0,
+                 'target_freq': 0,
+                 'direction': 1,
+                 'last_updated': 1649085992.719602}
+        """
+        pid = pd.PID(ip=self.ip, port=self.port, verb=self._verbosity)
+        self.log.info("Connected to PID controller")
+
+        self._clear_queue()
+
+        sample_period = 5.0
+        last_sample = 0.0
+        session.set_status("running")
+        while session.status in ["starting", "running"]:
+            now = time.time()
+            if now - last_sample > sample_period:
+                self._get_data_and_publish(pid, session)
+                last_sample = now
+
+            self._process_actions(pid)
+            time.sleep(0.2)
+
+        return True, "Exited main process"
+
+    def _main_stop(self, session, params):
+        """Stop main process"""
+        session.set_status("stopping")
+        return True, "Set main status to stopping"
+
+    @defer.inlineCallbacks
     def tune_stop(self, session, params):
         """tune_stop()
 
@@ -81,16 +192,13 @@ class HWPPIDAgent:
         optimize the PID parameters for deceleration.
 
         """
-        with self.lock.acquire_timeout(3, job='tune_stop') as acquired:
-            if not acquired:
-                self.log.warn(
-                    'Could not tune stop because {} is already running'.format(self.lock.job))
-                return False, 'Could not acquire lock'
+        action = Actions.TuneStop(**params)
+        self.action_queue.put(action)
+        res = yield action.deferred
+        session.data = parse_action_result(res)
+        return True, f"Completed: {str(action)}"
 
-            self.pid.tune_stop()
-
-        return True, 'Reversing Direction'
-
+    @defer.inlineCallbacks
     def tune_freq(self, session, params):
         """tune_freq()
 
@@ -98,17 +206,14 @@ class HWPPIDAgent:
         and optimize the PID parameters for rotation.
 
         """
-        with self.lock.acquire_timeout(3, job='tune_freq') as acquired:
-            if not acquired:
-                self.log.warn(
-                    'Could not tune freq because {} is already running'.format(self.lock.job))
-                return False, 'Could not acquire lock'
+        action = Actions.TuneFreq(**params)
+        self.action_queue.put(action)
+        res = yield action.deferred
+        session.data = parse_action_result(res)
+        return True, f"Completed: {str(action)}"
 
-            self.pid.tune_freq()
-
-        return True, 'Tuning to setpoint'
-
-    @ocs_agent.param('freq', default=0., check=lambda x: 0. <= x <= 3.0)
+    @defer.inlineCallbacks
+    @ocs_agent.param("freq", default=0.0, check=lambda x: 0.0 <= x <= 3.0)
     def declare_freq(self, session, params):
         """declare_freq(freq=0)
 
@@ -118,20 +223,22 @@ class HWPPIDAgent:
         Parameters:
             freq (float): Desired HWP rotation frequency
 
+        Notes:
+            Session data is structured as follows::
+
+                >>> response.session['data']
+                {'declared_freq': 2.0}
         """
-        with self.lock.acquire_timeout(3, job='declare_freq') as acquired:
-            if not acquired:
-                self.log.warn(
-                    'Could not declare freq because {} is already running'.format(self.lock.job))
-                return False, 'Could not acquire lock'
+        action = Actions.DeclareFreq(**params)
+        self.action_queue.put(action)
+        res = yield action.deferred
+        session.data = parse_action_result(res)
+        return True, f"Completed: {str(action)}"
 
-            self.pid.declare_freq(params['freq'])
-
-        return True, 'Setpoint at {} Hz'.format(params['freq'])
-
-    @ocs_agent.param('p', default=0.2, type=float, check=lambda x: 0. < x <= 8.)
-    @ocs_agent.param('i', default=63, type=int, check=lambda x: 0 <= x <= 200)
-    @ocs_agent.param('d', default=0., type=float, check=lambda x: 0. <= x < 10.)
+    @defer.inlineCallbacks
+    @ocs_agent.param("p", default=0.2, type=float, check=lambda x: 0.0 < x <= 8.0)
+    @ocs_agent.param("i", default=63, type=int, check=lambda x: 0 <= x <= 200)
+    @ocs_agent.param("d", default=0.0, type=float, check=lambda x: 0.0 <= x < 10.0)
     def set_pid(self, session, params):
         """set_pid(p=0.2, i=63, d=0.)
 
@@ -143,76 +250,15 @@ class HWPPIDAgent:
             p (float): Proportional PID value
             i (int): Integral PID value
             d (float): Derivative PID value
-
         """
-        with self.lock.acquire_timeout(3, job='set_pid') as acquired:
-            if not acquired:
-                self.log.warn(
-                    'Could not set pid because {} is already running'.format(self.lock.job))
-                return False, 'Could not acquire lock'
+        action = Actions.SetPID(**params)
+        self.action_queue.put(action)
+        res = yield action.deferred
+        session.data = parse_action_result(res)
+        return True, f"Completed: {str(action)}"
 
-            self.pid.set_pid(
-                [params['p'], params['i'], params['d']])
-
-        return True, f"Set PID params to p: {params['p']}, i: {params['i']}, d: {params['d']}"
-
-    def get_freq(self, session, params):
-        """get_freq()
-
-        **Task** - Return the current HWP frequency as seen by the PID
-        controller.
-
-        """
-        with self.lock.acquire_timeout(3, job='get_freq') as acquired:
-            if not acquired:
-                self.log.warn(
-                    'Could not get freq because {} is already running'.format(self.lock.job))
-                return False, 'Could not acquire lock'
-
-            freq = self.pid.get_freq()
-            session.data = {
-                'freq': freq,
-                'timestamp': time.time(),
-            }
-
-        return True, 'Current frequency = {}'.format(freq)
-
-    def get_target(self, session, params):
-        """get_target()
-
-        **Task** - Return the target HWP frequency of the PID
-        controller.
-
-        """
-        with self.lock.acquire_timeout(3, job='get_target') as acquired:
-            if not acquired:
-                self.log.warn(
-                    'Could not get freq because {} is already running'.format(self.lock.job))
-                return False, 'Could not acquire lock'
-
-            freq = self.pid.get_target()
-
-        return True, 'Target frequency = {}'.format(freq)
-
-    def get_direction(self, session, params):
-        """get_direction()
-
-        **Task** - Return the current HWP tune direction as seen by the PID
-        controller.
-
-        """
-        with self.lock.acquire_timeout(3, job='get_direction') as acquired:
-            if not acquired:
-                self.log.warn(
-                    'Could not get freq because {} is already running'.format(self.lock.job))
-                return False, 'Could not acquire lock'
-
-            direction = self.pid.get_direction()
-            session.data = {'direction': direction}
-
-        return True, 'Current direction = {}'.format(['Forward', 'Reverse'][direction])
-
-    @ocs_agent.param('direction', type=str, default='0', choices=['0', '1'])
+    @defer.inlineCallbacks
+    @ocs_agent.param("direction", type=str, default="0", choices=["0", "1"])
     def set_direction(self, session, params):
         """set_direction(direction='0')
 
@@ -222,18 +268,17 @@ class HWPPIDAgent:
             direction (str): '0' for forward and '1' for reverse.
 
         """
-        with self.lock.acquire_timeout(3, job='set_direction') as acquired:
-            if not acquired:
-                self.log.warn(
-                    'Could not set direction because {} is already running'.format(self.lock.job))
-                return False, 'Could not acquire lock'
+        action = Actions.SetDirection(**params)
+        self.action_queue.put(action)
+        res = yield action.deferred
+        session.data = parse_action_result(res)
+        return True, f"Completed: {str(action)}"
 
-            self.pid.set_direction(params['direction'])
-
-        return True, 'Set direction'
-
-    @ocs_agent.param('slope', default=1., type=float, check=lambda x: -10. < x < 10.)
-    @ocs_agent.param('offset', default=0.1, type=float, check=lambda x: -10. < x < 10.)
+    @defer.inlineCallbacks
+    @ocs_agent.param("slope", default=1.0, type=float, check=lambda x: -10.0 < x < 10.0)
+    @ocs_agent.param(
+        "offset", default=0.1, type=float, check=lambda x: -10.0 < x < 10.0
+    )
     def set_scale(self, session, params):
         """set_scale(slope=1, offset=0.1)
 
@@ -247,87 +292,31 @@ class HWPPIDAgent:
                 voltage" relationship
 
         """
-        with self.lock.acquire_timeout(3, job='set_scale') as acquired:
-            if not acquired:
-                self.log.warn(
-                    'Could not set scale because {} is already running'.format(self.lock.job))
-                return False, 'Could not acquire lock'
+        action = Actions.SetScale(**params)
+        self.action_queue.put(action)
+        res = yield action.deferred
+        session.data = parse_action_result(res)
+        return True, f"Completed: {str(action)}"
 
-            self.pid.set_scale(params['slope'], params['offset'])
+    @defer.inlineCallbacks
+    def get_state(self, session, params):
+        """get_state()
 
-        return True, 'Set scale'
-
-    def acq(self, session, params):
-        """acq()
-
-        **Process** - Start PID data acquisition.
+        **Task** - Polls hardware for the current the PID state.
 
         Notes:
-            The most recent data collected is stored in the session data in the
-            structure::
+            Session data for this operation is as follows::
 
                 >>> response.session['data']
                 {'current_freq': 0,
                  'target_freq': 0,
-                 'direction': 1,
-                 'last_updated': 1649085992.719602}
-
+                 'direction': 1}
         """
-        with self.lock.acquire_timeout(timeout=10, job='acq') as acquired:
-            if not acquired:
-                self.log.warn('Could not start iv acq because {} is already running'
-                              .format(self.lock.job))
-                return False, 'Could not acquire lock'
-
-            session.set_status('running')
-            last_release = time.time()
-            self.take_data = True
-
-            while self.take_data:
-                # Relinquish sampling lock occasionally.
-                if time.time() - last_release > 1.:
-                    last_release = time.time()
-                    if not self.lock.release_and_acquire(timeout=10):
-                        self.log.warn(f"Failed to re-acquire sampling lock, "
-                                      f"currently held by {self.lock.job}.")
-                        continue
-
-                data = {'timestamp': time.time(),
-                        'block_name': 'HWPPID', 'data': {}}
-
-                try:
-                    current_freq = self.pid.get_freq()
-                    target_freq = self.pid.get_target()
-                    direction = self.pid.get_direction()
-
-                    data['data']['current_freq'] = current_freq
-                    data['data']['target_freq'] = target_freq
-                    data['data']['direction'] = direction
-                except BaseException:
-                    time.sleep(1)
-                    continue
-
-                self.agent.publish_to_feed('hwppid', data)
-
-                session.data = {'current_freq': current_freq,
-                                'target_freq': target_freq,
-                                'direction': direction,
-                                'last_updated': time.time()}
-
-                time.sleep(5)
-
-        self.agent.feeds['hwppid'].flush_buffer()
-        return True, 'Acqusition exited cleanly'
-
-    def _stop_acq(self, session, params):
-        """
-        Stop acq process.
-        """
-        if self.take_data:
-            self.take_data = False
-            return True, 'requested to stop taking data'
-
-        return False, 'acq is not currently running'
+        action = Actions.GetState(**params)
+        self.action_queue.put(action)
+        res = yield action.deferred
+        session.data = parse_action_result(res)
+        return True, f"Completed: {str(action)}"
 
 
 def make_parser(parser=None):
@@ -339,49 +328,44 @@ def make_parser(parser=None):
         parser = argparse.ArgumentParser()
 
     # Add options specific to this agent
-    pgroup = parser.add_argument_group('Agent Options')
-    pgroup.add_argument('--ip')
-    pgroup.add_argument('--port')
-    pgroup.add_argument('--verbose', '-v', action='count', default=0,
-                        help='PID Controller verbosity level.')
-    pgroup.add_argument('--mode', type=str, default='acq',
-                        choices=['init', 'acq'],
-                        help="Starting operation for the Agent.")
+    pgroup = parser.add_argument_group("Agent Options")
+    pgroup.add_argument("--ip")
+    pgroup.add_argument("--port")
+    pgroup.add_argument(
+        "--verbose",
+        "-v",
+        action="count",
+        default=0,
+        help="PID Controller verbosity level.",
+    )
+    pgroup.add_argument("--mode")
     return parser
 
 
 def main(args=None):
     parser = make_parser()
-    args = site_config.parse_args(agent_class='HWPPIDAgent',
-                                  parser=parser,
-                                  args=args)
-
-    init_params = False
-    if args.mode == 'init':
-        init_params = {'auto_acquire': False}
-    elif args.mode == 'acq':
-        init_params = {'auto_acquire': True}
+    args = site_config.parse_args(agent_class="HWPPIDAgent", parser=parser, args=args)
 
     agent, runner = ocs_agent.init_site_agent(args)
-    hwppid_agent = HWPPIDAgent(agent, ip=args.ip,
-                               port=args.port,
-                               verbosity=args.verbose)
-    agent.register_task('init_connection', hwppid_agent.init_connection,
-                        startup=init_params)
-    agent.register_process('acq', hwppid_agent.acq,
-                           hwppid_agent._stop_acq)
-    agent.register_task('tune_stop', hwppid_agent.tune_stop)
-    agent.register_task('tune_freq', hwppid_agent.tune_freq)
-    agent.register_task('declare_freq', hwppid_agent.declare_freq)
-    agent.register_task('set_pid', hwppid_agent.set_pid)
-    agent.register_task('get_freq', hwppid_agent.get_freq)
-    agent.register_task('get_target', hwppid_agent.get_target)
-    agent.register_task('get_direction', hwppid_agent.get_direction)
-    agent.register_task('set_direction', hwppid_agent.set_direction)
-    agent.register_task('set_scale', hwppid_agent.set_scale)
 
+    if args.mode is not None:
+        agent.log.warn("--mode agrument is deprecated.")
+
+    hwppid_agent = HWPPIDAgent(
+        agent, ip=args.ip, port=args.port, verbosity=args.verbose
+    )
+    agent.register_process(
+        "main", hwppid_agent.main, hwppid_agent._main_stop, startup=True
+    )
+    agent.register_task("tune_stop", hwppid_agent.tune_stop, blocking=False)
+    agent.register_task("tune_freq", hwppid_agent.tune_freq, blocking=False)
+    agent.register_task("declare_freq", hwppid_agent.declare_freq, blocking=False)
+    agent.register_task("set_pid", hwppid_agent.set_pid, blocking=False)
+    agent.register_task("set_direction", hwppid_agent.set_direction, blocking=False)
+    agent.register_task("set_scale", hwppid_agent.set_scale, blocking=False)
+    agent.register_task("get_state", hwppid_agent.get_state, blocking=False)
     runner.run(agent, auto_reconnect=True)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
