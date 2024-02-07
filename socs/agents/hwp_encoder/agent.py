@@ -391,13 +391,14 @@ class EncoderParser:
 
         Note:
            'data' structure:
-           (Please note that '150' below might be replaced by COUNTER_INFO_LENGTH)
+           (Please note that '120' below might be replaced by COUNTER_INFO_LENGTH)
            [0] Readout from the quadrature
-           [1-150] clock counts of 150 data points
-           [151-300] corresponding clock overflow of the 150 data points (each overflow count
+           [1] CPU level encoder packet count
+           [2-121] clock counts of 120 data points
+           [122-241] corresponding clock overflow of the 120 data points (each overflow count
            is equal to 2^16 clock counts)
-           [301-450] corresponding absolute number of the 150 data points ((1, 2, 3, etc ...)
-           or (150, 151, 152, etc ...) or (301, 302, 303, etc ...) etc ...)
+           [242-361] corresponding absolute number of the 120 data points ((1, 2, 3, etc ...)
+           or (120, 121, 122, etc ...) or (241, 242, 243, etc ...) etc ...)
 
            counter_queue structure:
            counter_queue = [[64 bit clock counts],
@@ -407,13 +408,13 @@ class EncoderParser:
         """
 
         # Convert the Encoder Packet structure into a numpy array
-        derter = np.array(struct.unpack('<' + 'I' + 'III' * COUNTER_INFO_LENGTH, data))
+        derter = np.array(struct.unpack('<' + 'I' + 'I' + 'III' * COUNTER_INFO_LENGTH, data))
 
         # self.quad_queue.append(derter[0].item()) # merged to counter_queue
-        self.counter_queue.append((derter[1:COUNTER_INFO_LENGTH + 1]
-                                   + (derter[COUNTER_INFO_LENGTH + 1:2 * COUNTER_INFO_LENGTH + 1] << 32),
-                                   derter[2 * COUNTER_INFO_LENGTH + 1:3 * COUNTER_INFO_LENGTH + 1],
-                                   derter[0].item(), time.time()))
+        self.counter_queue.append((derter[2:COUNTER_INFO_LENGTH + 2]
+                                   + (derter[COUNTER_INFO_LENGTH + 2:2 * COUNTER_INFO_LENGTH + 2] << 32),
+                                   derter[2 * COUNTER_INFO_LENGTH + 2:3 * COUNTER_INFO_LENGTH + 2],
+                                   derter[0].item(), derter[1].item(), time.time()))
 
     def parse_irig_info(self, data):
         """Method to parse the IRIG Packet and put them to the irig_queue
@@ -428,12 +429,13 @@ class EncoderParser:
            'data' structure:
            [0] clock count of the IRIG Packet which the UTC time corresponds to
            [1] overflow count of initial rising edge
-           [2] binary encoding of the second data
-           [3] binary encoding of the minute data
-           [4] binary encoding of the hour data
-           [5-11] additional IRIG information which we do mot use
-           [12-21] synchronization pulse clock counts
-           [22-31] overflow count at each synchronization pulse
+           [2] CPU level IRIG packet count
+           [3] binary encoding of the second data
+           [4] binary encoding of the minute data
+           [5] binary encoding of the hour data
+           [6-12] additional IRIG information which we do mot use
+           [13-22] synchronization pulse clock counts
+           [23-32] overflow count at each synchronization pulse
 
            irig_queue structure:
            irig_queue = [Packet clock count,
@@ -445,7 +447,7 @@ class EncoderParser:
         """
 
         # Convert the IRIG Packet structure into a numpy array
-        unpacked_data = struct.unpack('<L' + 'L' + 'L' * 10 + 'L' * 10 + 'L' * 10, data)
+        unpacked_data = struct.unpack('<L' + 'L' + 'L' + 'L' * 10 + 'L' * 10 + 'L' * 10, data)
 
         # Start of the packet clock count
         # overflow.append(unpacked_data[1])
@@ -453,20 +455,23 @@ class EncoderParser:
 
         rising_edge_time = unpacked_data[0] + (unpacked_data[1] << 32)
 
+        # CPUl level IRIG packet count
+        packet_count = unpacked_data[2]
+
         # Stores IRIG time data
-        irig_info = unpacked_data[2:12]
+        irig_info = unpacked_data[3:13]
 
         # Prints the time information and returns the current time in seconds
         irig_time = self.pretty_print_irig_info(irig_info, rising_edge_time)
 
         # Stores synch pulse clock counts accounting for overflow of 32 bit counter
-        synch_pulse_clock_times = (np.asarray(unpacked_data[12:22])
-                                   + (np.asarray(unpacked_data[22:32]) << 32)).tolist()
+        synch_pulse_clock_times = (np.asarray(unpacked_data[13:23])
+                                   + (np.asarray(unpacked_data[23:33]) << 32)).tolist()
 
         # self.irig_queue = [Packet clock count,Packet UTC time in sec,
         #                    [binary encoded IRIG data],[synch pulses clock counts],
         #                    [current system time]]
-        self.irig_queue.append((rising_edge_time, irig_time, irig_info,
+        self.irig_queue.append((rising_edge_time, packet_count, irig_time, irig_info,
                                 synch_pulse_clock_times, time.time()))
 
     def __del__(self):
@@ -520,6 +525,7 @@ class HWPBBBAgent:
         counter_index_list = []
         quad_list = []
         quad_counter_list = []
+        encoder_packet_count_list = []
         received_time_list = []
 
         with self.lock.acquire_timeout(timeout=0, job='acq') as acquired:
@@ -550,13 +556,15 @@ class HWPBBBAgent:
                 while len(self.parser.irig_queue):
                     irig_data = self.parser.irig_queue.popleft()
                     rising_edge_count = irig_data[0]
-                    irig_time = irig_data[1]
-                    irig_info = irig_data[2]
-                    synch_pulse_clock_counts = irig_data[3]
-                    sys_time = irig_data[4]
+                    irig_packet_count = irig_data[1]
+                    irig_time = irig_data[2]
+                    irig_info = irig_data[3]
+                    synch_pulse_clock_counts = irig_data[4]
+                    sys_time = irig_data[5]
                     data = {'timestamp': sys_time, 'block_name': 'HWPEncoder_irig', 'data': {}}
                     data['data']['irig_time'] = irig_time
                     data['data']['rising_edge_count'] = rising_edge_count
+                    data['data']['irig_packet_count'] = irig_packet_count
                     data['data']['irig_sec'] = de_irig(irig_info[0], 1)
                     data['data']['irig_min'] = de_irig(irig_info[1], 0)
                     data['data']['irig_hour'] = de_irig(irig_info[2], 0)
@@ -600,11 +608,13 @@ class HWPBBBAgent:
                     counter_index_list += counter_data[1].tolist()
 
                     quad_data = counter_data[2]
-                    sys_time = counter_data[3]
+                    encoder_packet_count = counter_data[3]
+                    sys_time = counter_data[4]
 
                     received_time_list.append(sys_time)
                     quad_list.append(quad_data)
                     quad_counter_list.append(counter_data[0][0])
+                    encoder_packet_count_list.append(encoder_packet_count)
                     ct = time.time()
 
                     if len(counter_list) >= NUM_ENCODER_TO_PUBLISH \
@@ -614,6 +624,7 @@ class HWPBBBAgent:
                         data = {'timestamps': [], 'block_name': 'HWPEncoder_quad', 'data': {}}
                         data['timestamps'] = received_time_list
                         data['data']['quad'] = quad_list
+                        data['data']['encoder_packet_count'] = encoder_packet_count_list
                         self.agent.publish_to_feed('HWPEncoder', data)
                         if quad_list:
                             self.last_quad = quad_list[-1]
