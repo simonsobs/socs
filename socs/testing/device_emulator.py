@@ -223,9 +223,8 @@ class DeviceEmulator:
             # print(out, err)
         if self._type == 'tcp':
             # print('shutting down background tcp relay')
-            if self._conn:
-                self._conn.close()
-                self._sock.close()
+            # wait for thread to clean up connection
+            self.bkg_read.join()
 
     def _read_socket(self, port):
         """Loop until shutdown, reading any commands sent over the relay.
@@ -303,10 +302,10 @@ class DeviceEmulator:
         """
         self._type = 'tcp'
         self._sock_bound = False
-        bkg_read = threading.Thread(name='background',
-                                    target=self._read_socket,
-                                    kwargs={'port': port})
-        bkg_read.start()
+        self.bkg_read = threading.Thread(name='background',
+                                         target=self._read_socket,
+                                         kwargs={'port': port})
+        self.bkg_read.start()
 
         # wait for socket to bind properly before returning
         while not self._sock_bound:
