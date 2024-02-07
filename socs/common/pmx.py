@@ -229,12 +229,20 @@ class PMX:
 
     def set_voltage_limit(self, val, silent=False):
         """Set the PMX voltage limit."""
+        print('DRIVER - before clean')
         self.clean_serial()
+        print('DRIVER - after clean')
+        print('DRIVER - before write VOLT:PROT')
         self.ser.write("VOLT:PROT %f\n\r" % (float(val)))
+        print('DRIVER - after write VOLT:PROT')
         self.wait()
+        print('DRIVER - before query VOLT:PROT')
         self.ser.write("VOLT:PROT?\n\r")
+        print('DRIVER - after query VOLT:PROT')
         self.wait()
+        print('DRIVER - before readline')
         val = self.ser.readline()
+        print('DRIVER - after readline')
         msg = "Voltage limit set = %.3f V" % (float(val))
         if silent is not True:
             print(msg)

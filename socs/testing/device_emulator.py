@@ -252,7 +252,10 @@ class DeviceEmulator:
 
         while self._read:
             try:
+                print('EMULATOR - before receive')
                 msg = self._conn.recv(4096)
+                print('EMULATOR - after receive')
+                print(f'EMULATOR - received {msg}')
             # Was seeing this on tests in the cryomech agent
             except ConnectionResetError:
                 self.logger.info('Caught connection reset on Agent clean up')
