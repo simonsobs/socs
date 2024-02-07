@@ -80,6 +80,7 @@ class DeviceEmulator:
         _read (bool): Used to stop the background reading of data recieved on
             the relay.
         _conn (socket.socket): TCP connection for use in 'tcp' relay.
+        _bkg_read (threading.Thread): Background thread for reading commands.
 
     """
 
@@ -90,6 +91,7 @@ class DeviceEmulator:
         self._type = None
         self._read = True
         self._conn = None
+        self._bkg_read = None
 
         self.logger = logging.getLogger(self.__class__.__name__)
         self.logger.setLevel(logging.DEBUG)
@@ -223,9 +225,8 @@ class DeviceEmulator:
             # print(out, err)
         if self._type == 'tcp':
             # print('shutting down background tcp relay')
-            if self._conn:
-                self._conn.close()
-                self._sock.close()
+            # wait for thread to clean up connection
+            self.bkg_read.join()
 
     def _read_socket(self, port):
         """Loop until shutdown, reading any commands sent over the relay.
@@ -303,10 +304,10 @@ class DeviceEmulator:
         """
         self._type = 'tcp'
         self._sock_bound = False
-        bkg_read = threading.Thread(name='background',
-                                    target=self._read_socket,
-                                    kwargs={'port': port})
-        bkg_read.start()
+        self._bkg_read = threading.Thread(name='background',
+                                          target=self._read_socket,
+                                          kwargs={'port': port})
+        self._bkg_read.start()
 
         # wait for socket to bind properly before returning
         while not self._sock_bound:
