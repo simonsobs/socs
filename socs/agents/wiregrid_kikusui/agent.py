@@ -41,7 +41,6 @@ class WiregridKikusuiAgent:
         self.encoder_agent = encoder_agent
         self.debug = debug
 
-        self.position_path = '/data/wg-data/position.log'
         self.debug_log_path = '/data/wg-data/action/'
 
         self.open_trial = 10
@@ -387,16 +386,12 @@ class WiregridKikusuiAgent:
             return True, \
                 'Get wire-grid rotation angle = {} deg'.format(angle)
 
-    @ocs_agent.param('storepath', default='/data/wg-data/action/', type=str)
-    def calibrate_wg(self, session, params):
-        """calibrate_wg(storepath='/data/wg-data/action/')
+    def calibrate_wg(self, session, params=None):
+        """calibrate_wg()
 
         **Task** - Run rotation-motor calibration for wire-grid.
 
-        Parameters:
-            storepath (str): Path for log file.
         """
-        storepath = params.get('storepath')
 
         with self.lock.acquire_timeout(timeout=5, job='calibrate_wg')\
                 as acquired:
@@ -406,7 +401,7 @@ class WiregridKikusuiAgent:
                               .format(self.lock.job))
                 return False, 'Could not acquire lock'
 
-            logfile = openlog(storepath)
+            logfile = openlog(self.debug_log_path)
 
             cycle = 1
             for i in range(11):
@@ -468,14 +463,18 @@ class WiregridKikusuiAgent:
             self.feedback_time = params.get(
                 'feedback_time', [0.181, 0.221, 0.251, 0.281, 0.301])
 
-            logfile = openlog(self.debug_log_path)
+            if self.debug:
+                logfile = openlog(self.debug_log_path)
+            else:
+                logfile = None
 
             for i in range(int(self.num_laps * 16.)):
                 self._move_next(
                     logfile, self.feedback_steps, self.feedback_time)
                 time.sleep(self.stopped_time)
 
-            logfile.close()
+            if self.debug:
+                logfile.close()
 
             return True, 'Step-wise rotation finished'
 
