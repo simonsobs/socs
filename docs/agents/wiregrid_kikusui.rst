@@ -56,16 +56,15 @@ An example docker-compose configuration::
         - INSTANCE_ID=wgkikusui
       volumes:
         - ${OCS_CONFIG_DIR}:/config:ro
-        - "<local directory to record log file>:/data/wg-data"
+        - "<local directory to record log file>:/data/wg-data/action"
 
 - Since the agent within the container needs to communicate with hardware on the
   host network you must use ``network_mode: "host"`` in your compose file.
 - To control the wire-grid rotation accurately,
-  the agent uses the output of the ``Wiregrid Encoder Agent``.
-  Therefore, mounting the volume of the ``ocs-wgencoder-agent`` is necessary.
+  the agent uses the OCS output of the ``Wiregrid Encoder Agent``.
 - For the ``calibration_wg()`` function and debug mode (assigned by ``--debug`` option),
   a directory path to log files should be assigned in the ``volumes`` section
-  (``/data/wg-data`` is the default path in the docker).
+  (``/data/wg-data/action`` is the path in the docker).
 
 
 Description
