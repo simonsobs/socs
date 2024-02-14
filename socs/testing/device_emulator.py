@@ -142,9 +142,9 @@ class DeviceEmulator:
             baudrate=57600,
             timeout=5,
         )
-        bkg_read = threading.Thread(name='background',
-                                    target=self._read_serial)
-        bkg_read.start()
+        self._bkg_read = threading.Thread(name='background',
+                                          target=self._read_serial)
+        self._bkg_read.start()
 
     def get_response(self, msg):
         """Determine the response to a given message.
@@ -206,6 +206,10 @@ class DeviceEmulator:
 
             time.sleep(0.01)
 
+        # clean up connection
+        self.proc.terminate()
+        out, err = self.proc.communicate()
+
     def __del__(self):
         self.shutdown()
 
@@ -217,16 +221,9 @@ class DeviceEmulator:
         """
         # print('shutting down background reading')
         self._read = False
-        time.sleep(1)
-        if self._type == 'serial':
-            # print('shutting down socat relay')
-            self.proc.terminate()
-            out, err = self.proc.communicate()
-            # print(out, err)
-        if self._type == 'tcp':
-            # print('shutting down background tcp relay')
-            # wait for thread to clean up connection
-            self.bkg_read.join()
+
+        # wait for thread to close connection
+        self._bkg_read.join()
 
     def _read_socket(self, port):
         """Loop until shutdown, reading any commands sent over the relay.
