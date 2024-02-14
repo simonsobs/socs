@@ -68,23 +68,43 @@ This agent has two main purposes:
   of various HWP subsystems, such as "Begin rotating at 2 Hz"
 
 For the first point, the supervisor agent implements the ``monitor`` process,
-which monitors HWP-related to compile full state info for the HWP, and uses
+which monitors HWP-related processes to compile full state info for the HWP, and uses
 that to make a determination if the HWP should be shutdown.
 
 For high-level control, the HWP supervisor implements a state machine that
-is used to perform complex actions with HWP agents that depend on the global
+is used to perform complex operations with HWP agents that depend on the global
+state of the HWP and related hardware.
 
-Running actions
-`````````````````
-HWP supervisor actions such as ``pid_to_freq``, ``set_const_voltage``,
-``brake``, and ``pmx_off`` request that the corresponding is run by the main
-``spin_control`` process.  Control tasks like these will sleep until the
-corresponding action enters an end- state such as Done, Error, or Abort.
+Control States and Actions
+`````````````````````````````
+In the context of the HWP supervisor state machine, a *Control State* is a python
+dataclass that contains data to dictate what the supervisor will do on each
+update call. For example, while in the ``WaitForTargetFreq`` state, the
+supervisor will do nothing until the HWP frequency is within tolerance of a
+specified freq for a specified period of time, at which point it will transition
+into the Done state.
 
-You can run an action and make sure it is complete by running the task and
-waiting for it to complete. The session-data that is returned will contain the
-encoded action, including the state chain, and whether the action was successful
-or not. For example, to spin up to a particular frequency, you can run:
+A *Control Action* is a user-requested operation, where a starting state can
+transition through any number of states before completing. The action object
+contains its current state, state history, completion status, and whether it
+considers itself successful. The action is considered "complete" when it
+transitions into a "completion state", which can be ``Done``, ``Error``,
+``Abort``, or ``Idle``, at which point no more state transitions will occur.
+In between update calls, a control action may be aborted by the state-machine,
+where the action will transition into the completed "Abort" state, and no further
+action will be taken.
+
+OCS agent operations are generally one-to-one with control actions, where each
+operation begins a new action, and sleeps until that action is complete.
+If an operation is started while there is already an action is in progress, the
+current action will be aborted at the next opportunity and replaced with the new
+requested action.  The ``abort_action`` task can be used to abort the current
+action without beginning a new one.
+
+Examples
+```````````
+Below is an example client script that runs the PID to freq operation, and waits
+until the target freq has been reached.
 
 .. code-block:: python
 
@@ -109,9 +129,10 @@ or not. For example, to spin up to a particular frequency, you can run:
                       {'class': 'Done', 'msg': None, 'success': True}],
           'success': True}
 
-To stop an action while its running, you can use the ``abort_action`` task,
-which will set the state of the current action to ``Abort``, and put the
-supervisor into the Idle state.
+Below is an example of a client script that starts to PID the HWP to 2 Hz, then
+aborts the PID action, and shuts off the PMX power supply. Note that the
+``abort_action`` here is technically redundant, since starting the new action
+would abort the active action in the same manner.
 
 .. code-block:: python
 
@@ -147,12 +168,11 @@ supervisor into the Idle state.
                       {'class': 'Done', 'msg': None, 'success': True}],
     'success': True}
 
-
-
-
-
 Agent API
 -----------
+
+.. autoclass:: socs.agents.hwp_supervisor.agent.ControlAction
+    :members:
 
 .. autoclass:: socs.agents.hwp_supervisor.agent.HWPSupervisor
     :members:

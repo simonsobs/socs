@@ -28,7 +28,9 @@ def create_device_emulator(responses, relay_type, port=9001, encoding='utf-8',
         encoding (str): Encoding for the messages and responses. See
             :func:`socs.testing.device_emulator.DeviceEmulator` for more
             details.
-
+        reconnect (bool): If True, on TCP client disconnect, the emulator will
+            listen for new incoming connections instead of quitting
+        
     Returns:
         function:
             A pytest fixture that creates a Device emulator of the specified
@@ -67,6 +69,8 @@ class DeviceEmulator:
             given encoding. No encoding is used if set to None. That can be
             useful if you need to use raw data from your hardware. Defaults
             to 'utf-8'.
+        reconnect (bool): If True, on TCP client disconnect, the emulator will
+            listen for new incoming connections instead of quitting
 
     Attributes:
         responses (dict): Current set of responses the DeviceEmulator would

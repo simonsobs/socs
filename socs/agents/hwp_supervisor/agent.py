@@ -963,6 +963,18 @@ class HWPSupervisor:
         **Process** - Process to manage the spin-state for HWP agents. This will
         issue commands to various HWP agents depending on the current control
         state.
+
+        Notes
+        --------
+
+        Example of ``session.data``::
+
+            >>> session['data'] 
+            {
+                'current_action': <Encoded action>,
+                'action_history': List[Encoded action]
+                'timestammp': <time.time()>
+            }
         """
         clients = self._get_hwp_clients()
 
@@ -1000,6 +1012,20 @@ class HWPSupervisor:
         freq_thresh_duration : float
             Duration (seconds) for which the HWP must be within ``freq_thresh`` of the
             ``target_freq`` to be considered successful.
+
+        Notes
+        --------
+
+        Example of ``session.data``::
+
+            >>> session['data'] 
+            {'action': 
+                {'action_id': 3,
+                'completed': True,
+                'cur_state': {'class': 'Done', 'msg': None, 'success': True},
+                'state_history': List[ConrolState],
+                'success': True}
+            }
         """
         if params['target_freq'] >= 0:
             d = '0' if self.forward_is_cw else '1'
@@ -1031,6 +1057,20 @@ class HWPSupervisor:
             Direction of the HWP. Must be one of ``cw`` or ``ccw``,
             corresponding to the clockwise and counter-clockwise directions of
             the HWP, as seen when looking at the cryostat from the sky.
+
+        Notes
+        --------
+
+        Example of ``session.data``::
+
+            >>> session['data'] 
+            {'action': 
+                {'action_id': 3,
+                'completed': True,
+                'cur_state': {'class': 'Done', 'msg': None, 'success': True},
+                'state_history': List[ConrolState],
+                'success': True}
+            }
         """
         if params['direction'] == 'cw':
             d = '0' if self.forward_is_cw else '1'
@@ -1058,6 +1098,20 @@ class HWPSupervisor:
         freq_thresh_duration : float
             Duration (seconds) for which the HWP must be within ``freq_thresh`` of the
             ``target_freq`` to be considered successful.
+
+        Notes
+        --------
+
+        Example of ``session.data``::
+
+            >>> session['data'] 
+            {'action': 
+                {'action_id': 3,
+                'completed': True,
+                'cur_state': {'class': 'Done', 'msg': None, 'success': True},
+                'state_history': List[ConrolState],
+                'success': True}
+            }
         """
         state = ControlState.Brake(
             freq_tol=params['freq_tol'],
@@ -1071,6 +1125,20 @@ class HWPSupervisor:
         """pmx_off()
 
         **Task** - Sets the control state to turn off the PMX.
+
+        Notes
+        --------
+
+        Example of ``session.data``::
+
+            >>> session['data'] 
+            {'action': 
+                {'action_id': 3,
+                'completed': True,
+                'cur_state': {'class': 'Done', 'msg': None, 'success': True},
+                'state_history': List[ConrolState],
+                'success': True}
+            }
         """
         state = ControlState.PmxOff()
         action = self.control_state_machine.request_new_action(state)
@@ -1081,6 +1149,20 @@ class HWPSupervisor:
         """abort_action()
 
         **Task** - Aborts the current action, setting the control state to Idle
+
+        Notes
+        --------
+
+        Example of ``session.data``::
+
+            >>> session['data'] 
+            {'action': 
+                {'action_id': 3,
+                'completed': True,
+                'cur_state': {'class': 'Idle'},
+                'state_history': List[ConrolState],
+                'success': False}
+            }
         """
         state = ControlState.Idle()
         action = self.control_state_machine.request_new_action(state)
