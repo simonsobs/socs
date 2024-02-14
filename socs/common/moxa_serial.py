@@ -77,6 +77,7 @@ class Serial_TCPServer(object):
         t0 = time.time()
         msg = ""
         timeout = self.gettimeout()
+        print(f'TIMEOUT IS {timeout}')
         while len(msg) < n:
             newtimeout = timeout - (time.time() - t0)
             if newtimeout <= 0.0:

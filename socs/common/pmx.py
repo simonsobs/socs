@@ -243,6 +243,7 @@ class PMX:
         print('DRIVER - before readline')
         val = self.ser.readline()
         print('DRIVER - after readline')
+        print(f'DRIVER - read "{val}"')
         msg = "Voltage limit set = %.3f V" % (float(val))
         if silent is not True:
             print(msg)
@@ -251,12 +252,21 @@ class PMX:
 
     def set_current_limit(self, val, silent=False):
         """Set the PMX current limit."""
+        print('DRIVER - before clean')
         self.clean_serial()
+        print('DRIVER - after clean')
+        print('DRIVER - before write CURR:PROT')
         self.ser.write("CURR:PROT %f\n\r" % (float(val)))
+        print('DRIVER - after write CURR:PROT')
         self.wait()
+        print('DRIVER - before query CURR:PROT')
         self.ser.write("CURR:PROT?\n\r")
+        print('DRIVER - after query CURR:PROT')
         self.wait()
+        print('DRIVER - before readline')
         val = self.ser.readline()
+        print('DRIVER - after readline')
+        print(f'DRIVER - read {val}')
         msg = "Current limit set = %.3f A\n" % (float(val))
         if silent is not True:
             print(msg)
