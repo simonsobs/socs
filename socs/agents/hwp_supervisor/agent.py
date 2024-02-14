@@ -969,7 +969,7 @@ class HWPSupervisor:
 
         Example of ``session.data``::
 
-            >>> session['data'] 
+            >>> session['data']
             {
                 'current_action': <Encoded action>,
                 'action_history': List[Encoded action]
@@ -1018,8 +1018,8 @@ class HWPSupervisor:
 
         Example of ``session.data``::
 
-            >>> session['data'] 
-            {'action': 
+            >>> session['data']
+            {'action':
                 {'action_id': 3,
                 'completed': True,
                 'cur_state': {'class': 'Done', 'msg': None, 'success': True},
@@ -1063,8 +1063,8 @@ class HWPSupervisor:
 
         Example of ``session.data``::
 
-            >>> session['data'] 
-            {'action': 
+            >>> session['data']
+            {'action':
                 {'action_id': 3,
                 'completed': True,
                 'cur_state': {'class': 'Done', 'msg': None, 'success': True},
@@ -1104,8 +1104,8 @@ class HWPSupervisor:
 
         Example of ``session.data``::
 
-            >>> session['data'] 
-            {'action': 
+            >>> session['data']
+            {'action':
                 {'action_id': 3,
                 'completed': True,
                 'cur_state': {'class': 'Done', 'msg': None, 'success': True},
@@ -1131,8 +1131,8 @@ class HWPSupervisor:
 
         Example of ``session.data``::
 
-            >>> session['data'] 
-            {'action': 
+            >>> session['data']
+            {'action':
                 {'action_id': 3,
                 'completed': True,
                 'cur_state': {'class': 'Done', 'msg': None, 'success': True},
@@ -1155,8 +1155,8 @@ class HWPSupervisor:
 
         Example of ``session.data``::
 
-            >>> session['data'] 
-            {'action': 
+            >>> session['data']
+            {'action':
                 {'action_id': 3,
                 'completed': True,
                 'cur_state': {'class': 'Idle'},

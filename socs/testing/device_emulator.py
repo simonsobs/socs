@@ -30,7 +30,7 @@ def create_device_emulator(responses, relay_type, port=9001, encoding='utf-8',
             details.
         reconnect (bool): If True, on TCP client disconnect, the emulator will
             listen for new incoming connections instead of quitting
-        
+
     Returns:
         function:
             A pytest fixture that creates a Device emulator of the specified
