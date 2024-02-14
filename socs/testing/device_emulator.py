@@ -278,6 +278,7 @@ class DeviceEmulator:
                 self.logger.debug(f"response='{response}'")
                 if self.encoding:
                     response = response.encode(self.encoding)
+                time.sleep(1)
                 self._conn.sendall(response)
 
             time.sleep(0.01)
