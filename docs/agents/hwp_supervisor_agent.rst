@@ -84,15 +84,15 @@ supervisor will do nothing until the HWP frequency is within tolerance of a
 specified freq for a specified period of time, at which point it will transition
 into the Done state.
 
-A *Control Action* is a user-requested operation, where a starting state can
-transition through any number of states before completing. The action object
-contains its current state, state history, completion status, and whether it
-considers itself successful. The action is considered "complete" when it
-transitions into a "completion state", which can be ``Done``, ``Error``,
-``Abort``, or ``Idle``, at which point no more state transitions will occur.
-In between update calls, a control action may be aborted by the state-machine,
-where the action will transition into the completed "Abort" state, and no further
-action will be taken.
+A *Control Action* is a user-requested operation, in which a starting control
+state is requested, that then transitions through any number of subsequent
+states before completing. The action object contains its current state, state
+history, completion status, and whether it considers itself successful. The
+action is considered "complete" when it transitions into a "completion state",
+which can be ``Done``, ``Error``, ``Abort``, or ``Idle``, at which point no more
+state transitions will occur.  In between update calls, a control action may be
+aborted by the state-machine, where the action will transition into the
+completed "Abort" state, and no further action will be taken.
 
 OCS agent operations are generally one-to-one with control actions, where each
 operation begins a new action, and sleeps until that action is complete.
