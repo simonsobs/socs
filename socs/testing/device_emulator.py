@@ -12,7 +12,8 @@ import pytest
 import serial
 
 
-def create_device_emulator(responses, relay_type, port=9001, encoding='utf-8'):
+def create_device_emulator(responses, relay_type, port=9001, encoding='utf-8',
+                           reconnect=False):
     """Create a device emulator fixture.
 
     This provides a device emulator that can be used to mock a device during
@@ -27,6 +28,8 @@ def create_device_emulator(responses, relay_type, port=9001, encoding='utf-8'):
         encoding (str): Encoding for the messages and responses. See
             :func:`socs.testing.device_emulator.DeviceEmulator` for more
             details.
+        reconnect (bool): If True, on TCP client disconnect, the emulator will
+            listen for new incoming connections instead of quitting
 
     Returns:
         function:
@@ -40,7 +43,7 @@ def create_device_emulator(responses, relay_type, port=9001, encoding='utf-8'):
 
     @pytest.fixture()
     def create_device():
-        device = DeviceEmulator(responses, encoding)
+        device = DeviceEmulator(responses, encoding, reconnect=reconnect)
 
         if relay_type == 'serial':
             device.create_serial_relay()
@@ -66,6 +69,8 @@ class DeviceEmulator:
             given encoding. No encoding is used if set to None. That can be
             useful if you need to use raw data from your hardware. Defaults
             to 'utf-8'.
+        reconnect (bool): If True, on TCP client disconnect, the emulator will
+            listen for new incoming connections instead of quitting
 
     Attributes:
         responses (dict): Current set of responses the DeviceEmulator would
@@ -83,10 +88,11 @@ class DeviceEmulator:
 
     """
 
-    def __init__(self, responses, encoding='utf-8'):
+    def __init__(self, responses, encoding='utf-8', reconnect=False):
         self.responses = deepcopy(responses)
         self.default_response = None
         self.encoding = encoding
+        self.reconnect = reconnect
         self._type = None
         self._read = True
         self._conn = None
@@ -254,6 +260,18 @@ class DeviceEmulator:
         while self._read:
             try:
                 msg = self._conn.recv(4096)
+                if not msg:
+                    self.logger.info("Client disconnected")
+                    if self.reconnect:
+                        self.logger.info("Waiting for new connection")
+                        # attempt to reconnect
+                        self._conn, client_address = self._sock.accept()
+                        self.logger.info(f"Client connection made from {client_address}")
+                        continue
+                    else:
+                        self.logger.info("Shutting down")
+                        break
+
             # Was seeing this on tests in the cryomech agent
             except ConnectionResetError:
                 self.logger.info('Caught connection reset on Agent clean up')

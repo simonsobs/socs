@@ -2,7 +2,7 @@ from socs.agents.hwp_pid.drivers.pid_controller import PID
 from socs.testing.device_emulator import create_device_emulator
 
 pid_emu = create_device_emulator(
-    {'*W02400000': 'W02\r'}, relay_type='tcp', port=3003)
+    {'*W02400000': 'W02\r'}, relay_type='tcp', port=3003, reconnect=False)
 
 
 def test_send_message(pid_emu):
