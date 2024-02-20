@@ -309,29 +309,6 @@ class HWPState:
         self.ups_last_connection_attempt = data['ups_connection']['last_attempt']
         self.ups_connected = data['ups_connection']['connected']
 
-    def update_iboot_state(self, op):
-        """
-        Updates state values from the IBoot acq operation results.
-
-        Args
-        -----
-        op : dict
-            Dict containing the operations (from get_op_data) from the IBoot
-            ``acq`` process
-        """
-        iboot_keymap = {
-            'iboot_outlet1_state': (f'outletStatus_{self.iboot_outlet1}', 'status'),
-            'iboot_outlet2_state': (f'outletStatus_{self.iboot_outlet2}', 'status'),
-        }
-
-        if op['status'] != 'ok':
-            for k in iboot_keymap:
-                setattr(self, k, None)
-            return
-
-        for k, f in iboot_keymap.items():
-            setattr(self, k, op['data'][f[0]][f[1]])
-
     @property
     def pmx_action(self):
         """
@@ -1100,7 +1077,6 @@ class HWPSupervisor:
             pmx_op = get_op_data(self.hwp_pmx_id, 'acq', **kw)
             pid_op = get_op_data(self.hwp_pid_id, 'main', **kw)
             ups_op = get_op_data(self.ups_id, 'acq', **kw)
-            iboot_op = get_op_data(self.iboot_id, 'acq', **kw)
 
             session.data['monitored_sessions'] = {
                 'temperature': temp_op,
