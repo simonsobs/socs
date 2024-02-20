@@ -1,6 +1,7 @@
 """
 HWP Emulation module
 """
+import argparse
 import logging
 import threading
 import time
@@ -105,6 +106,7 @@ class HWPEmulator:
             with s.lock:
                 if s.pmx.source == "volt":
                     s.cur_freq = lerp(s.cur_freq, s.pid.freq_setpoint, 0.3)
+            time.sleep(1)
 
     def process_pmx_msg(self, data):
         """Process messages for PMX emulator"""
@@ -214,7 +216,12 @@ def create_hwp_emulator_fixture(**kwargs):
 
 
 if __name__ == "__main__":
-    hwp_em = HWPEmulator()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--pid-port", type=int, default=5025)
+    parser.add_argument("--pmx-port", type=int, default=5026)
+    args = parser.parse_args()
+
+    hwp_em = HWPEmulator(pid_port=args.pid_port, pmx_port=args.pmx_port)
     try:
         hwp_em.start()
         while True:
