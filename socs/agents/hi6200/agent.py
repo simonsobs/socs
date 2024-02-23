@@ -92,8 +92,9 @@ class Hi6200Agent:
                     gross_weight = self.scale.read_scale_gross_weight()
                     net_weight = self.scale.read_scale_net_weight()
 
-                    # The above functions return None when an Attribute error is thrown.
-                    # If they did not return None and threw no errors, the data is good.
+                    # The above functions return None when an Attribute error
+                    # is thrown. If they did not return None and threw no
+                    # errors, the data is good.
                     if (gross_weight is not None) and (net_weight is not None):
                         data['data']["Gross"] = gross_weight
                         data['data']["Net"] = net_weight
@@ -101,14 +102,17 @@ class Hi6200Agent:
 
                 # Occurs when the scale disconnects.
                 except AttributeError as e:
-                    self.log.error(f"Connection with scale failed. Check that the scale is connected: {e}")
+                    self.log.error("Connection with scale failed. Check that "
+                                   + f"the scale is connected: {e}")
                     return False, "Monitoring weight failed"
 
                 except ValueError as e:
-                    self.log.error(f"Scale responded with an anomolous number, ignorning: {e}")
+                    self.log.error("Scale responded with an anomolous number, "
+                                   + f"ignorning: {e}")
 
                 except TypeError as e:
-                    self.log.error(f"Scale responded with 'None' and broke the hex decoding, trying again: {e}")
+                    self.log.error("Scale responded with 'None' and broke the "
+                                   + f"hex decoding, trying again: {e}")
 
         return True, "Finished monitoring weight"
 
