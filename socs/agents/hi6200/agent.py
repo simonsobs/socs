@@ -76,38 +76,38 @@ class Hi6200Agent:
 
             pm.sleep()
             with self.lock.acquire_timeout(1) as acquired:
-                if acquired:
-                    data = {
-                        'timestamp': time.time(),
-                        'block_name': 'weight',
-                        'data': {}
-                    }
-
-                    try:
-                        # Grab the gross and net weights from the scale.
-                        gross_weight = self.scale.read_scale_gross_weight()
-                        net_weight = self.scale.read_scale_net_weight()
-
-                        # The above functions return None when an Attribute error is thrown.
-                        # If they did not return None and threw no errors, the data is good.
-                        if (gross_weight is not None) and (net_weight is not None):
-                            data['data']["Gross"] = gross_weight
-                            data['data']["Net"] = net_weight
-                            self.agent.publish_to_feed('scale_output', data)
-
-                    # Occurs when the scale disconnects.
-                    except AttributeError as e:
-                        self.log.error(f"Connection with scale failed. Check that the scale is connected: {e}")
-                        return False, "Monitoring weight failed"
-
-                    except ValueError as e:
-                        self.log.error(f"Scale responded with an anomolous number, ignorning: {e}")
-
-                    except TypeError as e:
-                        self.log.error(f"Scale responded with 'None' and broke the hex decoding, trying again: {e}")
-
-                else:
+                if not acquired:
                     self.log.warn("Could not acquire in monitor_weight")
+                    return False, "Could not acquire lock."
+
+                data = {
+                    'timestamp': time.time(),
+                    'block_name': 'weight',
+                    'data': {}
+                }
+
+                try:
+                    # Grab the gross and net weights from the scale.
+                    gross_weight = self.scale.read_scale_gross_weight()
+                    net_weight = self.scale.read_scale_net_weight()
+
+                    # The above functions return None when an Attribute error is thrown.
+                    # If they did not return None and threw no errors, the data is good.
+                    if (gross_weight is not None) and (net_weight is not None):
+                        data['data']["Gross"] = gross_weight
+                        data['data']["Net"] = net_weight
+                        self.agent.publish_to_feed('scale_output', data)
+
+                # Occurs when the scale disconnects.
+                except AttributeError as e:
+                    self.log.error(f"Connection with scale failed. Check that the scale is connected: {e}")
+                    return False, "Monitoring weight failed"
+
+                except ValueError as e:
+                    self.log.error(f"Scale responded with an anomolous number, ignorning: {e}")
+
+                except TypeError as e:
+                    self.log.error(f"Scale responded with 'None' and broke the hex decoding, trying again: {e}")
 
         return True, "Finished monitoring weight"
 
