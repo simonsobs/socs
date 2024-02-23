@@ -1150,6 +1150,7 @@ def main(args=None):
     agent.register_task('bias_dets', controller.bias_dets)
     agent.register_task('take_iv', controller.take_iv)
     agent.register_task('take_bias_steps', controller.take_bias_steps)
+    agent.register_task('take_bias_waves', controller.take_bias_waves)
     agent.register_task('overbias_tes', controller.overbias_tes)
     agent.register_task('take_noise', controller.take_noise)
     agent.register_task('bias_dets', controller.bias_dets)
