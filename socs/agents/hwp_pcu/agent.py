@@ -75,10 +75,10 @@ class HWPPCUAgent:
             try:
                 self.log.info(f"Running action {action}")
                 res = process_action(action, PCU)
-                action.deferred.callback(res)
+                reactor.callFromThread(action.deferred.callback, res)
             except Exception as e:
                 self.log.error(f"Error processing action: {action}")
-                action.deferred.errback(e)
+                reactor.callFromThread(action.deferred.errback, e)
 
     def _get_and_publish_data(self, PCU: pcu.PCU, session):
         now = time.time()
