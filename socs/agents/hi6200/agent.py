@@ -47,7 +47,7 @@ class Hi6200Agent:
         **Task** - Initialize connection to the Hi 6200 Weight Sensor.
 
         """
-        with self.lock.acquire_timeout(0) as acquired:
+        with self.lock.acquire_timeout(0, job='init') as acquired:
             if not acquired:
                 return False, "Could not acquire lock"
 
@@ -75,9 +75,10 @@ class Hi6200Agent:
         while self.monitor:
 
             pm.sleep()
-            with self.lock.acquire_timeout(1) as acquired:
+            with self.lock.acquire_timeout(1, job='monitor_weight') as acquired:
                 if not acquired:
-                    self.log.warn("Could not acquire in monitor_weight")
+                    self.log.warn("Could not start monitor_weight because "
+                                  + f"{self.lock.job} is already running")
                     return False, "Could not acquire lock."
 
                 data = {
