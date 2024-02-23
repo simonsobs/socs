@@ -19,8 +19,8 @@ from ocs import ocs_agent, site_config
 from ocs.ocs_agent import log_formatter
 from ocs.ocs_twisted import TimeoutLock
 from sodetlib.det_config import DetConfig
-from sodetlib.operations import (bias_dets, bias_steps, bias_wave, iv, uxm_relock,
-                                 uxm_setup)
+from sodetlib.operations import (bias_dets, bias_steps, bias_wave, iv,
+                                 uxm_relock, uxm_setup)
 
 NBIASLINES = 12
 
@@ -729,7 +729,6 @@ class PysmurfController:
     @ocs_agent.param('kwargs', default=None)
     @ocs_agent.param('rfrac_range', default=(0.2, 0.9))
     @ocs_agent.param('tag', default=None)
-    
     def take_bias_steps(self, session, params):
         """take_bias_steps(kwargs=None, rfrac_range=(0.2, 0.9), tag=None)
 
@@ -834,15 +833,14 @@ class PysmurfController:
 
     @ocs_agent.param('bgs', default=None)
     @ocs_agent.param('kwargs', default=None)
-
     def take_bias_waves(self, session, params):
         """take_bias_waves(kwargs=None, rfrac_range=(0.2, 0.9), tag=None)
 
         **Task** - Takes bias_wave and saves the output filepath to the
         session data object. See the `sodetlib bias wave docs page
-        
+
         NEED TO CREATE DOCS PAGE AND INSERT HERE
-        
+
         for more information on bias wave and what kwargs can be passed in.
 
         Args
@@ -941,7 +939,6 @@ class PysmurfController:
 
     @ocs_agent.param('bgs', default=None)
     @ocs_agent.param('kwargs', default=None)
-  
     def overbias_tes(self, session, params):
         """overbias_tes(bgs=None, kwargs=None)
 
