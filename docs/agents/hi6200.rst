@@ -78,3 +78,10 @@ Below is an example client demonstrating full agent functionality.::
 
     #Stop Monitoring Weight
     scale.stop_monitoring.start()
+
+Supporting APIs
+---------------
+
+.. autoclass:: socs.agents.hi6200.drivers.Hi6200Interface
+    :members:
+    :noindex:
