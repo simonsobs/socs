@@ -398,10 +398,16 @@ class ControlState:
     
     @dataclass
     class CheckInitialRotation(Base):
+        """
+        In this state, will check if the HWP has started rotating. If it has not
+        started rotating in ``check_wait_time`` seconds, it will briefly turn on the PCU
+        to initiate rotation, before transitioning to the WaitForTargetFreq state.
+        """
         target_freq: float
         freq_tol: float
         freq_tol_duration: float
         direction: str
+        check_wait_time: float = 10.0
         start_time: float = field(default_factory=time.time)
 
     @dataclass
@@ -673,7 +679,7 @@ class ControlStateMachine:
                     ))
                     return
                 
-                if time.time() - state.start_time < 10:
+                if time.time() - state.start_time < state.check_wait_time:
                     return
 
                 time.sleep(5)
