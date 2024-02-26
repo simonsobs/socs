@@ -9,6 +9,7 @@ agents = {
     'FlowmeterAgent': {'module': 'socs.agents.ifm_sbn246_flowmeter.agent', 'entry_point': 'main'},
     'FTSAerotechAgent': {'module': 'socs.agents.fts_aerotech.agent', 'entry_point': 'main'},
     'GeneratorAgent': {'module': 'socs.agents.generator.agent', 'entry_point': 'main'},
+    'Hi6200Agent': {'module': 'socs.agents.hi6200.agent', 'entry_point': 'main'},
     'HWPBBBAgent': {'module': 'socs.agents.hwp_encoder.agent', 'entry_point': 'main'},
     'HWPGripperAgent': {'module': 'socs.agents.hwp_gripper.agent', 'entry_point': 'main'},
     'HWPPCUAgent': {'module': 'socs.agents.hwp_pcu.agent', 'entry_point': 'main'},
