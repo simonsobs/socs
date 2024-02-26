@@ -1273,7 +1273,6 @@ def make_parser(parser=None):
 
 
 def main(args=None):
-    print("HEREEE")
     parser = make_parser()
     args = site_config.parse_args(agent_class='HWPSupervisor',
                                   parser=parser,
