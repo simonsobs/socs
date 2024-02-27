@@ -407,7 +407,7 @@ class ControlState:
         freq_tol: float
         freq_tol_duration: float
         direction: str
-        check_wait_time: float = 10.0
+        check_wait_time: float = 15.0
         start_time: float = field(default_factory=time.time)
 
     @dataclass
@@ -682,7 +682,6 @@ class ControlStateMachine:
                 if time.time() - state.start_time < state.check_wait_time:
                     return
 
-                time.sleep(5)
                 if int(state.direction) == 1: #Reverse
                     self.run_and_validate(
                         clients.pcu.send_command,
@@ -1142,7 +1141,7 @@ class HWPSupervisor:
     @ocs_agent.param('freq_tol_duration', type=float, default=10)
     @ocs_agent.param('brake_voltage', type=float, default=10.)
     def brake(self, session, params):
-        """brake(freq_thresh=0.05, freq_thresh_duration=10)
+        """brake(freq_thresh=0.05, freq_thresh_duration=10, brake_voltage=10)
 
         **Task** - Sets the control state to brake the HWP.
 
