@@ -710,6 +710,11 @@ class ControlStateMachine:
                 self.log.info("pid state: {data}", data=data)
                 return data
 
+            def query_pid_state():
+                data = self.run_and_validate(clients.pid.get_state)['data']
+                self.log.info("pid state: {data}", data=data)
+                return data
+
             if isinstance(state, ControlState.PIDToFreq):
                 self.run_and_validate(clients.pid.set_direction,
                                       kwargs={'direction': state.direction})
