@@ -111,6 +111,7 @@ class HWPClients:
     lakeshore: Optional[OCSClient] = None
     gripper_iboot: Optional[OCSClient] = None
     driver_iboot: Optional[OCSClient] = None
+    pcu: Optional[OCSClient] = None
 
 
 @dataclass
@@ -396,6 +397,20 @@ class ControlState:
         freq_tol_duration: float
 
     @dataclass
+    class CheckInitialRotation(Base):
+        """
+        In this state, will check if the HWP has started rotating. If it has not
+        started rotating in ``check_wait_time`` seconds, it will briefly turn on the PCU
+        to initiate rotation, before transitioning to the WaitForTargetFreq state.
+        """
+        target_freq: float
+        freq_tol: float
+        freq_tol_duration: float
+        direction: str
+        check_wait_time: float = 15.0
+        start_time: float = field(default_factory=time.time)
+
+    @dataclass
     class WaitForTargetFreq(Base):
         """
         Wait until HWP reaches its target frequency before transitioning to
@@ -419,6 +434,8 @@ class ControlState:
         freq_tol: float
         freq_tol_duration: float
         freq_within_tol_start: Optional[float] = None
+        direction: str = ''
+        _pcu_enabled: bool = field(init=False, default=False)
 
     @dataclass
     class ConstVolt(Base):
@@ -474,6 +491,7 @@ class ControlState:
         """
         freq_tol: float
         freq_tol_duration: float
+        brake_voltage: float
 
     @dataclass
     class WaitForBrake(Base):
@@ -482,12 +500,8 @@ class ControlState:
 
         min_freq : float
             Frequency (Hz) below which the PMX should be shut off.
-        init_quad : float
-            Initial quadrature reading while the HWP is spinning.  This is used
-            to determine if the HWP has reversed direction.
         """
         min_freq: float
-        init_quad: float
         prev_freq: float = None
 
     @dataclass
@@ -527,6 +541,7 @@ class ControlAction:
         self.completed = False
         self.success = False
         self.state_history = []
+        self.log = txaio.make_logger()  # pylint: disable=E1101
         self.set_state(state)
 
     def set_state(self, state: ControlState.Base):
@@ -536,6 +551,7 @@ class ControlAction:
         """
         self.state_history.append(state)
         self.cur_state = state
+        self.log.info(f"Setting state: {state}")
         if isinstance(state, ControlState.completed_states):
             self.completed = True
         if isinstance(state, ControlState.Done):
@@ -579,7 +595,7 @@ class ControlStateMachine:
         self.log = txaio.make_logger()  # pylint: disable=E1101
         self.lock = threading.Lock()
 
-    def run_and_validate(self, op, kwargs=None, timeout=10, log=None):
+    def run_and_validate(self, op, kwargs=None, timeout=30, log=None):
         """
         Runs an OCS Operation, and validates that it was successful.
 
@@ -599,6 +615,8 @@ class ControlStateMachine:
             kwargs = {}
 
         status, msg, session = op.start(**kwargs)
+        self.log.info("Starting op: name={name}, kwargs={kw}",
+                      name=session.get('op_name'), kw=kwargs)
 
         if status == ocs.ERROR:
             raise ControlClientError("op-start returned Error:\n  msg: " + msg)
@@ -626,6 +644,11 @@ class ControlStateMachine:
             self.lock.acquire()
             state = self.action.cur_state
 
+            def query_pid_state():
+                data = self.run_and_validate(clients.pid.get_state)['data']
+                self.log.info("pid state: {data}", data=data)
+                return data
+
             if isinstance(state, ControlState.PIDToFreq):
                 self.run_and_validate(clients.pid.set_direction,
                                       kwargs={'direction': state.direction})
@@ -633,13 +656,52 @@ class ControlStateMachine:
                                       kwargs={'freq': state.target_freq})
                 self.run_and_validate(clients.pmx.use_ext)
                 self.run_and_validate(clients.pmx.set_on)
-                self.run_and_validate(clients.pid.tune_freq)
-                #  kwargs={'freq': state.target_freq})
+                self.run_and_validate(clients.pid.tune_freq, timeout=60)
+                self.run_and_validate(
+                    clients.pcu.send_command,
+                    kwargs={'command': 'off'}, timeout=None,
+                )
+                self.action.set_state(ControlState.CheckInitialRotation(
+                    target_freq=state.target_freq,
+                    freq_tol=state.freq_tol,
+                    freq_tol_duration=state.freq_tol_duration,
+                    direction=state.direction,
+                ))
 
+            if isinstance(state, ControlState.CheckInitialRotation):
+                fhwp = hwp_state.enc_freq
+                if fhwp >= 0.2:
+                    self.action.set_state(ControlState.WaitForTargetFreq(
+                        target_freq=state.target_freq,
+                        freq_tol=state.freq_tol,
+                        freq_tol_duration=state.freq_tol_duration,
+                        direction=state.direction,
+                    ))
+                    return
+
+                if time.time() - state.start_time < state.check_wait_time:
+                    return
+
+                if int(state.direction) == 1:  # Reverse
+                    self.run_and_validate(
+                        clients.pcu.send_command,
+                        kwargs={'command': 'on_1'}, timeout=None
+                    )
+                else:
+                    self.run_and_validate(
+                        clients.pcu.send_command,
+                        kwargs={'command': 'on_2'}, timeout=None
+                    )
+                time.sleep(3)
+                self.run_and_validate(
+                    clients.pcu.send_command,
+                    kwargs={'command': 'off'}, timeout=None
+                )
                 self.action.set_state(ControlState.WaitForTargetFreq(
                     target_freq=state.target_freq,
                     freq_tol=state.freq_tol,
-                    freq_tol_duration=state.freq_tol_duration
+                    freq_tol_duration=state.freq_tol_duration,
+                    direction=state.direction,
                 ))
 
             elif isinstance(state, ControlState.WaitForTargetFreq):
@@ -647,6 +709,22 @@ class ControlStateMachine:
                 # This will make sure we remain within the frequency threshold for
                 # ``self.freq_tol_duration`` seconds before switching to DONE
                 f = hwp_state.pid_current_freq
+
+                # Enable pcu if spinning up faster than 1.5 Hz
+                if state.target_freq > 1.5 and f > 1.0 and not state._pcu_enabled:
+                    self.log.info("Enabling PCU")
+                    if int(state.direction) == 1:  # Reverse
+                        self.run_and_validate(
+                            clients.pcu.send_command,
+                            kwargs={'command': 'on_1'}, timeout=None
+                        )
+                    else:
+                        self.run_and_validate(
+                            clients.pcu.send_command,
+                            kwargs={'command': 'on_2'}, timeout=None
+                        )
+                    state._pcu_enabled = True
+
                 if f is None:
                     state.freq_within_tol_start = None
                     return
@@ -677,79 +755,52 @@ class ControlStateMachine:
                 self.run_and_validate(clients.pid.declare_freq,
                                       kwargs={'freq': 0})
                 self.run_and_validate(clients.pid.tune_freq)
+                self.run_and_validate(
+                    clients.pcu.send_command,
+                    kwargs={'command': 'stop'}, timeout=None
+                )
                 self.action.set_state(ControlState.Done(success=state.success))
 
             elif isinstance(state, ControlState.Brake):
-                init_quad = hwp_state.last_quad
-                init_quad_time = hwp_state.last_quad_time
+                self.run_and_validate(
+                    clients.pcu.send_command,
+                    kwargs={'command': 'off'}, timeout=None
+                )
 
-                if init_quad is None or init_quad_time is None:
-                    self.log.warn("Could not determine direction from Encoder agent")
-                    self.log.warn("Setting PMX Off")
-                    self.action.set_state(ControlState.PmxOff(success=False))
-                    return
-
-                quad_last_updated = time.time() - init_quad_time
-                if quad_last_updated > 10.0:
-                    self.log.warn(f"Quad has not been updated in last {quad_last_updated} sec")
-                    self.log.warn("Setting PMX Off, since can't confirm direction")
-                    self.action.set_state(ControlState.PmxOff(success=False))
-                    return
-
-                self.run_and_validate(clients.pmx.ign_ext)
+                # Flip PID direciton and tune stop
+                pid_dir = int(query_pid_state()['direction'])
+                new_d = '0' if (pid_dir == 1) else '1'
+                self.run_and_validate(clients.pid.set_direction,
+                                      kwargs=dict(direction=new_d))
                 self.run_and_validate(clients.pid.tune_stop)
-                # self.run_and_validate(clients.pmx.set_on)
-                self.run_and_validate(clients.pmx.set_v, kwargs={'volt': 30.0})
+                self.run_and_validate(clients.pmx.set_on)
 
-                f0 = hwp_state.enc_freq
-                time.sleep(2)
-                f1 = hwp_state.enc_freq
-                if (f1 - f0) > 0:
-                    self.log.warn("HWP is speeding up!! Reversing direction")
-                    new_d = '0' if (hwp_state.pid_direction == '1') else '1'
-                    self.run_and_validate(clients.pid.set_direction,
-                                          kwargs=dict(direction=new_d))
+                self.run_and_validate(clients.pmx.set_v, kwargs={'volt': state.brake_voltage})
+                self.run_and_validate(clients.pmx.ign_ext)
 
+                time.sleep(10)
                 self.action.set_state(ControlState.WaitForBrake(
-                    init_quad=init_quad,
                     min_freq=0.5,
-                    prev_freq=hwp_state.enc_freq
+                    prev_freq=hwp_state.enc_freq,
                 ))
 
             elif isinstance(state, ControlState.WaitForBrake):
-                quad = hwp_state.last_quad
-                quad_time = hwp_state.last_quad_time
-                freq = hwp_state.enc_freq
-
-                if quad is None or quad_time is None:
-                    self.log.warn("Could not determine direction from Encoder agent")
-                    self.log.warn("Setting PMX Off")
-                    self.action.set_state(ControlState.PmxOff())
-                    return
-
-                quad_last_updated = time.time() - quad_time
-                if quad_last_updated > 10.0:
-                    self.log.warn(f"Quad has not been updated in last {quad_last_updated} sec")
-                    self.log.warn("Setting PMX Off, since can't confirm direction")
-                    self.action.set_state(ControlState.PmxOff())
-                    return
-
-                if freq - state.prev_freq > 0:
-                    self.log.warn("HWP Freq is increasing! Setting PMX Off")
-                    self.action.set_state(ControlState.PmxOff())
-                    return
-
-                quad_diff = np.abs(quad - state.init_quad)
-                if freq < state.min_freq or quad_diff > 0.1:
+                f0 = query_pid_state()['current_freq']
+                time.sleep(5)
+                f1 = query_pid_state()['current_freq']
+                if f0 < 0.5 or (f1 > f0):
+                    self.log.info("Turning off PMX and putting PCU in stop mode")
                     self.run_and_validate(clients.pmx.set_off)
+                    self.run_and_validate(
+                        clients.pcu.send_command,
+                        kwargs={'command': 'stop'}, timeout=None
+                    )
                     self.action.set_state(ControlState.WaitForTargetFreq(
                         target_freq=0,
-                        freq_tol=0.1,
-                        freq_tol_duration=10,
+                        freq_tol=0.05,
+                        freq_tol_duration=30,
                     ))
-
-                state.prev_freq = freq
-                return
+                    return
 
         except Exception:
             tb = traceback.format_exc()
@@ -835,6 +886,7 @@ class HWPSupervisor:
             encoder=get_client(self.hwp_encoder_id),
             pmx=get_client(self.hwp_pmx_id),
             pid=get_client(self.hwp_pid_id),
+            pcu=get_client(self.args.hwp_pcu_id),
             ups=get_client(self.ups_id),
             lakeshore=get_client(self.ybco_lakeshore_id),
             gripper_iboot=get_client(self.gripper_iboot_id),
@@ -1086,8 +1138,9 @@ class HWPSupervisor:
 
     @ocs_agent.param('freq_tol', type=float, default=0.05)
     @ocs_agent.param('freq_tol_duration', type=float, default=10)
+    @ocs_agent.param('brake_voltage', type=float, default=10.)
     def brake(self, session, params):
-        """brake(freq_thresh=0.05, freq_thresh_duration=10)
+        """brake(freq_thresh=0.05, freq_thresh_duration=10, brake_voltage=10)
 
         **Task** - Sets the control state to brake the HWP.
 
@@ -1098,6 +1151,8 @@ class HWPSupervisor:
         freq_thresh_duration : float
             Duration (seconds) for which the HWP must be within ``freq_thresh`` of the
             ``target_freq`` to be considered successful.
+        brake_voltage: float
+            Voltage to use when braking the HWP.
 
         Notes
         --------
@@ -1115,7 +1170,8 @@ class HWPSupervisor:
         """
         state = ControlState.Brake(
             freq_tol=params['freq_tol'],
-            freq_tol_duration=params['freq_tol_duration']
+            freq_tol_duration=params['freq_tol_duration'],
+            brake_voltage=params['brake_voltage'],
         )
         action = self.control_state_machine.request_new_action(state)
         action.sleep_until_complete(session=session)
@@ -1188,6 +1244,8 @@ def make_parser(parser=None):
                         help="Instance ID for HWP pmx agent")
     pgroup.add_argument('--hwp-pid-id',
                         help="Instance ID for HWP pid agent")
+    pgroup.add_argument('--hwp-pcu-id',
+                        help="Instance ID for HWP PCU agent")
     pgroup.add_argument('--ups-id', help="Instance ID for UPS agent")
     pgroup.add_argument('--ups-minutes-remaining-thresh', type=float,
                         help="Threshold for UPS minutes remaining before a "
