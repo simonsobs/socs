@@ -395,7 +395,7 @@ class ControlState:
         direction: str
         freq_tol: float
         freq_tol_duration: float
-    
+
     @dataclass
     class CheckInitialRotation(Base):
         """
@@ -678,11 +678,11 @@ class ControlStateMachine:
                         direction=state.direction,
                     ))
                     return
-                
+
                 if time.time() - state.start_time < state.check_wait_time:
                     return
 
-                if int(state.direction) == 1: #Reverse
+                if int(state.direction) == 1:  # Reverse
                     self.run_and_validate(
                         clients.pcu.send_command,
                         kwargs={'command': 'on_1'}, timeout=None
@@ -713,7 +713,7 @@ class ControlStateMachine:
                 # Enable pcu if spinning up faster than 1.5 Hz
                 if state.target_freq > 1.5 and f > 1.0 and not state._pcu_enabled:
                     self.log.info("Enabling PCU")
-                    if int(state.direction) == 1: #Reverse
+                    if int(state.direction) == 1:  # Reverse
                         self.run_and_validate(
                             clients.pcu.send_command,
                             kwargs={'command': 'on_1'}, timeout=None
@@ -766,7 +766,6 @@ class ControlStateMachine:
                     clients.pcu.send_command,
                     kwargs={'command': 'off'}, timeout=None
                 )
-
 
                 # Flip PID direciton and tune stop
                 pid_dir = int(query_pid_state()['direction'])
