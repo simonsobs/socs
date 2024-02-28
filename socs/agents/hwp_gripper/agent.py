@@ -170,7 +170,7 @@ class HWPGripperAgent:
 
     @ocs_agent.param('mode', default='push', type=str, choices=['push', 'pos'])
     @ocs_agent.param('actuator', default=1, type=int, check=lambda x: 1 <= x <= 3)
-    @ocs_agent.param('distance', default=0, type=float, check=lambda x: -10. <= x <= 10.)
+    @ocs_agent.param('distance', default=0, type=float)
     def move(self, session, params=None):
         """move(mode='push', actuator=1, distance=0)
 
