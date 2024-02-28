@@ -15,9 +15,11 @@ class SynaccessAgent:
         ip_address(str): IP address for the device.
         username(str): Username credential to login to device.
         password(str): Password credential to login to device.
+        outlet_names(list of str): List of outlet names.
+        num_outlets(int): Number of outlets for device.
     """
 
-    def __init__(self, agent, ip_address, username, password, outlet_names=None):
+    def __init__(self, agent, ip_address, username, password, outlet_names=None, num_outlets=5):
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
@@ -26,7 +28,10 @@ class SynaccessAgent:
         self.passw = password
 
         if outlet_names is None:
-            self.outlet_names = ['outlet1', 'outlet2', 'outlet3', 'outlet4', 'outlet5']
+            outlet_names = []
+            for i in range(num_outlets):
+                outlet_names.append('outlet%i' % (i + 1))
+            self.outlet_names = outlet_names
         else:
             for i in range(5):
                 if len(outlet_names) <= i:
@@ -230,6 +235,7 @@ def make_parser(parser=None):
     pgroup.add_argument('--password', help='Password credential to login to device.')
     pgroup.add_argument('--outlet-names', nargs='+', type=str,
                         help="List of outlet names.")
+    pgroup.add_argument('--num-outlets', default=5, help='Number of outlets for the device.')
     return parser
 
 
@@ -245,7 +251,8 @@ def main(args=None):
                        ip_address=args.ip_address,
                        username=args.username,
                        password=args.password,
-                       outlet_names=args.outlet_names)
+                       outlet_names=args.outlet_names,
+                       num_outlets=args.num_outlets)
     agent.register_process('acq', p.acq,
                            p.stop_acq, startup=True)
     agent.register_task('get_status', p.get_status, startup={})
