@@ -57,7 +57,7 @@ def test_synacc_startup(wait_for_crossbar, http_mock, run_agent, client):
     with http_mock:
         resp = client.get_status.wait()  # get_status runs on startup
         check_resp_state(resp)
-        resp = client.status_acq.status()
+        resp = client.acq.status()
         check_resp_state(resp, OpCode.RUNNING.value)
 
 
