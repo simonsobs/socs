@@ -936,7 +936,6 @@ class PysmurfController:
 
     @ocs_agent.param('bgs', default=None)
     @ocs_agent.param('kwargs', default=None)
-    @ocs_agent.param('tag', default=None)
     def overbias_tes(self, session, params):
         """overbias_tes(bgs=None, kwargs=None)
 
