@@ -170,7 +170,7 @@ class HWPGripperAgent:
 
     @ocs_agent.param('mode', default='push', type=str, choices=['push', 'pos'])
     @ocs_agent.param('actuator', default=1, type=int, check=lambda x: 1 <= x <= 3)
-    @ocs_agent.param('distance', default=0, type=float, check=lambda x: -10. <= x <= 10.)
+    @ocs_agent.param('distance', default=0, type=float)
     def move(self, session, params=None):
         """move(mode='push', actuator=1, distance=0)
 
@@ -381,8 +381,8 @@ class HWPGripperAgent:
         self.shutdown_mode = True
         return True, 'Shutdown completed'
 
-    def grip_hwp(self, session, params=None):
-        """grip_hwp()
+    def grip(self, session, params=None):
+        """grip()
 
         **Task** - Series of commands to automatically grip the HWP.
         This will return grippers to their home position, then move them each
@@ -442,7 +442,8 @@ class HWPGripperAgent:
 
                 # Reset alarms. If the warm-limit is hit, the alarm will be triggered
                 # and return_dict['result'] will be True
-                return_dict = run_and_append(self.client.reset, job='grip', check_shutdown=check_shutdown)
+                return_dict = run_and_append(self.client.reset, job='grip',
+                                             check_shutdown=check_shutdown)
 
                 if return_dict['result']:
                     # If the warm-limit is hit, move the actuator outwards bit
@@ -676,9 +677,7 @@ def main(args=None):
                                   args=args)
 
     agent, runner = ocs_agent.init_site_agent(args)
-    gripper_agent = HWPGripperAgent(agent, mcu_ip=args.mcu_ip,
-                                    control_port=args.control_port,
-                                    supervisor_id=args.supervisor_id)
+    gripper_agent = HWPGripperAgent(agent, args)
     agent.register_task('init_connection', gripper_agent.init_connection,
                         startup=True)
     agent.register_process('monitor_state', gripper_agent.monitor_state,
