@@ -2,6 +2,7 @@ import array as arr
 import struct
 import time
 
+import numpy as np
 from serial import Serial
 
 # some commands require a CRC code (cyclic redundancy check) -
@@ -56,6 +57,22 @@ def F_to_C(temp):
     """Function to convert fahrenheit measurement to celsius"""
 
     return (temp - 32) * (5 / 9)
+
+
+def wind_chill(temp, wind):
+    """Function to calculate wind chill temperature. Only valid if temp < 50F.
+    Taken from https://www.calculator.net/wind-chill-calculator.html
+    If temp > 50F, need to use heat index instead...
+
+        Temp: Temperature in Fahrenheit
+        wind: Speed in miles per hour
+    """
+    # Calculation not valid above 50 F
+    if temp > 50:
+        return temp
+
+    chill = 35.75 + 0.6215 * temp - 35.75 * np.power(wind, 0.16) + 0.4275 * temp * np.power(wind, 0.16)
+    return chill
 
 
 class VantagePro2:
@@ -317,6 +334,11 @@ class VantagePro2:
         loop_data['forecast_rule_num'] = byte_data[74]
         loop_data['time_sunrise'] = byte_data[75]
         loop_data['time_sunset'] = byte_data[76]
+
+        # Add wind chill temperature to observation data
+        temp = byte_data[9] / 10.0
+        wind_speed = byte_data[10]
+        loop_data['wind_chill_temp'] = F_to_C(wind_chill(temp, wind_speed))
 
         # Correct UV Index by a factor of 10 and fix overflow
         uvi = loop_data['UV']
