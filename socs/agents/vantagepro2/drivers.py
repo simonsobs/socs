@@ -67,6 +67,9 @@ def wind_chill(temp, wind):
         Temp: Temperature in Fahrenheit
         wind: Speed in miles per hour
     """
+    # Calculation not valid above 50 F
+    if temp > 50:
+        return temp
 
     chill = 35.75 + 0.6215 * temp - 35.75 * np.power(wind, 0.16) + 0.4275 * temp * np.power(wind, 0.16)
     return chill
