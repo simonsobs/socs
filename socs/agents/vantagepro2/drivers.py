@@ -340,11 +340,10 @@ class VantagePro2:
         wind_speed = byte_data[10]
         loop_data['wind_chill_temp'] = F_to_C(wind_chill(temp, wind_speed))
 
-        # Correct UV Index by a factor of 10 and fix overflow
+        # Fix overflow
         uvi = loop_data['UV']
         if uvi < 0:
             uvi += 2**8
-        uvi /= 10
         loop_data['UV'] = uvi
 
         # CRC check, data must be sent byte by byte
