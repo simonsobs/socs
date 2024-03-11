@@ -1,8 +1,8 @@
 import argparse
 import os
+import struct
 import sys
 import time
-import struct
 
 import txaio
 import yaml
@@ -79,7 +79,7 @@ def interp_unsigned_double_reg(r1, r2):
     """
 
     return (r1 << 16) + r2
-    
+
 
 def interp_signed_double_reg(r1, r2):
     """
@@ -94,9 +94,10 @@ def interp_signed_double_reg(r1, r2):
     """
     return twos(interp_unsigned_double_reg(r1, r2), 4)
 
-def interp_float(r1,r2):
+
+def interp_float(r1, r2):
     """
-    Take two 16 bit register values and combine them assuming we really wanted to read a 32 bit 
+    Take two 16 bit register values and combine them assuming we really wanted to read a 32 bit
     (single precision) float.
 
     Parameters
@@ -106,10 +107,11 @@ def interp_float(r1,r2):
     r2: int
         Second 16 bit register value.
     """
-    val = interp_unsigned_double_reg(r1,r2)
+    val = interp_unsigned_double_reg(r1, r2)
 
     val = struct.unpack('!f', struct.pack('!I', val))[0]
     return val
+
 
 def make_bin_reader(offset, spec):
     """Read an individual bit or continuous range of bits out of the 2 byte register.
@@ -125,7 +127,7 @@ def make_bin_reader(offset, spec):
     spec: string
         Specification of which bits to read; see above.
     """
-    
+
     spec = spec.split(' ')[1:]
     spec = spec[0].split('-')
     spec = [int(s) for s in spec]
@@ -165,13 +167,13 @@ class ReadBlock(object):
     error_out_of_range : bin
         True if values out of specified range should automatically be converted to the error value.
     filter_errors : bin
-        True if values equal to the error value should be removed from the data and not returned. 
+        True if values equal to the error value should be removed from the data and not returned.
 
     Attributes
     ----------
     functions : list
         List of functions used to interpret the registers returned in this block.
-    error_val : 
+    error_val :
         Value representing erroneous information.
     rconfigs : list
         Register configurations for this block.
@@ -289,7 +291,7 @@ class ModbusDevice:
         The Modbus unit id to use when communicating with the device.
     close_port : boolean
        Whether or not to close the open port to the device while waiting for the next Pacemaker
-       triggered read cycle. 
+       triggered read cycle.
 
     Attributes
     ----------
@@ -385,7 +387,7 @@ class ModbusDeviceAgent:
         self.initialized = False
         self.take_data = False
 
-        self.modbus_device= None
+        self.modbus_device = None
 
         agg_params = {
             'frame_length': 10 * 60  # [sec]
@@ -583,11 +585,11 @@ def main(args=None):
     agent, runner = ocs_agent.init_site_agent(args)
 
     p = ModbusDeviceAgent(agent,
-                       configdir=args.configdir,
-                       host=args.host,
-                       port=int(args.port),
-                       sample_interval=args.sample_interval,
-                       unit_id=args.unit_id)
+                          configdir=args.configdir,
+                          host=args.host,
+                          port=int(args.port),
+                          sample_interval=args.sample_interval,
+                          unit_id=args.unit_id)
 
     agent.register_task('init_mbdevice', p.init_mbdevice,
                         startup=init_params)
