@@ -1,9 +1,9 @@
 import argparse
-import time
 import os
 import struct
-import serial
+import time
 
+import serial
 import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import Pacemaker, TimeoutLock
@@ -11,96 +11,98 @@ from pyModbusTCP.client import ModbusClient
 
 
 class TankLevelMonitor:
-    
+
     """Initialize serial communication with tank sensors & creates dicts to store data depending on tanks numbers."""
+
     def __init__(self):
-        
+
         self.client = serial.Serial("/dev/ttyUSB1", 9600, timeout=0.5)
 
-        self.tank_data = {} #Define dictionary for Tank data, 7 fields
+        self.tank_data = {}  # Define dictionary for Tank data, 7 fields
         self.tank1_data = {}
         self.tank2_data = {}
-        self.tank1_data_fields = ['Tank1_vol','Net1_vol','emp1_vol','prod1_h','water1_h','avg1_temp','water1_vol']
-        self.tank2_data_fields = ['Tank2_vol','Net2_vol','emp2_vol','prod2_h','water2_h','avg2_temp','water2_vol']
-       
+        self.tank1_data_fields = ['Tank1_vol', 'Net1_vol', 'emp1_vol', 'prod1_h', 'water1_h', 'avg1_temp', 'water1_vol']
+        self.tank2_data_fields = ['Tank2_vol', 'Net2_vol', 'emp2_vol', 'prod2_h', 'water2_h', 'avg2_temp', 'water2_vol']
+
         self.tank_data_ok = False
         self.tank_length_to_read = 89
         self.verbose = True
- 
+
         self.client.flushOutput()
-    
+
     def tank_data_checker(self, tank_num):
         self.tank_data_ok = False
-        
+
         if len(self.full_data) == 89:
-            if self.full_data[18:19] !=  b'':
+            if self.full_data[18:19] != b'':
                 if self.verbose:
                     print("IN DATA CHECKER 1: ", self.full_data[0:2])
                 if self.full_data[0:2] == b'\x01i':
                     if self.verbose:
                         print("IN DATA CHECKER 2:", self.full_data[88:89])
-                    if self.full_data [88:89] == b'\x03':
+                    if self.full_data[88:89] == b'\x03':
                         if self.verbose:
                             print("IN DATA CHECKER 3:", self.full_data[18:19])
                         if int(self.full_data[18:19]) == int(tank_num):
                             if self.verbose:
-                                print ("DATA IS OK")
+                                print("DATA IS OK")
                             self.tank_data_ok = True
-    
-    def tank_data_verbosity(self, tank_num, msg = ""):
-        
-        if self.verbose == True:
+
+    def tank_data_verbosity(self, tank_num, msg=""):
+
+        if self.verbose:
             print("Tank Number: ", tank_num)
             print(msg, self.full_data)
 
-
     """Recieves tank number (default tank1) and returns non decoded data."""
-    def tank_data_reader(self, tank_num = 1):
+
+    def tank_data_reader(self, tank_num=1):
 
         self.client.flushOutput()
         self.client.flushInput()
-        
-        self.client.write(b'01i201' + tank_num) #Inquiry <SOH>i201TT = 01 i201tank_num
+
+        self.client.write(b'01i201' + tank_num)  # Inquiry <SOH>i201TT = 01 i201tank_num
         self.full_data = {}
         self.full_data = self.client.read(self.tank_length_to_read)
-        
+
         self.tank_data_checker(tank_num)
 
         while True:
-            self.tank_data_verbosity (tank_num, "Entering while loop in tank_data_reader")            
+            self.tank_data_verbosity(tank_num, "Entering while loop in tank_data_reader")
             self.tank_data_checker(tank_num)
-            if self.tank_data_ok == True:
+            if self.tank_data_ok:
                 break
             else:
                 self.client.flushOutput()
                 self.client.write(b'01i201' + tank_num)
-                self.full_data = {} 
+                self.full_data = {}
                 self.full_data = self.client.read(self.tank_length_to_read)
-                self.tank_data_verbosity (tank_num, "After tank_data_ok got False, full data: ")
+                self.tank_data_verbosity(tank_num, "After tank_data_ok got False, full data: ")
                 self.client.flushOutput()
                 self.client.flushInput()
-                time.sleep (10) 
+                time.sleep(10)
 
         if self.verbose:
-            print (tank_num, self.full_data)
+            print(tank_num, self.full_data)
 
     """Recieves undecoded hex data and returns a dictionary with decoded & corrected data."""
+
     def tank_decode_data(self, tank_num):
 
-        multfactor = [3.785,3.785,3.785,2.54/100,2.54/100,5/9,3.785] #correction factor
-        addfactor = [0,0,0,0,0,-32,0] 
-        
+        multfactor = [3.785, 3.785, 3.785, 2.54 / 100, 2.54 / 100, 5 / 9, 3.785]  # correction factor
+        addfactor = [0, 0, 0, 0, 0, -32, 0]
+
         data = {}
-        data = self.full_data[26:26+8*7]
-        
-        for i in range (7):
-            data_field = data[i*8:(i+1)*8] #moving through all data
-            decoded_data = struct.unpack('!f',bytes.fromhex(data_field.decode('ascii')))[0] # decode hex to ieee float
-            
+        data = self.full_data[26:26 + 8 * 7]
+
+        for i in range(7):
+            data_field = data[i * 8:(i + 1) * 8]  # moving through all data
+            decoded_data = struct.unpack('!f', bytes.fromhex(data_field.decode('ascii')))[0]  # decode hex to ieee float
+
             if tank_num == b'01':
-                self.tank1_data [self.tank1_data_fields[i]] = (decoded_data + addfactor[i])*multfactor[i]
+                self.tank1_data[self.tank1_data_fields[i]] = (decoded_data + addfactor[i]) * multfactor[i]
             elif tank_num == b'02':
-                self.tank2_data [self.tank2_data_fields[i]] = (decoded_data + addfactor[i])*multfactor[i]
+                self.tank2_data[self.tank2_data_fields[i]] = (decoded_data + addfactor[i]) * multfactor[i]
 
     def read_cycle(self):
 
@@ -109,7 +111,7 @@ class TankLevelMonitor:
 
         self.tank_data_reader(b'02')
         self.tank_decode_data(b'02')
-        
+
         self.tank_data = self.tank1_data
         self.tank_data.update(self.tank2_data)
 
@@ -119,13 +121,12 @@ class TankLevelMonitor:
         try:
             this_cycle_data = {}
             for key in self.tank_data:
-                this_cycle_data[key] = {'value':self.tank_data[key]}
+                this_cycle_data[key] = {'value': self.tank_data[key]}
             if self.verbose:
                 print(this_cycle_data)
             return this_cycle_data
-        except:
+        except BaseException:
             pass
-
 
 
 class TankLevelMonitorAgent:
@@ -150,12 +151,11 @@ class TankLevelMonitorAgent:
     """
 
     def __init__(self, agent, unit=1, sample_interval=15.):
-        
+
         self.unit = unit
         self.agent: ocs_agent.OCSAgent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
-
 
         self.pacemaker_freq = 1. / sample_interval
 
@@ -250,7 +250,7 @@ class TankLevelMonitorAgent:
                                                         'connected': True}})
 
                     regdata = self.TankLevelMonitor.read_cycle()
-                    
+
                     if regdata:
                         for reg in regdata:
                             data['data'][reg] = regdata[reg]["value"]
@@ -285,7 +285,7 @@ class TankLevelMonitorAgent:
         Stops acq process.
         """
         if self.TankLevelMonitor.verbose:
-            print ("DEBUG: stops acq process:  ", self.take_data)
+            print("DEBUG: stops acq process:  ", self.take_data)
         if self.take_data:
             self.take_data = False
             return True, 'requested to stop taking data.'
@@ -324,12 +324,12 @@ def main(args=None):
         init_params = {'auto_acquire': False}
     elif args.mode == 'acq':
         init_params = {'auto_acquire': True}
-    #print('init_params', init_params)
+    # print('init_params', init_params)
     agent, runner = ocs_agent.init_site_agent(args)
-    
+
     p = TankLevelMonitorAgent(agent,
-                       unit=int(args.unit),
-                       sample_interval=args.sample_interval)
+                              unit=int(args.unit),
+                              sample_interval=args.sample_interval)
 
     agent.register_task('init_TankLevelMonitor', p.init_TankLevelMonitor,
                         startup=init_params)
