@@ -102,7 +102,7 @@ class ld_monitor:
         self.data, _ = self.sock.recvfrom(1024)
         self.data = self.data.decode('utf-8')
 
-        # receiving an "e-fiel" sentence
+        # "e-field" sentence
         if self.data[0] == '$':
             data_split = self.data[1:].split(',')
             rot_fault = int(data_split[1].split('*')[0])
@@ -116,71 +116,70 @@ class ld_monitor:
 
         elif self.data[0] == '@':
             param = self.data[1:3]
+            
+            # "lightning strike" sentence 
+            if param=='LI':
+                data_split = self.data.split(',')[1:]
+                if data_split[2].split('*')[0] == 'Miles':
+                    unit_d = 0
+                elif data_split[2].split('*')[0] == 'Km':
+                    unit_d = 1
 
-            match param:
-                # receiving a "lightning strike" sentence
-                case 'LI':
-                    data_split = self.data.split(',')[1:]
-                    if data_split[2].split('*')[0] == 'Miles':
-                        unit_d = 0
-                    elif data_split[2].split('*')[0] == 'Km':
-                        unit_d = 1
-
-                    self.newdata_dict = {
-                        'd_type': 1,
-                        'time_last': time.time(),
-                        'dist': int(data_split[1]),
-                        'unit_d': unit_d
+                self.newdata_dict = {
+                    'd_type': 1,
+                    'time_last': time.time(),
+                    'dist': int(data_split[1]),
+                    'unit_d': unit_d
                     }
-                    self.data_dict.update(self.newdata_dict)
+                self.data_dict.update(self.newdata_dict)
 
-                    return self.data_dict
+                return self.data_dict
 
-                # receiving a "high e-field" sentence, account for 2 types
-                case 'HF':
-                    data_split = self.data[1:].split(',')
-                    if len(data_split) == 1:
-                        self.newdata_dict = {
-                            'd_type': 2,
-                            'high_field': 1,
-                            'hifield_value': float(self.data_dict['field_value'])
-                        }
-                    else:
-                        self.newdata_dict = {
-                            'd_type': 2,
-                            'hifield_value': float(data_split[1])
-                        }
-                    self.data_dict.update(self.newdata_dict)
-                    return self.data_dict
-
-                # status sentence
-                case 'ST':
-                    faultcode = int(self.data.split(',')[-1].split('*')[0], 16)
-                    data_split = [int(i) for i in self.data.split(',')[1:-1]]
-
+            # "high e-field" sentence, account for 2 types
+            elif param=='HF':
+                data_split = self.data[1:].split(',')
+                if len(data_split) == 1:
                     self.newdata_dict = {
-                        'd_type': 3,
-                        'alarm_r': data_split[0],
-                        'alarm_o': data_split[1],
-                        'alarm_y': data_split[2],
-                        'delay_g': data_split[3],
-                        'clear': data_split[4],
-                        'r_timer': data_split[5],
-                        'o_timer': data_split[6],
-                        'y_timer': data_split[7],
-                        'g_timer': data_split[8],
-                        'allclear_timer': data_split[9],
-                        'faultcode': faultcode
+                        'd_type': 2,
+                        'high_field': 1,
+                        'hifield_value': float(self.data_dict['field_value'])
+                        }
+                else:
+                    self.newdata_dict = {
+                        'd_type': 2,
+                        'hifield_value': float(data_split[1])
+                        }
+                self.data_dict.update(self.newdata_dict)
+                return self.data_dict
+
+            # "status" sentence
+            elif param=='ST':
+                faultcode = int(self.data.split(',')[-1].split('*')[0], 16)
+                data_split = [int(i) for i in self.data.split(',')[1:-1]]
+
+                self.newdata_dict = {
+                    'd_type': 3,
+                    'alarm_r': data_split[0],
+                    'alarm_o': data_split[1],
+                    'alarm_y': data_split[2],
+                    'delay_g': data_split[3],
+                    'clear': data_split[4],
+                    'r_timer': data_split[5],
+                    'o_timer': data_split[6],
+                    'y_timer': data_split[7],
+                    'g_timer': data_split[8],
+                    'allclear_timer': data_split[9],
+                    'faultcode': faultcode
                     }
 
-                    self.data_dict.update(self.newdata_dict)
-                    return self.data_dict
+                self.data_dict.update(self.newdata_dict)
+                return self.data_dict
 
-                # disregard "alarm timers" sentence but update sentence type
-                case 'WT':
-                    self.newdata_dict = {'d_type': 4}
-                    self.data_dict.update(self.newdata_dict)
-                    return self.data_dict
+            # disregard "alarm timers" sentence but update sentence type
+            elif param=='WT':
+                self.newdata_dict = {'d_type': 4}
+                self.data_dict.update(self.newdata_dict)
+                return self.data_dict
 
     def read_cycle(self):
         """
