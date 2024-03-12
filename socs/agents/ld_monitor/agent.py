@@ -116,9 +116,9 @@ class ld_monitor:
 
         elif self.data[0] == '@':
             param = self.data[1:3]
-            
-            # "lightning strike" sentence 
-            if param=='LI':
+
+            # "lightning strike" sentence
+            if param == 'LI':
                 data_split = self.data.split(',')[1:]
                 if data_split[2].split('*')[0] == 'Miles':
                     unit_d = 0
@@ -130,30 +130,30 @@ class ld_monitor:
                     'time_last': time.time(),
                     'dist': int(data_split[1]),
                     'unit_d': unit_d
-                    }
+                }
                 self.data_dict.update(self.newdata_dict)
 
                 return self.data_dict
 
             # "high e-field" sentence, account for 2 types
-            elif param=='HF':
+            elif param == 'HF':
                 data_split = self.data[1:].split(',')
                 if len(data_split) == 1:
                     self.newdata_dict = {
                         'd_type': 2,
                         'high_field': 1,
                         'hifield_value': float(self.data_dict['field_value'])
-                        }
+                    }
                 else:
                     self.newdata_dict = {
                         'd_type': 2,
                         'hifield_value': float(data_split[1])
-                        }
+                    }
                 self.data_dict.update(self.newdata_dict)
                 return self.data_dict
 
             # "status" sentence
-            elif param=='ST':
+            elif param == 'ST':
                 faultcode = int(self.data.split(',')[-1].split('*')[0], 16)
                 data_split = [int(i) for i in self.data.split(',')[1:-1]]
 
@@ -170,13 +170,13 @@ class ld_monitor:
                     'g_timer': data_split[8],
                     'allclear_timer': data_split[9],
                     'faultcode': faultcode
-                    }
+                }
 
                 self.data_dict.update(self.newdata_dict)
                 return self.data_dict
 
             # disregard "alarm timers" sentence but update sentence type
-            elif param=='WT':
+            elif param == 'WT':
                 self.newdata_dict = {'d_type': 4}
                 self.data_dict.update(self.newdata_dict)
                 return self.data_dict
