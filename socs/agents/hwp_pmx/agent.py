@@ -158,6 +158,7 @@ class HWPPMXAgent:
         action = Actions.ClearAlarm(**params)
         self.action_queue.put(action)
         session.data = yield action.deferred
+        self.prot = 0
         return True, 'Clear alarm'
 
     @defer.inlineCallbacks
