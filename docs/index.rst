@@ -43,6 +43,7 @@ API Reference        Full API documentation for core parts of the SOCS library.
     agents/cryomech_cpa
     agents/fts_agent
     agents/generator
+    agents/hi6200
     agents/hwp_encoder
     agents/hwp_gripper
     agents/hwp_pcu
