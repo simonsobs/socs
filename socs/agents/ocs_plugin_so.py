@@ -53,5 +53,6 @@ for n, f in [
         ('WiregridActuatorAgent', 'wiregrid_actuator/agent.py'),
         ('WiregridEncoderAgent', 'wiregrid_encoder/agent.py'),
         ('WiregridKikusuiAgent', 'wiregrid_kikusui/agent.py'),
+        ('WiregridTiltsensorAgent', 'wiregrid_tiltsensor/agent.py'),
 ]:
     ocs.site_config.register_agent_class(n, os.path.join(root, f))
