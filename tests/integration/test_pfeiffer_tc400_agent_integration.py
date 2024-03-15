@@ -43,7 +43,7 @@ wait_for_crossbar = create_crossbar_fixture()
 run_agent = create_agent_runner_fixture(
     '../socs/agents/pfeiffer_tc400/agent.py', 'tc400_agent')
 client = create_client_fixture('pfeifferturboA')
-emulator = create_device_emulator({}, relay_type='tcp')
+emulator = create_device_emulator({}, relay_type='tcp', port=9001)
 
 
 @pytest.mark.integtest
