@@ -71,7 +71,7 @@ from ocs.ocs_twisted import TimeoutLock
 # The number of datapoints in every encoder packet from the Beaglebone
 COUNTER_INFO_LENGTH = 120
 # The size of the encoder packet from the beaglebone
-#    (header + 3*COUNTER_INFO_LENGTH datapoint information 
+#    (header + 3*COUNTER_INFO_LENGTH datapoint information
 #     + 1 quadrature readout + 1 packet counter)
 COUNTER_PACKET_SIZE = 4 + 4 + 4 * COUNTER_INFO_LENGTH + 8 * COUNTER_INFO_LENGTH + 4
 # The size of the IRIG packet from the Beaglebone
