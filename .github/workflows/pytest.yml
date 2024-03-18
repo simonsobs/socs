@@ -11,6 +11,7 @@ on:
       - '.readthedocs.yaml'
       - '.github/dependabot.yml'
   workflow_call:
+  push:
 
 jobs:
   test:
