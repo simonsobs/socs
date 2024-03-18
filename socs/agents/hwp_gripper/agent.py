@@ -580,23 +580,25 @@ class HWPGripperAgent:
         run_and_append(self.client.reset, job='ungrip', check_shutdown=check_shutdown)
         # Enable power to actuators
         run_and_append(self.client.power, True, job='ungrip', check_shutdown=check_shutdown)
+        # Disable breaks
         run_and_append(self.client.brake, False, job='ungrip', check_shutdown=check_shutdown)
+        # Ignore limit switches
         run_and_append(self.client.force, True, job='ungrip', check_shutdown=check_shutdown)
 
         # Send grippers to their home position
         run_and_append(self.client.home, job='ungrip', check_shutdown=check_shutdown)
 
+        # Move actuator outwards until as much as possible
         for actuator in range(1, 4):
-            # Move actuator inwards until warm-limit is hit
             run_and_append(self.client.move, 'POS', actuator, -1.9,
                            job='ungrip', check_shutdown=check_shutdown)
         time.sleep(5)
 
         # Enable brake
         run_and_append(self.client.brake, True, job='ungrip', check_shutdown=check_shutdown)
-        time.sleep(1)
         # Power off actuators
         run_and_append(self.client.power, False, job='ungrip', check_shutdown=check_shutdown)
+        # Enable limit switches
         run_and_append(self.client.force, False, job='ungrip', check_shutdown=check_shutdown)
         time.sleep(1)
 
@@ -798,7 +800,7 @@ def make_parser(parser=None):
     pgroup.add_argument('--control-port', type=int, default=8041,
                         help='Port for actuator control as set by the Beaglebone code')
     pgroup.add_argument('--warm-grip-distance', nargs='+', default=[10.0, 10.0, 10.0],
-                        help="Nominal distance for warm grip position")
+                        help='Nominal distance for warm grip position')
     pgroup.add_argument('--supervisor-id', type=str,
                         help='Instance ID for HWP Supervisor agent')
     pgroup.add_argument('--no-data-warn-time', type=float, default=60,
