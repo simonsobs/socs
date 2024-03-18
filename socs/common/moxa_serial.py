@@ -198,6 +198,7 @@ class Serial_TCPServer(object):
     def writeread(self, msg):
         self.flushInput()
         self.write(msg)
+        time.sleep(0.1)
         return self.readall()
 
     def flushInput(self):

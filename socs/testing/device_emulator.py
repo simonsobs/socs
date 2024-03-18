@@ -258,6 +258,7 @@ class DeviceEmulator:
         self.logger.info(f"Client connection made from {client_address}")
 
         while self._read:
+            msg = None
             try:
                 msg = self._conn.recv(4096)
                 if not msg:

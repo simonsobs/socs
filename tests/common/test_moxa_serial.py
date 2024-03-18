@@ -44,4 +44,5 @@ def test_moxa_serial_writeread(tcp_emulator):
 def test_moxa_serial_write_readline(tcp_emulator):
     ser = create_tcpserver()
     ser.write('ping')
+    time.sleep(0.1)
     assert ser.readline() == 'pong\r'
