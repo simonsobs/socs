@@ -33,6 +33,7 @@ class HWPGripperAgent:
         self._initialized = False
         self.mcu_ip = args.mcu_ip
         self.control_port = args.control_port
+        self.warm_grip_distance = args.warm_grip_distance
 
         self.shutdown_mode = False
         self.supervisor_id = args.supervisor_id
@@ -425,17 +426,35 @@ class HWPGripperAgent:
             data['responses'].append(return_dict)
             return return_dict
 
+        run_and_append(self.client.reset, job='grip', check_shutdown=check_shutdown)
         # Enable power to actuators
         run_and_append(self.client.power, True, job='grip', check_shutdown=check_shutdown)
 
         run_and_append(self.client.brake, False, job='grip', check_shutdown=check_shutdown)
 
+        run_and_append(self.client.force, False, job='grip', check_shutdown=check_shutdown)
+
+        run_and_append(self.client.is_cold, False, job='grip', check_shutdown=check_shutdown)
+
         # Send grippers to their home position
         run_and_append(self.client.home, job='grip', check_shutdown=check_shutdown)
 
         finished = [False, False, False]
-        for actuator, _ in enumerate(finished):
-            while not finished[actuator]:
+        aborted = [False, False, False]
+
+        for i in range(100): # 20 mm is absolute maximum
+            if np.all(finished):
+                break
+            if np.any(aborted):
+                break
+            for actuator, _ in enumerate(finished):
+                # 1 mm margin to abort the increntation
+                if i*0.2 - 1 > self.warm_grip_distance[actuator]:
+                    aborted[actuator] = True
+                    finished[actuator] = True
+
+                if finished[actuator]:
+                    continue
                 # Move actuator inwards until warm-limit is hit
                 run_and_append(self.client.move, 'POS', actuator + 1, 0.2,
                                job='grip', check_shutdown=check_shutdown)
@@ -460,6 +479,14 @@ class HWPGripperAgent:
 
                     finished[actuator] = True
 
+        if not np.all(finished):
+            self.log.error('HWP is not correctly gripped')
+            run_and_append(self.client.home, job='grip', check_shutdown=check_shutdown)
+
+        if not np.any(aborted):
+            self.log.error('HWP is not correctly gripped')
+            run_and_append(self.client.home, job='grip', check_shutdown=check_shutdown)
+
         # Enable breaks
         run_and_append(self.client.brake, True, job='grip',
                        check_shutdown=check_shutdown)
@@ -471,6 +498,81 @@ class HWPGripperAgent:
         time.sleep(1)
 
         return data
+
+    def ungrip(self, session, params=None):
+        """ungrip()
+
+        **Task** - Series of commands to automatically ungrip the HWP.
+        This will return grippers to their home position, and retract
+        and retract as much as possible.
+        """
+
+        self._ungrip_hwp(session, check_shutdown=True)
+        return True, "Finished ungripping procedure"
+
+    def _ungrip_hwp(self, session, check_shutdown=True):
+        """
+        Helper function to ungrip the HWP that can be called by the ungrip_hwp
+        task or by the shutdown procedure.  This will return grippers to their
+        home position, and retract as much as possible.
+
+        Args
+        ------
+        session (OpSession):
+            Session object for current operation. This function will add to
+            session data.
+
+        Notes:
+            The most recent data collected is stored in session data in the
+            structure:
+
+                >>> response.session['responses']
+                [{'result': True, 'log': [.., .., etc]},
+                                    ..
+                 {'result': True, 'log': [.., .., etc]}]
+        """
+        data = {
+            'responses': [],
+        }
+        session.data = data
+
+        def run_and_append(func, *args, **kwargs):
+            return_dict = self._run_client_func(func, *args, **kwargs)
+            data['responses'].append(return_dict)
+            return return_dict
+
+        run_and_append(self.client.reset, job='ungrip', check_shutdown=check_shutdown)
+        # Enable power to actuators
+        run_and_append(self.client.power, True, job='ungrip', check_shutdown=check_shutdown)
+        run_and_append(self.client.brake, False, job='ungrip', check_shutdown=check_shutdown)
+        run_and_append(self.client.force, True, job='ungrip', check_shutdown=check_shutdown)
+
+        # Send grippers to their home position
+        run_and_append(self.client.home, job='ungrip', check_shutdown=check_shutdown)
+
+        for actuator in range(1,4):
+            # Move actuator inwards until warm-limit is hit
+            run_and_append(self.client.move, 'POS', actuator, -1.9,
+                           job='ungrip', check_shutdown=check_shutdown)
+        time.sleep(5)
+
+        # Enable brake
+        run_and_append(self.client.brake, True, job='ungrip', check_shutdown=check_shutdown)
+        time.sleep(1)
+        # Power off actuators
+        run_and_append(self.client.power, False, job='ungrip', check_shutdown=check_shutdown)
+        run_and_append(self.client.force, False, job='ungrip', check_shutdown=check_shutdown)
+        time.sleep(1)
+
+        # check limit switch state
+        monitor_state(session)
+        limit_switch_state = np.logical_not(session['data']['state']['act1_limit_warm_grip_state']) & \
+                             np.logical_not(session['data']['state']['act2_limit_warm_grip_state']) & \
+                             np.logical_not(session['data']['state']['act3_limit_warm_grip_state'])
+
+        assert limit_switch_state, "HWP is not ungripped"
+        return data
+
 
     def cancel_shutdown(self, session, params=None):
         """cancel_shutdown()
@@ -659,6 +761,8 @@ def make_parser(parser=None):
                         help='IP of Gripper Beaglebone')
     pgroup.add_argument('--control-port', type=int, default=8041,
                         help='Port for actuator control as set by the Beaglebone code')
+    pgroup.add_argument('--warm-grip-distance', nargs='+', default=[10.0, 10.0, 10.0],
+                        help="Nominal distance for warm grip position")
     pgroup.add_argument('--supervisor-id', type=str,
                         help='Instance ID for HWP Supervisor agent')
     pgroup.add_argument('--no-data-warn-time', type=float, default=60,
@@ -698,6 +802,7 @@ def main(args=None):
     agent.register_task('force', gripper_agent.force)
     agent.register_task('shutdown', gripper_agent.shutdown)
     agent.register_task('grip', gripper_agent.grip)
+    agent.register_task('ungrip', gripper_agent.ungrip)
     agent.register_task('cancel_shutdown', gripper_agent.cancel_shutdown)
 
     runner.run(agent, auto_reconnect=True)
