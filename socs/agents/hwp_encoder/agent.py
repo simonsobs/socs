@@ -61,6 +61,9 @@ from collections import deque
 import numpy as np
 import txaio
 
+from dataclasses import dataclass
+from typing import Optional
+
 txaio.use_twisted()
 
 from ocs import ocs_agent, site_config
@@ -70,10 +73,6 @@ from ocs.ocs_twisted import TimeoutLock
 # should be consistent with the software on beaglebone.
 # The number of datapoints in every encoder packet from the Beaglebone
 COUNTER_INFO_LENGTH = 120
-# The size of the encoder packet from the beaglebone
-#    (header + 3*COUNTER_INFO_LENGTH datapoint information 
-#     + 1 quadrature readout + 1 packet counter)
-COUNTER_PACKET_SIZE = 4 + 4 + 4 * COUNTER_INFO_LENGTH + 8 * COUNTER_INFO_LENGTH + 4
 # The size of the IRIG packet from the Beaglebone
 IRIG_PACKET_SIZE = 132
 
@@ -137,6 +136,88 @@ def count2time(counts, t_offset=0.):
     t_array += t_offset
 
     return t_array.tolist()
+
+class DropCounter:
+    """Helper class for counting frame drops"""
+    def __init__(self, name, log):
+        self.name = name
+        self.drop_count = 0
+        self.last_counter = None
+        self.log = log
+
+    def update(self, counters):
+        prepend = [self.last_counter] if self.last_counter is not None else []
+        diff = np.diff(counters, prepend=prepend)
+        if not diff.any():
+            # All zeros, probably not valid (older packet version)
+            return
+
+        self.last_counter = counters[-1]
+        dropped = int(np.sum(diff - 1))
+        # print(np.where(diff - 1))
+        if dropped < 0:
+            # print(dropped)
+            self.log.warn(f'{self.name}: Negative drops found, resetting counter')
+            self.drop_count = 0
+        else:
+            self.drop_count += dropped
+
+@dataclass
+class EncoderPacket:
+    """Dataclass for the encoder packet
+
+    Attributes
+    ----------
+    counter : list of int
+       clock counts of 120 data points
+    counter_index : list of int
+       corresponding clock counts of the 120 data points
+    quadrature : int
+       Readout from the quadrature
+    encoder_packet_count : int
+       CPU level encoder packet count
+    system_time : float
+       current system time
+
+    """
+    clock_counts: np.ndarray
+    edge_idxs: np.ndarray
+    quad: int
+    sys_time: float
+    encoder_packet_count: int = 0
+    buffer_reset_counter: int = 0
+
+def get_enc_packet_size(data) -> Optional[int]:
+    """
+    Returns the expected size of the encoder packet based on header info.
+
+    Returns
+    --------
+    packet_size : Optional[int]
+        The expected size of the encoder packet in bytes. If the size cannot be
+        determined because data is too short, returns None
+    """
+    if len(data) < 4:
+        return
+    
+    header, = struct.unpack('<I', data[0:4])
+    if header == 0x1eaf:
+        # header, quad, 3*COUNTER_INFO_LENGTH datapoint information
+        # all unsigned longs
+        nsamps = 120
+        return 4 * (2 + 3 * nsamps)
+    elif header == 0x2eaf:
+        if len(data) < 8:
+            return
+        version, nsamps = struct.unpack('<II', data[4:12])
+        if version == 1:
+            # header, version, nsamp, quad, packet counter, 3*nsamps datapoint information
+            # all unsigned longs
+            return 4 * (6 + 3 * nsamps)
+        else:
+            raise ValueError(f'Invalid encoder packet version: {version}')
+    else:
+        raise ValueError(f'Invalid encoder packet header: 0x{header:x}')
 
 
 class EncoderParser:
@@ -330,20 +411,27 @@ class EncoderParser:
                     header = struct.unpack('<I', header)[0]
                     # print('header ', '0x%x'%header)
 
-                    # 0x1EAF = Encoder Packet
+                    # 0x1EAF = Encoder Packet (v0)
+                    # 0x2EAF = Encoder Packet (>=v1)
                     # 0xCAFE = IRIG Packet
                     # 0xE12A = Error Packet
-
-                    # Encoder
-                    if header == 0x1eaf:
-                        # Make sure the data is the correct length for an Encoder Packet
-                        if not self.check_data_length(0, COUNTER_PACKET_SIZE):
-                            self.log.error('Error 1')
+                    if header in [0x1eaf, 0x2eaf]:
+                        expected_size = get_enc_packet_size(self.data)
+                        if expected_size is None: # Not enough data to determine from header
                             break
-                        # Call the meathod self.parse_counter_info() to parse the Encoder Packet
-                        self.parse_counter_info(self.data[4: COUNTER_PACKET_SIZE])
-                        if len(self.data) >= COUNTER_PACKET_SIZE:
-                            self.data = self.data[COUNTER_PACKET_SIZE:]
+
+                        if not self.check_data_length(0, expected_size):
+                            self.log.error('Error 1')
+
+                        if header == 0x1eaf:
+                            version = 0
+                        else:
+                            version, = struct.unpack('<I', self.data[4:8])
+
+                        self.parse_counter_info(
+                            self.data[4: expected_size], packet_version=version
+                        )
+                        self.data = self.data[expected_size:]
 
                     # IRIG
                     elif header == 0xcafe:
@@ -370,7 +458,7 @@ class EncoderParser:
                         # Clear self.data
                         self.data = ''
                     else:
-                        self.log.error('Bad header')
+                        self.log.error('Bad header: 0x{header:x}', header=header)
                         # Clear self.data
                         self.data = ''
 
@@ -382,40 +470,52 @@ class EncoderParser:
             # If you see this make sure that the beaglebone has been set up properly
             # print('Looking for data ...')
 
-    def parse_counter_info(self, data):
-        """Method to parse the Encoder Packet and put them to counter_queue
+    def parse_counter_info(self, data, packet_version=0):
+        """Method to parse the Encoder Packet and add them to counter_queue
 
         Parameters
         ----------
         data : str
            string for the encoder ounter info
-
-        Note:
-           'data' structure:
-           (Please note that '120' below might be replaced by COUNTER_INFO_LENGTH)
-           [0] Readout from the quadrature
-           [1] CPU level encoder packet count
-           [2-121] clock counts of 120 data points
-           [122-241] corresponding clock overflow of the 120 data points (each overflow count
-           is equal to 2^16 clock counts)
-           [242-361] corresponding absolute number of the 120 data points ((1, 2, 3, etc ...)
-           or (120, 121, 122, etc ...) or (241, 242, 243, etc ...) etc ...)
-
-           counter_queue structure:
-           counter_queue = [[64 bit clock counts],
-                            [clock count indicese incremented by every edge],
-                            quadrature,
-                            current system time]
         """
+        if packet_version == 0: 
+            # No packet index
+            quad, = struct.unpack('<I', data[:4])
+            nsamps = 120
 
-        # Convert the Encoder Packet structure into a numpy array
-        derter = np.array(struct.unpack('<' + 'I' + 'I' + 'III' * COUNTER_INFO_LENGTH, data))
+            derter = np.array(struct.unpack('<' + 'III' * nsamps, data[4:]))
+            clock_counter0 = derter[:nsamps]
+            clock_overflow = derter[nsamps:2*nsamps]
+            edge_idxs = derter[2*nsamps:3*nsamps]
+            clock_counts = clock_counter0 + (clock_overflow << 32)
+            packet = EncoderPacket(
+                clock_counts=clock_counts, edge_idxs=edge_idxs,
+                quad=quad, sys_time=time.time()
+            )
+            self.counter_queue.append(packet)
 
-        # self.quad_queue.append(derter[0].item()) # merged to counter_queue
-        self.counter_queue.append((derter[2:COUNTER_INFO_LENGTH + 2]
-                                   + (derter[COUNTER_INFO_LENGTH + 2:2 * COUNTER_INFO_LENGTH + 2] << 32),
-                                   derter[2 * COUNTER_INFO_LENGTH + 2:3 * COUNTER_INFO_LENGTH + 2],
-                                   derter[0].item(), derter[1].item(), time.time()))
+        elif packet_version == 1:
+            # Packet index included
+            # Convert the Encoder Packet structure into a numpy array
+
+            version, nsamps, quad, packet_counter, buffer_reset_counter = \
+                struct.unpack('<IIIII', data[:20])
+            derter = np.array(struct.unpack('<' + 'III' * nsamps, data[20:]))
+            clock_counter0 = derter[:nsamps]
+            clock_overflow = derter[nsamps:2*nsamps]
+            edge_idxs = derter[2*nsamps:3*nsamps]
+
+            clock_counts = clock_counter0 + (clock_overflow << 32)
+            packet = EncoderPacket(
+                clock_counts=clock_counts, edge_idxs=edge_idxs,
+                quad=quad, encoder_packet_count=packet_counter,
+                buffer_reset_counter=buffer_reset_counter,
+                sys_time=time.time()
+            )
+            self.counter_queue.append(packet)
+
+        else:
+            raise ValueError(f'Invalid encoder packet version: {packet_version}')
 
     def parse_irig_info(self, data):
         """Method to parse the IRIG Packet and put them to the irig_queue
@@ -524,9 +624,15 @@ class HWPBBBAgent:
         time_encoder_published = 0
         counter_list = []
         counter_index_list = []
+
+        encoder_packet_drop_counter = DropCounter('encoder_packet', self.log)
+        buffer_reset_drop_counter = DropCounter('buffer_reset', self.log)
+        edge_drop_counter = DropCounter('encoder_edges', self.log)
+
         quad_list = []
         quad_counter_list = []
         encoder_packet_count_list = []
+        buffer_reset_counter_list = []
         received_time_list = []
 
         with self.lock.acquire_timeout(timeout=0, job='acq') as acquired:
@@ -605,17 +711,18 @@ class HWPBBBAgent:
                 while len(self.parser.counter_queue):
                     counter_data = self.parser.counter_queue.popleft()
 
-                    counter_list += counter_data[0].tolist()
-                    counter_index_list += counter_data[1].tolist()
+                    counter_list += counter_data.clock_counts.tolist()
+                    counter_index_list += counter_data.edge_idxs.tolist()
 
-                    quad_data = counter_data[2]
-                    encoder_packet_count = counter_data[3]
-                    sys_time = counter_data[4]
+                    quad_data = counter_data.quad
+                    encoder_packet_count = counter_data.encoder_packet_count
+                    sys_time = counter_data.sys_time
 
                     received_time_list.append(sys_time)
                     quad_list.append(quad_data)
-                    quad_counter_list.append(counter_data[0][0])
+                    quad_counter_list.append(counter_data.clock_counts[0])
                     encoder_packet_count_list.append(encoder_packet_count)
+                    buffer_reset_counter_list.append(counter_data.buffer_reset_counter)
                     ct = time.time()
 
                     if len(counter_list) >= NUM_ENCODER_TO_PUBLISH \
@@ -626,6 +733,7 @@ class HWPBBBAgent:
                         data['timestamps'] = received_time_list
                         data['data']['quad'] = quad_list
                         data['data']['encoder_packet_count'] = encoder_packet_count_list
+                        data['data']['buffer_reset_counter'] = buffer_reset_counter_list
                         self.agent.publish_to_feed('HWPEncoder', data)
                         if quad_list:
                             self.last_quad = quad_list[-1]
@@ -636,6 +744,7 @@ class HWPBBBAgent:
                         data = {'timestamps': [], 'block_name': 'HWPEncoder_counter', 'data': {}}
                         data['data']['counter'] = counter_list
                         data['data']['counter_index'] = counter_index_list
+
 
                         data['timestamps'] = count2time(counter_list, received_time_list[0])
                         self.agent.publish_to_feed('HWPEncoder_full', data)
@@ -656,8 +765,16 @@ class HWPBBBAgent:
                         pulse_rate = dindex_counter * 2.e8 / dclock_counter
                         hwp_freq = pulse_rate / 2. / NUM_SLITS
 
+                        encoder_packet_drop_counter.update(encoder_packet_count_list)
+                        buffer_reset_drop_counter.update(buffer_reset_counter_list)
+                        edge_drop_counter.update(counter_index_list)
+
                         diff_counter = np.diff(counter_list)
                         diff_index = np.diff(counter_index_list)
+
+                        data['data']['dropped_edges'] = edge_drop_counter.drop_count
+                        data['data']['encoder_packet_drops'] = encoder_packet_drop_counter.drop_count
+                        data['data']['buffer_reset_drops'] = buffer_reset_drop_counter.drop_count
 
                         self.log.debug(f'pulse_rate {pulse_rate} {hwp_freq}')
                         data['data']['approx_hwp_freq'] = hwp_freq
@@ -674,6 +791,7 @@ class HWPBBBAgent:
                         quad_counter_list = []
                         received_time_list = []
                         encoder_packet_count_list = []
+                        buffer_reset_counter_list = []
 
                         time_encoder_published = ct
 
