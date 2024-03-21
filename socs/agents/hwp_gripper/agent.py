@@ -437,8 +437,8 @@ class HWPGripperAgent:
         # We should check if hwp is already gripper or not
         self.monitor_state(session)
         limit_switch_state = session['data']['state']['act1_limit_warm_grip_state'] | \
-                             session['data']['state']['act2_limit_warm_grip_state'] | \
-                             session['data']['state']['act3_limit_warm_grip_state']
+            session['data']['state']['act2_limit_warm_grip_state'] | \
+            session['data']['state']['act3_limit_warm_grip_state']
         if limit_switch_state:
             self.log.warning("HWP is already gripped")
             return data
@@ -477,12 +477,12 @@ class HWPGripperAgent:
         finished = [False, False, False]
         aborted = [False, False, False]
 
-        for i in range(100): # 20 mm is absolute maximum
+        for i in range(100):  # 20 mm is absolute maximum
             if all(finished) or any(aborted):
                 break
             for actuator, _ in enumerate(finished):
                 # 1 mm margin to abort the increntation
-                if i*0.2 - 1 > self.warm_grip_distance[actuator]:
+                if i * 0.2 - 1 > self.warm_grip_distance[actuator]:
                     aborted[actuator] = True
                     finished[actuator] = True
 
