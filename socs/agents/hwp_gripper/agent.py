@@ -384,26 +384,21 @@ class HWPGripperAgent:
         self.shutdown_mode = True
         return True, 'Shutdown completed'
 
-    @ocs_agent.param('home', default=True, type=bool)
     def grip(self, session, params=None):
         """grip()
 
         **Task** - Series of commands to automatically warm grip the HWP.
-        This will return grippers to their home position if we want, then move
-        them each inwards incrementally until warm limit switches are tiggered.
-        If the HWP is spinning, this will not run.
-
-        Parameters:
-            home (bool): if True, we return grippers to theie home position
-                         before we move inwards.
+        This will return grippers to their home position, then move them each
+        inwards incrementally until warm limit switches are tiggered. If the
+        HWP is spinning, this will not run.
         """
         if self._get_hwp_freq() > 0.1:
             return False, "Not gripping HWP because HWP is spinning"
 
-        self._grip_hwp(session, params, check_shutdown=True)
+        self._grip_hwp(session, check_shutdown=True)
         return True, "Finished gripping procedure"
 
-    def _grip_hwp(self, session, params, check_shutdown=True):
+    def _grip_hwp(self, session, check_shutdown=True):
         """
         Helper function to grip the HWP that can be called by the grip_hwp
         task or by the shutdown procedure.  This will return grippers to their
@@ -440,7 +435,7 @@ class HWPGripperAgent:
             session['data']['state']['act2_limit_warm_grip_state'] | \
             session['data']['state']['act3_limit_warm_grip_state']
         if limit_switch_state:
-            self.log.warning("HWP is already gripped")
+            self.log.warning("HWP is already gripped. Do nothing.")
             return data
 
         # Reset alarms
@@ -461,15 +456,8 @@ class HWPGripperAgent:
         # Ensure that the limit switches are in warm configuration
         run_and_append(self.client.is_cold, False, job='grip', check_shutdown=check_shutdown)
 
-        if params['home']:
-            # Send grippers to their home position
-            run_and_append(self.client.home, job='grip', check_shutdown=check_shutdown)
-        else:
-            # Move actuators outwards by 2 mm.
-            # This will not drop the but untrigger the warm limit switches.
-            for actuator in range(1, 4):
-                run_and_append(self.client.move, 'POS', actuator, -2.,
-                               job='grip', check_shutdown=check_shutdown)
+        # Send grippers to their home position
+        run_and_append(self.client.home, job='grip', check_shutdown=check_shutdown)
 
         # Ensure that we do not ignore limit switches
         run_and_append(self.client.force, False, job='grip', check_shutdown=check_shutdown)
@@ -481,7 +469,7 @@ class HWPGripperAgent:
             if all(finished) or any(aborted):
                 break
             for actuator, _ in enumerate(finished):
-                # 1 mm margin to abort the increntation
+                # 1 mm margin to abort the incrementation
                 if i * 0.2 - 1 > self.warm_grip_distance[actuator]:
                     aborted[actuator] = True
                     finished[actuator] = True
@@ -516,8 +504,16 @@ class HWPGripperAgent:
                     finished[actuator] = True
 
         if (not all(finished)) or any(aborted):
-            self.log.error('HWP is not correctly gripped')
-            run_and_append(self.client.home, job='grip', check_shutdown=check_shutdown)
+            self.log.error('Failed to grip HWP. Retract grippers.')
+            run_and_append(self.client.force, True, job='grip',
+                           check_shutdown=check_shutdown)
+            time.sleep(1)
+
+            run_and_append(self.client.home, job='grip',
+                           check_shutdown=check_shutdown)
+            time.sleep(1)
+            run_and_append(self.client.force, False, job='grip',
+                           check_shutdown=check_shutdown)
 
         # Enable breaks
         run_and_append(self.client.brake, True, job='grip',
@@ -531,7 +527,7 @@ class HWPGripperAgent:
 
         # We should stop schedule if we have an error in this task
         if (not all(finished)) or any(aborted):
-            raise ValueError("HWP was not correctly gripped")
+            raise ValueError("Failed to grip HWP. Grippers are retracted.")
 
         return data
 
@@ -588,7 +584,7 @@ class HWPGripperAgent:
         # Send grippers to their home position
         run_and_append(self.client.home, job='ungrip', check_shutdown=check_shutdown)
 
-        # Move actuator outwards until as much as possible
+        # Move actuator outwards as much as possible
         for actuator in range(1, 4):
             run_and_append(self.client.move, 'POS', actuator, -1.9,
                            job='ungrip', check_shutdown=check_shutdown)
@@ -609,7 +605,7 @@ class HWPGripperAgent:
                              (not session['data']['state']['act3_limit_warm_grip_state'])
 
         # We should stop schedule if we have an error in this task
-        assert limit_switch_state, "HWP is not ungripped"
+        assert limit_switch_state, "Failed to ungrip HWP."
         return data
 
     def cancel_shutdown(self, session, params=None):
