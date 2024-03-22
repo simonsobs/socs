@@ -110,7 +110,7 @@ class FlowmeterAgent:
             dp = int(self.daq_port)
             adr = "/iolinkmaster/port[{}]/iolinkdevice/pdin/getdata".format(dp)
             url = 'http://{}'.format(self.ip_address)
-            
+
             try:
                 r = requests.post(url, json={"code": "request", "cid": -1, "adr": adr})
             except requests.exceptions.ConnectionError as e:
