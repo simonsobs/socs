@@ -110,8 +110,14 @@ class FlowmeterAgent:
             dp = int(self.daq_port)
             adr = "/iolinkmaster/port[{}]/iolinkdevice/pdin/getdata".format(dp)
             url = 'http://{}'.format(self.ip_address)
+            
+            try:
+                r = requests.post(url, json={"code": "request", "cid": -1, "adr": adr})
+            except requests.exceptions.ConnectionError as e:
+                self.log.warn(f"Connection error occured: {e}")
+                pm.sleep()
+                continue
 
-            r = requests.post(url, json={"code": "request", "cid": -1, "adr": adr})
             value = r.json()['data']['value']
 
             flow_gpm, temp_f = extract(value)  # units [gallons/minute], [F]
