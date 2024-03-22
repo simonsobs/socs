@@ -115,7 +115,6 @@ class FlowmeterAgent:
                 r = requests.post(url, json={"code": "request", "cid": -1, "adr": adr})
             except requests.exceptions.ConnectionError as e:
                 self.log.warn(f"Connection error occured: {e}")
-                pm.sleep()
                 continue
 
             value = r.json()['data']['value']
