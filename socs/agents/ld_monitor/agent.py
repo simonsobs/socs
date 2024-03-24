@@ -8,10 +8,8 @@ import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import Pacemaker, TimeoutLock
 
-verbosity = False
 
-
-class ld_monitor:
+class LDMonitor:
     """Receives and decodes data of the lightning detector via UDP
 
     Parameters
@@ -20,51 +18,48 @@ class ld_monitor:
         Address of the computer reading the data.
     port : int
         Port of host where data will be received, default 1110.
-    verbose : boolean
-        Defines verbosity of the function (debug purposes).
 
     Attributes
     ----------
-    verbose : bool
-        Defines verbosity for debugging purposes
-    host : string
-        Defines the host where data will be received (where the agent is to be ran)
     port : int
         Port number in the local host to be bound to receive the data
+    log : txaio.tx.Logger
+        txaio logger object, created by the OCSAgent
     sockopen : bool
         Indicates when the socket is open
     inittime : float
         Logs the time at which initialization was carried out
     data_dict : dictionary
-        Raw data received from the lightning detector
+        Dictionary data stored from the lightning detector
     newdata_dict : dictioanry
-        The dictionary where new data is received
+        Dictionary where new data is received
     """
 
-    def __init__(self, port=1110, verbose=verbosity):
-        self.verbose = verbose
+    def __init__(self, port=1110):
         self.port = port
+        self.log = txaio.make_logger()
 
-        # get localhost ip
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-            s.connect(("8.8.8.8", 80))
-            self.host = s.getsockname()[0]
-
-        if hasattr(self, 'sockopen'):
-            self.sock.close()
-
-        # open and bind socket to receive lightning detector data
+        # check if socket has been opened
+        if hasattr(self,'sockopen'):
+            if self.sockopen==True:
+                self.sock.close()
+                self.log.info('Socket closed preemptively')
+        
+        # open and bing socket to receieve lightning detector data
         try:
+            self.log.info('Opening socket')
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self.sock.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
         except BaseException:
-            print('Failed to create socket')
+            self.log.info('Failed to create socket')
 
         try:
-            self.sock.bind((self.host, self.port))
+            self.log.info('Binding socket')
+            self.sock.bind(('', self.port))
             self.sockopen = True
             self.inittime = time.time()
         except BaseException:
-            print('Failed to bind socket')
+            self.log.info('Failed to bind socket')
 
         # initialize variables to account for absence of previous data
         self.data_dict = {
@@ -90,8 +85,7 @@ class ld_monitor:
             'faultcode': 0
         }
 
-        if self.verbose:
-            print('ld_monitor function monitor initialized')
+        self.log.info('LDMonitor function initialized')
 
     def read_data(self):
         """
@@ -132,6 +126,8 @@ class ld_monitor:
                     'unit_d': unit_d
                 }
                 self.data_dict.update(self.newdata_dict)
+                
+                self.log.info('Lightning strike detected!')
 
                 return self.data_dict
 
@@ -187,31 +183,23 @@ class ld_monitor:
         the format required to publish data to the ocs feed
         """
         try:
-            cycle_data = {}
             self.read_data()
-
-            # updates time since last strike if previous strike data exists
+            
+            # updates time since last strike if strike data exists
             if self.data_dict['time_last'] == -1.:
                 self.data_dict['tsince_last'] = -1.
             else:
                 self.data_dict['tsince_last'] = (time.time()
                                                  - self.data_dict['time_last'])
 
-            # parse data to ocs agent feed format
-            for key in self.data_dict:
-                cycle_data[key] = {'value': self.data_dict[key]}
-
-            if self.verbose:
-                print(cycle_data)
-            return cycle_data
+            return self.data_dict
 
         except BaseException:
             pass
-            if self.verbose:
-                print('Passing to next data iteration')
+            self.log.info('LD data read error, passing to next data iteration')
 
 
-class ld_monitorAgent:
+class LDMonitorAgent:
     """Monitor the Lightning Detector data via UDP.
 
     Parameters
@@ -233,9 +221,8 @@ class ld_monitorAgent:
         txaio logger object, created by the OCSAgent
     """
 
-    def __init__(self, agent, unit=1, sample_interval=15.):
+    def __init__(self, agent, sample_interval=15.):
 
-        self.unit = unit
         self.agent: ocs_agent.OCSAgent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
@@ -245,12 +232,12 @@ class ld_monitorAgent:
         self.initialized = False
         self.take_data = False
 
-        self.ld_monitor = None
+        self.LDMonitor = None
 
         agg_params = {
             'frame_length': 10 * 60  # [sec]
         }
-        self.agent.register_feed('ld_monitor',
+        self.agent.register_feed('LDMonitor',
                                  record=True,
                                  agg_params=agg_params,
                                  buffer_time=0)
@@ -259,13 +246,13 @@ class ld_monitorAgent:
         """connect()
         Instantiates LD object and check if client is open
         """
-        self.ld_monitor = ld_monitor(verbose=verbosity)
+        self.LDMonitor = LDMonitor()
         self.initialized = True
 
     @ocs_agent.param('auto_acquire', default=False, type=bool)
-    def init_ld_monitor(self, session, params=None):
+    def init_LDMonitor(self, session, params=None):
         """
-        Perform first time setup of the LD.
+        **Task** - Perform first time setup of the LD.
 
         Parameters:
             auto_acquire (bool, optional): Starts data acquisition after
@@ -297,7 +284,28 @@ class ld_monitorAgent:
     def acq(self, session, params=None):
         """acq()
 
-        Starts the data acquisition process
+        **Process** - Starts the data acquisition process
+        
+        Notes
+        _____
+        The most recent data collected is stored in session data in the
+        structure::
+
+        >>> response.session['data']
+        {'fields':{
+            'd_type': 3, 'field_value': 0.28, 'rot_fault': 0,
+            'time_last': -1.0, 'tsince_last': -1.0, 'dist': -1, 'unit_d': 0,
+            'high_field': -1, 'hifield_value': -1000.0, 'alarm_r': 0,
+            'alarm_o': 0, 'alarm_y': 0, 'delay_g': 1, 'clear': 1, 'r_timer': 0,
+            'o_timer': 0, 'y_timer': 0, 'g_timer': 0, 'allclear_timer': 0,
+            'faultcode': 0
+            }, 
+            ...
+            'connection': {
+                'conn_timestamp': 1711285858.1063662,
+                'connected': True}, 'data_timestamp': 1711285864.6254003
+                }
+        }
 
         """
         with self.lock.acquire_timeout(0, job='acq') as acquired:
@@ -323,7 +331,7 @@ class ld_monitorAgent:
                     'block_name': 'registers',
                     'data': {}
                 }
-                if not self.ld_monitor.sockopen:
+                if not self.LDMonitor.sockopen:
                     self.initialized = False
 
                 # Try to re-initialize if connection lost
@@ -332,17 +340,17 @@ class ld_monitorAgent:
 
                 # Only get readings if connected
                 if self.initialized:
-                    session.data.update({'connection': {'last_attempt': time.time(),
+                    session.data.update({'connection': {'conn_timestamp': self.LDMonitor.inittime,
                                                         'connected': True}})
 
-                    regdata = self.ld_monitor.read_cycle()
-
-                    if regdata:
-                        for reg in regdata:
-                            data['data'][reg] = regdata[reg]["value"]
-                            field_dict = {reg: regdata[reg]['value']}
-                            session.data['fields'].update(field_dict)
-                        session.data.update({'timestamp': current_time})
+                    ld_data = self.LDMonitor.read_cycle()
+                    
+                    if ld_data:
+                        for key, value in ld_data.items():
+                            data['data'][key]=value
+                        session.data.update({'data_timestamp':current_time,
+                            'fields':ld_data})
+                        self.log.debug(ld_data)
                     else:
                         self.log.info('Connection error or error in processing data.')
                         self.initialized = False
@@ -360,9 +368,9 @@ class ld_monitorAgent:
                         'block_name': field,
                         'data': {field: val}
                     }
-                    self.agent.publish_to_feed('ld_monitor', _data)
+                    self.agent.publish_to_feed('LDMonitor', _data)
 
-            self.agent.feeds['ld_monitor'].flush_buffer()
+            self.agent.feeds['LDMonitor'].flush_buffer()
 
         return True, 'Acquisition exited cleanly.'
 
@@ -382,11 +390,9 @@ def make_parser(parser=None):
         parser = argparse.ArgumentParser()
 
     pgroup = parser.add_argument_group('Agent Options')
-    pgroup.add_argument("--unit", default=1,
-                        help="unit to listen to.")
     pgroup.add_argument('--mode', type=str, choices=['idle', 'init', 'acq'],
                         help="Starting action for the agent.")
-    pgroup.add_argument("--sample-interval", type=float, default=15., help="Time between samples in seconds.")
+    pgroup.add_argument("--sample-interval", type=float, default=.2, help="Time between samples in seconds.")
 
     return parser
 
@@ -398,7 +404,7 @@ def main(args=None):
     parser = make_parser()
 
     # Interpret options in the context of site_config.
-    args = site_config.parse_args(agent_class='ld_monitor',
+    args = site_config.parse_args(agent_class='LDMonitor',
                                   parser=parser,
                                   args=args)
 
@@ -411,10 +417,8 @@ def main(args=None):
     print('init_params', init_params)
     agent, runner = ocs_agent.init_site_agent(args)
 
-    p = ld_monitorAgent(agent,
-                        unit=int(args.unit),
-                        sample_interval=args.sample_interval)
-    agent.register_task('init_ld_monitor', p.init_ld_monitor,
+    p = LDMonitorAgent(agent,sample_interval=args.sample_interval)
+    agent.register_task('init_LDMonitor', p.init_LDMonitor,
                         startup=init_params)
     agent.register_process('acq', p.acq, p._stop_acq)
     runner.run(agent, auto_reconnect=True)
