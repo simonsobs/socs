@@ -171,7 +171,7 @@ class LDMonitor:
                 self.data_dict.update(self.newdata_dict)
                 return self.data_dict
 
-            # disregard "alarm timers" sentence but update sentence type
+            # disregard "alarm timers" sentence, but update sentence type
             elif param == 'WT':
                 self.newdata_dict = {'d_type': 4}
                 self.data_dict.update(self.newdata_dict)
