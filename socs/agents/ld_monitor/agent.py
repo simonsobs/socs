@@ -328,7 +328,6 @@ class LDMonitorAgent:
                 data = {
                     'timestamp': current_time,
                     'connection': {},
-                    'block_name': 'registers',
                     'data': {}
                 }
                 if not self.LDMonitor.sockopen:
