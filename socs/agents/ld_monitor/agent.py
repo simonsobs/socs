@@ -206,7 +206,6 @@ class LDMonitorAgent:
     ----------
     agent : OCSAgent
         OCSAgent object which forms this Agent
-    unit : int
     sample_interval : float
         Time between samples in seconds.
 
