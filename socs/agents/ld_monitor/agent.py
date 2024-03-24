@@ -40,16 +40,16 @@ class LDMonitor:
         self.log = txaio.make_logger()
 
         # check if socket has been opened
-        if hasattr(self,'sockopen'):
-            if self.sockopen==True:
+        if hasattr(self, 'sockopen'):
+            if self.sockopen:
                 self.sock.close()
                 self.log.info('Socket closed preemptively')
-        
+
         # open and bing socket to receieve lightning detector data
         try:
             self.log.info('Opening socket')
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            self.sock.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+            self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         except BaseException:
             self.log.info('Failed to create socket')
 
@@ -126,7 +126,7 @@ class LDMonitor:
                     'unit_d': unit_d
                 }
                 self.data_dict.update(self.newdata_dict)
-                
+
                 self.log.info('Lightning strike detected!')
 
                 return self.data_dict
@@ -184,7 +184,7 @@ class LDMonitor:
         """
         try:
             self.read_data()
-            
+
             # updates time since last strike if strike data exists
             if self.data_dict['time_last'] == -1.:
                 self.data_dict['tsince_last'] = -1.
@@ -285,7 +285,7 @@ class LDMonitorAgent:
         """acq()
 
         **Process** - Starts the data acquisition process
-        
+
         Notes
         _____
         The most recent data collected is stored in session data in the
@@ -299,7 +299,7 @@ class LDMonitorAgent:
             'alarm_o': 0, 'alarm_y': 0, 'delay_g': 1, 'clear': 1, 'r_timer': 0,
             'o_timer': 0, 'y_timer': 0, 'g_timer': 0, 'allclear_timer': 0,
             'faultcode': 0
-            }, 
+            },
             ...
             'connection': {
                 'conn_timestamp': 1711285858.1063662,
@@ -344,12 +344,12 @@ class LDMonitorAgent:
                                                         'connected': True}})
 
                     ld_data = self.LDMonitor.read_cycle()
-                    
+
                     if ld_data:
                         for key, value in ld_data.items():
-                            data['data'][key]=value
-                        session.data.update({'data_timestamp':current_time,
-                            'fields':ld_data})
+                            data['data'][key] = value
+                        session.data.update({'data_timestamp': current_time,
+                                             'fields': ld_data})
                         self.log.debug(ld_data)
                     else:
                         self.log.info('Connection error or error in processing data.')
@@ -417,7 +417,7 @@ def main(args=None):
     print('init_params', init_params)
     agent, runner = ocs_agent.init_site_agent(args)
 
-    p = LDMonitorAgent(agent,sample_interval=args.sample_interval)
+    p = LDMonitorAgent(agent, sample_interval=args.sample_interval)
     agent.register_task('init_LDMonitor', p.init_LDMonitor,
                         startup=init_params)
     agent.register_process('acq', p.acq, p._stop_acq)
