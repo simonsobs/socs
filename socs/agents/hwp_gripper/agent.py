@@ -435,8 +435,8 @@ class HWPGripperAgent:
                                      check_shutdown=check_shutdown)
         act_results = return_dict['result']['actuators']
         limit_switch_state = act_results[0]['limits']['warm_grip']['state'] | \
-                             act_results[1]['limits']['warm_grip']['state'] | \
-                             act_results[2]['limits']['warm_grip']['state']
+            act_results[1]['limits']['warm_grip']['state'] | \
+            act_results[2]['limits']['warm_grip']['state']
         if limit_switch_state:
             self.log.warning("HWP is already gripped. Do nothing.")
             return data
@@ -607,12 +607,12 @@ class HWPGripperAgent:
                                      check_shutdown=check_shutdown)
         act_results = return_dict['result']['actuators']
         limit_switch_state = act_results[0]['limits']['warm_grip']['state'] | \
-                             act_results[1]['limits']['warm_grip']['state'] | \
-                             act_results[2]['limits']['warm_grip']['state']
+            act_results[1]['limits']['warm_grip']['state'] | \
+            act_results[2]['limits']['warm_grip']['state']
 
         # We should stop schedule if we have an error in this task
         if limit_switch_state:
-            print("Failed to ungrip HWP.") # need to fix
+            print("Failed to ungrip HWP.")  # need to fix
         return data
 
     def cancel_shutdown(self, session, params=None):
