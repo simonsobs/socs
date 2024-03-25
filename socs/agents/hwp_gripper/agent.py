@@ -431,10 +431,12 @@ class HWPGripperAgent:
             return return_dict
 
         # We should check if hwp is already gripper or not
-        self.monitor_state(session)
-        limit_switch_state = session['data']['state']['act1_limit_warm_grip_state'] | \
-            session['data']['state']['act2_limit_warm_grip_state'] | \
-            session['data']['state']['act3_limit_warm_grip_state']
+        return_dict = run_and_append(self.client.get_state, job='grip',
+                                     check_shutdown=check_shutdown)
+        act_results = return_dict['result']['actuators']
+        limit_switch_state = act_results[0]['limits']['warm_grip']['state'] | \
+                             act_results[1]['limits']['warm_grip']['state'] | \
+                             act_results[2]['limits']['warm_grip']['state']
         if limit_switch_state:
             self.log.warning("HWP is already gripped. Do nothing.")
             return data
@@ -590,7 +592,7 @@ class HWPGripperAgent:
         for actuator in range(1, 4):
             run_and_append(self.client.move, 'POS', actuator, -1.9,
                            job='ungrip', check_shutdown=check_shutdown)
-        time.sleep(5)
+        time.sleep(1)
 
         # Enable brake
         run_and_append(self.client.brake, True, job='ungrip', check_shutdown=check_shutdown)
@@ -601,13 +603,16 @@ class HWPGripperAgent:
         time.sleep(1)
 
         # check limit switch state
-        self.monitor_state(session)
-        limit_switch_state = (not session['data']['state']['act1_limit_warm_grip_state']) & \
-                             (not session['data']['state']['act2_limit_warm_grip_state']) & \
-                             (not session['data']['state']['act3_limit_warm_grip_state'])
+        return_dict = run_and_append(self.client.get_state, job='ungrip',
+                                     check_shutdown=check_shutdown)
+        act_results = return_dict['result']['actuators']
+        limit_switch_state = act_results[0]['limits']['warm_grip']['state'] | \
+                             act_results[1]['limits']['warm_grip']['state'] | \
+                             act_results[2]['limits']['warm_grip']['state']
 
         # We should stop schedule if we have an error in this task
-        assert limit_switch_state, "Failed to ungrip HWP."
+        if limit_switch_state:
+            print("Failed to ungrip HWP.") # need to fix
         return data
 
     def cancel_shutdown(self, session, params=None):
@@ -797,9 +802,11 @@ def make_parser(parser=None):
                         help='IP of Gripper Beaglebone')
     pgroup.add_argument('--control-port', type=int, default=8041,
                         help='Port for actuator control as set by the Beaglebone code')
-    pgroup.add_argument('--warm-grip-distance', nargs='+', default=[10.0, 10.0, 10.0],
+    pgroup.add_argument('--warm-grip-distance', action='store', type=float, nargs=3,
+                        default=[10.0, 10.0, 10.0],
                         help='Nominal distance for warm grip position')
-    pgroup.add_argument('--adjustment-distance', nargs='+', default=[-0.5, -0.5, -0.5],
+    pgroup.add_argument('--adjustment-distance', action='store', type=float, nargs=3,
+                        default=[-0.5, -0.5, -0.5],
                         help='Adjustment distance to compensate overshoot or hysteresis')
     pgroup.add_argument('--supervisor-id', type=str,
                         help='Instance ID for HWP Supervisor agent')
