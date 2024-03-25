@@ -34,6 +34,7 @@ class HWPGripperAgent:
         self.mcu_ip = args.mcu_ip
         self.control_port = args.control_port
         self.warm_grip_distance = args.warm_grip_distance
+        self.adjustment_distance = args.adjustment_distance
 
         self.shutdown_mode = False
         self.supervisor_id = args.supervisor_id
@@ -489,12 +490,13 @@ class HWPGripperAgent:
                     # If the warm-limit is hit, move the actuator outwards bit. This
                     # is because gripper sligthly overshoot the limit switches. The
                     # outward movement compensates for the overshoot and hysteresys of
-                    # the limit switches.
+                    # the limit switches. Default is -0.5 mm.
                     run_and_append(self.client.is_cold, True, job='grip',
                                    check_shutdown=check_shutdown)
                     time.sleep(1)
 
-                    run_and_append(self.client.move, 'POS', actuator + 1, -0.5,
+                    run_and_append(self.client.move, 'POS', actuator + 1,
+                                   self.adjustment_distance[actuator],
                                    job='grip', check_shutdown=check_shutdown)
 
                     run_and_append(self.client.is_cold, False, job='grip',
@@ -797,6 +799,8 @@ def make_parser(parser=None):
                         help='Port for actuator control as set by the Beaglebone code')
     pgroup.add_argument('--warm-grip-distance', nargs='+', default=[10.0, 10.0, 10.0],
                         help='Nominal distance for warm grip position')
+    pgroup.add_argument('--adjustment-distance', nargs='+', default=[-0.5, -0.5, -0.5],
+                        help='Adjustment distance to compensate overshoot or hysteresis')
     pgroup.add_argument('--supervisor-id', type=str,
                         help='Instance ID for HWP Supervisor agent')
     pgroup.add_argument('--no-data-warn-time', type=float, default=60,
