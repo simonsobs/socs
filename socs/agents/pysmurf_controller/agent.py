@@ -718,10 +718,6 @@ class PysmurfController:
             S, cfg = self._get_smurf_control(session=session)
             iva = iv.take_iv(S, cfg, **params['kwargs'])
             session.data = {
-                'bands': iva.bands.tolist(),
-                'channels': iva.channels.tolist(),
-                'bgmap': iva.bgmap.tolist(),
-                'R_n': iva.R_n.tolist(),
                 'filepath': iva.filepath,
             }
             return True, "Finished taking IV"
