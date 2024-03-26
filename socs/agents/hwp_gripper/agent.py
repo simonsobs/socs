@@ -76,7 +76,11 @@ class HWPGripperAgent:
                 )
                 raise TimeoutError('Could not acquire lock')
 
-            return_dict = func(*args, **kwargs)
+            try:
+                return_dict = func(*args, **kwargs)
+            except OSError:
+                self.log.error("Communication error with gripper. Reconnecting")
+                self._initialized = False
 
         for line in return_dict['log']:
             self.log.debug(line)
@@ -520,6 +524,10 @@ class HWPGripperAgent:
                 )
             except TimeoutError:
                 self.log.warn('monitor_state: Query Timeout')
+            except OSError:
+                self.client = cli.GripperClient(self.mcu_ip, self.control_port)
+                self.log.info("Re-initialized Client")
+                self._initialized = True
 
             now = time.time()
 
