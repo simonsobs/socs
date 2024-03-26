@@ -6,7 +6,7 @@ import pytest
 from socs.testing import device_emulator
 
 tcp_emulator = device_emulator.create_device_emulator({'ping': 'pong'},
-                                                      'tcp', 9001)
+                                                      'tcp')
 
 
 def test_create_device_emulator_invalid_type():
@@ -15,11 +15,12 @@ def test_create_device_emulator_invalid_type():
 
 
 def test_create_device_emulator_tcp_relay(tcp_emulator):
+    port = tcp_emulator.port
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         # Connection might not work on first attempt
         for i in range(5):
             try:
-                s.connect(('127.0.0.1', 9001))
+                s.connect(('127.0.0.1', port))
                 break
             except ConnectionRefusedError:
                 print("Could not connect, waiting and trying again.")
