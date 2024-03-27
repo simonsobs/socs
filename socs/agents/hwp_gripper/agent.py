@@ -205,7 +205,7 @@ class HWPGripperAgent:
         """
 
         if self._get_hwp_freq() > 0.1:
-            self.log.warning("Not moving actuators while HWP is spinning")
+            self.log.warn("Not moving actuators while HWP is spinning")
             return False, "HWP is spinning, not moving actuators"
 
         return_dict = self._run_client_func(
@@ -391,25 +391,8 @@ class HWPGripperAgent:
         **Task** - Series of commands to automatically warm grip the HWP.
         This will return grippers to their home position, then move them each
         inwards incrementally until warm limit switches are tiggered. If the
-        HWP is spinning, this will not run.
-        """
-        if self._get_hwp_freq() > 0.1:
-            return False, "Not gripping HWP because HWP is spinning"
-
-        self._grip_hwp(session, check_shutdown=True)
-        return True, "Finished gripping procedure"
-
-    def _grip_hwp(self, session, check_shutdown=True):
-        """
-        Helper function to grip the HWP that can be called by the grip_hwp
-        task or by the shutdown procedure.  This will return grippers to their
-        home position, then move them each inwards incrementally.
-
-        Args
-        ------
-        session (OpSession):
-            Session object for current operation. This function will add to
-            session data.
+        HWP is spinning, this will not run. If this fails to grip hwp, this
+        return grippers to their home position.
 
         Notes:
             The most recent data collected is stored in session data in the
@@ -420,10 +403,21 @@ class HWPGripperAgent:
                                     ..
                  {'result': True, 'log': [.., .., etc]}]
         """
+        if self._get_hwp_freq() > 0.1:
+            return False, "Not gripping HWP because HWP is spinning"
+
+        result, session.data = self._grip_hwp(check_shutdown=True)
+        return result, "Finished gripping procedure"
+
+    def _grip_hwp(self, check_shutdown=True):
+        """
+        Helper function to grip the HWP that can be called by the grip_hwp
+        task or by the shutdown procedure.  This will return grippers to their
+        home position, then move them each inwards incrementally.
+        """
         data = {
             'responses': [],
         }
-        session.data = data
 
         def run_and_append(func, *args, **kwargs):
             return_dict = self._run_client_func(func, *args, **kwargs)
@@ -438,8 +432,8 @@ class HWPGripperAgent:
             act_results[1]['limits']['warm_grip']['state'] | \
             act_results[2]['limits']['warm_grip']['state']
         if limit_switch_state:
-            self.log.warning("HWP is already gripped. Do nothing.")
-            return data
+            self.log.warn("HWP is already gripped. Do nothing.")
+            return True, data
 
         # Reset alarms
         run_and_append(self.client.reset, job='grip', check_shutdown=check_shutdown)
@@ -472,23 +466,28 @@ class HWPGripperAgent:
             if all(finished) or any(aborted):
                 break
             for actuator, _ in enumerate(finished):
+                if finished[actuator]:
+                    continue
+
                 # 1 mm margin to abort the incrementation
                 if i * 0.2 - 1 > self.warm_grip_distance[actuator]:
                     aborted[actuator] = True
                     finished[actuator] = True
 
-                if finished[actuator]:
-                    continue
                 # Move actuator inwards until warm-limit is hit
-                run_and_append(self.client.move, 'POS', actuator + 1, 0.2,
-                               job='grip', check_shutdown=check_shutdown)
+                # the alarm will be triggered
+                # and return_dict['result'] will be False
+                return_dict = run_and_append(self.client.move, 'POS', actuator + 1,
+                              0.2, job='grip', check_shutdown=check_shutdown)
+                print( actuator+1, return_dict)
 
-                # Reset alarms. If the warm-limit is hit, the alarm will be triggered
-                # and return_dict['result'] will be True
-                return_dict = run_and_append(self.client.reset, job='grip',
-                                             check_shutdown=check_shutdown)
 
-                if return_dict['result']:
+                if not return_dict['result']:
+                    # Reset alarms.
+                    run_and_append(self.client.reset, job='grip',
+                                   check_shutdown=check_shutdown)
+                    time.sleep(1)
+
                     # If the warm-limit is hit, move the actuator outwards bit. This
                     # is because gripper sligthly overshoot the limit switches. The
                     # outward movement compensates for the overshoot and hysteresys of
@@ -516,6 +515,7 @@ class HWPGripperAgent:
             run_and_append(self.client.home, job='grip',
                            check_shutdown=check_shutdown)
             time.sleep(1)
+
             run_and_append(self.client.force, False, job='grip',
                            check_shutdown=check_shutdown)
 
@@ -531,9 +531,10 @@ class HWPGripperAgent:
 
         # We should stop schedule if we have an error in this task
         if (not all(finished)) or any(aborted):
-            raise ValueError("Failed to grip HWP. Grippers are retracted.")
+            self.log.error('Failed to grip HWP. Grippers are retracted.')
+            return False, data
 
-        return data
+        return True, data
 
     def ungrip(self, session, params=None):
         """ungrip()
@@ -541,22 +542,6 @@ class HWPGripperAgent:
         **Task** - Series of commands to automatically ungrip the HWP.
         This will return grippers to their home position, and retract
         grippers as much as possible.
-        """
-
-        self._ungrip_hwp(session, check_shutdown=True)
-        return True, "Finished ungripping procedure"
-
-    def _ungrip_hwp(self, session, check_shutdown=True):
-        """
-        Helper function to ungrip the HWP that can be called by the ungrip_hwp
-        task or by the shutdown procedure.  This will return grippers to their
-        home position, and retract as much as possible.
-
-        Args
-        ------
-        session (OpSession):
-            Session object for current operation. This function will add to
-            session data.
 
         Notes:
             The most recent data collected is stored in session data in the
@@ -567,10 +552,19 @@ class HWPGripperAgent:
                                     ..
                  {'result': True, 'log': [.., .., etc]}]
         """
+
+        result, session.data = self._ungrip_hwp(check_shutdown=True)
+        return result, "Finished ungripping procedure"
+
+    def _ungrip_hwp(self, check_shutdown=True):
+        """
+        Helper function to ungrip the HWP that can be called by the ungrip_hwp
+        task or by the shutdown procedure.  This will return grippers to their
+        home position, and retract as much as possible.
+        """
         data = {
             'responses': [],
         }
-        session.data = data
 
         def run_and_append(func, *args, **kwargs):
             return_dict = self._run_client_func(func, *args, **kwargs)
@@ -610,10 +604,12 @@ class HWPGripperAgent:
             act_results[1]['limits']['warm_grip']['state'] | \
             act_results[2]['limits']['warm_grip']['state']
 
-        # We should stop schedule if we have an error in this task
+        # Stop schedule if the limit switch state is wrong
         if limit_switch_state:
-            print("Failed to ungrip HWP.")  # need to fix
-        return data
+            self.log.error("Failed to ungrip HWP. Limit switch state is not as expected.")
+            return False, data
+
+        return True, data
 
     def cancel_shutdown(self, session, params=None):
         """cancel_shutdown()
