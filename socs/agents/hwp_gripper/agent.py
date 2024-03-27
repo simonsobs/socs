@@ -388,11 +388,11 @@ class HWPGripperAgent:
     def grip(self, session, params=None):
         """grip()
 
-        **Task** - Series of commands to automatically warm grip the HWP.
-        This will return grippers to their home position, then move them each
-        inwards incrementally until warm limit switches are tiggered. If the
-        HWP is spinning, this will not run. If this fails to grip hwp, this
-        return grippers to their home position.
+        **Task** - Series of commands to automatically warm grip the HWP. This
+        assumes that HWP is cold. This will return grippers to their home position,
+        then move them each inwards incrementally until warm limit switches are
+        tiggered. If the HWP is spinning, this will not run. If this fails to grip
+        hwp, this will return grippers to their home position.
 
         Notes:
             The most recent data collected is stored in session data in the
@@ -460,26 +460,26 @@ class HWPGripperAgent:
         run_and_append(self.client.force, False, job='grip', check_shutdown=check_shutdown)
 
         finished = [False, False, False]
-        aborted = [False, False, False]
 
-        for i in range(100):  # 20 mm is absolute maximum
-            if all(finished) or any(aborted):
+        # Move to the warm_grip_distance - 5 mm.
+        for actuator in range(3):
+            distance = self.warm_grip_distance[actuator] - 5.
+            return_dict = run_and_append(self.client.move, 'POS', actuator + 1, distance,
+                                         job='grip', check_shutdown=check_shutdown)
+            time.sleep(1)
+
+        # Move actator inwards by 0.1 mm step, warm_grip_distance + 1 is absolute maximum
+        for i in range(60):
+            if all(finished):
                 break
             for actuator, _ in enumerate(finished):
                 if finished[actuator]:
                     continue
 
-                # 1 mm margin to abort the incrementation
-                if i * 0.2 - 1 > self.warm_grip_distance[actuator]:
-                    aborted[actuator] = True
-                    finished[actuator] = True
-
                 # Move actuator inwards until warm-limit is hit
-                # the alarm will be triggered
-                # and return_dict['result'] will be False
-                return_dict = run_and_append(self.client.move, 'POS', actuator + 1,
-                                             0.2, job='grip', check_shutdown=check_shutdown)
-                print(actuator + 1, return_dict)
+                # If the warm limit is hit, return_dict['result'] will be False
+                return_dict = run_and_append(self.client.move, 'POS', actuator + 1, 0.1,
+                                             job='grip', check_shutdown=check_shutdown)
 
                 if not return_dict['result']:
                     # Reset alarms.
@@ -487,16 +487,15 @@ class HWPGripperAgent:
                                    check_shutdown=check_shutdown)
                     time.sleep(1)
 
-                    # If the warm-limit is hit, move the actuator outwards bit. This
-                    # is because gripper sligthly overshoot the limit switches. The
-                    # outward movement compensates for the overshoot and hysteresys of
-                    # the limit switches. Default is -0.5 mm.
+                    # If the warm-limit is hit, move the actuator outwards by 0.5 mm
+                    # to un-trigger the warm-limit. This is because gripper sligthly
+                    # overshoot the limit switches. The outward movement compensates
+                    # for the overshoot and hysteresys of the limit switches.
                     run_and_append(self.client.is_cold, True, job='grip',
                                    check_shutdown=check_shutdown)
                     time.sleep(1)
 
-                    run_and_append(self.client.move, 'POS', actuator + 1,
-                                   self.adjustment_distance[actuator],
+                    run_and_append(self.client.move, 'POS', actuator + 1, -0.5,
                                    job='grip', check_shutdown=check_shutdown)
 
                     run_and_append(self.client.is_cold, False, job='grip',
@@ -505,7 +504,8 @@ class HWPGripperAgent:
 
                     finished[actuator] = True
 
-        if (not all(finished)) or any(aborted):
+        # Return grippers back to home is something is wrong
+        if not all(finished):
             self.log.error('Failed to grip HWP. Retract grippers.')
             run_and_append(self.client.force, True, job='grip',
                            check_shutdown=check_shutdown)
@@ -518,6 +518,21 @@ class HWPGripperAgent:
             run_and_append(self.client.force, False, job='grip',
                            check_shutdown=check_shutdown)
 
+        # Adjust gripper position if you need
+        else:
+            run_and_append(self.client.is_cold, True, job='grip',
+                           check_shutdown=check_shutdown)
+            time.sleep(1)
+
+            for actuator in range(3):
+                run_and_append(self.client.move, 'POS', actuator + 1,
+                               self.adjustment_distance[actuator],
+                               job='grip', check_shutdown=check_shutdown)
+
+            run_and_append(self.client.is_cold, False, job='grip',
+                           check_shutdown=check_shutdown)
+            time.sleep(1)
+
         # Enable breaks
         run_and_append(self.client.brake, True, job='grip',
                        check_shutdown=check_shutdown)
@@ -529,7 +544,7 @@ class HWPGripperAgent:
         time.sleep(1)
 
         # We should stop schedule if we have an error in this task
-        if (not all(finished)) or any(aborted):
+        if not all(finished):
             self.log.error('Failed to grip HWP. Grippers are retracted.')
             return False, data
 
@@ -799,10 +814,12 @@ def make_parser(parser=None):
                         help='Port for actuator control as set by the Beaglebone code')
     pgroup.add_argument('--warm-grip-distance', action='store', type=float, nargs=3,
                         default=[10.0, 10.0, 10.0],
-                        help='Nominal distance for warm grip position')
+                        help='Nominal distance for warm grip position (mm). This needs'
+                             'to be multiple of 0.1')
     pgroup.add_argument('--adjustment-distance', action='store', type=float, nargs=3,
-                        default=[-0.5, -0.5, -0.5],
-                        help='Adjustment distance to compensate overshoot or hysteresis')
+                        default=[0, 0, 0],
+                        help='Adjustment distance to compensate the misalignment of '
+                             'limit switches (mm). This needs to be multiple of 0.1')
     pgroup.add_argument('--supervisor-id', type=str,
                         help='Instance ID for HWP Supervisor agent')
     pgroup.add_argument('--no-data-warn-time', type=float, default=60,
