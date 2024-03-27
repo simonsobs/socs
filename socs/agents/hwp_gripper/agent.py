@@ -478,9 +478,8 @@ class HWPGripperAgent:
                 # the alarm will be triggered
                 # and return_dict['result'] will be False
                 return_dict = run_and_append(self.client.move, 'POS', actuator + 1,
-                              0.2, job='grip', check_shutdown=check_shutdown)
-                print( actuator+1, return_dict)
-
+                                             0.2, job='grip', check_shutdown=check_shutdown)
+                print(actuator + 1, return_dict)
 
                 if not return_dict['result']:
                     # Reset alarms.
