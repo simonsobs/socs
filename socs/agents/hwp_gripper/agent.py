@@ -318,15 +318,15 @@ class HWPGripperAgent:
         """is_cold(value=False)
 
         **Task** - Set the limit switches to warm/cold grip configuration
-        warm grip configuration: enable both warm and cold limit switches.
-        cold grip configuration: enable only cold limit switches.
 
         Parameters:
             value (bool): Set to warm grip (False) or cold grip (True)
 
         Notes:
-            Configures the software to query the correct set of limit switches. The
-            maximum extension of the actuators depends on the cryostat temperature.
+            Configures the software to query the correct set of limit switches.
+            Warm grip configuration enables both warm and cold limit switches.
+            Cold grip configuration enables only cold limit switches. The maximum
+            extension of the actuators depends on the cryostat temperature.
 
             The most recent data collected is stored in session data in the
             structure:
