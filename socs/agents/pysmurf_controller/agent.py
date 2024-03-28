@@ -19,8 +19,8 @@ from ocs import ocs_agent, site_config
 from ocs.ocs_agent import log_formatter
 from ocs.ocs_twisted import TimeoutLock
 from sodetlib.det_config import DetConfig
-from sodetlib.operations import (bias_dets, bias_steps, iv, uxm_relock,
-                                 uxm_setup)
+from sodetlib.operations import (bias_dets, bias_steps, bias_wave, iv,
+                                 uxm_relock, uxm_setup)
 
 NBIASLINES = 12
 
@@ -833,6 +833,109 @@ class PysmurfController:
 
     @ocs_agent.param('bgs', default=None)
     @ocs_agent.param('kwargs', default=None)
+    @ocs_agent.param('tag', default=None)
+    def take_bias_waves(self, session, params):
+        """take_bias_waves(kwargs=None, rfrac_range=(0.2, 0.9), tag=None)
+
+        **Task** - Takes bias_wave and saves the output filepath to the
+        session data object.
+
+        Args
+        ----
+        kwargs : dict
+            Additional kwargs to pass to ``take_bias_wave`` function.
+        rfrac_range : tuple
+            Range of valid rfracs to check against when determining the number
+            of good detectors.
+        tag : Optional[str]
+            String containing a tag or comma-separated list of tags to attach
+            to the g3 stream.
+
+        Notes
+        ------
+        The following data will be written to the session.data object::
+
+            >> response.session['data']
+            {
+                'filepath': Filepath of saved BiasWaveAnalysis object
+                'biased_total': Total number of detectors biased into rfrac_range
+                'biased_per_bg': List containing number of biased detectors on each bias line
+                'Rtes_quantiles': {
+                    'Rtes': List of 15%, 25%, 50%, 75%, 85% Rtes quantiles,
+                    'quantiles': List of quantile labels
+                    'count': Total count of the distribution
+                }
+                'responsivity_quantiles': Same as above for responsivity
+                'Rfrac_quantiles': Same as above for Rfrac
+
+            }
+        """
+
+        if params['kwargs'] is None:
+            params['kwargs'] = {}
+
+        if params['tag'] is not None:
+            params['kwargs']['g3_tag'] = params['tag']
+
+        with self.lock.acquire_timeout(0, job='bias_wave') as acquired:
+            if not acquired:
+                return False, f"Operation failed: {self.lock.job} is running."
+
+            session.set_status('starting')
+            S, cfg = self._get_smurf_control(session=session)
+            bwa = bias_wave.take_bias_waves(
+                S, cfg, **params['kwargs']
+            )
+
+            biased = np.logical_and.reduce([
+                params['rfrac_range'][0] < bwa.Rfrac,
+                params['rfrac_range'][1] > bwa.Rfrac
+            ])
+            session.data = {
+                'filepath': bwa.filepath,
+                'biased_total': int(np.sum(biased)),
+                'biased_per_bg': [
+                    int(np.sum(biased[bwa.bgmap == bg])) for bg in range(12)
+                ],
+            }
+            quantiles = np.array([15, 25, 50, 75, 85])
+
+            def publish_quantile_block(arr, name):
+                if np.isnan(arr).all():
+                    return None
+                labels = [f'{name}_q{q}' for q in quantiles]
+                qs = [float(np.nanquantile(arr, q / 100)) for q in quantiles]
+                block = {
+                    k: q
+                    for k, q in zip(labels, qs)
+                }
+                count = int(np.sum(~np.isnan(arr)))
+                block[f'{name}_count'] = count
+
+                session.data[f'{name}_quantiles'] = {
+                    name: qs,
+                    'quantiles': labels,
+                    'count': count,
+                }
+
+                d = {
+                    'timestamp': time.time(),
+                    'block_name': f'{name}_quantile',
+                    'data': block
+                }
+
+                self.agent.publish_to_feed('bias_wave_quantiles', d)
+                return d
+
+            # Resistance quantiles
+            publish_quantile_block(bwa.R0, 'Rtes')
+            publish_quantile_block(bwa.Si, 'resposnivity')
+            publish_quantile_block(bwa.Rfrac, 'Rfrac')
+
+            return True, "Finished taking bias waves"
+
+    @ocs_agent.param('bgs', default=None)
+    @ocs_agent.param('kwargs', default=None)
     def overbias_tes(self, session, params):
         """overbias_tes(bgs=None, kwargs=None)
 
@@ -1046,6 +1149,7 @@ def main(args=None):
     agent.register_task('bias_dets', controller.bias_dets)
     agent.register_task('take_iv', controller.take_iv)
     agent.register_task('take_bias_steps', controller.take_bias_steps)
+    agent.register_task('take_bias_waves', controller.take_bias_waves)
     agent.register_task('overbias_tes', controller.overbias_tes)
     agent.register_task('take_noise', controller.take_noise)
     agent.register_task('bias_dets', controller.bias_dets)
