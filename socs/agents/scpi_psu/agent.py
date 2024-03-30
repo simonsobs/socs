@@ -1,12 +1,12 @@
 import argparse
 import socket
 import time
+from typing import Optional
 
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
 from socs.agents.scpi_psu.drivers import PsuInterface
-
 
 class ScpiPsuAgent:
     def __init__(self, agent, ip_address, gpib_slot):
@@ -20,6 +20,8 @@ class ScpiPsuAgent:
         self.monitor = False
 
         self.psu = None
+
+        self.module: Optional[ScpiPsuAgent] = None
 
         # Registers Temperature and Voltage feeds
         agg_params = {
@@ -37,6 +39,9 @@ class ScpiPsuAgent:
         **Task** - Initialize connection to the power supply.
 
         """
+        if self.module is not None:
+            return True, "Already Initialized Module"
+    
         with self.lock.acquire_timeout(0) as acquired:
             if not acquired:
                 return False, "Could not acquire lock"
@@ -44,12 +49,26 @@ class ScpiPsuAgent:
             try:
                 self.psu = PsuInterface(self.ip_address, self.gpib_slot)
                 self.idn = self.psu.identify()
+                # self.agent.start('initialize')
             except socket.timeout as e:
                 self.log.error(f"PSU timed out during connect: {e}")
                 return False, "Timeout"
             self.log.info("Connected to psu: {}".format(self.idn))
 
-        return True, 'Initialized PSU.'
+            self._initialize_module()
+
+        return True, 'Initialized PSU.'  
+ 
+    def _initialize_module(self):
+        """Initialize the ScpiPsu module."""
+        try:
+            self.module = ScpiPsuAgent(self.agent, self.ip_address, self.gpib_slot)
+            self.log.info(f"Initialized ScpiPsuAgent module: {self.module}")
+            return True
+        except Exception as e:
+            self.log.error(f"Failed to initialize ScpiPsuAgent module: {e}")
+            self.module = None
+        return False
 
     @ocs_agent.param('wait', type=float, default=1)
     @ocs_agent.param('channels', type=list, default=[1, 2, 3])
@@ -74,6 +93,11 @@ class ScpiPsuAgent:
         while self.monitor:
             with self.lock.acquire_timeout(1) as acquired:
                 if acquired:
+                    if self.module is None:  # Try to re-initialize module if it fails
+                        if not self._initialize_module():
+                            time.sleep(5)  # wait 5 sec before trying to re-initialize
+                            continue
+
                     data = {
                         'timestamp': time.time(),
                         'block_name': 'output',
@@ -81,8 +105,13 @@ class ScpiPsuAgent:
                     }
 
                     for chan in params['channels']:
-                        data['data']["Voltage_{}".format(chan)] = self.psu.get_volt(chan)
-                        data['data']["Current_{}".format(chan)] = self.psu.get_curr(chan)
+                        try:
+                            data['data']["Voltage_{}".format(chan)] = self.psu.get_volt(chan)
+                            data['data']["Current_{}".format(chan)] = self.psu.get_curr(chan)
+                        except socket.timeout as e:
+                            self.log.warn(f"TimeoutError: {e}")
+                            self.module = None
+                            continue
 
                     # self.log.info(str(data))
                     # print(data)
