@@ -4,7 +4,7 @@ import threading
 import time
 import traceback
 from dataclasses import asdict, dataclass, field
-from typing import Dict, List, Optional, Literal
+from typing import Dict, List, Literal, Optional
 
 import numpy as np
 import ocs
@@ -531,7 +531,7 @@ class ControlState:
         "Outlets required for enabling driver board"
         cycle_twice: bool = False
         "If true, will wait, and then power cycle again"
-        cycle_wait_time: float = 60*5
+        cycle_wait_time: float = 60 * 5
         "Time [sec] before repeating the power cycle"
 
         def __post_init__(self):
@@ -542,7 +542,6 @@ class ControlState:
                 )
             self.cycled = False
             self.cycle_timestamp = None
-
 
     @dataclass
     class DisableDriverBoard(Base):
@@ -657,7 +656,7 @@ class ControlStateMachine:
 
         status, msg, session = op.start(**kwargs)
         log.info("Starting op: name={name}, kwargs={kw}",
-                        name=session.get('op_name'), kw=kwargs)
+                 name=session.get('op_name'), kw=kwargs)
 
         if status == ocs.ERROR:
             raise ControlClientError("op-start returned Error:\n  msg: " + msg)
@@ -674,8 +673,8 @@ class ControlStateMachine:
             raise ControlClientError("op-wait timed out")
 
         log.info("Completed op: name={name}, success={success}, kwargs={kw}",
-                        name=session.get('op_name'), success=session.get('success'),
-                        kw=kwargs)
+                 name=session.get('op_name'), success=session.get('success'),
+                 kw=kwargs)
 
         return session
 
@@ -1407,7 +1406,7 @@ def make_parser(parser=None):
         '--driver-power-cycle-twice', action='store_true',
         help="If set, will power cycle the driver board twice on enable")
     pgroup.add_argument(
-        '--driver-power-cycle-wait-time', type=float, default=60*5,
+        '--driver-power-cycle-wait-time', type=float, default=60 * 5,
         help="Wait time between power cycles on enable (sec)")
     pgroup.add_argument(
         '--driver-power-agent-type', choices=['iboot', 'synaccess'], default=None,
