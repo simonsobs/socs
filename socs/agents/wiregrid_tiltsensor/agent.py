@@ -11,8 +11,7 @@ from socs.agents.wiregrid_tiltsensor.drivers.sherborne import Sherborne
 
 def connect(tiltsensor_ip, tiltsensor_port, type_tiltsensor):
     if type_tiltsensor == 'DWL':
-        # tiltsensor = DWL(tcp_ip=tiltsensor_ip, tcp_port=tiltsensor_port, timeout=0.5, isSingle=False, verbose=0)
-        tiltsensor = DWL(rtu_port='/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_AB0L75U1-if00-port0', timeout=0.5, isSingle=False, verbose=0)
+        tiltsensor = DWL(tcp_ip=tiltsensor_ip, tcp_port=tiltsensor_port, timeout=0.5, isSingle=False, verbose=0)
     elif type_tiltsensor == 'sherborne':
         tiltsensor = Sherborne(tcp_ip=tiltsensor_ip, tcp_port=tiltsensor_port, reset_boot=False, timeout=0.5, verbose=0)
     else:
