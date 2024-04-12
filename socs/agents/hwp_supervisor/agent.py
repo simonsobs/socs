@@ -364,9 +364,14 @@ class ControlState:
         def __init__(self):
             super().__init__()
             self.start_time = time.time()
+            self.last_update_time = 0
 
         def encode(self):
-            d = {'class': self.__class__.__name__}
+            d = {
+                'class': self.__class__.__name__,
+                'start_time': self.start_time,
+                'last_update_time': self.last_update_time,
+            }
             d.update(asdict(self))
             return d
 
@@ -523,16 +528,25 @@ class ControlState:
 
     @dataclass
     class EnableDriverBoard(Base):
-        "Enables driver boards for encoder LEDs"
+        """
+        Enables driver boards for encoder LEDs
 
+        Attributes
+        -----------
+        driver_power_agent_type : Literal["iboot", "synaccess"]
+            Type of agent used for controlling the driver power. Must be
+            "iboot" or "synaccess".
+        outlets : List[int]
+            Outlets required for enabling driver board
+        cycle_twice : bool
+            If true, will wait, and then power cycle again
+        cycle_wait_time : float
+            Time [sec] before repeating the power cycle
+        """
         driver_power_agent_type: Literal['iboot, synaccess']
-        "Type of agent used for controlling the driver power"
         outlets: List[int]
-        "Outlets required for enabling driver board"
         cycle_twice: bool = False
-        "If true, will wait, and then power cycle again"
         cycle_wait_time: float = 60 * 5
-        "Time [sec] before repeating the power cycle"
 
         def __post_init__(self):
             if self.driver_power_agent_type not in ['iboot', 'synaccess']:
@@ -545,12 +559,18 @@ class ControlState:
 
     @dataclass
     class DisableDriverBoard(Base):
-        "Disables driver board for encoder LEDs"
+        """
+        Disables driver board for encoder LEDs
 
+        Attributes
+        -----------
         driver_power_agent_type: Literal['iboot, synaccess']
-        "Type of agent used for controlling the driver power"
+            Type of agent used for controlling the driver power
         outlets: List[int]
-        "Outlets required for enabling driver board"
+            Outlets required for enabling driver board
+        """
+        driver_power_agent_type: Literal['iboot, synaccess']
+        outlets: List[int]
 
         def __post_init__(self):
             if self.driver_power_agent_type not in ['iboot', 'synaccess']:
@@ -683,6 +703,7 @@ class ControlStateMachine:
         try:
             self.lock.acquire()
             state = self.action.cur_state
+            state.last_update_time = time.time()
 
             def query_pid_state():
                 data = self.run_and_validate(clients.pid.get_state)['data']
