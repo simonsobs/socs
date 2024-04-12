@@ -801,7 +801,7 @@ class PysmurfController:
                 if np.isnan(arr).all():
                     return None
                 labels = [f'{name}_q{q}' for q in quantiles]
-                qs = [float(np.nanquantile(arr, q / 100)) for q in quantiles]
+                qs = [float(np.nan_to_num(np.nanquantile(arr, q / 100))) for q in quantiles]
                 block = {
                     k: q
                     for k, q in zip(labels, qs)
