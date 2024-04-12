@@ -233,13 +233,3 @@ class DWL:
         self.ser.write(command)
         self.wait()
         return True
-
-
-if __name__ == "__main__":
-    import dwl_config as cg
-
-    # isSingle = True
-    isSingle = False
-    dwl = DWL(rtu_port=cg.rtu_port, tcp_ip=cg.tcp_ip, tcp_port=cg.tcp_port, timeout=0.5, isSingle=isSingle, verbose=1)
-    read_status, msg, val = dwl.get_angle()
-    print(val)
