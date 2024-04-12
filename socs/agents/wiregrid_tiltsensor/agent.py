@@ -21,6 +21,19 @@ def connect(tiltsensor_ip, tiltsensor_port, type_tiltsensor):
 
 class WiregridTiltsensorAgent:
     """ Agent to record the wiregrid tilt sensor data.
+    The tilt sensor data is sent via serial-to-ethernet converter.
+
+    Args:
+        tiltsensor_ip (str): IP address of the serial-to-ethernet converter
+        tiltsensor_port (int or str): Asigned port for the tilt sensor
+            The converter has four D-sub ports to control
+            multiple devices is determined
+            by the ethernet port number of converter.
+        type_tiltsensor (str): Type of tilt sensor
+            There are twp types of tilt sensor,
+            and this argument is used for specifying
+            to communicate with whichtilt sensor.
+            This argument should be 'DWL' or 'sherborne'.
     """
 
     def __init__(self, agent, tiltsensor_ip, tiltsensor_port, type_tiltsensor=None):
@@ -43,8 +56,26 @@ class WiregridTiltsensorAgent:
 
     def acq(self, session, params=None):
         """acq()
+
         **Process** - Run data acquisition.
+
+        Notes:
+            The most recent data collected is stored in session.data in the
+            structure::
+
+                >>> response.session['data']
+                {'tiltsensor_data': {
+                    'angleX': the angle in X-axis of tilt sensor,
+                    'angleY': the angle in Y-axis of tilt sensor,
+                    'temperatureX': the temperature in X-axis of tilt sensor
+                                    this is available for only sherborne,
+                    'temperatureY': the temperature in Y-axis of tilt sensor
+                                    this is available for only sherborne
+                    },
+                'timestamp': timestamp when it updates tilt sensor data
+                }
         """
+
         with self.lock.acquire_timeout(timeout=0, job='acq') as acquired:
             if not acquired:
                 self.log.warn(
@@ -87,7 +118,6 @@ class WiregridTiltsensorAgent:
                 else:
                     pass
 
-                # if read_status:
                 tiltsensor_data['timestamp'] = current_time
                 tiltsensor_data['data']['angleX'] = angles[0]
                 tiltsensor_data['data']['angleY'] = angles[1]
@@ -107,7 +137,7 @@ class WiregridTiltsensorAgent:
 
                 # store the session data
                 session.data = {
-                    'test_data': {
+                    'tiltsensor_data': {
                         'angleX': tiltsensor_data['data']['angleX'],
                         'angleY': tiltsensor_data['data']['angleY'],
                         'temperatureX': tiltsensor_data['data']['temperatureX'],
@@ -133,7 +163,9 @@ class WiregridTiltsensorAgent:
 
     def reset(self, session, params=None):
         """reset()
+
         **Task** - Reset the tiltsensor if the type of tiltsensor is sherborne.
+
         """
         with self.lock.acquire_timeout(timeout=3.0, job='reset') as acquired:
             if not acquired:
