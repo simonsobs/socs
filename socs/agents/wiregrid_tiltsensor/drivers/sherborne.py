@@ -137,10 +137,3 @@ class Sherborne:
             print(readY)
         self.wait_reset()
         return True
-
-
-if __name__ == '__main__':
-    import sherborne_config as cg
-    sherborne = Sherborne(rtu_port=None, tcp_ip=cg.tcp_ip, tcp_port=cg.tcp_port, timeout=1.0, verbose=1)
-    msg, val = sherborne.get_angle()
-    print(val)
