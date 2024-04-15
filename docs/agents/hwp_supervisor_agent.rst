@@ -38,9 +38,37 @@ Here is an example of a config block you can add to your ocs site-config file::
             '--ups-id', 'power-ups-az',
             '--ups-minutes-remaining-thresh', 45,
             '--iboot-id', 'power-iboot-hwp-2',
-            '--iboot-outlets', [1,2]
+            '--driver-iboot-id', 'hwp-synaccess-1',
+            '--driver-iboot-outlets', 4, 5,
+            '--driver-power-agent-type', 'synaccess',
+            '--driver-power-cycle-twice',
+            '--driver-power-cycle-wait-time', 300,
         ]}
 
+For SATP1, we use an ibootbar to power the driver, and it is not necessary to
+cycle the driver power twice, so the config will look like::
+
+       {'agent-class': 'HWPSupervisor',
+        'instance-id': 'hwp-supervisor',
+        'arguments': [
+            '--ybco-lakeshore-id', 'cryo-ls240-lsa2619',
+            '--ybco-temp-field', 'Channel_7',
+            '--ybco-temp-thresh', 75,
+            '--hwp-encoder-id', 'hwp-bbb-e1',
+            '--hwp-pmx-id', 'hwp-pmx',
+            '--hwp-pid-id', 'hwp-pid',
+            '--ups-id', 'power-ups-az',
+            '--ups-minutes-remaining-thresh', 45,
+            '--iboot-id', 'power-iboot-hwp-2',
+            '--driver-iboot-id', 'power-iboot-hwp-2',
+            '--driver-iboot-outlets', 1, 2,
+            '--driver-power-agent-type', 'iboot',
+        ]}
+
+.. note::
+  The ``--driver-iboot-id`` and ``--driver-iboot-outlets`` arguments are
+  currently used to specify the agent-id and outlets for all power agent types,
+  not just ``iboot``.
 
 Docker Compose
 ````````````````
