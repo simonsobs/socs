@@ -4,7 +4,7 @@ import threading
 import time
 import traceback
 from dataclasses import asdict, dataclass, field
-from typing import Dict, List, Optional
+from typing import Dict, List, Literal, Optional
 
 import numpy as np
 import ocs
@@ -364,9 +364,14 @@ class ControlState:
         def __init__(self):
             super().__init__()
             self.start_time = time.time()
+            self.last_update_time = 0
 
         def encode(self):
-            d = {'class': self.__class__.__name__}
+            d = {
+                'class': self.__class__.__name__,
+                'start_time': self.start_time,
+                'last_update_time': self.last_update_time,
+            }
             d.update(asdict(self))
             return d
 
@@ -521,6 +526,59 @@ class ControlState:
         """Abort current action"""
         pass
 
+    @dataclass
+    class EnableDriverBoard(Base):
+        """
+        Enables driver boards for encoder LEDs
+
+        Attributes
+        -----------
+        driver_power_agent_type : Literal["iboot", "synaccess"]
+            Type of agent used for controlling the driver power. Must be
+            "iboot" or "synaccess".
+        outlets : List[int]
+            Outlets required for enabling driver board
+        cycle_twice : bool
+            If true, will wait, and then power cycle again
+        cycle_wait_time : float
+            Time [sec] before repeating the power cycle
+        """
+        driver_power_agent_type: Literal['iboot, synaccess']
+        outlets: List[int]
+        cycle_twice: bool = False
+        cycle_wait_time: float = 60 * 5
+
+        def __post_init__(self):
+            if self.driver_power_agent_type not in ['iboot', 'synaccess']:
+                raise ValueError(
+                    f"Invalid driver_power_agent_type: {self.driver_power_agent_type}. "
+                    "Must be in ['iboot', 'synaccess']"
+                )
+            self.cycled = False
+            self.cycle_timestamp = None
+
+    @dataclass
+    class DisableDriverBoard(Base):
+        """
+        Disables driver board for encoder LEDs
+
+        Attributes
+        -----------
+        driver_power_agent_type: Literal['iboot, synaccess']
+            Type of agent used for controlling the driver power
+        outlets: List[int]
+            Outlets required for enabling driver board
+        """
+        driver_power_agent_type: Literal['iboot, synaccess']
+        outlets: List[int]
+
+        def __post_init__(self):
+            if self.driver_power_agent_type not in ['iboot', 'synaccess']:
+                raise ValueError(
+                    f"Invalid driver_power_agent_type: {self.driver_power_agent_type}. "
+                    "Must be in ['iboot', 'synaccess']"
+                )
+
     completed_states = (Done, Error, Abort, Idle)
 
 
@@ -613,10 +671,12 @@ class ControlStateMachine:
         """
         if kwargs is None:
             kwargs = {}
+        if log is None:
+            log = self.log
 
         status, msg, session = op.start(**kwargs)
-        self.log.info("Starting op: name={name}, kwargs={kw}",
-                      name=session.get('op_name'), kw=kwargs)
+        log.info("Starting op: name={name}, kwargs={kw}",
+                 name=session.get('op_name'), kw=kwargs)
 
         if status == ocs.ERROR:
             raise ControlClientError("op-start returned Error:\n  msg: " + msg)
@@ -632,9 +692,9 @@ class ControlStateMachine:
         if status == ocs.TIMEOUT:
             raise ControlClientError("op-wait timed out")
 
-        self.log.info("Completed op: name={name}, success={success}, kwargs={kw}",
-                      name=session.get('op_name'), success=session.get('success'),
-                      kw=kwargs)
+        log.info("Completed op: name={name}, success={success}, kwargs={kw}",
+                 name=session.get('op_name'), success=session.get('success'),
+                 kw=kwargs)
 
         return session
 
@@ -643,6 +703,7 @@ class ControlStateMachine:
         try:
             self.lock.acquire()
             state = self.action.cur_state
+            state.last_update_time = time.time()
 
             def query_pid_state():
                 data = self.run_and_validate(clients.pid.get_state)['data']
@@ -802,6 +863,48 @@ class ControlStateMachine:
                     ))
                     return
 
+            elif isinstance(state, ControlState.EnableDriverBoard):
+                def set_outlet_state(outlet: int, outlet_state: bool):
+                    if state.driver_power_agent_type == 'iboot':
+                        kw = {'outlet': outlet, 'state': 'on' if outlet_state else 'off'}
+                    else:
+                        kw = {'outlet': outlet, 'on': outlet_state}
+                    self.run_and_validate(clients.driver_iboot.set_outlet, kwargs=kw)
+
+                if not state.cycled:
+                    for outlet in state.outlets:
+                        set_outlet_state(outlet, True)
+                    state.cycled = True
+                    state.cycle_timestamp = time.time()
+                    if not state.cycle_twice:
+                        self.action.set_state(ControlState.Done(success=True))
+                        return
+
+                # Needs to be re-cycled, after wait time
+                if time.time() - state.cycle_timestamp < state.cycle_wait_time:
+                    return
+
+                for outlet in state.outlets:
+                    set_outlet_state(outlet, False)
+                time.sleep(5)
+                for outlet in state.outlets:
+                    set_outlet_state(outlet, True)
+                self.action.set_state(ControlState.Done(success=True))
+                return
+
+            elif isinstance(state, ControlState.DisableDriverBoard):
+                def set_outlet_state(outlet: int, outlet_state: bool):
+                    if state.driver_power_agent_type == 'iboot':
+                        kw = {'outlet': outlet, 'state': 'on' if outlet_state else 'off'}
+                    else:
+                        kw = {'outlet': outlet, 'on': outlet_state}
+                    self.run_and_validate(clients.driver_iboot.set_outlet, kwargs=kw)
+
+                for outlet in state.outlets:
+                    set_outlet_state(outlet, False)
+                self.action.set_state(ControlState.Done(success=True))
+                return
+
         except Exception:
             tb = traceback.format_exc()
             self.log.error("Error updating state:\n{tb}", tb=tb)
@@ -868,6 +971,11 @@ class HWPSupervisor:
         self.driver_iboot_id = args.driver_iboot_id
         self.control_state_machine = ControlStateMachine()
         self.forward_is_cw = args.forward_dir == 'cw'
+
+        self.driver_power_agent_type = args.driver_power_agent_type
+        self.driver_iboot_outlets = args.driver_iboot_outlets
+        self.driver_power_cycle_twice = args.driver_power_cycle_twice
+        self.driver_power_cycle_wait_time = args.driver_power_cycle_wait_time
 
     def _get_hwp_clients(self):
         def get_client(id):
@@ -1225,6 +1333,64 @@ class HWPSupervisor:
         session.data['action'] = action.encode()
         return True, "Set state to idle"
 
+    def enable_driver_board(self, session, params):
+        """enable_driver_board()
+
+        **Task** - Enables the HWP driver board
+
+        Notes
+        --------
+
+        Example of ``session.data``::
+
+            >>> session['data']
+            {'action':
+                {'action_id': 3,
+                'completed': True,
+                'cur_state': {'class': 'Done', 'msg': None, 'success': True},
+                'state_history': List[ConrolState],
+                'success': False}
+            }
+        """
+        kw = {
+            'driver_power_agent_type': self.driver_power_agent_type,
+            'outlets': self.driver_iboot_outlets,
+            'cycle_twice': self.driver_power_cycle_twice,
+            'cycle_wait_time': self.driver_power_cycle_wait_time,
+        }
+        state = ControlState.EnableDriverBoard(**kw)
+        action = self.control_state_machine.request_new_action(state)
+        action.sleep_until_complete(session=session)
+        return action.success, f"Completed with state: {action.cur_state}"
+
+    def disable_driver_board(self, session, params):
+        """disable_driver_board()
+
+        **Task** - Disables the HWP driver board
+
+        Notes
+        --------
+
+        Example of ``session.data``::
+
+            >>> session['data']
+            {'action':
+                {'action_id': 3,
+                'completed': True,
+                'cur_state': {'class': 'Done', 'msg': None, 'success': True},
+                'state_history': List[ConrolState],
+                'success': False}
+            }
+        """
+        kw = {
+            'driver_power_agent_type': self.driver_power_agent_type,
+            'outlets': self.driver_iboot_outlets,
+        }
+        state = ControlState.DisableDriverBoard(**kw)
+        action = self.control_state_machine.request_new_action(state)
+        action.sleep_until_complete(session=session)
+        return action.success, f"Completed with state: {action.cur_state}"
+
 
 def make_parser(parser=None):
     if parser is None:
@@ -1257,6 +1423,15 @@ def make_parser(parser=None):
     pgroup.add_argument(
         '--driver-iboot-outlets', nargs='+', type=int,
         help="Outlets for driver iboot power")
+    pgroup.add_argument(
+        '--driver-power-cycle-twice', action='store_true',
+        help="If set, will power cycle the driver board twice on enable")
+    pgroup.add_argument(
+        '--driver-power-cycle-wait-time', type=float, default=60 * 5,
+        help="Wait time between power cycles on enable (sec)")
+    pgroup.add_argument(
+        '--driver-power-agent-type', choices=['iboot', 'synaccess'], default=None,
+        help="Type of agent used for controlling the driver power")
 
     pgroup.add_argument(
         '--gripper-iboot-id',
@@ -1288,6 +1463,8 @@ def main(args=None):
     agent.register_task('brake', hwp.brake)
     agent.register_task('pmx_off', hwp.pmx_off)
     agent.register_task('abort_action', hwp.abort_action)
+    agent.register_task('enable_driver_board', hwp.enable_driver_board)
+    agent.register_task('disable_driver_board', hwp.disable_driver_board)
 
     runner.run(agent, auto_reconnect=True)
 
