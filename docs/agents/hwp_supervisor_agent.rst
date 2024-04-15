@@ -65,6 +65,11 @@ cycle the driver power twice, so the config will look like::
             '--driver-power-agent-type', 'iboot',
         ]}
 
+.. note::
+  The ``--driver-iboot-id`` and ``--driver-iboot-outlets`` arguments are
+  currently used to specify the agent-id and outlets for all power agent types,
+  not just ``iboot``.
+
 Docker Compose
 ````````````````
 
