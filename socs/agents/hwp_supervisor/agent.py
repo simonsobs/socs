@@ -242,13 +242,13 @@ class HWPState:
 
     def update_pmx_state(self, op):
         """
-        Updates state values from the pmx acq operation results.
+        Updates state values from the pmx main operation results.
 
         Args
         -----
         op : dict
             Dict containing the operations (from get_op_data) from the pmx
-            ``acq`` process
+            ``main`` process
         """
         keymap = {'pmx_current': 'curr', 'pmx_voltage': 'volt',
                   'pmx_source': 'source', 'pmx_last_updated': 'last_updated'}
@@ -256,13 +256,13 @@ class HWPState:
 
     def update_pid_state(self, op):
         """
-        Updates state values from the pid acq operation results.
+        Updates state values from the pid main operation results.
 
         Args
         -----
         op : dict
             Dict containing the operations (from get_op_data) from the pid
-            ``acq`` process
+            ``main`` process
         """
         self._update_from_keymap(op, {
             'pid_current_freq': 'current_freq',
@@ -359,12 +359,10 @@ class HWPState:
 
 class ControlState:
     """Namespace for HWP control state definitions"""
-    @dataclass
+    @dataclass(kw_only=True)
     class Base:
-        def __init__(self):
-            super().__init__()
-            self.start_time = time.time()
-            self.last_update_time = 0
+        start_time: float = field(default_factory=time.time)
+        last_update_time: float = 0
 
         def encode(self):
             d = {
@@ -413,7 +411,7 @@ class ControlState:
         freq_tol_duration: float
         direction: str
         check_wait_time: float = 15.0
-        start_time: float = field(default_factory=time.time)
+        start_time: float = field(default_factory=time.time, kw_only=True)
 
     @dataclass
     class WaitForTargetFreq(Base):
@@ -487,7 +485,7 @@ class ControlState:
             Time that the state was entered
         """
         traceback: str
-        start_time: float = field(default_factory=time.time)
+        start_time: float = field(default_factory=time.time, kw_only=True)
 
     @dataclass
     class Brake(Base):
@@ -720,7 +718,7 @@ class ControlStateMachine:
                 self.run_and_validate(clients.pid.tune_freq, timeout=60)
                 self.run_and_validate(
                     clients.pcu.send_command,
-                    kwargs={'command': 'off'}, timeout=None,
+                    kwargs={'command': 'off'}, timeout=None
                 )
                 self.action.set_state(ControlState.CheckInitialRotation(
                     target_freq=state.target_freq,
@@ -1074,7 +1072,7 @@ class HWPSupervisor:
             # 1. Gather data from relevant operations
             temp_op = get_op_data(self.ybco_lakeshore_id, 'acq', **kw)
             enc_op = get_op_data(self.hwp_encoder_id, 'acq', **kw)
-            pmx_op = get_op_data(self.hwp_pmx_id, 'acq', **kw)
+            pmx_op = get_op_data(self.hwp_pmx_id, 'main', **kw)
             pid_op = get_op_data(self.hwp_pid_id, 'main', **kw)
             ups_op = get_op_data(self.ups_id, 'acq', **kw)
 
