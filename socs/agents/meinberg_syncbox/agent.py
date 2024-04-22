@@ -1,17 +1,16 @@
 import argparse
+import asyncio
 import os
 import time
 
 import txaio
 from autobahn.twisted.util import sleep as dsleep
+from guppy import hpy
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 from twisted.internet.defer import inlineCallbacks
 
 from socs.snmp import SNMPTwister
-
-from guppy import hpy
-import asyncio
 
 # For logging
 # txaio.use_asyncio()

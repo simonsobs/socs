@@ -1,7 +1,7 @@
+import asyncio
 import os
 
 import txaio
-import asyncio
 from pysnmp.hlapi.asyncio import (CommunityData, ContextData, ObjectIdentity,
                                   ObjectType, SnmpEngine, UdpTransportTarget,
                                   UsmUserData, getCmd, setCmd)
@@ -193,7 +193,7 @@ class SNMPTwister:
                 errorStatus.prettyPrint(),
                 errorIndex and varBinds[int(errorIndex) - 1][0] or '?'
             )
-                )
+            )
         else:
             for varBind in varBinds:
                 print(' = '.join([x.prettyPrint() for x in varBind]))
