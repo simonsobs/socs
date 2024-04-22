@@ -140,6 +140,10 @@ class SupRsync:
 
         next_feed_update = 0
 
+        # update tcdirs every six-hours
+        last_tcdir_update = 0
+        tcdir_update_interval = 6 * 3600
+
         while self.running:
             counters['iterations'] += 1
 
@@ -160,6 +164,15 @@ class SupRsync:
                 counters['errors_nonzero'] += 1
 
             now = time.time()
+
+            if now - last_tcdir_update > tcdir_update_interval:
+                # add timecode-dirs for all files from the last week
+                self.log.info("Creating timecode dirs for recent files.....")
+                srfm.create_all_timecode_dirs(
+                    self.archive_name, min_ctime=now - (7 * 24 * 3600)
+                )
+                self.log.info("Finished creating tcdirs")
+                last_tcdir_update = now
 
             archive_stats = srfm.get_archive_stats(self.archive_name)
             if archive_stats is not None:

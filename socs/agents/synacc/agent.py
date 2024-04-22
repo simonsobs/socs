@@ -15,15 +15,28 @@ class SynaccessAgent:
         ip_address(str): IP address for the device.
         username(str): Username credential to login to device.
         password(str): Password credential to login to device.
+        outlet_names(list of str): List of outlet names.
+        num_outlets(int): Number of outlets for device.
     """
 
-    def __init__(self, agent, ip_address, username, password):
+    def __init__(self, agent, ip_address, username, password, outlet_names=None, num_outlets=5):
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
         self.ip_address = ip_address
         self.user = username
         self.passw = password
+
+        if outlet_names is None:
+            outlet_names = []
+            for i in range(num_outlets):
+                outlet_names.append('outlet%i' % (i + 1))
+            self.outlet_names = outlet_names
+        else:
+            for i in range(num_outlets):
+                if len(outlet_names) <= i:
+                    outlet_names.append('outlet%i' % (i + 1))
+            self.outlet_names = outlet_names
 
         agg_params = {'frame_length': 60}
         self.agent.register_feed(
@@ -126,8 +139,8 @@ class SynaccessAgent:
                 return False, "Could not acquire lock"
 
     @ocs_agent.param('_')
-    def status_acq(self, session, params=None):
-        """status_acq()
+    def acq(self, session, params=None):
+        """acq()
 
         **Process** - Start data acquisition.
 
@@ -137,19 +150,22 @@ class SynaccessAgent:
 
                 >>> response.session['data']
                 {"fields":
-                    {synaccess:
-                        {0: 0 or 1, (0: OFF, 1:ON)
-                         1: 0 or 1, (0: OFF, 1:ON)
-                         2: 0 or 1, (0: OFF, 1:ON)
-                         3: 0 or 1, (0: OFF, 1:ON)
-                         4: 0 or 1, (0: OFF, 1:ON)
-                        }
+                    {"0": {"status": 0 or 1, (0: OFF, 1:ON)
+                           "name": "outlet1"},
+                     "1": {"status": 0 or 1, (0: OFF, 1:ON)
+                           "name": "outlet2"},
+                     "2": {"status": 0 or 1, (0: OFF, 1:ON)
+                           "name": "outlet3"},
+                     "3": {"status": 0 or 1, (0: OFF, 1:ON)
+                           "name": "outlet4"},
+                     "4": {"status": 0 or 1, (0: OFF, 1:ON)
+                           "name": "outlet5"},
                     }
                 }
 
         """
 
-        with self.lock.acquire_timeout(timeout=3, job='status_acq')\
+        with self.lock.acquire_timeout(timeout=3, job='acq')\
                 as acquired:
             if not acquired:
                 self.log.warn(
@@ -184,11 +200,11 @@ class SynaccessAgent:
                     else:
                         status = 0
                     data['data']['synaccess_%d' % i] = status
-                    status_dict['%d' % i] = status
+                    status_dict['%d' % i] = {'status': status}
+                    status_dict['%d' % i]['name'] = self.outlet_names[i]
                 self.agent.publish_to_feed('synaccess', data)
-                field_dict = {'synaccess': status_dict}
                 session.data['timestamp'] = current_time
-                session.data['fields'] = field_dict
+                session.data['fields'] = status_dict
 
                 time.sleep(1)  # DAQ interval
                 # End of while loop
@@ -196,7 +212,7 @@ class SynaccessAgent:
         self.agent.feeds['synaccess'].flush_buffer()
         return True, 'Acqusition exited cleanly'
 
-    def stop_status_acq(self, session, params=None):
+    def stop_acq(self, session, params=None):
         if self.take_data:
             self.take_data = False
             return True, 'requested to stop taking data'
@@ -217,6 +233,9 @@ def make_parser(parser=None):
     pgroup.add_argument('--ip-address', help='IP address for the device.')
     pgroup.add_argument('--username', help='Username credential to login to device.')
     pgroup.add_argument('--password', help='Password credential to login to device.')
+    pgroup.add_argument('--outlet-names', nargs='+', type=str,
+                        help="List of outlet names.")
+    pgroup.add_argument('--num-outlets', default=5, help='Number of outlets for the device.')
     return parser
 
 
@@ -231,9 +250,11 @@ def main(args=None):
     p = SynaccessAgent(agent,
                        ip_address=args.ip_address,
                        username=args.username,
-                       password=args.password)
-    agent.register_process('status_acq', p.status_acq,
-                           p.stop_status_acq, startup=True)
+                       password=args.password,
+                       outlet_names=args.outlet_names,
+                       num_outlets=args.num_outlets)
+    agent.register_process('acq', p.acq,
+                           p.stop_acq, startup=True)
     agent.register_task('get_status', p.get_status, startup={})
     agent.register_task('reboot', p.reboot)
     agent.register_task('set_outlet', p.set_outlet)

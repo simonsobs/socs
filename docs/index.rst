@@ -37,13 +37,16 @@ API Reference        Full API documentation for core parts of the SOCS library.
     :caption: Agent Reference
     :maxdepth: 2
 
+    agents/acti_camera
     agents/acu_agent
     agents/bluefors_agent
     agents/cryomech_cpa
     agents/fts_agent
     agents/generator
+    agents/hi6200
     agents/hwp_encoder
     agents/hwp_gripper
+    agents/hwp_pcu
     agents/hwp_picoscope
     agents/hwp_pid
     agents/hwp_pmx
