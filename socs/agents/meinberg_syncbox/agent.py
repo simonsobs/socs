@@ -387,7 +387,7 @@ class MeinbergSyncboxAgent:
             for oid in self.oids:
                 get_list.append([(self.mib, oid, 0)])
 
-            outputs = 3 # number of outputs on the syncbox
+            outputs = 3  # number of outputs on the syncbox
             for i in range(outputs):
                 for oid in self.output_oids:
                     get_list.append([(self.mib, oid, i)])
@@ -401,7 +401,7 @@ class MeinbergSyncboxAgent:
                 if result is None:
                     self.connected = False
                     session.data['syncbox_connection'] = {'last_attempt': time.time(),
-                                                        'connected': False}
+                                                          'connected': False}
                     continue
                 get_result.extend(result)
                 self.connected = True
