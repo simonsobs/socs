@@ -359,10 +359,10 @@ class HWPState:
 
 class ControlState:
     """Namespace for HWP control state definitions"""
-    @dataclass(kw_only=True)
+    @dataclass
     class Base:
-        start_time: float = field(default_factory=time.time)
-        last_update_time: float = 0
+        start_time: float = field(default_factory=time.time, kw_only=True)
+        last_update_time: float = field(default=0, kw_only=True)
 
         def encode(self):
             d = {
