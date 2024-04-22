@@ -718,7 +718,7 @@ class ControlStateMachine:
                 self.run_and_validate(clients.pid.tune_freq, timeout=60)
                 self.run_and_validate(
                     clients.pcu.send_command,
-                    kwargs={'command': 'off'}, timeout=None
+                    kwargs={'command': 'off'}, timeout=None,
                 )
                 self.action.set_state(ControlState.CheckInitialRotation(
                     target_freq=state.target_freq,
