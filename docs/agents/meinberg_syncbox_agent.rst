@@ -61,8 +61,8 @@ debugging. The default level is "info".
 
 Description
 -----------
-The Meinberg syncbox synchronizes to GPS and distributes timing mostly over
-the network using PTP.
+The Meinberg syncbox synchronizes to the M1000 from PTP and distributes signal
+to attached devices in various formats (IRIG, PPS, etc).
 
 The Meinberg Syncbox Agent actively issues SNMP GET commands to request the
 status from several Object Identifiers (OIDs) specified by the syncbox

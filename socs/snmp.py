@@ -1,15 +1,14 @@
-import asyncio
 import os
 
 import txaio
-from pysnmp.hlapi.asyncio import (CommunityData, ContextData, ObjectIdentity,
+from pysnmp.hlapi.twisted import (CommunityData, ContextData, ObjectIdentity,
                                   ObjectType, SnmpEngine, UdpTransportTarget,
                                   UsmUserData, getCmd, setCmd)
 
 from socs import mibs
 
 # For logging
-# txaio.use_asyncio()
+txaio.use_twisted()
 
 
 # https://pysnmp.readthedocs.io/en/latest/faq/pass-custom-mib-to-manager.html
@@ -157,50 +156,6 @@ class SNMPTwister:
         datagram.addCallback(self._success).addErrback(self._failure)
 
         return datagram
-
-    @asyncio.coroutine
-    def run(self, oid_list, version):
-        oid_list = [ObjectType(ObjectIdentity(*x).addMibSource(MIB_SOURCE))
-                    if isinstance(x, tuple)
-                    else x
-                    for x
-                    in oid_list]
-
-        if version == 1:
-            version_object = CommunityData('public', mpModel=0)  # SNMPv1
-        elif version == 2:
-            version_object = CommunityData('public')  # SNMPv2c
-        elif version == 3:
-            version_object = UsmUserData('ocs')  # SNMPv3 (no auth, no privacy)
-        else:
-            raise ValueError(f'SNMP version {version} not supported.')
-
-        iterator = getCmd(
-            self.snmp_engine,
-            version_object,
-            self.udp_transport,
-            ContextData(),
-            *oid_list
-        )
-
-        errorIndication, errorStatus, errorIndex, varBinds = yield from iterator
-
-        if errorIndication:
-            print(errorIndication)
-
-        elif errorStatus:
-            print('%s at %s' % (
-                errorStatus.prettyPrint(),
-                errorIndex and varBinds[int(errorIndex) - 1][0] or '?'
-            )
-            )
-        else:
-            for varBind in varBinds:
-                print(' = '.join([x.prettyPrint() for x in varBind]))
-
-        self.snmp_engine.transportDispatcher.closeDispatcher()
-
-        return varBinds
 
     def set(self, oid_list, version, setvalue, community_name='private'):
         """Issue a setCmd to set SNMP OID states.

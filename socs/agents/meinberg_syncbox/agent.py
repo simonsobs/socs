@@ -1,11 +1,9 @@
 import argparse
-import asyncio
 import os
 import time
 
 import txaio
 from autobahn.twisted.util import sleep as dsleep
-from guppy import hpy
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 from twisted.internet.defer import inlineCallbacks
@@ -13,7 +11,7 @@ from twisted.internet.defer import inlineCallbacks
 from socs.snmp import SNMPTwister
 
 # For logging
-# txaio.use_asyncio()
+txaio.use_twisted()
 
 
 def _extract_oid_field_and_value(get_result):
@@ -66,7 +64,7 @@ def _extract_oid_field_and_value(get_result):
     return field_name, oid_value, oid_description
 
 
-def _build_message(get_result, time, blockname):
+def _build_message(get_result, time):
     """Build the message for publication on an OCS Feed.
 
     Parameters
@@ -75,8 +73,6 @@ def _build_message(get_result, time, blockname):
         Result from a pysnmp GET command.
     time : float
         Timestamp for when the SNMP GET was issued.
-    blockname : string
-        Blockname for feed.
 
     Returns
     -------
@@ -84,7 +80,7 @@ def _build_message(get_result, time, blockname):
         OCS Feed formatted message for publishing
     """
     message = {
-        'block_name': blockname,
+        'block_name': 'syncbox',
         'timestamp': time,
         'data': {}
     }
@@ -93,7 +89,8 @@ def _build_message(get_result, time, blockname):
         field_name, oid_value, oid_description = _extract_oid_field_and_value(item)
 
         if oid_value is None:
-            continue
+            oid_value = 'No SNMP response'
+            oid_description = 'No SNMP response'
 
         message['data'][field_name] = oid_value
         message['data'][field_name + "_description"] = oid_description
@@ -190,6 +187,30 @@ class MeinbergSyncboxAgent:
         self.lastGet = 0
         self.sample_period = 60
 
+        # Create the list of OIDs to send get commands
+        self.oids = ['mbgSyncboxN2XSerialNumber',
+                     'mbgSyncboxN2XFirmwareRevision',
+                     'mbgSyncboxN2XSystemTime',
+                     'mbgSyncboxN2XCurrentRefSource',
+                     'mbgSyncboxN2XPtpProfile',
+                     'mbgSyncboxN2XPtpNwProt',
+                     'mbgSyncboxN2XPtpPortState',
+                     'mbgSyncboxN2XPtpDelayMechanism',
+                     'mbgSyncboxN2XPtpDelayRequestInterval',
+                     'mbgSyncboxN2XPtpTimescale',
+                     'mbgSyncboxN2XPtpUTCOffset',
+                     'mbgSyncboxN2XPtpLeapSecondAnnounced',
+                     'mbgSyncboxN2XPtpGrandmasterClockID',
+                     'mbgSyncboxN2XPtpGrandmasterTimesource',
+                     'mbgSyncboxN2XPtpGrandmasterPriority1',
+                     'mbgSyncboxN2XPtpGrandmasterClockClass',
+                     'mbgSyncboxN2XPtpGrandmasterClockAccuracy',
+                     'mbgSyncboxN2XPtpGrandmasterClockVariance',
+                     'mbgSyncboxN2XPtpOffsetToGrandmaster',
+                     'mbgSyncboxN2XPtpMeanPathDelay']
+        self.output_oids = ['mbgSyncboxN2XOutputMode']
+        self.mib = 'MBG-SYNCBOX-N2X-MIB'
+
         agg_params = {
             'frame_length': 10 * 60  # [sec]
         }
@@ -199,8 +220,7 @@ class MeinbergSyncboxAgent:
                                  buffer_time=0)
 
     @ocs_agent.param('test_mode', default=False, type=bool)
-    # @asyncio.coroutine
-    # @inlineCallbacks
+    @inlineCallbacks
     def acq(self, session, params=None):
         """acq()
 
@@ -348,7 +368,6 @@ class MeinbergSyncboxAgent:
                           accurateToGreaterThan10s(49)
         """
 
-        session.set_status('running')
         self.is_streaming = True
         while self.is_streaming:
             yield dsleep(1)
@@ -362,102 +381,47 @@ class MeinbergSyncboxAgent:
             if (read_time - self.lastGet) < self.sample_period:
                 continue
 
-            main_get_list = []
             get_list = []
 
-            # Create the list of OIDs to send get commands
-            oids = ['mbgSyncboxN2XSerialNumber',
-                    'mbgSyncboxN2XFirmwareRevision',
-                    'mbgSyncboxN2XSystemTime',
-                    'mbgSyncboxN2XCurrentRefSource',
-                    'mbgSyncboxN2XPtpProfile',
-                    'mbgSyncboxN2XPtpNwProt',
-                    'mbgSyncboxN2XPtpPortState',
-                    'mbgSyncboxN2XPtpDelayMechanism',
-                    'mbgSyncboxN2XPtpDelayRequestInterval',
-                    'mbgSyncboxN2XPtpTimescale',
-                    'mbgSyncboxN2XPtpUTCOffset',
-                    'mbgSyncboxN2XPtpLeapSecondAnnounced',
-                    'mbgSyncboxN2XPtpGrandmasterClockID',
-                    'mbgSyncboxN2XPtpGrandmasterTimesource',
-                    'mbgSyncboxN2XPtpGrandmasterPriority1',
-                    'mbgSyncboxN2XPtpGrandmasterClockClass',
-                    'mbgSyncboxN2XPtpGrandmasterClockAccuracy',
-                    'mbgSyncboxN2XPtpGrandmasterClockVariance',
-                    'mbgSyncboxN2XPtpOffsetToGrandmaster',
-                    'mbgSyncboxN2XPtpMeanPathDelay']
+            # Create the lists of OIDs to send get commands
+            for oid in self.oids:
+                get_list.append([(self.mib, oid, 0)])
 
-            for oid in oids:
-                main_get_list.append(('MBG-SYNCBOX-N2X-MIB', oid, 0))
-                get_list.append(('MBG-SYNCBOX-N2X-MIB', oid, 0))
-            loop = asyncio.get_event_loop()
-            # general_get_result = loop.run_until_complete(self.snmp.run(get_list, self.version))
-            # if general_get_result is None:
-            #     self.connected = False
-            #     print("failed general")
-            #     continue
-            # self.connected = True
-
-            output_oids = ['mbgSyncboxN2XOutputMode']
-
-            output_get_results = []
-            outputs = 2
+            outputs = 3 # number of outputs on the syncbox
             for i in range(outputs):
-                get_list = []
-                for oid in output_oids:
-                    main_get_list.append(('MBG-SYNCBOX-N2X-MIB', oid, i + 1))
-                    get_list.append(('MBG-SYNCBOX-N2X-MIB', oid, i + 1))
-                # output_get_result = loop.run_until_complete(self.snmp.run(get_list, self.version))
-                # output_get_results.append(output_get_result)
+                for oid in self.output_oids:
+                    get_list.append([(self.mib, oid, i)])
 
-            # get_results = []
-            # # Issue SNMP GET command
-            # for get in main_get_list:
-            #     get_result = loop.run_until_complete(self.snmp.run([get], self.version))
-            #     if get_result is None:
-            #         self.connected = False
-            #         print("failed main")
-            #         continue
-            #     self.connected = True
-            #     get_results.append(get_result[0])
-
-            get_result = loop.run_until_complete(self.snmp.run(main_get_list, self.version))
-            if get_result is None:
-                self.connected = False
-                print("failed main")
-                continue
-            self.connected = True
+            # Issue SNMP GET command
+            # The syncbox has a unique case this requires issuing GET commands
+            # one by one or else it will return the same data for each OID
+            get_result = yield self.snmp.get(get_list[0], self.version)
+            for get in get_list[1:]:
+                result = yield self.snmp.get(get, self.version)
+                if result is None:
+                    self.connected = False
+                    session.data['syncbox_connection'] = {'last_attempt': time.time(),
+                                                        'connected': False}
+                    continue
+                get_result.extend(result)
+                self.connected = True
 
             # Do not publish if syncbox connection has dropped
             try:
                 # Update session.data
-                session.data = update_cache(get_result, read_time)
-                # oid_cache['address'] = self.address
-                # session.data = oid_cache
+                oid_cache = update_cache(get_result, read_time)
+                oid_cache['address'] = self.address
+                session.data = oid_cache
                 self.log.info("{data}", data=session.data)
-
-                if not self.connected:
-                    raise ConnectionError('No SNMP response. Check your connection.')
 
                 self.lastGet = time.time()
                 # Publish to feed
-                if get_result is not None:
-                    message = _build_message(get_result, read_time, 'syncbox')
-                    self.log.info("{msg}", msg=message)
-                    session.app.publish_to_feed('syncbox', message)
-                # for i, result in enumerate(output_get_results):
-                #     if result is not None:
-                #         blockname = f'output_{i}'
-                #         message = _build_message(result, read_time, blockname)
-                #         self.log.debug("{msg}", msg=message)
-                #         session.app.publish_to_feed('syncbox', message)
-            except ConnectionError as e:
+                message = _build_message(get_result, read_time)
+                self.log.info("{msg}", msg=message)
+                session.app.publish_to_feed('syncbox', message)
+            except Exception as e:
                 self.log.error(f'{e}')
                 yield dsleep(1)
-                self.log.info('Trying to reconnect.')
-
-            h = hpy()
-            print(h.heap())
 
             if params['test_mode']:
                 break
