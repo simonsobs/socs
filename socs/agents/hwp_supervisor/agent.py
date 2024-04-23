@@ -356,6 +356,7 @@ class HWPState:
         else:  # Only grip if the hwp_freq is smaller than 0.01
             return 'stop'
 
+
 class ControlStateInfo:
     def __init__(self, state):
         """
@@ -371,7 +372,7 @@ class ControlStateInfo:
         self.last_update_time = 0
         self.start_time = time.time()
         self.state_type = state.__class__.__name__
-    
+
     def encode(self):
         d = {
             'state_type': self.state_type,
