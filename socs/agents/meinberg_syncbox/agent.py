@@ -89,8 +89,7 @@ def _build_message(get_result, time):
         field_name, oid_value, oid_description = _extract_oid_field_and_value(item)
 
         if oid_value is None:
-            oid_value = 'No SNMP response'
-            oid_description = 'No SNMP response'
+            continue
 
         message['data'][field_name] = oid_value
         message['data'][field_name + "_description"] = oid_description
@@ -160,6 +159,8 @@ class MeinbergSyncboxAgent:
         SNMP port to issue GETs to, default to 161.
     version : int
         SNMP version for communication (1, 2, or 3), defaults to 1.
+    outputs : list of ints
+        List of outputs to monitor.
 
     Attributes
     ----------
@@ -172,7 +173,7 @@ class MeinbergSyncboxAgent:
         txaio logger object, created by the OCSAgent
     """
 
-    def __init__(self, agent, address, port=161, version=1):
+    def __init__(self, agent, address, port=161, version=1, outputs=[1,2,3]):
         self.agent = agent
         self.is_streaming = False
         self.log = self.agent.log
@@ -188,28 +189,38 @@ class MeinbergSyncboxAgent:
         self.sample_period = 60
 
         # Create the list of OIDs to send get commands
-        self.oids = ['mbgSyncboxN2XSerialNumber',
-                     'mbgSyncboxN2XFirmwareRevision',
-                     'mbgSyncboxN2XSystemTime',
-                     'mbgSyncboxN2XCurrentRefSource',
-                     'mbgSyncboxN2XPtpProfile',
-                     'mbgSyncboxN2XPtpNwProt',
-                     'mbgSyncboxN2XPtpPortState',
-                     'mbgSyncboxN2XPtpDelayMechanism',
-                     'mbgSyncboxN2XPtpDelayRequestInterval',
-                     'mbgSyncboxN2XPtpTimescale',
-                     'mbgSyncboxN2XPtpUTCOffset',
-                     'mbgSyncboxN2XPtpLeapSecondAnnounced',
-                     'mbgSyncboxN2XPtpGrandmasterClockID',
-                     'mbgSyncboxN2XPtpGrandmasterTimesource',
-                     'mbgSyncboxN2XPtpGrandmasterPriority1',
-                     'mbgSyncboxN2XPtpGrandmasterClockClass',
-                     'mbgSyncboxN2XPtpGrandmasterClockAccuracy',
-                     'mbgSyncboxN2XPtpGrandmasterClockVariance',
-                     'mbgSyncboxN2XPtpOffsetToGrandmaster',
-                     'mbgSyncboxN2XPtpMeanPathDelay']
-        self.output_oids = ['mbgSyncboxN2XOutputMode']
-        self.mib = 'MBG-SYNCBOX-N2X-MIB'
+        oids = ['mbgSyncboxN2XSerialNumber',
+                'mbgSyncboxN2XFirmwareRevision',
+                'mbgSyncboxN2XSystemTime',
+                'mbgSyncboxN2XCurrentRefSource',
+                'mbgSyncboxN2XPtpProfile',
+                'mbgSyncboxN2XPtpNwProt',
+                'mbgSyncboxN2XPtpPortState',
+                'mbgSyncboxN2XPtpDelayMechanism',
+                'mbgSyncboxN2XPtpDelayRequestInterval',
+                'mbgSyncboxN2XPtpTimescale',
+                'mbgSyncboxN2XPtpUTCOffset',
+                'mbgSyncboxN2XPtpLeapSecondAnnounced',
+                'mbgSyncboxN2XPtpGrandmasterClockID',
+                'mbgSyncboxN2XPtpGrandmasterTimesource',
+                'mbgSyncboxN2XPtpGrandmasterPriority1',
+                'mbgSyncboxN2XPtpGrandmasterClockClass',
+                'mbgSyncboxN2XPtpGrandmasterClockAccuracy',
+                'mbgSyncboxN2XPtpGrandmasterClockVariance',
+                'mbgSyncboxN2XPtpOffsetToGrandmaster',
+                'mbgSyncboxN2XPtpMeanPathDelay']
+        output_oids = ['mbgSyncboxN2XOutputMode']
+        mib = 'MBG-SYNCBOX-N2X-MIB'
+
+        self.get_list = []
+
+        # Create the lists of OIDs to send get commands
+        for oid in oids:
+            self.get_list.append([(mib, oid, 0)])
+
+        for out in outputs:
+            for oid in output_oids:
+                self.get_list.append([(mib, oid, out-1)])
 
         agg_params = {
             'frame_length': 10 * 60  # [sec]
@@ -381,30 +392,21 @@ class MeinbergSyncboxAgent:
             if (read_time - self.lastGet) < self.sample_period:
                 continue
 
-            get_list = []
-
-            # Create the lists of OIDs to send get commands
-            for oid in self.oids:
-                get_list.append([(self.mib, oid, 0)])
-
-            outputs = 3  # number of outputs on the syncbox
-            for i in range(outputs):
-                for oid in self.output_oids:
-                    get_list.append([(self.mib, oid, i)])
-
             # Issue SNMP GET command
             # The syncbox has a unique case this requires issuing GET commands
             # one by one or else it will return the same data for each OID
-            get_result = yield self.snmp.get(get_list[0], self.version)
-            for get in get_list[1:]:
+            get_result = []
+            for get in self.get_list:
                 result = yield self.snmp.get(get, self.version)
                 if result is None:
                     self.connected = False
                     session.data['syncbox_connection'] = {'last_attempt': time.time(),
                                                           'connected': False}
-                    continue
+                    break
                 get_result.extend(result)
                 self.connected = True
+            if not self.connected:
+                continue
 
             # Do not publish if syncbox connection has dropped
             try:
@@ -456,6 +458,8 @@ def add_agent_args(parser=None):
                         help="SNMP version for communication. Must match "
                              + "configuration on the syncbox.")
     pgroup.add_argument("--mode", default='acq', choices=['acq', 'test'])
+    pgroup.add_argument("--outputs", nargs='+', default=[1,2,3], type=int,
+                        help="Syncbox outputs to monitor. Defaults to [1,2,3].")
 
     return parser
 
@@ -478,7 +482,8 @@ def main(args=None):
     p = MeinbergSyncboxAgent(agent,
                              address=args.address,
                              port=int(args.port),
-                             version=int(args.snmp_version))
+                             version=int(args.snmp_version),
+                             outputs=args.outputs)
 
     agent.register_process("acq",
                            p.acq,
