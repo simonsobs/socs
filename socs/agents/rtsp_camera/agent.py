@@ -406,11 +406,11 @@ def add_agent_args(parser=None):
     )
 
     pgroup.add_argument(
-        "--seconds",
+        "--snapshot_seconds",
         type=int,
         required=False,
         default=10,
-        help="Number of seconds between frame grabs",
+        help="Number of seconds between snapshots for motion detection",
     )
 
     pgroup.add_argument(
@@ -512,7 +512,7 @@ def main(args=None):
         args.address,
         args.user,
         args.password,
-        seconds=args.seconds,
+        seconds=args.snapshot_seconds,
         port=args.port,
         urlpath=args.urlpath,
         jpeg_quality=args.jpeg_quality,
