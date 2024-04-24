@@ -173,7 +173,7 @@ class MeinbergSyncboxAgent:
         txaio logger object, created by the OCSAgent
     """
 
-    def __init__(self, agent, address, port=161, version=1, outputs=[1,2,3]):
+    def __init__(self, agent, address, port=161, version=1, outputs=[1, 2, 3]):
         self.agent = agent
         self.is_streaming = False
         self.log = self.agent.log
@@ -220,7 +220,7 @@ class MeinbergSyncboxAgent:
 
         for out in outputs:
             for oid in output_oids:
-                self.get_list.append([(mib, oid, out-1)])
+                self.get_list.append([(mib, oid, out - 1)])
 
         agg_params = {
             'frame_length': 10 * 60  # [sec]
@@ -458,7 +458,7 @@ def add_agent_args(parser=None):
                         help="SNMP version for communication. Must match "
                              + "configuration on the syncbox.")
     pgroup.add_argument("--mode", default='acq', choices=['acq', 'test'])
-    pgroup.add_argument("--outputs", nargs='+', default=[1,2,3], type=int,
+    pgroup.add_argument("--outputs", nargs='+', default=[1, 2, 3], type=int,
                         help="Syncbox outputs to monitor. Defaults to [1,2,3].")
 
     return parser
