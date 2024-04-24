@@ -769,16 +769,16 @@ class HWPGripperAgent:
             time_since_ok = time.time() - last_ok_time
             if time_since_ok > params['no_data_warn_time'] and not warning_issued:
                 self.log.error(
-                    f"Have not received 'ok' in {time_since_ok/60:.2f} minutes."
+                    f"Have not received 'ok' in {time_since_ok / 60:.2f} minutes."
                     f"Will issue shutdown in "
-                    f"{params['no_data_shutdown_time']/60:.2f} minutes."
+                    f"{params['no_data_shutdown_time'] / 60:.2f} minutes."
                 )
                 warning_issued = True
 
             if time_since_ok > params['no_data_shutdown_time']:
                 self.log.error(
                     f"Have not received 'ok' in "
-                    f"{params['no_data_shutdown_time']/60:.2f} minutes. "
+                    f"{params['no_data_shutdown_time'] / 60:.2f} minutes. "
                     "Issuing shutdown"
                 )
                 self.agent.start('shutdown')
