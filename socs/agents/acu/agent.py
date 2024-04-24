@@ -1180,7 +1180,7 @@ class ACUAgent:
             if state != last_state:
                 _state = f'{axis}.state={state.name}'
                 self.log.info(
-                    f'{_state:<30} dt={now-start_time:7.3f} dist={distance:8.3f}')
+                    f'{_state:<30} dt={now - start_time:7.3f} dist={distance:8.3f}')
                 last_state = state
 
             # Handle task abort
