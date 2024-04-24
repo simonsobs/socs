@@ -1213,7 +1213,7 @@ class HWPSupervisor:
         )
         action = self.control_state_machine.request_new_action(state)
         action.sleep_until_complete(session=session)
-        return action.success, f"Completed with state: {action.cur_state}"
+        return action.success, f"Completed with state: {action.cur_state_info.state}"
 
     @ocs_agent.param('voltage', type=float)
     @ocs_agent.param('direction', type=str, choices=['cw', 'ccw'], default='cw')
@@ -1255,7 +1255,7 @@ class HWPSupervisor:
         )
         action = self.control_state_machine.request_new_action(state)
         action.sleep_until_complete(session=session)
-        return action.success, f"Completed with state: {action.cur_state}"
+        return action.success, f"Completed with state: {action.cur_state_info.state}"
 
     @ocs_agent.param('freq_tol', type=float, default=0.05)
     @ocs_agent.param('freq_tol_duration', type=float, default=10)
@@ -1296,7 +1296,7 @@ class HWPSupervisor:
         )
         action = self.control_state_machine.request_new_action(state)
         action.sleep_until_complete(session=session)
-        return action.success, f"Completed with state: {action.cur_state}"
+        return action.success, f"Completed with state: {action.cur_state_info.state}"
 
     def pmx_off(self, session, params):
         """pmx_off()
@@ -1320,7 +1320,7 @@ class HWPSupervisor:
         state = ControlState.PmxOff()
         action = self.control_state_machine.request_new_action(state)
         action.sleep_until_complete(session=session)
-        return action.success, f"Completed with state: {action.cur_state}"
+        return action.success, f"Completed with state: {action.cur_state_info.state}"
 
     def abort_action(self, session, params):
         """abort_action()
@@ -1374,7 +1374,7 @@ class HWPSupervisor:
         state = ControlState.EnableDriverBoard(**kw)
         action = self.control_state_machine.request_new_action(state)
         action.sleep_until_complete(session=session)
-        return action.success, f"Completed with state: {action.cur_state}"
+        return action.success, f"Completed with state: {action.cur_state_info.state}"
 
     def disable_driver_board(self, session, params):
         """disable_driver_board()
@@ -1402,7 +1402,7 @@ class HWPSupervisor:
         state = ControlState.DisableDriverBoard(**kw)
         action = self.control_state_machine.request_new_action(state)
         action.sleep_until_complete(session=session)
-        return action.success, f"Completed with state: {action.cur_state}"
+        return action.success, f"Completed with state: {action.cur_state_info.state}"
 
 
 def make_parser(parser=None):
