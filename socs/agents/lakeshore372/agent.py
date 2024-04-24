@@ -924,7 +924,7 @@ class LS372_Agent:
                             "units": ls_chann_setting.units}
 
         return True, f"Channel {channel} has measurement inputs {input_setup} = [mode," \
-                     "excitation, auto range, range, cs_shunt, units]"
+            "excitation, auto range, range, cs_shunt, units]"
 
     @ocs_agent.param('setpoint', type=float)
     @ocs_agent.param('heater', type=str)
