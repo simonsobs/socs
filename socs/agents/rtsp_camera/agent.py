@@ -31,7 +31,7 @@ from ...common.camera import (
 )
 
 
-class CameraRTSPAgent:
+class RTSPCameraAgent:
     """Agent to support image capture from RTSP cameras.
 
     This Agent captures images and writes them to a feed, as well as saving frames
@@ -496,7 +496,7 @@ def main(args=None):
 
     parser = add_agent_args()
     args = site_config.parse_args(
-        agent_class="CameraRTSPAgent", parser=parser, args=args
+        agent_class="RTSPCameraAgent", parser=parser, args=args
     )
 
     if args.mode == "acq":
@@ -506,7 +506,7 @@ def main(args=None):
 
     agent, runner = ocs_agent.init_site_agent(args)
 
-    cam = CameraRTSPAgent(
+    cam = RTSPCameraAgent(
         agent,
         args.directory,
         args.address,
