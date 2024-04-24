@@ -78,6 +78,11 @@ magpie = [
     "scipy",
     "so3g",
 ]
+# Camera control
+camera = [
+    "opencv-python",
+    "imutils",
+]
 # Pfeiffer TC 400 Agent
 pfeiffer = [
     "pfeiffer-vacuum-protocol==0.4",
