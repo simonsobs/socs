@@ -14,7 +14,7 @@ from ocs.ocs_twisted import Pacemaker, TimeoutLock
 
 txaio.use_twisted()
 
-from ...common.camera import (CircularMediaBuffer, FakeCamera, MotionDetector,
+from socs.common.camera import (CircularMediaBuffer, FakeCamera, MotionDetector,
                               image_read_callback, image_write_callback,
                               video_write_callback)
 
