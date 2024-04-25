@@ -2,17 +2,12 @@
 # See top-level LICENSE.txt file for more information.
 """Agent to capture images from cameras which support the RTSP protocol.
 """
-
-import glob
 import os
-import re
 import time
-from collections import deque
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 import cv2
 import imutils
-import numpy as np
 import ocs
 import txaio
 from ocs import ocs_agent, site_config
@@ -46,6 +41,9 @@ class RTSPCameraAgent:
         record_fps (float): The frames per second for recorded video.
         record_duration (int): The number of seconds for each recorded video.
         max_record_files (int): The maximum number of recordings to keep.
+        motion_start (str): ISO time (HH:MM:SS+-zz:zz) to start motion detection.
+        motion_stop (str): ISO time (HH:MM:SS+-zz:zz) to stop motion detection.
+        disable_motion (bool): If True, disable motion detection.
         fake (bool): If True, ignore camera settings and generate fake video
             for testing.
 
@@ -73,6 +71,8 @@ class RTSPCameraAgent:
         record_fps=20.0,
         record_duration=60,
         max_record_files=100,
+        motion_start=None,
+        motion_stop=None,
         disable_motion=False,
         fake=False,
     ):
@@ -88,6 +88,8 @@ class RTSPCameraAgent:
         self.seconds = seconds
         self.urlpath = urlpath
         self.fake = fake
+        self.motion_start = motion_start
+        self.motion_stop = motion_stop
         self.motion_detect = not disable_motion
 
         if self.urlpath is None:
@@ -139,6 +141,42 @@ class RTSPCameraAgent:
             agg_params=agg_params,
             buffer_time=1.0,
         )
+
+    def _in_motion_time_range(self):
+        """Determine if we are in the valid time range for motion detection."""
+        if self.motion_start is None or self.motion_stop is None:
+            # We are not using the start / stop time range, so all times are valid
+            return True
+
+        # The current time in UTC
+        curtime = datetime.now(tz=timezone.utc)
+
+        # Convert the start / stop times to datetimes based on today
+        curdaystr = f"{curtime.year}-{curtime.month:02d}-{curtime.day:02d}"
+
+        # The datetimes for start/stop today
+        def _dt_convert(timestr):
+            tstr = f"{curdaystr}T{timestr}"
+            try:
+                tm = datetime.strptime(tstr, "%Y-%m-%dT%H:%M:%S%z")
+            except ValueError:
+                tm = datetime.strptime(tstr, "%Y-%m-%dT%H:%M:%S")
+                msg = f"Motion time '{timestr}' is not "
+                msg += f"timezone-aware.  Assuming UTC."
+                self.log.warning(msg)
+                tm = tm.replace(tzinfo=timezone.utc)
+            return tm
+        start = _dt_convert(self.motion_start)
+        stop = _dt_convert(self.motion_stop)
+
+        if stop <= start:
+            # We are starting today and stopping tomorrow
+            stop += timedelta(days=1)
+
+        if curtime > start and curtime < stop:
+            return True
+        else:
+            return False
 
     @ocs_agent.param("test_mode", default=False, type=bool)
     def acq(self, session, params=None):
@@ -216,7 +254,7 @@ class RTSPCameraAgent:
                 else:
                     # We are still recording
                     skip = True
-            if self.motion_detect:
+            if self.motion_detect and self._in_motion_time_range():
                 image, movement = motion_detector.process(image, skip=skip)
                 if movement:
                     # Start recording
@@ -397,6 +435,22 @@ def add_agent_args(parser=None):
         type=str,
         required=True,
         help="Password for camera access",
+    )
+
+    pgroup.add_argument(
+        "--motion_start",
+        type=str,
+        default=None,
+        required=False,
+        help="ISO 8601 time (HH:MM:SS+-zz:zz) to begin motion detection",
+    )
+
+    pgroup.add_argument(
+        "--motion_stop",
+        type=str,
+        default=None,
+        required=False,
+        help="ISO 8601 time (HH:MM:SS+-zz:zz) to end motion detection",
     )
 
     pgroup.add_argument(
