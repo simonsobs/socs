@@ -13,7 +13,6 @@ root = os.path.abspath(os.path.split(__file__)[0])
 for n, f in [
         ('ACUAgent', 'acu/agent.py'),
         ('BlueforsAgent', 'bluefors/agent.py'),
-        ('CameraRTSPAgent', 'camera_rtsp/agent.py'),
         ('CrateAgent', 'smurf_crate_monitor/agent.py'),
         ('CryomechCPAAgent', 'cryomech_cpa/agent.py'),
         ('FlowmeterAgent', 'ifm_sbn246_flowmeter/agent.py'),
@@ -40,6 +39,7 @@ for n, f in [
         ('PfeifferTC400Agent', 'pfeiffer_tc400/agent.py'),
         ('PysmurfController', 'pysmurf_controller/agent.py'),
         ('PysmurfMonitor', 'pysmurf_monitor/agent.py'),
+        ('RTSPCameraAgent', 'rtsp_camera/agent.py'),
         ('ScpiPsuAgent', 'scpi_psu/agent.py'),
         ('SmurfFileEmulator', 'smurf_file_emulator/agent.py'),
         ('SmurfStreamSimulator', 'smurf_stream_simulator/agent.py'),
