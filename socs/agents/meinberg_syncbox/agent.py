@@ -406,7 +406,9 @@ class MeinbergSyncboxAgent:
                 get_result.extend(result)
                 self.connected = True
             if not self.connected:
+                session.degraded = True
                 continue
+            session.degraded = False
 
             # Do not publish if syncbox connection has dropped
             try:
