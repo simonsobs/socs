@@ -7,7 +7,6 @@ import time
 from datetime import datetime, timedelta, timezone
 
 import cv2
-import imutils
 import ocs
 import txaio
 from ocs import ocs_agent, site_config
@@ -17,7 +16,7 @@ txaio.use_twisted()
 
 from ...common.camera import (CircularMediaBuffer, FakeCamera, MotionDetector,
                               image_read_callback, image_write_callback,
-                              video_read_callback, video_write_callback)
+                              video_write_callback)
 
 
 class RTSPCameraAgent:
@@ -162,7 +161,7 @@ class RTSPCameraAgent:
             except ValueError:
                 tm = datetime.strptime(tstr, "%Y-%m-%dT%H:%M:%S")
                 msg = f"Motion time '{timestr}' is not "
-                msg += f"timezone-aware.  Assuming UTC."
+                msg += "timezone-aware.  Assuming UTC."
                 self.log.warning(msg)
                 tm = tm.replace(tzinfo=timezone.utc)
             return tm
