@@ -173,10 +173,8 @@ class RTSPCameraAgent:
             stop += timedelta(days=1)
 
         if curtime > start and curtime < stop:
-            self.log.info(msg)
             return True
         else:
-            self.log.info(msg)
             return False
 
     @ocs_agent.param("test_mode", default=False, type=bool)
