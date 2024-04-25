@@ -178,8 +178,8 @@ class CircularMediaBuffer:
         # Clear stale recent entry
         if len(self._deque) > self.recent and self.recent > 0:
             pos = -(self.recent + 1)
-            file = self._deque[pos][0]
-            del self._deque[pos][1]
+            file, buffer = self._deque[pos]
+            del buffer
             self._deque[pos] = (file, None)
 
         # Update latest symlink

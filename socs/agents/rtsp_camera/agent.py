@@ -173,8 +173,10 @@ class RTSPCameraAgent:
             stop += timedelta(days=1)
 
         if curtime > start and curtime < stop:
+            self.log.info(msg)
             return True
         else:
+            self.log.info(msg)
             return False
 
     @ocs_agent.param("test_mode", default=False, type=bool)
@@ -568,6 +570,8 @@ def main(args=None):
         record_duration=args.record_duration,
         max_record_files=args.max_record_files,
         fake=args.fake,
+        motion_start=args.motion_start,
+        motion_stop=args.motion_stop,
         disable_motion=args.disable_motion,
     )
     agent.register_process("acq", cam.acq, cam._stop_acq, startup=init_params)
