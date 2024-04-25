@@ -1,6 +1,6 @@
 .. highlight:: rst
 
-.. _camera_rtsp:
+.. _rtsp_camera:
 
 ====================
 RTSP Camera Agent
@@ -10,7 +10,7 @@ This OCS Agent which grabs screenshots and records video from IP cameras
 supporting the RTSP streaming protocol.
 
 .. argparse::
-    :filename: ../socs/agents/camera_rtsp/agent.py
+    :filename: ../socs/agents/rtsp_camera/agent.py
     :func: add_agent_args
     :prog: python3 agent.py
 
@@ -23,19 +23,21 @@ Agent in a docker container.
 OCS Site Config
 ```````````````
 
-To configure the RTSP Camera Agent we need to add a CameraRTSPAgent block to our
+To configure the RTSP Camera Agent we need to add a RTSPCameraAgent block to our
 ocs configuration file. Here is an example configuration block using all of the
 common arguments. Many options do not normally need to be changed::
 
-      {'agent-class': 'CameraRTSPAgent',
+      {'agent-class': 'RTSPCameraAgent',
        'instance-id': 'camera-c3',
        'arguments': [['--mode', 'acq'],
                      ['--directory', '/camera']
                      ['--address', 'camera-c3.simonsobs.org'],
                      ['--user', 'ocs'],
                      ['--password', '<password>'],
-                     ['--seconds', '10'],
-                     ['--record_duration', '60']]},
+                     ['--motion_start', '19:00:00-04:00'],
+                     ['--motion_stop', '07:00:00-04:00'],
+                     ['--snapshot_seconds', '10'],
+                     ['--record_duration', '120']]},
 
 Docker Compose
 ``````````````
@@ -83,5 +85,5 @@ were acquired.
 Agent API
 ---------
 
-.. autoclass:: socs.agents.camera_rtsp.agent.CameraRTSPAgent
+.. autoclass:: socs.agents.rtsp_camera.agent.RTSPCameraAgent
     :members:
