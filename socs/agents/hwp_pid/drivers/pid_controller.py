@@ -317,9 +317,8 @@ class PID:
 
     @staticmethod
     def _decode_read(string):
-
-
-if isinstance(string,         if )            end_string = string.split('\r')[-1]
+        if isinstance(string, str):
+            end_string = string.split('\r')[-1]
             read_type = end_string[1:3]
         else:
             read_type = '00'
@@ -350,7 +349,8 @@ if isinstance(string,         if )            end_string = string.split('\r')[-1
 
     @staticmethod
     def _decode_measure(string):
-if isinstance(string,         if )            end_string = string.split('\r')[-1]
+        if isinstance(string, str):
+            end_string = string.split('\r')[-1]
             measure_type = end_string[1:3]
         else:
             measure_type = '00'
