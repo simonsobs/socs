@@ -317,8 +317,11 @@ class PID:
 
     @staticmethod
     def _decode_read(string):
-        end_string = string.split('\r')[-1]
-        read_type = end_string[1:3]
+        if type(string) == str:
+            end_string = string.split('\r')[-1]
+            read_type = end_string[1:3]
+        else:
+            read_type = '00'
         # Decode target
         if read_type == '01':
             target = float(int(end_string[4:], 16) / 1000.)
@@ -346,8 +349,11 @@ class PID:
 
     @staticmethod
     def _decode_measure(string):
-        end_string = string.split('\r')[-1]
-        measure_type = end_string[1:3]
+        if type(string) == str:
+            end_string = string.split('\r')[-1]
+            measure_type = end_string[1:3]
+        else:
+            measure_type = '00'
         if measure_type == '01':
             return float(end_string[3:])
         else:
