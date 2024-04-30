@@ -317,14 +317,18 @@ class PID:
 
     @staticmethod
     def _decode_read(string):
-        read_type = string[1:3]
+        if isinstance(string, str):
+            end_string = string.split('\r')[-1]
+            read_type = end_string[1:3]
+        else:
+            read_type = '00'
         # Decode target
         if read_type == '01':
-            target = float(int(string[4:], 16) / 1000.)
+            target = float(int(end_string[4:], 16) / 1000.)
             return target
         # Decode direction
         if read_type == '02':
-            if int(string[4:], 16) / 1000. > 2.5:
+            if int(end_string[4:], 16) / 1000. > 2.5:
                 return 1
             else:
                 return 0
@@ -345,8 +349,12 @@ class PID:
 
     @staticmethod
     def _decode_measure(string):
-        measure_type = string[1:3]
+        if isinstance(string, str):
+            end_string = string.split('\r')[-1]
+            measure_type = end_string[1:3]
+        else:
+            measure_type = '00'
         if measure_type == '01':
-            return float(string[3:])
+            return float(end_string[3:])
         else:
             return 9.999
