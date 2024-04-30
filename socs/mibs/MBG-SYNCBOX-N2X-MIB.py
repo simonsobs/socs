@@ -5,9 +5,6 @@
 # On host HAWKING platform Linux version 5.15.90.1-microsoft-standard-WSL2 by user davidvng
 # Using Python version 3.8.8 (default, Apr 13 2021, 19:58:26)
 #
-from pysnmp.smi import builder
-
-mibBuilder = builder.MibBuilder()
 
 Integer, ObjectIdentifier, OctetString = mibBuilder.importSymbols("ASN1", "Integer", "ObjectIdentifier", "OctetString")
 NamedValues, = mibBuilder.importSymbols("ASN1-ENUMERATION", "NamedValues")
