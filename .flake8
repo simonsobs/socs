@@ -16,6 +16,7 @@ exclude =
     socs/mibs/MBG-SNMP-ROOT-MIB.py,
     socs/mibs/IBOOTPDU-MIB.py,
     socs/mibs/UPS-MIB.py,
+    socs/mibs/MBG-SYNCBOX-N2X-MIB.py,
     versioneer.py,
     docs/conf.py,
 per-file-ignores =
