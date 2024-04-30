@@ -64,8 +64,6 @@ class LS240_Agent:
                               "{} is already running".format(self.lock.job))
                 return False, "Could not acquire lock."
 
-            session.set_status('starting')
-
             self.module = Module(port=self.port)
             print("Initialized Lakeshore module: {!s}".format(self.module))
             session.add_message("Lakeshore initialized with ID: %s" % self.module.inst_sn)

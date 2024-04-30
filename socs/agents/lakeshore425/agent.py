@@ -68,8 +68,6 @@ class LS425Agent:
                               "{} is already running".format(self.lock.job))
                 return False, "Could not acquire lock."
 
-            session.set_status('starting')
-
             self.dev = ls.LakeShore425(self.port)
             self.log.info(self.dev.get_id())
             print("Initialized Lakeshore module: {!s}".format(self.dev))

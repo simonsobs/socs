@@ -689,7 +689,6 @@ class SmurfFileEmulator:
             tag (str, optional):
                 User tag to add to the g3 stream.
         """
-        session.set_status('starting')
 
         if self.tune is None:
             raise ValueError("No tune loaded!")

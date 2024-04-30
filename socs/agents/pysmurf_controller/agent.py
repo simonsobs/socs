@@ -714,7 +714,6 @@ class PysmurfController:
             if not acquired:
                 return False, f"Operation failed: {self.lock.job} is running."
 
-            session.set_status('starting')
             S, cfg = self._get_smurf_control(session=session)
             iva = iv.take_iv(S, cfg, **params['kwargs'])
             session.data = {
@@ -778,7 +777,6 @@ class PysmurfController:
             if not acquired:
                 return False, f"Operation failed: {self.lock.job} is running."
 
-            session.set_status('starting')
             S, cfg = self._get_smurf_control(session=session)
             bsa = bias_steps.take_bias_steps(
                 S, cfg, **params['kwargs']
@@ -881,7 +879,6 @@ class PysmurfController:
             if not acquired:
                 return False, f"Operation failed: {self.lock.job} is running."
 
-            session.set_status('starting')
             S, cfg = self._get_smurf_control(session=session)
             bwa = bias_wave.take_bias_waves(
                 S, cfg, **params['kwargs']
