@@ -78,8 +78,6 @@ class VantagePro2Agent:
                               "{} is already running".format(self.lock.job))
                 return False, "Could not acquire lock."
 
-            session.set_status('starting')
-
             self._initialize_module()
 
         # Start data acquisition if requested
