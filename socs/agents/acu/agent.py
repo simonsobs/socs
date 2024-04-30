@@ -2284,7 +2284,10 @@ class ACUAgent:
                 },
             })
 
-            sun_is_real = True  # flags time shift during debugging.
+            # Flags for unsafe position.
+            safety_known, danger_zone, warning_zone = False, False, False
+            # Flag for time shift during debugging.
+            sun_is_real = True
             if self.sun is not None:
                 info = self.sun.get_sun_pos(az, el)
                 sun_is_real = ('WARNING' not in info)
@@ -2292,13 +2295,9 @@ class ACUAgent:
                 if az is not None:
                     t = self.sun.check_trajectory([az], [el])['sun_time']
                     new_data['sun_pos']['sun_safe_time'] = t if t > 0 else 0
-
-            # Are we currently in safe position?
-            safety_known, danger_zone, warning_zone = False, False, False
-            if self.sun is not None:
-                safety_known = True
-                danger_zone = (t < self.sun_params['policy']['min_sun_time'])
-                warning_zone = (t < self.sun_params['policy']['response_time'])
+                    safety_known = True
+                    danger_zone = (t < self.sun_params['policy']['min_sun_time'])
+                    warning_zone = (t < self.sun_params['policy']['response_time'])
 
             # Has a drill been requested?
             drill_req = (self.sun_params['next_drill'] is not None
