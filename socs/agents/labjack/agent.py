@@ -246,7 +246,6 @@ class LabJackAgent:
                               "{} is already running".format(self.lock.job))
                 return False, "Could not acquire lock."
 
-            session.set_status('starting')
             # Connect with the labjack
             self.handle = ljm.openS("ANY", "ANY", self.ip_address)
             info = ljm.getHandleInfo(self.handle)
