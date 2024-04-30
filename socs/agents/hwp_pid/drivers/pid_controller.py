@@ -68,8 +68,8 @@ class PID:
 
         Args:
             value (float): value to be converted
-            decimal (int): number of decimal places needed by the PID 
-                           controller. Depends on what the converted 
+            decimal (int): number of decimal places needed by the PID
+                           controller. Depends on what the converted
                            value is needed for (e.g. the setpoint values
                            need take the form X.XXX so decimal=3)
 
@@ -104,7 +104,7 @@ class PID:
 
         Modifies the ``direction`` attribute.
 
-        Command messages: 
+        Command messages:
             W024XXXXX:
             - W: write type command
             - 02: target pid 2 setpoint
@@ -158,7 +158,7 @@ class PID:
             - W: write type command
             - 01: target pid 1 setpoint
             - 4: decimal point format X.XXX
-            - 00000: write value 
+            - 00000: write value
             R01:
             - R: read type command
             - 01: target pid 1 setpoint
@@ -197,14 +197,14 @@ class PID:
             - W: write type command
             - 01: target pid 1 setpoint
             - 4: decimal point format X.XXX
-            - XXXXX: write value 
+            - XXXXX: write value
             R01:
             - R: read type command
             - 01: target pid 1 setpoint
             Z02:
             - Z: reset type command
             - 02: target entire controller
-        
+
         """
         if self.verb:
             print('Starting Tune')
@@ -229,7 +229,7 @@ class PID:
             X01:
             - X: read (decimal) type command
             - 01: target pid 1 value
-        
+
         """
         if self.verb:
             print('Finding CHWP Frequency')
@@ -296,18 +296,18 @@ class PID:
             W17XXXX
             - W: write type command
             - 17: target pid 1 p param
-            - XXXX: write value 
+            - XXXX: write value
             W18XXXX
             - W: write type command
             - 18: target pid 1 i param
-            - XXXX: write value 
+            - XXXX: write value
             W19XXXX
             - W: write type command
             - 19: target pid 1 d param
-            - XXXX: write value 
+            - XXXX: write value
             Z02:
             - Z: reset type command
-            - 02: target entire controller 
+            - 02: target entire controller
 
         """
         if self.verb:
@@ -415,7 +415,7 @@ class PID:
             - Z: reset
         Following the action type, the next two characters are the command type. The
         supported command type depends on the action type:
-            - R01: read setpoint for pid 1 (rotation frequency setpoint) 
+            - R01: read setpoint for pid 1 (rotation frequency setpoint)
             - R02: read setpoint for pid 2 (rotation direction setpoint)
             - W01: write setpoint for pid 1 (rotation frequency setpoint)
             - W02: write setpoint for pid 2 (rotation direction setpoint)
@@ -457,8 +457,8 @@ class PID:
 
     @staticmethod
     def _decode_read(string):
-        """Helper function to decode "read (hex)" type response strings 
-        
+        """Helper function to decode "read (hex)" type response strings
+
         Specific decoding procedure depends on response string type:
             - R01 (pid 1 setpoint): convert hex value into decimal (X.XXX format).
                                     Returns decimal value
@@ -526,7 +526,7 @@ class PID:
             - X01 (pid 1 value): removes header and returns decimal value
 
         Args:
-            string (str): Read (decimal) type string to decode 
+            string (str): Read (decimal) type string to decode
 
         Return:
             float: Decoded value
