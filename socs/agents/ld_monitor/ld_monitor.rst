@@ -47,7 +47,7 @@ The Lightning Detector System is connnected through serial communication with a 
 Transmitted data
 ----------------
 
-The lightning detector transmits its data in "sentences". There are 5 types of expected sentences: 
+The lightning detector transmits its data in "sentences". There are 5 types of expected sentences:
 -electric field
 -lightning strike
 -high-field
