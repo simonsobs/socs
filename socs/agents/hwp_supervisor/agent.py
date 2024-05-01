@@ -242,13 +242,13 @@ class HWPState:
 
     def update_pmx_state(self, op):
         """
-        Updates state values from the pmx acq operation results.
+        Updates state values from the pmx main operation results.
 
         Args
         -----
         op : dict
             Dict containing the operations (from get_op_data) from the pmx
-            ``acq`` process
+            ``main`` process
         """
         keymap = {'pmx_current': 'curr', 'pmx_voltage': 'volt',
                   'pmx_source': 'source', 'pmx_last_updated': 'last_updated'}
@@ -256,13 +256,13 @@ class HWPState:
 
     def update_pid_state(self, op):
         """
-        Updates state values from the pid acq operation results.
+        Updates state values from the pid main operation results.
 
         Args
         -----
         op : dict
             Dict containing the operations (from get_op_data) from the pid
-            ``acq`` process
+            ``main`` process
         """
         self._update_from_keymap(op, {
             'pid_current_freq': 'current_freq',
@@ -1084,7 +1084,7 @@ class HWPSupervisor:
             # 1. Gather data from relevant operations
             temp_op = get_op_data(self.ybco_lakeshore_id, 'acq', **kw)
             enc_op = get_op_data(self.hwp_encoder_id, 'acq', **kw)
-            pmx_op = get_op_data(self.hwp_pmx_id, 'acq', **kw)
+            pmx_op = get_op_data(self.hwp_pmx_id, 'main', **kw)
             pid_op = get_op_data(self.hwp_pid_id, 'main', **kw)
             ups_op = get_op_data(self.ups_id, 'acq', **kw)
 
