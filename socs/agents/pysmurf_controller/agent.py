@@ -21,9 +21,9 @@ from ocs.ocs_twisted import TimeoutLock
 from sodetlib.det_config import DetConfig
 from sodetlib.operations import (bias_dets, bias_steps, bias_wave, iv,
                                  uxm_relock, uxm_setup)
+
 from socs.agents.pysmurf_controller.smurf_subprocess_util import (
-    RunCfg, RunResult, run_func_in_subprocess, NBIASLINES
-)
+    NBIASLINES, RunCfg, RunResult, run_func_in_subprocess)
 
 
 class PysmurfScriptProtocol(protocol.ProcessProtocol):
@@ -86,6 +86,7 @@ def set_session_data(session, result: RunResult):
         session.data = result.return_val
     else:
         session.data = {'data': result.return_val}
+
 
 class PysmurfController:
     """
@@ -341,12 +342,12 @@ class PysmurfController:
     def _stop_check_state(self, session, params):
         """Stopper for check state process"""
         session.set_status('stopping')
-    
+
     def run_test_func(self, session, params):
         """
         Task to run subprocess test function
         """
-        cfg =RunCfg(
+        cfg = RunCfg(
             func_name='test',
         )
         result = run_func_in_subprocess(cfg)
@@ -359,7 +360,6 @@ class PysmurfController:
             session.data['data'] = result.return_val
 
         return result.success, 'finished'
-        
 
     @ocs_agent.param("duration", default=None, type=float)
     @ocs_agent.param('kwargs', default=None)
@@ -511,7 +511,7 @@ class PysmurfController:
         with self.lock.acquire_timeout(0, job='uxm_setup') as acquired:
             if not acquired:
                 return False, f"Operation failed: {self.lock.job} is running."
-            
+
             cfg = RunCfg(
                 func_name='run_uxm_setup',
                 kwargs={'bands': params['bands'], 'kwargs': params['kwargs']}
@@ -633,7 +633,7 @@ class PysmurfController:
         with self.lock.acquire_timeout(0, job='take_noise') as acquired:
             if not acquired:
                 return False, f"Operation failed: {self.lock.job} is running."
-            
+
             cfg = RunCfg(
                 func_name='take_noise',
                 args=[params['duration']],
@@ -741,7 +741,7 @@ class PysmurfController:
             if not acquired:
                 return False, f"Operation failed: {self.lock.job} is running."
             cfg = RunCfg(
-                func_name='take_iv', 
+                func_name='take_iv',
                 kwargs={'iv_kwargs': params['kwargs']}
             )
             result = run_func_in_subprocess(cfg)
@@ -799,7 +799,7 @@ class PysmurfController:
         with self.lock.acquire_timeout(0, job='bias_steps') as acquired:
             if not acquired:
                 return False, f"Operation failed: {self.lock.job} is running."
-            
+
             cfg = RunCfg(
                 func_name='take_bias_steps',
                 kwargs={
@@ -808,7 +808,7 @@ class PysmurfController:
             )
             result = run_func_in_subprocess(cfg)
             set_session_data(session, result)
-            if result.success: #Publish quantile results
+            if result.success:  # Publish quantile results
                 for name, d in result.return_val['quantiles'].items():
                     block = {
                         k: q for k, q in zip(d['labels'], d['values'])
@@ -881,7 +881,7 @@ class PysmurfController:
             )
             result = run_func_in_subprocess(cfg)
             set_session_data(session, result)
-            if result.success: # Publish quantile results
+            if result.success:  # Publish quantile results
                 for name, d in result.return_val['quantiles'].items():
                     block = {
                         k: q for k, q in zip(d['labels'], d['values'])
@@ -895,7 +895,6 @@ class PysmurfController:
                     self.agent.publish_to_feed('bias_wave_quantiles', d)
 
             return result.success, "Finished taking bias steps"
-
 
     @ocs_agent.param('bgs', default=None)
     @ocs_agent.param('kwargs', default=None)

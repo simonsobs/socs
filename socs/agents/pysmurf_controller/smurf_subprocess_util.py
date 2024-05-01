@@ -1,16 +1,16 @@
-import sys
 import json
-from dataclasses import dataclass, field, asdict
-from typing import List, Dict, Optional
-from twisted.internet import protocol, reactor, threads, defer
-import traceback
 import os
-import sodetlib as sdl
-from sodetlib.det_config import DetConfig
-from sodetlib.operations import iv, uxm_setup, bias_steps, bias_wave
-import numpy as np
-from ocs.ocs_twisted import in_reactor_context
+import sys
+import traceback
+from dataclasses import asdict, dataclass, field
+from typing import Dict, List, Optional
 
+import numpy as np
+import sodetlib as sdl
+from ocs.ocs_twisted import in_reactor_context
+from sodetlib.det_config import DetConfig
+from sodetlib.operations import bias_steps, bias_wave, iv, uxm_setup
+from twisted.internet import defer, protocol, reactor, threads
 
 NBIASLINES = 12
 
@@ -64,7 +64,7 @@ def take_iv(iv_kwargs=None):
 def run_uxm_setup(bands=None, kwargs=None):
     """Runs through the UXM setup procedure"""
     if kwargs is None:
-        kwargs = {} 
+        kwargs = {}
     S, cfg = get_smurf_control()
     uxm_setup.uxm_setup(S, cfg, bands=bands, **kwargs)
     return None
@@ -73,7 +73,7 @@ def run_uxm_setup(bands=None, kwargs=None):
 def run_uxm_relock(bands=None, kwargs=None):
     """Runs through the UXM relock procedure"""
     if kwargs is None:
-        kwargs = {} 
+        kwargs = {}
     S, cfg = get_smurf_control()
     uxm_setup.uxm_relock(S, cfg, bands=bands, **kwargs)
     return None
@@ -205,26 +205,27 @@ class FuncProtocol(protocol.ProcessProtocol):
     the subprocess through stdin. Once the function is finished, the result is
     encoded and passed back through FD 3.
     """
+
     def __init__(self, cfg: RunCfg):
         self.cfg = cfg
         self.result = None
-    
+
     def connectionMade(self):
         data = json.dumps(asdict(self.cfg)).encode()
         self.transport.write(data)
         self.transport.closeStdin()
 
     def childDataReceived(self, childFD, data):
-        if childFD in [1, 2]: # stdout or stderr:
+        if childFD in [1, 2]:  # stdout or stderr:
             print(data.decode())
 
         if childFD == 3:
             self.result = json.loads(data.decode())
-    
+
     def processExited(self, status):
         if self.result is None:
             raise RuntimeError("No result received from child process")
-        
+
         self.deferred.callback(self.result)
 
 
@@ -233,7 +234,7 @@ def _run_func_in_subprocess_reactor(cfg: RunCfg) -> RunResult:
     """Helper function for run_func_in_subprocess, that can assume reactor context"""
     prot = FuncProtocol(cfg)
     prot.deferred = defer.Deferred()
-    childFDs = {0: 'w', 1: 'r', 2: 'r', 3: 'r'} # Regular FDs plus 3 for sending results back
+    childFDs = {0: 'w', 1: 'r', 2: 'r', 3: 'r'}  # Regular FDs plus 3 for sending results back
     env = os.environ.copy()
     if cfg.slot is not None:
         env['SLOT'] = str(cfg.slot)
@@ -243,6 +244,7 @@ def _run_func_in_subprocess_reactor(cfg: RunCfg) -> RunResult:
     )
     result = yield prot.deferred
     return RunResult(**result)
+
 
 def run_func_in_subprocess(cfg: RunCfg) -> RunResult:
     """
@@ -260,7 +262,6 @@ def run_func_in_subprocess(cfg: RunCfg) -> RunResult:
             reactor, _run_func_in_subprocess_reactor, cfg)
     else:
         return _run_func_in_subprocess_reactor(cfg)
-
 
 
 def subprocess_main():
@@ -283,6 +284,7 @@ def subprocess_main():
         )
         return_data = json.dumps(asdict(result)).encode()
     os.write(3, return_data)
+
 
 if __name__ == '__main__':
     subprocess_main()
