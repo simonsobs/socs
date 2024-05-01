@@ -236,7 +236,7 @@ class LDMonitorAgent:
         agg_params = {
             'frame_length': 10 * 60  # [sec]
         }
-        self.agent.register_feed('LDMonitor',
+        self.agent.register_feed('ld_monitor',
                                  record=True,
                                  agg_params=agg_params,
                                  buffer_time=0)
@@ -245,12 +245,14 @@ class LDMonitorAgent:
         """connect()
         Instantiates LD object and check if client is open
         """
+
         self.LDMonitor = LDMonitor()
         self.initialized = True
 
     @ocs_agent.param('auto_acquire', default=False, type=bool)
-    def init_LDMonitor(self, session, params=None):
-        """
+    def init_ld_monitor(self, session, params=None):
+        """init_ld_monitor(auto_acquire=False)
+
         **Task** - Perform first time setup of the LD.
 
         Parameters:
@@ -366,9 +368,9 @@ class LDMonitorAgent:
                         'block_name': field,
                         'data': {field: val}
                     }
-                    self.agent.publish_to_feed('LDMonitor', _data)
+                    self.agent.publish_to_feed('ld_monitor', _data)
 
-            self.agent.feeds['LDMonitor'].flush_buffer()
+            self.agent.feeds['ld_monitor'].flush_buffer()
 
         return True, 'Acquisition exited cleanly.'
 
@@ -416,7 +418,7 @@ def main(args=None):
     agent, runner = ocs_agent.init_site_agent(args)
 
     p = LDMonitorAgent(agent, sample_interval=args.sample_interval)
-    agent.register_task('init_LDMonitor', p.init_LDMonitor,
+    agent.register_task('init_ld_monitor', p.init_ld_monitor,
                         startup=init_params)
     agent.register_process('acq', p.acq, p._stop_acq)
     runner.run(agent, auto_reconnect=True)
