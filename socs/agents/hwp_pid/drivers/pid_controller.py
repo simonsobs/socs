@@ -1,3 +1,4 @@
+# For a deeper understanding of the pid command message syntax refer to: https://assets.omega.com/manuals/M3397.pdf
 import socket
 import time
 
@@ -65,6 +66,20 @@ class PID:
         """Converts the user input into a format the PID controller can
         read.
 
+        Args:
+            value (float): value to be converted
+            decimal (int): number of decimal places needed by the PID
+                           controller. Depends on what the converted
+                           value is needed for (e.g. the setpoint values
+                           need take the form X.XXX so decimal=3)
+
+        Returns:
+            str: encoded hex string
+
+        Examples:
+            _convert_to_hex(0, 3) -> '0000'
+            _convert_to_hex(2.0, 3) -> '07D0'
+
         """
         temp_value = hex(int(10**decimal * float(value)))
         return ('0000' + str(temp_value)[2:].upper())[-4:]
@@ -88,6 +103,13 @@ class PID:
         """Sets the direction if the CHWP.
 
         Modifies the ``direction`` attribute.
+
+        Command messages:
+            W024XXXXX:
+            - W: write type command
+            - 02: target pid 2 setpoint
+            - 4: decimal point format X.XXX
+            - XXXXX: write value
 
         Args:
             direction (int): 0 for forward and 1 for backwards
@@ -125,7 +147,26 @@ class PID:
                 print('Invalid Frequency')
 
     def tune_stop(self):
-        """Set the setpoint to 0 Hz and stop the CHWP."""
+        """Set the setpoint to 0 Hz and stop the CHWP.
+
+        Command messages:
+            W0C83:
+            - W: write type command
+            - 0C: target pid 1 action type
+            - 83: set action type to direct
+            W01400000
+            - W: write type command
+            - 01: target pid 1 setpoint
+            - 4: decimal point format X.XXX
+            - 00000: write value
+            R01:
+            - R: read type command
+            - 01: target pid 1 setpoint
+            Z02:
+            - Z: reset type command
+            - 02: target entire controller
+
+        """
         if self.verb:
             print('Starting Stop')
 
@@ -147,6 +188,23 @@ class PID:
 
         To declare the frequency, use ``PID.declare_freq()``.
 
+        Command messages:
+            W0C81:
+            - W: write type command
+            - 0C: target pid 1 action type
+            - 81: set action type to reverse
+            W014XXXXX
+            - W: write type command
+            - 01: target pid 1 setpoint
+            - 4: decimal point format X.XXX
+            - XXXXX: write value
+            R01:
+            - R: read type command
+            - 01: target pid 1 setpoint
+            Z02:
+            - Z: reset type command
+            - 02: target entire controller
+
         """
         if self.verb:
             print('Starting Tune')
@@ -165,7 +223,14 @@ class PID:
         self.set_pid(tune_params)
 
     def get_freq(self):
-        """Returns the current frequency of the CHWP."""
+        """Returns the current frequency of the CHWP.
+
+        Command messages:
+            X01:
+            - X: read (decimal) type command
+            - 01: target pid 1 value
+
+        """
         if self.verb:
             print('Finding CHWP Frequency')
 
@@ -178,7 +243,14 @@ class PID:
         return freq
 
     def get_target(self):
-        """Returns the target frequency of the CHWP."""
+        """Returns the target frequency of the CHWP.
+
+        Command messages:
+            R01:
+            - R: read type command
+            - 01: target pid 1 setpoint
+
+        """
         if self.verb:
             print('Finding target CHWP Frequency')
 
@@ -197,6 +269,11 @@ class PID:
         Returns:
             int: 0 for forward and 1 for backwards
 
+        Command messages:
+            R02:
+            - R: read type command
+            - 02: target pid 2 setpoint
+
         """
         if self.verb:
             print('Finding CHWP Direction')
@@ -213,7 +290,26 @@ class PID:
         return direction
 
     def set_pid(self, params):
-        """Sets the PID parameters of the controller."""
+        """Sets the PID parameters of the controller.
+
+        Command messages:
+            W17XXXX
+            - W: write type command
+            - 17: target pid 1 p param
+            - XXXX: write value
+            W18XXXX
+            - W: write type command
+            - 18: target pid 1 i param
+            - XXXX: write value
+            W19XXXX
+            - W: write type command
+            - 19: target pid 1 d param
+            - XXXX: write value
+            Z02:
+            - Z: reset type command
+            - 02: target entire controller
+
+        """
         if self.verb:
             print('Setting PID Params')
 
@@ -233,6 +329,19 @@ class PID:
     def set_scale(self, slope, offset):
         """Set the conversion between feedback voltage and approximate
         frequency.
+
+        Command messages:
+            W14XXXXX:
+            - W: write type command
+            - 14: target feedback scale
+            - XXXXX: write value
+            W03XXXXX:
+            - W: write type command
+            - 03: target feedback offset
+            - XXXXX: write value
+            Z02:
+            - Z: reset type command
+            - 02: target entire controller
 
         """
         slope_hex = self._get_scale_hex(slope, 1)
@@ -291,6 +400,37 @@ class PID:
 
     @staticmethod
     def _decode_array(input_array):
+        """Helper function to parse the individual response strings.
+
+        Each function calls a series of commands which each have a reponse string.
+        The strings are arranged into an array and sent here to be decoded. For each
+        individual string, the first character is the action type:
+            - R: read (hex)
+            - W: write (hex)
+            - E: enable
+            - D: disable
+            - P: put
+            - G: get
+            - X: read (decimal)
+            - Z: reset
+        Following the action type, the next two characters are the command type. The
+        supported command type depends on the action type:
+            - R01: read setpoint for pid 1 (rotation frequency setpoint)
+            - R02: read setpoint for pid 2 (rotation direction setpoint)
+            - W01: write setpoint for pid 1 (rotation frequency setpoint)
+            - W02: write setpoint for pid 2 (rotation direction setpoint)
+            - W0C: write action type for pid 1 (how to interpret sign of (setpoint-value))
+            - X01: read value for pid 1 (current rotation frequency)
+        The helper function goes through the raw response strings and replaces them
+        with their decoded values.
+
+        Args:
+            input_array (list): List of str messages to decode
+
+        Returns:
+            list: Decoded responses
+
+        """
         output_array = list(input_array)
 
         for index, string in enumerate(list(input_array)):
@@ -317,6 +457,28 @@ class PID:
 
     @staticmethod
     def _decode_read(string):
+        """Helper function to decode "read (hex)" type response strings
+
+        Specific decoding procedure depends on response string type:
+            - R01 (pid 1 setpoint): convert hex value into decimal (X.XXX format).
+                                    Returns decimal value
+            - R02 (pid 2 setpoint): convert hex value into decimal (X.XXX format)
+                                    and compair to mean value to determine rotation
+                                    direction. Returns rotation direction
+
+        Examples:
+            _decode_read('R01400000') -> 0.0
+            _decode_read('R014007D0') -> 2.0
+            _decode_read('R02400000') -> 0
+            _decode_read('R024007D0') -> 1
+
+        Args:
+            string (str): Read (hex) type string to decode
+
+        Returns:
+            Decoded value
+
+        """
         if isinstance(string, str):
             end_string = string.split('\r')[-1]
             read_type = end_string[1:3]
@@ -337,6 +499,15 @@ class PID:
 
     @staticmethod
     def _decode_write(string):
+        """Helper function to decode "write (hex)" type response strings
+
+        Args:
+            string (str): Write (hex) type string to decode
+
+        Returns:
+            str: Decoded string
+
+        """
         write_type = string[1:]
         if write_type == '01':
             return 'Changed Setpoint'
@@ -349,6 +520,17 @@ class PID:
 
     @staticmethod
     def _decode_measure(string):
+        """Helper function to decode "read (decimal)" type response strings
+
+        Deconding is done in the following way
+            - X01 (pid 1 value): removes header and returns decimal value
+
+        Args:
+            string (str): Read (decimal) type string to decode
+
+        Return:
+            float: Decoded value
+        """
         if isinstance(string, str):
             end_string = string.split('\r')[-1]
             measure_type = end_string[1:3]
