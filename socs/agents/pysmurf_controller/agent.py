@@ -22,7 +22,7 @@ from sodetlib.det_config import DetConfig
 from sodetlib.operations import bias_dets
 
 from socs.agents.pysmurf_controller.smurf_subprocess_util import (
-     RunCfg, RunResult, run_func_in_subprocess_from_thread)
+    RunCfg, RunResult, run_func_in_subprocess_from_thread)
 
 
 class PysmurfScriptProtocol(protocol.ProcessProtocol):
