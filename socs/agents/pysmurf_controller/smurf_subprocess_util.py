@@ -9,10 +9,43 @@ import numpy as np
 import sodetlib as sdl
 from ocs.ocs_twisted import in_reactor_context
 from sodetlib.det_config import DetConfig
-from sodetlib.operations import bias_steps, bias_wave, iv, uxm_setup
+from sodetlib.operations import bias_steps, bias_wave, iv, uxm_setup, uxm_relock
 from twisted.internet import defer, protocol, reactor, threads
 
 NBIASLINES = 12
+
+
+def json_safe(data):
+    """Convert data so it can be serialized and decoded on
+    the other end.  This includes:
+
+    - Converting numpy arrays and scalars to generic lists and
+        Python basic types.
+    - Converting NaN/inf to Num (0 or +/- large number)
+    """
+    if isinstance(data, dict):
+        return {k: json_safe(v) for k, v in data.items()}
+    if isinstance(data, (list, tuple)):
+        return [json_safe(x) for x in data]
+    if hasattr(data, 'dtype'):
+        # numpy arrays and scalars.
+        return json_safe(data.tolist())
+    if isinstance(data, (str, int, bool)):
+        return data
+    if isinstance(data, float):
+        return np.nan_to_num(data)
+    # This could still be something weird but json.dumps will
+    # probably reject it!
+    return data
+
+
+def encode_dataclass(obj):
+    """
+    Encodes a data-class into json, replacing any json-unsafe types with
+    reasonable alternatives.
+    """
+    data = json_safe(asdict(obj))
+    return json.dumps(data).encode()
 
 
 def get_smurf_control():
@@ -75,7 +108,7 @@ def run_uxm_relock(bands=None, kwargs=None):
     if kwargs is None:
         kwargs = {}
     S, cfg = get_smurf_control()
-    uxm_setup.uxm_relock(S, cfg, bands=bands, **kwargs)
+    uxm_relock.uxm_relock(S, cfg, bands=bands, **kwargs)
     return None
 
 
@@ -162,7 +195,7 @@ def test():
 
 runnable_funcs = [
     take_noise, take_iv, run_uxm_setup, run_uxm_relock, take_bias_steps,
-    take_bias_waves, test
+    take_bias_waves, test, take_bgmap
 ]
 func_map = {f.__name__: f for f in runnable_funcs}
 
@@ -211,7 +244,7 @@ class FuncProtocol(protocol.ProcessProtocol):
         self.result = None
 
     def connectionMade(self):
-        data = json.dumps(asdict(self.cfg)).encode()
+        data = encode_dataclass(self.cfg)
         self.transport.write(data)
         self.transport.closeStdin()
 
@@ -246,22 +279,19 @@ def _run_func_in_subprocess_reactor(cfg: RunCfg) -> RunResult:
     return RunResult(**result)
 
 
-def run_func_in_subprocess(cfg: RunCfg) -> RunResult:
+def run_func_in_subprocess_from_thread(cfg: RunCfg) -> RunResult:
     """
     This function takes a RunCfg object, and runs the specified function in a
     subprocess. The result is returned as a RunResult object. This function
-    must be run in the reactor thread.
+    must be run in a worker thread.
 
     Args
     -----
     cfg: RunCfg
         Configuration object to specify the function to run, and the arguments.
     """
-    if not in_reactor_context():
-        return threads.blockingCallFromThread(
-            reactor, _run_func_in_subprocess_reactor, cfg)
-    else:
-        return _run_func_in_subprocess_reactor(cfg)
+    return threads.blockingCallFromThread(
+        reactor, _run_func_in_subprocess_reactor, cfg)
 
 
 def subprocess_main():
@@ -276,13 +306,13 @@ def subprocess_main():
     try:
         return_val = func_map[cfg.func_name](*cfg.args, **cfg.kwargs)
         result = RunResult(success=True, return_val=return_val)
-        return_data = json.dumps(asdict(result)).encode()
+        return_data = encode_dataclass(result)
     except Exception:
         result = RunResult(
             success=False,
             traceback=traceback.format_exc()
         )
-        return_data = json.dumps(asdict(result)).encode()
+        return_data = encode_dataclass(result)
     os.write(3, return_data)
 
 

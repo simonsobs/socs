@@ -23,7 +23,7 @@ from sodetlib.operations import (bias_dets, bias_steps, bias_wave, iv,
                                  uxm_relock, uxm_setup)
 
 from socs.agents.pysmurf_controller.smurf_subprocess_util import (
-    NBIASLINES, RunCfg, RunResult, run_func_in_subprocess)
+    NBIASLINES, RunCfg, RunResult, run_func_in_subprocess_from_thread)
 
 
 class PysmurfScriptProtocol(protocol.ProcessProtocol):
@@ -350,7 +350,7 @@ class PysmurfController:
         cfg = RunCfg(
             func_name='test',
         )
-        result = run_func_in_subprocess(cfg)
+        result = run_func_in_subprocess_from_thread(cfg)
         if not result.success:
             self.log.error("Subprocess errored out:\n{tb}", tb=result.traceback)
 
@@ -516,7 +516,7 @@ class PysmurfController:
                 func_name='run_uxm_setup',
                 kwargs={'bands': params['bands'], 'kwargs': params['kwargs']}
             )
-            result = run_func_in_subprocess(cfg)
+            result = run_func_in_subprocess_from_thread(cfg)
             set_session_data(session, result)
             if result.traceback is not None:
                 self.log.error("Error occurred:\n{tb}", tb=result.traceback)
@@ -581,7 +581,7 @@ class PysmurfController:
                 func_name='run_uxm_relock',
                 kwargs={'bands': params['bands'], 'kwargs': params['kwargs']}
             )
-            result = run_func_in_subprocess(cfg)
+            result = run_func_in_subprocess_from_thread(cfg)
             set_session_data(session, result)
             if result.traceback is not None:
                 self.log.error("Error occurred:\n{tb}", tb=result.traceback)
@@ -639,7 +639,7 @@ class PysmurfController:
                 args=[params['duration']],
                 kwargs={'kwargs': params['kwargs']}
             )
-            result = run_func_in_subprocess(cfg)
+            result = run_func_in_subprocess_from_thread(cfg)
             set_session_data(session, result)
             return result.success, "Finished taking noise"
 
@@ -694,7 +694,7 @@ class PysmurfController:
                 func_name='take_bgmap',
                 kwargs={'kwargs': kwargs}
             )
-            result = run_func_in_subprocess(cfg)
+            result = run_func_in_subprocess_from_thread(cfg)
             set_session_data(session, result)
             return result.success, "Finished taking bgmap"
 
@@ -744,7 +744,7 @@ class PysmurfController:
                 func_name='take_iv',
                 kwargs={'iv_kwargs': params['kwargs']}
             )
-            result = run_func_in_subprocess(cfg)
+            result = run_func_in_subprocess_from_thread(cfg)
             set_session_data(session, result)
             return result.success, "Finished taking IV"
 
@@ -806,7 +806,7 @@ class PysmurfController:
                     'kwargs': params['kwargs'], 'rfrac_range': params['rfrac_range'],
                 }
             )
-            result = run_func_in_subprocess(cfg)
+            result = run_func_in_subprocess_from_thread(cfg)
             set_session_data(session, result)
             if result.success:  # Publish quantile results
                 for name, d in result.return_val['quantiles'].items():
@@ -879,7 +879,7 @@ class PysmurfController:
                     'kwargs': params['kwargs'], 'rfrac_range': params['rfrac_range'],
                 }
             )
-            result = run_func_in_subprocess(cfg)
+            result = run_func_in_subprocess_from_thread(cfg)
             set_session_data(session, result)
             if result.success:  # Publish quantile results
                 for name, d in result.return_val['quantiles'].items():
