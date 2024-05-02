@@ -19,11 +19,10 @@ from ocs import ocs_agent, site_config
 from ocs.ocs_agent import log_formatter
 from ocs.ocs_twisted import TimeoutLock
 from sodetlib.det_config import DetConfig
-from sodetlib.operations import (bias_dets, bias_steps, bias_wave, iv,
-                                 uxm_relock, uxm_setup)
+from sodetlib.operations import bias_dets
 
 from socs.agents.pysmurf_controller.smurf_subprocess_util import (
-    NBIASLINES, RunCfg, RunResult, run_func_in_subprocess_from_thread)
+     RunCfg, RunResult, run_func_in_subprocess_from_thread)
 
 
 class PysmurfScriptProtocol(protocol.ProcessProtocol):

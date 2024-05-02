@@ -7,7 +7,6 @@ from typing import Dict, List, Optional
 
 import numpy as np
 import sodetlib as sdl
-from ocs.ocs_twisted import in_reactor_context
 from sodetlib.det_config import DetConfig
 from sodetlib.operations import (bias_steps, bias_wave, iv, uxm_relock,
                                  uxm_setup)
