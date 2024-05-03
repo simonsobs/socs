@@ -1,10 +1,11 @@
+from dataclasses import asdict
+
 import matplotlib
 from autobahn.twisted.util import sleep as dsleep
 from twisted.internet import protocol, reactor, threads
 from twisted.internet.defer import Deferred, inlineCallbacks
 from twisted.logger import FileLogObserver, Logger
 from twisted.python.failure import Failure
-from dataclasses import asdict
 
 matplotlib.use('Agg')
 import argparse

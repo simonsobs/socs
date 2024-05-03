@@ -1,3 +1,4 @@
+import os
 from unittest import mock
 
 import numpy as np
@@ -7,7 +8,6 @@ from ocs.ocs_agent import OpSession
 
 from socs.agents.pysmurf_controller.agent import PysmurfController, make_parser
 
-import os
 os.environ['SLOT'] = '2'
 
 txaio.use_twisted()

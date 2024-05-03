@@ -305,7 +305,7 @@ def run_smurf_func(cfg: RunCfg) -> RunResult:
                 traceback=traceback.format_exc()
             )
         return result
- 
+
     return threads.blockingCallFromThread(
         reactor, _run_func_in_subprocess_reactor, cfg)
 
