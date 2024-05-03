@@ -214,6 +214,9 @@ class RunCfg:
     slot: Optional[int] = None
     "Slot to setup smurf control for. If None, uses the slot from the environment variable 'SLOT'"
 
+    run_in_main_process: bool = False
+    "If true, run the function in the main process instead of a subprocess."
+
     def __post_init__(self):
         if self.func_name not in func_map:
             raise ValueError(f"Invalid function name: {self.func_name}")
@@ -279,7 +282,7 @@ def _run_func_in_subprocess_reactor(cfg: RunCfg) -> RunResult:
     return RunResult(**result)
 
 
-def run_func_in_subprocess_from_thread(cfg: RunCfg) -> RunResult:
+def run_smurf_func(cfg: RunCfg) -> RunResult:
     """
     This function takes a RunCfg object, and runs the specified function in a
     subprocess. The result is returned as a RunResult object. This function
@@ -290,6 +293,19 @@ def run_func_in_subprocess_from_thread(cfg: RunCfg) -> RunResult:
     cfg: RunCfg
         Configuration object to specify the function to run, and the arguments.
     """
+    if cfg.run_in_main_process:
+        try:
+            result = RunResult(
+                success=True,
+                return_val=func_map[cfg.func_name](*cfg.args, **cfg.kwargs)
+            )
+        except Exception:
+            result = RunResult(
+                success=False,
+                traceback=traceback.format_exc()
+            )
+        return result
+ 
     return threads.blockingCallFromThread(
         reactor, _run_func_in_subprocess_reactor, cfg)
 

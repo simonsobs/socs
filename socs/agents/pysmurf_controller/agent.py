@@ -4,6 +4,7 @@ from twisted.internet import protocol, reactor, threads
 from twisted.internet.defer import Deferred, inlineCallbacks
 from twisted.logger import FileLogObserver, Logger
 from twisted.python.failure import Failure
+from dataclasses import asdict
 
 matplotlib.use('Agg')
 import argparse
@@ -22,7 +23,7 @@ from sodetlib.det_config import DetConfig
 from sodetlib.operations import bias_dets
 
 from socs.agents.pysmurf_controller.smurf_subprocess_util import (
-    RunCfg, RunResult, run_func_in_subprocess_from_thread)
+    RunCfg, RunResult, run_smurf_func)
 
 
 class PysmurfScriptProtocol(protocol.ProcessProtocol):
@@ -79,12 +80,10 @@ class PysmurfScriptProtocol(protocol.ProcessProtocol):
 
 def set_session_data(session, result: RunResult):
     """Sets session data based on a RunResult object"""
-    if not result.success or result.return_val is None:
-        return
-    if isinstance(result.return_val, dict):
-        session.data = result.return_val
-    else:
-        session.data = {'data': result.return_val}
+    if result.return_val is not None:
+        if isinstance(result.return_val, dict):
+            session.data = result.return_val
+    session.data['result'] = asdict(result)
 
 
 class PysmurfController:
@@ -349,7 +348,7 @@ class PysmurfController:
         cfg = RunCfg(
             func_name='test',
         )
-        result = run_func_in_subprocess_from_thread(cfg)
+        result = run_smurf_func(cfg)
         if not result.success:
             self.log.error("Subprocess errored out:\n{tb}", tb=result.traceback)
 
@@ -451,6 +450,7 @@ class PysmurfController:
 
     @ocs_agent.param('bands', default=None)
     @ocs_agent.param('kwargs', default=None)
+    @ocs_agent.param('run_in_main_procsess', default=False)
     def uxm_setup(self, session, params):
         """uxm_setup(bands=None, kwargs=None)
 
@@ -477,6 +477,8 @@ class PysmurfController:
         kwargs : dict
             Dict containing additional keyword args to pass to the uxm_setup
             function.
+        run_in_main_process : bool
+            If true, run smurf-function in main process
 
         Notes
         -------
@@ -513,9 +515,10 @@ class PysmurfController:
 
             cfg = RunCfg(
                 func_name='run_uxm_setup',
-                kwargs={'bands': params['bands'], 'kwargs': params['kwargs']}
+                kwargs={'bands': params['bands'], 'kwargs': params['kwargs']},
+                run_in_main_process=params['run_in_main_process'],
             )
-            result = run_func_in_subprocess_from_thread(cfg)
+            result = run_smurf_func(cfg)
             set_session_data(session, result)
             if result.traceback is not None:
                 self.log.error("Error occurred:\n{tb}", tb=result.traceback)
@@ -523,6 +526,7 @@ class PysmurfController:
 
     @ocs_agent.param('bands', default=None)
     @ocs_agent.param('kwargs', default=None)
+    @ocs_agent.param('run_in_main_process', default=False, type=bool)
     def uxm_relock(self, session, params):
         """uxm_relock(bands=None, kwargs=None)
 
@@ -547,6 +551,8 @@ class PysmurfController:
         kwargs : dict
             Dict containing additional keyword args to pass to the uxm_relock
             function.
+        run_in_main_process : bool
+            If true, run smurf-function in main process
 
         Notes
         -------
@@ -578,9 +584,10 @@ class PysmurfController:
 
             cfg = RunCfg(
                 func_name='run_uxm_relock',
-                kwargs={'bands': params['bands'], 'kwargs': params['kwargs']}
+                kwargs={'bands': params['bands'], 'kwargs': params['kwargs']},
+                run_in_main_process=params['run_in_main_process'],
             )
-            result = run_func_in_subprocess_from_thread(cfg)
+            result = run_smurf_func(cfg)
             set_session_data(session, result)
             if result.traceback is not None:
                 self.log.error("Error occurred:\n{tb}", tb=result.traceback)
@@ -590,6 +597,7 @@ class PysmurfController:
     @ocs_agent.param('duration', default=30., type=float)
     @ocs_agent.param('kwargs', default=None)
     @ocs_agent.param('tag', default=None)
+    @ocs_agent.param('run_in_main_process', default=False, type=bool)
     def take_noise(self, session, params):
         """take_noise(duration=30., kwargs=None, tag=None)
 
@@ -609,7 +617,8 @@ class PysmurfController:
         tag : string, optional
             Tag (or comma-separated list of tags) to attach to the G3 stream.
             This has precedence over the `tag` key in the kwargs dict.
-
+        run_in_main_process : bool
+            If true, run smurf-function in main process
 
         Notes
         -------
@@ -636,14 +645,17 @@ class PysmurfController:
             cfg = RunCfg(
                 func_name='take_noise',
                 args=[params['duration']],
-                kwargs={'kwargs': params['kwargs']}
+                kwargs={'kwargs': params['kwargs']},
+                run_in_main_process=params['run_in_main_process'],
             )
-            result = run_func_in_subprocess_from_thread(cfg)
+
+            result = run_smurf_func(cfg)
             set_session_data(session, result)
             return result.success, "Finished taking noise"
 
     @ocs_agent.param('kwargs', default=None)
     @ocs_agent.param('tag', default=None)
+    @ocs_agent.param('run_in_main_process', default=False, type=bool)
     def take_bgmap(self, session, params):
         """take_bgmap(kwargs=None, tag=None)
 
@@ -661,6 +673,8 @@ class PysmurfController:
         tag : Optional[str]
             String containing a tag or comma-separated list of tags to attach
             to the g3 stream.
+        run_in_main_process : bool
+            If true, run smurf-function in main process
 
         Notes
         ------
@@ -691,14 +705,16 @@ class PysmurfController:
             kwargs.update(params['kwargs'])
             cfg = RunCfg(
                 func_name='take_bgmap',
-                kwargs={'kwargs': kwargs}
+                kwargs={'kwargs': kwargs},
+                run_in_main_process=params['run_in_main_process'],
             )
-            result = run_func_in_subprocess_from_thread(cfg)
+            result = run_smurf_func(cfg)
             set_session_data(session, result)
             return result.success, "Finished taking bgmap"
 
     @ocs_agent.param('kwargs', default=None)
     @ocs_agent.param('tag', default=None)
+    @ocs_agent.param('run_in_main_process', default=False, type=bool)
     def take_iv(self, session, params):
         """take_iv(kwargs=None, tag=None)
 
@@ -716,6 +732,8 @@ class PysmurfController:
         tag : Optional[str]
             String containing a tag or comma-separated list of tags to attach
             to the g3 stream.
+        run_in_main_process : bool
+            If true, run smurf-function in main process
 
         Notes
         ------
@@ -741,15 +759,17 @@ class PysmurfController:
                 return False, f"Operation failed: {self.lock.job} is running."
             cfg = RunCfg(
                 func_name='take_iv',
-                kwargs={'iv_kwargs': params['kwargs']}
+                kwargs={'iv_kwargs': params['kwargs']},
+                run_in_main_process=params['run_in_main_process'],
             )
-            result = run_func_in_subprocess_from_thread(cfg)
+            result = run_smurf_func(cfg)
             set_session_data(session, result)
             return result.success, "Finished taking IV"
 
     @ocs_agent.param('kwargs', default=None)
     @ocs_agent.param('rfrac_range', default=(0.2, 0.9))
     @ocs_agent.param('tag', default=None)
+    @ocs_agent.param('run_in_main_process', default=False, type=bool)
     def take_bias_steps(self, session, params):
         """take_bias_steps(kwargs=None, rfrac_range=(0.2, 0.9), tag=None)
 
@@ -768,6 +788,8 @@ class PysmurfController:
         tag : Optional[str]
             String containing a tag or comma-separated list of tags to attach
             to the g3 stream.
+        run_in_main_process : bool
+            If true, run smurf-function in main process
 
         Notes
         ------
@@ -803,9 +825,10 @@ class PysmurfController:
                 func_name='take_bias_steps',
                 kwargs={
                     'kwargs': params['kwargs'], 'rfrac_range': params['rfrac_range'],
-                }
+                },
+                run_in_main_process=params['run_in_main_process'],
             )
-            result = run_func_in_subprocess_from_thread(cfg)
+            result = run_smurf_func(cfg)
             set_session_data(session, result)
             if result.success:  # Publish quantile results
                 for name, d in result.return_val['quantiles'].items():
@@ -825,6 +848,7 @@ class PysmurfController:
     @ocs_agent.param('bgs', default=None)
     @ocs_agent.param('kwargs', default=None)
     @ocs_agent.param('tag', default=None)
+    @ocs_agent.param('run_in_main_process', default=False, type=bool)
     def take_bias_waves(self, session, params):
         """take_bias_waves(kwargs=None, rfrac_range=(0.2, 0.9), tag=None)
 
@@ -841,6 +865,8 @@ class PysmurfController:
         tag : Optional[str]
             String containing a tag or comma-separated list of tags to attach
             to the g3 stream.
+        run_in_main_process : bool
+            If true, run smurf-function in main process
 
         Notes
         ------
@@ -876,9 +902,10 @@ class PysmurfController:
                 func_name='take_bias_waves',
                 kwargs={
                     'kwargs': params['kwargs'], 'rfrac_range': params['rfrac_range'],
-                }
+                },
+                run_in_main_process=params['run_in_main_process'],
             )
-            result = run_func_in_subprocess_from_thread(cfg)
+            result = run_smurf_func(cfg)
             set_session_data(session, result)
             if result.success:  # Publish quantile results
                 for name, d in result.return_val['quantiles'].items():
