@@ -242,13 +242,13 @@ class HWPState:
 
     def update_pmx_state(self, op):
         """
-        Updates state values from the pmx acq operation results.
+        Updates state values from the pmx main operation results.
 
         Args
         -----
         op : dict
             Dict containing the operations (from get_op_data) from the pmx
-            ``acq`` process
+            ``main`` process
         """
         keymap = {'pmx_current': 'curr', 'pmx_voltage': 'volt',
                   'pmx_source': 'source', 'pmx_last_updated': 'last_updated'}
@@ -256,13 +256,13 @@ class HWPState:
 
     def update_pid_state(self, op):
         """
-        Updates state values from the pid acq operation results.
+        Updates state values from the pid main operation results.
 
         Args
         -----
         op : dict
             Dict containing the operations (from get_op_data) from the pid
-            ``acq`` process
+            ``main`` process
         """
         self._update_from_keymap(op, {
             'pid_current_freq': 'current_freq',
@@ -357,30 +357,40 @@ class HWPState:
             return 'stop'
 
 
+class ControlStateInfo:
+    def __init__(self, state):
+        """
+        Class that holds the control state dataclass, and relevant metadata
+        such as start time and last_update time.
+
+        Args
+        ------
+        state : ControlState
+            ControlState object
+        """
+        self.state = state
+        self.last_update_time = 0
+        self.start_time = time.time()
+        self.state_type = state.__class__.__name__
+
+    def encode(self):
+        d = {
+            'state_type': self.state_type,
+            'start_time': self.start_time,
+            'last_update_time': self.last_update_time,
+        }
+        d.update(asdict(self.state))
+        return d
+
+
 class ControlState:
     """Namespace for HWP control state definitions"""
     @dataclass
-    class Base:
-        def __init__(self):
-            super().__init__()
-            self.start_time = time.time()
-            self.last_update_time = 0
-
-        def encode(self):
-            d = {
-                'class': self.__class__.__name__,
-                'start_time': self.start_time,
-                'last_update_time': self.last_update_time,
-            }
-            d.update(asdict(self))
-            return d
-
-    @dataclass
-    class Idle(Base):
+    class Idle:
         """Does nothing"""
 
     @dataclass
-    class PIDToFreq(Base):
+    class PIDToFreq:
         """
         Configures PID and PMX agents to PID to a target frequency.
 
@@ -402,7 +412,7 @@ class ControlState:
         freq_tol_duration: float
 
     @dataclass
-    class CheckInitialRotation(Base):
+    class CheckInitialRotation:
         """
         In this state, will check if the HWP has started rotating. If it has not
         started rotating in ``check_wait_time`` seconds, it will briefly turn on the PCU
@@ -416,7 +426,7 @@ class ControlState:
         start_time: float = field(default_factory=time.time)
 
     @dataclass
-    class WaitForTargetFreq(Base):
+    class WaitForTargetFreq:
         """
         Wait until HWP reaches its target frequency before transitioning to
         the Done state.
@@ -443,7 +453,7 @@ class ControlState:
         _pcu_enabled: bool = field(init=False, default=False)
 
     @dataclass
-    class ConstVolt(Base):
+    class ConstVolt:
         """
         Configure PMX agent to output a constant voltage.
 
@@ -458,7 +468,7 @@ class ControlState:
         direction: str
 
     @dataclass
-    class Done(Base):
+    class Done:
         """
         Signals the last state has completed
 
@@ -475,7 +485,7 @@ class ControlState:
         msg: str = None
 
     @dataclass
-    class Error(Base):
+    class Error:
         """
         Signals the last state update threw an error
 
@@ -490,7 +500,7 @@ class ControlState:
         start_time: float = field(default_factory=time.time)
 
     @dataclass
-    class Brake(Base):
+    class Brake:
         """
         Configure the PID and PMX agents to actively brake the HWP
         """
@@ -499,7 +509,7 @@ class ControlState:
         brake_voltage: float
 
     @dataclass
-    class WaitForBrake(Base):
+    class WaitForBrake:
         """
         Waits until the HWP has slowed before shutting off PMX
 
@@ -510,7 +520,7 @@ class ControlState:
         prev_freq: float = None
 
     @dataclass
-    class PmxOff(Base):
+    class PmxOff:
         """
         Turns off the PMX
 
@@ -522,12 +532,12 @@ class ControlState:
         success: bool = True
 
     @dataclass
-    class Abort(Base):
+    class Abort:
         """Abort current action"""
         pass
 
     @dataclass
-    class EnableDriverBoard(Base):
+    class EnableDriverBoard:
         """
         Enables driver boards for encoder LEDs
 
@@ -558,7 +568,7 @@ class ControlState:
             self.cycle_timestamp = None
 
     @dataclass
-    class DisableDriverBoard(Base):
+    class DisableDriverBoard:
         """
         Disables driver board for encoder LEDs
 
@@ -591,7 +601,7 @@ class ControlAction:
     _cur_action_id: int = 0
     _id_lock = threading.Lock()
 
-    def __init__(self, state: ControlState.Base):
+    def __init__(self, state):
         with ControlAction._id_lock:
             self.action_id = ControlAction._cur_action_id
             ControlAction._cur_action_id += 1
@@ -602,13 +612,13 @@ class ControlAction:
         self.log = txaio.make_logger()  # pylint: disable=E1101
         self.set_state(state)
 
-    def set_state(self, state: ControlState.Base):
+    def set_state(self, state):
         """
         Sets state for the current action. If this is a `completed_state`,
         will mark as complete.
         """
-        self.state_history.append(state)
-        self.cur_state = state
+        self.cur_state_info = ControlStateInfo(state)
+        self.state_history.append(self.cur_state_info)
         self.log.info(f"Setting state: {state}")
         if isinstance(state, ControlState.completed_states):
             self.completed = True
@@ -621,7 +631,7 @@ class ControlAction:
             action_id=self.action_id,
             completed=self.completed,
             success=self.success,
-            cur_state=self.cur_state.encode(),
+            cur_state=self.cur_state_info.encode(),
             state_history=[s.encode() for s in self.state_history],
         )
 
@@ -702,8 +712,8 @@ class ControlStateMachine:
         """Run the next series of actions for the current state"""
         try:
             self.lock.acquire()
-            state = self.action.cur_state
-            state.last_update_time = time.time()
+            state = self.action.cur_state_info.state
+            self.action.cur_state_info.last_update_time = time.time()
 
             def query_pid_state():
                 data = self.run_and_validate(clients.pid.get_state)['data']
@@ -912,7 +922,7 @@ class ControlStateMachine:
         finally:
             self.lock.release()
 
-    def request_new_action(self, state: ControlState.Base):
+    def request_new_action(self, state):
         """
         Requests that a new action is started with a given state.
         If an action is already in progress, it will be aborted.
@@ -1074,7 +1084,7 @@ class HWPSupervisor:
             # 1. Gather data from relevant operations
             temp_op = get_op_data(self.ybco_lakeshore_id, 'acq', **kw)
             enc_op = get_op_data(self.hwp_encoder_id, 'acq', **kw)
-            pmx_op = get_op_data(self.hwp_pmx_id, 'acq', **kw)
+            pmx_op = get_op_data(self.hwp_pmx_id, 'main', **kw)
             pid_op = get_op_data(self.hwp_pid_id, 'main', **kw)
             ups_op = get_op_data(self.ups_id, 'acq', **kw)
 
@@ -1117,12 +1127,19 @@ class HWPSupervisor:
         session.status = 'stopping'
         return True, 'Stopping monitor process'
 
+    @ocs_agent.param('test_mode', type=bool, default=False)
     def spin_control(self, session, params):
         """spin_control()
 
         **Process** - Process to manage the spin-state for HWP agents. This will
         issue commands to various HWP agents depending on the current control
         state.
+
+        Args
+        ----------
+        test_mode : bool
+            If True, spin_control loop will run a single update iteration before
+            exiting. This is useful for testing actions.
 
         Notes
         --------
@@ -1146,6 +1163,8 @@ class HWPSupervisor:
                 'action_history': [a.encode() for a in self.control_state_machine.action_history],
                 'timestamp': time.time()
             }
+            if params['test_mode']:
+                break
             time.sleep(1)
         return True, "Finished spin control process"
 
@@ -1200,7 +1219,7 @@ class HWPSupervisor:
         )
         action = self.control_state_machine.request_new_action(state)
         action.sleep_until_complete(session=session)
-        return action.success, f"Completed with state: {action.cur_state}"
+        return action.success, f"Completed with state: {action.cur_state_info.state}"
 
     @ocs_agent.param('voltage', type=float)
     @ocs_agent.param('direction', type=str, choices=['cw', 'ccw'], default='cw')
@@ -1242,7 +1261,7 @@ class HWPSupervisor:
         )
         action = self.control_state_machine.request_new_action(state)
         action.sleep_until_complete(session=session)
-        return action.success, f"Completed with state: {action.cur_state}"
+        return action.success, f"Completed with state: {action.cur_state_info.state}"
 
     @ocs_agent.param('freq_tol', type=float, default=0.05)
     @ocs_agent.param('freq_tol_duration', type=float, default=10)
@@ -1283,7 +1302,7 @@ class HWPSupervisor:
         )
         action = self.control_state_machine.request_new_action(state)
         action.sleep_until_complete(session=session)
-        return action.success, f"Completed with state: {action.cur_state}"
+        return action.success, f"Completed with state: {action.cur_state_info.state}"
 
     def pmx_off(self, session, params):
         """pmx_off()
@@ -1307,7 +1326,7 @@ class HWPSupervisor:
         state = ControlState.PmxOff()
         action = self.control_state_machine.request_new_action(state)
         action.sleep_until_complete(session=session)
-        return action.success, f"Completed with state: {action.cur_state}"
+        return action.success, f"Completed with state: {action.cur_state_info.state}"
 
     def abort_action(self, session, params):
         """abort_action()
@@ -1361,7 +1380,7 @@ class HWPSupervisor:
         state = ControlState.EnableDriverBoard(**kw)
         action = self.control_state_machine.request_new_action(state)
         action.sleep_until_complete(session=session)
-        return action.success, f"Completed with state: {action.cur_state}"
+        return action.success, f"Completed with state: {action.cur_state_info.state}"
 
     def disable_driver_board(self, session, params):
         """disable_driver_board()
@@ -1389,7 +1408,7 @@ class HWPSupervisor:
         state = ControlState.DisableDriverBoard(**kw)
         action = self.control_state_machine.request_new_action(state)
         action.sleep_until_complete(session=session)
-        return action.success, f"Completed with state: {action.cur_state}"
+        return action.success, f"Completed with state: {action.cur_state_info.state}"
 
 
 def make_parser(parser=None):

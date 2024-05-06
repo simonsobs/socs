@@ -14,6 +14,21 @@ def create_session(op_name):
     return session
 
 
+def test_hwp_supervisor_control():
+    mock_agent = mock.MagicMock()
+    log = txaio.make_logger()
+    txaio.start_logging(level='debug')
+    mock_agent.log = log
+    log.info('Initialized mock OCSAgent')
+    parser = make_parser()
+    args = parser.parse_args(args=['--hwp-encoder-id', 'test'])
+    agent = HWPSupervisor(mock_agent, args)
+    session = create_session('spin_control')
+    params = {'test_mode': True}
+    success, result = agent.spin_control(session, params)
+    return
+
+
 def test_hwp_supervisor_agent():
     mock_agent = mock.MagicMock()
     log = txaio.make_logger()
