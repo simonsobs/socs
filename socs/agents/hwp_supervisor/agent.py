@@ -1135,6 +1135,12 @@ class HWPSupervisor:
         issue commands to various HWP agents depending on the current control
         state.
 
+        Args
+        ----------
+        test_mode : bool
+            If True, spin_control loop will run a single update iteration before
+            exiting. This is useful for testing actions.
+
         Notes
         --------
 
