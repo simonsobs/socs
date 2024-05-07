@@ -105,7 +105,6 @@ class HWPPCUAgent:
         **Process** - Main process for PCU agent.
         """
         PCU = None
-        session.set_status('running')
 
         threads.blockingCallFromThread(reactor, self._clear_queue)
 

@@ -97,7 +97,6 @@ class ACTiCameraAgent:
         """
         pm = Pacemaker(1 / 60, quantize=False)
 
-        session.set_status('running')
         self.is_streaming = True
         while self.is_streaming:
             # Use UTC

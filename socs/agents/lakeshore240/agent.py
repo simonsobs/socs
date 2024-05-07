@@ -199,8 +199,6 @@ class LS240_Agent:
                               .format(self.lock.job))
                 return False, "Could not acquire lock."
 
-            session.set_status('running')
-
             self.take_data = True
 
             session.data = {"fields": {}}
