@@ -1077,7 +1077,6 @@ class HWPSupervisor:
 
         kw = {'test_mode': test_mode, 'log': self.log}
 
-        session.set_status('running')
         while session.status in ['starting', 'running']:
             session.data['timestamp'] = time.time()
 
@@ -1155,7 +1154,6 @@ class HWPSupervisor:
         """
         clients = self._get_hwp_clients()
 
-        session.set_status('running')
         while session.status in ['starting', 'running']:
             self.control_state_machine.update(clients, self.hwp_state)
             session.data = {

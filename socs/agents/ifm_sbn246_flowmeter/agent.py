@@ -102,7 +102,6 @@ class FlowmeterAgent:
         """
         pm = Pacemaker(1, quantize=True)
         self.take_data = True
-        session.set_status('running')
 
         while self.take_data:
             pm.sleep()

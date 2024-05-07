@@ -114,8 +114,6 @@ class WiregridEncoderAgent:
                     .format(self.lock.job))
                 return False, 'Could not acquire lock.'
 
-            session.set_status('running')
-
             self.take_data = True
             # Initialize data containers
             session.data = {'fields': {'irig_data': {}, 'encoder_data': {},

@@ -126,8 +126,6 @@ class LS336_Agent:
                     f"{self._lock.job}")
                 return False, 'Could not acquire lock'
 
-            session.set_status('running')
-
             # get lakeshore
             self.module = LS336(self.ip)
             session.add_message(
@@ -189,8 +187,6 @@ class LS336_Agent:
                     f"Lock could not be acquired because it is held by "
                     f"{self._lock.job}")
                 return False, 'Could not acquire lock'
-
-            session.set_status('running')
 
             # initialize recent temps array
             # shape is N_points x N_channels
@@ -313,8 +309,6 @@ class LS336_Agent:
                     f"{self._lock.job}")
                 return False, 'Could not acquire lock'
 
-            session.set_status('running')
-
             # get heater
             heater_key = params.get('heater', '2')  # default to 50W output
             heater = self.module.heaters[heater_key]
@@ -358,8 +352,6 @@ class LS336_Agent:
                     f"Lock could not be acquired because it is held by "
                     f"{self._lock.job}")
                 return False, 'Could not acquire lock'
-
-            session.set_status('running')
 
             # get heater
             heater_key = params.get('heater', '2')  # default to 50W output
@@ -410,8 +402,6 @@ class LS336_Agent:
                     f"{self._lock.job}")
                 return False, 'Could not acquire lock'
 
-            session.set_status('running')
-
             # get heater
             heater_key = params.get('heater', '2')  # default to 50W output
             heater = self.module.heaters[heater_key]
@@ -451,8 +441,6 @@ class LS336_Agent:
                     f"Lock could not be acquired because it is held by "
                     f"{self._lock.job}")
                 return False, 'Could not acquire lock'
-
-            session.set_status('running')
 
             # get heater
             heater_key = params.get('heater', '2')  # default to 50W output
@@ -494,8 +482,6 @@ class LS336_Agent:
                     f"Lock could not be acquired because it is held by "
                     f"{self._lock.job}")
                 return False, 'Could not acquire lock'
-
-            session.set_status('running')
 
             # get heater
             heater_key = params.get('heater', '2')  # default to 50W output
@@ -540,8 +526,6 @@ class LS336_Agent:
                     f"{self._lock.job}")
                 return False, 'Could not acquire lock'
 
-            session.set_status('running')
-
             # get heater
             heater_key = params.get('heater', '2')  # default to 50W output
             heater = self.module.heaters[heater_key]
@@ -585,8 +569,6 @@ class LS336_Agent:
                     f"Lock could not be acquired because it is held by "
                     f"{self._lock.job}")
                 return False, 'Could not acquire lock'
-
-            session.set_status('running')
 
             # get heater
             heater_key = params.get('heater', '2')  # default to 50W output
@@ -635,8 +617,6 @@ class LS336_Agent:
                     f"Lock could not be acquired because it is held by "
                     f"{self._lock.job}")
                 return False, 'Could not acquire lock'
-
-            session.set_status('running')
 
             # get heater
             heater_key = params.get('heater', '2')  # default to 50W output
@@ -687,8 +667,6 @@ class LS336_Agent:
                     f"Lock could not be acquired because it is held by "
                     f"{self._lock.job}")
                 return False, 'Could not acquire lock'
-
-            session.set_status('running')
 
             # get channel
             channel_key = params.get('channel', 'A')  # default to input A
@@ -766,8 +744,6 @@ class LS336_Agent:
                     f"Lock could not be acquired because it is held by "
                     f"{self._lock.job}")
                 return False, 'Could not acquire lock'
-
-            session.set_status('running')
 
             # get heater
             heater_key = params.get('heater', '2')  # default to 50W output
@@ -934,8 +910,6 @@ class LS336_Agent:
                     f"{self._lock.job}")
                 return False, 'Could not acquire lock'
 
-            session.set_status('running')
-
             # get heater
             heater_key = params.get('heater', '2')  # default to 50W output
             heater = self.module.heaters[heater_key]
@@ -1005,8 +979,6 @@ class LS336_Agent:
                     f"{self._lock.job}")
                 return False, 'Could not acquire lock'
 
-            session.set_status('running')
-
             # get channel
             channel_key = params.get('channel', 'A')  # default to input A
             channel = self.module.channels[channel_key]
@@ -1051,8 +1023,6 @@ class LS336_Agent:
                     f"Lock could not be acquired because it is held by "
                     f"{self._lock.job}")
                 return False, 'Could not acquire lock'
-
-            session.set_status('running')
 
             # get heater
             heater_key = params.get('heater', '2')  # default to 50W output

@@ -68,7 +68,6 @@ class ScpiPsuAgent:
                 Defaults to False.
 
         """
-        session.set_status('running')
         self.monitor = True
 
         while self.monitor:

@@ -797,8 +797,6 @@ class WiregridActuatorAgent:
                 return False, 'acq(): Could not acquire lock.'
             self.log.info('acq(): Got the lock')
 
-            session.set_status('running')
-
             self.run_acq = True
             last_release = time.time()
             session.data = {'fields': {}}

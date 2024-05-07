@@ -102,8 +102,6 @@ class ThorlabsMC2000BAgent:
                               f"{self.lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            session.set_status('running')
-
             # Establish connection to the chopper controller
             self.hdl = MC2000BOpen(self.comport, self.nbaud, self.timeout)
 
@@ -138,8 +136,6 @@ class ThorlabsMC2000BAgent:
                               f"{self.lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            session.set_status('running')
-
             MC2000BSetFrequency(self.hdl, params['freq'])
 
         return True, "Chopper frequency set to {} Hz".format(params['freq'])
@@ -162,8 +158,6 @@ class ThorlabsMC2000BAgent:
                 self.log.warn(f"Could not start Task because "
                               f"{self.lock.job} is already running")
                 return False, "Could not acquire lock"
-
-            session.set_status('running')
 
             bladetype = bladetype_keys[params['bladetype']]
             MC2000BSetBladeType(self.hdl, bladetype)
@@ -189,8 +183,6 @@ class ThorlabsMC2000BAgent:
                 self.log.warn(f"Could not start Task because "
                               f"{self.lock.job} is already running")
                 return False, "Could not acquire lock"
-
-            session.set_status('running')
 
             mode = params['output_mode']
             mode_int = outputmode_keys[mode]
@@ -218,8 +210,6 @@ class ThorlabsMC2000BAgent:
                               f"{self.lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            session.set_status('running')
-
             reference = params['reference']
 
             if reference in ('external', 'internal'):
@@ -242,8 +232,6 @@ class ThorlabsMC2000BAgent:
                 self.log.warn(f"Could not start acq because {self.lock.job} "
                               "is already running")
                 return False, "Could not acquire lock."
-
-            session.set_status('running')
 
             last_release = time.time()
 

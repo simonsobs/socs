@@ -68,7 +68,6 @@ class Hi6200Agent:
                 [seconds].
 
         """
-        session.set_status('running')
         self.monitor = True
 
         pm = Pacemaker(1, quantize=True)

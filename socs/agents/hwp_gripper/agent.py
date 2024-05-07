@@ -659,7 +659,6 @@ class HWPGripperAgent:
                            'act{axis}_emg': False,
                            'act{axis}_brake': True}}
         """
-        session.set_status('running')
         sleep_time = 5
         while session.status in ['starting', 'running']:
             if self.client is None:
@@ -745,7 +744,6 @@ class HWPGripperAgent:
                 {'time': 1649085992.719602,
                  'gripper_action': 'ok'}
         """
-        session.set_status('running')
         last_ok_time = time.time()
 
         if self.supervisor_id is None:

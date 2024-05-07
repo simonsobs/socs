@@ -194,8 +194,6 @@ class LS372_Agent:
                               f"{self._acq_proc_lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            session.set_status('running')
-
             if self.fake_data:
                 self.res = random.randrange(1, 1000)
                 session.add_message("No initialization since faking data")
@@ -271,7 +269,6 @@ class LS372_Agent:
                               f"{self._lock.job} is holding the lock")
                 return False, "Could not acquire lock"
 
-            session.set_status('running')
             self.log.info("Starting data acquisition for {}".format(self.agent.agent_address))
             previous_channel = None
             last_release = time.time()
@@ -447,8 +444,6 @@ class LS372_Agent:
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            session.set_status('running')
-
             heater_string = params.get('heater', 'sample')
             if heater_string.lower() == 'sample':
                 heater = self.module.sample_heater
@@ -486,8 +481,6 @@ class LS372_Agent:
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            session.set_status('running')
-
             self.module.channels[params['channel']].set_excitation_mode(params['mode'])
             session.add_message(f'post message in agent for Set channel {params["channel"]} excitation mode to {params["mode"]}')
             print(f'print statement in agent for Set channel {params["channel"]} excitation mode to {params["mode"]}')
@@ -515,8 +508,6 @@ class LS372_Agent:
                 self.log.warn(f"Could not start Task because "
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
-
-            session.set_status('running')
 
             current_excitation = self.module.channels[params['channel']].get_excitation()
             mode = self.module.channels[params["channel"]].get_excitation_mode()
@@ -546,8 +537,6 @@ class LS372_Agent:
                 self.log.warn(f"Could not start Task because "
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
-
-            session.set_status('running')
 
             current_excitation = self.module.channels[params["channel"]].get_excitation()
             mode = self.module.channels[params["channel"]].get_excitation_mode()
@@ -582,8 +571,6 @@ class LS372_Agent:
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            session.set_status('running')
-
             current_resistance_range = self.module.channels[params['channel']].get_resistance_range()
 
             if params['resistance_range'] == current_resistance_range:
@@ -610,8 +597,6 @@ class LS372_Agent:
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            session.set_status('running')
-
             current_resistance_range = self.module.channels[params['channel']].get_resistance_range()
             session.add_message(f'Channel {params["channel"]} resistance range is {current_resistance_range}')
             session.data = {"resistance_range": current_resistance_range}
@@ -637,8 +622,6 @@ class LS372_Agent:
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            session.set_status('running')
-
             self.module.channels[params["channel"]].set_dwell(params["dwell"])
             session.add_message(f'Set dwell to {params["dwell"]}')
 
@@ -659,8 +642,6 @@ class LS372_Agent:
                 self.log.warn(f"Could not start Task because "
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
-
-            session.set_status('running')
 
             current_dwell = self.module.channels[params["channel"]].get_dwell()
             session.add_message(f'Dwell time for channel {params["channel"]} is {current_dwell}')
@@ -691,8 +672,6 @@ class LS372_Agent:
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            session.set_status('running')
-
             self.module.sample_heater.set_pid(params["P"], params["I"], params["D"])
             session.add_message(f'post message text for Set PID to {params["P"]}, {params["I"]}, {params["D"]}')
             print(f'print text for Set PID to {params["P"]}, {params["I"]}, {params["D"]}')
@@ -715,8 +694,6 @@ class LS372_Agent:
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            session.set_status('running')
-
             self.module.set_active_channel(params["channel"])
             session.add_message(f'post message text for set channel to {params["channel"]}')
             print(f'print text for set channel to {params["channel"]}')
@@ -738,8 +715,6 @@ class LS372_Agent:
                 self.log.warn(f"Could not start Task because "
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
-
-            session.set_status('running')
 
             if params['autoscan']:
                 self.module.enable_autoscan()
@@ -765,8 +740,6 @@ class LS372_Agent:
                 self.log.warn(f"Could not start Task because "
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
-
-            session.set_status('running')
 
             # Check we're in correct control mode for servo.
             if self.module.sample_heater.mode != 'Closed Loop':
@@ -813,8 +786,6 @@ class LS372_Agent:
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            session.set_status('running')
-
             channel = params['channel']
             state = params['state']
             if state == 'on':
@@ -840,8 +811,6 @@ class LS372_Agent:
                 self.log.warn(f"Could not start Task because "
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
-
-            session.set_status('running')
 
             channel = params['channel']
             state = params['state']
@@ -870,8 +839,6 @@ class LS372_Agent:
                 self.log.warn(f"Could not start Task because "
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
-
-            session.set_status('running')
 
             channel = params['channel']
             curve_number = params['curve_number']
@@ -907,8 +874,6 @@ class LS372_Agent:
                 self.log.warn(f"Could not start Task because "
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
-
-            session.set_status('running')
 
             channel = params['channel']
 
@@ -978,7 +943,6 @@ class LS372_Agent:
                               f"{self._lock.job} is holding the lock")
                 return False, "Could not acquire lock"
 
-            session.set_status('running')
             session.data = {"fields": {}}
 
             setpoint = params['setpoint']
@@ -1128,8 +1092,6 @@ class LS372_Agent:
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            session.set_status('running')
-
             setpoint = float(self.module.sample_heater.get_setpoint())
 
             if params is None:
@@ -1177,8 +1139,6 @@ class LS372_Agent:
                 self.log.warn(f"Could not start Task because "
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
-
-            session.set_status('running')
 
             if params['heater'].lower() == 'still':
                 self.module.still_heater.set_mode(params['mode'])
@@ -1231,8 +1191,6 @@ class LS372_Agent:
 
             self.log.info("Set {} heater display to {}, output to {}".format(heater, display, output))
 
-            session.set_status('running')
-
             data = {'timestamp': time.time(),
                     'block_name': '{}_heater_out'.format(heater),
                     'data': {'{}_heater_out'.format(heater): output}
@@ -1266,8 +1224,6 @@ class LS372_Agent:
 
             self.log.info("Set still output to {}".format(output))
 
-            session.set_status('running')
-
             data = {'timestamp': time.time(),
                     'block_name': 'still_heater_still_out',
                     'data': {'still_heater_still_out': output}
@@ -1300,7 +1256,6 @@ class LS372_Agent:
 
             self.log.info("Current still output is {}".format(still_output))
 
-            session.set_status('running')
             session.data = {"still_heater_still_out": still_output}
 
         return True, "Current still output is {}".format(still_output)
@@ -1339,8 +1294,6 @@ class LS372_Agent:
 
             device_config = config[ls_serial]['device_settings']
             ls_chann_settings = config[ls_serial]['channel']
-
-            session.set_status('running')
 
             # enable/disable autoscan
             if device_config['autoscan'] == 'on':

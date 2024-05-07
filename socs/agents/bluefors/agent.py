@@ -466,8 +466,6 @@ class BlueforsAgent:
         if not ok:
             return ok, msg
 
-        session.set_status('running')
-
         # Create file objects for all logs in today's directory
         self.log_tracker.open_all_logs()
 

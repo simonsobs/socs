@@ -122,7 +122,6 @@ class SupRsync:
         )
 
         self.running = True
-        session.set_status('running')
 
         # Note this will also be stored directly in session.data
         counters = {

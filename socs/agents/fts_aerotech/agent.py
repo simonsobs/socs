@@ -268,7 +268,6 @@ class FTSAerotechAgent:
 
             self.log.info("Starting Data Acquisition for FTS Mirror at"
                           f"{f_sample} Hz")
-            session.set_status('running')
             self.take_data = True
             last_release = time.time()
 

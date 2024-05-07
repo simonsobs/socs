@@ -353,7 +353,6 @@ class ACUAgent:
         """
         IDLE_RESET_TIMEOUT = 60  # The watchdog timeout in ACU
 
-        session.set_status('running')
         next_action = 0
 
         while session.status in ['starting', 'running']:
@@ -432,8 +431,6 @@ class ACUAgent:
         stored under Status3rdAxis.
 
         """
-
-        session.set_status('running')
 
         # Note that session.data will get scanned, to assign data to
         # feed blocks.  We make an explicit list of items to ignore
@@ -806,7 +803,6 @@ class ACUAgent:
             }
 
         """
-        session.set_status('running')
         FMT = self.udp_schema['format']
         FMT_LEN = struct.calcsize(FMT)
         UDP_PORT = self.udp['port']
@@ -1361,7 +1357,6 @@ class ACUAgent:
                         f'[{limits[0]}, {limits[1]}].')
 
             self.log.info(f'Requested position: az={target_az}, el={target_el}')
-            session.set_status('running')
 
             legs, msg = yield self._get_sunsafe_moves(target_az, target_el,
                                                       zero_legs_ok=False)
@@ -1417,7 +1412,6 @@ class ACUAgent:
                         f'[{limits[0]}, {limits[1]}].')
 
             self.log.info(f'Commanded position: boresight={target}')
-            session.set_status('running')
 
             ok, msg = yield self._go_to_axis(session, 'Boresight', target)
 
@@ -1443,8 +1437,6 @@ class ACUAgent:
         target = self.named_positions.get(params['target'])
         if target is None:
             return False, 'Position "%s" is not configured.' % params['target']
-
-        session.set_status('running')
 
         ok, msg, _session = self.agent.start('go_to', {'az': target[0], 'el': target[1],
                                                        'end_stop': params['end_stop']})
@@ -1529,7 +1521,6 @@ class ACUAgent:
 
         """
 
-        session.set_status('running')
         yield self.acu_control.clear_faults()
         session.set_status('stopping')
         return True, 'Job completed.'
@@ -1556,7 +1547,6 @@ class ACUAgent:
                 modes.append(self.data['status']['corotator']['Corotator_mode'])
             return modes
 
-        session.set_status('running')
         for i in range(6):
             for short_name, mode in zip(['az', 'el', 'third'],
                                         _read_modes()):
@@ -1628,7 +1618,6 @@ class ACUAgent:
 
             It is acceptable to omit columns 5 and 6.
         """
-        session.set_status('running')
 
         times, azs, els, vas, ves, azflags, elflags = sh.from_file(params['filename'])
         if min(azs) <= self.motion_limits['azimuth']['lower'] \
@@ -1803,7 +1792,6 @@ class ACUAgent:
         if scan_upload_len:
             point_batch_count = scan_upload_len / step_time
 
-        session.set_status('running')
         self.log.info('The plan: {plan}', plan=plan)
         self.log.info('The scan_params: {scan_params}', scan_params=scan_params)
 
@@ -2238,7 +2226,6 @@ class ACUAgent:
         last_panic = 0
 
         session.data = {}
-        session.set_status('running')
 
         while session.status in ['starting', 'running']:
             new_data = {
@@ -2442,7 +2429,6 @@ class ACUAgent:
 
         session.data = {'state': state,
                         'timestamp': time.time()}
-        session.set_status('running')
 
         while session.status in ['starting', 'running'] and state not in ['escape-done']:
             az, el = [self.data['status']['summary'][f'{ax}_current_position']
@@ -2622,7 +2608,6 @@ class ACUAgent:
             'attempts': 0,
             'errors': 0,
         }
-        session.set_status('running')
 
         def _publish_activity(activity):
             msg = {
