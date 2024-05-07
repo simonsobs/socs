@@ -245,7 +245,6 @@ class ibootbarAgent:
         names = ['Outlet-1', 'Outlet-2', 'Outlet-3', 'Outlet-4',
                  'Outlet-5', 'Outlet-6', 'Outlet-7', 'Outlet-8']
 
-        session.set_status('running')
         self.is_streaming = True
         while self.is_streaming:
             yield dsleep(1)

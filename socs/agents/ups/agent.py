@@ -308,7 +308,6 @@ class UPSAgent:
                 Units:: Watts
         """
 
-        session.set_status('running')
         self.is_streaming = True
         timeout = time.time() + 60 * self.restart  # exit loop after self.restart minutes
         while self.is_streaming:

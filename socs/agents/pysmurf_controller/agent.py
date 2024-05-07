@@ -301,7 +301,6 @@ class PysmurfController:
         S, cfg = self._get_smurf_control(load_tune=False, no_dir=True)
         reg = sdl.Registers(S)
 
-        session.set_status('running')
         kw = {'retry_on_fail': False}
         while session.status in ['starting', 'running']:
             try:
@@ -404,7 +403,6 @@ class PysmurfController:
 
             session.data['stream_id'] = cfg.stream_id
             session.data['sid'] = sdl.stream_g3_on(S, **params['kwargs'])
-            session.set_status('running')
             while session.status in ['starting', 'running']:
                 if stop_time is not None:
                     if time.time() > stop_time:
@@ -484,7 +482,6 @@ class PysmurfController:
                 return False, f"Operation failed: {self.lock.job} is running."
 
             S, cfg = self._get_smurf_control(session=session)
-            session.set_status('running')
             self.log.info("Starting UXM setup")
             success, summary = uxm_setup.uxm_setup(
                 S, cfg, bands=params['bands'], **params['kwargs']
@@ -551,7 +548,6 @@ class PysmurfController:
             if not acquired:
                 return False, f"Operation failed: {self.lock.job} is running."
 
-            session.set_status('running')
             S, cfg = self._get_smurf_control(session=session)
             success, summary = uxm_relock.uxm_relock(
                 S, cfg, bands=params['bands'], **params['kwargs']
@@ -604,7 +600,6 @@ class PysmurfController:
             if not acquired:
                 return False, f"Operation failed: {self.lock.job} is running."
 
-            session.set_status('running')
             S, cfg = self._get_smurf_control(session=session)
             sdl.noise.take_noise(S, cfg, params['duration'], **params['kwargs'])
             return True, "Finished taking noise"
@@ -652,7 +647,6 @@ class PysmurfController:
             if not acquired:
                 return False, f"Operation failed: {self.lock.job} is running."
 
-            session.set_status('running')
             S, cfg = self._get_smurf_control(session=session)
 
             kwargs = {
@@ -954,7 +948,6 @@ class PysmurfController:
             if not acquired:
                 return False, f"Operation failed: {self.lock.job} is running."
 
-            session.set_status('running')
             S, cfg = self._get_smurf_control(session=session)
             sdl.overbias_dets(S, cfg, **kw)
 
@@ -992,7 +985,6 @@ class PysmurfController:
             if not acquired:
                 return False, f"Operation failed: {self.lock.job} is running."
 
-            session.set_status('running')
             S, _ = self._get_smurf_control(session=session)
 
             for bg, bias in zip(bgs, biases):
@@ -1057,7 +1049,6 @@ class PysmurfController:
             if not acquired:
                 return False, f"Operation failed: {self.lock.job} is running."
 
-            session.set_status('running')
             S, cfg = self._get_smurf_control(session=session)
             if isinstance(params['rfrac'], (int, float)):
                 biases = bias_dets.bias_to_rfrac(
@@ -1090,7 +1081,6 @@ class PysmurfController:
             if not acquired:
                 return False, f"Operation failed: {self.lock.job} is running."
 
-            session.set_status('running')
             S, cfg = self._get_smurf_control(session=session)
             if params['disable_tones']:
                 S.all_off()
