@@ -292,21 +292,21 @@ class LDMonitorAgent:
         The most recent data collected is stored in session data in the
         structure::
 
-        >>> response.session['data']
-        {'fields':{
-            'd_type': 3, 'field_value': 0.28, 'rot_fault': 0,
-            'time_last': -1.0, 'tsince_last': -1.0, 'dist': -1, 'unit_d': 0,
-            'high_field': -1, 'hifield_value': -1000.0, 'alarm_r': 0,
-            'alarm_o': 0, 'alarm_y': 0, 'delay_g': 1, 'clear': 1, 'r_timer': 0,
-            'o_timer': 0, 'y_timer': 0, 'g_timer': 0, 'allclear_timer': 0,
-            'faultcode': 0
-            },
-            ...
-            'connection': {
-                'conn_timestamp': 1711285858.1063662,
-                'connected': True}, 'data_timestamp': 1711285864.6254003
-                }
-        }
+            >>> response.session['data']
+            {'fields':{
+                'd_type': 3, 'field_value': 0.28, 'rot_fault': 0,
+                'time_last': -1.0, 'tsince_last': -1.0, 'dist': -1, 'unit_d': 0,
+                'high_field': -1, 'hifield_value': -1000.0, 'alarm_r': 0,
+                'alarm_o': 0, 'alarm_y': 0, 'delay_g': 1, 'clear': 1, 'r_timer': 0,
+                'o_timer': 0, 'y_timer': 0, 'g_timer': 0, 'allclear_timer': 0,
+                'faultcode': 0
+                },
+                ...
+                'connection': {
+                    'conn_timestamp': 1711285858.1063662,
+                    'connected': True}, 'data_timestamp': 1711285864.6254003
+                    }
+            }
 
         """
         with self.lock.acquire_timeout(0, job='acq') as acquired:
