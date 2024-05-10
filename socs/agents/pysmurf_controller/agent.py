@@ -343,8 +343,10 @@ class PysmurfController:
         session.set_status('stopping')
 
     def run_test_func(self, session, params):
-        """
-        Task to run subprocess test function
+        """run_test_func()
+
+        **Task** - Task to test the subprocessing functionality without any
+        smurf hardware.
         """
         cfg = RunCfg(
             func_name='test',
@@ -453,7 +455,7 @@ class PysmurfController:
     @ocs_agent.param('kwargs', default=None)
     @ocs_agent.param('run_in_main_procsess', default=False)
     def uxm_setup(self, session, params):
-        """uxm_setup(bands=None, kwargs=None)
+        """uxm_setup(bands=None, kwargs=None, run_in_main_process=False)
 
         **Task** - Runs first-time setup procedure for a UXM. This will run the
         following operations:
@@ -479,7 +481,8 @@ class PysmurfController:
             Dict containing additional keyword args to pass to the uxm_setup
             function.
         run_in_main_process : bool
-            If true, run smurf-function in main process
+            If true, run smurf-function in main process. Mainly for the purpose
+            of testing without the reactor running.
 
         Notes
         -------
@@ -529,7 +532,7 @@ class PysmurfController:
     @ocs_agent.param('kwargs', default=None)
     @ocs_agent.param('run_in_main_process', default=False, type=bool)
     def uxm_relock(self, session, params):
-        """uxm_relock(bands=None, kwargs=None)
+        """uxm_relock(bands=None, kwargs=None, run_in_main_process=False)
 
         **Task** - Relocks detectors to existing tune if setup has already been
         run. Runs the following operations:
@@ -553,7 +556,8 @@ class PysmurfController:
             Dict containing additional keyword args to pass to the uxm_relock
             function.
         run_in_main_process : bool
-            If true, run smurf-function in main process
+            If true, run smurf-function in main process. Mainly for the purpose
+            of testing without the reactor running.
 
         Notes
         -------
@@ -600,7 +604,7 @@ class PysmurfController:
     @ocs_agent.param('tag', default=None)
     @ocs_agent.param('run_in_main_process', default=False, type=bool)
     def take_noise(self, session, params):
-        """take_noise(duration=30., kwargs=None, tag=None)
+        """take_noise(duration=30., kwargs=None, tag=None, run_in_main_process=False)
 
         **Task** - Takes a short timestream and calculates noise statistics.
         Median white noise level for each band will be stored in the session
@@ -619,7 +623,8 @@ class PysmurfController:
             Tag (or comma-separated list of tags) to attach to the G3 stream.
             This has precedence over the `tag` key in the kwargs dict.
         run_in_main_process : bool
-            If true, run smurf-function in main process
+            If true, run smurf-function in main process. Mainly for the purpose
+            of testing without the reactor running.
 
         Notes
         -------
@@ -658,7 +663,7 @@ class PysmurfController:
     @ocs_agent.param('tag', default=None)
     @ocs_agent.param('run_in_main_process', default=False, type=bool)
     def take_bgmap(self, session, params):
-        """take_bgmap(kwargs=None, tag=None)
+        """take_bgmap(kwargs=None, tag=None, run_in_main_process=False)
 
         **Task** - Takes a bias-group map. This will calculate the number of
         channels assigned to each bias group and put that into the session data
@@ -675,7 +680,8 @@ class PysmurfController:
             String containing a tag or comma-separated list of tags to attach
             to the g3 stream.
         run_in_main_process : bool
-            If true, run smurf-function in main process
+            If true, run smurf-function in main process. Mainly for the purpose
+            of testing without the reactor running.
 
         Notes
         ------
@@ -717,7 +723,7 @@ class PysmurfController:
     @ocs_agent.param('tag', default=None)
     @ocs_agent.param('run_in_main_process', default=False, type=bool)
     def take_iv(self, session, params):
-        """take_iv(kwargs=None, tag=None)
+        """take_iv(kwargs=None, tag=None, run_in_main_process=False)
 
         **Task** - Takes an IV. This will add the normal resistance array and
         channel info to the session data object along with the analyzed IV
@@ -734,7 +740,8 @@ class PysmurfController:
             String containing a tag or comma-separated list of tags to attach
             to the g3 stream.
         run_in_main_process : bool
-            If true, run smurf-function in main process
+            If true, run smurf-function in main process. Mainly for the purpose
+            of testing without the reactor running.
 
         Notes
         ------
@@ -772,7 +779,7 @@ class PysmurfController:
     @ocs_agent.param('tag', default=None)
     @ocs_agent.param('run_in_main_process', default=False, type=bool)
     def take_bias_steps(self, session, params):
-        """take_bias_steps(kwargs=None, rfrac_range=(0.2, 0.9), tag=None)
+        """take_bias_steps(kwargs=None, rfrac_range=(0.2, 0.9), tag=None, run_in_main_process=False)
 
         **Task** - Takes bias_steps and saves the output filepath to the
         session data object. See the `sodetlib bias step docs page
@@ -790,7 +797,8 @@ class PysmurfController:
             String containing a tag or comma-separated list of tags to attach
             to the g3 stream.
         run_in_main_process : bool
-            If true, run smurf-function in main process
+            If true, run smurf-function in main process. Mainly for the purpose
+            of testing without the reactor running.
 
         Notes
         ------
@@ -833,16 +841,14 @@ class PysmurfController:
             set_session_data(session, result)
             if result.success:  # Publish quantile results
                 for name, d in result.return_val['quantiles'].items():
-                    block = {
-                        k: q for k, q in zip(d['labels'], d['values'])
-                    }
+                    block = dict(zip(d['labels'], d['values']))
                     block[f'{name}_count'] = d['count']
-                    d = {
+                    pub_data = {
                         'timestamp': time.time(),
                         'block_name': f'{name}_quantile',
                         'data': block
                     }
-                    self.agent.publish_to_feed('bias_step_quantiles', d)
+                    self.agent.publish_to_feed('bias_step_quantiles', pub_data)
 
             return result.success, "Finished taking bias steps"
 
@@ -851,7 +857,7 @@ class PysmurfController:
     @ocs_agent.param('tag', default=None)
     @ocs_agent.param('run_in_main_process', default=False, type=bool)
     def take_bias_waves(self, session, params):
-        """take_bias_waves(kwargs=None, rfrac_range=(0.2, 0.9), tag=None)
+        """take_bias_waves(kwargs=None, rfrac_range=(0.2, 0.9), tag=None, run_in_main_process=False)
 
         **Task** - Takes bias_wave and saves the output filepath to the
         session data object.
@@ -867,7 +873,8 @@ class PysmurfController:
             String containing a tag or comma-separated list of tags to attach
             to the g3 stream.
         run_in_main_process : bool
-            If true, run smurf-function in main process
+            If true, run smurf-function in main process. Mainly for the purpose
+            of testing without the reactor running.
 
         Notes
         ------
@@ -910,16 +917,14 @@ class PysmurfController:
             set_session_data(session, result)
             if result.success:  # Publish quantile results
                 for name, d in result.return_val['quantiles'].items():
-                    block = {
-                        k: q for k, q in zip(d['labels'], d['values'])
-                    }
+                    block = dict(zip(d['labels'], d['values']))
                     block[f'{name}_count'] = d['count']
-                    d = {
+                    pub_data = {
                         'timestamp': time.time(),
                         'block_name': f'{name}_quantile',
                         'data': block
                     }
-                    self.agent.publish_to_feed('bias_wave_quantiles', d)
+                    self.agent.publish_to_feed('bias_wave_quantiles', pub_data)
 
             return result.success, "Finished taking bias steps"
 

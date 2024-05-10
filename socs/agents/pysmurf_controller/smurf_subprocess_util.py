@@ -189,7 +189,7 @@ def take_bias_waves(kwargs=None, rfrac_range=(0.2, 0.9)):
 
 def test():
     """Function for testing subprocess operation"""
-    print("HEREE")
+    print("Inside test func")
     return {'test': 10}
 
 
@@ -266,8 +266,8 @@ class FuncProtocol(protocol.ProcessProtocol):
 
 
 @defer.inlineCallbacks
-def _run_func_in_subprocess_reactor(cfg: RunCfg) -> RunResult:
-    """Helper function for run_func_in_subprocess, that can assume reactor context"""
+def _run_smurf_func_reactor(cfg: RunCfg) -> RunResult:
+    """Helper function for run_smurf_func, that can assume reactor context"""
     prot = FuncProtocol(cfg)
     prot.deferred = defer.Deferred()
     childFDs = {0: 'w', 1: 'r', 2: 'r', 3: 'r'}  # Regular FDs plus 3 for sending results back
@@ -307,7 +307,7 @@ def run_smurf_func(cfg: RunCfg) -> RunResult:
         return result
 
     return threads.blockingCallFromThread(
-        reactor, _run_func_in_subprocess_reactor, cfg)
+        reactor, _run_smurf_func_reactor, cfg)
 
 
 def subprocess_main():
