@@ -248,8 +248,6 @@ class PTCAgent:
                               "{} is already running".format(self.lock.job))
                 return False, "Could not acquire lock."
 
-            session.set_status('running')
-
             # Establish connection to ptc
             self.ptc = PTC(self.ip_address, port=self.port,
                            fake_errors=self.fake_errors)
@@ -287,8 +285,6 @@ class PTCAgent:
                               "running".format(self.lock.job))
                 return False, "Could not acquire lock."
 
-            session.set_status('running')
-
             self.ptc.power(params['state'])
 
         return True, "PTC powered {}".format(params['state'])
@@ -309,8 +305,6 @@ class PTCAgent:
                 self.log.warn("Could not start acq because {} is already"
                               "running".format(self.lock.job))
                 return False, "Could not acquire lock."
-
-            session.set_status('running')
 
             last_release = time.time()
 

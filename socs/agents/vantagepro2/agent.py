@@ -113,7 +113,6 @@ class VantagePro2Agent:
                               .format(self.lock.job))
                 return False, "Could not acquire lock."
 
-            session.set_status('running')
             # use pacemaker class to take data at regular intervals
             if sample_freq % 1 == 0:
                 pm = Pacemaker(sample_freq, True)
