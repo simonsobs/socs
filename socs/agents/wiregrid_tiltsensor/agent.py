@@ -1,52 +1,39 @@
 import time
 
 from ocs import ocs_agent, site_config
-from ocs.ocs_twisted import TimeoutLock
+from ocs.ocs_twisted import TimeoutLock, Pacemaker
 
-# DWL drivers
-from socs.agents.wiregrid_tiltsensor.drivers.dwl import DWL
-# sherborne drivers
-from socs.agents.wiregrid_tiltsensor.drivers.sherborne import Sherborne
+from socs.agents.wiregrid_tiltsensor.drivers import connect
 
-
-def connect(tiltsensor_ip, tiltsensor_port, type_tiltsensor):
-    if type_tiltsensor == 'DWL':
-        tiltsensor = DWL(tcp_ip=tiltsensor_ip, tcp_port=tiltsensor_port, timeout=0.5, isSingle=False, verbose=0)
-    elif type_tiltsensor == 'sherborne':
-        tiltsensor = Sherborne(tcp_ip=tiltsensor_ip, tcp_port=tiltsensor_port, reset_boot=False, timeout=0.5, verbose=0)
-    else:
-        raise ('Invalid tiltsensor type')
-    return tiltsensor
-
-
-class WiregridTiltsensorAgent:
+class WiregridTiltSensorAgent:
     """ Agent to record the wiregrid tilt sensor data.
     The tilt sensor data is sent via serial-to-ethernet converter.
 
     Args:
-        tiltsensor_ip (str): IP address of the serial-to-ethernet converter
-        tiltsensor_port (int or str): Asigned port for the tilt sensor
+        ip (str): IP address of the serial-to-ethernet converter
+        port (int or str): Asigned port for the tilt sensor
             The converter has four D-sub ports to control
             multiple devices is determined
             by the ethernet port number of converter.
-        type_tiltsensor (str): Type of tilt sensor
+        sensor_type (str): Type of tilt sensor
             There are twp types of tilt sensor,
             and this argument is used for specifying
             to communicate with whichtilt sensor.
             This argument should be 'DWL' or 'sherborne'.
     """
 
-    def __init__(self, agent, tiltsensor_ip, tiltsensor_port, type_tiltsensor=None):
+    def __init__(self, agent, ip, port, sensor_type=None):
         self.agent: ocs_agent.OCSAgent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
 
         self.take_data = False
 
-        self.tiltsensor_ip = tiltsensor_ip
-        self.tiltsensor_port = tiltsensor_port
-        self.type_tiltsensor = type_tiltsensor
-        self.tiltsensor = connect(self.tiltsensor_ip, self.tiltsensor_port, self.type_tiltsensor)
+        self.ip = ip
+        self.port = port
+        self.sensor_type = sensor_type
+        self.tiltsensor = connect(self.ip, self.port, self.sensor_type)
+        self.pm = Pacemaker(2, quantize=True)
 
         agg_params = {'frame_length': 60}
         self.agent.register_feed('wgtiltsensor',
@@ -80,10 +67,7 @@ class WiregridTiltsensorAgent:
             if not acquired:
                 self.log.warn(
                     'Could not start acq because {} is already running'
-                    .format(self.lock.job))
-                return False, 'Could not acquire lock.'
-
-            session.set_status('running')
+                )
 
             # Initialize a take_data flag
             self.take_data = True
@@ -113,26 +97,16 @@ class WiregridTiltsensorAgent:
                 # data taking
                 current_time = time.time()
                 read_status, msg, angles = self.tiltsensor.get_angle()
-                if self.type_tiltsensor == 'sherborne':
+                if self.sensor_type == 'sherborne':
                     msg, temperatures = self.tiltsensor.get_temp()
-                else:
-                    pass
 
                 tiltsensor_data['timestamp'] = current_time
                 tiltsensor_data['data']['angleX'] = angles[0]
                 tiltsensor_data['data']['angleY'] = angles[1]
-                if self.type_tiltsensor == 'sherborne':
+                if self.sensor_type == 'sherborne':
                     tiltsensor_data['data']['temperatureX'] = temperatures[0]
                     tiltsensor_data['data']['temperatureY'] = temperatures[1]
-                else:
-                    pass
 
-                """
-                with open('time.log', 'a') as f:
-                    f.write(str(last_release) + '\n')
-                    pass
-                """
-                # self.log.info(f"sens_data:{sens_data}")
                 self.agent.publish_to_feed('wgtiltsensor', tiltsensor_data)
 
                 # store the session data
@@ -146,7 +120,7 @@ class WiregridTiltsensorAgent:
                     'timestamp': current_time
                 }
 
-                time.sleep(0.5)  # DAQ interval
+                self.pm.sleep()  # DAQ interval
                 # End of loop
             # End of lock acquiring
 
@@ -173,8 +147,8 @@ class WiregridTiltsensorAgent:
                               + f"is held by {self.lock.job}")
                 return False
 
-            if self.type_tiltsensor != 'sherborne':
-                raise ("This type of tiltsensor cannot reset.")
+            if self.sensor_type != 'sherborne':
+                return False, "This type of tiltsensor cannot reset."
             else:
                 # Log the text provided to the Agent logs
                 self.log.info("running reset")
@@ -194,10 +168,13 @@ def make_parser(parser_in=None):
         parser_in = argparse.ArgumentParser()
 
     pgroup = parser_in.add_argument_group('Agent Options')
-    pgroup.add_argument('--tiltsensor_ip')
-    pgroup.add_argument('--tiltsensor_port')
-    pgroup.add_argument('--type_tiltsensor',
-                        dest='type_tiltsensor',
+    pgroup.add_argument('--ip-address', dest='ip', type=str, default=None,
+                        help='The ip adress of the serial-to-ethernet converter')
+    pgroup.add_argument('--port', dest='port', type=str, default=None,
+                        help='The assigned port of the serial-to-ethernet converter '
+                             'for the tilt sensor')
+    pgroup.add_argument('--sensor-type',
+                        dest='sensor_type',
                         type=str, default=None,
                         help='The type of tilt sensor '
                              'running wiregrid tilt sensor DAQ')
@@ -206,16 +183,16 @@ def make_parser(parser_in=None):
 
 def main(args=None):
     parser_in = make_parser()
-    args = site_config.parse_args(agent_class='WiregridTiltsensorAgent',
+    args = site_config.parse_args(agent_class='WiregridTiltSensorAgent',
                                   parser=parser_in,
                                   args=args)
 
     agent, runner = ocs_agent.init_site_agent(args)
 
-    tiltsensor_agent = WiregridTiltsensorAgent(agent,
-                                               tiltsensor_ip=args.type_tiltsensor,
-                                               tiltsensor_port=args.type_tiltsensor,
-                                               type_tiltsensor=args.type_tiltsensor)
+    tiltsensor_agent = WiregridTiltSensorAgent(agent,
+                                               ip=args.ip,
+                                               port=args.port,
+                                               sensor_type=args.sensor_type)
 
     agent.register_process('acq',
                            tiltsensor_agent.acq,
