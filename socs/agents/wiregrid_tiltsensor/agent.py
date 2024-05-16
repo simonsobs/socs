@@ -1,9 +1,10 @@
 import time
 
 from ocs import ocs_agent, site_config
-from ocs.ocs_twisted import TimeoutLock, Pacemaker
+from ocs.ocs_twisted import Pacemaker, TimeoutLock
 
 from socs.agents.wiregrid_tiltsensor.drivers import connect
+
 
 class WiregridTiltSensorAgent:
     """ Agent to record the wiregrid tilt sensor data.

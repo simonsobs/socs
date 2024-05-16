@@ -28,7 +28,7 @@ class Sherborne:
         self.tcp_ip = tcp_ip
         self.tcp_port = tcp_port
         self.verbose = verbose
-        
+
         # Connect to device
         msg = self.__conn(tcp_ip, tcp_port, timeout)
         print(msg)
@@ -58,14 +58,14 @@ class Sherborne:
         value_read_angleY = value_read_angleY.replace('\r', '')
         if self.verbose > 0:
             print(f'read_angleY = {value_read_angleY}')
-            
+
         self.wait()
 
         val = (value_read_angleX, value_read_angleY)
         msg = f"Measured angle: X = {value_read_angleX}, Y = {value_read_angleY}"
         if self.verbose > 0:
             print(msg)
-            
+
         return msg, val
 
     def __conn(self, tcp_ip, tcp_port, timeout):

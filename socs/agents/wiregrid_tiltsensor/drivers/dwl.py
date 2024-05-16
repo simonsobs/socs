@@ -41,10 +41,10 @@ class DWL:
             command = b"\x06\x01\x02\xAA\x00\x00\x00\x00\x00\x00\x00\x00"
         if self.verbose > 0:
             print(f'get_angle() command = {command}')
-        
+
         read = []
         SIZE = 12
-       
+
         # write and read serial
         self.ser.write(command)
         read_hex = self.ser.read(SIZE)
@@ -54,7 +54,7 @@ class DWL:
         if self.verbose > 0:
             print(f'read_hex = {read_hex}')
             print(f'read = {read}')
-        
+
         # check header matching and calculate the angles
         if self.isSingle:
             header = ['0x61', '0x11']
