@@ -300,9 +300,11 @@ def run_smurf_func(cfg: RunCfg) -> RunResult:
                 return_val=func_map[cfg.func_name](*cfg.args, **cfg.kwargs)
             )
         except Exception:
+            exc = traceback.format_exc()
+            print(f"Exception raised in smurf_func:\n{exc}")
             result = RunResult(
                 success=False,
-                traceback=traceback.format_exc()
+                traceback=exc,
             )
         return result
 
