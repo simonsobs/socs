@@ -2,27 +2,8 @@
 SOCS - Simons Observatory Control System
 ========================================
 
-.. image:: https://img.shields.io/github/actions/workflow/status/simonsobs/socs/develop.yml?branch=main
-    :target: https://github.com/simonsobs/socs/actions?query=workflow%3A%22Build+Test+Images%22
-    :alt: GitHub Workflow Status
-
-.. image:: https://readthedocs.org/projects/socs/badge/?version=main
-    :target: https://socs.readthedocs.io/en/main/?badge=main
-    :alt: Documentation Status
-
-.. image:: https://coveralls.io/repos/github/simonsobs/socs/badge.svg
-    :target: https://coveralls.io/github/simonsobs/socs
-
-.. image:: https://img.shields.io/badge/dockerhub-latest-blue
-    :target: https://hub.docker.com/r/simonsobs/socs
-
-.. image:: https://img.shields.io/pypi/v/socs
-   :target: https://pypi.org/project/socs/
-   :alt: PyPI Package
-
-.. image:: https://results.pre-commit.ci/badge/github/simonsobs/socs/main.svg
-   :target: https://results.pre-commit.ci/latest/github/simonsobs/socs/main
-   :alt: pre-commit.ci status
+| |pypi| |versions| |docker| |license|
+| |tests| |pre-commit| |coverage| |docs|
 
 Overview
 --------
@@ -142,3 +123,33 @@ This project is licensed under the BSD 2-Clause License - see the
 `LICENSE.txt`_ file for details.
 
 .. _LICENSE.txt: https://github.com/simonsobs/socs/blob/main/LICENSE.txt
+
+
+.. |coverage| image:: https://coveralls.io/repos/github/simonsobs/socs/badge.svg
+    :target: https://coveralls.io/github/simonsobs/socs
+
+.. |docker| image:: https://img.shields.io/badge/dockerhub-latest-blue
+    :target: https://hub.docker.com/r/simonsobs/socs
+
+.. |docs| image:: https://readthedocs.org/projects/socs/badge/?version=main
+    :target: https://socs.readthedocs.io/en/main/?badge=main
+    :alt: Documentation Status
+
+.. |license| image:: https://img.shields.io/pypi/l/socs
+    :target: LICENSE.txt
+    :alt: PyPI - License
+
+.. |pre-commit| image:: https://results.pre-commit.ci/badge/github/simonsobs/socs/main.svg
+   :target: https://results.pre-commit.ci/latest/github/simonsobs/socs/main
+   :alt: pre-commit.ci status
+
+.. |pypi| image:: https://img.shields.io/pypi/v/socs
+   :target: https://pypi.org/project/socs/
+   :alt: PyPI Package
+
+.. |tests| image:: https://github.com/simonsobs/socs/actions/workflows/pytest.yml/badge.svg
+    :target: https://github.com/simonsobs/socs/actions/workflows/pytest.yml
+    :alt: GitHub Workflow Status
+
+.. |versions| image:: https://img.shields.io/pypi/pyversions/socs
+    :alt: PyPI - Python Version

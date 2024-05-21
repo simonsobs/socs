@@ -1,2 +1,1 @@
-socs_version.py export-subst
 socs/_version.py export-subst
