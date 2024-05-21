@@ -2,9 +2,9 @@
 
 .. _meinberg_syncbox:
 
-====================
+======================
 Meinberg Syncbox Agent
-====================
+======================
 
 The Meinberg Syncbox Agent is an OCS Agent which monitors the Meinberg syncbox, the
 Monitoring is performed via SNMP.
