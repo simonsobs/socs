@@ -300,9 +300,11 @@ def run_smurf_func(cfg: RunCfg) -> RunResult:
                 return_val=func_map[cfg.func_name](*cfg.args, **cfg.kwargs)
             )
         except Exception:
+            exc = traceback.format_exc()
+            print(f"Exception raised in smurf_func:\n{exc}")
             result = RunResult(
                 success=False,
-                traceback=traceback.format_exc()
+                traceback=exc,
             )
         return result
 
@@ -324,9 +326,11 @@ def subprocess_main():
         result = RunResult(success=True, return_val=return_val)
         return_data = encode_dataclass(result)
     except Exception:
+        exc = traceback.format_exc()
+        print(f"Exception raised in subprocess:\n{exc}")
         result = RunResult(
             success=False,
-            traceback=traceback.format_exc()
+            traceback=exc,
         )
         return_data = encode_dataclass(result)
     os.write(3, return_data)
