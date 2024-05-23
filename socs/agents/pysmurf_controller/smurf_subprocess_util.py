@@ -59,7 +59,7 @@ class QuantileData:
 def compute_quantiles(name: str, arr: np.ndarray, quantiles: List[float]):
     """
     Computes QuantileData object for a given array
-    
+
     """
     quantiles = map(float, quantiles)
     if np.isnan(arr).all():
@@ -169,8 +169,8 @@ def take_bias_steps(kwargs=None, rfrac_range=(0.2, 0.9)):
         ],
         'quantiles': {
             'Rfrac': compute_quantiles('Rfrac', bsa.Rfrac, qs),
-            'Si':    compute_quantiles('Si', bsa.Si, qs),
-            'Rtes':  compute_quantiles('Rtes', bsa.R0, qs),
+            'Si': compute_quantiles('Si', bsa.Si, qs),
+            'Rtes': compute_quantiles('Rtes', bsa.R0, qs),
         }
     }
     return data
@@ -196,8 +196,8 @@ def take_bias_waves(kwargs=None, rfrac_range=(0.2, 0.9)):
         ],
         'quantiles': {
             'Rfrac': compute_quantiles('Rfrac', bwa.Rfrac, qs),
-            'Si':    compute_quantiles('Si', bwa.Si, qs),
-            'Rtes':  compute_quantiles('Rtes', bwa.R0, qs),
+            'Si': compute_quantiles('Si', bwa.Si, qs),
+            'Rtes': compute_quantiles('Rtes', bwa.R0, qs),
         }
     }
     return data

@@ -24,7 +24,8 @@ from sodetlib.det_config import DetConfig
 from sodetlib.operations import bias_dets
 
 from socs.agents.pysmurf_controller.smurf_subprocess_util import (
-    RunCfg, RunResult, run_smurf_func, QuantileData)
+    QuantileData, RunCfg, RunResult, run_smurf_func)
+
 
 class PysmurfScriptProtocol(protocol.ProcessProtocol):
     """
