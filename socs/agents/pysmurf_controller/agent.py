@@ -748,11 +748,10 @@ class PysmurfController:
 
             >> response.session['data']
             {
-                'bands': Bands number of each resonator
-                'channels': Channel number of each resonator
-                'bgmap': BGMap assignment for each resonator
-                'R_n': Normal resistance for each resonator
                 'filepath': Filepath of saved IVAnalysis object
+                'quantiles': {
+                    'Rn': Rn quantiles
+                }
             }
         """
         if params['kwargs'] is None:
@@ -818,14 +817,11 @@ class PysmurfController:
                 'filepath': Filepath of saved BiasStepAnalysis object
                 'biased_total': Total number of detectors biased into rfrac_range
                 'biased_per_bg': List containing number of biased detectors on each bias line
-                'Rtes_quantiles': {
-                    'Rtes': List of 15%, 25%, 50%, 75%, 85% Rtes quantiles,
-                    'quantiles': List of quantile labels
-                    'count': Total count of the distribution
+                'quantiles': {
+                    'Rtes': Rtes quantiles,
+                    'Rfrac': Rfrac quantiles,
+                    'Si': Si quantiles,
                 }
-                'responsivity_quantiles': Same as above for responsivity
-                'Rfrac_quantiles': Same as above for Rfrac
-
             }
         """
 
@@ -898,14 +894,11 @@ class PysmurfController:
                 'filepath': Filepath of saved BiasWaveAnalysis object
                 'biased_total': Total number of detectors biased into rfrac_range
                 'biased_per_bg': List containing number of biased detectors on each bias line
-                'Rtes_quantiles': {
-                    'Rtes': List of 15%, 25%, 50%, 75%, 85% Rtes quantiles,
-                    'quantiles': List of quantile labels
-                    'count': Total count of the distribution
+                'quantiles': {
+                    'Rtes': Rtes quantiles,
+                    'Rfrac': Rfrac quantiles,
+                    'Si': Si quantiles,
                 }
-                'responsivity_quantiles': Same as above for responsivity
-                'Rfrac_quantiles': Same as above for Rfrac
-
             }
         """
 
