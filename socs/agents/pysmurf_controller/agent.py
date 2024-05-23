@@ -1,4 +1,4 @@
-from dataclasses import asdict
+from dataclasses import asdict, is_dataclass
 
 import matplotlib
 from autobahn.twisted.util import sleep as dsleep
@@ -12,7 +12,7 @@ import argparse
 import os
 import sys
 import time
-from typing import Optional
+from typing import Optional, Union, Dict
 
 import epics
 import numpy as np
@@ -24,8 +24,7 @@ from sodetlib.det_config import DetConfig
 from sodetlib.operations import bias_dets
 
 from socs.agents.pysmurf_controller.smurf_subprocess_util import (
-    RunCfg, RunResult, run_smurf_func)
-
+    RunCfg, RunResult, run_smurf_func, QuantileData)
 
 class PysmurfScriptProtocol(protocol.ProcessProtocol):
     """
@@ -129,7 +128,9 @@ class PysmurfController:
                 'observatory.{}.feeds.pysmurf_session_data'.format(args.monitor_id),
             )
 
-        self.agent.register_feed('bias_step_quantiles', record=True)
+        self.agent.register_feed('bias_step_results', record=True)
+        self.agent.register_feed('iv_results', record=True)
+        self.agent.register_feed('bias_wave_results', record=True)
 
     def _on_session_data(self, _data):
         data, feed = _data
@@ -770,6 +771,16 @@ class PysmurfController:
             )
             result = run_smurf_func(cfg)
             set_session_data(session, result)
+            if result.success:
+                block_data = {}
+                for quantile in result.return_val['quantiles'].values():
+                    block_data.update(QuantileData(**quantile).to_block_data())
+                d = {
+                    'timestamp': time.time(),
+                    'block_name': 'iv_results',
+                    'data': block_data
+                }
+                self.agent.publish_to_feed('iv_results', d)
             return result.success, "Finished taking IV"
 
     @ocs_agent.param('kwargs', default=None)
@@ -838,15 +849,19 @@ class PysmurfController:
             result = run_smurf_func(cfg)
             set_session_data(session, result)
             if result.success:  # Publish quantile results
-                for name, d in result.return_val['quantiles'].items():
-                    block = dict(zip(d['labels'], d['values']))
-                    block[f'{name}_count'] = d['count']
-                    pub_data = {
-                        'timestamp': time.time(),
-                        'block_name': f'{name}_quantile',
-                        'data': block
-                    }
-                    self.agent.publish_to_feed('bias_step_quantiles', pub_data)
+                block_data = {
+                    f'biased_bg{bg}': v
+                    for bg, v in enumerate(result.return_val['biased_per_bg'])
+                }
+                block_data['biased_total'] = result.return_val['biased_total']
+                for qd in result.return_val['quantiles'].values():
+                    block_data.update(QuantileData(**qd).to_block_data())
+                data = {
+                    'timestamp': time.time(),
+                    'block_name': 'bias_steps_results',
+                    'data': block_data
+                }
+                self.agent.publish_to_feed('bias_step_results', data)
 
             return result.success, "Finished taking bias steps"
 
@@ -914,15 +929,19 @@ class PysmurfController:
             result = run_smurf_func(cfg)
             set_session_data(session, result)
             if result.success:  # Publish quantile results
-                for name, d in result.return_val['quantiles'].items():
-                    block = dict(zip(d['labels'], d['values']))
-                    block[f'{name}_count'] = d['count']
-                    pub_data = {
-                        'timestamp': time.time(),
-                        'block_name': f'{name}_quantile',
-                        'data': block
-                    }
-                    self.agent.publish_to_feed('bias_wave_quantiles', pub_data)
+                block_data = {
+                    f'biased_bg{bg}': v
+                    for bg, v in enumerate(result.return_val['biased_per_bg'])
+                }
+                block_data['biased_total'] = result.return_val['biased_total']
+                for qd in result.return_val['quantiles'].values():
+                    block_data.update(QuantileData(**qd).to_block_data())
+                data = {
+                    'timestamp': time.time(),
+                    'block_name': 'bias_steps_results',
+                    'data': block_data
+                }
+                self.agent.publish_to_feed('bias_wave_results', data)
 
             return result.success, "Finished taking bias steps"
 
