@@ -51,18 +51,22 @@ class QuantileData:
     def to_block_data(self):
         "Format quantile data for OCS HK block"
         labels = [f'{self.name}_q{int(q)}' for q in self.quantiles]
-        block_data = zip(labels, self.values)
+        block_data = dict(zip(labels, self.values))
         block_data[f'{self.name}_total'] = self.total
         return block_data
 
 
-def compute_quantiles(arr, quantiles, name)
+def compute_quantiles(name: str, arr: np.ndarray, quantiles: List[float]):
+    """
+    Computes QuantileData object for a given array
+    
+    """
     quantiles = map(float, quantiles)
     if np.isnan(arr).all():
-        return QuantileData(quantiles, [0 for _ in quantiles], 0, name=name)
+        return QuantileData(name, quantiles, [0 for _ in quantiles], 0)
     qs = [float(np.nan_to_num(np.nanquantile(arr, q / 100))) for q in quantiles]
-    count = int(np.sum(~np.isnan(arr)))
-    return QuantileData(name, quantiles, qs, count)
+    total = int(np.sum(~np.isnan(arr)))
+    return QuantileData(name, quantiles, qs, total)
 
 
 def encode_dataclass(obj):

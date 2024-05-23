@@ -1,4 +1,4 @@
-from dataclasses import asdict, is_dataclass
+from dataclasses import asdict
 
 import matplotlib
 from autobahn.twisted.util import sleep as dsleep
@@ -12,7 +12,7 @@ import argparse
 import os
 import sys
 import time
-from typing import Optional, Union, Dict
+from typing import Optional
 
 import epics
 import numpy as np
