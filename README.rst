@@ -147,8 +147,8 @@ This project is licensed under the BSD 2-Clause License - see the
    :target: https://pypi.org/project/socs/
    :alt: PyPI Package
 
-.. |tests| image:: https://github.com/simonsobs/socs/actions/workflows/pytest.yml/badge.svg
-    :target: https://github.com/simonsobs/socs/actions/workflows/pytest.yml
+.. |tests| image:: https://github.com/simonsobs/socs/actions/workflows/develop.yml/badge.svg?branch=main
+    :target: https://github.com/simonsobs/socs/actions/workflows/develop.yml
     :alt: GitHub Workflow Status
 
 .. |versions| image:: https://img.shields.io/pypi/pyversions/socs
