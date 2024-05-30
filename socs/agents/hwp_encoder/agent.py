@@ -52,6 +52,7 @@ HWPEncoder_full: separated feed for full-sample HWP encoder data,
 
 import argparse
 import calendar
+import os
 import select
 import socket
 import struct
@@ -700,6 +701,9 @@ def make_parser(parser=None):
 
 # Portion of the code that runs
 def main(args=None):
+    # Start logging
+    txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
+
     parser = make_parser()
     args = site_config.parse_args(agent_class='HWPBBBAgent',
                                   parser=parser,
