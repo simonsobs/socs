@@ -365,7 +365,8 @@ class EncoderParser:
                         # Clear self.data
                         self.data = ''
                     elif header == 0x1234:
-                        self.log.error('Received timeout packet.')
+                        # Expected behavior when HWP is not spinning
+                        self.log.debug('Received timeout packet.')
                         # Clear self.data
                         self.data = ''
                     else:
