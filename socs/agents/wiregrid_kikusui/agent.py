@@ -289,14 +289,14 @@ class WiregridKikusuiAgent:
             return True, 'Set Kikusui off'
 
     @ocs_agent.param('current', default=0., type=float,
-                     check=lambda x: 0.0 <= x <= 3.0)
+                     check=lambda x: 0.0 <= x <= 4.5)
     def set_c(self, session, params):
         """set_c(current=0)
 
         **Task** - Set current [A]
 
         Parameters:
-            current (float): set current [A] (should be [0.0, 3.0])
+            current (float): set current [A] (should be [0.0, 4.5])
         """
         current = params.get('current')
 
