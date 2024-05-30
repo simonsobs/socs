@@ -101,7 +101,7 @@ def take_noise(duration, kwargs=None):
     qs = [10, 25, 50, 75, 90]
     return {
         'quantiles': {
-            'white_noise_level': compute_quantiles('white_noise_level', wls, qs), 
+            'white_noise_level': compute_quantiles('white_noise_level', wls, qs),
         }
     }
 
