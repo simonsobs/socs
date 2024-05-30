@@ -661,7 +661,9 @@ class PysmurfController:
             if result.success:
                 block_data = {}
                 for qd in result.return_val['quantiles'].values():
-                    block_data.update(QuantileData(**qd).to_block_data())
+                    if isinstance(qd, dict):
+                        qd = QuantileData(**qd)
+                    block_data.update(qd.to_block_data())
                 d = {
                     'timestamp': time.time(),
                     'block_name': 'noise_results',
@@ -784,8 +786,10 @@ class PysmurfController:
             set_session_data(session, result)
             if result.success:
                 block_data = {}
-                for quantile in result.return_val['quantiles'].values():
-                    block_data.update(QuantileData(**quantile).to_block_data())
+                for qd in result.return_val['quantiles'].values():
+                    if isinstance(qd, dict):
+                        qd = QuantileData(**qd)
+                    block_data.update(qd.to_block_data())
                 d = {
                     'timestamp': time.time(),
                     'block_name': 'iv_results',
@@ -863,7 +867,9 @@ class PysmurfController:
                 }
                 block_data['biased_total'] = result.return_val['biased_total']
                 for qd in result.return_val['quantiles'].values():
-                    block_data.update(QuantileData(**qd).to_block_data())
+                    if isinstance(qd, dict):
+                        qd = QuantileData(**qd)
+                    block_data.update(qd.to_block_data())
                 data = {
                     'timestamp': time.time(),
                     'block_name': 'bias_steps_results',
