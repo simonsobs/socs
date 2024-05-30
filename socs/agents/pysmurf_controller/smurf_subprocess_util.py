@@ -96,7 +96,14 @@ def take_noise(duration, kwargs=None):
     if kwargs is None:
         kwargs = {}
     S, cfg = get_smurf_control()
-    sdl.noise.take_noise(S, cfg, duration, **kwargs)
+    _, res = sdl.noise.take_noise(S, cfg, duration, **kwargs)
+    wls = res['noise_dict']['noise_pars'][:, 0]
+    qs = [10, 25, 50, 75, 90]
+    return {
+        'quantiles': {
+            'white_noise_level': compute_quantiles('white_noise_level', wls, qs), 
+        }
+    }
 
 
 def take_bgmap(kwargs=None):

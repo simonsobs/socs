@@ -657,6 +657,16 @@ class PysmurfController:
 
             result = run_smurf_func(cfg)
             set_session_data(session, result)
+            if result.success:
+                block_data = {}
+                for qd in result.return_val['quantiles'].values():
+                    block_data.update(QuantileData(**qd).to_block_data())
+                d = {
+                    'timestamp': time.time(),
+                    'block_name': 'noise_results',
+                    'data': block_data
+                }
+                self.agent.publish_to_feed('noise_results', d)
             return result.success, "Finished taking noise"
 
     @ocs_agent.param('kwargs', default=None)
@@ -932,7 +942,7 @@ class PysmurfController:
                     block_data.update(QuantileData(**qd).to_block_data())
                 data = {
                     'timestamp': time.time(),
-                    'block_name': 'bias_steps_results',
+                    'block_name': 'bias_wave_results',
                     'data': block_data
                 }
                 self.agent.publish_to_feed('bias_wave_results', data)
