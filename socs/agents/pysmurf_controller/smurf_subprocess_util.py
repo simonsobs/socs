@@ -36,6 +36,11 @@ def json_safe(data):
         return data
     if isinstance(data, float):
         return np.nan_to_num(data)
+    if data is None:
+        return None
+
+    print(f"Unsure how to encode data of type {type(data)}...")
+    print(f"data: {data}")
     # This could still be something weird but json.dumps will
     # probably reject it!
     return data
@@ -61,7 +66,7 @@ def compute_quantiles(name: str, arr: np.ndarray, quantiles: List[float]):
     Computes QuantileData object for a given array
 
     """
-    quantiles = map(float, quantiles)
+    quantiles = [float(q) for q in quantiles]
     if np.isnan(arr).all():
         return QuantileData(name, quantiles, [0 for _ in quantiles], 0)
     qs = [float(np.nan_to_num(np.nanquantile(arr, q / 100))) for q in quantiles]
@@ -97,7 +102,7 @@ def take_noise(duration, kwargs=None):
         kwargs = {}
     S, cfg = get_smurf_control()
     _, res = sdl.noise.take_noise(S, cfg, duration, **kwargs)
-    wls = res['noise_dict']['noise_pars'][:, 0]
+    wls = res['noise_pars'][:, 0]
     qs = [10, 25, 50, 75, 90]
     return {
         'quantiles': {

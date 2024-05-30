@@ -130,6 +130,7 @@ class PysmurfController:
             )
 
         self.agent.register_feed('bias_step_results', record=True)
+        self.agent.register_feed('noise_results', record=True)
         self.agent.register_feed('iv_results', record=True)
         self.agent.register_feed('bias_wave_results', record=True)
 
