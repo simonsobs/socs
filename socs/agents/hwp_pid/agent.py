@@ -28,9 +28,14 @@ def parse_action_result(res):
         return {'result': res}
 
 
-def get_pid_state(pid: pd.PID):
+def get_pid_state(pid: pd.PID, num_attempts: int = 3):
+    for _ in range(num_attempts):
+        freq = pid.get_freq()
+        if freq != 9.999:
+            break
+        time.sleep(1)
     return {
-        "current_freq": pid.get_freq(),
+        "current_freq": freq,
         "target_freq": pid.get_target(),
         "direction": pid.get_direction(),
     }
