@@ -32,6 +32,7 @@ available arguments::
           ['--ip-address', '10.10.10.8'],
           ['--username', 'admin'],
           ['--password', 'admin'],
+          ['--outlet-names', ['outlet1', 'outlet2', 'outlet3', 'outlet4', 'outlet5']]
           ]}
 
 Docker Compose

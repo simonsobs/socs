@@ -168,7 +168,6 @@ class PysmurfMonitor(DatagramProtocol):
         srfm = SupRsyncFilesManager(self.db_path, create_all=True, echo=self.echo_sql)
 
         self.running = True
-        session.set_status('running')
         while self.running:
             files = []
             while not self.file_queue.empty():

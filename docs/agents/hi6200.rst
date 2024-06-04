@@ -1,0 +1,87 @@
+.. highlight:: rst
+
+.. _Hi6200:
+
+==============
+Hi6200 Agent
+==============
+
+This agent uses Modbus TCP to communicate with the Hi6200 Weight Sensor.
+This agent uses ModbusClient from pyModbusTCP to facilitate the communication.
+The agent is able to communicate over ethernet to read and monitor the net and
+gross weights of the scale.
+
+.. argparse::
+    :filename: ../socs/agents/hi6200/agent.py
+    :func: make_parser
+    :prog: python3 agent.py
+
+
+Configuration File Examples
+---------------------------
+Below are configuration examples for the ocs config file and for running the
+Agent in a docker container.
+
+OCS Site Config
+```````````````
+
+To configure the Hi6200 Agent we need to add a block to our ocs
+configuration file. Here is an example configuration block using all of
+the available arguments::
+
+      {'agent-class': 'Hi6200Agent',
+        'instance-id': 'hi6200',
+        'arguments': [
+          ['--ip-address', '192.168.11.43'],
+          ['--tcp-port', '502']
+          ]},
+
+The Hi6200 Agent requires the IP address and ModbusTCP port of the Hi6200
+in order to connect to the Hi6200. The default ModbusTCP port on the Hi6200
+is 502.
+
+Docker Compose
+``````````````
+
+The SCPI PSU Agent should be configured to run in a Docker container.
+An example docker-compose service configuration is shown here::
+
+  ocs-hi6200:
+    image: simonsobs/socs:latest
+    hostname: ocs-docker
+    network_mode: "host"
+    environment:
+      - INSTANCE_ID=hi6200
+    volumes:
+      - ${OCS_CONFIG_DIR}:/config:ro
+
+Agent API
+---------
+
+.. autoclass:: socs.agents.hi6200.agent.Hi6200Agent
+    :members:
+
+Example Clients
+---------------
+
+Below is an example client demonstrating full agent functionality.::
+
+    from ocs.ocs_client import OCSClient
+
+    # Initialize the power supply
+    scale = OCSClient('hi6200')
+    scale.init.start()
+    scale.init.wait()
+
+    # Begin Monitoring Weight
+    scale.monitor_weight.start()
+
+    #Stop Monitoring Weight
+    scale.stop_monitoring.start()
+
+Supporting APIs
+---------------
+
+.. autoclass:: socs.agents.hi6200.drivers.Hi6200Interface
+    :members:
+    :noindex:

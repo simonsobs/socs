@@ -54,17 +54,14 @@ An example docker-compose configuration::
       image: simonsobs/socs:latest
       restart: always
       hostname: ocs-docker
-      network_mode: "host"
       environment:
         - INSTANCE_ID=wgencoder
       volumes:
         - ${OCS_CONFIG_DIR}:/config:ro
         - "/data/wg-data:/data/wg-data"
       ports:
-          - "localhost:50007:50007/udp"
+          - "50007:50007/udp"
 
-- Since the agent within the container needs to communicate with hardware on the
-  host network you must use ``network_mode: "host"`` in your compose file.
 - ``/data/wg-data`` is a directory to store
   the information of the current angle of the wire-grid rotation,
   which is used in ``Wiregrid Kikusui Agent`` for feedback control of the rotation.

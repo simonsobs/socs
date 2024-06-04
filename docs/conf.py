@@ -16,7 +16,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.abspath('..'))
-from socs_version import get_versions
+from socs._version import get_versions
 
 # -- Project information -----------------------------------------------------
 
