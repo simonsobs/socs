@@ -143,7 +143,7 @@ class StmEncData:
         return StmEncTime(self.time_raw)
 
     def __str__(self):
-        return f'time={int(self.time.g3)/1e8:.8f} data={self.state:02b}'
+        return f'time={int(self.time.g3) / 1e8:.8f} data={self.state:02b}'
 
 
 def get_path_dev():
