@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 '''OCS agent for stimulator encoder
 '''
+import argparse
 import os
 import time
 
@@ -102,14 +103,22 @@ class StmEncAgent:
         return False, 'acq is not currently running.'
 
 
+def make_parser(parser=None):
+    if parser is None:
+        parser = argparse.ArgumentParser()
+    
+    _ = parser.add_argument_group('Agent Options')
+
+    return parser
+
+
 def main():
     '''Boot OCS agent'''
     txaio.start_logging(level=os.environ.get('LOGLEVEL', 'info'))
 
-    parser = site_config.add_arguments()
-    _ = parser.add_argument_group('Agent Options')
-
-    args = site_config.parse_args('StmEncAgent')
+    parser = make_parser()
+    args = site_config.parse_args('StmEncAgent',
+                                  parser=parser)
     agent_inst, runner = ocs_agent.init_site_agent(args)
 
     stm_enc_agent = StmEncAgent(agent_inst)
