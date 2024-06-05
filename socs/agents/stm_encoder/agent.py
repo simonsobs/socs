@@ -106,7 +106,7 @@ class StmEncAgent:
 def make_parser(parser=None):
     if parser is None:
         parser = argparse.ArgumentParser()
-    
+
     _ = parser.add_argument_group('Agent Options')
 
     return parser
