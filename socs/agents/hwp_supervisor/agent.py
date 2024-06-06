@@ -139,6 +139,42 @@ class IBootState:
 
 
 @dataclass
+class ACUState:
+    instance_id: str
+
+    min_el: float
+    "Minimum elevation allowed before restricting spin-up [deg]"
+
+    max_time_since_update: float
+    "Maximum time since last update before restricting spin-up[sec]"
+
+    el_current_position: Optional[float] = None
+    "Current el position [deg]"
+
+    el_commanded_position: Optional[float] = None
+    "Commanded el position [deg]"
+
+    el_current_velocity: Optional[float] = None
+    "Current el velocity [deg/s]"
+
+    last_updated: Optional[float] = None
+    "Time of last reading"
+
+    def update(self):
+        op = get_op_data(self.instance_id, 'monitor')
+        if op['status'] != 'ok':
+            return
+
+        d = op['data'].get("StatusDetailed")
+        if d is None:
+            return
+
+        self.el_current_position = d['Elevation current position']
+        self.el_commanded_position = d['Elevation commanded position']
+        self.el_current_velocity = d['Elevation current velocity']
+        self.last_updated = time.time()
+
+@dataclass
 class HWPState:
     temp: Optional[float] = None
     temp_status: Optional[str] = None
@@ -171,6 +207,8 @@ class HWPState:
     gripper_iboot: Optional[IBootState] = None
     driver_iboot: Optional[IBootState] = None
 
+    acu: Optional[ACUState] = None
+
     @classmethod
     def from_args(cls, args: argparse.Namespace):
         self = cls(
@@ -182,6 +220,8 @@ class HWPState:
             self.gripper_iboot = IBootState(args.gripper_iboot_id, args.gripper_iboot_outlets)
         if args.driver_iboot_id is not None:
             self.driver_iboot = IBootState(args.driver_iboot_id, args.driver_iboot_outlets)
+        if args.acu_instance_id is not None:
+            self.acu = ACUState(args.acu_instance_id, args.acu_min_el, args.acu_max_time_since_update)
         return self
 
     def _update_from_keymap(self, op, keymap):
@@ -721,6 +761,15 @@ class ControlStateMachine:
                 return data
 
             if isinstance(state, ControlState.PIDToFreq):
+                acu = hwp_state.acu
+                if acu is not None:
+                    if acu.last_updated is None:
+                        raise RuntimeError(f"No ACU data has been received from instance-id {acu.instance_id}")
+                    tdiff = time.time() - acu.last_updated
+                    if tdiff < acu.max_time_since_update:
+                        raise RuntimeError(f"ACU has not been updated in {tdiff} sec")
+                    if acu.el_current_position < acu.min_el_allowed:
+                        raise RuntimeError(f"ACU elevation is below minimum allowed: {acu.el_current_position} deg")
                 self.run_and_validate(clients.pid.set_direction,
                                       kwargs={'direction': state.direction})
                 self.run_and_validate(clients.pid.declare_freq,
@@ -1456,6 +1505,18 @@ def make_parser(parser=None):
     pgroup.add_argument(
         '--gripper-iboot-outlets', nargs='+', type=int,
         help="Outlets for gripper iboot power")
+    pgroup.add_argument(
+        '--acu-instance-id', help="Instance ID for the ACU agent"
+    )
+    pgroup.add_argument(
+        '--acu-min-el', help="Min elevation to allow HWP to spin up",
+        default=50.0
+    )
+    pgroup.add_argument(
+        '--acu-max-time-since-update',
+        help="Max amount of time since last ACU update before restricting spin-up",
+        default=60.0,
+    )
 
     pgroup.add_argument('--forward-dir', choices=['cw', 'ccw'], default="cw",
                         help="Whether the PID 'forward' direction is cw or ccw")
