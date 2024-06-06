@@ -784,7 +784,7 @@ class ControlStateMachine:
 
         return session
 
-    def update(self, clients, hwp_state):
+    def update(self, clients, hwp_state: HWPState):
         """Run the next series of actions for the current state"""
         try:
             self.lock.acquire()
@@ -806,6 +806,9 @@ class ControlStateMachine:
                         raise RuntimeError(f"ACU state has not been updated in {tdiff} sec")
                     if not (acu.min_el <= acu.el_current_position <= acu.max_el):
                         raise RuntimeError(f"ACU elevation is {acu.el_current_pos} deg, "
+                                           f"outside of allowed range ({acu.min_el}, {acu.max_el})")
+                    if not (acu.min_el <= acu.el_commanded_position <= acu.max_el):
+                        raise RuntimeError(f"ACU commanded elevation is {acu.el_commanded_position} deg, "
                                            f"outside of allowed range ({acu.min_el}, {acu.max_el})")
 
             if isinstance(state, ControlState.PIDToFreq):
