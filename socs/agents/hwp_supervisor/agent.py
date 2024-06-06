@@ -189,6 +189,7 @@ class ACUState:
         self.el_current_velocity = d['Elevation current velocity']
         self.last_updated = time.time()
 
+
 @dataclass
 class HWPState:
     temp: Optional[float] = None
