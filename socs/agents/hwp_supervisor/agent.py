@@ -760,16 +760,19 @@ class ControlStateMachine:
                 self.log.info("pid state: {data}", data=data)
                 return data
 
-            if isinstance(state, ControlState.PIDToFreq):
+            def check_acu_ok():
                 acu = hwp_state.acu
                 if acu is not None:
                     if acu.last_updated is None:
                         raise RuntimeError(f"No ACU data has been received from instance-id {acu.instance_id}")
                     tdiff = time.time() - acu.last_updated
                     if tdiff < acu.max_time_since_update:
-                        raise RuntimeError(f"ACU has not been updated in {tdiff} sec")
+                        raise RuntimeError(f"ACU state has not been updated in {tdiff} sec")
                     if acu.el_current_position < acu.min_el_allowed:
                         raise RuntimeError(f"ACU elevation is below minimum allowed: {acu.el_current_position} deg")
+
+            if isinstance(state, ControlState.PIDToFreq):
+                check_acu_ok()
                 self.run_and_validate(clients.pid.set_direction,
                                       kwargs={'direction': state.direction})
                 self.run_and_validate(clients.pid.declare_freq,
@@ -862,6 +865,8 @@ class ControlStateMachine:
                     self.action.set_state(ControlState.Done(success=True))
 
             elif isinstance(state, ControlState.ConstVolt):
+                if state.voltage > 0:
+                    check_acu_ok()
                 self.run_and_validate(clients.pmx.set_on)
                 self.run_and_validate(clients.pid.set_direction,
                                       kwargs={'direction': state.direction})
@@ -1509,7 +1514,7 @@ def make_parser(parser=None):
         '--acu-instance-id', help="Instance ID for the ACU agent"
     )
     pgroup.add_argument(
-        '--acu-min-el', help="Min elevation to allow HWP to spin up",
+        '--acu-min-el', help="Min elevation before restricting HWP spin up",
         default=50.0
     )
     pgroup.add_argument(
