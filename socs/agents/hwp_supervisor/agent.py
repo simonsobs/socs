@@ -1520,7 +1520,7 @@ def make_parser(parser=None):
     pgroup.add_argument(
         '--acu-max-time-since-update',
         help="Max amount of time since last ACU update before restricting spin-up",
-        default=60.0,
+        default=30.0,
     )
 
     pgroup.add_argument('--forward-dir', choices=['cw', 'ccw'], default="cw",
