@@ -141,7 +141,7 @@ class IBootState:
 @dataclass
 class ACUState:
     """
-    Class containg ACU state information.
+    Class containing ACU state information.
 
     Args
     ------
@@ -227,17 +227,37 @@ class HWPState:
 
     @classmethod
     def from_args(cls, args: argparse.Namespace):
+        log = txaio.make_logger()  # pylint: disable=E1101
         self = cls(
             temp_field=args.ybco_temp_field,
             temp_thresh=args.ybco_temp_thresh,
             ups_minutes_remaining_thresh=args.ups_minutes_remaining_thresh,
         )
+
         if args.gripper_iboot_id is not None:
             self.gripper_iboot = IBootState(args.gripper_iboot_id, args.gripper_iboot_outlets)
+            log.info("Gripper Ibootbar id set: {id}", id=args.gripper_iboot_id)
+        else:
+            log.warning("Gripper Ibootbar id not set")
+
         if args.driver_iboot_id is not None:
             self.driver_iboot = IBootState(args.driver_iboot_id, args.driver_iboot_outlets)
+            log.info("Driver Ibootbar id set: {id}", id=args.driver_iboot_id)
+        else:
+            log.warning("Driver Ibootbar id not set")
+
         if args.acu_instance_id is not None:
-            self.acu = ACUState(args.acu_instance_id, args.acu_min_el, args.acu_max_time_since_update)
+            self.acu = ACUState(
+                instance_id=args.acu_instance_id,
+                min_el=args.acu_min_el,
+                max_el=args.acu_max_el,
+                max_time_since_update=args.acu_max_time_since_update
+            )
+            log.info("ACU state checking enabled: instance_id={id}",
+                     id=self.acu.instance_id)
+        else:
+            log.info("ACU state checking disabled.")
+
         return self
 
     def _update_from_keymap(self, op, keymap):
@@ -782,7 +802,7 @@ class ControlStateMachine:
                     if acu.last_updated is None:
                         raise RuntimeError(f"No ACU data has been received from instance-id {acu.instance_id}")
                     tdiff = time.time() - acu.last_updated
-                    if tdiff < acu.max_time_since_update:
+                    if tdiff > acu.max_time_since_update:
                         raise RuntimeError(f"ACU state has not been updated in {tdiff} sec")
                     if not (acu.min_el <= acu.el_current_position <= acu.max_el):
                         raise RuntimeError(f"ACU elevation is {acu.el_current_pos} deg, "
@@ -1529,7 +1549,9 @@ def make_parser(parser=None):
         help="Outlets for gripper iboot power")
 
     pgroup.add_argument(
-        '--acu-instance-id', help="Instance ID for the ACU agent"
+        '--acu-instance-id',
+        help="Instance ID for the ACU agent. This is required for checks of ACU "
+             "postiion and velocity before HWP commands."
     )
     pgroup.add_argument(
         '--acu-min-el', help="Min elevation before restricting HWP spin up",
