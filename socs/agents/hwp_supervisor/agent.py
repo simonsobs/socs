@@ -140,25 +140,40 @@ class IBootState:
 
 @dataclass
 class ACUState:
+    """
+    Class containg ACU state information.
+
+    Args
+    ------
+    instance_id : str
+        Instance ID of ACU agent
+    min_el : float
+        Minimum elevation allowed before restricting spin-up [deg]
+    max_el : float
+        Maximum elevation allowed before restricting spin-up [deg]
+    max_time_since_update : float
+        Maximum time since last update before restricting spin-up[sec]
+
+    Attributes
+    ------------
+    el_current_position : float
+        Current el position [deg]
+    el_commanded_position : float
+        Commanded el position [deg]
+    el_current_velocity : float
+        Current el velocity [deg/s]
+    last_updated : float
+        Time of last update [sec]
+    """
     instance_id: str
-
     min_el: float
-    "Minimum elevation allowed before restricting spin-up [deg]"
-
+    max_el: float
     max_time_since_update: float
-    "Maximum time since last update before restricting spin-up[sec]"
 
     el_current_position: Optional[float] = None
-    "Current el position [deg]"
-
     el_commanded_position: Optional[float] = None
-    "Commanded el position [deg]"
-
     el_current_velocity: Optional[float] = None
-    "Current el velocity [deg/s]"
-
     last_updated: Optional[float] = None
-    "Time of last reading"
 
     def update(self):
         op = get_op_data(self.instance_id, 'monitor')
@@ -760,7 +775,7 @@ class ControlStateMachine:
                 self.log.info("pid state: {data}", data=data)
                 return data
 
-            def check_acu_ok():
+            def check_acu_ok_for_spinup():
                 acu = hwp_state.acu
                 if acu is not None:
                     if acu.last_updated is None:
@@ -768,11 +783,12 @@ class ControlStateMachine:
                     tdiff = time.time() - acu.last_updated
                     if tdiff < acu.max_time_since_update:
                         raise RuntimeError(f"ACU state has not been updated in {tdiff} sec")
-                    if acu.el_current_position < acu.min_el_allowed:
-                        raise RuntimeError(f"ACU elevation is below minimum allowed: {acu.el_current_position} deg")
+                    if not (acu.min_el <= acu.el_current_position <= acu.max_el):
+                        raise RuntimeError(f"ACU elevation is {acu.el_current_pos} deg, "
+                                           f"outside of allowed range ({acu.min_el}, {acu.max_el})")
 
             if isinstance(state, ControlState.PIDToFreq):
-                check_acu_ok()
+                check_acu_ok_for_spinup()
                 self.run_and_validate(clients.pid.set_direction,
                                       kwargs={'direction': state.direction})
                 self.run_and_validate(clients.pid.declare_freq,
@@ -866,7 +882,7 @@ class ControlStateMachine:
 
             elif isinstance(state, ControlState.ConstVolt):
                 if state.voltage > 0:
-                    check_acu_ok()
+                    check_acu_ok_for_spinup()
                 self.run_and_validate(clients.pmx.set_on)
                 self.run_and_validate(clients.pid.set_direction,
                                       kwargs={'direction': state.direction})
@@ -1510,12 +1526,17 @@ def make_parser(parser=None):
     pgroup.add_argument(
         '--gripper-iboot-outlets', nargs='+', type=int,
         help="Outlets for gripper iboot power")
+
     pgroup.add_argument(
         '--acu-instance-id', help="Instance ID for the ACU agent"
     )
     pgroup.add_argument(
         '--acu-min-el', help="Min elevation before restricting HWP spin up",
-        default=50.0
+        default=48.0
+    )
+    pgroup.add_argument(
+        '--acu-max-el', help="Min elevation before restricting HWP spin up",
+        default=90.0
     )
     pgroup.add_argument(
         '--acu-max-time-since-update',
