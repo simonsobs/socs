@@ -9,7 +9,7 @@ from socs.agents.scpi_psu.drivers import PsuInterface
 
 
 class ScpiPsuAgent:
-    def __init__(self, agent, ip_address, gpib_slot):
+    def __init__(self, agent, ip_address, gpib_slot, **kwargs):
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
@@ -17,6 +17,9 @@ class ScpiPsuAgent:
         self.job = None
         self.ip_address = ip_address
         self.gpib_slot = gpib_slot
+        self.port = None
+        if('port' in kwargs.keys()):
+            self.port = kwargs['port']
         self.monitor = False
 
         self.psu = None
@@ -41,12 +44,21 @@ class ScpiPsuAgent:
             if not acquired:
                 return False, "Could not acquire lock"
 
-            try:
-                self.psu = PsuInterface(self.ip_address, self.gpib_slot)
-                self.idn = self.psu.identify()
-            except socket.timeout as e:
-                self.log.error(f"PSU timed out during connect: {e}")
-                return False, "Timeout"
+            if self.port == None: # Use the old Prologix-based GPIB code
+                try:
+                    self.psu = PsuInterface(self.ip_address, self.gpib_slot)
+                    self.idn = self.psu.identify()
+                except socket.timeout as e:
+                    self.log.error(f"PSU timed out during connect: {e}")
+                    return False, "Timeout"
+            else: # Use the new direct ethernet connection code
+                try:
+                    self.psu = PsuInterface(self.ip_address, self.gpib_slot, port=self.port)
+                    self.idn = self.psu.identify()
+                except socket.timeout as e:
+                    self.log.error(f"PSU timed out during connect: {e}")
+                    return False, "Timeout"
+
             self.log.info("Connected to psu: {}".format(self.idn))
 
         return True, 'Initialized PSU.'
@@ -68,6 +80,7 @@ class ScpiPsuAgent:
                 Defaults to False.
 
         """
+        session.set_status('running')
         self.monitor = True
 
         while self.monitor:
@@ -178,6 +191,7 @@ def make_parser(parser=None):
     pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--ip-address')
     pgroup.add_argument('--gpib-slot')
+    pgroup.add_argument('--port')
 
     return parser
 
@@ -190,9 +204,9 @@ def main(args=None):
 
     agent, runner = ocs_agent.init_site_agent(args)
 
-    p = ScpiPsuAgent(agent, args.ip_address, int(args.gpib_slot))
+    p = ScpiPsuAgent(agent, args.ip_address, int(args.gpib_slot), port=int(args.port))
 
-    agent.register_task('init', p.init)
+    agent.register_task('init', p.init, startup=True)
     agent.register_task('set_voltage', p.set_voltage)
     agent.register_task('set_current', p.set_current)
     agent.register_task('set_output', p.set_output)
