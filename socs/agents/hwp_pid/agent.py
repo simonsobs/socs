@@ -33,6 +33,7 @@ def get_pid_state(pid: pd.PID, num_attempts: int = 3):
         freq = pid.get_freq()
         if freq != 9.999:
             break
+        agent.log.warn('Warning: Invalid PID freq')
         time.sleep(1)
     return {
         "current_freq": freq,
