@@ -18,7 +18,7 @@ class ScpiPsuAgent:
         self.ip_address = ip_address
         self.gpib_slot = gpib_slot
         self.port = None
-        if('port' in kwargs.keys()):
+        if ('port' in kwargs.keys()):
             self.port = kwargs['port']
         self.monitor = False
 
@@ -44,14 +44,14 @@ class ScpiPsuAgent:
             if not acquired:
                 return False, "Could not acquire lock"
 
-            if self.port == None: # Use the old Prologix-based GPIB code
+            if self.port is None:  # Use the old Prologix-based GPIB code
                 try:
                     self.psu = PsuInterface(self.ip_address, self.gpib_slot)
                     self.idn = self.psu.identify()
                 except socket.timeout as e:
                     self.log.error(f"PSU timed out during connect: {e}")
                     return False, "Timeout"
-            else: # Use the new direct ethernet connection code
+            else:  # Use the new direct ethernet connection code
                 try:
                     self.psu = PsuInterface(self.ip_address, self.gpib_slot, port=self.port)
                     self.idn = self.psu.identify()

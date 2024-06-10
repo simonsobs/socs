@@ -9,7 +9,7 @@ class PrologixInterface:
         self.isPrologix = True
         self.sock = None
         self.port = 1234
-        if('port' in kwargs.keys()):
+        if ('port' in kwargs.keys()):
             self.isPrologix = False
             self.port = kwargs['port']
             del kwargs['port']
@@ -25,7 +25,7 @@ class PrologixInterface:
         self.sock.settimeout(5)
 
     def configure(self):
-        if(self.isPrologix):
+        if (self.isPrologix):
             self.write('++mode 1')
             self.write('++auto 1')
             self.write('++addr ' + str(self.gpibAddr))
@@ -39,7 +39,7 @@ class PrologixInterface:
         return self.sock.recv(128).decode().strip()
 
     def version(self):
-        if(self.isPrologix):
+        if (self.isPrologix):
             self.write('++ver')
             return self.read()
         else:
