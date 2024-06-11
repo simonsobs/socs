@@ -127,7 +127,7 @@ def mock_take_noise(S, cfg, acq_time, **kwargs):
     **Mock** - Mock take_noise() in sodetlib.
     """
     am = mock.MagicMock()
-    outdict = {'noise_pars': 0,
+    outdict = {'noise_pars': np.zeros((10, 3), dtype=float),
                'bands': 0,
                'channels': 0,
                'band_medians': 0,
