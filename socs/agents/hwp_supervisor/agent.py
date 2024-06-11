@@ -139,7 +139,7 @@ class IBootState:
                 for outlet, label in self.outlet_labels.items()
             }
         elif self.driver_power_agent_type == 'synaccess':
-            self.outlet_labels = {o: str(o-1) for o in self.outlets}
+            self.outlet_labels = {o: str(o - 1) for o in self.outlets}
             self.outlet_state = {
                 outlet: op['data']['fields'][label]['status']
                 for outlet, label in self.outlet_labels.items()
@@ -193,10 +193,10 @@ class HWPState:
         )
         if args.gripper_iboot_id is not None:
             self.gripper_iboot = IBootState(args.gripper_iboot_id, args.gripper_iboot_outlets,
-                args.driver_power_agent_type)
+                                            args.driver_power_agent_type)
         if args.driver_iboot_id is not None:
             self.driver_iboot = IBootState(args.driver_iboot_id, args.driver_iboot_outlets,
-                args.driver_power_agent_type)
+                                           args.driver_power_agent_type)
         return self
 
     def _update_from_keymap(self, op, keymap):
