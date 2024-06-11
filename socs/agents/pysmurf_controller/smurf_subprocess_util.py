@@ -2,7 +2,7 @@ import json
 import os
 import sys
 import traceback
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, is_dataclass
 from typing import Dict, List, Optional
 
 import numpy as np
@@ -23,6 +23,8 @@ def json_safe(data):
         Python basic types.
     - Converting NaN/inf to Num (0 or +/- large number)
     """
+    if is_dataclass(data):
+        return json_safe(asdict(data))
     if isinstance(data, dict):
         return {k: json_safe(v) for k, v in data.items()}
     if isinstance(data, (list, tuple)):
@@ -34,9 +36,42 @@ def json_safe(data):
         return data
     if isinstance(data, float):
         return np.nan_to_num(data)
+    if data is None:
+        return None
+
+    print(f"Unsure how to encode data of type {type(data)}...")
+    print(f"data: {data}")
     # This could still be something weird but json.dumps will
     # probably reject it!
     return data
+
+
+@dataclass
+class QuantileData:
+    name: str
+    quantiles: List[float]
+    values: List[float]
+    total: int
+
+    def to_block_data(self):
+        "Format quantile data for OCS HK block"
+        labels = [f'{self.name}_q{int(q)}' for q in self.quantiles]
+        block_data = dict(zip(labels, self.values))
+        block_data[f'{self.name}_total'] = self.total
+        return block_data
+
+
+def compute_quantiles(name: str, arr: np.ndarray, quantiles: List[float]):
+    """
+    Computes QuantileData object for a given array
+
+    """
+    quantiles = [float(q) for q in quantiles]
+    if np.isnan(arr).all():
+        return QuantileData(name, quantiles, [0 for _ in quantiles], 0)
+    qs = [float(np.nan_to_num(np.nanquantile(arr, q / 100))) for q in quantiles]
+    total = int(np.sum(~np.isnan(arr)))
+    return QuantileData(name, quantiles, qs, total)
 
 
 def encode_dataclass(obj):
@@ -44,7 +79,7 @@ def encode_dataclass(obj):
     Encodes a data-class into json, replacing any json-unsafe types with
     reasonable alternatives.
     """
-    data = json_safe(asdict(obj))
+    data = json_safe(obj)
     return json.dumps(data).encode()
 
 
@@ -66,7 +101,14 @@ def take_noise(duration, kwargs=None):
     if kwargs is None:
         kwargs = {}
     S, cfg = get_smurf_control()
-    sdl.noise.take_noise(S, cfg, duration, **kwargs)
+    _, res = sdl.noise.take_noise(S, cfg, duration, **kwargs)
+    wls = res['noise_pars'][:, 0]
+    qs = [10, 25, 50, 75, 90]
+    return {
+        'quantiles': {
+            'white_noise_level': compute_quantiles('white_noise_level', wls, qs),
+        }
+    }
 
 
 def take_bgmap(kwargs=None):
@@ -91,7 +133,13 @@ def take_iv(iv_kwargs=None):
     if iv_kwargs is None:
         iv_kwargs = {}
     iva = iv.take_iv(S, cfg, **iv_kwargs)
-    return {'filepath': iva.filepath}
+    quantiles = [10, 25, 50, 75, 90]
+    return {
+        'filepath': iva.filepath,
+        'quantiles': {
+            'Rn': compute_quantiles('Rn', iva.R_n, quantiles)
+        }
+    }
 
 
 def run_uxm_setup(bands=None, kwargs=None):
@@ -112,28 +160,6 @@ def run_uxm_relock(bands=None, kwargs=None):
     return None
 
 
-def _process_quantiles(quantiles: list, arrays: Dict):
-    """
-    Args
-    ----
-    quantiles: list of quantiles to compute (in percent)
-    arrays: Dict of arrays to compute quantiles for
-    """
-    res = {}
-    for name, arr in arrays.items():
-        if np.isnan(arr).all():
-            continue
-        labels = [f'{name}_q{q}' for q in quantiles]
-        qs = [float(np.nan_to_num(np.nanquantile(arr, q / 100))) for q in quantiles]
-        count = int(np.sum(~np.isnan(arr)))
-        res[name] = {
-            'values': qs,
-            'labels': labels,
-            'count': count,
-        }
-    return res
-
-
 def take_bias_steps(kwargs=None, rfrac_range=(0.2, 0.9)):
     """Takes bias steps and computes quantiles for various parameters"""
     if kwargs is None:
@@ -146,18 +172,19 @@ def take_bias_steps(kwargs=None, rfrac_range=(0.2, 0.9)):
         rfrac_range[0] < bsa.Rfrac,
         rfrac_range[1] > bsa.Rfrac
     ])
+    qs = [10, 25, 50, 75, 90]
     data = {
         'filepath': bsa.filepath,
         'biased_total': int(np.sum(biased)),
         'biased_per_bg': [
             int(np.sum(biased[bsa.bgmap == bg])) for bg in range(12)
         ],
+        'quantiles': {
+            'Rfrac': compute_quantiles('Rfrac', bsa.Rfrac, qs),
+            'Si': compute_quantiles('Si', bsa.Si, qs),
+            'Rtes': compute_quantiles('Rtes', bsa.R0, qs),
+        }
     }
-    arrays = {
-        'Rfrac': bsa.Rfrac, 'responsivity': bsa.Si, 'Rtes': bsa.R0,
-    }
-    quantiles = np.array([15, 25, 50, 75, 85])
-    data['quantiles'] = _process_quantiles(quantiles, arrays)
     return data
 
 
@@ -172,18 +199,19 @@ def take_bias_waves(kwargs=None, rfrac_range=(0.2, 0.9)):
         rfrac_range[0] < bwa.Rfrac,
         rfrac_range[1] > bwa.Rfrac
     ])
+    qs = [10, 25, 50, 75, 90]
     data = {
         'filepath': bwa.filepath,
         'biased_total': int(np.sum(biased)),
         'biased_per_bg': [
             int(np.sum(biased[bwa.bgmap == bg])) for bg in range(12)
         ],
+        'quantiles': {
+            'Rfrac': compute_quantiles('Rfrac', bwa.Rfrac, qs),
+            'Si': compute_quantiles('Si', bwa.Si, qs),
+            'Rtes': compute_quantiles('Rtes', bwa.R0, qs),
+        }
     }
-    arrays = {
-        'Rfrac': bwa.Rfrac, 'responsivity': bwa.Si, 'Rtes': bwa.R0,
-    }
-    quantiles = np.array([15, 25, 50, 75, 85])
-    data['quantiles'] = _process_quantiles(quantiles, arrays)
     return data
 
 
