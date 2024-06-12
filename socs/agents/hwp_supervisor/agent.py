@@ -118,7 +118,7 @@ class HWPClients:
 class IBootState:
     instance_id: str
     outlets: List[int]
-    driver_power_agent_type: Literal['iboot, synaccess']
+    agent_type: Literal['iboot, synaccess']
     outlet_state: Dict[int, Optional[int]] = None
     op_data: Optional[Dict] = None
 
@@ -132,13 +132,13 @@ class IBootState:
             self.outlet_state = {o: None for o in self.outlets}
             return
 
-        if self.driver_power_agent_type == 'iboot':
+        if self.agent_type == 'iboot':
             self.outlet_labels = {o: f'outletStatus_{o}' for o in self.outlets}
             self.outlet_state = {
                 outlet: op['data'][label]['status']
                 for outlet, label in self.outlet_labels.items()
             }
-        elif self.driver_power_agent_type == 'synaccess':
+        elif self.agent_type == 'synaccess':
             self.outlet_labels = {o: str(o - 1) for o in self.outlets}
             self.outlet_state = {
                 outlet: op['data']['fields'][label]['status']
@@ -146,7 +146,7 @@ class IBootState:
             }
         else:
             raise ValueError(
-                f"Invalid driver_power_agent_type: {self.driver_power_agent_type}. "
+                f"Invalid agent_type: {self.agent_type}. "
                 "Must be in ['iboot', 'synaccess']"
             )
 
@@ -193,7 +193,7 @@ class HWPState:
         )
         if args.gripper_iboot_id is not None:
             self.gripper_iboot = IBootState(args.gripper_iboot_id, args.gripper_iboot_outlets,
-                                            args.driver_power_agent_type)
+                                            args.gripper_power_agent_type)
         if args.driver_iboot_id is not None:
             self.driver_iboot = IBootState(args.driver_iboot_id, args.driver_iboot_outlets,
                                            args.driver_power_agent_type)
@@ -1472,6 +1472,9 @@ def make_parser(parser=None):
     pgroup.add_argument(
         '--gripper-iboot-outlets', nargs='+', type=int,
         help="Outlets for gripper iboot power")
+    pgroup.add_argument(
+        '--gripper-power-agent-type', choices=['iboot', 'synaccess'], default=None,
+        help="Type of agent used for controlling the gripper power")
 
     pgroup.add_argument('--forward-dir', choices=['cw', 'ccw'], default="cw",
                         help="Whether the PID 'forward' direction is cw or ccw")
