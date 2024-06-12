@@ -5,7 +5,7 @@ import time
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
-from socs.agents.scpi_psu.drivers import PsuInterface
+from socs.agents.scpi_psu.drivers import PsuInterface, ScpiPsuInterface
 
 
 class ScpiPsuAgent:
@@ -53,11 +53,17 @@ class ScpiPsuAgent:
                     return False, "Timeout"
             else:  # Use the new direct ethernet connection code
                 try:
-                    self.psu = PsuInterface(self.ip_address, self.gpib_slot, port=self.port)
+                    self.psu = ScpiPsuInterface(self.ip_address, self.gpib_slot, port=self.port)
                     self.idn = self.psu.identify()
                 except socket.timeout as e:
                     self.log.error(f"PSU timed out during connect: {e}")
                     return False, "Timeout"
+                except ValueError as e:
+                    if (e.args[0].startswith('Model number')):
+                        self.log.error(f"PSU initialization error: {e}. Suggest appending {e.args[-1]} to the list of known model numbers in scpi_psu/drivers.py")
+                    else:
+                        self.log.error(f"PSU initialization resulted in unknown ValueError: {e}")
+                    return False, "ValueError"
 
             self.log.info("Connected to psu: {}".format(self.idn))
 
