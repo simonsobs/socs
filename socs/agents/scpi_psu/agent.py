@@ -33,7 +33,7 @@ class ScpiPsuAgent:
                                  agg_params=agg_params,
                                  buffer_time=0)
 
-    @ocs_agent.param('_')
+    # @ocs_agent.param('_')
     def init(self, session, params=None):
         """init()
 
@@ -67,6 +67,14 @@ class ScpiPsuAgent:
 
             self.log.info("Connected to psu: {}".format(self.idn))
 
+        session.add_message('Initialized PSU.')
+        auto_acquire = params.get('auto_acquire', False)
+
+        if auto_acquire:
+            acq_params = None
+            if self.psu.numChannels == 1:
+                acq_params = {'channels': [1]}
+            self.agent.start('monitor_output', acq_params)
         return True, 'Initialized PSU.'
 
     @ocs_agent.param('wait', type=float, default=1)
@@ -198,6 +206,7 @@ def make_parser(parser=None):
     pgroup.add_argument('--ip-address')
     pgroup.add_argument('--gpib-slot')
     pgroup.add_argument('--port')
+    pgroup.add_argument('--mode')
 
     return parser
 
@@ -208,11 +217,14 @@ def main(args=None):
                                   parser=parser,
                                   args=args)
 
+    init_params = False
+    if args.mode == 'acq':
+        init_params = {'auto_acquire': True}
     agent, runner = ocs_agent.init_site_agent(args)
 
     p = ScpiPsuAgent(agent, args.ip_address, int(args.gpib_slot), port=int(args.port))
 
-    agent.register_task('init', p.init, startup=True)
+    agent.register_task('init', p.init, startup=init_params)
     agent.register_task('set_voltage', p.set_voltage)
     agent.register_task('set_current', p.set_current)
     agent.register_task('set_output', p.set_output)
