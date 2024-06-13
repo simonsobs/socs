@@ -64,8 +64,9 @@ class ScpiPsuInterface:
         Depending on state of power supply, it might need to be called
         before the output is set.
         '''
-        self.set_chan(ch)
-        self.write('OUTP:ENAB ON')
+        if (self.numChannels != 1):
+            self.set_chan(ch)
+            self.write('OUTP:ENAB ON')
 
     def disable(self, ch):
         '''
@@ -75,7 +76,8 @@ class ScpiPsuInterface:
         self.write('OUTP:ENAB OFF')
 
     def set_chan(self, ch):
-        self.write('inst:nsel ' + str(ch))
+        if (self.numChannels != 1):
+            self.write('inst:nsel ' + str(ch))
 
     def set_output(self, ch, out):
         '''
@@ -90,19 +92,30 @@ class ScpiPsuInterface:
         '''
         self.set_chan(ch)
         self.enable(ch)
-        if isinstance(out, str):
-            self.write('CHAN:OUTP ' + out)
-        elif out:
-            self.write('CHAN:OUTP ON')
+        if (self.numChannels != 1):
+            if isinstance(out, str):
+                self.write('CHAN:OUTP ' + out)
+            elif out:
+                self.write('CHAN:OUTP ON')
+            else:
+                self.write('CHAN:OUTP OFF')
         else:
-            self.write('CHAN:OUTP OFF')
+            if isinstance(out, str):
+                self.write('OUTP ' + out)
+            elif out:
+                self.write('OUTP ON')
+            else:
+                self.write('OUTP OFF')
 
     def get_output(self, ch):
         '''
         check if the output of a channel (1,2,3) is on (True) or off (False)
         '''
         self.set_chan(ch)
-        self.write('CHAN:OUTP:STAT?')
+        if (self.numChannels != 1):
+            self.write('CHAN:OUTP:STAT?')
+        else:
+            self.write('OUTP:STAT?')
         out = bool(float(self.read()))
         return out
 
@@ -116,14 +129,20 @@ class ScpiPsuInterface:
 
     def get_volt(self, ch):
         self.set_chan(ch)
-        self.write('MEAS:VOLT? CH' + str(ch))
-        voltage = float(self.read())
+        if (self.numChannels != 1):
+            self.write('MEAS:VOLT? CH' + str(ch))
+        else:
+            self.write('MEAS:VOLT?')
+        voltage = float(self.read().split(',')[1].strip('V'))
         return voltage
 
     def get_curr(self, ch):
         self.set_chan(ch)
-        self.write('MEAS:CURR? CH' + str(ch))
-        current = float(self.read())
+        if (self.numChannels != 1):
+            self.write('MEAS:CURR? CH' + str(ch))
+        else:
+            self.write('MEAS:CURR?')
+        current = float(self.read().split(',')[0].strip('A'))
         return current
 
 
