@@ -87,7 +87,7 @@ class dS378Agent:
                 data['data']['V_sppl'] = d_status['V_sppl']
                 data['data']['T_int'] = d_status['T_int']
                 for i in range(8):
-                    data['data'][f'Relay_{i+1}'] = relay_list[i]
+                    data['data'][f'Relay_{i + 1}'] = relay_list[i]
 
                 field_dict = {'relay': {'V_sppl': d_status['V_sppl'],
                                         'T_int': d_status['T_int']}}
@@ -154,7 +154,7 @@ class dS378Agent:
                 return False, 'Could not acquire lock.'
 
             d_status = self._dev.get_relays()
-            session.data = {f'Relay_{i+1}': d_status[i] for i in range(8)}
+            session.data = {f'Relay_{i + 1}': d_status[i] for i in range(8)}
 
         return True, 'Got relay status'
 
