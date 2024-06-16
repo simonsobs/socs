@@ -536,7 +536,7 @@ class PID:
             measure_type = end_string[1:3]
         else:
             measure_type = '00'
-        if measure_type == '01':
+        if measure_type == '01' and end_string[3:] != '?+9999.':
             return float(end_string[3:])
         else:
             return 9.999
