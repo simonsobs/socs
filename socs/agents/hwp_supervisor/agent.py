@@ -1557,17 +1557,16 @@ def make_parser(parser=None):
              "postiion and velocity before HWP commands."
     )
     pgroup.add_argument(
-        '--acu-min-el', help="Min elevation before restricting HWP spin up",
-        default=48.0
+        '--acu-min-el', type=float, default=48.0,
+        help="Min elevation that HWP spin up is allowed",
     )
     pgroup.add_argument(
-        '--acu-max-el', help="Min elevation before restricting HWP spin up",
-        default=90.0
+        '--acu-max-el', type=float, default=90.0,
+        help="Max elevation that HWP spin up is allowed",
     )
     pgroup.add_argument(
-        '--acu-max-time-since-update',
-        help="Max amount of time since last ACU update before restricting spin-up",
-        default=30.0,
+        '--acu-max-time-since-update', type=float, default=30.0,
+        help="Max amount of time since last ACU update before allowing HWP spin up",
     )
 
     pgroup.add_argument('--forward-dir', choices=['cw', 'ccw'], default="cw",
