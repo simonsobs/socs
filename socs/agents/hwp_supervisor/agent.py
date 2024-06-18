@@ -238,13 +238,13 @@ class HWPState:
             self.gripper_iboot = IBootState(args.gripper_iboot_id, args.gripper_iboot_outlets)
             log.info("Gripper Ibootbar id set: {id}", id=args.gripper_iboot_id)
         else:
-            log.warning("Gripper Ibootbar id not set")
+            log.warn("Gripper Ibootbar id not set")
 
         if args.driver_iboot_id is not None:
             self.driver_iboot = IBootState(args.driver_iboot_id, args.driver_iboot_outlets)
             log.info("Driver Ibootbar id set: {id}", id=args.driver_iboot_id)
         else:
-            log.warning("Driver Ibootbar id not set")
+            log.warn("Driver Ibootbar id not set")
 
         if args.acu_instance_id is not None:
             self.acu = ACUState(
