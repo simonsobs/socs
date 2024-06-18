@@ -1200,6 +1200,8 @@ class HWPSupervisor:
                 self.hwp_state.driver_iboot.update()
             if self.hwp_state.gripper_iboot is not None:
                 self.hwp_state.gripper_iboot.update()
+            if self.hwp_state.acu is not None:
+                self.hwp_state.acu.update()
 
             session.data['hwp_state'] = asdict(self.hwp_state)
 
