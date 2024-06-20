@@ -187,7 +187,10 @@ class ACUState:
         self.el_current_position = d['Elevation current position']
         self.el_commanded_position = d['Elevation commanded position']
         self.el_current_velocity = d['Elevation current velocity']
-        self.last_updated = time.time()
+        t = d.get('timestamp_agent')
+        if t is None:
+            t = time.time()
+        self.last_updated = t
 
 
 @dataclass
