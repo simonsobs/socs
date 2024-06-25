@@ -1286,6 +1286,10 @@ class ACUAgent:
             axis).
 
         """
+        # Construct args for each _go_to_axis command... don't create
+        # the Deferred here, because we will want to clear_faults
+        # first (and the Deferred might start running before that
+        # completes).
         move_defs = []
         for axis_name, short_name, target in [
                 ('Azimuth', 'az', az),
@@ -1294,7 +1298,7 @@ class ACUAgent:
         ]:
             if target is not None:
                 move_defs.append(
-                    (short_name, self._go_to_axis(session, axis_name, target)))
+                    (short_name, (session, axis_name, target)))
         if len(move_defs) is None:
             return True, 'No motion requested.'
 
@@ -1302,7 +1306,8 @@ class ACUAgent:
             yield self.acu_control.clear_faults()
             yield dsleep(1)
 
-        moves = yield DeferredList([d for n, d in move_defs])
+        moves = yield DeferredList([self._go_to_axis(*args)
+                                    for name, args in move_defs])
         all_ok, msgs = True, []
         for _ok, result in moves:
             if _ok:
@@ -1315,7 +1320,8 @@ class ACUAgent:
         if all_ok:
             msg = msgs[0]
         else:
-            msg = ' '.join([f'{n}: {msg}' for (n, d), msg in zip(move_defs, msgs)])
+            msg = ' '.join([f'{name}: {msg}'
+                            for (name, args), msg in zip(move_defs, msgs)])
         return all_ok, msg
 
     @ocs_agent.param('az', type=float)
