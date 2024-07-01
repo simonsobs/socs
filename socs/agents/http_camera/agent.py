@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 import shutil
 import time
@@ -6,7 +7,10 @@ from pathlib import Path
 
 import requests
 import txaio
+import urllib3
 import yaml
+
+urllib3.disable_warnings()
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import Pacemaker, TimeoutLock
 
@@ -91,10 +95,26 @@ class HTTPCameraAgent:
                 data[camera['location']] = {'location': camera['location']}
                 self.log.info(f"Grabbing screenshot from {camera['location']}")
 
-                payload = {'USER': camera['user'],
-                           'PWD': camera['password'],
-                           'SNAPSHOT': camera['resolution']}
-                url = f"http://{camera['address']}/cgi-bin/encoder"
+                if camera['brand'] == 'reolink':
+                    login_url = f"https://{camera['address']}/api.cgi?cmd=Login"
+                    login_payload = [{"cmd": "Login",
+                                      "param": {"User":
+                                                {"Version": 0,
+                                                 "userName": camera['user'],
+                                                 "password": camera['password']}}}]
+                    resp = requests.post(login_url, data=json.dumps(login_payload), verify=False)
+                    rdata = resp.json()
+                    token = rdata[0]['value']['Token']['name']
+                    payload = {'cmd': "Snap",
+                               'channel': "0",
+                               'rs': "flsYJfZgM6RTB_os",
+                               'token': token}
+                    url = f"https://{camera['address']}/cgi-bin/api.cgi"
+                elif camera['brand'] == 'acti':
+                    payload = {'USER': camera['user'],
+                               'PWD': camera['password'],
+                               'SNAPSHOT': camera['resolution']}
+                    url = f"http://{camera['address']}/cgi-bin/encoder"
 
                 # Format directory and filename
                 ctime = int(timestamp)
@@ -105,7 +125,10 @@ class HTTPCameraAgent:
 
                 # If no response from camera, update connection status and continue
                 try:
-                    response = requests.get(url, params=payload, stream=True, timeout=5)
+                    if camera['brand'] == 'reolink':
+                        response = requests.get(url, params=payload, stream=True, timeout=5, verify=False)
+                    elif camera['brand'] == 'acti':
+                        response = requests.get(url, params=payload, stream=True, timeout=5)
                     connected = True
                 except requests.exceptions.RequestException as e:
                     self.log.error(f'{e}')
@@ -121,7 +144,9 @@ class HTTPCameraAgent:
                 with open(filename, 'wb') as out_file:
                     shutil.copyfileobj(response.raw, out_file)
                 self.log.debug(f"Wrote {ctime}.jpg to /{camera['location']}/{ctime_dir}.")
-                shutil.copy2(filename, latest_filename)
+                if os.path.exists(latest_filename):
+                    os.remove(latest_filename)
+                os.symlink(filename, latest_filename)
                 self.log.debug(f"Updated latest.jpg in /{camera['location']}.")
                 del response
 
