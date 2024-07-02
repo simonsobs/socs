@@ -144,9 +144,7 @@ class HTTPCameraAgent:
                 with open(filename, 'wb') as out_file:
                     shutil.copyfileobj(response.raw, out_file)
                 self.log.debug(f"Wrote {ctime}.jpg to /{camera['location']}/{ctime_dir}.")
-                if os.path.exists(latest_filename):
-                    os.remove(latest_filename)
-                os.symlink(filename, latest_filename)
+                shutil.copy2(filename, latest_filename)
                 self.log.debug(f"Updated latest.jpg in /{camera['location']}.")
                 del response
 
@@ -164,7 +162,7 @@ class HTTPCameraAgent:
                 'timestamp': timestamp,
                 'data': {}
             }
-            for camera in self.cameras:
+            for camera in self.config['cameras']:
                 message['data'][camera['location'] + "_connected"] = int(connected)
             session.app.publish_to_feed('cameras', message)
             self.log.debug("{msg}", msg=message)
@@ -196,7 +194,7 @@ def add_agent_args(parser=None):
         parser = argparse.ArgumentParser()
 
     pgroup = parser.add_argument_group("Agent Options")
-    pgroup.add_argument("--camera-addresses", type=str, help="Config file path relative to OCS_CONFIG_DIR")
+    pgroup.add_argument("--config-file", type=str, help="Config file path relative to OCS_CONFIG_DIR")
     pgroup.add_argument("--mode", choices=['acq', 'test'])
 
     return parser
