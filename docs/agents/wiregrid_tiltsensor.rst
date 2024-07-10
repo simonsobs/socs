@@ -6,7 +6,7 @@
 Wiregrid Tilt Sensor Agent
 ==========================
 
-The Wiregrid Tiltsensor Agent records the wire-grid tilt sensor outputs
+The Wiregrid Tilt Sensor Agent records the wire-grid tilt sensor outputs
 related to the tilt angle of the wire-grid plane along the gravitaional direction.
 There is two types of tilt sensors, DWL and sherborne.
 The tilt sensor data is sent via serial-to-ethernet converter.
