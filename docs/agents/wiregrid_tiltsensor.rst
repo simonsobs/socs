@@ -2,9 +2,9 @@
 
 .. _wiregrid_tiltsensor:
 
-=======================
+==========================
 Wiregrid Tilt Sensor Agent
-=======================
+==========================
 
 The Wiregrid Tiltsensor Agent records the wire-grid tilt sensor outputs
 related to the tilt angle of the wire-grid plane along the gravitaional direction.
