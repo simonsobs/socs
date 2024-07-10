@@ -1,7 +1,5 @@
 import time as tm
 
-import serial as sr
-
 # Control modules
 from socs.common import moxa_serial as mx
 
