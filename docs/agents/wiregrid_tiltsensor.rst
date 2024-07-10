@@ -36,12 +36,12 @@ An example site-config-file block::
                    '--port', '32',
                    '--sensor-type', 'DWL']},
 
-- tiltsensor-ip is an IP address of the serial-to-ethernet converter.
-- tiltsensor-port is an asigned port for the tilt sensor.
+- ``ip-address`` is an IP address of the serial-to-ethernet converter.
+- ``port`` is an asigned port for the tilt sensor.
   (The converter has four D-sub ports to control
   multiple devices connected via serial communication.
   Communicating device is determined by the ethernet port number of the converter.)
-- tiltsensor_type represents the type of tilt sensor to communicate with.
+- ``sensor_type`` represents the type of tilt sensor to communicate with.
   We have the two types of tilt sensor, DWL and sherborne.
   Available values of this argument are only 'DWL' or 'sherborne',
   and depend on SATp.
