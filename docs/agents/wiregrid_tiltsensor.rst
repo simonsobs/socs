@@ -32,9 +32,9 @@ An example site-config-file block::
 
     {'agent-class': 'WiregridTiltSensorAgent',
      'instance-id': 'wg-tilt-sensor',
-     'arguments': [['--ip-address', '192.168.11.27'],
-                   ['--port', '32'],
-                   ['--sensor-type', 'DWL']]},
+     'arguments': ['--ip-address', '192.168.11.27',
+                   '--port', '32',
+                   '--sensor-type', 'DWL']},
 
 - tiltsensor-ip is an IP address of the serial-to-ethernet converter.
 - tiltsensor-port is an asigned port for the tilt sensor.
