@@ -765,6 +765,7 @@ class PysmurfController:
                 'filepath': Filepath of saved IVAnalysis object
                 'quantiles': {
                     'Rn': Rn quantiles
+                    'p_sat': electrical power at 90% Rn quantiles
                 }
             }
         """
