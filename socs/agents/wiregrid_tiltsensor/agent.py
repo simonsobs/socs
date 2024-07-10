@@ -74,15 +74,16 @@ class WiregridTiltSensorAgent:
             self.take_data = True
             last_release = time.time()
 
-            tiltsensor_data = {'timestamp': 0,
-                               'block_name': 'wgtiltsensor',
-                               'data': {
-                                   'angleX': -999,
-                                   'angleY': -999,
-                                   'temperatureX': -999,
-                                   'temperatureY': -999
-                               }
-                               }
+            tiltsensor_data = {
+                'timestamp': 0,
+                'block_name': 'wgtiltsensor',
+                'data': {
+                    'angleX': -999,
+                    'angleY': -999,
+                    'temperatureX': -999,
+                    'temperatureY': -999,
+                },
+            }
 
             self.log.info("Starting the count!")
 
