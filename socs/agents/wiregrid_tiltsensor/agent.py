@@ -142,7 +142,16 @@ class WiregridTiltSensorAgent:
 
         **Task** - Reset the tiltsensor if the type of tiltsensor is sherborne.
 
+        Notes:
+            The most recent data collected is stored in session.data in the
+            structure::
+
+                >>> response.session['data']
+                {'reset': bool whether the reset successful or not
+                 'timestamp': timestamp when this command is performed
+                }
         """
+        
         with self.lock.acquire_timeout(timeout=3.0, job='reset') as acquired:
             if not acquired:
                 self.log.warn("Lock could not be acquired because it "
