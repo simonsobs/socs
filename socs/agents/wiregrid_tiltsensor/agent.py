@@ -98,7 +98,7 @@ class WiregridTiltSensorAgent:
 
                 # data taking
                 current_time = time.time()
-                read_status, msg, angles = self.tiltsensor.get_angle()
+                msg, angles = self.tiltsensor.get_angle()
                 if self.sensor_type == 'sherborne':
                     msg, temperatures = self.tiltsensor.get_temp()
 
