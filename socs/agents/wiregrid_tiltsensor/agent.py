@@ -151,7 +151,7 @@ class WiregridTiltSensorAgent:
                  'timestamp': timestamp when this command is performed
                 }
         """
-        
+
         with self.lock.acquire_timeout(timeout=3.0, job='reset') as acquired:
             if not acquired:
                 self.log.warn("Lock could not be acquired because it "
