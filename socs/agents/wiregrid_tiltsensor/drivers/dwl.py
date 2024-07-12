@@ -46,12 +46,19 @@ class DWL:
         # write and read serial
         self.ser.write(command)
         read_hex = self.ser.read(SIZE)
-        if self.verbose > 0:
-            print(f'{read_hex}')
         read = [hex(r) for r in read_hex]
         if self.verbose > 0:
             print(f'read_hex = {read_hex}')
             print(f'read = {read}')
+
+        # check the size of the string read
+        if not len(read) == SIZE:
+            msg = 'The size of the string read does not match with the expected size 12.'
+            if self.isSingle:
+                val = (-999)
+            else:
+                val = (-999, 999)
+            return msg, val
 
         # check header matching and calculate the angles
         if self.isSingle:
