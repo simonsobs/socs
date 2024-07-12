@@ -38,7 +38,7 @@ An example site-config-file block::
 
 - ``ip-address`` is an IP address of the serial-to-ethernet converter.
 - ``port`` is an asigned port for the tilt sensor.
-  (The converter has four D-sub ports to control
+  (The converter has four D-sub ports, 23, 26, 29, 32, to control
   multiple devices connected via serial communication.
   Communicating device is determined by the ethernet port number of the converter.)
 - ``sensor_type`` represents the type of tilt sensor to communicate with.
@@ -62,21 +62,6 @@ An example docker-compose configuration::
 
 - Since the agent within the container needs to communicate with hardware on the
   host network you must use ``network_mode: "host"`` in your compose file.
-
-
-Description
------------
-
-Functions
-`````````
-
-The agent has only one function, ``reset()``.
-This function can be available only for sherborne tilt sensor.
-
-**Reset Function**
- - reset():
-   Reset the sherborne tilt sensor.
-
 
 Agent API
 ---------
