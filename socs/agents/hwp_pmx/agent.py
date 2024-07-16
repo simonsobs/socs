@@ -280,7 +280,6 @@ class HWPPMXAgent:
 
         """
         PMX = None
-        session.set_status('running')
 
         threads.blockingCallFromThread(reactor, self._clear_queue)
 
@@ -385,7 +384,6 @@ class HWPPMXAgent:
         power off.
         """
 
-        session.set_status('running')
         last_ok_time = time.time()
 
         if self.supervisor_id is None:
