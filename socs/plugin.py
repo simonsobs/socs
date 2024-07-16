@@ -47,4 +47,5 @@ agents = {
     'WiregridActuatorAgent': {'module': 'socs.agents.wiregrid_actuator.agent', 'entry_point': 'main'},
     'WiregridEncoderAgent': {'module': 'socs.agents.wiregrid_encoder.agent', 'entry_point': 'main'},
     'WiregridKikusuiAgent': {'module': 'socs.agents.wiregrid_kikusui.agent', 'entry_point': 'main'},
+    'WiregridTiltSensorAgent': {'module': 'socs.agents.wiregrid_tiltsensor.agent', 'entry_point': 'main'},
 }

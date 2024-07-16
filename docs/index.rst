@@ -82,6 +82,7 @@ API Reference        Full API documentation for core parts of the SOCS library.
     agents/wiregrid_actuator
     agents/wiregrid_encoder
     agents/wiregrid_kikusui
+    agents/wiregrid_tiltsensor
 
 .. toctree::
     :caption: Simulator Reference
