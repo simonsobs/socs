@@ -107,11 +107,14 @@ class ScpiPsuAgent:
                     }
 
                     for chan in params['channels']:
-                        if self.psu.get_output(1):
+                        if self.psu.get_output(chan):
                             data['data']["Voltage_{}".format(chan)] = self.psu.get_volt(chan)
                             data['data']["Current_{}".format(chan)] = self.psu.get_curr(chan)
                         else:
                             self.log.warn("Cannot measure output when output is disabled")
+                            data['data']["Voltage_{}".format(chan)] = 'off'
+                            data['data']["Current_{}".format(chan)] = 'off'
+
                     # self.log.info(str(data))
                     # print(data)
                     self.agent.publish_to_feed('psu_output', data)
