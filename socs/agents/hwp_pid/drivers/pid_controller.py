@@ -14,8 +14,6 @@ class PID:
     Attributes:
         verb (bool): Verbose output setting.
         hex_freq (str): Currently declared rotation frequency in hexadecimal.
-        direction (int): Current direction of the HWP. 0 for forward and 1 for
-            backwards.
         conn (socket.socket): Socket object with open connection to the PID
             controller.
 
@@ -26,7 +24,6 @@ class PID:
         self.ip = ip
         self.port = port
         self.hex_freq = '00000'
-        # Need to setup connection before setting direction
         self.conn = self._establish_connection(self.ip, int(self.port))
 
     @staticmethod
