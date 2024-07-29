@@ -29,17 +29,21 @@ def parse_action_result(res):
 
 
 def get_pid_state(pid: pd.PID, num_attempts: int = 3):
-    for _ in range(num_attempts):
-        freq = pid.get_freq()
-        if freq != 9.999:
-            break
-        agent.log.warn('Warning: Invalid PID freq')
-        time.sleep(1)
-    return {
-        "current_freq": freq,
-        "target_freq": pid.get_target(),
-        "direction": pid.get_direction(),
+    result = {}
+    get_state_functions = {
+        "current_freq": pid.get_freq,
+        "target_freq": pid.get_target,
+        "direction": pid.get_direction,
     }
+    for k, func in get_state_functions.items():
+        for _ in range(num_attempts):
+            v = func()
+            if not isinstance(v, str):
+                result[k] = v
+                break
+            print(f'Warning: Invalid {k}')
+            time.sleep(1)
+    return result
 
 
 class Actions:

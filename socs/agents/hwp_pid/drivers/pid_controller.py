@@ -236,10 +236,11 @@ class PID:
 
         responses = []
         responses.append(self.send_message("*X01"))
+        freq = self.return_messages(responses)[0]
         if self.verb:
             print(responses)
+            print('Current frequency = ' + str(freq))
 
-        freq = self.return_messages(responses)[0]
         return freq
 
     def get_target(self):
@@ -286,6 +287,8 @@ class PID:
                 print('Direction = Reverse')
             elif direction == 0:
                 print('Direction = Forward')
+            else:
+                print('Direction = ' + str(direction))
 
         return direction
 
@@ -421,6 +424,7 @@ class PID:
             - W02: write setpoint for pid 2 (rotation direction setpoint)
             - W0C: write action type for pid 1 (how to interpret sign of (setpoint-value))
             - X01: read value for pid 1 (current rotation frequency)
+        "?" chadacter indicates the error messages.
         The helper function goes through the raw response strings and replaces them
         with their decoded values.
 
@@ -434,9 +438,13 @@ class PID:
         output_array = list(input_array)
 
         for index, string in enumerate(list(input_array)):
+            if not isinstance(string, str):
+                output_array[index] = 'Unrecognized response'
+                continue
             header = string[0]
-
-            if header == 'R':
+            if '?' in string:
+                output_array[index] = PID._decode_error(string)
+            elif header == 'R':
                 output_array[index] = PID._decode_read(string)
             elif header == 'W':
                 output_array[index] = PID._decode_write(string)
@@ -454,6 +462,29 @@ class PID:
                 pass
 
         return output_array
+
+    @staticmethod
+    def _decode_error(string):
+        """Helper function to decode error messages
+
+        Args:
+            string (str): Error message type string to decode
+
+        Returns:
+            Decoded value
+
+        """
+        error_dict = {
+            '?+9999.': 'Exceed Maximum Error',
+            '?43': 'Command Error',
+            '?46': 'Format Error',
+            '?50': 'Parity Error',
+            '?56': 'Serial Device Address Error',
+        }
+        for k in error_dict.keys():
+            if k in string:
+                return error_dict[k]
+        return 'Unrecognized Error'
 
     @staticmethod
     def _decode_read(string):
@@ -479,17 +510,14 @@ class PID:
             Decoded value
 
         """
-        if isinstance(string, str):
-            end_string = string.split('\r')[-1]
-            read_type = end_string[1:3]
-        else:
-            read_type = '00'
+        end_string = string.split('\r')[-1]
+        read_type = end_string[1:3]
         # Decode target
         if read_type == '01':
             target = float(int(end_string[4:], 16) / 1000.)
             return target
         # Decode direction
-        if read_type == '02':
+        elif read_type == '02':
             if int(end_string[4:], 16) / 1000. > 2.5:
                 return 1
             else:
@@ -511,9 +539,9 @@ class PID:
         write_type = string[1:]
         if write_type == '01':
             return 'Changed Setpoint'
-        if write_type == '02':
+        elif write_type == '02':
             return 'Changed Direction'
-        if write_type == '0C':
+        elif write_type == '0C':
             return 'Changed Action Type'
         else:
             return 'Unrecognized Write'
@@ -531,12 +559,9 @@ class PID:
         Return:
             float: Decoded value
         """
-        if isinstance(string, str):
-            end_string = string.split('\r')[-1]
-            measure_type = end_string[1:3]
-        else:
-            measure_type = '00'
-        if measure_type == '01' and end_string[3:] != '?+9999.':
+        end_string = string.split('\r')[-1]
+        measure_type = end_string[1:3]
+        if measure_type == '01':
             return float(end_string[3:])
         else:
-            return 9.999
+            return 'Unrecognized Measure'
