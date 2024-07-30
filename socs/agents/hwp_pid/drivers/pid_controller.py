@@ -387,7 +387,7 @@ class PID:
             msg (str): Command to send to the controller.
 
         Returns:
-            str: Respnose from the controller.
+            str: Response from the controller.
 
         """
         for attempt in range(2):
@@ -414,7 +414,7 @@ class PID:
             msg (list): List of messages to decode.
 
         Returns:
-            list: Decoded responses.
+            list: DecodedResponse
 
         """
         return self._decode_array(msg)
@@ -442,7 +442,7 @@ class PID:
             - W02: write setpoint for pid 2 (rotation direction setpoint)
             - W0C: write action type for pid 1 (how to interpret sign of (setpoint-value))
             - X01: read value for pid 1 (current rotation frequency)
-        "?" chadacter indicates the error messages.
+        "?" character indicates the error messages.
         The helper function goes through the raw response strings and replaces them
         with their decoded values.
 
@@ -450,7 +450,7 @@ class PID:
             input_array (list): List of str messages to decode
 
         Returns:
-            list: Decoded responses
+            list: DecodedResponse
 
         """
         output_array = list(input_array)
@@ -491,7 +491,7 @@ class PID:
             string (str): Error message type string to decode
 
         Returns:
-            Decoded value
+            DecodedResponse
 
         """
         if '?+9999.' in string:
@@ -528,7 +528,7 @@ class PID:
             string (str): Read (hex) type string to decode
 
         Returns:
-            Decoded value
+            DecodedResponse
 
         """
         end_string = string.split('\r')[-1]
@@ -554,7 +554,7 @@ class PID:
             string (str): Write (hex) type string to decode
 
         Returns:
-            str: Decoded string
+            DecodedResponse
 
         """
         write_type = string[1:]
@@ -584,7 +584,7 @@ class PID:
             string (str): Read (decimal) type string to decode
 
         Return:
-            float: Decoded value
+            DecodedReponse
         """
         end_string = string.split('\r')[-1]
         measure_type = end_string[1:3]
