@@ -457,7 +457,7 @@ class PID:
 
         for index, string in enumerate(list(input_array)):
             if not isinstance(string, str):
-                output_array[index] = 'Unrecognized response'
+                output_array[index] = DecodedResponse('error', 'Unrecognized response', None)
                 continue
             header = string[0]
             if '?' in string:
