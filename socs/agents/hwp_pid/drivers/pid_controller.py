@@ -1,6 +1,15 @@
 # For a deeper understanding of the pid command message syntax refer to: https://assets.omega.com/manuals/M3397.pdf
 import socket
 import time
+from dataclasses import dataclass
+from typing import Union
+
+
+@dataclass
+class DecodedResponse:
+    msg_type: str
+    msg: str
+    measure: Union[int, float]
 
 
 class PID:
@@ -175,10 +184,9 @@ class PID:
         responses.append(self.send_message("*W01400000"))
         responses.append(self.send_message("*R01"))
         responses.append(self.send_message("*Z02"))
-        messages = self.return_messages(responses)
         if self.verb:
             print(responses)
-            print(messages)
+            print(self.return_messages(responses))
 
         stop_params = [0.2, 0, 0]
         self.set_pid(stop_params)
@@ -214,10 +222,9 @@ class PID:
         responses.append(self.send_message(f"*W014{self.hex_freq}"))
         responses.append(self.send_message("*R01"))
         responses.append(self.send_message("*Z02"))
-        messages = self.return_messages(responses)
         if self.verb:
             print(responses)
-            print(messages)
+            print(self.return_messages(responses))
 
         tune_params = [0.2, 63, 0]
         self.set_pid(tune_params)
@@ -236,12 +243,17 @@ class PID:
 
         responses = []
         responses.append(self.send_message("*X01"))
-        freq = self.return_messages(responses)[0]
-        if self.verb:
-            print(responses)
-            print('Current frequency = ' + str(freq))
-
-        return freq
+        decoded_resp = self.return_messages(responses)[0]
+        attempts = 3
+        for attempt in range(attempts):
+            if self.verb:
+                print(responses)
+                print(decoded_resp)
+            if decoded_resp.msg_type == 'measure':
+                return decoded_resp.measure
+            elif decoded_resp.msg_type == 'error':
+                print(f"Error reading freq: {decoded_resp.msg}")
+        raise ValueError('Could not get current frequency')
 
     def get_target(self):
         """Returns the target frequency of the CHWP.
@@ -257,12 +269,17 @@ class PID:
 
         responses = []
         responses.append(self.send_message("*R01"))
-        target = self.return_messages(responses)[0]
-        if self.verb:
-            print(responses)
-            print('Setpoint = ' + str(target))
-
-        return target
+        decoded_resp = self.return_messages(responses)[0]
+        attempts = 3
+        for attempt in range(attempts):
+            if self.verb:
+                print(responses)
+                print(decoded_resp)
+            if decoded_resp.msg_type == 'read':
+                return decoded_resp.measure
+            elif decoded_resp.msg_type == 'error':
+                print(f"Error reading target: {decoded_resp.msg}")
+        raise ValueError('Could not get target frequency')
 
     def get_direction(self):
         """Get the current rotation direction.
@@ -281,16 +298,17 @@ class PID:
 
         responses = []
         responses.append(self.send_message("*R02"))
-        direction = self.return_messages(responses)[0]
-        if self.verb:
-            if direction == 1:
-                print('Direction = Reverse')
-            elif direction == 0:
-                print('Direction = Forward')
-            else:
-                print('Direction = ' + str(direction))
-
-        return direction
+        decoded_resp = self.return_messages(responses)[0]
+        attempts = 3
+        for attempt in range(attempts):
+            if self.verb:
+                print(responses)
+                print(decoded_resp)
+            if decoded_resp.msg_type == 'read':
+                return decoded_resp.measure
+            elif decoded_resp.msg_type == 'error':
+                print(f"Error reading direction: {decoded_resp.msg}")
+        raise ValueError('Could not get direction')
 
     def set_pid(self, params):
         """Sets the PID parameters of the controller.
@@ -449,15 +467,17 @@ class PID:
             elif header == 'W':
                 output_array[index] = PID._decode_write(string)
             elif header == 'E':
-                output_array[index] = 'PID Enabled'
+                output_array[index] = DecodedResponse('enable', 'PID Enabled', None)
             elif header == 'D':
-                output_array[index] = 'PID Disabled'
+                output_array[index] = DecodedResponse('disable', 'PID Disabled', None)
             elif header == 'P':
                 pass
             elif header == 'G':
                 pass
             elif header == 'X':
                 output_array[index] = PID._decode_measure(string)
+            elif header == 'Z':
+                output_array[index] = DecodedResponse('reset', 'PID Reset', None)
             else:
                 pass
 
@@ -474,17 +494,18 @@ class PID:
             Decoded value
 
         """
-        error_dict = {
-            '?+9999.': 'Exceed Maximum Error',
-            '?43': 'Command Error',
-            '?46': 'Format Error',
-            '?50': 'Parity Error',
-            '?56': 'Serial Device Address Error',
-        }
-        for k in error_dict.keys():
-            if k in string:
-                return error_dict[k]
-        return 'Unrecognized Error'
+        if '?+9999.' in string:
+            return DecodedResponse('error', 'Exceed Maximum Error', None)
+        elif '?43' in string:
+            return DecodedResponse('error', 'Command Error', None)
+        elif '?46' in string:
+            return DecodedResponse('error', 'Format Error', None)
+        elif '?50' in string:
+            return DecodedResponse('error', 'Parity Error', None)
+        elif '?56' in string:
+            return DecodedResponse('error', 'Serial Device Address Error', None)
+        else:
+            return DecodedResponse('error', 'Unrecognized Error', None)
 
     @staticmethod
     def _decode_read(string):
@@ -515,15 +536,15 @@ class PID:
         # Decode target
         if read_type == '01':
             target = float(int(end_string[4:], 16) / 1000.)
-            return target
+            return DecodedResponse('read', 'Setpoint = ' + str(target), target)
         # Decode direction
         elif read_type == '02':
             if int(end_string[4:], 16) / 1000. > 2.5:
-                return 1
+                return DecodedResponse('read', 'Direction = Reverse', 1)
             else:
-                return 0
+                return DecodedResponse('read', 'Direction = Forward', 0)
         else:
-            return 'Unrecognized Read'
+            return DecodedResponse('error', 'Unrecognized Read', None)
 
     @staticmethod
     def _decode_write(string):
@@ -538,13 +559,19 @@ class PID:
         """
         write_type = string[1:]
         if write_type == '01':
-            return 'Changed Setpoint'
+            return DecodedResponse('write', 'Changed Setpoint', None)
         elif write_type == '02':
-            return 'Changed Direction'
+            return DecodedResponse('write', 'Changed Direction', None)
         elif write_type == '0C':
-            return 'Changed Action Type'
+            return DecodedResponse('write', 'Changed Action Type', None)
+        elif write_type == '17':
+            return DecodedResponse('write', 'Changed PID 1 P Param', None)
+        elif write_type == '18':
+            return DecodedResponse('write', 'Changed PID 1 I Param', None)
+        elif write_type == '19':
+            return DecodedResponse('write', 'Changed PID 1 D Param', None)
         else:
-            return 'Unrecognized Write'
+            return DecodedResponse('error', 'Unrecognized Write', None)
 
     @staticmethod
     def _decode_measure(string):
@@ -562,6 +589,7 @@ class PID:
         end_string = string.split('\r')[-1]
         measure_type = end_string[1:3]
         if measure_type == '01':
-            return float(end_string[3:])
+            freq = float(end_string[3:])
+            return DecodedResponse('measure', 'Current frequency = ' + str(freq), freq)
         else:
-            return 'Unrecognized Measure'
+            return DecodedResponse('error', 'Unrecognized Measure', None)
