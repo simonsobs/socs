@@ -35,6 +35,8 @@ RUN ./labjack_ljm_software_2020_03_30_x86_64/labjack_ljm_installer.run -- --no-r
 COPY requirements/ /app/socs/requirements
 COPY requirements.txt /app/socs/requirements.txt
 WORKDIR /app/socs/
+# Work around https://github.com/pypa/setuptools/issues/4483/ temporarily
+RUN pip3 install -U "setuptools<71.0.0"
 RUN pip3 install -r requirements.txt
 
 # Copy the current directory contents into the container at /app
