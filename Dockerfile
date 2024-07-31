@@ -2,7 +2,7 @@
 # A container setup with an installation of socs.
 
 # Use the ocs image as a base
-FROM simonsobs/ocs:v0.11.0
+FROM simonsobs/ocs:v0.11.0-5-g3909484
 
 # Set up the cryo/smurf user and group so this can run on smurf-servers
 # See link for how all other smurf-containers are set up:
@@ -35,6 +35,8 @@ RUN ./labjack_ljm_software_2020_03_30_x86_64/labjack_ljm_installer.run -- --no-r
 COPY requirements/ /app/socs/requirements
 COPY requirements.txt /app/socs/requirements.txt
 WORKDIR /app/socs/
+# Work around https://github.com/pypa/setuptools/issues/4483/ temporarily
+RUN pip3 install -U "setuptools<71.0.0"
 RUN pip3 install -r requirements.txt
 
 # Copy the current directory contents into the container at /app
