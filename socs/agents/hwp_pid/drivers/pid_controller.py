@@ -1,15 +1,15 @@
 # For a deeper understanding of the pid command message syntax refer to: https://assets.omega.com/manuals/M3397.pdf
 import socket
 import time
-from dataclasses import dataclass
-from typing import Union
+from dataclasses import dataclass, field
+from typing import Optional, Union
 
 
 @dataclass
 class DecodedResponse:
     msg_type: str
     msg: str
-    measure: Union[int, float]
+    measure: Optional[Union[int, float]] = field(default=None)
 
 
 class PID:
@@ -457,7 +457,7 @@ class PID:
 
         for index, string in enumerate(list(input_array)):
             if not isinstance(string, str):
-                output_array[index] = DecodedResponse('error', 'Unrecognized response', None)
+                output_array[index] = DecodedResponse(msg_type='error', msg='Unrecognized response')
                 continue
             header = string[0]
             if '?' in string:
@@ -467,9 +467,9 @@ class PID:
             elif header == 'W':
                 output_array[index] = PID._decode_write(string)
             elif header == 'E':
-                output_array[index] = DecodedResponse('enable', 'PID Enabled', None)
+                output_array[index] = DecodedResponse(msg_type='enable', msg='PID Enabled')
             elif header == 'D':
-                output_array[index] = DecodedResponse('disable', 'PID Disabled', None)
+                output_array[index] = DecodedResponse(msg_type='disable', msg='PID Disabled')
             elif header == 'P':
                 pass
             elif header == 'G':
@@ -477,7 +477,7 @@ class PID:
             elif header == 'X':
                 output_array[index] = PID._decode_measure(string)
             elif header == 'Z':
-                output_array[index] = DecodedResponse('reset', 'PID Reset', None)
+                output_array[index] = DecodedResponse(msg_type='reset', msg='PID Reset')
             else:
                 pass
 
@@ -495,17 +495,17 @@ class PID:
 
         """
         if '?+9999.' in string:
-            return DecodedResponse('error', 'Exceed Maximum Error', None)
+            return DecodedResponse(msg_type='error', msg='Exceed Maximum Error')
         elif '?43' in string:
-            return DecodedResponse('error', 'Command Error', None)
+            return DecodedResponse(msg_type='error', msg='Command Error')
         elif '?46' in string:
-            return DecodedResponse('error', 'Format Error', None)
+            return DecodedResponse(msg_type='error', msg='Format Error')
         elif '?50' in string:
-            return DecodedResponse('error', 'Parity Error', None)
+            return DecodedResponse(msg_type='error', msg='Parity Error')
         elif '?56' in string:
-            return DecodedResponse('error', 'Serial Device Address Error', None)
+            return DecodedResponse(msg_type='error', msg='Serial Device Address Error')
         else:
-            return DecodedResponse('error', 'Unrecognized Error', None)
+            return DecodedResponse(msg_type='error', msg='Unrecognized Error')
 
     @staticmethod
     def _decode_read(string):
@@ -536,15 +536,15 @@ class PID:
         # Decode target
         if read_type == '01':
             target = float(int(end_string[4:], 16) / 1000.)
-            return DecodedResponse('read', 'Setpoint = ' + str(target), target)
+            return DecodedResponse(msg_type='read', msg='Setpoint = ' + str(target), measure=target)
         # Decode direction
         elif read_type == '02':
             if int(end_string[4:], 16) / 1000. > 2.5:
-                return DecodedResponse('read', 'Direction = Reverse', 1)
+                return DecodedResponse(msg_type='read', msg='Direction = Reverse', measure=1)
             else:
-                return DecodedResponse('read', 'Direction = Forward', 0)
+                return DecodedResponse(msg_type='read', msg='Direction = Forward', measure=0)
         else:
-            return DecodedResponse('error', 'Unrecognized Read', None)
+            return DecodedResponse(msg_type='error', msg='Unrecognized Read')
 
     @staticmethod
     def _decode_write(string):
@@ -559,19 +559,19 @@ class PID:
         """
         write_type = string[1:]
         if write_type == '01':
-            return DecodedResponse('write', 'Changed Setpoint', None)
+            return DecodedResponse(msg_type='write', msg='Changed Setpoint')
         elif write_type == '02':
-            return DecodedResponse('write', 'Changed Direction', None)
+            return DecodedResponse(msg_type='write', msg='Changed Direction')
         elif write_type == '0C':
-            return DecodedResponse('write', 'Changed Action Type', None)
+            return DecodedResponse(msg_type='write', msg='Changed Action Type')
         elif write_type == '17':
-            return DecodedResponse('write', 'Changed PID 1 P Param', None)
+            return DecodedResponse(msg_type='write', msg='Changed PID 1 P Param')
         elif write_type == '18':
-            return DecodedResponse('write', 'Changed PID 1 I Param', None)
+            return DecodedResponse(msg_type='write', msg='Changed PID 1 I Param')
         elif write_type == '19':
-            return DecodedResponse('write', 'Changed PID 1 D Param', None)
+            return DecodedResponse(msg_type='write', msg='Changed PID 1 D Param')
         else:
-            return DecodedResponse('error', 'Unrecognized Write', None)
+            return DecodedResponse(msg_type='error', msg='Unrecognized Write')
 
     @staticmethod
     def _decode_measure(string):
@@ -590,6 +590,6 @@ class PID:
         measure_type = end_string[1:3]
         if measure_type == '01':
             freq = float(end_string[3:])
-            return DecodedResponse('measure', 'Current frequency = ' + str(freq), freq)
+            return DecodedResponse(msg_type='measure', msg='Current frequency = ' + str(freq), measure=freq)
         else:
-            return DecodedResponse('error', 'Unrecognized Measure', None)
+            return DecodedResponse(msg_type='error', msg='Unrecognized Measure')
