@@ -112,8 +112,8 @@ class ScpiPsuAgent:
                             data['data']["Current_{}".format(chan)] = self.psu.get_curr(chan)
                         else:
                             self.log.warn("Cannot measure output when output is disabled")
-                            data['data']["Voltage_{}".format(chan)] = 'off'
-                            data['data']["Current_{}".format(chan)] = 'off'
+                            self.monitor = False
+                            return False, "Cannot measure output when output is disabled"
 
                     # self.log.info(str(data))
                     # print(data)
@@ -211,7 +211,8 @@ def make_parser(parser=None):
     pgroup.add_argument('--ip-address')
     pgroup.add_argument('--gpib-slot')
     pgroup.add_argument('--port')
-    pgroup.add_argument('--mode')
+    pgroup.add_argument('--mode', type=str, default='acq',
+                        choices=['init', 'acq'])
 
     return parser
 
