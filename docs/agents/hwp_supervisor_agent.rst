@@ -129,6 +129,17 @@ current action will be aborted at the next opportunity and replaced with the new
 requested action.  The ``abort_action`` task can be used to abort the current
 action without beginning a new one.
 
+ACU Safety Checks
+```````````````````
+
+If the ACU instance-id is provided in the site-config, the supervisor will check
+the ACU state before spin-up or gripping procedures to ensure the telescope is
+in a safe state to perform the specified operation.
+
+Before spinning up the HWP, the agent will check that
+- The current elevation and commanded elevation are in the range ``(acu-min-el, acu-max-el)``.
+- The ACU state info has been updated within ``acu-max-time-since-update`` seconds.
+
 Examples
 ```````````
 Below is an example client script that runs the PID to freq operation, and waits
