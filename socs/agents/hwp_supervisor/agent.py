@@ -112,6 +112,7 @@ class HWPClients:
     gripper_iboot: Optional[OCSClient] = None
     driver_iboot: Optional[OCSClient] = None
     pcu: Optional[OCSClient] = None
+    gripper: Optional[OCSClient] = None
 
 
 @dataclass
@@ -166,6 +167,8 @@ class ACUState:
         Maximum elevation allowed before restricting spin-up [deg]
     max_time_since_update : float
         Maximum time since last update before restricting spin-up[sec]
+    mount_velocity_grip_thresh: float
+        Maximum mount velocity for gripping the HWP [deg/s] .
 
     Attributes
     ------------
@@ -182,10 +185,13 @@ class ACUState:
     min_el: float
     max_el: float
     max_time_since_update: float
+    mount_velocity_grip_thresh: float
 
     el_current_position: Optional[float] = None
     el_commanded_position: Optional[float] = None
     el_current_velocity: Optional[float] = None
+    az_current_velocity: Optional[float] = None
+
     last_updated: Optional[float] = None
 
     def update(self):
@@ -200,6 +206,8 @@ class ACUState:
         self.el_current_position = d['Elevation current position']
         self.el_commanded_position = d['Elevation commanded position']
         self.el_current_velocity = d['Elevation current velocity']
+        self.az_current_velocity = d['Azimuth current velocity']
+
         t = d.get('timestamp_agent')
         if t is None:
             t = time.time()
@@ -269,7 +277,8 @@ class HWPState:
                 instance_id=args.acu_instance_id,
                 min_el=args.acu_min_el,
                 max_el=args.acu_max_el,
-                max_time_since_update=args.acu_max_time_since_update
+                max_time_since_update=args.acu_max_time_since_update,
+                mount_velocity_grip_thresh=args.mount_velocity_grip_thresh,
             )
             log.info("ACU state checking enabled: instance_id={id}",
                      id=self.acu.instance_id)
@@ -627,6 +636,20 @@ class ControlState:
         success: bool = True
 
     @dataclass
+    class GripHWP:
+        """
+        Grips the HWP
+        """
+        pass
+
+    @dataclass
+    class UngripHWP:
+        """
+        Ungrips the HWP
+        """
+        pass
+
+    @dataclass
     class Abort:
         """Abort current action"""
         pass
@@ -830,6 +853,43 @@ class ControlStateMachine:
                         raise RuntimeError(f"ACU commanded elevation is {acu.el_commanded_position} deg, "
                                            f"outside of allowed range ({acu.min_el}, {acu.max_el})")
 
+            def check_ok_for_grip():
+                """Validates telescope is in a state that is ok for gripping/ungripping"""
+                acu = hwp_state.acu
+
+                if np.abs(hwp_state.pid_current_freq) > 0.02:
+                    raise RuntimeError("Cannot grip HWP while spinning")
+
+                if acu is not None:
+                    if acu.last_updated is None:
+                        raise RuntimeError(
+                            f"No ACU data has been received from instance-id {acu.instance_id}"
+                        )
+                    tdiff = time.time() - acu.last_updated
+                    if tdiff > acu.max_time_since_update:
+                        raise RuntimeError(f"ACU state has not been updated in {tdiff} sec")
+
+                    if not (acu.min_el <= acu.el_current_position <= acu.max_el):
+                        raise RuntimeError(
+                            f"ACU elevation is {acu.el_current_pos} deg, "
+                            f"outside of allowed range ({acu.min_el}, {acu.max_el})"
+                        )
+                    if not (acu.min_el <= acu.el_commanded_position <= acu.max_el):
+                        raise RuntimeError(
+                            f"ACU commanded elevation is {acu.el_commanded_position} deg, "
+                            f"outside of allowed range ({acu.min_el}, {acu.max_el})"
+                        )
+                    if np.abs(acu.az_current_velocity) > np.abs(acu.mount_velocity_grip_thresh):
+                        raise RuntimeError(
+                            f"ACU az-velocity is {acu.az_current_velocity} deg/s, "
+                            f"above threshold of {acu.mount_velocity_grip_thresh} deg/s"
+                        )
+                    if np.abs(acu.el_current_velocity) > np.abs(acu.mount_velocity_grip_thresh):
+                        raise RuntimeError(
+                            f"ACU el-velocity is {acu.el_current_velocity} deg/s, "
+                            f"above threshold of {acu.mount_velocity_grip_thresh} deg/s"
+                        )
+
             if isinstance(state, ControlState.PIDToFreq):
                 check_acu_ok_for_spinup()
                 self.run_and_validate(clients.pid.set_direction,
@@ -943,6 +1003,18 @@ class ControlStateMachine:
                     clients.pcu.send_command,
                     kwargs={'command': 'stop'}, timeout=None
                 )
+                self.action.set_state(ControlState.Done(success=state.success))
+
+            elif isinstance(state, ControlState.GripHWP):
+                if np.abs(hwp_state.pid_current_freq) > 0.02:
+                    raise RuntimeError("Cannot grip HWP while spinning")
+                check_ok_for_grip()
+                self.run_and_validate(clients.gripper.grip)
+                self.action.set_state(ControlState.Done(success=state.success))
+
+            elif isinstance(state, ControlState.UngripHWP):
+                check_ok_for_grip()
+                self.run_and_validate(clients.gripper.ungrip)
                 self.action.set_state(ControlState.Done(success=state.success))
 
             elif isinstance(state, ControlState.Brake):
@@ -1122,6 +1194,7 @@ class HWPSupervisor:
             lakeshore=get_client(self.ybco_lakeshore_id),
             gripper_iboot=get_client(self.gripper_iboot_id),
             driver_iboot=get_client(self.driver_iboot_id),
+            gripper=get_client(self.args.hwp_gripper_id),
         )
 
     @ocs_agent.param('test_mode', type=bool, default=False)
@@ -1441,6 +1514,54 @@ class HWPSupervisor:
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
+    def grip_hwp(self, session, params):
+        """grip()
+
+        **Task** - Grip the HWP if ACU and HWP state passes checks.
+
+        Notes
+        --------
+
+        Example of ``session.data``::
+
+            >>> session['data']
+            {'action':
+                {'action_id': 3,
+                'completed': True,
+                'cur_state': {'class': 'Done', 'msg': None, 'success': True},
+                'state_history': List[ConrolState],
+                'success': True}
+            }
+        """
+        state = ControlState.GripHWP()
+        action = self.control_state_machine.request_new_action(state)
+        action.sleep_until_complete(session=session)
+        return action.success, f"Completed with state: {action.cur_state_info.state}"
+
+    def ungrip_hwp(self, session, params):
+        """ungrip()
+
+        **Task** - Ungrip the HWP if ACU and HWP state passes checks.
+
+        Notes
+        --------
+
+        Example of ``session.data``::
+
+            >>> session['data']
+            {'action':
+                {'action_id': 3,
+                'completed': True,
+                'cur_state': {'class': 'Done', 'msg': None, 'success': True},
+                'state_history': List[ConrolState],
+                'success': True}
+            }
+        """
+        state = ControlState.UngripHWP()
+        action = self.control_state_machine.request_new_action(state)
+        action.sleep_until_complete(session=session)
+        return action.success, f"Completed with state: {action.cur_state_info.state}"
+
     def abort_action(self, session, params):
         """abort_action()
 
@@ -1544,6 +1665,8 @@ def make_parser(parser=None):
                         help="Instance ID for HWP pid agent")
     pgroup.add_argument('--hwp-pcu-id',
                         help="Instance ID for HWP PCU agent")
+    pgroup.add_argument('--hwp-gripper-id',
+                        help="Instance ID for HWP Gripper agent")
     pgroup.add_argument('--ups-id', help="Instance ID for UPS agent")
     pgroup.add_argument('--ups-minutes-remaining-thresh', type=float,
                         help="Threshold for UPS minutes remaining before a "
@@ -1591,6 +1714,10 @@ def make_parser(parser=None):
     pgroup.add_argument(
         '--acu-max-time-since-update', type=float, default=30.0,
         help="Max amount of time since last ACU update before allowing HWP spin up",
+    )
+    pgroup.add_argument(
+        '--mount-vel-grip-thresh', type=float, default=0.005,
+        help="Max mount velocity (both az and el) for gripping the HWP"
     )
 
     pgroup.add_argument('--forward-dir', choices=['cw', 'ccw'], default="cw",
