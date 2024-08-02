@@ -55,7 +55,7 @@ Docker
     yourself. A Dockerfile is provided in ``socs/docker/hwp_picoscope/``.
 
 The HWP picoscope agent can be run via a Docker container. The following is an
-example of what to insert into your institution's docker-compose file::
+example of what to insert into your institution's docker compose file::
 
   picoscope:
     image: ocs-hwp-picoscope-agent:latest
