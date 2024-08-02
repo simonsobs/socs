@@ -192,9 +192,9 @@ class HWPEmulator:
                 return f"R01{PID._convert_to_hex(self.state.pid.freq_setpoint, 3)}"
             elif cmd == "*R02":  # Get Direction
                 if self.state.pid.direction == "forward":
-                    return "1"
+                    return "R02400000"
                 else:
-                    return "0"
+                    return "R02401388"
             else:
                 self.logger.info("Unknown cmd: %s", cmd)
                 return "unknown"
