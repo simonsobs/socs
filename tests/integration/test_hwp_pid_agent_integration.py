@@ -48,13 +48,13 @@ def test_hwp_rotation_set_direction(wait_for_crossbar, hwp_emu, run_agent, clien
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
     data = client.get_state().session['data']
-    assert data['direction'] == '0'
+    assert data['direction'] == 0
 
     resp = client.set_direction(direction='1')
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
     data = client.get_state().session['data']
-    assert data['direction'] == '1'
+    assert data['direction'] == 1
 
 
 @pytest.mark.integtest
