@@ -44,7 +44,7 @@ Docker Compose
 ``````````````
 
 The Pfeiffer Agent can be run via a Docker container. The following is an
-example of what to insest into your institution's docker-compose file. ::
+example of what to insest into your institution's docker compose file. ::
 
 
   ocs-pfeiffer:

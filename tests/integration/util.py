@@ -14,7 +14,7 @@ def create_crossbar_fixture():
     # def wait_for_crossbar(function_scoped_container_getter):
     @pytest.fixture(scope="session")
     def wait_for_crossbar(docker_services):
-        """Wait for the crossbar server from docker-compose to become
+        """Wait for the crossbar server from docker compose to become
         responsive.
 
         """

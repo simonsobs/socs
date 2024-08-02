@@ -49,7 +49,7 @@ An example site-config-file block::
 Docker Compose
 ``````````````
 
-An example docker-compose configuration::
+An example docker compose configuration::
 
     ocs-wg-tilt-sensor-agent:
       image: simonsobs/socs:latest

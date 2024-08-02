@@ -31,7 +31,7 @@ Example site-config entry::
 
 Docker Compose
 ````````````````
-An example docker-compose entry might look like::
+An example docker compose entry might look like::
 
     ocs-pysmurf-monitor:
         image: simonsobs/socs:latest
@@ -48,7 +48,7 @@ An example docker-compose entry might look like::
             - /data:/data
 
 Where SOCS_TAG and CB_HOST are set in the ``.env`` file in the same dir as the
-docker-compose file.
+docker compose file.
 
 Description
 -----------

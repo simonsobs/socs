@@ -48,7 +48,7 @@ The port number is determined in the script running in the BeagleBoneBlack.
 Docker Compose
 ``````````````
 
-An example docker-compose configuration::
+An example docker compose configuration::
 
     ocs-wgencoder-agent:
       image: simonsobs/socs:latest

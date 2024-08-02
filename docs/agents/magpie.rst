@@ -22,7 +22,7 @@ frame is received.
 Configuration File Examples
 ------------------------------
 
-Below are example docker-compose and ocs configuration files for running the
+Below are example docker compose and ocs configuration files for running the
 magpie agent.
 
 OCS Site Config
@@ -67,7 +67,7 @@ fake data by adding the ``--fake-data`` argument.
 Docker Compose
 ``````````````````
 
-Below is an example docker-compose entry for running a magpie corresponding to
+Below is an example docker compose entry for running a magpie corresponding to
 crate-id 1 and slot 2. If crossbar is being run on a different server, you'll
 have to modify the ``site-hub`` and ``site-http`` args accordingly::
 

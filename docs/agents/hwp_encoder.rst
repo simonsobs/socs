@@ -49,7 +49,7 @@ Docker Compose
 ``````````````
 
 The CHWP BBB agent can be run via a Docker container. The following is an
-example of what to insert into your institution's docker-compose file.
+example of what to insert into your institution's docker compose file.
 This again is an example to run multiple agents::
 
   ocs-hwpbbb-agent-HBA0:

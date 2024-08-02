@@ -38,7 +38,7 @@ selected port.
 Docker
 ``````
 The simulator can be configured to run in a Docker container. An example
-docker-compose service configuration is shown here::
+docker compose service configuration is shown here::
 
   ocs-LS372-sim:
     image: ocs-lakeshore372-simulator

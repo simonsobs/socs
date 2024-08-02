@@ -137,7 +137,7 @@ that config is:
     The entire point of the tool is remote code execution, making it dangerous
     if exposed to the open internet.
 
-Once you bring these containers up (with ``docker-compose up -d``), you should
+Once you bring these containers up (with ``docker compose up -d``), you should
 be able to access the Sequencer by pointing your web browser to
 http://localhost/nextline/.
 

@@ -55,7 +55,7 @@ steps:
 4. Copy ocs-user ssh key using 'ssh-copy-id'
 
 You also need to add the ocs-base anchor and mount the home directory of
-the ocs-user in your 'docker-compose' file, see below for an example.
+the ocs-user in your 'docker compose' file, see below for an example.
 
 The second argument, 'crate-id', is just an identifier for your feed names
 to distinguish between identical sensors on different crates.
@@ -64,7 +64,7 @@ Docker Compose
 ``````````````
 
 The SMuRF Crate Agent should be configured to run in a Docker container. An
-example docker-compose service configuration is shown here::
+example docker compose service configuration is shown here::
 
   ocs-smurf-crate-monitor:
     <<: *ocs-base

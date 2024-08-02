@@ -26,4 +26,4 @@ jobs:
     # Dockerize
     - name: Build docker images
       run: |
-        docker-compose build
+        docker compose build

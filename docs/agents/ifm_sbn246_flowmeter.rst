@@ -43,7 +43,7 @@ Docker Compose
 ``````````````
 
 The IFM SBN246 Flowmeter Agent should be configured to run in a Docker
-container. An example docker-compose service configuration is shown here::
+container. An example docker compose service configuration is shown here::
 
   ocs-flow:
     image: simonsobs/socs:latest

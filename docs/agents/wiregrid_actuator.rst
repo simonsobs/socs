@@ -47,7 +47,7 @@ An example site-config-file block::
 Docker Compose
 ``````````````
 
-An example docker-compose configuration::
+An example docker compose configuration::
 
     ocs-wgactuator-agent:
         image: simonsobs/ocs-wgactuator-agent:latest

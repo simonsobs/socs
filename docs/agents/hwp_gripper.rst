@@ -39,7 +39,7 @@ An example site-config-file block::
 Docker Compose
 `````````````````````
 
-An example docker-compose configuration::
+An example docker compose configuration::
 
     ocs-hwp-gripper:
         image: simonsobs/socs:latest

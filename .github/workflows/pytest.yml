@@ -53,7 +53,7 @@ jobs:
 
     - name: Build docker test images
       run: |
-        docker-compose build socs
+        docker compose build socs
 
     # Integration Tests
     - name: Run integration tests

@@ -38,7 +38,7 @@ using all of the available arguments::
 Docker
 ``````
 The simulator should be configured to run in a Docker container. An example
-docker-compose service configuration is shown here::
+docker compose service configuration is shown here::
 
   smurf-stream-sim:
     image: simonsobs/socs:latest

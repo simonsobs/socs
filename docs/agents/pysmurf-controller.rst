@@ -64,7 +64,7 @@ mount in a development copy of SODETLIB so that we have the most recent version
 without having to rebuild this container.
 
 
-The docker-compose for the pysmurf-controller that publishes to a container
+The docker compose for the pysmurf-controller that publishes to a container
 named ``ocs-pysmurf-monitor`` might look something like::
 
     ocs-pysmurf:

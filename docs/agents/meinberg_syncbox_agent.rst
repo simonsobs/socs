@@ -43,7 +43,7 @@ Docker Compose
 ``````````````
 
 The Meinberg Syncbox Agent should be configured to run in a Docker container. An
-example docker-compose service configuration is shown here::
+example docker compose service configuration is shown here::
 
   ocs-timing-syncbox:
     image: simonsobs/socs:latest
