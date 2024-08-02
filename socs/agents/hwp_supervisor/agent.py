@@ -10,11 +10,11 @@ import numpy as np
 import ocs
 import txaio
 from ocs import client_http, ocs_agent, site_config
-from ocs.client_http import ControlClientError
+from ocs.client_http import ControlClientError, ControlClient
 from ocs.ocs_client import OCSClient, OCSReply
 from ocs.ocs_twisted import Pacemaker
 
-client_cache = {}
+client_cache: Dict[str, ControlClient] = {}
 
 
 def get_op_data(agent_id, op_name, log=None, test_mode=False):
@@ -169,6 +169,9 @@ class ACUState:
         Maximum time since last update before restricting spin-up[sec]
     mount_velocity_grip_thresh: float
         Maximum mount velocity for gripping the HWP [deg/s] .
+    grip_max_boresight_angle: float
+        Maximum absolute boresight angle [deg] for which operating the grippers
+        is allowed.
 
     Attributes
     ------------
@@ -178,6 +181,12 @@ class ACUState:
         Commanded el position [deg]
     el_current_velocity : float
         Current el velocity [deg/s]
+    az_current_velocity : float
+        Current az velocity [deg/s]
+    bor_current_position : float
+        Current bor position [deg]
+    bor_commanded_position : float
+        Commanded bor position [deg]
     last_updated : float
         Time of last update [sec]
     """
@@ -186,11 +195,14 @@ class ACUState:
     max_el: float
     max_time_since_update: float
     mount_velocity_grip_thresh: float
+    grip_max_boresight_angle: float
 
     el_current_position: Optional[float] = None
     el_commanded_position: Optional[float] = None
     el_current_velocity: Optional[float] = None
     az_current_velocity: Optional[float] = None
+    bor_current_position: Optional[float] = None
+    bor_commanded_position: Optional[float] = None
 
     last_updated: Optional[float] = None
 
@@ -207,6 +219,8 @@ class ACUState:
         self.el_commanded_position = d['Elevation commanded position']
         self.el_current_velocity = d['Elevation current velocity']
         self.az_current_velocity = d['Azimuth current velocity']
+        self.bor_current_position = d['Boresight current position']
+        self.bor_commanded_position = d['Boresight commanded position']
 
         t = d.get('timestamp_agent')
         if t is None:
@@ -279,6 +293,7 @@ class HWPState:
                 max_el=args.acu_max_el,
                 max_time_since_update=args.acu_max_time_since_update,
                 mount_velocity_grip_thresh=args.mount_velocity_grip_thresh,
+                grip_max_boresight_angle=args.grip_max_boresight_angle,
             )
             log.info("ACU state checking enabled: instance_id={id}",
                      id=self.acu.instance_id)
@@ -640,14 +655,12 @@ class ControlState:
         """
         Grips the HWP
         """
-        pass
 
     @dataclass
     class UngripHWP:
         """
         Ungrips the HWP
         """
-        pass
 
     @dataclass
     class Abort:
@@ -889,6 +902,16 @@ class ControlStateMachine:
                             f"ACU el-velocity is {acu.el_current_velocity} deg/s, "
                             f"above threshold of {acu.mount_velocity_grip_thresh} deg/s"
                         )
+                    if np.abs(acu.bor_current_position) > np.abs(acu.grip_max_boresight_angle):
+                        raise RuntimeError(
+                            f"boresight current angle of {acu.bor_current_position} deg, "
+                            f"above threshold of {acu.grip_max_boresight_angle} deg"
+                        )
+                    if np.abs(acu.bor_commanded_position) > np.abs(acu.grip_max_boresight_angle):
+                        raise RuntimeError(
+                            f"boresight commanded angle of {acu.bor_commanded_position} deg, "
+                            f"above threshold of {acu.grip_max_boresight_angle} deg"
+                        )
 
             if isinstance(state, ControlState.PIDToFreq):
                 check_acu_ok_for_spinup()
@@ -1010,12 +1033,12 @@ class ControlStateMachine:
                     raise RuntimeError("Cannot grip HWP while spinning")
                 check_ok_for_grip()
                 self.run_and_validate(clients.gripper.grip)
-                self.action.set_state(ControlState.Done(success=state.success))
+                self.action.set_state(ControlState.Done(success=True))
 
             elif isinstance(state, ControlState.UngripHWP):
                 check_ok_for_grip()
                 self.run_and_validate(clients.gripper.ungrip)
-                self.action.set_state(ControlState.Done(success=state.success))
+                self.action.set_state(ControlState.Done(success=True))
 
             elif isinstance(state, ControlState.Brake):
                 self.run_and_validate(
@@ -1718,6 +1741,10 @@ def make_parser(parser=None):
     pgroup.add_argument(
         '--mount-vel-grip-thresh', type=float, default=0.005,
         help="Max mount velocity (both az and el) for gripping the HWP"
+    )
+    pgroup.add_argument(
+        '--grip-max-boresight-angle', type=float, default=1.,
+        help="Maximum absolute value of boresight angle (deg) for gripping the HWP"
     )
 
     pgroup.add_argument('--forward-dir', choices=['cw', 'ccw'], default="cw",

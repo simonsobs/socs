@@ -51,6 +51,7 @@ Here is an example of a config block you can add to your ocs site-config file::
             '--acu-max-el', 90.0,
             '--acu-max-time-since-update', 30.0,
             '--mount-velocity-grip-thresh', 0.005,
+            '--grip-max-boresight-angle', 1.0,
         ]}
 
 For SATP1, we use an ibootbar to power the driver, and it is not necessary to
