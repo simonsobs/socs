@@ -137,6 +137,31 @@ class ScpiPsuAgent:
         return True, "Stopping current monitor"
 
     @ocs_agent.param('channel', type=int, choices=[1, 2, 3])
+    def get_voltage(self, session, params=None):
+        """get_voltage(channel)
+
+        **Task** - Measure and return the voltage of the power supply.
+
+        Parameters:
+            channel (int): Channel number (1, 2, or 3).
+
+        """
+        chan = params['channel']
+        with self.lock.acquire_timeout(1) as acquired:
+            if acquired:
+                data = {
+                    'timestamp': time.time(),
+                    'block_name': 'output',
+                    'data': {}
+                }
+
+                data['data']['Voltage_{}'.format(chan)] = self.psu.get_volt(chan)
+                session.data = data
+            else:
+                return False, "Could not acquire lock"
+        return True, 'Channel {} voltage measured'.format(chan)
+
+    @ocs_agent.param('channel', type=int, choices=[1, 2, 3])
     @ocs_agent.param('volts', type=float, check=lambda x: 0 <= x <= 30)
     def set_voltage(self, session, params=None):
         """set_voltage(channel, volts)
@@ -158,6 +183,30 @@ class ScpiPsuAgent:
         return True, 'Set channel {} voltage to {}'.format(params['channel'], params['volts'])
 
     @ocs_agent.param('channel', type=int, choices=[1, 2, 3])
+    def get_current(self, session, params=None):
+        """get_current(channel)
+
+        **Task** - Measure and return the current of the power supply.
+
+        Parameters:
+            channel (int): Channel number (1, 2, or 3).
+
+        """
+        chan = params['channel']
+        with self.lock.acquire_timeout(1) as acquired:
+            if acquired:
+                data = {
+                    'timestamp': time.time(),
+                    'block_name': 'output',
+                    'data': {}
+                }
+                data['data']['Current_{}'.format(chan)] = self.psu.get_curr(chan)
+                session.data = data
+            else:
+                return False, "Could not acquire lock"
+        return True, 'Channel {} current measured'.format(chan)
+
+    @ocs_agent.param('channel', type=int, choices=[1, 2, 3])
     @ocs_agent.param('current', type=float)
     def set_current(self, session, params=None):
         """set_current(channel, current)
@@ -176,6 +225,26 @@ class ScpiPsuAgent:
                 return False, "Could not acquire lock"
 
         return True, 'Set channel {} current to {}'.format(params['channel'], params['current'])
+
+    @ocs_agent.param('channel', type=int, choices=[1, 2, 3])
+    def get_output(self, session, params=None):
+        """get_output(channel)
+
+        **Task** - Check if channel ouput is enabled or disabled.
+
+        Parameters:
+            channel (int):
+        """
+        enabled = False
+        with self.lock.acquire_timeout(1) as acquired:
+            if acquired:
+                enabled = self.psu.get_output(params['channel'])
+            else:
+                return False, "Could not acquire lock."
+        if enabled:
+            return True, 'Channel {} output is currently enabled.'.format(params['channel'])
+        else:
+            return True, 'Channel {} output is currently disabled.'.format(params['channel'])
 
     @ocs_agent.param('channel', type=int, choices=[1, 2, 3])
     @ocs_agent.param('state', type=bool)
@@ -234,6 +303,11 @@ def main(args=None):
     agent.register_task('set_voltage', p.set_voltage)
     agent.register_task('set_current', p.set_current)
     agent.register_task('set_output', p.set_output)
+
+    # Need tasks for get_voltage, get_current, and get_output
+    agent.register_task('get_voltage', p.get_voltage)
+    agent.register_task('get_current', p.get_current)
+    agent.register_task('get_output', p.get_output)
 
     agent.register_process('monitor_output', p.monitor_output, p.stop_monitoring)
 
