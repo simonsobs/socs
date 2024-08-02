@@ -479,7 +479,7 @@ class PID:
             elif header == 'Z':
                 output_array[index] = DecodedResponse(msg_type='reset', msg='PID Reset')
             else:
-                pass
+                output_array[index] = DecodedResponse(msg_type='error', msg='Unrecognized response')
 
         return output_array
 
