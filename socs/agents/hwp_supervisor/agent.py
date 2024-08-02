@@ -4,7 +4,7 @@ import threading
 import time
 import traceback
 from dataclasses import asdict, dataclass, field
-from typing import Dict, List, Literal, Optional
+from typing import Dict, List, Literal, Optional, Any
 
 import numpy as np
 import ocs
@@ -262,6 +262,8 @@ class HWPState:
     driver_iboot: Optional[IBootState] = None
 
     acu: Optional[ACUState] = None
+
+    supervisor_control_state: Optional[Dict[str, Any]] = None
 
     @classmethod
     def from_args(cls, args: argparse.Namespace):
@@ -1365,8 +1367,14 @@ class HWPSupervisor:
         """
         clients = self._get_hwp_clients()
 
+        def update_supervisor_state():
+            state_info = self.control_state_machine.action.cur_state_info.encode()
+            self.hwp_state.supervisor_control_state = state_info
+
         while session.status in ['starting', 'running']:
+            update_supervisor_state()
             self.control_state_machine.update(clients, self.hwp_state)
+            update_supervisor_state()
             session.data = {
                 'current_action': self.control_state_machine.action.encode(),
                 'action_history': [a.encode() for a in self.control_state_machine.action_history],
@@ -1538,7 +1546,7 @@ class HWPSupervisor:
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
     def grip_hwp(self, session, params):
-        """grip()
+        """grip_hwp()
 
         **Task** - Grip the HWP if ACU and HWP state passes checks.
 
@@ -1562,7 +1570,7 @@ class HWPSupervisor:
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
     def ungrip_hwp(self, session, params):
-        """ungrip()
+        """ungrip_hwp()
 
         **Task** - Ungrip the HWP if ACU and HWP state passes checks.
 
