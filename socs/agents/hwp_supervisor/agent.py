@@ -10,7 +10,7 @@ import numpy as np
 import ocs
 import txaio
 from ocs import client_http, ocs_agent, site_config
-from ocs.client_http import ControlClientError, ControlClient
+from ocs.client_http import ControlClient, ControlClientError
 from ocs.ocs_client import OCSClient, OCSReply
 from ocs.ocs_twisted import Pacemaker
 
