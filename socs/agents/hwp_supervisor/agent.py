@@ -1370,16 +1370,21 @@ class HWPSupervisor:
         def update_supervisor_state():
             state_info = self.control_state_machine.action.cur_state_info.encode()
             self.hwp_state.supervisor_control_state = state_info
+            if session.data:
+                session.data['current_state_type'] = self.control_state_machine.action.cur_state_info.state_type
 
         while session.status in ['starting', 'running']:
+            # Update session data beginning and end of update call, because its
+            # possible for an action change to happen due to external request from
+            # task.
             update_supervisor_state()
             self.control_state_machine.update(clients, self.hwp_state)
             update_supervisor_state()
-            session.data = {
+            session.data.update({
                 'current_action': self.control_state_machine.action.encode(),
                 'action_history': [a.encode() for a in self.control_state_machine.action_history],
-                'timestamp': time.time()
-            }
+                'timestamp': time.time(),
+            })
             if params['test_mode']:
                 break
             time.sleep(1)
