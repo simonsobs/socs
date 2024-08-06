@@ -5,11 +5,11 @@ import time
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
-from socs.agents.scpi_psu.drivers import PsuInterface
+from socs.agents.scpi_psu.drivers import PsuInterface, ScpiPsuInterface
 
 
 class ScpiPsuAgent:
-    def __init__(self, agent, ip_address, gpib_slot):
+    def __init__(self, agent, ip_address, gpib_slot, **kwargs):
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
@@ -17,6 +17,9 @@ class ScpiPsuAgent:
         self.job = None
         self.ip_address = ip_address
         self.gpib_slot = gpib_slot
+        self.port = None
+        if ('port' in kwargs.keys()):
+            self.port = kwargs['port']
         self.monitor = False
 
         self.psu = None
@@ -30,7 +33,7 @@ class ScpiPsuAgent:
                                  agg_params=agg_params,
                                  buffer_time=0)
 
-    @ocs_agent.param('_')
+    # @ocs_agent.param('_')
     def init(self, session, params=None):
         """init()
 
@@ -41,14 +44,37 @@ class ScpiPsuAgent:
             if not acquired:
                 return False, "Could not acquire lock"
 
-            try:
-                self.psu = PsuInterface(self.ip_address, self.gpib_slot)
-                self.idn = self.psu.identify()
-            except socket.timeout as e:
-                self.log.error(f"PSU timed out during connect: {e}")
-                return False, "Timeout"
+            if self.port is None:  # Use the old Prologix-based GPIB code
+                try:
+                    self.psu = PsuInterface(self.ip_address, self.gpib_slot)
+                    self.idn = self.psu.identify()
+                except socket.timeout as e:
+                    self.log.error(f"PSU timed out during connect: {e}")
+                    return False, "Timeout"
+            else:  # Use the new direct ethernet connection code
+                try:
+                    self.psu = ScpiPsuInterface(self.ip_address, self.gpib_slot, port=self.port)
+                    self.idn = self.psu.identify()
+                except socket.timeout as e:
+                    self.log.error(f"PSU timed out during connect: {e}")
+                    return False, "Timeout"
+                except ValueError as e:
+                    if (e.args[0].startswith('Model number')):
+                        self.log.error(f"PSU initialization error: {e}. Suggest appending {e.args[-1]} to the list of known model numbers in scpi_psu/drivers.py")
+                    else:
+                        self.log.error(f"PSU initialization resulted in unknown ValueError: {e}")
+                    return False, "ValueError"
+
             self.log.info("Connected to psu: {}".format(self.idn))
 
+        session.add_message('Initialized PSU.')
+        auto_acquire = params.get('auto_acquire', False)
+
+        if auto_acquire:
+            acq_params = None
+            if self.psu.numChannels == 1:
+                acq_params = {'channels': [1]}
+            self.agent.start('monitor_output', acq_params)
         return True, 'Initialized PSU.'
 
     @ocs_agent.param('wait', type=float, default=1)
@@ -68,6 +94,7 @@ class ScpiPsuAgent:
                 Defaults to False.
 
         """
+        session.set_status('running')
         self.monitor = True
 
         while self.monitor:
@@ -80,8 +107,13 @@ class ScpiPsuAgent:
                     }
 
                     for chan in params['channels']:
-                        data['data']["Voltage_{}".format(chan)] = self.psu.get_volt(chan)
-                        data['data']["Current_{}".format(chan)] = self.psu.get_curr(chan)
+                        if self.psu.get_output(chan):
+                            data['data']["Voltage_{}".format(chan)] = self.psu.get_volt(chan)
+                            data['data']["Current_{}".format(chan)] = self.psu.get_curr(chan)
+                        else:
+                            self.log.warn("Cannot measure output when output is disabled")
+                            self.monitor = False
+                            return False, "Cannot measure output when output is disabled"
 
                     # self.log.info(str(data))
                     # print(data)
@@ -105,6 +137,31 @@ class ScpiPsuAgent:
         return True, "Stopping current monitor"
 
     @ocs_agent.param('channel', type=int, choices=[1, 2, 3])
+    def get_voltage(self, session, params=None):
+        """get_voltage(channel)
+
+        **Task** - Measure and return the voltage of the power supply.
+
+        Parameters:
+            channel (int): Channel number (1, 2, or 3).
+
+        """
+        chan = params['channel']
+        with self.lock.acquire_timeout(1) as acquired:
+            if acquired:
+                data = {
+                    'timestamp': time.time(),
+                    'block_name': 'output',
+                    'data': {}
+                }
+
+                data['data']['Voltage_{}'.format(chan)] = self.psu.get_volt(chan)
+                session.data = data
+            else:
+                return False, "Could not acquire lock"
+        return True, 'Channel {} voltage measured'.format(chan)
+
+    @ocs_agent.param('channel', type=int, choices=[1, 2, 3])
     @ocs_agent.param('volts', type=float, check=lambda x: 0 <= x <= 30)
     def set_voltage(self, session, params=None):
         """set_voltage(channel, volts)
@@ -126,6 +183,30 @@ class ScpiPsuAgent:
         return True, 'Set channel {} voltage to {}'.format(params['channel'], params['volts'])
 
     @ocs_agent.param('channel', type=int, choices=[1, 2, 3])
+    def get_current(self, session, params=None):
+        """get_current(channel)
+
+        **Task** - Measure and return the current of the power supply.
+
+        Parameters:
+            channel (int): Channel number (1, 2, or 3).
+
+        """
+        chan = params['channel']
+        with self.lock.acquire_timeout(1) as acquired:
+            if acquired:
+                data = {
+                    'timestamp': time.time(),
+                    'block_name': 'output',
+                    'data': {}
+                }
+                data['data']['Current_{}'.format(chan)] = self.psu.get_curr(chan)
+                session.data = data
+            else:
+                return False, "Could not acquire lock"
+        return True, 'Channel {} current measured'.format(chan)
+
+    @ocs_agent.param('channel', type=int, choices=[1, 2, 3])
     @ocs_agent.param('current', type=float)
     def set_current(self, session, params=None):
         """set_current(channel, current)
@@ -144,6 +225,26 @@ class ScpiPsuAgent:
                 return False, "Could not acquire lock"
 
         return True, 'Set channel {} current to {}'.format(params['channel'], params['current'])
+
+    @ocs_agent.param('channel', type=int, choices=[1, 2, 3])
+    def get_output(self, session, params=None):
+        """get_output(channel)
+
+        **Task** - Check if channel ouput is enabled or disabled.
+
+        Parameters:
+            channel (int):
+        """
+        enabled = False
+        with self.lock.acquire_timeout(1) as acquired:
+            if acquired:
+                enabled = self.psu.get_output(params['channel'])
+            else:
+                return False, "Could not acquire lock."
+        if enabled:
+            return True, 'Channel {} output is currently enabled.'.format(params['channel'])
+        else:
+            return True, 'Channel {} output is currently disabled.'.format(params['channel'])
 
     @ocs_agent.param('channel', type=int, choices=[1, 2, 3])
     @ocs_agent.param('state', type=bool)
@@ -178,6 +279,9 @@ def make_parser(parser=None):
     pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--ip-address')
     pgroup.add_argument('--gpib-slot')
+    pgroup.add_argument('--port')
+    pgroup.add_argument('--mode', type=str, default='acq',
+                        choices=['init', 'acq'])
 
     return parser
 
@@ -188,14 +292,22 @@ def main(args=None):
                                   parser=parser,
                                   args=args)
 
+    init_params = False
+    if args.mode == 'acq':
+        init_params = {'auto_acquire': True}
     agent, runner = ocs_agent.init_site_agent(args)
 
-    p = ScpiPsuAgent(agent, args.ip_address, int(args.gpib_slot))
+    p = ScpiPsuAgent(agent, args.ip_address, int(args.gpib_slot), port=int(args.port))
 
-    agent.register_task('init', p.init)
+    agent.register_task('init', p.init, startup=init_params)
     agent.register_task('set_voltage', p.set_voltage)
     agent.register_task('set_current', p.set_current)
     agent.register_task('set_output', p.set_output)
+
+    # Need tasks for get_voltage, get_current, and get_output
+    agent.register_task('get_voltage', p.get_voltage)
+    agent.register_task('get_current', p.get_current)
+    agent.register_task('get_output', p.get_output)
 
     agent.register_process('monitor_output', p.monitor_output, p.stop_monitoring)
 
