@@ -174,12 +174,12 @@ class HWPEmulator:
         with self.state.lock:
             # self.logger.debug(cmd)
             if cmd == "*W02400000":
-                self.state.pid.direction = "reverse"
-                logger.info("Setting direction: reverse")
-                return "asdfl"
-            elif cmd == "*W02401388":
                 self.state.pid.direction = "forward"
                 logger.info("Setting direction: forward")
+                return "asdfl"
+            elif cmd == "*W02401388":
+                self.state.pid.direction = "reverse"
+                logger.info("Setting direction: reverse")
                 return "asdfl"
             elif cmd.startswith("*W014"):
                 setpt = hex_str_to_dec(cmd[5:], 3)
@@ -192,9 +192,9 @@ class HWPEmulator:
                 return f"R01{PID._convert_to_hex(self.state.pid.freq_setpoint, 3)}"
             elif cmd == "*R02":  # Get Direction
                 if self.state.pid.direction == "forward":
-                    return "1"
+                    return "R02400000"
                 else:
-                    return "0"
+                    return "R02401388"
             else:
                 self.logger.info("Unknown cmd: %s", cmd)
                 return "unknown"

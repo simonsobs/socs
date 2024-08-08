@@ -39,9 +39,14 @@ def test_decode_write():
     print(PID._decode_write('W02'))
 
 
-def test_decode_array():
-    print(PID._decode_array(['R02400000']))
+def test_decode_measure():
+    print(PID._decode_measure('X012.000'))
 
 
 def test_decode_measure_unknown():
-    assert PID._decode_measure(['R02400000']) == 9.999
+    decoded_resp = PID._decode_measure('X022.000')
+    assert decoded_resp.msg_type == 'error'
+
+
+def test_decode_array():
+    print(PID._decode_array(['R02400000']))
