@@ -108,7 +108,7 @@ setup(
         'ocs',
         'pyModbusTCP',
         'pyserial',
-        'pysnmp',
+        'pysnmp==4.4.12',
         'pysmi',
         'pyyaml',
         'requests',

@@ -6,7 +6,7 @@ twisted
 
 # hardware communication
 pyserial
-pysnmp
+pysnmp==4.4.12
 pysmi
 pyasn1==0.4.8
 
