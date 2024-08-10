@@ -80,3 +80,7 @@ class PsuInterface(PrologixInterface):
         self.write('MEAS:CURR? CH' + str(ch))
         current = float(self.read())
         return current
+
+    def clear(self):
+        self.write('*CLS') #Clear all the event registers and error queue, using a querry such as *ESR? or MEAS:X? can confuse the PSU
+        return True

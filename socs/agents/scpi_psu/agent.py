@@ -2,11 +2,13 @@ import argparse
 import socket
 import time
 from typing import Optional
+import numpy as np
 
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
-from socs.agents.scpi_psu.drivers import PsuInterface
+from drivers import PsuInterface
+# from socs.agents.scpi_psu.drivers import PsuInterface
 
 class ScpiPsuAgent:
     def __init__(self, agent, ip_address, gpib_slot):
@@ -19,9 +21,7 @@ class ScpiPsuAgent:
         self.gpib_slot = gpib_slot
         self.monitor = False
 
-        self.psu = None
-
-        self.module: Optional[ScpiPsuAgent] = None
+        self.psu: Optional[ScpiPsuAgent] = None
 
         # Registers Temperature and Voltage feeds
         agg_params = {
@@ -39,7 +39,7 @@ class ScpiPsuAgent:
         **Task** - Initialize connection to the power supply.
 
         """
-        if self.module is not None:
+        if self.psu is not None:
             return True, "Already Initialized Module"
     
         with self.lock.acquire_timeout(0) as acquired:
@@ -49,26 +49,33 @@ class ScpiPsuAgent:
             try:
                 self.psu = PsuInterface(self.ip_address, self.gpib_slot)
                 self.idn = self.psu.identify()
-                # self.agent.start('initialize')
             except socket.timeout as e:
                 self.log.error(f"PSU timed out during connect: {e}")
                 return False, "Timeout"
             self.log.info("Connected to psu: {}".format(self.idn))
-
-            self._initialize_module()
-
         return True, 'Initialized PSU.'  
  
-    def _initialize_module(self):
+    def _initialize_module(self, session, params=None):
         """Initialize the ScpiPsu module."""
         try:
-            self.module = ScpiPsuAgent(self.agent, self.ip_address, self.gpib_slot)
-            self.log.info(f"Initialized ScpiPsuAgent module: {self.module}")
-            return True
-        except Exception as e:
-            self.log.error(f"Failed to initialize ScpiPsuAgent module: {e}")
-            self.module = None
-        return False
+            self.psu = PsuInterface(self.ip_address, self.gpib_slot) #this is only necessary if the ip_address or gpib_slot has changed. I could declare a self.connected flag if this is uneeded.
+            self.idn = self.psu.identify()
+        except Exception as e: #socket.tiout OR OSError 113 No route to host.
+            self.psu = None
+            return False
+        self.log.info("Reconnected to psu: {}".format(self.idn))
+
+        # try:
+        #     test = self.psu.test()
+        # except socket.timeout as e:
+        #     self.log.warn(f"TimeoutError during test: {e}")
+        #     self.psu = None
+        #     return False
+
+        self.log.info("Clearing event registers and error queue")
+        self.psu.clear()
+        session.set_status('running') #I can remove if this is not appropriate
+        return True
 
     @ocs_agent.param('wait', type=float, default=1)
     @ocs_agent.param('channels', type=list, default=[1, 2, 3])
@@ -93,32 +100,34 @@ class ScpiPsuAgent:
         while self.monitor:
             with self.lock.acquire_timeout(1) as acquired:
                 if acquired:
-                    if self.module is None:  # Try to re-initialize module if it fails
-                        if not self._initialize_module():
+                    if self.psu:
+                        data = {
+                            'timestamp': time.time(),
+                            'block_name': 'output',
+                            'data': {}
+                        }
+
+                        for chan in params['channels']:
+                            try:
+                                data['data']["Voltage_{}".format(chan)] = self.psu.get_volt(chan)
+                                data['data']["Current_{}".format(chan)] = self.psu.get_curr(chan)
+                            except socket.timeout as e:
+                                self.log.warn(f"TimeoutError: {e}")
+                                # session.set_status('disconnected') #There is not an applicable session.status. in SESSION_STATUS_CODES (ocs_agent.py LN#958)
+                                self.log.info("Attempting to reconnect")
+                                self.psu = None
+                                break
+
+                    if self.psu: #Check to make sure there weren't any timeout errors so we don't publish incomplete data and make block errors.
+                        # self.log.info(str(data))
+                        self.agent.publish_to_feed('psu_output', data)
+
+                        # Allow this process to be queried to return current data
+                        session.data = data
+
+                    else:
+                        if not self._initialize_module(session, params):
                             time.sleep(5)  # wait 5 sec before trying to re-initialize
-                            continue
-
-                    data = {
-                        'timestamp': time.time(),
-                        'block_name': 'output',
-                        'data': {}
-                    }
-
-                    for chan in params['channels']:
-                        try:
-                            data['data']["Voltage_{}".format(chan)] = self.psu.get_volt(chan)
-                            data['data']["Current_{}".format(chan)] = self.psu.get_curr(chan)
-                        except socket.timeout as e:
-                            self.log.warn(f"TimeoutError: {e}")
-                            self.module = None
-                            continue
-
-                    # self.log.info(str(data))
-                    # print(data)
-                    self.agent.publish_to_feed('psu_output', data)
-
-                    # Allow this process to be queried to return current data
-                    session.data = data
 
                 else:
                     self.log.warn("Could not acquire in monitor_current")
@@ -127,7 +136,6 @@ class ScpiPsuAgent:
 
             if params['test_mode']:
                 break
-
         return True, "Finished monitoring current"
 
     def stop_monitoring(self, session, params=None):
