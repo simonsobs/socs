@@ -2,13 +2,12 @@ import argparse
 import socket
 import time
 from typing import Optional
-import numpy as np
 
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
-from drivers import PsuInterface
-# from socs.agents.scpi_psu.drivers import PsuInterface
+# from drivers import PsuInterface # import the local driver for testing purposes
+from socs.agents.scpi_psu.drivers import PsuInterface
 
 class ScpiPsuAgent:
     def __init__(self, agent, ip_address, gpib_slot):
