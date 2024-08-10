@@ -63,14 +63,6 @@ class ScpiPsuAgent:
             self.psu = None
             return False
         self.log.info("Reconnected to psu: {}".format(self.idn))
-
-        # try:
-        #     test = self.psu.test()
-        # except socket.timeout as e:
-        #     self.log.warn(f"TimeoutError during test: {e}")
-        #     self.psu = None
-        #     return False
-
         self.log.info("Clearing event registers and error queue")
         self.psu.clear()
         session.set_status('running') #I can remove if this is not appropriate
