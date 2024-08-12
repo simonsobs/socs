@@ -3,9 +3,9 @@ import os
 import threading
 import time
 import traceback
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Literal, Optional
-from contextlib import contextmanager
 
 import numpy as np
 import ocs
@@ -209,7 +209,7 @@ class ACUState:
 
     # This will only be set by spin-control agent for communication with ACU
     request_block_ACU_motion: bool = False
-    ACU_motion_blocked: Optional[bool] = None # This flag is only set by the ACU agent
+    ACU_motion_blocked: Optional[bool] = None  # This flag is only set by the ACU agent
     use_acu_blocking: bool = False
 
     def update(self):
@@ -796,7 +796,7 @@ class ControlAction:
 
 
 @contextmanager
-def ensure_grip_safety(hwp_state: HWPState, timeout: float=60.):
+def ensure_grip_safety(hwp_state: HWPState, timeout: float = 60.):
     """
     Run required checks for gripper safety. This will check ACU parameters such
     as az/el position and velocity. If `use_acu_blocking` is set, this will
@@ -866,7 +866,7 @@ def ensure_grip_safety(hwp_state: HWPState, timeout: float=60.):
         yield
         return
 
-    try: #If use_acu_blocking, do handshake with ACU agent to block motino
+    try:  # If use_acu_blocking, do handshake with ACU agent to block motino
         acu.request_block_ACU_motion = True
         start_time = time.time()
         while not acu.ACU_motion_blocked:
