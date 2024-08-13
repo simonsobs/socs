@@ -133,7 +133,7 @@ class IBootState:
             return
 
         if self.agent_type == 'iboot':
-            self.outlet_labels = {o: f'outletStatus_{o}' for o in self.outlets}
+            self.outlet_labels = {o: f'outletStatus_{o - 1}' for o in self.outlets}
             self.outlet_state = {
                 outlet: op['data'][label]['status']
                 for outlet, label in self.outlet_labels.items()
