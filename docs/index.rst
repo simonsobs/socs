@@ -37,13 +37,16 @@ API Reference        Full API documentation for core parts of the SOCS library.
     :caption: Agent Reference
     :maxdepth: 2
 
+    agents/acti_camera
     agents/acu_agent
     agents/bluefors_agent
     agents/cryomech_cpa
     agents/fts_agent
     agents/generator
+    agents/hi6200
     agents/hwp_encoder
     agents/hwp_gripper
+    agents/hwp_pcu
     agents/hwp_picoscope
     agents/hwp_pid
     agents/hwp_pmx
@@ -61,6 +64,7 @@ API Reference        Full API documentation for core parts of the SOCS library.
     agents/latrt_xy_stage
     agents/magpie
     agents/meinberg_m1000_agent
+    agents/meinberg_syncbox_agent
     agents/pfeiffer
     agents/pfeiffer_tc400
     agents/pysmurf-controller
@@ -78,6 +82,7 @@ API Reference        Full API documentation for core parts of the SOCS library.
     agents/wiregrid_actuator
     agents/wiregrid_encoder
     agents/wiregrid_kikusui
+    agents/wiregrid_tiltsensor
 
 .. toctree::
     :caption: Simulator Reference

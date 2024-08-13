@@ -47,9 +47,6 @@ pysmurf_deps = [
 # SMuRF File Emulator, SMuRF Stream Simulator
 smurf_sim_deps = ['so3g']
 
-# Synaccess Agent
-synacc_deps = ['requests']
-
 # Timing Master Monitor
 timing_master_deps = ['pyepics']
 
@@ -61,7 +58,7 @@ timing_master_deps = ['pyepics']
 # Note: Not including the holograph deps, which are Python 3.8 only. Also not
 # including any dependencies with only direct references.
 all_deps = acu_deps + labjack_deps + magpie_deps + pfeiffer_deps + \
-    pysmurf_deps + smurf_sim_deps + synacc_deps + timing_master_deps
+    pysmurf_deps + smurf_sim_deps + timing_master_deps
 all_deps = list(set(all_deps))
 
 setup(
@@ -94,6 +91,11 @@ setup(
     },
     classifiers=[
         "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
         "License :: OSI Approved :: BSD License",
         "Intended Audience :: Science/Research",
         "Topic :: Scientific/Engineering :: Astronomy",
@@ -106,9 +108,10 @@ setup(
         'ocs',
         'pyModbusTCP',
         'pyserial',
-        'pysnmp',
+        'pysnmp==4.4.12',
         'pysmi',
         'pyyaml',
+        'requests',
         'sqlalchemy>=1.4',
         'twisted',
         'pyasn1==0.4.8',
@@ -122,7 +125,6 @@ setup(
         'pfeiffer': pfeiffer_deps,
         'pysmurf': pysmurf_deps,
         'smurf_sim': smurf_sim_deps,
-        'synacc': synacc_deps,
         'timing_master': timing_master_deps,
         # 'xy_stage': xy_stage_deps,
     },

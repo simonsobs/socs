@@ -79,14 +79,16 @@ class PMX:
         self.ser.write("MEAS:CURR?\n\r")
         self.wait()
         try:
-            val = float(self.ser.readline())
-            msg = "Measured current = %.3f A" % (val)
+            val = self.ser.readline()
+            curr = float(val)
+            msg = "Measured current = %.3f A" % (curr)
             # print(msg)
         except ValueError:
-            val = -999.
+            print(f"Could not convert '{val}' to float")
+            curr = -999.
             msg = 'WARNING! Could not get correct current value! | Response = "%s"' % (val)
             print(msg)
-        return msg, val
+        return msg, curr
 
     def check_voltage_current(self):
         """Check both the voltage and current."""

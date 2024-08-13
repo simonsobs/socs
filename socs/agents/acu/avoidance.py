@@ -447,7 +447,7 @@ class SunTracker:
         # Include the direct path, but put in "worst case" details
         # based on all "confined" paths computed above.
         direct = dict(base)
-        direct['moves'] = MoveSequence(az0, el0, az1, el1)
+        direct['moves'] = MoveSequence(az0, el0, az1, el1, simplify=True)
         traj_info = self.check_trajectory(*direct['moves'].get_traj(), t=t)
         direct.update(traj_info)
         conf = [m for m in all_moves if m['travel_el_confined']]
@@ -679,6 +679,9 @@ class MoveSequence:
         No step in az or el will be greater than res.
 
         """
+        if len(self.nodes) == 1:
+            return np.array([self.nodes[0][0]]), np.array([self.nodes[0][1]])
+
         xx, yy = [], []
         for (x0, y0), (x1, y1) in self.get_legs():
             n = max(2, math.ceil(abs(x1 - x0) / res), math.ceil(abs(y1 - y0) / res))

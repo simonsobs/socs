@@ -114,8 +114,6 @@ class WiregridEncoderAgent:
                     .format(self.lock.job))
                 return False, 'Could not acquire lock.'
 
-            session.set_status('running')
-
             self.take_data = True
             # Initialize data containers
             session.data = {'fields': {'irig_data': {}, 'encoder_data': {},
@@ -316,7 +314,7 @@ class WiregridEncoderAgent:
                 }
                 session.data['timestamp'] = current_time
                 session.data['fields']['irig_data'] = irig_field_dict
-                session.data['fields']['enc_data'] = enc_field_dict
+                session.data['fields']['encoder_data'] = enc_field_dict
                 # End of loop
             # End of lock acquiring
 

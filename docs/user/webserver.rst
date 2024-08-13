@@ -16,11 +16,11 @@ nginx
 nginx is a lightweight, open source, web server which we will use as a reverse
 proxy.
 
-docker-compose Configuration
+Docker Compose Configuration
 ----------------------------
 We will setup nginx in a docker container. First, ensure you do not currently
 have a web server running (we need to make sure port 80 is available.) Then add
-nginx to your docker-compose file::
+nginx to your docker compose file::
 
   web:
     image: nginx
@@ -105,7 +105,7 @@ htaccesstools.com_. It will look something like this::
 
 Once you have created these two files you can bring up the webserver with::
 
-    $ sudo docker-compose up -d
+    $ sudo docker compose up -d
 
 Your webserver should now be accessible via the configured domain, or through
 `http://localhost <http://localhost>`_.
@@ -114,7 +114,7 @@ Grafana Proxy
 -------------
 If you are proxying Grafana and accessing it externally (i.e. not on
 ``localhost``), then you need to configure several additional environment
-variables. In your docker-compose configuration file add::
+variables. In your docker compose configuration file add::
 
     environment:
       - GF_SERVER_ROOT_URL=http://{{ domain }}/grafana

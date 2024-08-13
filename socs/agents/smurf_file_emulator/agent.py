@@ -689,7 +689,6 @@ class SmurfFileEmulator:
             tag (str, optional):
                 User tag to add to the g3 stream.
         """
-        session.set_status('starting')
 
         if self.tune is None:
             raise ValueError("No tune loaded!")
@@ -714,7 +713,6 @@ class SmurfFileEmulator:
         if params.get('tag') is not None:
             tag += f',{params["tag"]}'
 
-        session.set_status('running')
         streamer = self._new_streamer(action=action, action_time=action_time, tag='obs,cmb')
         session.data['session_id'] = streamer.session_id
         session.data['g3_files'] = streamer.file_list

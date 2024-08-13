@@ -5,6 +5,7 @@ import time
 from enum import Enum
 
 import numpy as np
+import ocs
 import soaculib as aculib
 import soaculib.status_keys as status_keys
 import twisted.web.client as tclient
@@ -40,11 +41,18 @@ DEFAULT_SCAN_PARAMS = {
 }
 
 
-#: Default Sun avoidance params by platform type (enabled, policy)
+#: Default Sun avoidance params by platform type (enabled, policy). If
+#: either of escape *or* monitoring is enabled, then the full policy
+#: must be specified.
 SUN_CONFIGS = {
     'ccat': {
         'enabled': False,
-        'policy': {},
+        'policy': {
+            'exclusion_radius': 20,
+            'el_horizon': 10,
+            'min_sun_time': 1800,
+            'response_time': 7200,
+        },
     },
     'satp': {
         'enabled': True,
@@ -93,13 +101,18 @@ class ACUAgent:
         fov_radius (float): If set, override the default Sun
             avoidance radius (i.e. the radius of the field of view, in
             degrees, to use for Sun avoidance purposes).
+        named_positions (list of str): Names and target positions to
+            register for use with go_to_named task.  If provided, each
+            entry in the list should be of the form "name=az,el" with
+            az and el parseable as floats; e.g. "home=180,45.1".
 
     """
 
     def __init__(self, agent, acu_config='guess', exercise_plan=None,
                  startup=False, ignore_axes=None, disable_idle_reset=False,
                  min_el=None, max_el=None,
-                 avoid_sun=None, fov_radius=None):
+                 avoid_sun=None, fov_radius=None,
+                 named_positions=None):
         self.log = agent.log
 
         # Separate locks for exclusive access to az/el, and boresight motions.
@@ -146,6 +159,17 @@ class ACUAgent:
 
         self._reset_sun_params(enabled=avoid_sun,
                                radius=fov_radius)
+
+        self.named_positions = {}
+        if named_positions:
+            for text in named_positions:
+                try:
+                    name, target = text.split('=')
+                    _az, _el = target.split(',')
+                    self.named_positions[name] = (float(_az), float(_el))
+                except Exception as e:
+                    agent.log.error('Failed to parse named_position string: {text}', text=text)
+                    raise e
 
         self.exercise_plan = exercise_plan
 
@@ -263,6 +287,9 @@ class ACUAgent:
                             self.go_to,
                             blocking=False,
                             aborter=self._simple_task_abort)
+        agent.register_task('go_to_named',
+                            self.go_to_named,
+                            blocking=False)
         agent.register_task('set_scan_params',
                             self.set_scan_params,
                             blocking=False)
@@ -326,7 +353,6 @@ class ACUAgent:
         """
         IDLE_RESET_TIMEOUT = 60  # The watchdog timeout in ACU
 
-        session.set_status('running')
         next_action = 0
 
         while session.status in ['starting', 'running']:
@@ -386,6 +412,12 @@ class ACUAgent:
             "StatusResponseRate": 19.237531827325963,
             "PlatformType": "satp",
             "IgnoredAxes": [],
+            "NamedPositions": {
+              "home": [
+                180,
+                40
+              ]
+            },
             "DefaultScanParams": {
               "az_speed": 2.0,
               "az_accel": 1.0,
@@ -400,8 +432,6 @@ class ACUAgent:
 
         """
 
-        session.set_status('running')
-
         # Note that session.data will get scanned, to assign data to
         # feed blocks.  We make an explicit list of items to ignore
         # during that scan (not_data_keys).
@@ -409,6 +439,7 @@ class ACUAgent:
                         'DefaultScanParams': self.scan_params,
                         'StatusResponseRate': 0.,
                         'IgnoredAxes': self.ignore_axes,
+                        'NamedPositions': self.named_positions,
                         'connected': False}
         not_data_keys = list(session.data.keys())
 
@@ -772,7 +803,6 @@ class ACUAgent:
             }
 
         """
-        session.set_status('running')
         FMT = self.udp_schema['format']
         FMT_LEN = struct.calcsize(FMT)
         UDP_PORT = self.udp['port']
@@ -970,6 +1000,13 @@ class ACUAgent:
             arrived at target position.
           msg (str): success/error message.
 
+        Notes:
+          This has various checks to ensure the movement executes as
+          expected and in a timely fashion.  In the case that the
+          warning horn sounds, this function should block until that
+          completes, even if the requested position has been achieved
+          (i.e. no actual motion was needed).
+
         """
         # Step time in event loop.
         TICK_TIME = 0.1
@@ -992,9 +1029,23 @@ class ACUAgent:
         # can be as long as 12 seconds.
         MAX_STARTUP_TIME = 13.
 
-        # Velocity to assume when computing maximum time a move should take (to bail
-        # out in unforeseen circumstances).
-        UNREASONABLE_VEL = 0.5
+        # How long does it take to sound the warning horn?  It takes
+        # 10 seconds.  Don't wait longer than this.
+        WARNING_HORN_TOO_LONG = 15.
+
+        # How long after mode change to Preset should we expect to see
+        # brakes released, except in case that warning horn is
+        # sounding?  3 seconds should be enough.
+        WARNING_HORN_DETECT = 3.
+
+        # Velocity to assume when computing maximum time a move should
+        # take (to bail out in unforeseen circumstances).  There are
+        # other checks in place to catch when the platform has not
+        # started moving or has stopped at the wrong place.  So the
+        # timeout computed from this should only activate in cases
+        # where some other commander has taken over and then kept the
+        # platform moving around.
+        UNREASONABLE_VEL = 0.1
 
         # Positive acknowledgment of AcuControl.go_to
         OK_RESPONSE = b'OK, Command executed.'
@@ -1025,6 +1076,11 @@ class ACUAgent:
 
             def get_vel(_self):
                 return self.data['status']['summary'][f'{axis}_current_velocity']
+
+            def get_active(_self):
+                return bool(
+                    self.data['status']['axis_state'][f'{axis}_brakes_released']
+                    and not self.data['status']['axis_state'][f'{axis}_axis_stop'])
 
         class AzAxis(AxisControl):
             @inlineCallbacks
@@ -1087,6 +1143,7 @@ class ACUAgent:
         motion_completed = False
         give_up_time = None
         has_never_moved = True
+        warning_horn = False
 
         while session.status in ['starting', 'running', 'stopping']:
             # Time ...
@@ -1102,7 +1159,8 @@ class ACUAgent:
             history.append(distance)
             if give_up_time is None:
                 give_up_time = now + distance / UNREASONABLE_VEL \
-                    + MAX_STARTUP_TIME + 2 * PROFILE_TIME
+                    + MAX_STARTUP_TIME + 2 * PROFILE_TIME \
+                    + WARNING_HORN_TOO_LONG
 
             # Do we seem to be moving / not moving?
             ok, _d = get_history(PROFILE_TIME)
@@ -1112,12 +1170,13 @@ class ACUAgent:
 
             near_destination = distance < THERE_YET
             mode_ok = (ctrl.get_mode() == 'Preset')
+            active_now = ctrl.get_active()
 
             # Log only on state changes
             if state != last_state:
                 _state = f'{axis}.state={state.name}'
                 self.log.info(
-                    f'{_state:<30} dt={now-start_time:7.3f} dist={distance:8.3f}')
+                    f'{_state:<30} dt={now - start_time:7.3f} dist={distance:8.3f}')
                 last_state = state
 
             # Handle task abort
@@ -1149,7 +1208,14 @@ class ACUAgent:
                 # Position and mode change requested, now wait for
                 # either mode change or clear failure of motion.
                 if mode_ok:
-                    state = state.WAIT_STILL
+                    if active_now:
+                        state = state.WAIT_STILL
+                    elif time_since_start > WARNING_HORN_TOO_LONG:
+                        self.log.error('Warning horn too long!')
+                        state = state.FAIL
+                    elif time_since_start > WARNING_HORN_DETECT and not warning_horn:
+                        warning_horn = True
+                        self.log.info('Warning horn is probably sounding.')
                 elif still and motion_expected:
                     self.log.error(f'Motion did not start within {MAX_STARTUP_TIME:.1f} s.')
                     state = state.FAIL
@@ -1252,14 +1318,14 @@ class ACUAgent:
     @ocs_agent.param('end_stop', default=False, type=bool)
     @inlineCallbacks
     def go_to(self, session, params):
-        """go_to(az=None, el=None, end_stop=False)
+        """go_to(az, el, end_stop=False)
 
         **Task** - Move the telescope to a particular point (azimuth,
         elevation) in Preset mode. When motion has ended and the telescope
         reaches the preset point, it returns to Stop mode and ends.
 
         Parameters:
-            az (float): destination angle for the azimuthal axis
+            az (float): destination angle for the azimuth axis
             el (float): destination angle for the elevation axis
             end_stop (bool): put the telescope in Stop mode at the end of
                 the motion
@@ -1291,9 +1357,9 @@ class ACUAgent:
                         f'[{limits[0]}, {limits[1]}].')
 
             self.log.info(f'Requested position: az={target_az}, el={target_el}')
-            session.set_status('running')
 
-            legs, msg = yield self._get_sunsafe_moves(target_az, target_el)
+            legs, msg = yield self._get_sunsafe_moves(target_az, target_el,
+                                                      zero_legs_ok=False)
             if msg is not None:
                 self.log.error(msg)
                 return False, msg
@@ -1315,7 +1381,7 @@ class ACUAgent:
     @ocs_agent.param('end_stop', default=False, type=bool)
     @inlineCallbacks
     def set_boresight(self, session, params):
-        """set_boresight(target=None, end_stop=False)
+        """set_boresight(target, end_stop=False)
 
         **Task** - Move the telescope to a particular third-axis angle.
 
@@ -1346,7 +1412,6 @@ class ACUAgent:
                         f'[{limits[0]}, {limits[1]}].')
 
             self.log.info(f'Commanded position: boresight={target}')
-            session.set_status('running')
 
             ok, msg = yield self._go_to_axis(session, 'Boresight', target)
 
@@ -1354,6 +1419,31 @@ class ACUAgent:
                 yield self._set_modes(third='Stop')
 
         return ok, msg
+
+    @ocs_agent.param('target')
+    @ocs_agent.param('end_stop', default=True, type=bool)
+    @inlineCallbacks
+    def go_to_named(self, session, params):
+        """go_to_named(target, end_stop=True)
+
+        **Task** - Move the telescope to a named position,
+        e.g. "home", that has been configured through command line args.
+
+        Parameters:
+          target (str): name of the target position.
+          end_stop (bool): put axes in Stop mode after motion
+
+        """
+        target = self.named_positions.get(params['target'])
+        if target is None:
+            return False, 'Position "%s" is not configured.' % params['target']
+
+        ok, msg, _session = self.agent.start('go_to', {'az': target[0], 'el': target[1],
+                                                       'end_stop': params['end_stop']})
+        if ok == ocs.ERROR:
+            return False, 'Failed to start go_to task.'
+        ok, msg, _session = yield self.agent.wait('go_to')
+        return (ok == ocs.OK), msg
 
     @ocs_agent.param('speed_mode', choices=['high', 'low'])
     @inlineCallbacks
@@ -1422,6 +1512,7 @@ class ACUAgent:
         yield
         return True, 'Done'
 
+    @ocs_agent.param('_')
     @inlineCallbacks
     def clear_faults(self, session, params):
         """clear_faults()
@@ -1430,7 +1521,6 @@ class ACUAgent:
 
         """
 
-        session.set_status('running')
         yield self.acu_control.clear_faults()
         session.set_status('stopping')
         return True, 'Job completed.'
@@ -1457,7 +1547,6 @@ class ACUAgent:
                 modes.append(self.data['status']['corotator']['Corotator_mode'])
             return modes
 
-        session.set_status('running')
         for i in range(6):
             for short_name, mode in zip(['az', 'el', 'third'],
                                         _read_modes()):
@@ -1498,7 +1587,7 @@ class ACUAgent:
     @ocs_agent.param('azonly', type=bool, default=True)
     @inlineCallbacks
     def fromfile_scan(self, session, params=None):
-        """fromfile_scan(filename=None, adjust_times=True, azonly=True)
+        """fromfile_scan(filename, adjust_times=True, azonly=True)
 
         **Task** - Upload and execute a scan pattern from numpy file.
 
@@ -1529,7 +1618,6 @@ class ACUAgent:
 
             It is acceptable to omit columns 5 and 6.
         """
-        session.set_status('running')
 
         times, azs, els, vas, ves, azflags, elflags = sh.from_file(params['filename'])
         if min(azs) <= self.motion_limits['azimuth']['lower'] \
@@ -1689,7 +1777,6 @@ class ACUAgent:
             'az_start', 'az_drift']
             if params.get(k) is not None}
         el_speed = params.get('el_speed', 0.0)
-
         plan = sh.plan_scan(az_endpoint1, az_endpoint2,
                             el=el_endpoint1, v_az=az_speed, a_az=az_accel,
                             az_start=scan_params.get('az_start'))
@@ -1705,7 +1792,6 @@ class ACUAgent:
         if scan_upload_len:
             point_batch_count = scan_upload_len / step_time
 
-        session.set_status('running')
         self.log.info('The plan: {plan}', plan=plan)
         self.log.info('The scan_params: {scan_params}', scan_params=scan_params)
 
@@ -1713,7 +1799,7 @@ class ACUAgent:
         ok, msg = self._check_scan_sunsafe(az_endpoint1, az_endpoint2, el_endpoint1,
                                            az_speed, az_accel)
         if ok:
-            self.log.info('Sun safety check passes: {msg}', msg=msg)
+            self.log.info('Sun safety check: {msg}', msg=msg)
         else:
             self.log.error('Sun safety check fails: {msg}', msg=msg)
             return False, 'Scan is not Sun Safe.'
@@ -1728,9 +1814,14 @@ class ACUAgent:
         if not ok:
             return False, msg
 
-        # Seek to starting position
+        # Seek to starting position.  Note we ask for at least one leg
+        # here, because go_to_axes knows how to wait for the warning
+        # horn to finish before returning, which relieves us from
+        # handling that delay in the (already onerous) scan point
+        # timing.
         self.log.info(f'Moving to start position, az={plan["init_az"]}, el={init_el}')
-        legs, msg = yield self._get_sunsafe_moves(plan['init_az'], init_el)
+        legs, msg = yield self._get_sunsafe_moves(plan['init_az'], init_el,
+                                                  zero_legs_ok=False)
         if msg is not None:
             self.log.error(msg)
             return False, msg
@@ -1778,6 +1869,9 @@ class ACUAgent:
         # The approximate loop time
         LOOP_STEP = 0.1  # seconds
 
+        # Time to allow for initial ProgramTrack transition.
+        MAX_PROGTRACK_SET_TIME = 5.
+
         # Minimum number of points to have in the stack.  While the
         # docs strictly require 4, this number should be at least 1
         # more than that to allow for rounding when we are setting the
@@ -1809,14 +1903,14 @@ class ACUAgent:
 
             yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
                                                 'Clear Stack')
-            yield dsleep(0.2)
+            yield dsleep(0.5)
 
             if azonly:
                 yield self._set_modes(az='ProgramTrack')
             else:
                 yield self._set_modes(az='ProgramTrack', el='ProgramTrack')
 
-            yield dsleep(0.5)
+            yield dsleep(0.1)
 
             # Values for mode are:
             # - 'go' -- keep uploading points (unless there are no more to upload).
@@ -1827,13 +1921,24 @@ class ACUAgent:
             lines = []
             last_mode = None
             was_graceful_exit = True
+            start_time = time.time()
+            got_progtrack = False
             faults = {}
+            got_points_in = False
+            first_upload_time = None
 
             while True:
+                now = time.time()
                 current_modes = {'Az': self.data['status']['summary']['Azimuth_mode'],
                                  'El': self.data['status']['summary']['Elevation_mode'],
                                  'Remote': self.data['status']['platform_status']['Remote_mode']}
                 free_positions = self.data['status']['summary']['Free_upload_positions']
+
+                # Use this var to detect case where we're uploading
+                # points but ACU is quietly dumping them because the
+                # vel is too high.
+                got_points_in = got_points_in \
+                    or (got_progtrack and free_positions < FULL_STACK)
 
                 if last_mode != mode:
                     self.log.info(f'scan mode={mode}, line_buffer={len(lines)}, track_free={free_positions}')
@@ -1846,10 +1951,21 @@ class ACUAgent:
 
                 if mode != 'abort':
                     # Reasons we might decide to abort ...
-                    if current_modes['Az'] != 'ProgramTrack':
-                        self.log.warn('Unexpected mode transition!')
+                    if current_modes['Az'] == 'ProgramTrack':
+                        got_progtrack = True
+                    else:
+                        if got_progtrack:
+                            self.log.warn('Unexpected exit from ProgramTrack mode!')
+                            mode = 'abort'
+                            was_graceful_exit = False
+                        elif now - start_time > MAX_PROGTRACK_SET_TIME:
+                            self.log.warn('Failed to set ProgramTrack mode in a timely fashion.')
+                            mode = 'abort'
+                            was_graceful_exit = False
+                    if not got_points_in and (first_upload_time is not None) \
+                       and (now - first_upload_time > 10):
+                        self.log.warn('ACU seems to be dumping our track. Vel too high?')
                         mode = 'abort'
-                        was_graceful_exit = False
                     if current_modes['Remote'] == 0:
                         self.log.warn('ACU no longer in remote mode!')
                         mode = 'abort'
@@ -1864,7 +1980,12 @@ class ACUAgent:
                 if free_positions >= STACK_REFILL_THRESHOLD:
                     new_line_target = max(int(free_positions - STACK_TARGET), 1)
 
-                    while mode == 'go' and (len(lines) < new_line_target or lines[-1][0] != 0):
+                    # Make sure that you get one more line than you
+                    # need (len(lines) > new_line_target), so that
+                    # after "grabbing the minimum batch", below, there
+                    # is still >= 1 line left.  The lines-is-empty
+                    # check is used to decide we're done.
+                    while mode == 'go' and (len(lines) <= new_line_target or lines[-1][0] != 0):
                         try:
                             lines.extend(next(point_gen))
                         except StopIteration:
@@ -1880,7 +2001,11 @@ class ACUAgent:
                     if len(upload_lines):
                         # Discard the group flag and upload all.
                         text = ''.join([line for _flag, line in upload_lines])
+                        # This seems to return b'Ok.' no matter ~what,
+                        # so not much point checking it.
                         yield self.acu_control.http.UploadPtStack(text)
+                        if first_upload_time is None:
+                            first_upload_time = time.time()
 
                 if len(lines) == 0 and free_positions >= FULL_STACK - 1:
                     break
@@ -2043,7 +2168,8 @@ class ACUAgent:
               "escape_triggered": false,
               "escape_active": false,
               "last_escape_time": 0,
-              "sun_is_real": true
+              "sun_is_real": true,
+              "platform_is_moveable": true
             }
           }
 
@@ -2100,7 +2226,6 @@ class ACUAgent:
         last_panic = 0
 
         session.data = {}
-        session.set_status('running')
 
         while session.status in ['starting', 'running']:
             new_data = {
@@ -2115,6 +2240,13 @@ class ACUAgent:
                     raise KeyError
             except KeyError:
                 az, el = None, None
+
+            try:
+                moveable = [bool(self.data['status']['platform_status'][k])
+                            for k in ['Safe_mode', 'Remote_mode']]
+                moveable = (not moveable[0]) and moveable[1]
+            except KeyError:
+                moveable = False
 
             no_map = self.sun is None
             old_map = (not no_map
@@ -2139,7 +2271,10 @@ class ACUAgent:
                 },
             })
 
-            sun_is_real = True  # flags time shift during debugging.
+            # Flags for unsafe position.
+            safety_known, danger_zone, warning_zone = False, False, False
+            # Flag for time shift during debugging.
+            sun_is_real = True
             if self.sun is not None:
                 info = self.sun.get_sun_pos(az, el)
                 sun_is_real = ('WARNING' not in info)
@@ -2147,13 +2282,9 @@ class ACUAgent:
                 if az is not None:
                     t = self.sun.check_trajectory([az], [el])['sun_time']
                     new_data['sun_pos']['sun_safe_time'] = t if t > 0 else 0
-
-            # Are we currently in safe position?
-            safety_known, danger_zone, warning_zone = False, False, False
-            if self.sun is not None:
-                safety_known = True
-                danger_zone = (t < self.sun_params['policy']['min_sun_time'])
-                warning_zone = (t < self.sun_params['policy']['response_time'])
+                    safety_known = True
+                    danger_zone = (t < self.sun_params['policy']['min_sun_time'])
+                    warning_zone = (t < self.sun_params['policy']['response_time'])
 
             # Has a drill been requested?
             drill_req = (self.sun_params['next_drill'] is not None
@@ -2178,13 +2309,26 @@ class ACUAgent:
                 'escape_active': escape_in_progress,
                 'last_escape_time': last_panic,
                 'sun_is_real': sun_is_real,
+                'platform_is_moveable': moveable,
             }
 
-            if (panic_for_real or panic_for_fun) and (time.time() - last_panic > 60.):
-                self.log.warn('monitor_sun is requesting escape_sun_now.')
+            if (panic_for_real or panic_for_fun):
+                now = time.time()
+                # Different retry conditions for moveable / not moveable
+                if moveable and (now - last_panic > 60.):
+                    # When moveable, only attempt escape every 1 minute.
+                    self.log.warn('monitor_sun is requesting escape_sun_now.')
+                    self.agent.start('escape_sun_now')
+                    last_panic = now
+                elif not moveable and (now - last_panic > 600.):
+                    # When not moveable, only print complaint message every 10 minutes.
+                    self.log.warn('monitor_sun cannot request escape_sun_now, '
+                                  'because platform not moveable by remote!')
+                    last_panic = now
+
+                # Regardless, clear the drill indicator -- we don't
+                # want that to occur randomly later.
                 self.sun_params['next_drill'] = None
-                self.agent.start('escape_sun_now')
-                last_panic = time.time()
 
             # Update session.
             session.data.update(new_data)
@@ -2201,6 +2345,8 @@ class ACUAgent:
 
             yield dsleep(1)
 
+        return True, 'monitor_sun exited cleanly.'
+
     @ocs_agent.param('reset', type=bool, default=None)
     @ocs_agent.param('enable', type=bool, default=None)
     @ocs_agent.param('temporary_disable', type=float, default=None)
@@ -2208,13 +2354,15 @@ class ACUAgent:
     @ocs_agent.param('avoidance_radius', type=float, default=None)
     @ocs_agent.param('shift_sun_hours', type=float, default=None)
     def update_sun(self, session, params):
-        """update_sun(reset, enable, temporary_disable, escape, \
-                      avoidance_radius, shift_sun_hours)
+        """update_sun(reset=None, enable=None, temporary_disable=None,
+                      escape=None, avoidance_radius=None,
+                      shift_sun_hours=None)
 
         **Task** - Update Sun monitoring and avoidance parameters.
 
-        Args:
+        All arguments are optional.
 
+        Args:
           reset (bool): If True, reset all sun_params to the platform
             defaults.  (The "defaults" includes any overrides
             specified on Agent command line.)
@@ -2281,7 +2429,6 @@ class ACUAgent:
 
         session.data = {'state': state,
                         'timestamp': time.time()}
-        session.set_status('running')
 
         while session.status in ['starting', 'running'] and state not in ['escape-done']:
             az, el = [self.data['status']['summary'][f'{ax}_current_position']
@@ -2363,6 +2510,17 @@ class ACUAgent:
         return True, "Exited."
 
     def _check_scan_sunsafe(self, az1, az2, el, v_az, a_az):
+        """This will return True if active avoidance is disabled.  If active
+        avoidance is enabled, then it will only return true if the
+        planned scan seems to currently be sun-safe.
+
+        """
+        if not self._get_sun_policy('sunsafe_moves'):
+            return True, 'Sun-safety checking is not enabled.'
+
+        if not self._get_sun_policy('map_valid'):
+            return False, 'Sun Safety Map not computed or stale; run the monitor_sun process.'
+
         # Include a bit of buffer for turn-arounds.
         az1, az2 = min(az1, az2), max(az1, az2)
         turn = v_az**2 / a_az
@@ -2378,12 +2536,9 @@ class ACUAgent:
         else:
             msg = 'Scan will be unsafe in %.1f hours' % (info['sun_time'] / 3600)
 
-        if self._get_sun_policy('sunsafe_moves'):
-            return safe, msg
-        else:
-            return True, 'Sun-safety not active; %s' % msg
+        return safe, msg
 
-    def _get_sunsafe_moves(self, target_az, target_el):
+    def _get_sunsafe_moves(self, target_az, target_el, zero_legs_ok=True):
         """Given a target position, find a Sun-safe way to get there.  This
         will either be a direct move, or else an ordered slew in az
         before el (or vice versa).
@@ -2393,6 +2548,11 @@ class ACUAgent:
         path can be found, the legs is a list of intermediate move
         targets, ``[(az0, el0), (az1, el1) ...]``, terminating on
         ``(target_az, target_el)``.  msg is None in that case.
+
+        In the case that platform is already at the target position,
+        an empty list of legs will be returned unless zero_legs_ok is
+        False in which case a 1-entry list of legs is returned, with
+        the target position in it.
 
         When Sun avoidance is not enabled, this function returns as
         though the direct path to the target is a safe one.
@@ -2422,7 +2582,10 @@ class ACUAgent:
         if move is None:
             return None, 'No Sun-Safe moves could be identified!'
 
-        return list(move['moves'].nodes[1:]), None
+        legs = list(move['moves'].nodes)
+        if len(legs) == 1 and not zero_legs_ok:
+            return legs, None
+        return legs[1:], None
 
     @ocs_agent.param('starting_index', type=int, default=0)
     def exercise(self, session, params):
@@ -2445,7 +2608,6 @@ class ACUAgent:
             'attempts': 0,
             'errors': 0,
         }
-        session.set_status('running')
 
         def _publish_activity(activity):
             msg = {
@@ -2569,6 +2731,9 @@ def add_agent_args(parser_in=None):
     pgroup.add_argument("--fov-radius", type=float,
                         help="Override the default field-of-view (radius in "
                         "degrees) for Sun avoidance purposes.")
+    pgroup.add_argument("--named-positions", nargs='+',
+                        help="Define named positions, for go_to_named; e.g. 'home=180,60'.")
+
     return parser_in
 
 
@@ -2586,7 +2751,8 @@ def main(args=None):
                  avoid_sun=args.avoid_sun,
                  fov_radius=args.fov_radius,
                  min_el=args.min_el,
-                 max_el=args.max_el)
+                 max_el=args.max_el,
+                 named_positions=args.named_positions)
 
     runner.run(agent, auto_reconnect=True)
 
