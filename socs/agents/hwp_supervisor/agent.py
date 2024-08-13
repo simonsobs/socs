@@ -957,10 +957,10 @@ class ControlStateMachine:
                 self.run_and_validate(clients.pid.set_direction,
                                       kwargs=dict(direction=new_d))
                 self.run_and_validate(clients.pid.tune_stop)
-                self.run_and_validate(clients.pmx.set_on)
 
-                self.run_and_validate(clients.pmx.set_v, kwargs={'volt': state.brake_voltage})
                 self.run_and_validate(clients.pmx.ign_ext)
+                self.run_and_validate(clients.pmx.set_v, kwargs={'volt': state.brake_voltage})
+                self.run_and_validate(clients.pmx.set_on)
 
                 time.sleep(10)
                 self.action.set_state(ControlState.WaitForBrake(
