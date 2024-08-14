@@ -14,10 +14,10 @@ txaio.use_twisted()
 from ocs.ocs_twisted import Pacemaker
 
 from socs.Lakeshore.Lakeshore240 import Module
+from ocs import ocs_agent, site_config
 
 on_rtd = os.environ.get("READTHEDOCS") == "True"
 if not on_rtd:
-    from ocs import ocs_agent, site_config
     log = txaio.make_logger()  # pylint: disable=E1101
 
 
