@@ -2,12 +2,12 @@ import argparse
 import os
 import queue
 import time
+import traceback
+import typing
 import warnings
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional, Any, Union, NoReturn, Tuple, Generator, Dict
-import typing
-import traceback
+from typing import Any, Dict, Generator, NoReturn, Optional, Tuple, Union
 
 import txaio
 from twisted.internet import defer
@@ -27,6 +27,8 @@ log = txaio.make_logger()
 
 ActionReturnType = Optional[dict[str, Any]]
 OcsOpReturnType = Generator[Any, Any, Tuple[bool, str]]
+
+
 class Actions:
     class BaseAction:
         def __post_init__(self):
@@ -87,7 +89,7 @@ class LS240_Agent:
     def __init__(
             self, agent: ocs_agent.OCSAgent,
             port: str = "/dev/ttyUSB0",
-            f_sample: float=2.5
+            f_sample: float = 2.5
     ) -> None:
         self.agent: ocs_agent.OCSAgent = agent
         self.log = agent.log
@@ -105,7 +107,7 @@ class LS240_Agent:
         )
 
     @defer.inlineCallbacks
-    def set_values(self, session: ocs_agent.OpSession, params: Optional[dict[str, Any]]=None) -> OcsOpReturnType:
+    def set_values(self, session: ocs_agent.OpSession, params: Optional[dict[str, Any]] = None) -> OcsOpReturnType:
         """set_values(channel, sensor=None, auto_range=None, range=None,\
                 current_reversal=None, units=None, enabled=None, name=None)
 
@@ -146,7 +148,7 @@ class LS240_Agent:
         return True, f"Set values for channel {action.channel}"
 
     @defer.inlineCallbacks
-    def upload_cal_curve(self, session: ocs_agent.OpSession, params: Optional[dict[str, Any]]=None) -> OcsOpReturnType:
+    def upload_cal_curve(self, session: ocs_agent.OpSession, params: Optional[dict[str, Any]] = None) -> OcsOpReturnType:
         """upload_cal_curve(channel, filename)
 
         **Task** - Upload a calibration curve to a channel.
