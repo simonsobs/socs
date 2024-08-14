@@ -3,11 +3,9 @@ import os
 import queue
 import time
 import traceback
-import typing
 import warnings
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Dict, Generator, NoReturn, Optional, Tuple, Union
+from dataclasses import dataclass
+from typing import Any, Dict, Generator, Optional, Tuple
 
 import txaio
 from twisted.internet import defer
@@ -17,20 +15,25 @@ from ocs.ocs_twisted import Pacemaker
 
 from socs.Lakeshore.Lakeshore240 import Module
 
-on_rtd = os.environ.get('READTHEDOCS') == 'True'
+on_rtd = os.environ.get("READTHEDOCS") == "True"
 if not on_rtd:
     from ocs import ocs_agent, site_config
-    from ocs.ocs_twisted import TimeoutLock
 
-log = txaio.make_logger()
+
+log = txaio.make_logger()  # pylint: disable=E1101
 
 
 ActionReturnType = Optional[dict[str, Any]]
-OcsOpReturnType = Generator[Any, Any, Tuple[bool, str]]
+OcsOpReturnType = Tuple[bool, str]
+OcsInlineCallbackReturnType = Generator[Any, Any, OcsOpReturnType]
 
 
 class Actions:
+    "Namespace to hold action classes for the Lakeshore240 agent."
+
     class BaseAction:
+        "Base class for all actions."
+
         def __post_init__(self):
             self.deferred = defer.Deferred()
 
@@ -39,6 +42,11 @@ class Actions:
 
     @dataclass
     class UploadCalCurve(BaseAction):
+        """
+        Action to upload a calibration curve to the lakeshore.  For parameter
+        details, see the docstrings for the `upload_cal_curve` task.
+        """
+
         channel: int
         filename: str
 
@@ -51,6 +59,11 @@ class Actions:
 
     @dataclass
     class SetValues(BaseAction):
+        """
+        Action to configure settings on the lakeshore.  For parameter details,
+        see the docstrings for the `set_values` task.
+        """
+
         channel: int
         sensor: Optional[int] = None
         auto_range: Optional[int] = None
@@ -75,39 +88,37 @@ class Actions:
             return None
 
 
-def get_module(port) -> Optional[Module]:
-    try:
-        module = Module(port)
-        log.info("Lakeshore initialized with ID: %s" % module.inst_sn)
-        return module
-    except Exception:
-        log.error("Could not connect to lakeshore\n{exc}", exc=traceback.format_exc())
-        return None
-
-
 class LS240_Agent:
     def __init__(
-            self, agent: ocs_agent.OCSAgent,
-            port: str = "/dev/ttyUSB0",
-            f_sample: float = 2.5
+        self,
+        agent: ocs_agent.OCSAgent,
+        port: str = "/dev/ttyUSB0",
+        f_sample: float = 2.5,
     ) -> None:
         self.agent: ocs_agent.OCSAgent = agent
-        self.log = agent.log
         self.port = port
         self.f_sample = f_sample
         self.action_queue: queue.Queue = queue.Queue()
 
+        # Register Operaionts
+        agent.register_task("set_values", self.set_values, blocking=False)
+        agent.register_task("upload_cal_curve", self.upload_cal_curve, blocking=False)
+        agent.register_process("main", self.main, self._stop_main, startup=True)
+
         # Registers Temperature and Voltage feeds
         agg_params = {
-            'frame_length': 60,
+            "frame_length": 60,
         }
         self.agent.register_feed(
-            'temperatures', record=True,
-            agg_params=agg_params, buffer_time=1
+            "temperatures", record=True, agg_params=agg_params, buffer_time=1
         )
 
     @defer.inlineCallbacks
-    def set_values(self, session: ocs_agent.OpSession, params: Optional[dict[str, Any]] = None) -> OcsOpReturnType:
+    def set_values(
+        self,
+        session: ocs_agent.OpSession,
+        params: Optional[dict[str, Any]] = None,  # pylint: disable=unused-argument
+    ) -> OcsInlineCallbackReturnType:
         """set_values(channel, sensor=None, auto_range=None, range=None,\
                 current_reversal=None, units=None, enabled=None, name=None)
 
@@ -148,7 +159,11 @@ class LS240_Agent:
         return True, f"Set values for channel {action.channel}"
 
     @defer.inlineCallbacks
-    def upload_cal_curve(self, session: ocs_agent.OpSession, params: Optional[dict[str, Any]] = None) -> OcsOpReturnType:
+    def upload_cal_curve(
+        self,
+        session: ocs_agent.OpSession,
+        params: Optional[dict[str, Any]] = None,  # pylint: disable=unused-argument
+    ) -> OcsInlineCallbackReturnType:
         """upload_cal_curve(channel, filename)
 
         **Task** - Upload a calibration curve to a channel.
@@ -164,7 +179,9 @@ class LS240_Agent:
         session.data = yield action.deferred
         return True, f"Uploaded curve to channel {action.channel}"
 
-    def _get_and_pub_temp_data(self, module: Module, session: ocs_agent.OpSession) -> Dict[str, Any]:
+    def _get_and_pub_temp_data(
+        self, module: Module, session: ocs_agent.OpSession
+    ) -> Dict[str, Any]:
         """
         Gets temperature data from the LS240, publishes to OCS feed, and updates
         session.data
@@ -175,137 +192,166 @@ class LS240_Agent:
         data_dict = {}
         for chan in module.channels:
             # Read sensor on channel
-            chan_string = "Channel_{}".format(chan.channel_num)
-            temp_reading = chan.get_reading(unit='K')
-            sensor_reading = chan.get_reading(unit='S')
+            chan_string = f"Channel_{chan.channel_num}"
+            temp_reading = chan.get_reading(unit="K")
+            sensor_reading = chan.get_reading(unit="S")
 
             # For data feed
-            data_dict[chan_string + '_T'] = temp_reading
-            data_dict[chan_string + '_V'] = sensor_reading
+            data_dict[chan_string + "_T"] = temp_reading
+            data_dict[chan_string + "_V"] = sensor_reading
 
             # For session.data
             field_dict[chan_string] = {"T": temp_reading, "V": sensor_reading}
 
         data = {
-            'timestamp': current_time,
-            'block_name': 'temps',
-            'data': data_dict,
+            "timestamp": current_time,
+            "block_name": "temps",
+            "data": data_dict,
         }
 
-        session.data['fields'] = field_dict
-        self.agent.publish_to_feed('temperatures', data)
-        session.data['timestamp'] = current_time
+        session.data["fields"] = field_dict
+        self.agent.publish_to_feed("temperatures", data)
+        session.data["timestamp"] = current_time
         return data
 
     def _process_actions(self, module: Module) -> None:
+        """
+        Processes queued actions using the provided Lakeshore Module.
+        """
         while not self.action_queue.empty():
             action = self.action_queue.get()
             try:
-                self.log.info(f"Running action {action}")
+                log.info(f"Running action {action}")
                 res = action.process(module)
                 action.deferred.callback(res)
-            except Exception as e:
-                self.log.error(f"Error processing action: {action}")
+            except Exception as e:  # pylint: disable=broad-except
+                log.error(f"Error processing action: {action}")
                 action.deferred.errback(e)
         return None
 
-    def main(self, session: ocs_agent.OpSession, params=None):
+    def main(
+        self,
+        session: ocs_agent.OpSession,
+        params: Optional[dict[str, Any]] = None,  # pylint: disable=unused-argument
+    ) -> OcsOpReturnType:
         """
         **Process** - Main process for the Lakeshore240 agent.
         Gets temperature data at specified sample rate, and processes commands.
         """
         module: Optional[Module] = None
-        session.set_status('running')
+        session.set_status("running")
 
         # Clear pre-existing actions
         while not self.action_queue.empty():
             action = self.action_queue.get()
             action.deferred.errback(Exception("Action cancelled"))
 
+        exceptions_to_attempt_reconnect = (ConnectionError, TimeoutError)
+
         pm = Pacemaker(self.f_sample, quantize=False)
-        while session.status in ['starting', 'running']:
+        while session.status in ["starting", "running"]:
             if module is None:
+                # Try to instantiate module
                 try:
-                    module = self._init_lakeshore()
-                except ConnectionRefusedError:
-                    self.log.error(
-                        "Could not connect to Lakeshore. "
-                        "Retrying after 30 sec..."
+                    module = Module(self.port)
+                    log.info("Lakeshore initialized with ID: {sn}", sn=module.inst_sn)
+                except exceptions_to_attempt_reconnect:
+                    log.error(
+                        "Could not connect to lakeshore:\n{exc}",
+                        exc=traceback.format_exc(),
                     )
+                    log.info("Retrying after 30 sec...")
                     time.sleep(30)
-                    pm.sleep()
                     continue
 
+            pm.sleep()
             try:
                 self._get_and_pub_temp_data(module, session)
                 self._process_actions(module)
-            except (ConnectionError, TimeoutError):
-                self.log.error("Connection to Lakeshore lost. Attempting to reconnect...")
+            except exceptions_to_attempt_reconnect:
+                log.error(
+                    "Connection to lakeshore lost:\n{exc}",
+                    exc=traceback.format_exc(),
+                )
                 module = None
 
         return True, "Ended main process"
 
-    def _stop_main(self, session, params=None):
-        session.set_status('stopping')
-        return True, 'Requesting to stop main process'
+    def _stop_main(self, session: ocs_agent.OpSession, params=None) -> OcsOpReturnType:  # pylint: disable=unused-argument
+        session.set_status("stopping")
+        return True, "Requesting to stop main process"
 
 
 def make_parser(parser=None):
     if parser is None:
         parser = argparse.ArgumentParser()
 
-    pgroup = parser.add_argument_group('Agent Options')
-    pgroup.add_argument('--serial-number', type=str,
-                        help="Serial number of your Lakeshore240 device")
-    pgroup.add_argument('--port', type=str,
-                        help="Path to USB node for the lakeshore")
-    pgroup.add_argument('--mode', type=str, choices=['idle', 'init', 'acq'],
-                        help="Starting action for the agent.")
-    pgroup.add_argument('--sampling-frequency', type=float,
-                        help="Sampling frequency for data acquisition")
+    pgroup = parser.add_argument_group("Agent Options")
+    pgroup.add_argument(
+        "--serial-number", type=str, help="Serial number of your Lakeshore240 device"
+    )
+    pgroup.add_argument("--port", type=str, help="Path to USB node for the lakeshore")
+    pgroup.add_argument(
+        "--mode",
+        type=str,
+        choices=["idle", "init", "acq"],
+        help="Starting action for the agent.",
+    )
+    pgroup.add_argument(
+        "--sampling-frequency",
+        type=float,
+        help="Sampling frequency for data acquisition",
+    )
 
     return parser
 
 
 def main(args=None):
     # Start logging
-    txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
+    txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))  # pylint: disable=E1101
 
     parser = make_parser()
 
     # Not used anymore, but we don't it to break the agent if these args are passed
-    parser.add_argument('--fake-data', help=argparse.SUPPRESS)
-    parser.add_argument('--num-channels', help=argparse.SUPPRESS)
+    parser.add_argument("--fake-data", help=argparse.SUPPRESS)
+    parser.add_argument("--num-channels", help=argparse.SUPPRESS)
 
     # Interpret options in the context of site_config.
-    args = site_config.parse_args(agent_class='Lakeshore240Agent',
-                                  parser=parser,
-                                  args=args)
+    args = site_config.parse_args(
+        agent_class="Lakeshore240Agent", parser=parser, args=args
+    )
 
     if args.fake_data is not None:
-        warnings.warn("WARNING: the --fake-data parameter is deprecated, please "
-                      "remove from your site-config file", DeprecationWarning)
+        warnings.warn(
+            "WARNING: the --fake-data parameter is deprecated, please "
+            "remove from your site-config file",
+            DeprecationWarning,
+        )
 
     if args.num_channels is not None:
-        warnings.warn("WARNING: the --num-channels parameter is deprecated, please "
-                      "remove from your site-config file", DeprecationWarning)
+        warnings.warn(
+            "WARNING: the --num-channels parameter is deprecated, please "
+            "remove from your site-config file",
+            DeprecationWarning,
+        )
 
     if args.mode is not None:
         warnings.warn(
             "WARNING: the --init-mode parameter is deprecated, please "
-            "remove from your site-config file", DeprecationWarning)
+            "remove from your site-config file",
+            DeprecationWarning,
+        )
 
     device_port = None
     if args.port is not None:
         device_port = args.port
     else:  # Tries to find correct USB port automatically
-
         # This exists if udev rules are setup properly for the 240s
-        if os.path.exists('/dev/{}'.format(args.serial_number)):
+        if os.path.exists("/dev/{}".format(args.serial_number)):
             device_port = "/dev/{}".format(args.serial_number)
 
-        elif os.path.exists('/dev/serial/by-id'):
-            ports = os.listdir('/dev/serial/by-id')
+        elif os.path.exists("/dev/serial/by-id"):
+            ports = os.listdir("/dev/serial/by-id")
             for port in ports:
                 if args.serial_number in port:
                     device_port = "/dev/serial/by-id/{}".format(port)
@@ -318,20 +364,13 @@ def main(args=None):
 
     agent, runner = ocs_agent.init_site_agent(args)
 
-    kwargs = {
-        'port': device_port
-    }
-
+    kwargs = {"port": device_port}
     if args.sampling_frequency is not None:
-        kwargs['f_sample'] = float(args.sampling_frequency)
+        kwargs["f_sample"] = float(args.sampling_frequency)
 
-    therm = LS240_Agent(agent, **kwargs)
-    agent.register_task('set_values', therm.set_values, blocking=False)
-    agent.register_task('upload_cal_curve', therm.upload_cal_curve, blocking=False)
-    agent.register_process('main', therm.main, therm._stop_main, startup=True)
-
+    LS240_Agent(agent, **kwargs)
     runner.run(agent, auto_reconnect=True)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
