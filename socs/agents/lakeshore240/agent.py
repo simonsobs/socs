@@ -23,7 +23,7 @@ if not on_rtd:
 log = txaio.make_logger()  # pylint: disable=E1101
 
 
-ActionReturnType = Optional[dict[str, Any]]
+ActionReturnType = Optional[Dict[str, Any]]
 OcsOpReturnType = Tuple[bool, str]
 OcsInlineCallbackReturnType = Generator[Any, Any, OcsOpReturnType]
 
@@ -117,7 +117,7 @@ class LS240_Agent:
     def set_values(
         self,
         session: ocs_agent.OpSession,
-        params: Optional[dict[str, Any]] = None,  # pylint: disable=unused-argument
+        params: Optional[Dict[str, Any]] = None,  # pylint: disable=unused-argument
     ) -> OcsInlineCallbackReturnType:
         """set_values(channel, sensor=None, auto_range=None, range=None,\
                 current_reversal=None, units=None, enabled=None, name=None)
@@ -162,7 +162,7 @@ class LS240_Agent:
     def upload_cal_curve(
         self,
         session: ocs_agent.OpSession,
-        params: Optional[dict[str, Any]] = None,  # pylint: disable=unused-argument
+        params: Optional[Dict[str, Any]] = None,  # pylint: disable=unused-argument
     ) -> OcsInlineCallbackReturnType:
         """upload_cal_curve(channel, filename)
 
@@ -232,7 +232,7 @@ class LS240_Agent:
     def main(
         self,
         session: ocs_agent.OpSession,
-        params: Optional[dict[str, Any]] = None,  # pylint: disable=unused-argument
+        params: Optional[Dict[str, Any]] = None,  # pylint: disable=unused-argument
     ) -> OcsOpReturnType:
         """
         **Process** - Main process for the Lakeshore240 agent.
