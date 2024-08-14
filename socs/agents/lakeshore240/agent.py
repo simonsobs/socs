@@ -69,7 +69,7 @@ class Actions:
         auto_range: Optional[int] = None
         range: Optional[int] = None
         current_reversal: Optional[int] = None
-        unit: Optional[int] = None
+        units: Optional[int] = None
         enabled: Optional[int] = None
         name: Optional[str] = None
 
@@ -80,7 +80,7 @@ class Actions:
                 auto_range=self.auto_range,
                 range=self.range,
                 current_reversal=self.current_reversal,
-                unit=self.unit,
+                unit=self.units,
                 enabled=self.enabled,
                 name=self.name,
             )
