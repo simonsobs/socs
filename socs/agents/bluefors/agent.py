@@ -399,17 +399,22 @@ class LogParser:
                          + "This probably shouldn't happen.")
                 LOG.warn("Filename: {}".format(k))
                 data = None
+            LOG.debug("Data: {d}", d=data)
 
-            if data is not None:
-                LOG.debug("Data: {d}", d=data)
-                # If the file was reopened due to an inode change we don't know
-                # if the last line is recent enough to be worth publishing. Check
-                if (time.time() - data['timestamp']) < int(self.stale_time) * 60:
-                    app_session.app.publish_to_feed('bluefors', data)
-                else:
-                    LOG.warn("Not publishing stale data. Make sure your log "
-                             + "file sync is done at a rate faster than once ever "
-                             + "{x} minutes.", x=self.stale_time)
+            # Don't publish if we didn't load anything
+            if data is None:
+                continue
+            if data['data'] == {}:
+                continue
+
+            # If the file was reopened due to an inode change we don't know
+            # if the last line is recent enough to be worth publishing. Check
+            if (time.time() - data['timestamp']) < int(self.stale_time) * 60:
+                app_session.app.publish_to_feed('bluefors', data)
+            else:
+                LOG.warn("Not publishing stale data. Make sure your log "
+                         + "file sync is done at a rate faster than once ever "
+                         + "{x} minutes.", x=self.stale_time)
 
 
 class BlueforsAgent:
