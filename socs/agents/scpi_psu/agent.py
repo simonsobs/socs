@@ -60,12 +60,12 @@ class ScpiPsuAgent:
             self.psu = PsuInterface(self.ip_address, self.gpib_slot) #this is only necessary if the ip_address or gpib_slot has changed. I could declare a self.connected flag if this is uneeded.
             self.idn = self.psu.identify()
         except Exception as e: #socket.tiout OR OSError 113 No route to host.
+            self.log.info("Failed to reconnect, trying again")
             self.psu = None
             return False
         self.log.info("Reconnected to psu: {}".format(self.idn))
         self.log.info("Clearing event registers and error queue")
         self.psu.clear()
-        session.set_status('running') #I can remove if this is not appropriate
         return True
 
     @ocs_agent.param('wait', type=float, default=1)
@@ -85,7 +85,6 @@ class ScpiPsuAgent:
                 Defaults to False.
 
         """
-        session.set_status('running')
         self.monitor = True
 
         while self.monitor:
@@ -104,7 +103,6 @@ class ScpiPsuAgent:
                                 data['data']["Current_{}".format(chan)] = self.psu.get_curr(chan)
                             except socket.timeout as e:
                                 self.log.warn(f"TimeoutError: {e}")
-                                # session.set_status('disconnected') #There is not an applicable session.status. in SESSION_STATUS_CODES (ocs_agent.py LN#958)
                                 self.log.info("Attempting to reconnect")
                                 self.psu = None
                                 break
