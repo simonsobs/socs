@@ -1,5 +1,3 @@
-import time
-
 import ocs
 import pytest
 from integration.util import docker_compose_file  # noqa: F401

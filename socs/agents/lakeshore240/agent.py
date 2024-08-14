@@ -18,9 +18,7 @@ from socs.Lakeshore.Lakeshore240 import Module
 on_rtd = os.environ.get("READTHEDOCS") == "True"
 if not on_rtd:
     from ocs import ocs_agent, site_config
-
-
-log = txaio.make_logger()  # pylint: disable=E1101
+    log = txaio.make_logger()  # pylint: disable=E1101
 
 
 ActionReturnType = Optional[Dict[str, Any]]
