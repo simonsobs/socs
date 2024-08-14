@@ -256,6 +256,7 @@ class LS240_Agent:
                     module = Module(self.port)
                     log.info("Lakeshore initialized with ID: {sn}", sn=module.inst_sn)
                 except exceptions_to_attempt_reconnect:
+                    session.degraded = True
                     log.error(
                         "Could not connect to lakeshore:\n{exc}",
                         exc=traceback.format_exc(),
@@ -268,7 +269,9 @@ class LS240_Agent:
             try:
                 self._get_and_pub_temp_data(module, session)
                 self._process_actions(module)
+                session.degraded = False
             except exceptions_to_attempt_reconnect:
+                session.degraded = True
                 log.error(
                     "Connection to lakeshore lost:\n{exc}",
                     exc=traceback.format_exc(),
