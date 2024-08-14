@@ -50,6 +50,9 @@ smurf_sim_deps = ['so3g']
 # Timing Master Monitor
 timing_master_deps = ['pyepics']
 
+# Camera control dependencies
+camera_deps = ['opencv-python', 'imutils']
+
 # LATRt XY Stage Agent
 # xy_stage_deps = [
 #     'xy_stage_control @ git+https://github.com/kmharrington/xy_stage_control.git@main',
@@ -58,7 +61,7 @@ timing_master_deps = ['pyepics']
 # Note: Not including the holograph deps, which are Python 3.8 only. Also not
 # including any dependencies with only direct references.
 all_deps = acu_deps + labjack_deps + magpie_deps + pfeiffer_deps + \
-    pysmurf_deps + smurf_sim_deps + timing_master_deps
+    pysmurf_deps + smurf_sim_deps + timing_master_deps + camera_deps
 all_deps = list(set(all_deps))
 
 setup(
@@ -126,6 +129,7 @@ setup(
         'pysmurf': pysmurf_deps,
         'smurf_sim': smurf_sim_deps,
         'timing_master': timing_master_deps,
+        'camera': camera_deps,
         # 'xy_stage': xy_stage_deps,
     },
 )
