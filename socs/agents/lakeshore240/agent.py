@@ -5,7 +5,9 @@ import time
 import warnings
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
+from typing import Optional, Any, Union, NoReturn, Tuple, Generator, Dict
+import typing
+import traceback
 
 import txaio
 from twisted.internet import defer
@@ -20,14 +22,17 @@ if not on_rtd:
     from ocs import ocs_agent, site_config
     from ocs.ocs_twisted import TimeoutLock
 
+log = txaio.make_logger()
 
+
+ActionReturnType = Optional[dict[str, Any]]
+OcsOpReturnType = Generator[Any, Any, Tuple[bool, str]]
 class Actions:
     class BaseAction:
         def __post_init__(self):
             self.deferred = defer.Deferred()
-            self.log = txaio.make_logger()
 
-        def process(self, *args, **kwargs):
+        def process(self, module: Module) -> ActionReturnType:
             raise NotImplementedError
 
     @dataclass
@@ -35,15 +40,12 @@ class Actions:
         channel: int
         filename: str
 
-        def process(self, module, log=None):
-            if log is None:
-                log = self.log
-
+        def process(self, module: Module) -> ActionReturnType:
             log.info(f"Starting upload to channel {self.channel}...")
             channel = module.channels[self.channel - 1]
             channel.load_curve(self.filename)
             time.sleep(0.1)
-            return True
+            return None
 
     @dataclass
     class SetValues(BaseAction):
@@ -56,10 +58,7 @@ class Actions:
         enabled: Optional[int] = None
         name: Optional[str] = None
 
-        def process(self, module, log=None):
-            if log is None:
-                log = self.log
-
+        def process(self, module: Module) -> ActionReturnType:
             log.info(f"Setting values for channel {self.channel}...")
             module.channels[self.channel - 1].set_values(
                 sensor=self.sensor,
@@ -71,16 +70,30 @@ class Actions:
                 name=self.name,
             )
             time.sleep(0.1)
-            return True
+            return None
+
+
+def get_module(port) -> Optional[Module]:
+    try:
+        module = Module(port)
+        log.info("Lakeshore initialized with ID: %s" % module.inst_sn)
+        return module
+    except Exception:
+        log.error("Could not connect to lakeshore\n{exc}", exc=traceback.format_exc())
+        return None
 
 
 class LS240_Agent:
-    def __init__(self, agent, port="/dev/ttyUSB0", f_sample=2.5):
+    def __init__(
+            self, agent: ocs_agent.OCSAgent,
+            port: str = "/dev/ttyUSB0",
+            f_sample: float=2.5
+    ) -> None:
         self.agent: ocs_agent.OCSAgent = agent
         self.log = agent.log
         self.port = port
         self.f_sample = f_sample
-        self.action_queue = queue.Queue()
+        self.action_queue: queue.Queue = queue.Queue()
 
         # Registers Temperature and Voltage feeds
         agg_params = {
@@ -91,16 +104,8 @@ class LS240_Agent:
             agg_params=agg_params, buffer_time=1
         )
 
-    def _init_lakeshore(self):
-        """
-        Creates new lakeshore module
-        """
-        module = Module(port=self.port)
-        self.log.info("Lakeshore initialized with ID: %s" % module.inst_sn)
-        return module
-
     @defer.inlineCallbacks
-    def set_values(self, session, params=None):
+    def set_values(self, session: ocs_agent.OpSession, params: Optional[dict[str, Any]]=None) -> OcsOpReturnType:
         """set_values(channel, sensor=None, auto_range=None, range=None,\
                 current_reversal=None, units=None, enabled=None, name=None)
 
@@ -133,13 +138,15 @@ class LS240_Agent:
             name (str, optional):
                 Sets name of channel.
         """
+        if params is None:
+            params = {}
         action = Actions.SetValues(**params)
         self.action_queue.put(action)
         session.data = yield action.deferred
         return True, f"Set values for channel {action.channel}"
 
     @defer.inlineCallbacks
-    def upload_cal_curve(self, session, params=None):
+    def upload_cal_curve(self, session: ocs_agent.OpSession, params: Optional[dict[str, Any]]=None) -> OcsOpReturnType:
         """upload_cal_curve(channel, filename)
 
         **Task** - Upload a calibration curve to a channel.
@@ -148,24 +155,22 @@ class LS240_Agent:
             channel (int): Channel number, 1-8.
             filename (str): Filename for calibration curve.
         """
+        if params is None:
+            params = {}
         action = Actions.UploadCalCurve(**params)
         self.action_queue.put(action)
         session.data = yield action.deferred
         return True, f"Uploaded curve to channel {action.channel}"
 
-    def _get_and_pub_temp_data(self, module: Module, session: ocs_agent.OpSession):
+    def _get_and_pub_temp_data(self, module: Module, session: ocs_agent.OpSession) -> Dict[str, Any]:
         """
         Gets temperature data from the LS240, publishes to OCS feed, and updates
         session.data
         """
         current_time = time.time()
-        data = {
-            'timestamp': current_time,
-            'block_name': 'temps',
-            'data': {}
-        }
         # Get Temps
         field_dict = {}
+        data_dict = {}
         for chan in module.channels:
             # Read sensor on channel
             chan_string = "Channel_{}".format(chan.channel_num)
@@ -173,18 +178,24 @@ class LS240_Agent:
             sensor_reading = chan.get_reading(unit='S')
 
             # For data feed
-            data['data'][chan_string + '_T'] = temp_reading
-            data['data'][chan_string + '_V'] = sensor_reading
+            data_dict[chan_string + '_T'] = temp_reading
+            data_dict[chan_string + '_V'] = sensor_reading
 
             # For session.data
             field_dict[chan_string] = {"T": temp_reading, "V": sensor_reading}
+
+        data = {
+            'timestamp': current_time,
+            'block_name': 'temps',
+            'data': data_dict,
+        }
 
         session.data['fields'] = field_dict
         self.agent.publish_to_feed('temperatures', data)
         session.data['timestamp'] = current_time
         return data
 
-    def _process_actions(self, module: Module):
+    def _process_actions(self, module: Module) -> None:
         while not self.action_queue.empty():
             action = self.action_queue.get()
             try:
@@ -194,6 +205,7 @@ class LS240_Agent:
             except Exception as e:
                 self.log.error(f"Error processing action: {action}")
                 action.deferred.errback(e)
+        return None
 
     def main(self, session: ocs_agent.OpSession, params=None):
         """
