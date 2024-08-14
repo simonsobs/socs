@@ -55,8 +55,7 @@ configuration block that will automatically start data acquisition::
 
   {'agent-class': 'HWPPCUAgent',
    'instance-id': 'hwp-pcu',
-   'arguments': [['--port', '/dev/HWPPCU'],
-                 ['--mode', 'acq']]},
+   'arguments': ['--port', '/dev/HWPPCU']},
 
 Each device requires configuration under 'agent-instances'. See the OCS site
 configs documentation for more details.

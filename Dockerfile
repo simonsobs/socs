@@ -2,7 +2,7 @@
 # A container setup with an installation of socs.
 
 # Use the ocs image as a base
-FROM simonsobs/ocs:v0.11.1
+FROM simonsobs/ocs:v0.11.1-1-gb6cbd88
 
 # Set up the cryo/smurf user and group so this can run on smurf-servers
 # See link for how all other smurf-containers are set up:
@@ -16,10 +16,9 @@ RUN useradd -d /home/cryo -M cryo -u 1000 && \
 
 # Install packages
 # suprsync agent - rsync
-# labjack agent - wget, python3-pip, libusb-1.0-0-dev, udev
+# labjack agent - wget, libusb-1.0-0-dev, udev
 RUN apt-get update && apt-get install -y rsync \
     wget \
-    python3-pip \
     libusb-1.0-0-dev \
     udev
 
@@ -36,14 +35,14 @@ COPY requirements/ /app/socs/requirements
 COPY requirements.txt /app/socs/requirements.txt
 WORKDIR /app/socs/
 # Work around https://github.com/pypa/setuptools/issues/4483/ temporarily
-RUN pip3 install -U "setuptools<71.0.0"
-RUN pip3 install -r requirements.txt
+RUN python -m pip install -U "setuptools<71.0.0"
+RUN python -m pip install -r requirements.txt
 
 # Copy the current directory contents into the container at /app
 COPY . /app/socs/
 
 # Install socs
-RUN pip3 install .
+RUN python -m pip install .
 
 # Reset workdir to avoid local imports
 WORKDIR /
