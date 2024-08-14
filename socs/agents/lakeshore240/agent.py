@@ -11,10 +11,10 @@ import txaio
 from twisted.internet import defer
 
 txaio.use_twisted()
+from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import Pacemaker
 
 from socs.Lakeshore.Lakeshore240 import Module
-from ocs import ocs_agent, site_config
 
 on_rtd = os.environ.get("READTHEDOCS") == "True"
 if not on_rtd:
