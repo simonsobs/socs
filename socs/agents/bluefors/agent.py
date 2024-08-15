@@ -380,7 +380,13 @@ class LogParser:
                 new = self.log_tracker.reopen_file(k)
                 LOG.debug("File: {f}, Line: {l}", f=k, l=new)
             else:
-                new = v['file_object'].readline()
+                try:
+                    new = v['file_object'].readline()
+                except OSError as e:
+                    LOG.warn(f"Unable to read line from {k} due to error: '{e}'. "
+                             + "Reopening file.")
+                    # Error likely caused by improperly closed file, so reopen it
+                    new = self.log_tracker.reopen_file(k)
             if new == '':
                 continue
 
