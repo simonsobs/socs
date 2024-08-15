@@ -1793,7 +1793,7 @@ def make_parser(parser=None):
         help="Max amount of time since last ACU update before allowing HWP spin up",
     )
     pgroup.add_argument(
-        '--mount-vel-grip-thresh', type=float, default=0.005,
+        '--mount-velocity-grip-thresh', type=float, default=0.005,
         help="Max mount velocity (both az and el) for gripping the HWP"
     )
     pgroup.add_argument(
@@ -1828,9 +1828,11 @@ def main(args=None):
     agent.register_task('set_const_voltage', hwp.set_const_voltage)
     agent.register_task('brake', hwp.brake)
     agent.register_task('pmx_off', hwp.pmx_off)
-    agent.register_task('abort_action', hwp.abort_action)
+    agent.register_task('grip_hwp', hwp.grip_hwp)
+    agent.register_task('ungrip_hwp', hwp.ungrip_hwp)
     agent.register_task('enable_driver_board', hwp.enable_driver_board)
     agent.register_task('disable_driver_board', hwp.disable_driver_board)
+    agent.register_task('abort_action', hwp.abort_action)
 
     runner.run(agent, auto_reconnect=True)
 
