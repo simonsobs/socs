@@ -129,8 +129,6 @@ class PfeifferAgent:
                 self.log.warn("Could not start init because {} is already running".format(self.lock.job))
                 return False, "Could not acquire lock."
 
-            session.set_status('running')
-
             self.take_data = True
 
             while self.take_data:

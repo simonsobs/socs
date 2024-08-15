@@ -48,7 +48,6 @@ hosts:
        'instance-id': 'hwp-pmx',
        'arguments': [['--ip', '127.0.0.1'],
                      ['--port', '5025'],
-                     ['--mode', 'init'],
                     ]
       },
       {'agent-class': 'CryomechCPAAgent',
