@@ -9,6 +9,7 @@ from ocs.ocs_twisted import TimeoutLock
 # from drivers import PsuInterface # import the local driver for testing purposes
 from socs.agents.scpi_psu.drivers import PsuInterface
 
+
 class ScpiPsuAgent:
     def __init__(self, agent, ip_address, gpib_slot):
         self.agent = agent
@@ -40,7 +41,7 @@ class ScpiPsuAgent:
         """
         if self.psu is not None:
             return True, "Already Initialized Module"
-    
+
         with self.lock.acquire_timeout(0) as acquired:
             if not acquired:
                 return False, "Could not acquire lock"
@@ -52,14 +53,14 @@ class ScpiPsuAgent:
                 self.log.error(f"PSU timed out during connect: {e}")
                 return False, "Timeout"
             self.log.info("Connected to psu: {}".format(self.idn))
-        return True, 'Initialized PSU.'  
- 
+        return True, 'Initialized PSU.'
+
     def _initialize_module(self, session, params=None):
         """Initialize the ScpiPsu module."""
         try:
-            self.psu = PsuInterface(self.ip_address, self.gpib_slot) #this is only necessary if the ip_address or gpib_slot has changed. I could declare a self.connected flag if this is uneeded.
+            self.psu = PsuInterface(self.ip_address, self.gpib_slot)  # this is only necessary if the ip_address or gpib_slot has changed. I could declare a self.connected flag if this is uneeded.
             self.idn = self.psu.identify()
-        except Exception as e: #socket.tiout OR OSError 113 No route to host.
+        except Exception as e:  # socket.tiout OR OSError 113 No route to host.
             self.log.info("Failed to reconnect, trying again")
             self.psu = None
             return False
@@ -107,7 +108,7 @@ class ScpiPsuAgent:
                                 self.psu = None
                                 break
 
-                    if self.psu: #Check to make sure there weren't any timeout errors so we don't publish incomplete data and make block errors.
+                    if self.psu:  # Check to make sure there weren't any timeout errors so we don't publish incomplete data and make block errors.
                         # self.log.info(str(data))
                         self.agent.publish_to_feed('psu_output', data)
 
