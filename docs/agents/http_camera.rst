@@ -23,21 +23,25 @@ Agent in a docker container.
 OCS Site Config
 ```````````````
 
-To configure the HTTP Camera Agent we need to add a HTTPCameraAgent
+To configure the HTTP Camera Agent we need to add an HTTPCameraAgent
 block to our ocs configuration file. Here is an example configuration block
 using all of the available arguments::
 
       {'agent-class': 'HTTPCameraAgent',
        'instance-id': 'cameras',
        'arguments': [['--mode', 'acq'],
-                     ['--config-file', 'config_file.yaml']]},
+                     ['--config-file', 'cameras.yaml']]},
 
 .. note::
     The ``--config-file`` argument should be the config file path relative
     to ``OCS_CONFIG_DIR`` and contain an entry for each camera with
-    relevant information. An example can be found at `config`_.
+    relevant information. An example is given here which is also found
+    at `config`_.
 
 .. _config: https://github.com/simonsobs/socs/blob/main/socs/agents/http_camera/sample_config.yaml
+
+.. literalinclude:: ../../../socs/agents/http_camera/sample_config.yaml
+   :language: yaml
 
 Docker Compose
 ``````````````

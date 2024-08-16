@@ -113,8 +113,12 @@ class HTTPCameraAgent:
                 elif camera['brand'] == 'acti':
                     payload = {'USER': camera['user'],
                                'PWD': camera['password'],
-                               'SNAPSHOT': camera['resolution']}
+                               'SNAPSHOT': camera.get('resolution', 'N640x480,100')}
                     url = f"http://{camera['address']}/cgi-bin/encoder"
+                else:
+                    self.log.info(f"{camera['brand']} is an unsupported camera brand. Skipping this config block.")
+                    self.config['cameras'].remove(camera)
+                    continue
 
                 # Format directory and filename
                 ctime = int(timestamp)
@@ -137,7 +141,6 @@ class HTTPCameraAgent:
                     data[camera['location']]['last_attempt'] = time.time()
                     data[camera['location']]['connected'] = connected
                     continue
-                camera['connected'] = True
                 self.log.debug("Received screenshot from camera.")
 
                 # Write screenshot to file and update latest file
