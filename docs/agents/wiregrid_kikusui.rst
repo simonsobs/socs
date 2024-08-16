@@ -46,7 +46,7 @@ An example site-config-file block::
 Docker Compose
 ``````````````
 
-An example docker-compose configuration::
+An example docker compose configuration::
 
     ocs-wgkikusui-agent:
       image: simonsobs/socs:latest

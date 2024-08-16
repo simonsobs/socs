@@ -137,7 +137,8 @@ def take_iv(iv_kwargs=None):
     return {
         'filepath': iva.filepath,
         'quantiles': {
-            'Rn': compute_quantiles('Rn', iva.R_n, quantiles)
+            'Rn': compute_quantiles('Rn', iva.R_n, quantiles),
+            'p_sat': compute_quantiles('p_sat', iva.p_sat, quantiles)
         }
     }
 
