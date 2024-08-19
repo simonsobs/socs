@@ -524,7 +524,12 @@ class PID:
 
         """
         end_string = string.split('\r')[-1]
-        read_type = end_string[1:3]
+        if len(end_string) == 9:
+            read_type = end_string[1:3]
+        elif len(end_string) == 8:
+            read_type = '0' + end_string[1:2]
+        else:
+            return DecodedResponse(msg_type='error', msg='Unrecognized Read Length')
         # Decode target
         if read_type == '01':
             target = float(int(end_string[4:], 16) / 1000.)
@@ -536,7 +541,7 @@ class PID:
             else:
                 return DecodedResponse(msg_type='read', msg='Direction = Forward', measure=0)
         else:
-            return DecodedResponse(msg_type='error', msg='Unrecognized Read')
+            return DecodedResponse(msg_type='error', msg='Unrecognized Read Type')
 
     @staticmethod
     def _decode_write(string):
