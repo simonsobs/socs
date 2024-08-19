@@ -73,7 +73,8 @@ setup(
     package_data={'socs': [
         'agents/smurf_file_emulator/*.yaml',
         'agents/labjack/cal_curves/*.txt',
-        'agents/generator/*.yaml'
+        'agents/generator/*.yaml',
+        'agents/http_camera/*.yaml'
     ]},
     entry_points={
         'console_scripts': [
