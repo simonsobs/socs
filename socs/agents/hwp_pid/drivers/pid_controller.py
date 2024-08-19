@@ -532,11 +532,11 @@ class PID:
             return DecodedResponse(msg_type='error', msg='Unrecognized Read Length')
         # Decode target
         if read_type == '01':
-            target = float(int(end_string[4:], 16) / 1000.)
+            target = float(int(end_string[-5:], 16) / 1000.)
             return DecodedResponse(msg_type='read', msg='Setpoint = ' + str(target), measure=target)
         # Decode direction
         elif read_type == '02':
-            if int(end_string[4:], 16) / 1000. > 2.5:
+            if int(end_string[-5:], 16) / 1000. > 2.5:
                 return DecodedResponse(msg_type='read', msg='Direction = Reverse', measure=1)
             else:
                 return DecodedResponse(msg_type='read', msg='Direction = Forward', measure=0)
