@@ -1,16 +1,16 @@
 .. highlight:: rst
 
-.. _acti_camera:
+.. _http_camera:
 
 ====================
-ACTi Camera Agent
+HTTP Camera Agent
 ====================
 
-The ACTi Camera Agent is an OCS Agent which grabs screenshots from ACTi cameras
-and saves files to a directory.
+The HTTP Camera Agent is an OCS Agent which grabs screenshots from cameras
+using HTTP requests and saves files to a directory.
 
 .. argparse::
-    :filename: ../socs/agents/acti_camera/agent.py
+    :filename: ../socs/agents/http_camera/agent.py
     :func: add_agent_args
     :prog: python3 agent.py
 
@@ -23,32 +23,28 @@ Agent in a docker container.
 OCS Site Config
 ```````````````
 
-To configure the ACTi Camera Agent we need to add a ACTiCameraAgent
+To configure the HTTP Camera Agent we need to add an HTTPCameraAgent
 block to our ocs configuration file. Here is an example configuration block
 using all of the available arguments::
 
-      {'agent-class': 'ACTiCameraAgent',
+      {'agent-class': 'HTTPCameraAgent',
        'instance-id': 'cameras',
        'arguments': [['--mode', 'acq'],
-                     ['--camera-addresses', ['10.10.10.41', '10.10.10.42', '10.10.10.43']],
-                     ['--locations', ['location1', 'location2', 'location3']],
-                     ['--resolutions', ['N640x480,100', 'N640x480,100', 'N640x480,100']],
-                     ['--user', 'admin'],
-                     ['--password', 'password']]},
+                     ['--config-file', 'cameras.yaml']]},
 
 .. note::
-    The ``--camera-addresses`` argument should be a list of the IP addresses
-    of the cameras on the network.
-    The ``--locations`` argument should be a list of names for camera locations.
-    This should be in the same order as the list of IP addresses.
-    The ``--resolutions`` argument should be a list of resolutions for each camera.
-    For example, ``N640x480,100`` gives a 640x480 image with 100% quality.
+    The ``--config-file`` argument should be the config file path relative
+    to ``OCS_CONFIG_DIR`` and contain an entry for each camera with
+    relevant information. An example is given below which is also found
+    at `config`_.
+
+.. _config: https://github.com/simonsobs/socs/blob/main/socs/agents/http_camera/sample_config.yaml
 
 Docker Compose
 ``````````````
 
-The iBootbar Agent should be configured to run in a Docker container. An
-example docker compose service configuration is shown here::
+The HTTP Camera Agent should be configured to run in a Docker container. An
+example docker-compose service configuration is shown here::
 
   ocs-cameras:
     image: simonsobs/socs:latest
@@ -68,11 +64,17 @@ debugging. The default level is "info".
 The volume must mount to ``/screenshots``. The user must have permissions to write
 to the mounted local directory.
 
+Camera Config
+`````````````
+
+.. literalinclude:: ../../socs/agents/http_camera/sample_config.yaml
+   :language: yaml
+
 Description
 -----------
 
-The ACTi cameras will be used to monitor conditions at the SO site.
-The ACTi Camera Agent periodically (1 minute) grabs screenshots from each
+The HTTP cameras will be used to monitor conditions at the SO site.
+The HTTP Camera Agent periodically (1 minute) grabs screenshots from each HTTP
 camera on the network. The images are saved to a location on disk. A webserver
 should then be configured to serve this directory to some URL. Then we can use
 HTML to access the webserver and display ``latest.jpg`` for an up-to-date
@@ -82,5 +84,5 @@ using the Text panel in HTML mode.
 Agent API
 ---------
 
-.. autoclass:: socs.agents.acti_camera.agent.ACTiCameraAgent
+.. autoclass:: socs.agents.http_camera.agent.HTTPCameraAgent
     :members:
