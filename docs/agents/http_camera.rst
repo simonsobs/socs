@@ -35,13 +35,10 @@ using all of the available arguments::
 .. note::
     The ``--config-file`` argument should be the config file path relative
     to ``OCS_CONFIG_DIR`` and contain an entry for each camera with
-    relevant information. An example is given here which is also found
+    relevant information. An example is given below which is also found
     at `config`_.
 
 .. _config: https://github.com/simonsobs/socs/blob/main/socs/agents/http_camera/sample_config.yaml
-
-.. literalinclude:: ../../../socs/agents/http_camera/sample_config.yaml
-   :language: yaml
 
 Docker Compose
 ``````````````
@@ -66,6 +63,12 @@ The ``LOGLEVEL`` environment variable can be used to set the log level for
 debugging. The default level is "info".
 The volume must mount to ``/screenshots``. The user must have permissions to write
 to the mounted local directory.
+
+Camera Config
+`````````````
+
+.. literalinclude:: ../../socs/agents/http_camera/sample_config.yaml
+   :language: yaml
 
 Description
 -----------
