@@ -7,12 +7,13 @@ from pathlib import Path
 
 import requests
 import txaio
-import urllib3
 import yaml
-
-urllib3.disable_warnings()
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import Pacemaker, TimeoutLock
+# Disable unverified HTTPS warnings (https://urllib3.readthedocs.io/en/latest/advanced-usage.html#ssl-warnings)
+from urllib3.exceptions import InsecureRequestWarning
+
+requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
 # For logging
 txaio.use_twisted()
