@@ -40,7 +40,7 @@ class HTTPCameraAgent:
         txaio logger object, created by the OCSAgent
     """
 
-    def __init__(self, agent, config_file):
+    def __init__(self, agent, config_file, renew_token=2700):
         self.agent = agent
         self.is_streaming = False
         self.log = self.agent.log
@@ -49,6 +49,8 @@ class HTTPCameraAgent:
         file_path = os.path.join(os.environ['OCS_CONFIG_DIR'], config_file)
         with open(file_path, 'r') as f:
             self.config = yaml.safe_load(f)
+
+        self.renew_token = renew_token
 
         agg_params = {
             'frame_length': 10 * 60  # [sec]
@@ -97,19 +99,41 @@ class HTTPCameraAgent:
                 self.log.info(f"Grabbing screenshot from {camera['location']}")
 
                 if camera['brand'] == 'reolink':
-                    login_url = f"https://{camera['address']}/api.cgi?cmd=Login"
-                    login_payload = [{"cmd": "Login",
-                                      "param": {"User":
-                                                {"Version": 0,
-                                                 "userName": camera['user'],
-                                                 "password": camera['password']}}}]
-                    resp = requests.post(login_url, data=json.dumps(login_payload), verify=False)
-                    rdata = resp.json()
-                    token = rdata[0]['value']['Token']['name']
+                    token = camera.get('token', None)
+                    token_ts = camera.get('token_ts', 0)
+                    # Token lease time is 1hr.
+                    expired = (timestamp - token_ts) > self.renew_token
+                    if token is None or expired:
+                        login_url = f"https://{camera['address']}/api.cgi?cmd=Login"
+                        login_payload = [{"cmd": "Login",
+                                          "param": {"User":
+                                                    {"Version": 0,
+                                                     "userName": camera['user'],
+                                                     "password": camera['password']}}}]
+                        try:
+                            resp = requests.post(login_url, data=json.dumps(login_payload), verify=False)
+                        except requests.exceptions.RequestException as e:
+                            self.log.error(f'{e}')
+                            self.log.info("Unable to get response from camera.")
+                            connected = False
+                            data[camera['location']]['last_attempt'] = time.time()
+                            data[camera['location']]['connected'] = connected
+                            continue
+                        rdata = resp.json()
+                        value = rdata[0].get('value', None)
+                        if value is None:
+                            self.log.info("Unable to get token. Max number of tokens used.")
+                            connected = False
+                            data[camera['location']]['last_attempt'] = time.time()
+                            data[camera['location']]['connected'] = connected
+                            continue
+                        camera['token'] = value['Token']['name']
+                        camera['token_ts'] = timestamp
+
                     payload = {'cmd': "Snap",
                                'channel': "0",
                                'rs': "flsYJfZgM6RTB_os",
-                               'token': token}
+                               'token': camera['token']}
                     url = f"https://{camera['address']}/cgi-bin/api.cgi"
                 elif camera['brand'] == 'acti':
                     payload = {'USER': camera['user'],
@@ -200,6 +224,8 @@ def add_agent_args(parser=None):
     pgroup = parser.add_argument_group("Agent Options")
     pgroup.add_argument("--config-file", type=str, help="Config file path relative to OCS_CONFIG_DIR")
     pgroup.add_argument("--mode", choices=['acq', 'test'])
+    pgroup.add_argument("--renew-token", type=int, default=2700,
+                        help="Renew API token after this amount of seconds. Used for Reolink cameras.")
 
     return parser
 
@@ -220,7 +246,8 @@ def main(args=None):
 
     agent, runner = ocs_agent.init_site_agent(args)
     p = HTTPCameraAgent(agent,
-                        config_file=args.config_file)
+                        config_file=args.config_file,
+                        renew_token=args.renew_token)
 
     agent.register_process("acq",
                            p.acq,
