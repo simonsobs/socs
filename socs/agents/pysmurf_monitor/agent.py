@@ -3,15 +3,14 @@ import json
 import os
 import queue
 import time
+import traceback
+from typing import Any, Dict, Optional, Tuple
 
+import sqlalchemy
+import txaio  # type: ignore
 from ocs import ocs_agent, ocs_feed, site_config
 from twisted.internet import reactor
 from twisted.internet.protocol import DatagramProtocol
-import txaio  # type: ignore
-
-import traceback
-from typing import Tuple, Optional, Dict, Any
-import sqlalchemy
 
 from socs.db.suprsync import SupRsyncFilesManager, create_file
 
@@ -246,7 +245,7 @@ class PysmurfMonitor(DatagramProtocol):
         return True, 'Done monitoring.'
 
 
-def make_parser(parser: Optional[argparse.ArgumentParser]=None) -> argparse.ArgumentParser:
+def make_parser(parser: Optional[argparse.ArgumentParser] = None) -> argparse.ArgumentParser:
     if parser is None:
         parser = argparse.ArgumentParser()
 
