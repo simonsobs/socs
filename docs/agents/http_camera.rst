@@ -30,7 +30,8 @@ using all of the available arguments::
       {'agent-class': 'HTTPCameraAgent',
        'instance-id': 'cameras',
        'arguments': [['--mode', 'acq'],
-                     ['--config-file', 'cameras.yaml']]},
+                     ['--config-file', 'cameras.yaml'],
+                     ['--renew-token', 2700]]},
 
 .. note::
     The ``--config-file`` argument should be the config file path relative
