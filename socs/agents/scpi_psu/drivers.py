@@ -10,6 +10,10 @@ ONE_CHANNEL_MODELS = ['2280S-60-3', '2280S-32-6', '9171',
                       '9172', '9181', '9182', '9183', '9184', '9185']
 TWO_CHANNEL_MODELS = ['9173', '9174']
 THREE_CHANNEL_MODELS = ['2230G-30-1']
+
+# error codes from 2280S devices
+# part of an attempt to query devices for the number
+# of supported channels
 UNDEFINED_HEADER = -113
 HEADER_SUFFIX_OUT_OF_RANGE = -114
 
