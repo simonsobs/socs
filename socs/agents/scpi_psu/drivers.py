@@ -6,18 +6,21 @@ import time
 from socs.common.prologix_interface import PrologixInterface
 
 # append new model strings as needed
-ONE_CHANNEL_MODELS = ['2280S-60-3', '2280S-32-6']
+ONE_CHANNEL_MODELS = ['2280S-60-3', '2280S-32-6', '9171',
+                      '9172', '9181', '9182', '9183', '9184', '9185']
+TWO_CHANNEL_MODELS = ['9173', '9174']
 THREE_CHANNEL_MODELS = ['2230G-30-1']
+UNDEFINED_HEADER = -113
+HEADER_SUFFIX_OUT_OF_RANGE = -114
 
 
 class ScpiPsuInterface:
-    def __init__(self, ip_address, gpibAddr, port, **kwargs):
+    def __init__(self, ip_address, port, **kwargs):
         self.ip_address = ip_address
-        self.gpibAddr = gpibAddr
         self.port = port
         self.sock = None
         self.model = None
-        self.numChannels = 0
+        self.num_channels = 0
         self.conn_socket()
         try:
             self.configure()
@@ -51,11 +54,15 @@ class ScpiPsuInterface:
 
     def configure(self):
         self.model = self.read_model()
+
         if (self.model in ONE_CHANNEL_MODELS):
-            self.numChannels = 1
+            self.num_channels = 1
+        if (self.model in TWO_CHANNEL_MODELS):
+            self.num_channels = 2
         if (self.model in THREE_CHANNEL_MODELS):
-            self.numChannels = 3
-        if (self.numChannels == 0):
+            self.num_channels = 3
+        if (self.num_channels == 0):
+            self.num_channels = 3
             raise ValueError('Model number not found in known device models', self.model)
 
     def enable(self, ch):
@@ -64,9 +71,9 @@ class ScpiPsuInterface:
         Depending on state of power supply, it might need to be called
         before the output is set.
         '''
-        if (self.numChannels != 1):
+        if (self.num_channels != 1):
             self.set_chan(ch)
-            self.write('OUTP:ENAB ON')
+        self.write('OUTP:ENAB ON')
 
     def disable(self, ch):
         '''
@@ -76,7 +83,7 @@ class ScpiPsuInterface:
         self.write('OUTP:ENAB OFF')
 
     def set_chan(self, ch):
-        if (self.numChannels != 1):
+        if (self.num_channels != 1):
             self.write('inst:nsel ' + str(ch))
 
     def set_output(self, ch, out):
@@ -92,7 +99,7 @@ class ScpiPsuInterface:
         '''
         self.set_chan(ch)
         self.enable(ch)
-        if (self.numChannels != 1):
+        if (self.num_channels != 1):
             if isinstance(out, str):
                 self.write('CHAN:OUTP ' + out)
             elif out:
@@ -112,7 +119,7 @@ class ScpiPsuInterface:
         check if the output of a channel (1,2,3) is on (True) or off (False)
         '''
         self.set_chan(ch)
-        if (self.numChannels != 1):
+        if (self.num_channels != 1):
             self.write('CHAN:OUTP:STAT?')
         else:
             self.write('OUTP:STAT?')
@@ -129,7 +136,7 @@ class ScpiPsuInterface:
 
     def get_volt(self, ch):
         self.set_chan(ch)
-        if (self.numChannels != 1):
+        if (self.num_channels != 1):
             self.write('MEAS:VOLT? CH' + str(ch))
         else:
             self.write('MEAS:VOLT?')
@@ -138,7 +145,7 @@ class ScpiPsuInterface:
 
     def get_curr(self, ch):
         self.set_chan(ch)
-        if (self.numChannels != 1):
+        if (self.num_channels != 1):
             self.write('MEAS:CURR? CH' + str(ch))
         else:
             self.write('MEAS:CURR?')
