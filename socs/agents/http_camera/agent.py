@@ -90,6 +90,7 @@ class HTTPCameraAgent:
 
         self.is_streaming = True
         while self.is_streaming:
+            pm.sleep()
             # Use UTC
             timestamp = time.time()
             data = {}
@@ -171,6 +172,9 @@ class HTTPCameraAgent:
                 # Write screenshot to file and update latest file
                 with open(filename, 'wb') as out_file:
                     shutil.copyfileobj(response.raw, out_file)
+                    # Ensure all data is written to the disk before copying to latest
+                    out_file.flush()
+                    os.fsync(out_file.fileno())
                 self.log.debug(f"Wrote {ctime}.jpg to /{camera['location']}/{ctime_dir}.")
                 shutil.copy2(filename, latest_filename)
                 self.log.debug(f"Updated latest.jpg in /{camera['location']}.")
@@ -197,7 +201,6 @@ class HTTPCameraAgent:
 
             if params['test_mode']:
                 break
-            pm.sleep()
 
         return True, "Finished Recording"
 
