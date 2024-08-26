@@ -972,6 +972,12 @@ class LS372_Agent:
                     session.add_message('Changing control to Open Loop mode for sample PID.')
                     self.module.sample_heater.set_mode("Open Loop")
 
+                # Check we're in the correct display mode for servo.
+                # The custom PID expects that the sample heater is in 'current' mode
+                if self.module.sample_heater.display != "current":
+                    session.add_message("Changing display mode to \'current\' for sample PID.")
+                    self.module.sample_heater.set_heater_display("current")
+
             if heater == 'still':
                 # Check we're in correct control mode for servo.
                 if self.module.still_heater.mode != 'Open Loop':
