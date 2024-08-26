@@ -38,7 +38,7 @@ An example configuration for your ocs config file::
 Docker Compose
 ``````````````
 
-Example docker-compose configuration::
+Example docker compose configuration::
 
   ocs-bluefors:
     image: simonsobs/socs:latest
@@ -145,7 +145,7 @@ tools, i.e. Docker for Windows, if possible) is:
 - Run docker terminal (this performs some Virtualbox setup)
 - Run docker login
 - Clone the ocs-site-configs repo and create a directory for your machine
-- Configure ocs/docker-compose files
+- Configure ocs/docker compose files
 - Make sure your system clock is set to UTC
 - Bring up the container(s)
 

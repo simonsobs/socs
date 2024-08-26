@@ -28,6 +28,8 @@ An example site-config-file block::
      'instance-id': 'hwp-gripper',
      'arguments': [ '--mcu_ip', '10.10.10.115',
                     '--control_port', 8041,
+                    '--warm-grip-distance, 9.2, 10.6, 9.8,
+                    '--adjustment-distance, 0., 0., 0.,
                     '--supervisor-id', 'hwp-supervisor',
                     '--no-data-warn-time', 60,
                     '--no-data-shutdown-time', 300,  # 5 minutes
@@ -37,7 +39,7 @@ An example site-config-file block::
 Docker Compose
 `````````````````````
 
-An example docker-compose configuration::
+An example docker compose configuration::
 
     ocs-hwp-gripper:
         image: simonsobs/socs:latest

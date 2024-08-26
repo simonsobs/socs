@@ -308,7 +308,6 @@ class UPSAgent:
                 Units:: Watts
         """
 
-        session.set_status('running')
         self.is_streaming = True
         timeout = time.time() + 60 * self.restart  # exit loop after self.restart minutes
         while self.is_streaming:
@@ -438,7 +437,7 @@ class UPSAgent:
                 break
 
         # Exit agent to release memory
-        # Add "restart: unless-stopped" to docker-compose to automatically restart container
+        # Add "restart: unless-stopped" to docker compose to automatically restart container
         if ((not params['test_mode']) and (timeout != 0) and (self.is_streaming)):
             self.log.info(f"{self.restart} minutes have elasped. Exiting agent.")
             os.kill(os.getppid(), signal.SIGTERM)

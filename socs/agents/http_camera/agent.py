@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 import shutil
 import time
@@ -6,26 +7,27 @@ from pathlib import Path
 
 import requests
 import txaio
+import yaml
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import Pacemaker, TimeoutLock
+# Disable unverified HTTPS warnings (https://urllib3.readthedocs.io/en/latest/advanced-usage.html#ssl-warnings)
+from urllib3.exceptions import InsecureRequestWarning, ReadTimeoutError
+
+requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
 # For logging
 txaio.use_twisted()
 
 
-class ACTiCameraAgent:
-    """Grab screenshots from ACTi cameras.
+class HTTPCameraAgent:
+    """Grab screenshots from HTTP cameras.
 
     Parameters
     ----------
     agent : OCSAgent
         OCSAgent object which forms this Agent
-    camera_addresses : list
-        List of IP addresses (as strings) of cameras.
-    user : str
-        Username of cameras.
-    password : str
-        Password of cameras.
+    config_file : str
+        Config file path relative to OCS_CONFIG_DIR
 
     Attributes
     ----------
@@ -38,19 +40,17 @@ class ACTiCameraAgent:
         txaio logger object, created by the OCSAgent
     """
 
-    def __init__(self, agent, camera_addresses, locations, user, password):
+    def __init__(self, agent, config_file, renew_token=2700):
         self.agent = agent
         self.is_streaming = False
         self.log = self.agent.log
         self.lock = TimeoutLock()
 
-        self.cameras = []
-        for (location, address) in (zip(locations, camera_addresses)):
-            self.cameras.append({'location': location,
-                                 'address': address,
-                                 'connected': True})
-        self.user = user
-        self.password = password
+        file_path = os.path.join(os.environ['OCS_CONFIG_DIR'], config_file)
+        with open(file_path, 'r') as f:
+            self.config = yaml.safe_load(f)
+
+        self.renew_token = renew_token
 
         agg_params = {
             'frame_length': 10 * 60  # [sec]
@@ -64,7 +64,7 @@ class ACTiCameraAgent:
     def acq(self, session, params=None):
         """acq(test_mode=False)
 
-        **Process** - Grab screenshots from ACTi cameras.
+        **Process** - Grab screenshots from HTTP cameras.
 
         Parameters
         ----------
@@ -88,20 +88,63 @@ class ACTiCameraAgent:
         """
         pm = Pacemaker(1 / 60, quantize=False)
 
-        session.set_status('running')
         self.is_streaming = True
         while self.is_streaming:
+            pm.sleep()
             # Use UTC
             timestamp = time.time()
             data = {}
 
-            for camera in self.cameras:
+            for camera in self.config['cameras']:
                 data[camera['location']] = {'location': camera['location']}
                 self.log.info(f"Grabbing screenshot from {camera['location']}")
-                payload = {'USER': self.user,
-                           'PWD': self.password,
-                           'SNAPSHOT': 'N640x480,100'}
-                url = f"http://{camera['address']}/cgi-bin/encoder"
+
+                if camera['brand'] == 'reolink':
+                    token = camera.get('token', None)
+                    token_ts = camera.get('token_ts', 0)
+                    # Token lease time is 1hr.
+                    expired = (timestamp - token_ts) > self.renew_token
+                    if token is None or expired:
+                        login_url = f"https://{camera['address']}/api.cgi?cmd=Login"
+                        login_payload = [{"cmd": "Login",
+                                          "param": {"User":
+                                                    {"Version": 0,
+                                                     "userName": camera['user'],
+                                                     "password": camera['password']}}}]
+                        try:
+                            resp = requests.post(login_url, data=json.dumps(login_payload), verify=False)
+                        except (requests.exceptions.RequestException, ReadTimeoutError) as e:
+                            self.log.error(f'{e}')
+                            self.log.info("Unable to get response from camera.")
+                            connected = False
+                            data[camera['location']]['last_attempt'] = time.time()
+                            data[camera['location']]['connected'] = connected
+                            continue
+                        rdata = resp.json()
+                        value = rdata[0].get('value', None)
+                        if value is None:
+                            self.log.info("Unable to get token. Max number of tokens used.")
+                            connected = False
+                            data[camera['location']]['last_attempt'] = time.time()
+                            data[camera['location']]['connected'] = connected
+                            continue
+                        camera['token'] = value['Token']['name']
+                        camera['token_ts'] = timestamp
+
+                    payload = {'cmd': "Snap",
+                               'channel': "0",
+                               'rs': "flsYJfZgM6RTB_os",
+                               'token': camera['token']}
+                    url = f"https://{camera['address']}/cgi-bin/api.cgi"
+                elif camera['brand'] == 'acti':
+                    payload = {'USER': camera['user'],
+                               'PWD': camera['password'],
+                               'SNAPSHOT': camera.get('resolution', 'N640x480,100')}
+                    url = f"http://{camera['address']}/cgi-bin/encoder"
+                else:
+                    self.log.info(f"{camera['brand']} is an unsupported camera brand. Skipping this config block.")
+                    self.config['cameras'].remove(camera)
+                    continue
 
                 # Format directory and filename
                 ctime = int(timestamp)
@@ -112,30 +155,36 @@ class ACTiCameraAgent:
 
                 # If no response from camera, update connection status and continue
                 try:
-                    response = requests.get(url, params=payload, stream=True, timeout=5)
-                except requests.exceptions.RequestException as e:
+                    if camera['brand'] == 'reolink':
+                        response = requests.get(url, params=payload, stream=True, timeout=5, verify=False)
+                    elif camera['brand'] == 'acti':
+                        response = requests.get(url, params=payload, stream=True, timeout=5)
+                    connected = True
+                except (requests.exceptions.RequestException, ReadTimeoutError) as e:
                     self.log.error(f'{e}')
                     self.log.info("Unable to get response from camera.")
-                    camera['connected'] = False
+                    connected = False
                     data[camera['location']]['last_attempt'] = time.time()
-                    data[camera['location']]['connected'] = camera['connected']
+                    data[camera['location']]['connected'] = connected
                     continue
-                camera['connected'] = True
                 self.log.debug("Received screenshot from camera.")
 
                 # Write screenshot to file and update latest file
                 with open(filename, 'wb') as out_file:
                     shutil.copyfileobj(response.raw, out_file)
+                    # Ensure all data is written to the disk before copying to latest
+                    out_file.flush()
+                    os.fsync(out_file.fileno())
                 self.log.debug(f"Wrote {ctime}.jpg to /{camera['location']}/{ctime_dir}.")
                 shutil.copy2(filename, latest_filename)
                 self.log.debug(f"Updated latest.jpg in /{camera['location']}.")
                 del response
 
                 data[camera['location']]['last_attempt'] = time.time()
-                data[camera['location']]['connected'] = camera['connected']
+                data[camera['location']]['connected'] = connected
 
             # Update session.data and publish to feed
-            for camera in self.cameras:
+            for camera in self.config['cameras']:
                 data[camera['location']]['address'] = camera['address']
             session.data = data
             self.log.debug("{data}", data=session.data)
@@ -145,14 +194,13 @@ class ACTiCameraAgent:
                 'timestamp': timestamp,
                 'data': {}
             }
-            for camera in self.cameras:
-                message['data'][camera['location'] + "_connected"] = int(camera['connected'])
+            for camera in self.config['cameras']:
+                message['data'][camera['location'] + "_connected"] = int(connected)
             session.app.publish_to_feed('cameras', message)
             self.log.debug("{msg}", msg=message)
 
             if params['test_mode']:
                 break
-            pm.sleep()
 
         return True, "Finished Recording"
 
@@ -177,11 +225,10 @@ def add_agent_args(parser=None):
         parser = argparse.ArgumentParser()
 
     pgroup = parser.add_argument_group("Agent Options")
-    pgroup.add_argument("--camera-addresses", nargs='+', type=str, help="List of camera IP addresses.")
-    pgroup.add_argument("--locations", nargs='+', type=str, help="List of camera locations.")
-    pgroup.add_argument("--user", help="Username of camera.")
-    pgroup.add_argument("--password", help="Password of camera.")
+    pgroup.add_argument("--config-file", type=str, help="Config file path relative to OCS_CONFIG_DIR")
     pgroup.add_argument("--mode", choices=['acq', 'test'])
+    pgroup.add_argument("--renew-token", type=int, default=2700,
+                        help="Renew API token after this amount of seconds. Used for Reolink cameras.")
 
     return parser
 
@@ -191,7 +238,7 @@ def main(args=None):
     txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
 
     parser = add_agent_args()
-    args = site_config.parse_args(agent_class='ACTiCameraAgent',
+    args = site_config.parse_args(agent_class='HTTPCameraAgent',
                                   parser=parser,
                                   args=args)
 
@@ -201,11 +248,9 @@ def main(args=None):
         init_params = False
 
     agent, runner = ocs_agent.init_site_agent(args)
-    p = ACTiCameraAgent(agent,
-                        camera_addresses=args.camera_addresses,
-                        locations=args.locations,
-                        user=args.user,
-                        password=args.password)
+    p = HTTPCameraAgent(agent,
+                        config_file=args.config_file,
+                        renew_token=args.renew_token)
 
     agent.register_process("acq",
                            p.acq,
