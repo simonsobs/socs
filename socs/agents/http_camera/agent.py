@@ -11,7 +11,7 @@ import yaml
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import Pacemaker, TimeoutLock
 # Disable unverified HTTPS warnings (https://urllib3.readthedocs.io/en/latest/advanced-usage.html#ssl-warnings)
-from urllib3.exceptions import InsecureRequestWarning
+from urllib3.exceptions import InsecureRequestWarning, ReadTimeoutError
 
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
@@ -90,6 +90,7 @@ class HTTPCameraAgent:
 
         self.is_streaming = True
         while self.is_streaming:
+            pm.sleep()
             # Use UTC
             timestamp = time.time()
             data = {}
@@ -112,7 +113,7 @@ class HTTPCameraAgent:
                                                      "password": camera['password']}}}]
                         try:
                             resp = requests.post(login_url, data=json.dumps(login_payload), verify=False)
-                        except requests.exceptions.RequestException as e:
+                        except (requests.exceptions.RequestException, ReadTimeoutError) as e:
                             self.log.error(f'{e}')
                             self.log.info("Unable to get response from camera.")
                             connected = False
@@ -159,7 +160,7 @@ class HTTPCameraAgent:
                     elif camera['brand'] == 'acti':
                         response = requests.get(url, params=payload, stream=True, timeout=5)
                     connected = True
-                except requests.exceptions.RequestException as e:
+                except (requests.exceptions.RequestException, ReadTimeoutError) as e:
                     self.log.error(f'{e}')
                     self.log.info("Unable to get response from camera.")
                     connected = False
@@ -171,6 +172,9 @@ class HTTPCameraAgent:
                 # Write screenshot to file and update latest file
                 with open(filename, 'wb') as out_file:
                     shutil.copyfileobj(response.raw, out_file)
+                    # Ensure all data is written to the disk before copying to latest
+                    out_file.flush()
+                    os.fsync(out_file.fileno())
                 self.log.debug(f"Wrote {ctime}.jpg to /{camera['location']}/{ctime_dir}.")
                 shutil.copy2(filename, latest_filename)
                 self.log.debug(f"Updated latest.jpg in /{camera['location']}.")
@@ -197,7 +201,6 @@ class HTTPCameraAgent:
 
             if params['test_mode']:
                 break
-            pm.sleep()
 
         return True, "Finished Recording"
 
