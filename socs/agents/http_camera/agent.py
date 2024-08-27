@@ -11,7 +11,7 @@ import yaml
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import Pacemaker, TimeoutLock
 # Disable unverified HTTPS warnings (https://urllib3.readthedocs.io/en/latest/advanced-usage.html#ssl-warnings)
-from urllib3.exceptions import InsecureRequestWarning, ReadTimeoutError
+from urllib3.exceptions import InsecureRequestWarning
 
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
@@ -112,8 +112,8 @@ class HTTPCameraAgent:
                                                      "userName": camera['user'],
                                                      "password": camera['password']}}}]
                         try:
-                            resp = requests.post(login_url, data=json.dumps(login_payload), verify=False)
-                        except (requests.exceptions.RequestException, ReadTimeoutError) as e:
+                            resp = requests.post(login_url, data=json.dumps(login_payload), timeout=10, verify=False)
+                        except BaseException as e:
                             self.log.error(f'{e}')
                             self.log.info("Unable to get response from camera.")
                             connected = False
@@ -156,11 +156,11 @@ class HTTPCameraAgent:
                 # If no response from camera, update connection status and continue
                 try:
                     if camera['brand'] == 'reolink':
-                        response = requests.get(url, params=payload, stream=True, timeout=5, verify=False)
+                        response = requests.get(url, params=payload, stream=True, timeout=10, verify=False)
                     elif camera['brand'] == 'acti':
-                        response = requests.get(url, params=payload, stream=True, timeout=5)
+                        response = requests.get(url, params=payload, stream=True, timeout=10)
                     connected = True
-                except (requests.exceptions.RequestException, ReadTimeoutError) as e:
+                except BaseException as e:
                     self.log.error(f'{e}')
                     self.log.info("Unable to get response from camera.")
                     connected = False
