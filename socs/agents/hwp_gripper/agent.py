@@ -274,6 +274,36 @@ class HWPGripperAgent:
         session.data['response'] = return_dict
         return return_dict['result'], f"Success: {return_dict['result']}"
 
+    def alarm_group(self, session, params=None):
+        """alarm_group()
+
+        **Task** - Queries the actuator controller alarm group
+
+        Notes:
+            Return one of five values depending on the controller alarm state
+                False: No alarm was detected
+                'B': Controller saved parameter issue
+                'C': Issue with position calibration
+                'D': Could not reach position within time limit
+                'E': General controller error
+
+            The most recent data collected is stored in session data in the
+            structure:
+
+                >>> response.session['response']
+                {'result': 'B',
+                 'log': ["ALARM GROUP B detected"]}
+        """
+        return_dict = self._run_client_func(
+            self.client.alarm_group, job='alarm_group', check_shutdown=False)
+
+        if return_dict['result'] is None:
+            return_dict['result'] = False
+
+        session.data['response'] = return_dict
+        return return_dict['result'], f"Success: {return_dict['result']}"
+
+
     def reset(self, session, params=None):
         """reset()
         **Task** - Resets the current active controller alarm
@@ -633,6 +663,26 @@ class HWPGripperAgent:
         self.shutdown_mode = False
         return True, 'Cancelled shutdown mode'
 
+    def restart(self, session, params=None):
+        """restart()
+
+        **Task** - Restarts the beaglebone processes and the socket connection
+
+        Notes:
+            The most recent data collected is stored in session data in the
+            structure:
+
+                >>> response.session['response']
+                {'result': True,
+                 'log': ["Previous connection closed",
+                         "Restart command response: Success",
+                         "Control socket reconnected"]}
+        """
+        return_dict = self._run_client_func(
+            self.client.restart, job='restart', check_shutdown=False)
+        session.data['response'] = return_dict
+        return return_dict['result'], f"Success: {return_dict['result']}"
+
     def monitor_state(self, session, params=None):
         """monitor_state()
 
@@ -851,6 +901,7 @@ def main(args=None):
     agent.register_task('home', gripper_agent.home)
     agent.register_task('inp', gripper_agent.inp)
     agent.register_task('alarm', gripper_agent.alarm)
+    agent.register_task('alarm_group', gripper_agent.alarm_group)
     agent.register_task('reset', gripper_agent.reset)
     agent.register_task('act', gripper_agent.act)
     agent.register_task('is_cold', gripper_agent.is_cold)
@@ -859,6 +910,7 @@ def main(args=None):
     agent.register_task('grip', gripper_agent.grip)
     agent.register_task('ungrip', gripper_agent.ungrip)
     agent.register_task('cancel_shutdown', gripper_agent.cancel_shutdown)
+    agent.register_task('restart', gripper_agent.restart)
 
     runner.run(agent, auto_reconnect=True)
 
