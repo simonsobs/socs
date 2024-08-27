@@ -123,7 +123,7 @@ class GripperClient(object):
         try:
             self.close()
             log.append('Previous connection closed')
-        except:
+        except BaseException:
             log.append('Previous connection already closed')
 
         _restart_socket = self._init_connection(self.ip, 5656)

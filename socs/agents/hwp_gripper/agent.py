@@ -303,7 +303,6 @@ class HWPGripperAgent:
         session.data['response'] = return_dict
         return return_dict['result'], f"Success: {return_dict['result']}"
 
-
     def reset(self, session, params=None):
         """reset()
         **Task** - Resets the current active controller alarm
