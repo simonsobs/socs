@@ -174,9 +174,9 @@ class HTTPCameraAgent:
                         out_file.flush()
                         os.fsync(out_file.fileno())
                     self.log.debug(f"Wrote {ctime}.jpg to /{camera['location']}/{ctime_dir}.")
-                except BaseException as e:
+                except ReadTimeoutError as e:
                     self.log.error(f'{e}')
-                    self.log.info("An error occurred while writing to file.")
+                    self.log.info("Timeout occurred while writing to file.")
                     data[camera['location']]['last_attempt'] = time.time()
                     data[camera['location']]['connected'] = False
                     continue
