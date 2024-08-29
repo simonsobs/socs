@@ -116,17 +116,15 @@ class HTTPCameraAgent:
                         except (requests.exceptions.RequestException, ReadTimeoutError) as e:
                             self.log.error(f'{e}')
                             self.log.info("Unable to get response from camera.")
-                            connected = False
                             data[camera['location']]['last_attempt'] = time.time()
-                            data[camera['location']]['connected'] = connected
+                            data[camera['location']]['connected'] = False
                             continue
                         rdata = resp.json()
                         value = rdata[0].get('value', None)
                         if value is None:
                             self.log.info("Unable to get token. Max number of tokens used.")
-                            connected = False
                             data[camera['location']]['last_attempt'] = time.time()
-                            data[camera['location']]['connected'] = connected
+                            data[camera['location']]['connected'] = False
                             continue
                         camera['token'] = value['Token']['name']
                         camera['token_ts'] = timestamp
@@ -159,29 +157,36 @@ class HTTPCameraAgent:
                         response = requests.get(url, params=payload, stream=True, timeout=5, verify=False)
                     elif camera['brand'] == 'acti':
                         response = requests.get(url, params=payload, stream=True, timeout=5)
-                    connected = True
                 except (requests.exceptions.RequestException, ReadTimeoutError) as e:
                     self.log.error(f'{e}')
                     self.log.info("Unable to get response from camera.")
-                    connected = False
                     data[camera['location']]['last_attempt'] = time.time()
-                    data[camera['location']]['connected'] = connected
+                    data[camera['location']]['connected'] = False
                     continue
                 self.log.debug("Received screenshot from camera.")
 
                 # Write screenshot to file and update latest file
-                with open(filename, 'wb') as out_file:
-                    shutil.copyfileobj(response.raw, out_file)
-                    # Ensure all data is written to the disk before copying to latest
-                    out_file.flush()
-                    os.fsync(out_file.fileno())
-                self.log.debug(f"Wrote {ctime}.jpg to /{camera['location']}/{ctime_dir}.")
+                try:
+                    with open(filename, 'wb') as out_file:
+                        for chunk in response.iter_content(chunk_size=8192):
+                            if chunk:
+                                out_file.write(chunk)
+                        out_file.flush()
+                        os.fsync(out_file.fileno())
+                    self.log.debug(f"Wrote {ctime}.jpg to /{camera['location']}/{ctime_dir}.")
+                except ReadTimeoutError as e:
+                    self.log.error(f'{e}')
+                    self.log.info("Timeout occurred while writing to file.")
+                    data[camera['location']]['last_attempt'] = time.time()
+                    data[camera['location']]['connected'] = False
+                    continue
+                finally:
+                    response.close()
                 shutil.copy2(filename, latest_filename)
                 self.log.debug(f"Updated latest.jpg in /{camera['location']}.")
-                del response
 
                 data[camera['location']]['last_attempt'] = time.time()
-                data[camera['location']]['connected'] = connected
+                data[camera['location']]['connected'] = True
 
             # Update session.data and publish to feed
             for camera in self.config['cameras']:
@@ -195,7 +200,7 @@ class HTTPCameraAgent:
                 'data': {}
             }
             for camera in self.config['cameras']:
-                message['data'][camera['location'] + "_connected"] = int(connected)
+                message['data'][camera['location'] + "_connected"] = int(data[camera['location']]['connected'])
             session.app.publish_to_feed('cameras', message)
             self.log.debug("{msg}", msg=message)
 
