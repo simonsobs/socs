@@ -246,7 +246,6 @@ class LabJackAgent:
                               "{} is already running".format(self.lock.job))
                 return False, "Could not acquire lock."
 
-            session.set_status('starting')
             # Connect with the labjack
             self.handle = ljm.openS("ANY", "ANY", self.ip_address)
             info = ljm.getHandleInfo(self.handle)
@@ -314,7 +313,6 @@ class LabJackAgent:
                               "{} is already running".format(self.lock.job))
                 return False, "Could not acquire lock."
 
-            session.set_status('running')
             self.take_data = True
 
             # Start the data stream. Use the scan rate returned by the stream,
@@ -442,7 +440,6 @@ class LabJackAgent:
                               "{} is already running".format(self.lock.job))
                 return False, "Could not acquire lock."
 
-            session.set_status('running')
             self.take_data = True
 
             while self.take_data:

@@ -16,7 +16,7 @@ timing software.
 Configuration File Examples
 ------------------------------
 Below are configuration examples for the ocs config file and for the
-docker-compose service.
+docker compose service.
 
 OCS Site Config
 `````````````````
@@ -36,7 +36,7 @@ False by default.
 
 Docker Compose
 ````````````````
-Below is an example of the docker-compose service for the timing card agent::
+Below is an example of the docker compose service for the timing card agent::
 
     ocs-smurf-timing-card:
         image: simonsobs/socs:latest
