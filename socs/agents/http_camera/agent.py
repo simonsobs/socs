@@ -173,7 +173,7 @@ class HTTPCameraAgent:
                                 out_file.write(chunk)
                         out_file.flush()
                         os.fsync(out_file.fileno())
-                        self.log.debug(f"Wrote {ctime}.jpg to /{camera['location']}/{ctime_dir}.")
+                    self.log.debug(f"Wrote {ctime}.jpg to /{camera['location']}/{ctime_dir}.")
                 except BaseException as e:
                     self.log.error(f'{e}')
                     self.log.info("An error occurred while writing to file.")
