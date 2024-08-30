@@ -1110,6 +1110,11 @@ class ACUAgent:
             def get_mode(_self):
                 return self.data['status']['corotator']['Corotator_mode']
 
+            def get_active(_self):
+                return bool(
+                    self.data['status']['corotator']['Corotator_brakes_released']
+                    and not self.data['status']['corotator']['Corotator_axis_stop'])
+
         ctrl = None
         if axis == 'Azimuth':
             ctrl = AzAxis()
