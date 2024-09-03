@@ -1110,6 +1110,11 @@ class ACUAgent:
             def get_mode(_self):
                 return self.data['status']['corotator']['Corotator_mode']
 
+            def get_active(_self):
+                return bool(
+                    self.data['status']['corotator']['Corotator_brakes_released']
+                    and not self.data['status']['corotator']['Corotator_axis_stop'])
+
         ctrl = None
         if axis == 'Azimuth':
             ctrl = AzAxis()
@@ -1761,13 +1766,17 @@ class ACUAgent:
             az_accel = max_turnaround_accel
 
         # If el is not specified, drop in the current elevation.
-        init_el = None
         if el_endpoint1 is None:
             el_endpoint1 = self.data['status']['summary']['Elevation_current_position']
-        else:
-            init_el = el_endpoint1
         if el_endpoint2 is None:
             el_endpoint2 = el_endpoint1
+
+        # If requested el is just outside acceptable range, tweak it in.
+        _f, _ = self._get_limit_func('elevation')
+        el_endpoint1, _untweaked_el = _f(el_endpoint1), el_endpoint1
+        if abs(el_endpoint1 - _untweaked_el) > 0.1:
+            return False, "Current elevation (%.4f) is well outside limits." % _untweaked_el
+        init_el = el_endpoint1
 
         azonly = params.get('az_only', True)
         scan_upload_len = params.get('scan_upload_length')
