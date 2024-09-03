@@ -202,8 +202,8 @@ class SupRsyncFilesManager:
     """
 
     def __init__(
-        self, db_path: str, create_all: bool =True, echo: bool=False,
-        pool_size: int=5, max_overflow: int=10
+        self, db_path: str, create_all: bool = True, echo: bool = False,
+        pool_size: int = 5, max_overflow: int = 10
     ) -> None:
         db_path = os.path.abspath(db_path)
         if not os.path.exists(os.path.dirname(db_path)):
