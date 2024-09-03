@@ -113,7 +113,7 @@ class HTTPCameraAgent:
                                                      "password": camera['password']}}}]
                         try:
                             resp = requests.post(login_url, data=json.dumps(login_payload), verify=False)
-                        except (requests.exceptions.RequestException, ReadTimeoutError) as e:
+                        except (requests.exceptions.ConnectionError, requests.exceptions.RequestException, ReadTimeoutError) as e:
                             self.log.error(f'{e}')
                             self.log.info("Unable to get response from camera.")
                             data[camera['location']]['last_attempt'] = time.time()
@@ -157,7 +157,7 @@ class HTTPCameraAgent:
                         response = requests.get(url, params=payload, stream=True, timeout=5, verify=False)
                     elif camera['brand'] == 'acti':
                         response = requests.get(url, params=payload, stream=True, timeout=5)
-                except (requests.exceptions.RequestException, ReadTimeoutError) as e:
+                except (requests.exceptions.ConnectionError, requests.exceptions.RequestException, ReadTimeoutError) as e:
                     self.log.error(f'{e}')
                     self.log.info("Unable to get response from camera.")
                     data[camera['location']]['last_attempt'] = time.time()
@@ -174,9 +174,15 @@ class HTTPCameraAgent:
                         out_file.flush()
                         os.fsync(out_file.fileno())
                     self.log.debug(f"Wrote {ctime}.jpg to /{camera['location']}/{ctime_dir}.")
-                except ReadTimeoutError as e:
+                except (requests.exceptions.ConnectionError, requests.exceptions.RequestException, ReadTimeoutError) as e:
                     self.log.error(f'{e}')
                     self.log.info("Timeout occurred while writing to file.")
+                    data[camera['location']]['last_attempt'] = time.time()
+                    data[camera['location']]['connected'] = False
+                    continue
+                except Exception as e:
+                    self.log.error(f'{e}')
+                    self.log.info("Unexpected error occurred while writing to file.")
                     data[camera['location']]['last_attempt'] = time.time()
                     data[camera['location']]['connected'] = False
                     continue
