@@ -5,7 +5,7 @@ import time
 import traceback
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, Generator
 
 import numpy as np
 import ocs
@@ -208,9 +208,16 @@ class ACUState:
     bor_commanded_position: float = 0.0
 
     # This will only be set by spin-control agent for communication with ACU
-    request_block_ACU_motion: bool = False
+    request_block_motion: bool = False
+    request_block_motion_timestamp: float = 0.0
+
     ACU_motion_blocked: Optional[bool] = None  # This flag is only set by the ACU agent
     use_acu_blocking: bool = False
+    block_motion_timeout: float= 60.0
+
+    def set_request_block_motion(self, state: bool) -> None:
+        self.request_block_motion = state
+        self.request_block_motion_timestamp = time.time()
 
     def update(self):
         op = get_op_data(self.instance_id, 'monitor')
@@ -303,6 +310,7 @@ class HWPState:
                 mount_velocity_grip_thresh=args.mount_velocity_grip_thresh,
                 grip_max_boresight_angle=args.grip_max_boresight_angle,
                 use_acu_blocking=args.use_acu_blocking,
+                block_motion_timeout=args.acu_block_motion_timeout,
             )
             log.info("ACU state checking enabled: instance_id={id}",
                      id=self.acu.instance_id)
@@ -796,7 +804,7 @@ class ControlAction:
 
 
 @contextmanager
-def ensure_grip_safety(hwp_state: HWPState, timeout: float = 60.):
+def ensure_grip_safety(hwp_state: HWPState) -> Generator[None, None, None]:
     """
     Run required checks for gripper safety. This will check ACU parameters such
     as az/el position and velocity. If `use_acu_blocking` is set, this will
@@ -867,15 +875,14 @@ def ensure_grip_safety(hwp_state: HWPState, timeout: float = 60.):
         return
 
     try:  # If use_acu_blocking, do handshake with ACU agent to block motino
-        acu.request_block_ACU_motion = True
-        start_time = time.time()
+        acu.set_request_block_motion(True)
         while not acu.ACU_motion_blocked:
-            if time.time() - start_time > timeout:
+            if time.time() - acu.request_block_motion_timestamp > acu.block_motion_timeout:
                 raise RuntimeError("ACU motion was not blocked within timeout")
             time.sleep(1)
         yield
     finally:
-        acu.request_block_ACU_motion = False
+        acu.set_request_block_motion(False)
 
 
 class ControlStateMachine:
@@ -1804,6 +1811,10 @@ def make_parser(parser=None):
         '--use-acu-blocking', action='store_true',
         help="If True, will use blocking flags to make sure ACU is not moving "
              "during HWP gripper commands."
+    )
+    pgroup.add_argument(
+        '--acu-block-motion-timeout', type=float, default=60.,
+        help="Time to wait for ACU motion to be blocked before aborting gripper command."
     )
 
     pgroup.add_argument('--forward-dir', choices=['cw', 'ccw'], default="cw",
