@@ -301,7 +301,7 @@ class HWPState:
         else:
             log.warn("Driver Ibootbar id not set")
 
-        if args.acu_instance_id is not None:
+        if not args.no_acu:
             self.acu = ACUState(
                 instance_id=args.acu_instance_id,
                 min_el=args.acu_min_el,
@@ -315,7 +315,7 @@ class HWPState:
             log.info("ACU state checking enabled: instance_id={id}",
                      id=self.acu.instance_id)
         else:
-            log.info("ACU state checking disabled.")
+            log.warn("The no-acu option has been set. ACU state checking disabled.")
 
         return self
 
@@ -886,7 +886,7 @@ def ensure_grip_safety(hwp_state: HWPState) -> Generator[None, None, None]:
 
 
 class ControlStateMachine:
-    def __init__(self):
+    def __init__(self) -> None:
         self.action: ControlAction = ControlAction(ControlState.Idle())
         self.action_history: List[ControlAction] = []
         self.max_action_history_count = 100
@@ -959,7 +959,7 @@ class ControlStateMachine:
                     if tdiff > acu.max_time_since_update:
                         raise RuntimeError(f"ACU state has not been updated in {tdiff} sec")
                     if not (acu.min_el <= acu.el_current_position <= acu.max_el):
-                        raise RuntimeError(f"ACU elevation is {acu.el_current_pos} deg, "
+                        raise RuntimeError(f"ACU elevation is {acu.el_current_position} deg, "
                                            f"outside of allowed range ({acu.min_el}, {acu.max_el})")
                     if not (acu.min_el <= acu.el_commanded_position <= acu.max_el):
                         raise RuntimeError(f"ACU commanded elevation is {acu.el_commanded_position} deg, "
@@ -1783,9 +1783,13 @@ def make_parser(parser=None):
         help="Type of agent used for controlling the gripper power")
 
     pgroup.add_argument(
-        '--acu-instance-id',
-        help="Instance ID for the ACU agent. This is required for checks of ACU "
-             "postiion and velocity before HWP commands."
+        '--acu-instance-id', default='acu',
+        help="Instance ID for the ACU agent."
+    )
+    pgroup.add_argument(
+        '--no-acu', action='store_true',
+        help="If set, will not attempt to connect to the ACU or perform any ACU "
+             "checks for grip and spin-up"
     )
     pgroup.add_argument(
         '--acu-min-el', type=float, default=48.0,
