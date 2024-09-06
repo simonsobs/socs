@@ -261,6 +261,7 @@ class HWPState:
     pid_target_freq: Optional[float] = None
     pid_direction: Optional[str] = None
     pid_last_updated: Optional[float] = None
+    pid_max_time_since_update: float = 60.0
 
     pmx_current: Optional[float] = None
     pmx_voltage: Optional[float] = None
@@ -285,6 +286,7 @@ class HWPState:
             temp_field=args.ybco_temp_field,
             temp_thresh=args.ybco_temp_thresh,
             ups_minutes_remaining_thresh=args.ups_minutes_remaining_thresh,
+            pid_max_time_since_update=args.pid_max_time_since_update,
         )
 
         if args.gripper_iboot_id is not None:
@@ -818,8 +820,13 @@ def ensure_grip_safety(hwp_state: HWPState) -> Generator[None, None, None]:
     timeout: float
         Timeout for waiting for the ACU blockout before an error will be raised.
     """
-    if hwp_state.pid_current_freq is None:
+    now = time.time()
+    if hwp_state.pid_current_freq is None or hwp_state.pid_last_updated is None:
         raise RuntimeError("Cannot determine current HWP Freq")
+
+    tdiff = now - hwp_state.pid_last_updated
+    if tdiff > hwp_state.pid_max_time_since_update:
+        raise RuntimeError(f"HWP PID state has not been updated in {tdiff} sec")
 
     if np.abs(hwp_state.pid_current_freq) > 0.02:
         raise RuntimeError("Cannot grip HWP while spinning")
@@ -1755,6 +1762,10 @@ def make_parser(parser=None):
     pgroup.add_argument('--ups-minutes-remaining-thresh', type=float,
                         help="Threshold for UPS minutes remaining before a "
                              "shutdown is triggered")
+    pgroup.add_argument(
+        '--pid-max-time-since-update', type=float, default=60.0,
+        help="Max amount of time since last PID update before data is considered stale.",
+    )
 
     pgroup.add_argument(
         '--driver-iboot-id',
