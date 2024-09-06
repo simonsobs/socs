@@ -5,7 +5,7 @@ import time
 import traceback
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Literal, Optional, Generator
+from typing import Any, Dict, Generator, List, Literal, Optional
 
 import numpy as np
 import ocs
@@ -213,7 +213,7 @@ class ACUState:
 
     ACU_motion_blocked: Optional[bool] = None  # This flag is only set by the ACU agent
     use_acu_blocking: bool = False
-    block_motion_timeout: float= 60.0
+    block_motion_timeout: float = 60.0
 
     def set_request_block_motion(self, state: bool) -> None:
         self.request_block_motion = state
