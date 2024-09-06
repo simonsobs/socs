@@ -153,6 +153,51 @@ class LabJackFunctions:
         units = 'C'
 
         return values, units
+    
+    def series_warm_therm(self, v_array_high, v_array_low, v_array_10k_ref):
+        """
+        SATp1 and SATp2 warm therms are wired in series with a 10K Ohm Resistor as a Current reference.
+        Thus we need to use three channels to convert to the thermistor temperature.
+        
+        R = dV_resistor / I
+            
+        where, 
+            dV_resistor = v_high - v_low
+            
+            I = dV_10K_ref / 10kOhm
+            
+        One side of the 10k reference resistor is always grounded, so we only need its high voltage.
+        
+        Thus,
+        
+            R = (v_high - v_low) * 10kOhm / v_10k_ref
+        
+        """
+        
+        R = (v_array_high - v_array_low) / v_array_10k_ref * 10000
+            
+        # Import the Ohms to Celsius cal curve and apply cubic
+        # interpolation to find the temperature
+        cal_curves = os.path.join(os.path.dirname(__file__),
+                                  'cal_curves/GA10K4D25_cal_curve.txt')
+        reader = csv.reader(open(cal_curves),
+                            delimiter=' ')
+        lists = [el for el in [row for row in reader]]
+        T_cal = np.array([float(RT[0]) for RT in lists[1:]])
+        R_cal = np.array([float(RT[1]) for RT in lists[1:]])
+        T_cal = np.flip(T_cal)
+        R_cal = np.flip(R_cal)
+        try:
+            RtoT = interp1d(R_cal, T_cal, kind='cubic')
+            values = RtoT(R)
+
+        except ValueError:
+            self.log.error('Temperature outside thermometer range')
+            values = -1000 + np.zeros(len(R))
+
+        units = 'C'
+
+        return values, units    
 
 
 class LabJackAgent:
@@ -346,12 +391,36 @@ class LabJackAgent:
                     ch_output = output[i::num_chs]
                     data['data'][ch + 'V'] = ch_output
 
-                    # Apply unit conversion function for this channel
+                    #If the channel is a series_warm_therm then we have to grab its pair output too
                     if ch in self.functions.keys():
-                        new_ch_output, units = \
-                            self.ljf.unit_conversion(np.array(ch_output),
-                                                     self.functions[ch])
-                        data['data'][ch + units] = list(new_ch_output)
+                        if self.functions[ch]["user_defined"] == 'False':
+                            function = self.functions[ch]['type']
+                            if function == "series_warm_therm":
+                                ch_high_v = self.functions[ch]['ch_high_v']
+                                ch_low_v = self.functions[ch]['ch_low_v']
+                                ch_10k_ref = self.functions[ch]['ch_10k_ref']
+                                
+                                for j, chj in enumerate(self.chs):
+                                    if chj == ch_high_v:    
+                                        v_array_high = np.array(output[j::num_chs])
+                                        
+                                    if chj == ch_low_v:
+                                        v_array_low = np.array(output[j::num_chs])
+                                        
+                                    if chj == ch_10k_ref:
+                                        v_array_10k_ref = np.array(output[j::num_chs])
+                                        
+                                new_ch_output, units = \
+                                    self.ljf.series_warm_therm(v_array_high, v_array_low, v_array_10k_ref)
+                            
+                            else:
+                                # If it is not a series_warm_therm we can apply unit_conversion as normal
+                                # Apply unit conversion function for this channel
+                                new_ch_output, units = \
+                                    self.ljf.unit_conversion(np.array(ch_output),
+                                                             self.functions[ch])
+                            
+                            data['data'][ch + units] = list(new_ch_output)
 
                 # The labjack outputs at exactly the scan rate but doesn't
                 # generate timestamps. So create them here.
