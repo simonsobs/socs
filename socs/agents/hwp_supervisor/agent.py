@@ -806,7 +806,7 @@ class ControlAction:
 
 
 @contextmanager
-def ensure_grip_safety(hwp_state: HWPState) -> Generator[None, None, None]:
+def ensure_grip_safety(hwp_state: HWPState, log: txaio.ILogger) -> Generator[None, None, None]:
     """
     Run required checks for gripper safety. This will check ACU parameters such
     as az/el position and velocity. If `use_acu_blocking` is set, this will
@@ -821,6 +821,7 @@ def ensure_grip_safety(hwp_state: HWPState) -> Generator[None, None, None]:
         Timeout for waiting for the ACU blockout before an error will be raised.
     """
     now = time.time()
+
     if hwp_state.pid_current_freq is None or hwp_state.pid_last_updated is None:
         raise RuntimeError("Cannot determine current HWP Freq")
 
@@ -830,6 +831,7 @@ def ensure_grip_safety(hwp_state: HWPState) -> Generator[None, None, None]:
 
     if np.abs(hwp_state.pid_current_freq) > 0.02:
         raise RuntimeError("Cannot grip HWP while spinning")
+    log.info("Rotation safety checks have passed")
 
     acu = hwp_state.acu
     if acu is None:
@@ -876,6 +878,7 @@ def ensure_grip_safety(hwp_state: HWPState) -> Generator[None, None, None]:
             f"boresight commanded angle of {acu.bor_commanded_position} deg, "
             f"above threshold of {acu.grip_max_boresight_angle} deg"
         )
+    log.info("ACU safety checks have passed")
 
     if not acu.use_acu_blocking:
         yield
@@ -883,12 +886,15 @@ def ensure_grip_safety(hwp_state: HWPState) -> Generator[None, None, None]:
 
     try:  # If use_acu_blocking, do handshake with ACU agent to block motino
         acu.set_request_block_motion(True)
+        log.info("Requesting ACU to block motion")
         while not acu.ACU_motion_blocked:
             if time.time() - acu.request_block_motion_timestamp > acu.block_motion_timeout:
                 raise RuntimeError("ACU motion was not blocked within timeout")
             time.sleep(1)
+        log.info("ACU motion has been blocked")
         yield
     finally:
+        log.info("Releasing ACU motion block")
         acu.set_request_block_motion(False)
 
 
@@ -1088,12 +1094,12 @@ class ControlStateMachine:
                 self.action.set_state(ControlState.Done(success=state.success))
 
             elif isinstance(state, ControlState.GripHWP):
-                with ensure_grip_safety(hwp_state):
+                with ensure_grip_safety(hwp_state, self.log):
                     self.run_and_validate(clients.gripper.grip)
                 self.action.set_state(ControlState.Done(success=True))
 
             elif isinstance(state, ControlState.UngripHWP):
-                with ensure_grip_safety(hwp_state):
+                with ensure_grip_safety(hwp_state, self.log):
                     self.run_and_validate(clients.gripper.ungrip)
                 self.action.set_state(ControlState.Done(success=True))
 
