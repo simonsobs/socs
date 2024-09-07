@@ -82,5 +82,7 @@ class PsuInterface(PrologixInterface):
         return current
 
     def clear(self):
-        self.write('*CLS') #Clear all the event registers and error queue, using a querry such as *ESR? or MEAS:X? can confuse the PSU
+        #Clear all the event registers and error queue, using a query such as *ESR? or MEAS:X?
+        #instead of *CLS can confuse the PSU
+        self.write('*CLS') 
         return True

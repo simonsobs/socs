@@ -5,8 +5,6 @@ from typing import Optional
 
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
-
-# from drivers import PsuInterface # import the local driver for testing purposes
 from socs.agents.scpi_psu.drivers import PsuInterface
 
 class ScpiPsuAgent:
@@ -45,22 +43,17 @@ class ScpiPsuAgent:
             if not acquired:
                 return False, "Could not acquire lock"
 
-            try:
-                self.psu = PsuInterface(self.ip_address, self.gpib_slot)
-                self.idn = self.psu.identify()
-            except socket.timeout as e:
-                self.log.error(f"PSU timed out during connect: {e}")
-                return False, "Timeout"
-            self.log.info("Connected to psu: {}".format(self.idn))
+            while not self._initialize_module(): ## Does this work? try booting with it disconnected to see
+                time.sleep(5)  # wait 5 sec before trying to re-initialize
         return True, 'Initialized PSU.'  
  
-    def _initialize_module(self, session, params=None):
+    def _initialize_module(self):
         """Initialize the ScpiPsu module."""
         try:
             self.psu = PsuInterface(self.ip_address, self.gpib_slot) #this is only necessary if the ip_address or gpib_slot has changed. I could declare a self.connected flag if this is uneeded.
             self.idn = self.psu.identify()
         except Exception as e: #socket.tiout OR OSError 113 No route to host.
-            self.log.info("Failed to reconnect, trying again")
+            self.log.warn(f"Error establishing connection: {e}")
             self.psu = None
             return False
         self.log.info("Reconnected to psu: {}".format(self.idn))
@@ -90,7 +83,10 @@ class ScpiPsuAgent:
         while self.monitor:
             with self.lock.acquire_timeout(1) as acquired:
                 if acquired:
-                    if self.psu:
+                    if not self._initialize_module()
+                        time.sleep(5)
+
+                    else
                         data = {
                             'timestamp': time.time(),
                             'block_name': 'output',
@@ -106,17 +102,13 @@ class ScpiPsuAgent:
                                 self.log.info("Attempting to reconnect")
                                 self.psu = None
                                 break
-
-                    if self.psu: #Check to make sure there weren't any timeout errors so we don't publish incomplete data and make block errors.
-                        # self.log.info(str(data))
+                    #Check to make sure there weren't any timeout errors so we don't publish 
+                    #incomplete data and create block errors.
+                    if self.psu: 
                         self.agent.publish_to_feed('psu_output', data)
 
                         # Allow this process to be queried to return current data
                         session.data = data
-
-                    else:
-                        if not self._initialize_module(session, params):
-                            time.sleep(5)  # wait 5 sec before trying to re-initialize
 
                 else:
                     self.log.warn("Could not acquire in monitor_current")
@@ -125,6 +117,7 @@ class ScpiPsuAgent:
 
             if params['test_mode']:
                 break
+        
         return True, "Finished monitoring current"
 
     def stop_monitoring(self, session, params=None):
