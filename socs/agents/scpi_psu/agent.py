@@ -3,11 +3,11 @@ import socket
 import time
 from typing import Optional
 
+from drivers import PsuInterface
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
-from drivers import PsuInterface
-#from socs.agents.scpi_psu.drivers import PsuInterface
+# from socs.agents.scpi_psu.drivers import PsuInterface
 
 
 class ScpiPsuAgent:
@@ -56,7 +56,7 @@ class ScpiPsuAgent:
             self.psu = None
             return False
 
-        self.idn = self.psu.identify()    
+        self.idn = self.psu.identify()
         self.log.info("Connected to psu: {}".format(self.idn))
         self.log.info("Clearing event registers and error queue")
         self.psu.clear()
