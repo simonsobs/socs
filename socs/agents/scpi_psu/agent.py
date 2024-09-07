@@ -111,7 +111,7 @@ class ScpiPsuAgent:
                         if self.psu: 
                             self.agent.publish_to_feed('psu_output', data)
 
-                            # Allow this process to be queried to return current data
+                            # Allow this git process to be queried to return current data
                             session.data = data
 
             time.sleep(params['wait'])
