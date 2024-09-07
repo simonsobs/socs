@@ -82,11 +82,14 @@ class ScpiPsuAgent:
 
         while self.monitor:
             with self.lock.acquire_timeout(1) as acquired:
-                if acquired:
-                    if not self._initialize_module()
+                if not acquired:
+                    self.log.warn("Could not acquire in monitor_current")
+                
+                else:
+                    if not self._initialize_module():
                         time.sleep(5)
 
-                    else
+                    else:
                         data = {
                             'timestamp': time.time(),
                             'block_name': 'output',
@@ -102,16 +105,13 @@ class ScpiPsuAgent:
                                 self.log.info("Attempting to reconnect")
                                 self.psu = None
                                 break
-                    #Check to make sure there weren't any timeout errors so we don't publish 
-                    #incomplete data and create block errors.
-                    if self.psu: 
-                        self.agent.publish_to_feed('psu_output', data)
+                        # Only publish if the loop completes without timeout errors
+                        # as publishing incomplete data creates block errors
+                        if self.psu: 
+                            self.agent.publish_to_feed('psu_output', data)
 
-                        # Allow this process to be queried to return current data
-                        session.data = data
-
-                else:
-                    self.log.warn("Could not acquire in monitor_current")
+                            # Allow this process to be queried to return current data
+                            session.data = data
 
             time.sleep(params['wait'])
 
