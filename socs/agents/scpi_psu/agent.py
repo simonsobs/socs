@@ -7,6 +7,7 @@ from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 from socs.agents.scpi_psu.drivers import PsuInterface
 
+
 class ScpiPsuAgent:
     def __init__(self, agent, ip_address, gpib_slot):
         self.agent = agent
@@ -38,7 +39,7 @@ class ScpiPsuAgent:
         """
         if self.psu is not None:
             return True, "Already Initialized Module"
-    
+
         with self.lock.acquire_timeout(0) as acquired:
             if not acquired:
                 return False, "Could not acquire lock"
@@ -50,7 +51,7 @@ class ScpiPsuAgent:
     def _initialize_module(self):
         """Initialize the ScpiPsu module."""
         try:
-            self.psu = PsuInterface(self.ip_address, self.gpib_slot) #this is only necessary if the ip_address or gpib_slot has changed. I could declare a self.connected flag if this is uneeded.
+            self.psu = PsuInterface(self.ip_address, self.gpib_slot)  # this is only necessary if the ip_address or gpib_slot has changed. I could declare a self.connected flag if this is uneeded.
             self.idn = self.psu.identify()
         except Exception as e: #socket.tiout OR OSError 113 No route to host.
             self.log.warn(f"Error establishing connection: {e}")
