@@ -5,6 +5,7 @@ from typing import Optional
 
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
+
 from socs.agents.scpi_psu.drivers import PsuInterface
 
 
@@ -44,16 +45,16 @@ class ScpiPsuAgent:
             if not acquired:
                 return False, "Could not acquire lock"
 
-            while not self._initialize_module(): ## Does this work? try booting with it disconnected to see
+            while not self._initialize_module():  # Does this work? try booting with it disconnected to see
                 time.sleep(5)  # wait 5 sec before trying to re-initialize
-        return True, 'Initialized PSU.'  
- 
+        return True, 'Initialized PSU.'
+
     def _initialize_module(self):
         """Initialize the ScpiPsu module."""
         try:
             self.psu = PsuInterface(self.ip_address, self.gpib_slot)  # this is only necessary if the ip_address or gpib_slot has changed. I could declare a self.connected flag if this is uneeded.
             self.idn = self.psu.identify()
-        except Exception as e: #socket.tiout OR OSError 113 No route to host.
+        except Exception as e:  # socket.tiout OR OSError 113 No route to host.
             self.log.warn(f"Error establishing connection: {e}")
             self.psu = None
             return False
@@ -85,7 +86,7 @@ class ScpiPsuAgent:
             with self.lock.acquire_timeout(1) as acquired:
                 if not acquired:
                     self.log.warn("Could not acquire in monitor_current")
-                
+
                 else:
                     if not self._initialize_module():
                         time.sleep(5)
@@ -108,7 +109,7 @@ class ScpiPsuAgent:
                                 break
                         # Only publish if the loop completes without timeout errors
                         # as publishing incomplete data creates block errors
-                        if self.psu: 
+                        if self.psu:
                             self.agent.publish_to_feed('psu_output', data)
 
                             # Allow this git process to be queried to return current data
@@ -118,7 +119,7 @@ class ScpiPsuAgent:
 
             if params['test_mode']:
                 break
-        
+
         return True, "Finished monitoring current"
 
     def stop_monitoring(self, session, params=None):
