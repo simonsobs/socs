@@ -6,7 +6,8 @@ from typing import Optional
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
-from socs.agents.scpi_psu.drivers import PsuInterface
+from drivers import PsuInterface
+#from socs.agents.scpi_psu.drivers import PsuInterface
 
 
 class ScpiPsuAgent:
@@ -50,12 +51,13 @@ class ScpiPsuAgent:
         """Initialize the ScpiPsu module."""
         try:
             self.psu = PsuInterface(self.ip_address, self.gpib_slot)
-            self.idn = self.psu.identify()
         except (socket.timeout, OSError) as e:
             self.log.warn(f"Error establishing connection: {e}")
             self.psu = None
             return False
-        self.log.info("Reconnected to psu: {}".format(self.idn))
+
+        self.idn = self.psu.identify()    
+        self.log.info("Connected to psu: {}".format(self.idn))
         self.log.info("Clearing event registers and error queue")
         self.psu.clear()
         return True
@@ -80,38 +82,36 @@ class ScpiPsuAgent:
         self.monitor = True
 
         while self.monitor:
+            time.sleep(params['wait'])
             with self.lock.acquire_timeout(1) as acquired:
                 if not acquired:
                     self.log.warn("Could not acquire in monitor_current")
+                    continue
 
-                elif not self._initialize_module():
-                    time.sleep(5)
+                if not self.psu:
+                    self._initialize_module()
+                    continue
 
-                else:
-                    data = {
-                        'timestamp': time.time(),
-                        'block_name': 'output',
-                        'data': {}
-                    }
+                data = {
+                    'timestamp': time.time(),
+                    'block_name': 'output',
+                    'data': {}
+                }
 
+                try:
                     for chan in params['channels']:
-                        try:
-                            data['data']["Voltage_{}".format(chan)] = self.psu.get_volt(chan)
-                            data['data']["Current_{}".format(chan)] = self.psu.get_curr(chan)
-                        except socket.timeout as e:
-                            self.log.warn(f"TimeoutError: {e}")
-                            self.log.info("Attempting to reconnect")
-                            self.psu = None
-                            break
-                    # Only publish if the loop completes without timeout errors
-                    # as publishing incomplete data creates block errors
-                    if self.psu:
-                        self.agent.publish_to_feed('psu_output', data)
+                        data['data']["Voltage_{}".format(chan)] = self.psu.get_volt(chan)
+                        data['data']["Current_{}".format(chan)] = self.psu.get_curr(chan)
+                except socket.timeout as e:
+                    self.log.warn(f"TimeoutError: {e}")
+                    self.log.info("Attempting to reconnect")
+                    self.psu = None
+                    continue
 
-                        # Allow this git process to be queried to return current data
-                        session.data = data
+                self.agent.publish_to_feed('psu_output', data)
 
-            time.sleep(params['wait'])
+                # Allow this git process to be queried to return current data
+                session.data = data
 
             if params['test_mode']:
                 break
