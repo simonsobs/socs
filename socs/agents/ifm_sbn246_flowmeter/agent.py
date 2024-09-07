@@ -102,7 +102,6 @@ class FlowmeterAgent:
         """
         pm = Pacemaker(1, quantize=True)
         self.take_data = True
-        session.set_status('running')
 
         while self.take_data:
             pm.sleep()
@@ -111,7 +110,12 @@ class FlowmeterAgent:
             adr = "/iolinkmaster/port[{}]/iolinkdevice/pdin/getdata".format(dp)
             url = 'http://{}'.format(self.ip_address)
 
-            r = requests.post(url, json={"code": "request", "cid": -1, "adr": adr})
+            try:
+                r = requests.post(url, json={"code": "request", "cid": -1, "adr": adr})
+            except requests.exceptions.ConnectionError as e:
+                self.log.warn(f"Connection error occured: {e}")
+                continue
+
             value = r.json()['data']['value']
 
             flow_gpm, temp_f = extract(value)  # units [gallons/minute], [F]

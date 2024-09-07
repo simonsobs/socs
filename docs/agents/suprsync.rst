@@ -71,7 +71,7 @@ transferred files after 7 days, or 604800 seconds::
 Docker Compose
 ``````````````
 
-Below is a sample docker-compose entry for the SupRsync agents.
+Below is a sample docker compose entry for the SupRsync agents.
 Because the data we'll be transfering is owned by the ``cryo:smurf`` user, we
 set that as the user of the agent so it has the correct permissions. This is
 only possible because the ``cryo:smurf`` user is already built into the

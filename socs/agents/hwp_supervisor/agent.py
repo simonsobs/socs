@@ -4,7 +4,7 @@ import threading
 import time
 import traceback
 from dataclasses import asdict, dataclass, field
-from typing import Dict, List, Optional
+from typing import Dict, List, Literal, Optional
 
 import numpy as np
 import ocs
@@ -111,18 +111,19 @@ class HWPClients:
     lakeshore: Optional[OCSClient] = None
     gripper_iboot: Optional[OCSClient] = None
     driver_iboot: Optional[OCSClient] = None
+    pcu: Optional[OCSClient] = None
 
 
 @dataclass
 class IBootState:
     instance_id: str
     outlets: List[int]
+    agent_type: Literal['iboot, synaccess']
     outlet_state: Dict[int, Optional[int]] = None
     op_data: Optional[Dict] = None
 
     def __post_init__(self):
         self.outlet_state = {o: None for o in self.outlets}
-        self.outlet_labels = {o: f'outletStatus_{o}' for o in self.outlets}
 
     def update(self):
         op = get_op_data(self.instance_id, 'acq', test_mode=False)
@@ -131,10 +132,78 @@ class IBootState:
             self.outlet_state = {o: None for o in self.outlets}
             return
 
-        self.outlet_state = {
-            outlet: op['data'][label]['status']
-            for outlet, label in self.outlet_labels.items()
-        }
+        if self.agent_type == 'iboot':
+            self.outlet_labels = {o: f'outletStatus_{o - 1}' for o in self.outlets}
+            self.outlet_state = {
+                outlet: op['data'][label]['status']
+                for outlet, label in self.outlet_labels.items()
+            }
+        elif self.agent_type == 'synaccess':
+            self.outlet_labels = {o: str(o - 1) for o in self.outlets}
+            self.outlet_state = {
+                outlet: op['data']['fields'][label]['status']
+                for outlet, label in self.outlet_labels.items()
+            }
+        else:
+            raise ValueError(
+                f"Invalid agent_type: {self.agent_type}. "
+                "Must be in ['iboot', 'synaccess']"
+            )
+
+
+@dataclass
+class ACUState:
+    """
+    Class containing ACU state information.
+
+    Args
+    ------
+    instance_id : str
+        Instance ID of ACU agent
+    min_el : float
+        Minimum elevation allowed before restricting spin-up [deg]
+    max_el : float
+        Maximum elevation allowed before restricting spin-up [deg]
+    max_time_since_update : float
+        Maximum time since last update before restricting spin-up[sec]
+
+    Attributes
+    ------------
+    el_current_position : float
+        Current el position [deg]
+    el_commanded_position : float
+        Commanded el position [deg]
+    el_current_velocity : float
+        Current el velocity [deg/s]
+    last_updated : float
+        Time of last update [sec]
+    """
+    instance_id: str
+    min_el: float
+    max_el: float
+    max_time_since_update: float
+
+    el_current_position: Optional[float] = None
+    el_commanded_position: Optional[float] = None
+    el_current_velocity: Optional[float] = None
+    last_updated: Optional[float] = None
+
+    def update(self):
+        op = get_op_data(self.instance_id, 'monitor')
+        if op['status'] != 'ok':
+            return
+
+        d = op['data'].get("StatusDetailed")
+        if d is None:
+            return
+
+        self.el_current_position = d['Elevation current position']
+        self.el_commanded_position = d['Elevation commanded position']
+        self.el_current_velocity = d['Elevation current velocity']
+        t = d.get('timestamp_agent')
+        if t is None:
+            t = time.time()
+        self.last_updated = t
 
 
 @dataclass
@@ -170,17 +239,43 @@ class HWPState:
     gripper_iboot: Optional[IBootState] = None
     driver_iboot: Optional[IBootState] = None
 
+    acu: Optional[ACUState] = None
+
     @classmethod
     def from_args(cls, args: argparse.Namespace):
+        log = txaio.make_logger()  # pylint: disable=E1101
         self = cls(
             temp_field=args.ybco_temp_field,
             temp_thresh=args.ybco_temp_thresh,
             ups_minutes_remaining_thresh=args.ups_minutes_remaining_thresh,
         )
+
         if args.gripper_iboot_id is not None:
-            self.gripper_iboot = IBootState(args.gripper_iboot_id, args.gripper_iboot_outlets)
+            self.gripper_iboot = IBootState(args.gripper_iboot_id, args.gripper_iboot_outlets,
+                                            args.gripper_power_agent_type)
+            log.info("Gripper Ibootbar id set: {id}", id=args.gripper_iboot_id)
+        else:
+            log.warn("Gripper Ibootbar id not set")
+
         if args.driver_iboot_id is not None:
-            self.driver_iboot = IBootState(args.driver_iboot_id, args.driver_iboot_outlets)
+            self.driver_iboot = IBootState(args.driver_iboot_id, args.driver_iboot_outlets,
+                                           args.driver_power_agent_type)
+            log.info("Driver Ibootbar id set: {id}", id=args.driver_iboot_id)
+        else:
+            log.warn("Driver Ibootbar id not set")
+
+        if args.acu_instance_id is not None:
+            self.acu = ACUState(
+                instance_id=args.acu_instance_id,
+                min_el=args.acu_min_el,
+                max_el=args.acu_max_el,
+                max_time_since_update=args.acu_max_time_since_update
+            )
+            log.info("ACU state checking enabled: instance_id={id}",
+                     id=self.acu.instance_id)
+        else:
+            log.info("ACU state checking disabled.")
+
         return self
 
     def _update_from_keymap(self, op, keymap):
@@ -204,6 +299,7 @@ class HWPState:
         """
         self._update_from_keymap(op, {
             'enc_freq': 'approx_hwp_freq',
+            'encoder_last_updated': 'encoder_last_updated',
             'last_quad': 'last_quad',
             'last_quad_time': 'last_quad_time',
         })
@@ -241,13 +337,13 @@ class HWPState:
 
     def update_pmx_state(self, op):
         """
-        Updates state values from the pmx acq operation results.
+        Updates state values from the pmx main operation results.
 
         Args
         -----
         op : dict
             Dict containing the operations (from get_op_data) from the pmx
-            ``acq`` process
+            ``main`` process
         """
         keymap = {'pmx_current': 'curr', 'pmx_voltage': 'volt',
                   'pmx_source': 'source', 'pmx_last_updated': 'last_updated'}
@@ -255,13 +351,13 @@ class HWPState:
 
     def update_pid_state(self, op):
         """
-        Updates state values from the pid acq operation results.
+        Updates state values from the pid main operation results.
 
         Args
         -----
         op : dict
             Dict containing the operations (from get_op_data) from the pid
-            ``acq`` process
+            ``main`` process
         """
         self._update_from_keymap(op, {
             'pid_current_freq': 'current_freq',
@@ -356,25 +452,40 @@ class HWPState:
             return 'stop'
 
 
+class ControlStateInfo:
+    def __init__(self, state):
+        """
+        Class that holds the control state dataclass, and relevant metadata
+        such as start time and last_update time.
+
+        Args
+        ------
+        state : ControlState
+            ControlState object
+        """
+        self.state = state
+        self.last_update_time = 0
+        self.start_time = time.time()
+        self.state_type = state.__class__.__name__
+
+    def encode(self):
+        d = {
+            'state_type': self.state_type,
+            'start_time': self.start_time,
+            'last_update_time': self.last_update_time,
+        }
+        d.update(asdict(self.state))
+        return d
+
+
 class ControlState:
     """Namespace for HWP control state definitions"""
     @dataclass
-    class Base:
-        def __init__(self):
-            super().__init__()
-            self.start_time = time.time()
-
-        def encode(self):
-            d = {'class': self.__class__.__name__}
-            d.update(asdict(self))
-            return d
-
-    @dataclass
-    class Idle(Base):
+    class Idle:
         """Does nothing"""
 
     @dataclass
-    class PIDToFreq(Base):
+    class PIDToFreq:
         """
         Configures PID and PMX agents to PID to a target frequency.
 
@@ -396,7 +507,21 @@ class ControlState:
         freq_tol_duration: float
 
     @dataclass
-    class WaitForTargetFreq(Base):
+    class CheckInitialRotation:
+        """
+        In this state, will check if the HWP has started rotating. If it has not
+        started rotating in ``check_wait_time`` seconds, it will briefly turn on the PCU
+        to initiate rotation, before transitioning to the WaitForTargetFreq state.
+        """
+        target_freq: float
+        freq_tol: float
+        freq_tol_duration: float
+        direction: str
+        check_wait_time: float = 15.0
+        start_time: float = field(default_factory=time.time)
+
+    @dataclass
+    class WaitForTargetFreq:
         """
         Wait until HWP reaches its target frequency before transitioning to
         the Done state.
@@ -419,9 +544,11 @@ class ControlState:
         freq_tol: float
         freq_tol_duration: float
         freq_within_tol_start: Optional[float] = None
+        direction: str = ''
+        _pcu_enabled: bool = field(init=False, default=False)
 
     @dataclass
-    class ConstVolt(Base):
+    class ConstVolt:
         """
         Configure PMX agent to output a constant voltage.
 
@@ -436,7 +563,7 @@ class ControlState:
         direction: str
 
     @dataclass
-    class Done(Base):
+    class Done:
         """
         Signals the last state has completed
 
@@ -453,7 +580,7 @@ class ControlState:
         msg: str = None
 
     @dataclass
-    class Error(Base):
+    class Error:
         """
         Signals the last state update threw an error
 
@@ -468,30 +595,27 @@ class ControlState:
         start_time: float = field(default_factory=time.time)
 
     @dataclass
-    class Brake(Base):
+    class Brake:
         """
         Configure the PID and PMX agents to actively brake the HWP
         """
         freq_tol: float
         freq_tol_duration: float
+        brake_voltage: float
 
     @dataclass
-    class WaitForBrake(Base):
+    class WaitForBrake:
         """
         Waits until the HWP has slowed before shutting off PMX
 
         min_freq : float
             Frequency (Hz) below which the PMX should be shut off.
-        init_quad : float
-            Initial quadrature reading while the HWP is spinning.  This is used
-            to determine if the HWP has reversed direction.
         """
         min_freq: float
-        init_quad: float
         prev_freq: float = None
 
     @dataclass
-    class PmxOff(Base):
+    class PmxOff:
         """
         Turns off the PMX
 
@@ -503,9 +627,62 @@ class ControlState:
         success: bool = True
 
     @dataclass
-    class Abort(Base):
+    class Abort:
         """Abort current action"""
         pass
+
+    @dataclass
+    class EnableDriverBoard:
+        """
+        Enables driver boards for encoder LEDs
+
+        Attributes
+        -----------
+        driver_power_agent_type : Literal["iboot", "synaccess"]
+            Type of agent used for controlling the driver power. Must be
+            "iboot" or "synaccess".
+        outlets : List[int]
+            Outlets required for enabling driver board
+        cycle_twice : bool
+            If true, will wait, and then power cycle again
+        cycle_wait_time : float
+            Time [sec] before repeating the power cycle
+        """
+        driver_power_agent_type: Literal['iboot, synaccess']
+        outlets: List[int]
+        cycle_twice: bool = False
+        cycle_wait_time: float = 60 * 5
+
+        def __post_init__(self):
+            if self.driver_power_agent_type not in ['iboot', 'synaccess']:
+                raise ValueError(
+                    f"Invalid driver_power_agent_type: {self.driver_power_agent_type}. "
+                    "Must be in ['iboot', 'synaccess']"
+                )
+            self.cycled = False
+            self.cycle_timestamp = None
+
+    @dataclass
+    class DisableDriverBoard:
+        """
+        Disables driver board for encoder LEDs
+
+        Attributes
+        -----------
+        driver_power_agent_type: Literal['iboot, synaccess']
+            Type of agent used for controlling the driver power
+        outlets: List[int]
+            Outlets required for enabling driver board
+        """
+        driver_power_agent_type: Literal['iboot, synaccess']
+        outlets: List[int]
+
+        def __post_init__(self):
+            if self.driver_power_agent_type not in ['iboot', 'synaccess']:
+                raise ValueError(
+                    f"Invalid driver_power_agent_type: {self.driver_power_agent_type}. "
+                    "Must be in ['iboot', 'synaccess']"
+                )
 
     completed_states = (Done, Error, Abort, Idle)
 
@@ -519,7 +696,7 @@ class ControlAction:
     _cur_action_id: int = 0
     _id_lock = threading.Lock()
 
-    def __init__(self, state: ControlState.Base):
+    def __init__(self, state):
         with ControlAction._id_lock:
             self.action_id = ControlAction._cur_action_id
             ControlAction._cur_action_id += 1
@@ -527,15 +704,17 @@ class ControlAction:
         self.completed = False
         self.success = False
         self.state_history = []
+        self.log = txaio.make_logger()  # pylint: disable=E1101
         self.set_state(state)
 
-    def set_state(self, state: ControlState.Base):
+    def set_state(self, state):
         """
         Sets state for the current action. If this is a `completed_state`,
         will mark as complete.
         """
-        self.state_history.append(state)
-        self.cur_state = state
+        self.cur_state_info = ControlStateInfo(state)
+        self.state_history.append(self.cur_state_info)
+        self.log.info(f"Setting state: {state}")
         if isinstance(state, ControlState.completed_states):
             self.completed = True
         if isinstance(state, ControlState.Done):
@@ -547,7 +726,7 @@ class ControlAction:
             action_id=self.action_id,
             completed=self.completed,
             success=self.success,
-            cur_state=self.cur_state.encode(),
+            cur_state=self.cur_state_info.encode(),
             state_history=[s.encode() for s in self.state_history],
         )
 
@@ -579,7 +758,7 @@ class ControlStateMachine:
         self.log = txaio.make_logger()  # pylint: disable=E1101
         self.lock = threading.Lock()
 
-    def run_and_validate(self, op, kwargs=None, timeout=10, log=None):
+    def run_and_validate(self, op, kwargs=None, timeout=30, log=None):
         """
         Runs an OCS Operation, and validates that it was successful.
 
@@ -597,8 +776,12 @@ class ControlStateMachine:
         """
         if kwargs is None:
             kwargs = {}
+        if log is None:
+            log = self.log
 
         status, msg, session = op.start(**kwargs)
+        log.info("Starting op: name={name}, kwargs={kw}",
+                 name=session.get('op_name'), kw=kwargs)
 
         if status == ocs.ERROR:
             raise ControlClientError("op-start returned Error:\n  msg: " + msg)
@@ -614,32 +797,93 @@ class ControlStateMachine:
         if status == ocs.TIMEOUT:
             raise ControlClientError("op-wait timed out")
 
-        self.log.info("Completed op: name={name}, success={success}, kwargs={kw}",
-                      name=session.get('op_name'), success=session.get('success'),
-                      kw=kwargs)
+        log.info("Completed op: name={name}, success={success}, kwargs={kw}",
+                 name=session.get('op_name'), success=session.get('success'),
+                 kw=kwargs)
 
         return session
 
-    def update(self, clients, hwp_state):
+    def update(self, clients, hwp_state: HWPState):
         """Run the next series of actions for the current state"""
         try:
             self.lock.acquire()
-            state = self.action.cur_state
+            state = self.action.cur_state_info.state
+            self.action.cur_state_info.last_update_time = time.time()
+
+            def query_pid_state():
+                data = self.run_and_validate(clients.pid.get_state)['data']
+                self.log.info("pid state: {data}", data=data)
+                return data
+
+            def check_acu_ok_for_spinup():
+                acu = hwp_state.acu
+                if acu is not None:
+                    if acu.last_updated is None:
+                        raise RuntimeError(f"No ACU data has been received from instance-id {acu.instance_id}")
+                    tdiff = time.time() - acu.last_updated
+                    if tdiff > acu.max_time_since_update:
+                        raise RuntimeError(f"ACU state has not been updated in {tdiff} sec")
+                    if not (acu.min_el <= acu.el_current_position <= acu.max_el):
+                        raise RuntimeError(f"ACU elevation is {acu.el_current_pos} deg, "
+                                           f"outside of allowed range ({acu.min_el}, {acu.max_el})")
+                    if not (acu.min_el <= acu.el_commanded_position <= acu.max_el):
+                        raise RuntimeError(f"ACU commanded elevation is {acu.el_commanded_position} deg, "
+                                           f"outside of allowed range ({acu.min_el}, {acu.max_el})")
 
             if isinstance(state, ControlState.PIDToFreq):
+                check_acu_ok_for_spinup()
                 self.run_and_validate(clients.pid.set_direction,
                                       kwargs={'direction': state.direction})
                 self.run_and_validate(clients.pid.declare_freq,
                                       kwargs={'freq': state.target_freq})
                 self.run_and_validate(clients.pmx.use_ext)
                 self.run_and_validate(clients.pmx.set_on)
-                self.run_and_validate(clients.pid.tune_freq)
-                #  kwargs={'freq': state.target_freq})
+                self.run_and_validate(clients.pid.tune_freq, timeout=60)
+                self.run_and_validate(
+                    clients.pcu.send_command,
+                    kwargs={'command': 'off'}, timeout=None,
+                )
+                self.action.set_state(ControlState.CheckInitialRotation(
+                    target_freq=state.target_freq,
+                    freq_tol=state.freq_tol,
+                    freq_tol_duration=state.freq_tol_duration,
+                    direction=state.direction,
+                ))
 
+            if isinstance(state, ControlState.CheckInitialRotation):
+                fhwp = hwp_state.enc_freq
+                if fhwp >= 0.2:
+                    self.action.set_state(ControlState.WaitForTargetFreq(
+                        target_freq=state.target_freq,
+                        freq_tol=state.freq_tol,
+                        freq_tol_duration=state.freq_tol_duration,
+                        direction=state.direction,
+                    ))
+                    return
+
+                if time.time() - state.start_time < state.check_wait_time:
+                    return
+
+                if int(state.direction) == 1:  # Reverse
+                    self.run_and_validate(
+                        clients.pcu.send_command,
+                        kwargs={'command': 'on_1'}, timeout=None
+                    )
+                else:
+                    self.run_and_validate(
+                        clients.pcu.send_command,
+                        kwargs={'command': 'on_2'}, timeout=None
+                    )
+                time.sleep(3)
+                self.run_and_validate(
+                    clients.pcu.send_command,
+                    kwargs={'command': 'off'}, timeout=None
+                )
                 self.action.set_state(ControlState.WaitForTargetFreq(
                     target_freq=state.target_freq,
                     freq_tol=state.freq_tol,
-                    freq_tol_duration=state.freq_tol_duration
+                    freq_tol_duration=state.freq_tol_duration,
+                    direction=state.direction,
                 ))
 
             elif isinstance(state, ControlState.WaitForTargetFreq):
@@ -647,6 +891,22 @@ class ControlStateMachine:
                 # This will make sure we remain within the frequency threshold for
                 # ``self.freq_tol_duration`` seconds before switching to DONE
                 f = hwp_state.pid_current_freq
+
+                # Enable pcu if spinning up faster than 1.5 Hz
+                if state.target_freq > 1.5 and f > 1.0 and not state._pcu_enabled:
+                    self.log.info("Enabling PCU")
+                    if int(state.direction) == 1:  # Reverse
+                        self.run_and_validate(
+                            clients.pcu.send_command,
+                            kwargs={'command': 'on_1'}, timeout=None
+                        )
+                    else:
+                        self.run_and_validate(
+                            clients.pcu.send_command,
+                            kwargs={'command': 'on_2'}, timeout=None
+                        )
+                    state._pcu_enabled = True
+
                 if f is None:
                     state.freq_within_tol_start = None
                     return
@@ -664,6 +924,8 @@ class ControlStateMachine:
                     self.action.set_state(ControlState.Done(success=True))
 
             elif isinstance(state, ControlState.ConstVolt):
+                if state.voltage > 0:
+                    check_acu_ok_for_spinup()
                 self.run_and_validate(clients.pmx.set_on)
                 self.run_and_validate(clients.pid.set_direction,
                                       kwargs={'direction': state.direction})
@@ -677,78 +939,93 @@ class ControlStateMachine:
                 self.run_and_validate(clients.pid.declare_freq,
                                       kwargs={'freq': 0})
                 self.run_and_validate(clients.pid.tune_freq)
+                self.run_and_validate(
+                    clients.pcu.send_command,
+                    kwargs={'command': 'stop'}, timeout=None
+                )
                 self.action.set_state(ControlState.Done(success=state.success))
 
             elif isinstance(state, ControlState.Brake):
-                init_quad = hwp_state.last_quad
-                init_quad_time = hwp_state.last_quad_time
+                self.run_and_validate(
+                    clients.pcu.send_command,
+                    kwargs={'command': 'off'}, timeout=None
+                )
 
-                if init_quad is None or init_quad_time is None:
-                    self.log.warn("Could not determine direction from Encoder agent")
-                    self.log.warn("Setting PMX Off")
-                    self.action.set_state(ControlState.PmxOff(success=False))
-                    return
-
-                quad_last_updated = time.time() - init_quad_time
-                if quad_last_updated > 10.0:
-                    self.log.warn(f"Quad has not been updated in last {quad_last_updated} sec")
-                    self.log.warn("Setting PMX Off, since can't confirm direction")
-                    self.action.set_state(ControlState.PmxOff(success=False))
-                    return
+                # Flip PID direciton and tune stop
+                pid_dir = int(query_pid_state()['direction'])
+                new_d = '0' if (pid_dir == 1) else '1'
+                self.run_and_validate(clients.pid.set_direction,
+                                      kwargs=dict(direction=new_d))
+                self.run_and_validate(clients.pid.tune_stop)
 
                 self.run_and_validate(clients.pmx.ign_ext)
-                self.run_and_validate(clients.pid.tune_stop)
-                # self.run_and_validate(clients.pmx.set_on)
-                self.run_and_validate(clients.pmx.set_v, kwargs={'volt': 30.0})
+                self.run_and_validate(clients.pmx.set_v, kwargs={'volt': state.brake_voltage})
+                self.run_and_validate(clients.pmx.set_on)
 
-                f0 = hwp_state.enc_freq
-                time.sleep(2)
-                f1 = hwp_state.enc_freq
-                if (f1 - f0) > 0:
-                    self.log.warn("HWP is speeding up!! Reversing direction")
-                    new_d = '0' if (hwp_state.pid_direction == '1') else '1'
-                    self.run_and_validate(clients.pid.set_direction,
-                                          kwargs=dict(direction=new_d))
-
+                time.sleep(10)
                 self.action.set_state(ControlState.WaitForBrake(
-                    init_quad=init_quad,
                     min_freq=0.5,
-                    prev_freq=hwp_state.enc_freq
+                    prev_freq=hwp_state.enc_freq,
                 ))
 
             elif isinstance(state, ControlState.WaitForBrake):
-                quad = hwp_state.last_quad
-                quad_time = hwp_state.last_quad_time
-                freq = hwp_state.enc_freq
-
-                if quad is None or quad_time is None:
-                    self.log.warn("Could not determine direction from Encoder agent")
-                    self.log.warn("Setting PMX Off")
-                    self.action.set_state(ControlState.PmxOff())
-                    return
-
-                quad_last_updated = time.time() - quad_time
-                if quad_last_updated > 10.0:
-                    self.log.warn(f"Quad has not been updated in last {quad_last_updated} sec")
-                    self.log.warn("Setting PMX Off, since can't confirm direction")
-                    self.action.set_state(ControlState.PmxOff())
-                    return
-
-                if freq - state.prev_freq > 0:
-                    self.log.warn("HWP Freq is increasing! Setting PMX Off")
-                    self.action.set_state(ControlState.PmxOff())
-                    return
-
-                quad_diff = np.abs(quad - state.init_quad)
-                if freq < state.min_freq or quad_diff > 0.1:
+                f0 = query_pid_state()['current_freq']
+                time.sleep(5)
+                f1 = query_pid_state()['current_freq']
+                if f0 < 0.5 or (f1 > f0):
+                    self.log.info("Turning off PMX and putting PCU in stop mode")
                     self.run_and_validate(clients.pmx.set_off)
+                    self.run_and_validate(
+                        clients.pcu.send_command,
+                        kwargs={'command': 'stop'}, timeout=None
+                    )
                     self.action.set_state(ControlState.WaitForTargetFreq(
                         target_freq=0,
-                        freq_tol=0.1,
-                        freq_tol_duration=10,
+                        freq_tol=0.05,
+                        freq_tol_duration=30,
                     ))
+                    return
 
-                state.prev_freq = freq
+            elif isinstance(state, ControlState.EnableDriverBoard):
+                def set_outlet_state(outlet: int, outlet_state: bool):
+                    if state.driver_power_agent_type == 'iboot':
+                        kw = {'outlet': outlet, 'state': 'on' if outlet_state else 'off'}
+                    else:
+                        kw = {'outlet': outlet, 'on': outlet_state}
+                    self.run_and_validate(clients.driver_iboot.set_outlet, kwargs=kw)
+
+                if not state.cycled:
+                    for outlet in state.outlets:
+                        set_outlet_state(outlet, True)
+                    state.cycled = True
+                    state.cycle_timestamp = time.time()
+                    if not state.cycle_twice:
+                        self.action.set_state(ControlState.Done(success=True))
+                        return
+
+                # Needs to be re-cycled, after wait time
+                if time.time() - state.cycle_timestamp < state.cycle_wait_time:
+                    return
+
+                for outlet in state.outlets:
+                    set_outlet_state(outlet, False)
+                time.sleep(5)
+                for outlet in state.outlets:
+                    set_outlet_state(outlet, True)
+                self.action.set_state(ControlState.Done(success=True))
+                return
+
+            elif isinstance(state, ControlState.DisableDriverBoard):
+                def set_outlet_state(outlet: int, outlet_state: bool):
+                    if state.driver_power_agent_type == 'iboot':
+                        kw = {'outlet': outlet, 'state': 'on' if outlet_state else 'off'}
+                    else:
+                        kw = {'outlet': outlet, 'on': outlet_state}
+                    self.run_and_validate(clients.driver_iboot.set_outlet, kwargs=kw)
+
+                for outlet in state.outlets:
+                    set_outlet_state(outlet, False)
+                self.action.set_state(ControlState.Done(success=True))
                 return
 
         except Exception:
@@ -758,7 +1035,7 @@ class ControlStateMachine:
         finally:
             self.lock.release()
 
-    def request_new_action(self, state: ControlState.Base):
+    def request_new_action(self, state):
         """
         Requests that a new action is started with a given state.
         If an action is already in progress, it will be aborted.
@@ -818,6 +1095,11 @@ class HWPSupervisor:
         self.control_state_machine = ControlStateMachine()
         self.forward_is_cw = args.forward_dir == 'cw'
 
+        self.driver_power_agent_type = args.driver_power_agent_type
+        self.driver_iboot_outlets = args.driver_iboot_outlets
+        self.driver_power_cycle_twice = args.driver_power_cycle_twice
+        self.driver_power_cycle_wait_time = args.driver_power_cycle_wait_time
+
     def _get_hwp_clients(self):
         def get_client(id):
             args = []
@@ -835,6 +1117,7 @@ class HWPSupervisor:
             encoder=get_client(self.hwp_encoder_id),
             pmx=get_client(self.hwp_pmx_id),
             pid=get_client(self.hwp_pid_id),
+            pcu=get_client(self.args.hwp_pcu_id),
             ups=get_client(self.ups_id),
             lakeshore=get_client(self.ybco_lakeshore_id),
             gripper_iboot=get_client(self.gripper_iboot_id),
@@ -907,14 +1190,13 @@ class HWPSupervisor:
 
         kw = {'test_mode': test_mode, 'log': self.log}
 
-        session.set_status('running')
         while session.status in ['starting', 'running']:
             session.data['timestamp'] = time.time()
 
             # 1. Gather data from relevant operations
             temp_op = get_op_data(self.ybco_lakeshore_id, 'acq', **kw)
             enc_op = get_op_data(self.hwp_encoder_id, 'acq', **kw)
-            pmx_op = get_op_data(self.hwp_pmx_id, 'acq', **kw)
+            pmx_op = get_op_data(self.hwp_pmx_id, 'main', **kw)
             pid_op = get_op_data(self.hwp_pid_id, 'main', **kw)
             ups_op = get_op_data(self.ups_id, 'acq', **kw)
 
@@ -937,6 +1219,8 @@ class HWPSupervisor:
                 self.hwp_state.driver_iboot.update()
             if self.hwp_state.gripper_iboot is not None:
                 self.hwp_state.gripper_iboot.update()
+            if self.hwp_state.acu is not None:
+                self.hwp_state.acu.update()
 
             session.data['hwp_state'] = asdict(self.hwp_state)
 
@@ -957,12 +1241,19 @@ class HWPSupervisor:
         session.status = 'stopping'
         return True, 'Stopping monitor process'
 
+    @ocs_agent.param('test_mode', type=bool, default=False)
     def spin_control(self, session, params):
         """spin_control()
 
         **Process** - Process to manage the spin-state for HWP agents. This will
         issue commands to various HWP agents depending on the current control
         state.
+
+        Args
+        ----------
+        test_mode : bool
+            If True, spin_control loop will run a single update iteration before
+            exiting. This is useful for testing actions.
 
         Notes
         --------
@@ -978,7 +1269,6 @@ class HWPSupervisor:
         """
         clients = self._get_hwp_clients()
 
-        session.set_status('running')
         while session.status in ['starting', 'running']:
             self.control_state_machine.update(clients, self.hwp_state)
             session.data = {
@@ -986,6 +1276,8 @@ class HWPSupervisor:
                 'action_history': [a.encode() for a in self.control_state_machine.action_history],
                 'timestamp': time.time()
             }
+            if params['test_mode']:
+                break
             time.sleep(1)
         return True, "Finished spin control process"
 
@@ -1040,7 +1332,7 @@ class HWPSupervisor:
         )
         action = self.control_state_machine.request_new_action(state)
         action.sleep_until_complete(session=session)
-        return action.success, f"Completed with state: {action.cur_state}"
+        return action.success, f"Completed with state: {action.cur_state_info.state}"
 
     @ocs_agent.param('voltage', type=float)
     @ocs_agent.param('direction', type=str, choices=['cw', 'ccw'], default='cw')
@@ -1082,12 +1374,13 @@ class HWPSupervisor:
         )
         action = self.control_state_machine.request_new_action(state)
         action.sleep_until_complete(session=session)
-        return action.success, f"Completed with state: {action.cur_state}"
+        return action.success, f"Completed with state: {action.cur_state_info.state}"
 
     @ocs_agent.param('freq_tol', type=float, default=0.05)
     @ocs_agent.param('freq_tol_duration', type=float, default=10)
+    @ocs_agent.param('brake_voltage', type=float, default=10.)
     def brake(self, session, params):
-        """brake(freq_thresh=0.05, freq_thresh_duration=10)
+        """brake(freq_thresh=0.05, freq_thresh_duration=10, brake_voltage=10)
 
         **Task** - Sets the control state to brake the HWP.
 
@@ -1098,6 +1391,8 @@ class HWPSupervisor:
         freq_thresh_duration : float
             Duration (seconds) for which the HWP must be within ``freq_thresh`` of the
             ``target_freq`` to be considered successful.
+        brake_voltage: float
+            Voltage to use when braking the HWP.
 
         Notes
         --------
@@ -1115,11 +1410,12 @@ class HWPSupervisor:
         """
         state = ControlState.Brake(
             freq_tol=params['freq_tol'],
-            freq_tol_duration=params['freq_tol_duration']
+            freq_tol_duration=params['freq_tol_duration'],
+            brake_voltage=params['brake_voltage'],
         )
         action = self.control_state_machine.request_new_action(state)
         action.sleep_until_complete(session=session)
-        return action.success, f"Completed with state: {action.cur_state}"
+        return action.success, f"Completed with state: {action.cur_state_info.state}"
 
     def pmx_off(self, session, params):
         """pmx_off()
@@ -1143,7 +1439,7 @@ class HWPSupervisor:
         state = ControlState.PmxOff()
         action = self.control_state_machine.request_new_action(state)
         action.sleep_until_complete(session=session)
-        return action.success, f"Completed with state: {action.cur_state}"
+        return action.success, f"Completed with state: {action.cur_state_info.state}"
 
     def abort_action(self, session, params):
         """abort_action()
@@ -1169,6 +1465,64 @@ class HWPSupervisor:
         session.data['action'] = action.encode()
         return True, "Set state to idle"
 
+    def enable_driver_board(self, session, params):
+        """enable_driver_board()
+
+        **Task** - Enables the HWP driver board
+
+        Notes
+        --------
+
+        Example of ``session.data``::
+
+            >>> session['data']
+            {'action':
+                {'action_id': 3,
+                'completed': True,
+                'cur_state': {'class': 'Done', 'msg': None, 'success': True},
+                'state_history': List[ConrolState],
+                'success': False}
+            }
+        """
+        kw = {
+            'driver_power_agent_type': self.driver_power_agent_type,
+            'outlets': self.driver_iboot_outlets,
+            'cycle_twice': self.driver_power_cycle_twice,
+            'cycle_wait_time': self.driver_power_cycle_wait_time,
+        }
+        state = ControlState.EnableDriverBoard(**kw)
+        action = self.control_state_machine.request_new_action(state)
+        action.sleep_until_complete(session=session)
+        return action.success, f"Completed with state: {action.cur_state_info.state}"
+
+    def disable_driver_board(self, session, params):
+        """disable_driver_board()
+
+        **Task** - Disables the HWP driver board
+
+        Notes
+        --------
+
+        Example of ``session.data``::
+
+            >>> session['data']
+            {'action':
+                {'action_id': 3,
+                'completed': True,
+                'cur_state': {'class': 'Done', 'msg': None, 'success': True},
+                'state_history': List[ConrolState],
+                'success': False}
+            }
+        """
+        kw = {
+            'driver_power_agent_type': self.driver_power_agent_type,
+            'outlets': self.driver_iboot_outlets,
+        }
+        state = ControlState.DisableDriverBoard(**kw)
+        action = self.control_state_machine.request_new_action(state)
+        action.sleep_until_complete(session=session)
+        return action.success, f"Completed with state: {action.cur_state_info.state}"
+
 
 def make_parser(parser=None):
     if parser is None:
@@ -1188,6 +1542,8 @@ def make_parser(parser=None):
                         help="Instance ID for HWP pmx agent")
     pgroup.add_argument('--hwp-pid-id',
                         help="Instance ID for HWP pid agent")
+    pgroup.add_argument('--hwp-pcu-id',
+                        help="Instance ID for HWP PCU agent")
     pgroup.add_argument('--ups-id', help="Instance ID for UPS agent")
     pgroup.add_argument('--ups-minutes-remaining-thresh', type=float,
                         help="Threshold for UPS minutes remaining before a "
@@ -1199,6 +1555,15 @@ def make_parser(parser=None):
     pgroup.add_argument(
         '--driver-iboot-outlets', nargs='+', type=int,
         help="Outlets for driver iboot power")
+    pgroup.add_argument(
+        '--driver-power-cycle-twice', action='store_true',
+        help="If set, will power cycle the driver board twice on enable")
+    pgroup.add_argument(
+        '--driver-power-cycle-wait-time', type=float, default=60 * 5,
+        help="Wait time between power cycles on enable (sec)")
+    pgroup.add_argument(
+        '--driver-power-agent-type', choices=['iboot', 'synaccess'], default=None,
+        help="Type of agent used for controlling the driver power")
 
     pgroup.add_argument(
         '--gripper-iboot-id',
@@ -1206,6 +1571,27 @@ def make_parser(parser=None):
     pgroup.add_argument(
         '--gripper-iboot-outlets', nargs='+', type=int,
         help="Outlets for gripper iboot power")
+    pgroup.add_argument(
+        '--gripper-power-agent-type', choices=['iboot', 'synaccess'], default=None,
+        help="Type of agent used for controlling the gripper power")
+
+    pgroup.add_argument(
+        '--acu-instance-id',
+        help="Instance ID for the ACU agent. This is required for checks of ACU "
+             "postiion and velocity before HWP commands."
+    )
+    pgroup.add_argument(
+        '--acu-min-el', type=float, default=48.0,
+        help="Min elevation that HWP spin up is allowed",
+    )
+    pgroup.add_argument(
+        '--acu-max-el', type=float, default=90.0,
+        help="Max elevation that HWP spin up is allowed",
+    )
+    pgroup.add_argument(
+        '--acu-max-time-since-update', type=float, default=30.0,
+        help="Max amount of time since last ACU update before allowing HWP spin up",
+    )
 
     pgroup.add_argument('--forward-dir', choices=['cw', 'ccw'], default="cw",
                         help="Whether the PID 'forward' direction is cw or ccw")
@@ -1230,6 +1616,8 @@ def main(args=None):
     agent.register_task('brake', hwp.brake)
     agent.register_task('pmx_off', hwp.pmx_off)
     agent.register_task('abort_action', hwp.abort_action)
+    agent.register_task('enable_driver_board', hwp.enable_driver_board)
+    agent.register_task('disable_driver_board', hwp.disable_driver_board)
 
     runner.run(agent, auto_reconnect=True)
 

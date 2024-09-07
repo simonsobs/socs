@@ -158,6 +158,7 @@ class HWPPMXAgent:
         action = Actions.ClearAlarm(**params)
         self.action_queue.put(action)
         session.data = yield action.deferred
+        self.prot = 0
         return True, 'Clear alarm'
 
     @defer.inlineCallbacks
@@ -279,7 +280,6 @@ class HWPPMXAgent:
 
         """
         PMX = None
-        session.set_status('running')
 
         threads.blockingCallFromThread(reactor, self._clear_queue)
 
@@ -384,7 +384,6 @@ class HWPPMXAgent:
         power off.
         """
 
-        session.set_status('running')
         last_ok_time = time.time()
 
         if self.supervisor_id is None:

@@ -1,6 +1,5 @@
 package_name = 'socs'
 agents = {
-    'ACTiCameraAgent': {'module': 'socs.agents.acti_camera.agent', 'entry_point': 'main'},
     'ACUAgent': {'module': 'socs.agents.acu.agent', 'entry_point': 'main'},
     'BlueforsAgent': {'module': 'socs.agents.bluefors.agent', 'entry_point': 'main'},
     'CrateAgent': {'module': 'socs.agents.smurf_crate_monitor.agent', 'entry_point': 'main'},
@@ -9,6 +8,8 @@ agents = {
     'FlowmeterAgent': {'module': 'socs.agents.ifm_sbn246_flowmeter.agent', 'entry_point': 'main'},
     'FTSAerotechAgent': {'module': 'socs.agents.fts_aerotech.agent', 'entry_point': 'main'},
     'GeneratorAgent': {'module': 'socs.agents.generator.agent', 'entry_point': 'main'},
+    'Hi6200Agent': {'module': 'socs.agents.hi6200.agent', 'entry_point': 'main'},
+    'HTTPCameraAgent': {'module': 'socs.agents.http_camera.agent', 'entry_point': 'main'},
     'HWPBBBAgent': {'module': 'socs.agents.hwp_encoder.agent', 'entry_point': 'main'},
     'HWPGripperAgent': {'module': 'socs.agents.hwp_gripper.agent', 'entry_point': 'main'},
     'HWPPCUAgent': {'module': 'socs.agents.hwp_pcu.agent', 'entry_point': 'main'},
@@ -26,6 +27,7 @@ agents = {
     'LATRtXYStageAgent': {'module': 'socs.agents.xy_stage.agent', 'entry_point': 'main'},
     'MagpieAgent': {'module': 'socs.agents.magpie.agent', 'entry_point': 'main'},
     'MeinbergM1000Agent': {'module': 'socs.agents.meinberg_m1000.agent', 'entry_point': 'main'},
+    'MeinbergSyncboxAgent': {'module': 'socs.agents.meinberg_syncbox.agent', 'entry_point': 'main'},
     'PfeifferAgent': {'module': 'socs.agents.pfeiffer_tpg366.agent', 'entry_point': 'main'},
     'PfeifferTC400Agent': {'module': 'socs.agents.pfeiffer_tc400.agent', 'entry_point': 'main'},
     'PysmurfController': {'module': 'socs.agents.pysmurf_controller.agent', 'entry_point': 'main'},
@@ -45,4 +47,5 @@ agents = {
     'WiregridActuatorAgent': {'module': 'socs.agents.wiregrid_actuator.agent', 'entry_point': 'main'},
     'WiregridEncoderAgent': {'module': 'socs.agents.wiregrid_encoder.agent', 'entry_point': 'main'},
     'WiregridKikusuiAgent': {'module': 'socs.agents.wiregrid_kikusui.agent', 'entry_point': 'main'},
+    'WiregridTiltSensorAgent': {'module': 'socs.agents.wiregrid_tiltsensor.agent', 'entry_point': 'main'},
 }

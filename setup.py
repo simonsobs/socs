@@ -73,7 +73,8 @@ setup(
     package_data={'socs': [
         'agents/smurf_file_emulator/*.yaml',
         'agents/labjack/cal_curves/*.txt',
-        'agents/generator/*.yaml'
+        'agents/generator/*.yaml',
+        'agents/http_camera/*.yaml'
     ]},
     entry_points={
         'console_scripts': [
@@ -91,6 +92,11 @@ setup(
     },
     classifiers=[
         "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
         "License :: OSI Approved :: BSD License",
         "Intended Audience :: Science/Research",
         "Topic :: Scientific/Engineering :: Astronomy",
@@ -103,7 +109,7 @@ setup(
         'ocs',
         'pyModbusTCP',
         'pyserial',
-        'pysnmp',
+        'pysnmp==4.4.12',
         'pysmi',
         'pyyaml',
         'requests',
