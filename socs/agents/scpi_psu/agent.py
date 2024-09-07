@@ -38,21 +38,18 @@ class ScpiPsuAgent:
         **Task** - Initialize connection to the power supply.
 
         """
-        if self.psu is not None:
-            return True, "Already Initialized Module"
-
         with self.lock.acquire_timeout(0) as acquired:
             if not acquired:
                 return False, "Could not acquire lock"
 
-            while not self._initialize_module():  # Does this work? try booting with it disconnected to see
-                time.sleep(5)  # wait 5 sec before trying to re-initialize
+            while not self._initialize_module():
+                time.sleep(5)
         return True, 'Initialized PSU.'
 
     def _initialize_module(self):
         """Initialize the ScpiPsu module."""
         try:
-            self.psu = PsuInterface(self.ip_address, self.gpib_slot)  # this is only necessary if the ip_address or gpib_slot has changed. I could declare a self.connected flag if this is uneeded.
+            self.psu = PsuInterface(self.ip_address, self.gpib_slot)
             self.idn = self.psu.identify()
         except (socket.timeout, OSError) as e:
             self.log.warn(f"Error establishing connection: {e}")
