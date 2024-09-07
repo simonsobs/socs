@@ -7,7 +7,7 @@ from drivers import PsuInterface
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
-# from socs.agents.scpi_psu.drivers import PsuInterface
+from socs.agents.scpi_psu.drivers import PsuInterface
 
 
 class ScpiPsuAgent:
