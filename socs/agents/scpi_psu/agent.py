@@ -1,6 +1,7 @@
 import argparse
 import socket
 import time
+from typing import Optional
 
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
@@ -19,7 +20,7 @@ class ScpiPsuAgent:
         self.gpib_slot = gpib_slot
         self.monitor = False
 
-        self.psu = None
+        self.psu: Optional[ScpiPsuAgent] = None
 
         # Registers Temperature and Voltage feeds
         agg_params = {
@@ -41,15 +42,24 @@ class ScpiPsuAgent:
             if not acquired:
                 return False, "Could not acquire lock"
 
-            try:
-                self.psu = PsuInterface(self.ip_address, self.gpib_slot)
-                self.idn = self.psu.identify()
-            except socket.timeout as e:
-                self.log.error(f"PSU timed out during connect: {e}")
-                return False, "Timeout"
-            self.log.info("Connected to psu: {}".format(self.idn))
-
+            while not self._initialize_module():
+                time.sleep(5)
         return True, 'Initialized PSU.'
+
+    def _initialize_module(self):
+        """Initialize the ScpiPsu module."""
+        try:
+            self.psu = PsuInterface(self.ip_address, self.gpib_slot)
+        except (socket.timeout, OSError) as e:
+            self.log.warn(f"Error establishing connection: {e}")
+            self.psu = None
+            return False
+
+        self.idn = self.psu.identify()
+        self.log.info("Connected to psu: {}".format(self.idn))
+        self.log.info("Clearing event registers and error queue")
+        self.psu.clear()
+        return True
 
     @ocs_agent.param('wait', type=float, default=1)
     @ocs_agent.param('channels', type=list, default=[1, 2, 3])
@@ -71,29 +81,36 @@ class ScpiPsuAgent:
         self.monitor = True
 
         while self.monitor:
+            time.sleep(params['wait'])
             with self.lock.acquire_timeout(1) as acquired:
-                if acquired:
-                    data = {
-                        'timestamp': time.time(),
-                        'block_name': 'output',
-                        'data': {}
-                    }
+                if not acquired:
+                    self.log.warn("Could not acquire in monitor_current")
+                    continue
 
+                if not self.psu:
+                    self._initialize_module()
+                    continue
+
+                data = {
+                    'timestamp': time.time(),
+                    'block_name': 'output',
+                    'data': {}
+                }
+
+                try:
                     for chan in params['channels']:
                         data['data']["Voltage_{}".format(chan)] = self.psu.get_volt(chan)
                         data['data']["Current_{}".format(chan)] = self.psu.get_curr(chan)
+                except socket.timeout as e:
+                    self.log.warn(f"TimeoutError: {e}")
+                    self.log.info("Attempting to reconnect")
+                    self.psu = None
+                    continue
 
-                    # self.log.info(str(data))
-                    # print(data)
-                    self.agent.publish_to_feed('psu_output', data)
+                self.agent.publish_to_feed('psu_output', data)
 
-                    # Allow this process to be queried to return current data
-                    session.data = data
-
-                else:
-                    self.log.warn("Could not acquire in monitor_current")
-
-            time.sleep(params['wait'])
+                # Allow this process to be queried to return current data
+                session.data = data
 
             if params['test_mode']:
                 break
