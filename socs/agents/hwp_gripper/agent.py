@@ -41,6 +41,13 @@ class HWPGripperAgent:
 
         self.client: Optional[cli.GripperClient] = None
 
+        self.decoded_alarm_group = {False: 'No alarm was detected',
+                                    'A': 'Unrecognized error'
+                                    'B': 'Controller saved parameter issue',
+                                    'C': 'Issue with position calibration',
+                                    'D': 'Could not reach position within time limit',
+                                    'E': 'General controller erorr'}
+
         agg_params = {'frame_length': 60}
         self.agent.register_feed('hwp_gripper', record=True, agg_params=agg_params)
         self.agent.register_feed('gripper_action', record=True)
@@ -280,8 +287,9 @@ class HWPGripperAgent:
         **Task** - Queries the actuator controller alarm group
 
         Notes:
-            Return one of five values depending on the controller alarm state
+            Return one of six values depending on the controller alarm state
                 False: No alarm was detected
+                'A': Unrecognized error
                 'B': Controller saved parameter issue
                 'C': Issue with position calibration
                 'D': Could not reach position within time limit
@@ -294,13 +302,20 @@ class HWPGripperAgent:
                 {'result': 'B',
                  'log': ["ALARM GROUP B detected"]}
         """
-        return_dict = self._run_client_func(
-            self.client.alarm_group, job='alarm_group', check_shutdown=False)
+        state_return_dict = self._run_client_func(
+            self.client.get_state, job='get_state', check_shutdown=False
 
-        if return_dict['result'] is None:
-            return_dict['result'] = False
+        if not bool(state_return_dict['jxc']['alarm']):
+            return_dict = {'result': False, 'log': ['Alarm not triggered']}
+        else:
+            return_dict = self._run_client_func(
+                self.client.alarm_group, job='alarm_group', check_shutdown=False)
+
+            if return_dict['result'] is None:
+                return_dict['result'] = 'A'
 
         session.data['response'] = return_dict
+        session.data['decoded_alarm_group'] = self.decoded_alarm_group[return_dict['result']]
         return return_dict['result'], f"Success: {return_dict['result']}"
 
     def reset(self, session, params=None):
@@ -701,6 +716,7 @@ class HWPGripperAgent:
                            'jxc_inp': False,
                            'jxc_svre': False,
                            'jxc_alarm': False,
+                           'jxc_alarm_message': 'No alarm was detected',
                            'jxc_out': 0,
                            'act{axis}_pos': 0,
                            'act{axis}_limit_warm_grip_state': False,
@@ -740,6 +756,22 @@ class HWPGripperAgent:
                 'jxc_alarm': int(state['jxc']['alarm']),
                 'jxc_out': int(state['jxc']['out']),
             })
+
+            alarm_group_mapping = {4: 'B',
+                                   2: 'C',
+                                   1: 'D',
+                                   0: 'E'}
+
+            if bool(state['jxc']['alarm']):
+                out_value = int(state['jxc']['out'])%16
+                if out_value in alarm_group_mapping.keys():
+                    alarm_message = self.decoded_alarm_group[alarm_group_mapping]
+                else:
+                    alarm_message = self.decoded_alarm_group['A']
+            else:
+                alarm_message = self.decoded_alarm_group[False]
+
+            data.update({'jxc_alarm_message': alarm_message})
 
             for act in state['actuators']:
                 axis = act['axis']
