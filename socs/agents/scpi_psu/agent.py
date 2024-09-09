@@ -3,7 +3,6 @@ import socket
 import time
 from typing import Optional
 
-from drivers import PsuInterface
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
