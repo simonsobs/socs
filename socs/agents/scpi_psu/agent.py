@@ -109,7 +109,7 @@ class ScpiPsuAgent:
 
                 self.agent.publish_to_feed('psu_output', data)
 
-                # Allow this git process to be queried to return current data
+                # Allow this process to be queried to return current data
                 session.data = data
 
             if params['test_mode']:
