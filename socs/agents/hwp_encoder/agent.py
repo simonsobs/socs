@@ -722,7 +722,7 @@ class HWPBBBAgent:
 def make_parser(parser=None):
     """
     Arguments:
-        port (int): Listening port of Agent for receiving UDP encoder packets. This 
+        port (int): Listening port of Agent for receiving UDP encoder packets. This
                     should match what is defined in the bbb encoder process configs
         ip (str): IP of bbb running the corresponding encoder process
     """
