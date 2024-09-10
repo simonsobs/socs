@@ -6,10 +6,13 @@ import traceback
 import warnings
 from dataclasses import dataclass
 from typing import Any, Dict, Generator, Optional, Tuple
+
 import txaio  # type: ignore
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import Pacemaker
+
 from socs.Lakeshore.Lakeshore240 import Module
+
 txaio.use_twisted()
 
 
@@ -52,7 +55,6 @@ class Actions:
         def sleep_until_processed(self, interval=0.2) -> None:
             while not self.processed:
                 time.sleep(interval)
-
 
     @dataclass
     class UploadCalCurve(BaseAction):
