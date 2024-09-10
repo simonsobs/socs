@@ -284,7 +284,8 @@ class ScpiPsuAgent:
 
                 >>> response.session['data']
                 {'timestamp': 1723671503.4899583,
-                 'channel_1': 'enabled'}
+                 'channel': 1,
+                 'state': 1}
 
         """
         chan = params['channel']
@@ -292,17 +293,17 @@ class ScpiPsuAgent:
         data = {}
         with self.lock.acquire_timeout(1) as acquired:
             if acquired:
-                data['timestamp'] = time.time()
-                enabled = self.psu.get_output(chan)
+                data = {
+                    'timestamp': time.time(),
+                    'channel': chan,
+                    'state': self.psu.get_output(chan)
+                }
+                session.data = data
             else:
                 return False, "Could not acquire lock."
         if enabled:
-            data['channel_{}'.format(chan)] = 'enabled'
-            session.data = data
             return True, 'Channel {} output is currently enabled.'.format(chan)
         else:
-            data['channel_{}'.format(chan)] = 'disabled'
-            session.data = data
             return True, 'Channel {} output is currently disabled.'.format(chan)
 
     @ocs_agent.param('channel', type=int, choices=[1, 2, 3])
