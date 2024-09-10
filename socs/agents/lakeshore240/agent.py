@@ -257,7 +257,7 @@ class LS240_Agent:
                 log.info(f"Running action {action}")
                 result = action.process(module)
                 action.resolve_action(True, result=result)
-            except Exception as e:  # pylint: disable=broad-except
+            except Exception:  # pylint: disable=broad-except
                 log.error(f"Error processing action: {action}")
                 action.resolve_action(False, traceback=traceback.format_exc())
         return None
