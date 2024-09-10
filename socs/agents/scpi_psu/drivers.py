@@ -156,6 +156,9 @@ class ScpiPsuInterface:
         current = float(self.read().split(',')[0].strip('A'))
         return current
 
+    def clear(self):
+        return True
+
 
 class PsuInterface(PrologixInterface):
     def __init__(self, ip_address, gpibAddr, verbose=False, **kwargs):
