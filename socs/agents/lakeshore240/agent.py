@@ -146,7 +146,7 @@ def register_task_from_action(
     agent: ocs_agent.OCSAgent,
     name: str,
     action_class: Type[Actions.BaseAction],
-    queue: queue.Queue[Actions.BaseAction]
+    queue: "queue.Queue[Actions.BaseAction]"
 ) -> None:
     """
     Registers an OCSTask from an Action type. This will define ocs_params based
@@ -200,7 +200,7 @@ class LS240_Agent:
         self.agent: ocs_agent.OCSAgent = agent
         self.port = port
         self.f_sample = f_sample
-        self.action_queue: queue.Queue[Actions.BaseAction] = queue.Queue()
+        self.action_queue: "queue.Queue[Actions.BaseAction]" = queue.Queue()
 
         # Register Operaionts
         register_task_from_action(
