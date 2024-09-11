@@ -1,10 +1,10 @@
 import argparse
+import dataclasses
 import os
 import queue
 import time
 import traceback
 import warnings
-import dataclasses
 from dataclasses import dataclass, fields
 from typing import Any, Dict, Generator, Optional, Tuple, Type
 
@@ -156,7 +156,7 @@ def register_task_from_action(
 
     def task(
         session: ocs_agent.OpSession,
-        params: Optional[Dict[str, Any]]=None
+        params: Optional[Dict[str, Any]] = None
     ) -> OcsOpReturnType:
         _params = {} if params is None else params
         action = action_class(**_params)
