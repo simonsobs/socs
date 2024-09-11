@@ -6,7 +6,10 @@ import time
 import traceback
 import warnings
 from dataclasses import dataclass, fields
-from typing import Any, Dict, Generator, Optional, Tuple, Type
+from typing import (
+    Any, Dict, Generator, Optional, Tuple, Type, Callable, get_args, get_origin,
+    Union
+)
 
 import txaio  # type: ignore
 from ocs import ocs_agent, site_config
@@ -142,6 +145,45 @@ class Actions:
             return None
 
 
+def is_instanceable(t: Type) -> bool:
+    """
+    Checks if its possible to run isinstance with a specified type. This is
+    needed because older version of python don't let you run this on subscripted
+    generics.
+    """
+    try:
+        isinstance(0, t)
+        return True
+    except Exception:
+        return False
+
+def get_param_type(t: Type) -> Optional[Type]:
+    """
+    Takes in a dataclass field type and returns a type that is accepted
+    by the OCS param decorator. This will return the original type if it
+    works with isinstance, or will attempt to unwrap an optional type.  Other
+    types are not currently supported. If it fails, it will return None.
+    """
+    origin_type = get_origin(t)
+
+    # Unwrap possible option type
+    if origin_type == Union:
+        sub_types = get_args(t)
+        if len(sub_types) != 2:
+            return None
+        if type(None) not in sub_types:
+            return None
+        for st in sub_types:
+            if st is not type(None):
+                if is_instanceable(st):
+                    return st
+
+    elif is_instanceable(t):
+        return t
+
+    return None
+
+
 def register_task_from_action(
     agent: ocs_agent.OCSAgent,
     name: str,
@@ -178,8 +220,11 @@ def register_task_from_action(
 
     # Adds ocs parameters
     for f in fields(action_class):
+        param_type = get_param_type(f.type)
+        if param_type is None:
+            raise ValueError(f"Unsupported param type for arg {f.name}: {f.type}")
         param_kwargs: Dict[str, Any] = {
-            'type': f.type,
+            'type': param_type,
         }
         if f.default != dataclasses.MISSING:
             param_kwargs['default'] = f.default
