@@ -7,7 +7,7 @@ from integration.util import create_crossbar_fixture
 from ocs.base import OpCode
 from ocs.testing import create_agent_runner_fixture, create_client_fixture
 
-from socs.agents.lakeshore240.agent import Actions as LS240Actions
+from socs.agents.lakeshore240.agent import SetValues, UploadCalCurve
 from socs.testing.device_emulator import DeviceEmulator, create_device_emulator
 
 wait_for_crossbar = create_crossbar_fixture()
@@ -70,7 +70,7 @@ def test_ls240_set_values(wait_for_crossbar, emulator: DeviceEmulator, run_agent
                  'INTYPE 1,1,1,0,0,1,1': ''}
     emulator.update_responses(responses)
 
-    set_values_params = LS240Actions.SetValues(
+    set_values_params = SetValues(
         channel=1, sensor=1, auto_range=1, range=0, current_reversal=0, units=1,
         enabled=1, name="Channel 01"
     )
@@ -105,7 +105,7 @@ def test_ls240_upload_cal_curve(wait_for_crossbar, emulator, run_agent, client,
     # No queries are sent during upload, so rely on the default response of ''
     responses = {'CRVHDR 1,DT-670-SD-1.4L,D60STND,2,325.0,1': ''}
     emulator.update_responses(responses)
-    upload_cal_curve_params = LS240Actions.UploadCalCurve(
+    upload_cal_curve_params = UploadCalCurve(
         channel=1, filename=str(cal_file)
     )
     resp = client.upload_cal_curve(**asdict(upload_cal_curve_params))
