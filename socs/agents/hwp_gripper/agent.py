@@ -42,7 +42,7 @@ class HWPGripperAgent:
         self.client: Optional[cli.GripperClient] = None
 
         self.decoded_alarm_group = {False: 'No alarm was detected',
-                                    'A': 'Unrecognized error'
+                                    'A': 'Unrecognized error',
                                     'B': 'Controller saved parameter issue',
                                     'C': 'Issue with position calibration',
                                     'D': 'Could not reach position within time limit',
@@ -303,9 +303,9 @@ class HWPGripperAgent:
                  'log': ["ALARM GROUP B detected"]}
         """
         state_return_dict = self._run_client_func(
-            self.client.get_state, job='get_state', check_shutdown=False
+            self.client.get_state, job='get_state', check_shutdown=False)
 
-        if not bool(state_return_dict['jxc']['alarm']):
+        if not bool(state_return_dict['result']['jxc']['alarm']):
             return_dict = {'result': False, 'log': ['Alarm not triggered']}
         else:
             return_dict = self._run_client_func(
