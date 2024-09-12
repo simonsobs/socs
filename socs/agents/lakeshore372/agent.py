@@ -931,9 +931,9 @@ class LS372_Agent:
                     {"Channel_02": {"T": 293.644, "R": 33.752, "timestamps": 1601924482.722671}}
                 }
         """
-        
+
         pm = Pacemaker(params['query_rate'])
-        
+
         with self._acq_proc_lock.acquire_timeout(timeout=0, job='custom_pid') \
                 as acq_acquired, \
                 self._lock.acquire_timeout(job='custom_pid') as acquired:
@@ -1008,22 +1008,22 @@ class LS372_Agent:
 
             while self.custom_pid:
                 pm.sleep()
-                
+
                 # Get a list of T and R at the maximum sample frequency
                 temps.append(self.module.get_temp(unit='kelvin', chan=ch))
                 resistances.append(self.module.get_temp(unit='ohms', chan=ch))
                 times.append(time.time())
-                
+
                 attempted_heater_pow = 0
                 # Calculate and apply the PID based on the most recent temperature set
                 if times[-1] - last_pid > update_time:
                     heater_P = P_val * (setpoint - np.mean(np.array(temps)))
-                    
-                    #This attempts to stop the I_Val from becoming increasingly negative over time
-                    #If the setpoint is below the actual T for a long time
+
+                    # Update the I_val of the PID
+                    # The I_val should not become negative because negative heater values are unphysical
                     d_heater_I = P_val * I_val * (delta_t * np.sum(setpoint - np.array(temps)))
                     heater_I = max(0.0, heater_I + d_heater_I)
-                    
+
                     attempted_heater_pow = heater_P + heater_I
                     self.log.info(f"Attempted Power: {attempted_heater_pow}, Heater_I: {heater_I}")
                     heater_pow = max(0.0, attempted_heater_pow)
