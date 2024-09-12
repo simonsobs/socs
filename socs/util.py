@@ -1,18 +1,8 @@
-import hashlib
 import dataclasses
-from typing import (
-    Optional,
-    Dict,
-    Any,
-    Type,
-    Callable,
-    Tuple,
-    get_origin,
-    get_args,
-    Union,
-    TypeVar,
-)
+import hashlib
 import time
+from typing import (Any, Callable, Dict, Optional, Tuple, Type, TypeVar, Union,
+                    get_args, get_origin)
 
 from ocs import ocs_agent
 

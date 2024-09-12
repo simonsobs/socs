@@ -5,14 +5,14 @@ import time
 import traceback
 import warnings
 from dataclasses import dataclass
-from typing import ( Any, Dict, Optional, )
+from typing import Any, Dict, Optional
 
 import txaio  # type: ignore
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import Pacemaker
 
 from socs.Lakeshore.Lakeshore240 import Module
-from socs.util import BaseAction, register_task_from_action, OcsOpReturnType
+from socs.util import BaseAction, OcsOpReturnType, register_task_from_action
 
 txaio.use_twisted()
 
@@ -25,6 +25,7 @@ if not on_rtd:
 class LS240Action(BaseAction):
     def process(self, module: Module) -> None:
         raise NotImplementedError
+
 
 @dataclass
 class UploadCalCurve(LS240Action):
@@ -49,6 +50,7 @@ class UploadCalCurve(LS240Action):
         channel.load_curve(self.filename)
         time.sleep(0.1)
         raise Exception("TEST")
+
 
 @dataclass
 class SetValues(LS240Action):
@@ -107,6 +109,7 @@ class SetValues(LS240Action):
             name=self.name,
         )
         time.sleep(0.1)
+
 
 class LS240_Agent:
     def __init__(
