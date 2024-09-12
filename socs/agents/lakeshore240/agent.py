@@ -49,7 +49,6 @@ class UploadCalCurve(LS240Action):
         channel = module.channels[self.channel - 1]
         channel.load_curve(self.filename)
         time.sleep(0.1)
-        raise Exception("TEST")
 
 
 @dataclass
