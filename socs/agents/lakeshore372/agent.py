@@ -227,10 +227,11 @@ class LS372_Agent:
 
         return True, 'Lakeshore module initialized.'
 
-    @ocs_agent.param('sample_heater', default=False, type=bool)
+    @ocs_agent.param('sample_heater', default=True, type=bool)
+    @ocs_agent.param('still_heater', default=True, type=bool)
     @ocs_agent.param('run_once', default=False, type=bool)
     def acq(self, session, params=None):
-        """acq(sample_heater=False, run_once=False)
+        """acq(sample_heater=True, still_heater=True, run_once=False)
 
         **Process** - Acquire data from the Lakeshore 372.
 
@@ -389,7 +390,7 @@ class LS372_Agent:
                             }
                         })
 
-                if params.get("sample_heater", False):
+                if params.get("sample_heater", False) or params.get("still_heater", False):
                     # Sample Heater
                     heater = self.module.sample_heater
                     hout = heater.get_sample_heater_output()
@@ -397,10 +398,25 @@ class LS372_Agent:
                     current_time = time.time()
                     htr_data = {
                         'timestamp': current_time,
-                        'block_name': "heaters",
+                        'block_name': "sample_heater",
                         'data': {}
                     }
-                    htr_data['data']['sample_heater_output'] = hout
+                    htr_data['data']['sample_heater_output'] = float(hout)
+
+                    session.app.publish_to_feed('temperatures', htr_data)
+
+                if params.get("still_heater", False):
+                    # Sample Heater
+                    heater = self.module.still_heater
+                    hout = heater.get_still_output()
+
+                    current_time = time.time()
+                    htr_data = {
+                        'timestamp': current_time,
+                        'block_name': "still_heater",
+                        'data': {}
+                    }
+                    htr_data['data']['still_heater_output'] = float(hout[1:])
 
                     session.app.publish_to_feed('temperatures', htr_data)
 
