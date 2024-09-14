@@ -30,7 +30,6 @@ class ScpiPsuInterface:
             self.configure()
         except ValueError as err:
             raise ValueError(err)
-        super().__init__(**kwargs)
 
     def conn_socket(self):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
