@@ -89,8 +89,6 @@ class ScpiPsuAgent:
             if self.psu.num_channels == 1:
                 acq_params = {'channels': [1]}
             self.agent.start('monitor_output', acq_params)
-            # while not self._initialize_module():
-            #    time.sleep(5)
         return True, 'Initialized PSU.'
 
     def _initialize_module(self):
