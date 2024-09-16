@@ -1,12 +1,17 @@
 import argparse
+import os
 import socket
 import time
 from typing import Optional
 
+import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
 from socs.agents.scpi_psu.drivers import PsuInterface, ScpiPsuInterface
+
+# For logging
+txaio.use_twisted()
 
 
 class ScpiPsuAgent:
@@ -375,6 +380,9 @@ def make_parser(parser=None):
 
 
 def main(args=None):
+    # Start logging
+    txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
+
     parser = make_parser()
     args = site_config.parse_args(agent_class='ScpiPsuAgent',
                                   parser=parser,
