@@ -78,3 +78,7 @@ def test_scpi_psu_monitor_output(wait_for_crossbar, gpib_emu, run_agent, client)
     resp = client.monitor_output.start(test_mode=True, wait=0)
     resp = client.monitor_output.wait()
     check_resp_success(resp)
+
+    # stop process, else test hangs on auto-reconnection
+    client.monitor_output.stop()
+    client.monitor_output.wait()
