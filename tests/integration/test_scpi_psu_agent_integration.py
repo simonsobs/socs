@@ -13,6 +13,12 @@ run_agent = create_agent_runner_fixture(
     "scpi_psu_agent",
     args=["--log-dir", "./logs/"],
 )
+run_agent_acq = create_agent_runner_fixture(
+    "../socs/agents/scpi_psu/agent.py",
+    "scpi_psu_agent",
+    args=["--log-dir", "./logs/",
+          "--mode", "acq"],
+)
 client = create_client_fixture("psuK")
 gpib_emu = create_device_emulator(
     {
@@ -34,6 +40,12 @@ def check_resp_success(resp):
 @pytest.mark.integtest
 def test_scpi_psu_init_psu(wait_for_crossbar, gpib_emu, run_agent, client):
     resp = client.init()
+    check_resp_success(resp)
+
+
+@pytest.mark.integtest
+def test_scpi_psu_init_psu_acq_mode(wait_for_crossbar, gpib_emu, run_agent_acq, client):
+    resp = client.init.status()
     check_resp_success(resp)
 
 
