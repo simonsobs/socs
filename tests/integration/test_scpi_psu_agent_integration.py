@@ -64,6 +64,7 @@ def test_scpi_psu_set_voltage(wait_for_crossbar, gpib_emu, run_agent, client):
 @pytest.mark.integtest
 def test_scpi_psu_monitor_output(wait_for_crossbar, gpib_emu, run_agent, client):
     responses = {
+        "CHAN:OUTP:STAT?": "1",
         "MEAS:VOLT? CH1": "3.14",
         "MEAS:CURR? CH1": "6.28",
         "MEAS:VOLT? CH2": "2.72",
