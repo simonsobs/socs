@@ -162,6 +162,7 @@ class ScpiPsuInterface:
 class PsuInterface(PrologixInterface):
     def __init__(self, ip_address, gpibAddr, verbose=False, **kwargs):
         self.verbose = verbose
+        self.num_channels = 0
         super().__init__(ip_address, gpibAddr, **kwargs)
 
     def enable(self, ch):

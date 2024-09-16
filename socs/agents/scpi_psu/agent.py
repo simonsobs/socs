@@ -1,12 +1,17 @@
 import argparse
+import os
 import socket
 import time
 from typing import Optional
 
+import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
 from socs.agents.scpi_psu.drivers import PsuInterface, ScpiPsuInterface
+
+# For logging
+txaio.use_twisted()
 
 
 class ScpiPsuAgent:
@@ -77,16 +82,13 @@ class ScpiPsuAgent:
 
             self.log.info("Connected to psu: {}".format(self.idn))
 
-        session.add_message('Initialized PSU.')
         auto_acquire = params.get('auto_acquire', False)
 
         if auto_acquire:
             acq_params = None
-            if self.psu.num_channels == 1:
-                acq_params = {'channels': [1]}
+            if self.psu.num_channels != 0:
+                acq_params = {'channels': [i + 1 for i in range(self.psu.num_channels)]}
             self.agent.start('monitor_output', acq_params)
-            # while not self._initialize_module():
-            #    time.sleep(5)
         return True, 'Initialized PSU.'
 
     def _initialize_module(self):
@@ -375,6 +377,9 @@ def make_parser(parser=None):
 
 
 def main(args=None):
+    # Start logging
+    txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
+
     parser = make_parser()
     args = site_config.parse_args(agent_class='ScpiPsuAgent',
                                   parser=parser,
