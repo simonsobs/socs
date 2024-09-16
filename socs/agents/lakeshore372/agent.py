@@ -897,11 +897,12 @@ class LS372_Agent:
     @ocs_agent.param('P', type=float)
     @ocs_agent.param('I', type=float)
     @ocs_agent.param('update_time', type=float)
+    @ocs_agent.param('query_rate', type=float, default=10.)
     @ocs_agent.param('sample_heater_range', type=float, default=10e-3)
     @ocs_agent.param('test_mode', type=bool, default=False)
     def custom_pid(self, session, params):
         """custom_pid(setpoint, heater, channel, P, \
-                      I, update_time, sample_heater_range=10e-3, \
+                      I, update_time, query_rate=10., sample_heater_range=10e-3, \
                       test_mode=False)
 
         **Process** - Set custom software PID parameters for servo control of fridge
@@ -914,6 +915,7 @@ class LS372_Agent:
             P (float): Proportional value in Watts/Kelvin
             I (float): Integral Value in Hz
             update_time (float): Time between PID updates in seconds
+            query_rate (float): Rate at which to query temp data in Hz.
             sample_heater_range (float): Range for sample heater in Amps.
                                          Default is 10e-3.
             test_mode (bool, optional): Run the Process loop only once.
@@ -930,6 +932,7 @@ class LS372_Agent:
                     {"Channel_02": {"T": 293.644, "R": 33.752, "timestamps": 1601924482.722671}}
                 }
         """
+        pm = Pacemaker(params['query_rate'])
 
         with self._acq_proc_lock.acquire_timeout(timeout=0, job='custom_pid') \
                 as acq_acquired, \
@@ -1004,16 +1007,26 @@ class LS372_Agent:
             self.log.info(f"Starting PID on heater {heater}, ch {ch} to setpoint {setpoint} K")
 
             while self.custom_pid:
+                pm.sleep()
+
                 # Get a list of T and R at the maximum sample frequency
                 temps.append(self.module.get_temp(unit='kelvin', chan=ch))
                 resistances.append(self.module.get_temp(unit='ohms', chan=ch))
                 times.append(time.time())
 
+                attempted_heater_pow = 0
                 # Calculate and apply the PID based on the most recent temperature set
                 if times[-1] - last_pid > update_time:
                     heater_P = P_val * (setpoint - np.mean(np.array(temps)))
-                    heater_I += P_val * I_val * (delta_t * np.sum(setpoint - np.array(temps)))
-                    heater_pow = max(0.0, heater_P + heater_I)
+
+                    # Update the I_val of the PID
+                    # The I_val should not become negative because negative heater values are unphysical
+                    d_heater_I = P_val * I_val * (delta_t * np.sum(setpoint - np.array(temps)))
+                    heater_I = max(0.0, heater_I + d_heater_I)
+
+                    attempted_heater_pow = heater_P + heater_I
+                    self.log.info(f"Attempted Power: {attempted_heater_pow}, Heater_I: {heater_I}")
+                    heater_pow = max(0.0, attempted_heater_pow)
                     if heater == 'still':
                         heater_frac = still_power_to_perc(heater_pow, still_heater_R, still_lead_R, max_voltage)
                         self.module.still_heater.set_heater_output(heater_frac)
