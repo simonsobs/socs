@@ -32,11 +32,13 @@ using all of the available arguments::
         'instance-id': 'HBA0',
         'arguments': [
           ['--port', '8080'],
+          ['--ip', '192.168.11.113'],
           ]}
        {'agent-class': 'HWPBBBAgent',
         'instance-id': 'HBA1',
         'arguments': [
           ['--port', '8081'],
+          ['--ip', '192.168.11.114'],
           ]}
 
 This is an example to run two agents because we usually have a couple of

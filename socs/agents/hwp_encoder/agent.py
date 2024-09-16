@@ -488,12 +488,13 @@ class HWPBBBAgent:
 
     """
 
-    def __init__(self, agent_obj, port=8080):
+    def __init__(self, agent_obj, port=8080, ip='None'):
         self.active = True
         self.agent = agent_obj
         self.log = agent_obj.log
         self.lock = TimeoutLock()
         self.port = port
+        self.ip = ip
         self.take_data = False
         self.initialized = False
         # For clock count to time conversion
@@ -510,6 +511,36 @@ class HWPBBBAgent:
         self.agent.register_feed('HWPEncoder_full', record=True,
                                  agg_params=agg_params)
         self.parser = EncoderParser(beaglebone_port=self.port)
+
+    def restart(self, session, params):
+        """restart()
+
+        **Task** - Restarts the beaglebone process
+
+        Notes:
+            The most recent data collected is stored in the session data in the
+            structure:
+
+                >>> response.session['response']
+                {'result': True,
+                 'log': ["Restart command response: Success"]}
+        """
+        if self.ip == 'None':
+            return False, "Could not restart process because beaglebone ip is not defined"
+
+        _restart_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        _restart_socket.connect((self.ip, 5656))
+        _restart_socket.sendall(('reset\n').encode())
+        time.sleep(0.5)
+
+        resp = _restart_socket.recv(4096).decode().strip()
+        log = f'Restart command response: {resp}'
+        result = True if resp == "Success" else False
+        _restart_socket.close()
+        time.sleep(10)
+
+        session.data['response'] = {'result': result, 'log': log}
+        return result, f'Success: {result}'
 
     def acq(self, session, params):
         """acq()
@@ -694,7 +725,11 @@ def make_parser(parser=None):
 
     # Add options specific to this agent.
     pgroup = parser.add_argument_group('Agent Options')
-    pgroup.add_argument('--port', type=int, default=8080)
+    pgroup.add_argument('--port', type=int, default=8080,
+                        help='Listening port of Agent for receiving UDP encoder packets. '
+                             'This should match what is defined in the bbb encoder process configs')
+    pgroup.add_argument('--ip', type=str, default='None',
+                        help='IP of bbb running the corresponding encoder process')
 
     return parser
 
@@ -709,8 +744,9 @@ def main(args=None):
                                   parser=parser,
                                   args=args)
     agent, runner = ocs_agent.init_site_agent(args)
-    hwp_bbb_agent = HWPBBBAgent(agent, port=args.port)
+    hwp_bbb_agent = HWPBBBAgent(agent, port=args.port, ip=args.ip)
     agent.register_process('acq', hwp_bbb_agent.acq, hwp_bbb_agent._stop_acq, startup=True)
+    agent.register_task('restart', hwp_bbb_agent.restart)
 
     runner.run(agent, auto_reconnect=True)
 
