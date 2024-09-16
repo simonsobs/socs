@@ -726,10 +726,10 @@ def make_parser(parser=None):
     # Add options specific to this agent.
     pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--port', type=int, default=8080,
-                        help='IP of bbb running the corresponding encoder process')
-    pgroup.add_argument('--ip', type=str, default='None',
                         help='Listening port of Agent for receiving UDP encoder packets. '
                              'This should match what is defined in the bbb encoder process configs')
+    pgroup.add_argument('--ip', type=str, default='None',
+                        help='IP of bbb running the corresponding encoder process')
 
     return parser
 
