@@ -82,7 +82,6 @@ class ScpiPsuAgent:
 
             self.log.info("Connected to psu: {}".format(self.idn))
 
-        session.add_message('Initialized PSU.')
         auto_acquire = params.get('auto_acquire', False)
 
         if auto_acquire:
