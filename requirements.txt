@@ -58,7 +58,8 @@ pyModbusTCP
 # Docs
 # see docs/requirements.txt
 
-# testing
+# testing + development
+setuptools-scm
 -r requirements/testing.txt
 
 # Contributing

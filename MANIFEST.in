@@ -1,2 +1,0 @@
-include versioneer.py
-include socs/_version.py
