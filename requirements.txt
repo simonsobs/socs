@@ -60,3 +60,6 @@ pyModbusTCP
 
 # testing
 -r requirements/testing.txt
+
+# Contributing
+pre-commit

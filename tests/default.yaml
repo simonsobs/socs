@@ -61,7 +61,8 @@ hosts:
       {'agent-class': 'ScpiPsuAgent',
        'instance-id': 'psuK',
        'arguments': [['--ip-address', '127.0.0.1'],
-                     ['--gpib-slot', '1']
+                     ['--gpib-slot', '1'],
+                     ['--mode', 'init']
                     ]
       },
       {'agent-class': 'PfeifferAgent',
