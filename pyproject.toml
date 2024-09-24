@@ -35,6 +35,7 @@ dependencies = [
     "pyyaml",
     "requests",
     "sqlalchemy>=1.4",
+    "tqdm",
     "twisted",
 ]
 
