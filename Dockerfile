@@ -2,7 +2,7 @@
 # A container setup with an installation of socs.
 
 # Use the ocs image as a base
-FROM simonsobs/ocs:v0.11.2-8-gfa333dd
+FROM simonsobs/ocs:v0.11.3-3-g63fd5ef
 
 # Set up the cryo/smurf user and group so this can run on smurf-servers
 # See link for how all other smurf-containers are set up:
