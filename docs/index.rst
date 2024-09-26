@@ -54,7 +54,7 @@ API Reference        Full API documentation for core parts of the SOCS library.
     agents/holo_fpga
     agents/holo_synth
     agents/ibootbar
-    agents/ifm_kq1001_levelsensor        
+    agents/ifm_kq1001_levelsensor
     agents/ifm_sbn246_flowmeter
     agents/labjack
     agents/lakeshore240
