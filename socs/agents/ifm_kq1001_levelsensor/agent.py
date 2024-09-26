@@ -28,11 +28,11 @@ def extract(value):
     # Decode all of the process data fields, but most of them don't
     # matter.
     _b_pdv1 = binary[0:16]
-    #_b_scale_levl = binary[16:24]
+    # _b_scale_levl = binary[16:24]
     _b_device_status = binary[24:28]
-    #_b_out3 = binary[29:30]
-    #_b_out2 = binary[30:31]
-    #_b_out1 = binary[31:32]
+    # _b_out3 = binary[29:30]
+    # _b_out2 = binary[30:31]
+    # _b_out1 = binary[31:32]
 
     pdv1 = int(_b_pdv1, 2) * 1.0
     device_status = int(_b_device_status, 2)
