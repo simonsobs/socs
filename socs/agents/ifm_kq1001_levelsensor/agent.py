@@ -24,7 +24,7 @@ def extract(value):
         The level in % and the device status.
 
     """
-    binary = bin(int(value,16))[2:].zfill(32)
+    binary = bin(int(value, 16))[2:].zfill(32)
     # Decode all of the process data fields, but most of them don't
     # matter.
     _b_pdv1 = binary[0:16]
@@ -34,10 +34,10 @@ def extract(value):
     #_b_out2 = binary[30:31]
     #_b_out1 = binary[31:32]
 
-    pdv1 = int(_b_pdv1,2)*1.0
-    device_status = int(_b_device_status,2)
-    
-    return pdv1,device_status
+    pdv1 = int(_b_pdv1, 2) * 1.0
+    device_status = int(_b_device_status, 2)
+
+    return pdv1, device_status
 
 
 class LevelSensorAgent:

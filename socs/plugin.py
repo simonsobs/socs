@@ -6,7 +6,7 @@ agents = {
     'CryomechCPAAgent': {'module': 'socs.agents.cryomech_cpa.agent', 'entry_point': 'main'},
     'FPGAAgent': {'module': 'socs.agents.holo_fpga.agent', 'entry_point': 'main'},
     'FlowmeterAgent': {'module': 'socs.agents.ifm_sbn246_flowmeter.agent', 'entry_point': 'main'},
-    'LevelSensorAgent': {'module': 'socs.agents.ifm_kq1001_levelsensor.agent', 'entry_point': 'main'},    
+    'LevelSensorAgent': {'module': 'socs.agents.ifm_kq1001_levelsensor.agent', 'entry_point': 'main'},
     'FTSAerotechAgent': {'module': 'socs.agents.fts_aerotech.agent', 'entry_point': 'main'},
     'GeneratorAgent': {'module': 'socs.agents.generator.agent', 'entry_point': 'main'},
     'Hi6200Agent': {'module': 'socs.agents.hi6200.agent', 'entry_point': 'main'},
