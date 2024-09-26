@@ -2,9 +2,9 @@
 
 .. _ifm_kq1001_levelsensor:
 
-==========================
+=============================
 IFM KQ1001 Level Sensor Agent
-==========================
+=============================
 
 The IFM KQ1001 Level Sensor Agent is an OCS Agent which monitors the
 fluid level in percent reported by the sensor.  The agent also records

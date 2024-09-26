@@ -107,7 +107,7 @@ class LevelSensorAgent:
             }
 
         """
-        pm = Pacemaker(1, quantize=True)
+        pm = Pacemaker(0.2, quantize=False)
         self.take_data = True
 
         while self.take_data:
