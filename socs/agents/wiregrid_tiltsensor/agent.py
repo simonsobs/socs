@@ -31,7 +31,7 @@ class WiregridTiltSensorAgent:
         self.take_data = False
 
         self.ip = ip
-        self.port = port
+        self.port = int(port)
         self.sensor_type = sensor_type
         self.tiltsensor = connect(self.ip, self.port, self.sensor_type)
         self.pm = Pacemaker(2, quantize=True)
@@ -179,9 +179,9 @@ def make_parser(parser_in=None):
         parser_in = argparse.ArgumentParser()
 
     pgroup = parser_in.add_argument_group('Agent Options')
-    pgroup.add_argument('--ip-address', dest='ip', type=str, default=None,
+    pgroup.add_argument('--ip-address', dest='ip', default=None,
                         help='The ip adress of the serial-to-ethernet converter')
-    pgroup.add_argument('--port', dest='port', type=str, default=None,
+    pgroup.add_argument('--port', dest='port', default=None,
                         help='The assigned port of the serial-to-ethernet converter '
                              'for the tilt sensor')
     pgroup.add_argument('--sensor-type',

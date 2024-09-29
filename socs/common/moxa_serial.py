@@ -55,8 +55,9 @@ class Serial_TCPServer(object):
 
     """
 
-    def __init__(self, port, timeout=MOXA_DEFAULT_TIMEOUT):
+    def __init__(self, port, timeout=MOXA_DEFAULT_TIMEOUT, device="kikusui"):
         self.port = port
+        self.device = device
 
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setblocking(0)
@@ -88,7 +89,10 @@ class Serial_TCPServer(object):
                 pass
         # Flush the message out if you got everything
         if len(msg) == n:
-            msg = self.sock.recv(n).decode()
+            if self.device == 'kikusui':
+                msg = self.sock.recv(n).decode()
+            elif self.device == 'tilt_sensor':
+                msg = self.sock.recv(n)
         # Otherwise tell nothing and leave the data in the buffer
         else:
             msg = ''
@@ -193,7 +197,10 @@ class Serial_TCPServer(object):
                 needed.
 
         """
-        self.sock.send(msg.encode())
+        if self.device == 'kikusui':
+            self.sock.send(msg.encode())
+        elif self.device == 'tilt_sensor':
+            self.sock.send(msg)
 
     def writeread(self, msg):
         self.flushInput()
