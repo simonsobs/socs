@@ -287,7 +287,7 @@ class PID:
         else:
             raise ValueError('Unknown target response')
 
-    @retry_multipe_times(loops=3)
+    @retry_multiple_times(loops=3)
     def get_direction(self):
         """Get the current rotation direction.
 
