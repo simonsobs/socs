@@ -11,7 +11,7 @@ def retry_multiple_times(loops=3):
             for i in range(loops):
                 try:
                     return func(*args, **kwargs)
-                except:
+                except BaseException:
                     time.sleep(0.2)
             print(f'Could not complete {func.__name__} after {loops} attempt(s)')
             return None
