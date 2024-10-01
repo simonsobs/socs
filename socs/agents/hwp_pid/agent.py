@@ -29,11 +29,18 @@ def parse_action_result(res):
 
 
 def get_pid_state(pid: pd.PID):
-    return {
-        "current_freq": pid.get_freq(),
-        "target_freq": pid.get_target(),
-        "direction": pid.get_direction(),
-    }
+    freq = pid.get_freq()
+    target = pid.get_target()
+    direction = pid.get_direction()
+
+    return_dict = {}
+    if freq is not None:
+        return_dict['current_freq'] = freq
+    if target is not None:
+        return_dict['target_freq'] = target
+    if direction is not None:
+        return_dict['direction'] = direction
+    return return_dict
 
 
 class Actions:

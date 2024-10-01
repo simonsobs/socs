@@ -257,9 +257,11 @@ class PID:
         if decoded_resp.msg_type == 'measure':
             return decoded_resp.measure
         elif decoded_resp.msg_type == 'error':
-            raise ValueError(f"Error reading freq: {decoded_resp.msg}")
+            print(f"Error reading freq: {decoded_resp.msg}")
+            raise ValueError
         else:
-            raise ValueError("Unknown freq response")
+            print("Unknown freq response")
+            raise ValueError
 
     @retry_multiple_times(loops=3)
     def get_target(self):
@@ -283,9 +285,11 @@ class PID:
         if decoded_resp.msg_type == 'read':
             return decoded_resp.measure
         elif decoded_resp.msg_type == 'error':
-            raise ValueError(f"Error reading target: {decoded_resp.msg}")
+            print(f"Error reading target: {decoded_resp.msg}")
+            raise ValueError
         else:
-            raise ValueError('Unknown target response')
+            print('Unknown target response')
+            raise ValueError
 
     @retry_multiple_times(loops=3)
     def get_direction(self):
@@ -312,9 +316,11 @@ class PID:
         if decoded_resp.msg_type == 'read':
             return decoded_resp.measure
         elif decoded_resp.msg_type == 'error':
-            raise ValueError(f"Error reading direction: {decoded_resp.msg}")
+            print(f"Error reading direction: {decoded_resp.msg}")
+            raise ValueError
         else:
-            raise ValueError('Unknown direction response')
+            print('Unknown direction response')
+            raise ValueError
 
     def set_pid(self, params):
         """Sets the PID parameters of the controller.
