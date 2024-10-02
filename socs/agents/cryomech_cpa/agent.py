@@ -72,7 +72,11 @@ class PTCAgent:
                            fake_errors=self.fake_errors)
 
             # Test connection and display identifying info
-            self.ptc.get_data()
+            try:
+                self.ptc.get_data()
+            except ConnectionError:
+                self.log.error("Could not establish connection to compressor.")
+                return False, "PTC agent initialization failed"
             print("PTC Model:", self.ptc.model)
             print("PTC Serial Number:", self.ptc.serial)
             print("Software Revision is:", self.ptc.software_revision)
