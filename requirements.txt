@@ -29,6 +29,9 @@ numexpr
 scipy
 labjack-ljm
 
+# ifm aio
+aiohttp
+
 # magpie agent
 scipy
 pandas

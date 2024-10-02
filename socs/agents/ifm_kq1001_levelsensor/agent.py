@@ -2,11 +2,12 @@ import argparse
 import time
 from os import environ
 
+import aiohttp
+import asyncio 
 import requests
 import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import Pacemaker, TimeoutLock
-
 
 def extract(value):
     """
@@ -52,22 +53,34 @@ class LevelSensorAgent:
         IP address of IO-Link master to make requests from.
     daq_port: int
         Port on IO-Link master that connects to level sensor. Choices are 1-4.
+    sample_freq : float
+        The sampling frequency for the pacemaker to enforce. This can
+        be a float, however in order to use the ``quantize`` option it
+        must be a whole number.
+    quantize : bool
+        If True, the pacemaker will snap to a grid starting on the
+        second.
 
     """
 
-    def __init__(self, agent, ip_address, daq_port):
+    def __init__(self, agent, ip_address, daq_port, sample_freq, quantize):
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
 
+        self.sample_freq = sample_freq
+        self.quantize = quantize
+
         self.ip_address = ip_address
-        self.daq_port = daq_port
+        self.daq_port = int(daq_port)
+        self.url = 'http://{}'.format(self.ip_address)
 
         # check make of the level sensor, otherwise data may make no
         # sense
         prod_adr = "/iolinkmaster/port[{}]/iolinkdevice/productname/getdata".format(self.daq_port)
-        q = requests.post('http://{}'.format(self.ip_address), json={"code": "request", "cid": -1, "adr": prod_adr})
-        assert q.json()['data']['value'] == 'KQ1001', "Device is not an KQ1001 model level sensor.  Give up!"
+        payload = {"code": "request", "cid": -1, "adr": prod_adr}
+        q = asyncio.run(self.post(payload))
+        assert q['data']['value'] == 'KQ1001', "Device is not an KQ1001 model level sensor.  Give up!"
 
         self.take_data = False
 
@@ -80,6 +93,11 @@ class LevelSensorAgent:
                                  agg_params=agg_params,
                                  buffer_time=1
                                  )
+
+    async def post(self,payload):
+        async with aiohttp.ClientSession() as session:
+            async with session.post(self.url, json=payload) as response:
+                return await response.json()        
 
     @ocs_agent.param('test_mode', default=False, type=bool)
     def acq(self, session, params=None):
@@ -107,24 +125,23 @@ class LevelSensorAgent:
             }
 
         """
-        pm = Pacemaker(0.2, quantize=False)
+        pm = Pacemaker(sample_freq = self.sample_freq, quantize=self.quantize)
         self.take_data = True
 
         while self.take_data:
             pm.sleep()
-
-            dp = int(self.daq_port)
-            adr = "/iolinkmaster/port[{}]/iolinkdevice/pdin/getdata".format(dp)
-            url = 'http://{}'.format(self.ip_address)
+            
+            adr = "/iolinkmaster/port[{}]/iolinkdevice/pdin/getdata".format(self.daq_port)
 
             try:
-                r = requests.post(url, json={"code": "request", "cid": -1, "adr": adr})
+                payload = {"code": "request", "cid": -1, "adr": adr}
+                q = asyncio.run(self.post(payload))
             except requests.exceptions.ConnectionError as e:
                 self.log.warn(f"Connection error occured: {e}")
                 continue
 
             now = time.time()
-            value = r.json()['data']['value']
+            value = q['data']['value']
 
             level_pct, status_int = extract(value)  # units [gallons/minute], [F]
 
@@ -162,7 +179,9 @@ def add_agent_args(parser_in=None):
     pgroup = parser_in.add_argument_group('Agent Options')
     pgroup.add_argument("--ip-address", type=str, help="IP address of IO-Link master.")
     pgroup.add_argument("--daq-port", type=int, help="Port on IO-Link master that level sensor is connected to.")
-
+    pgroup.add_argument("--sample-freq", type=float, default=1.0, help="The sampling frequency for the pacemaker to enforce. This can be a float, however in order to use the ``quantize`` option it must be a whole number.")
+    pgroup.add_argument("--quantize", type=bool, default=True, help="If True, the pacemaker will snap to a grid starting on the second.")
+    
     return parser_in
 
 
@@ -177,7 +196,7 @@ def main(args=None):
     args = site_config.parse_args(agent_class='LevelSensorAgent', parser=parser, args=args)
 
     agent, runner = ocs_agent.init_site_agent(args)
-    f = LevelSensorAgent(agent, args.ip_address, args.daq_port)
+    f = LevelSensorAgent(agent, args.ip_address, args.daq_port, args.sample_freq, args.quantize)
 
     agent.register_process('acq', f.acq, f._stop_acq, startup=True)
 
