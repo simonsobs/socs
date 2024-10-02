@@ -15,9 +15,9 @@ and writes out fake files based on current examples of smurf anciliary data
 that's present on simons1.
 
 .. argparse::
-    :filename: ../agents/smurf_file_emulator/smurf_file_emulator.py
+    :filename: ../socs/agents/smurf_file_emulator/agent.py
     :func: make_parser
-    :prog: python3 smurf_file_emulator.py
+    :prog: python3 agent.py
 
 Configuration File Examples
 ---------------------------
@@ -52,8 +52,10 @@ This agent doesn't really need to run in a docker container, but if you're so
 inclined an example config entry is::
 
   ocs-smurf-file-emulator:
-    image: simonsobs/ocs-smurf-file-emulator-agent:latest
+    image: simonsobs/socs:latest
     hostname: ocs-docker
+    environment:
+      - INSTANCE_ID=smurf-file-emulator
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
       - /path/to/fake/data/dir:/data
@@ -61,5 +63,17 @@ inclined an example config entry is::
 Agent API
 ---------
 
-.. autoclass:: agents.smurf_file_emulator.smurf_file_emulator.SmurfFileEmulator
+.. autoclass:: socs.agents.smurf_file_emulator.agent.SmurfFileEmulator
+    :members:
+
+Supporting API
+---------------
+
+.. autoclass:: socs.agents.smurf_file_emulator.agent.Tune
+    :members:
+
+.. autoclass:: socs.agents.smurf_file_emulator.agent.DataStreamer
+    :members:
+
+.. autoclass:: socs.agents.smurf_file_emulator.agent.G3FrameGenerator
     :members:

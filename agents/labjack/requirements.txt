@@ -1,3 +1,0 @@
-numexpr
-scipy
-labjack-ljm

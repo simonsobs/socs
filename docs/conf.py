@@ -14,8 +14,9 @@
 #
 import os
 import sys
+
 sys.path.insert(0, os.path.abspath('..'))
-from socs_version import get_versions
+from socs import __version__ as socs_version
 
 # -- Project information -----------------------------------------------------
 
@@ -24,9 +25,9 @@ copyright = '2018-2019, Simons Observatory DAQ Group'
 author = 'Simons Observatory DAQ Group'
 
 # The short X.Y version.
-version = get_versions()['version']
+version = socs_version
 # The full version, including alpha/beta/rc tags.
-release = version
+release = socs_version
 
 
 # -- General configuration ---------------------------------------------------
@@ -68,7 +69,7 @@ master_doc = 'index'
 #
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
-language = None
+language = 'en'
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
@@ -78,6 +79,9 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
 
+# Force import protection
+os.environ['READTHEDOCS'] = 'True'
+
 autodoc_mock_imports = ['spt3g',
                         'so3g',
                         'so3g.proj',
@@ -86,6 +90,7 @@ autodoc_mock_imports = ['spt3g',
                         'labjack.ljm.ljm',
                         'ocs',
                         'ocs.agent',
+                        'ocs.client_http',
                         'ocs.ocs_twisted',
                         'ocs.ocs_agent',
                         'ocs.ocs_client',
@@ -106,6 +111,7 @@ autodoc_mock_imports = ['spt3g',
                         'src.pid_controller',
                         ]
 from unittest import mock
+
 for m in autodoc_mock_imports:
     sys.modules[m] = mock.Mock()
 
@@ -114,6 +120,7 @@ def wrap(*args, **kw):
     return lambda f: f
 
 import ocs
+
 ocs.ocs_agent.param = wrap
 
 # -- Options for HTML output -------------------------------------------------

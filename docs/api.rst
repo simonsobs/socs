@@ -3,55 +3,59 @@ API
 
 This page contains the auto-generated documentation for the socs package.
 
-socs.agent
-----------
+socs.agents
+-----------
 
-The ``agent/`` directory contains code that supports one or more socs Agents.
+socs.agents.scpi_psu.drivers
+````````````````````````````
 
-socs.agent.moxaSerial
-`````````````````````
-
-.. automodule:: socs.agent.moxaSerial
+.. automodule:: socs.agents.scpi_psu.drivers
     :members:
     :undoc-members:
     :show-inheritance:
 
-socs.agent.pmx
-``````````````
+socs.agents.tektronix3021c.drivers
+``````````````````````````````````
 
-.. automodule:: socs.agent.pmx
+.. automodule:: socs.agents.tektronix3021c.drivers
     :members:
     :undoc-members:
     :show-inheritance:
 
-socs.agent.prologix_interface
-`````````````````````````````
+socs.agents.vantagepro2.drivers
+```````````````````````````````
 
-.. automodule:: socs.agent.prologix_interface
+.. automodule:: socs.agents.vantagepro2.drivers
     :members:
     :undoc-members:
     :show-inheritance:
 
-socs.agent.scpi_psu_driver
-``````````````````````````
+socs.common
+-----------
 
-.. automodule:: socs.agent.scpi_psu_driver
-    :members:
-    :undoc-members:
-    :show-inheritance:
+The ``common/`` directory contains driver code that is used by multiple socs
+Agents.
 
-socs.agent.tektronix3021c_driver
-````````````````````````````````
-
-.. automodule:: socs.agent.tektronix3021c_driver
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-socs.agent.vantage_pro2
+socs.common.moxa_serial
 ```````````````````````
 
-.. automodule:: socs.agent.vantage_pro2.vantage_pro2
+.. automodule:: socs.common.moxa_serial
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+socs.common.pmx
+```````````````
+
+.. automodule:: socs.common.pmx
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+socs.common.prologix_interface
+``````````````````````````````
+
+.. automodule:: socs.common.prologix_interface
     :members:
     :undoc-members:
     :show-inheritance:
@@ -76,6 +80,17 @@ socs.Lakeshore
 The ``Lakeshore/`` directory contains code that supports the various Lakeshore
 devices used in socs. For details, see the "Supporting APIs" section of the
 relevant Agent page.
+
+socs.smurf
+----------
+
+socs.smurf.MultiSlotController
+``````````````````````````````
+
+.. automodule:: socs.smurf.MultiSlotController
+    :members:
+    :undoc-members:
+    :show-inheritance:
 
 socs.snmp
 ---------

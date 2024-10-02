@@ -1,3 +1,6 @@
+# dynamic package version
+socs/_version.py
+
 # iPython Notebooks
 *.ipynb
 
@@ -123,6 +126,10 @@ ENV/
 # mypy
 .mypy_cache/
 
+# vscode
+*.code-workspace
+.vscode
+
 # Custom
 .crossbar/
 ocs/Lakeshore/ls.cfg
@@ -133,3 +140,5 @@ key.*
 node.pid
 
 .DS_Store
+
+*.db

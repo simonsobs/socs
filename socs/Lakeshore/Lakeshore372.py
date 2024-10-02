@@ -1,9 +1,10 @@
 # Lakeshore372.py
 
-import sys
-import socket
 import select
+import socket
+import sys
 import time
+
 import numpy as np
 
 # Lookup keys for command parameters.
@@ -269,7 +270,7 @@ class LS372:
                     assert False, "Could not reconnect"
                 time.sleep(1)
         print(f"Successfully reconnected on attempt #{i}")
-        raise ConnectionResetError(reset_reason) # should be caught by agent
+        raise ConnectionResetError(reset_reason)  # should be caught by agent
 
     def write(self, message):
         self.connection_check('write')
@@ -1370,6 +1371,7 @@ class Curve:
         for point in values:
             print("uploading %s" % point)
             self._set_data_point(point[0], point[1], point[2])
+            time.sleep(0.065)
 
         # refresh curve attributes
         self.get_header()
@@ -1399,9 +1401,8 @@ class Curve:
                 point = values[j - 1]
                 units = float(resp[0])
                 temperature = float(resp[1])
-                assert units == float(point[1]), "Point number %s not uploaded" % point[0]
-                assert temperature == float(point[2]), "Point number %s not uploaded" % point[0]
-                print("Successfully uploaded %s, %s" % (units, temperature))
+                assert units == float(point[1]), "Point number %s not uploaded. Reuploading points." % point[0]
+                assert temperature == float(point[2]), "Point number %s not uploaded. Reuploading points." % point[0]
             # if AssertionError, tell 372 to re-upload points
             except AssertionError:
                 if units != float(point[1]):

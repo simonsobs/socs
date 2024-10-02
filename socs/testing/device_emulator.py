@@ -1,13 +1,19 @@
-import serial
-import socket
-import time
-import subprocess
+import logging
 import shutil
-import pytest
+import socket
+import subprocess
 import threading
+import time
+import traceback as tb
+from copy import deepcopy
+from typing import Dict
+
+import pytest
+import serial
 
 
-def create_device_emulator(responses, relay_type, port=9001, encoding='utf-8'):
+def create_device_emulator(responses, relay_type, port=9001, encoding='utf-8',
+                           reconnect=False):
     """Create a device emulator fixture.
 
     This provides a device emulator that can be used to mock a device during
@@ -22,6 +28,8 @@ def create_device_emulator(responses, relay_type, port=9001, encoding='utf-8'):
         encoding (str): Encoding for the messages and responses. See
             :func:`socs.testing.device_emulator.DeviceEmulator` for more
             details.
+        reconnect (bool): If True, on TCP client disconnect, the emulator will
+            listen for new incoming connections instead of quitting
 
     Returns:
         function:
@@ -35,7 +43,7 @@ def create_device_emulator(responses, relay_type, port=9001, encoding='utf-8'):
 
     @pytest.fixture()
     def create_device():
-        device = DeviceEmulator(responses, encoding)
+        device = DeviceEmulator(responses, encoding, reconnect=reconnect)
 
         if relay_type == 'serial':
             device.create_serial_relay()
@@ -61,6 +69,8 @@ class DeviceEmulator:
             given encoding. No encoding is used if set to None. That can be
             useful if you need to use raw data from your hardware. Defaults
             to 'utf-8'.
+        reconnect (bool): If True, on TCP client disconnect, the emulator will
+            listen for new incoming connections instead of quitting
 
     Attributes:
         responses (dict): Current set of responses the DeviceEmulator would
@@ -78,13 +88,22 @@ class DeviceEmulator:
 
     """
 
-    def __init__(self, responses, encoding='utf-8'):
-        self.responses = responses
+    def __init__(self, responses, encoding='utf-8', reconnect=False):
+        self.responses = deepcopy(responses)
         self.default_response = None
         self.encoding = encoding
+        self.reconnect = reconnect
         self._type = None
         self._read = True
         self._conn = None
+
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger.setLevel(logging.DEBUG)
+        if len(self.logger.handlers) == 0:
+            formatter = logging.Formatter("%(asctime)s - %(name)s: %(message)s")
+            handler = logging.StreamHandler()
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
 
     @staticmethod
     def _setup_socat():
@@ -131,7 +150,7 @@ class DeviceEmulator:
                                     target=self._read_serial)
         bkg_read.start()
 
-    def _get_response(self, msg):
+    def get_response(self, msg):
         """Determine the response to a given message.
 
         Args:
@@ -154,7 +173,9 @@ class DeviceEmulator:
             else:
                 response = self.responses[msg]
         except Exception as e:
-            print(f"encountered error {e}")
+            self.logger.info(f"Responses: {self.responses}")
+            self.logger.info(f"encountered error {e}")
+            self.logger.info(tb.format_exc())
             response = None
 
         return response
@@ -171,9 +192,9 @@ class DeviceEmulator:
                 msg = self.ser.readline()
                 if self.encoding:
                     msg = msg.strip().decode(self.encoding)
-                print(f"msg='{msg}'")
+                self.logger.debug(f"msg='{msg}'")
 
-                response = self._get_response(msg)
+                response = self.get_response(msg)
 
                 # Avoid user providing bytes-like response
                 if isinstance(response, bytes) and self.encoding is not None:
@@ -182,7 +203,7 @@ class DeviceEmulator:
                 if response is None:
                     continue
 
-                print(f"response='{response}'")
+                self.logger.debug(f"response='{response}'")
                 if self.encoding:
                     response = (response + '\r\n').encode(self.encoding)
                 self.ser.write(response)
@@ -224,25 +245,43 @@ class DeviceEmulator:
 
         # Listen for connections
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._sock.bind(('127.0.0.1', port))
+        while not self._sock_bound:
+            try:
+                self._sock.bind(('127.0.0.1', port))
+                self._sock_bound = True
+            except OSError:
+                self.logger.error(f"Failed to bind to port {port}, trying again...")
+                time.sleep(1)
         self._sock.listen(1)
-        print("Device emulator waiting for tcp client connection")
+        self.logger.info("Device emulator waiting for tcp client connection")
         self._conn, client_address = self._sock.accept()
-        print(f"Client connection made from {client_address}")
+        self.logger.info(f"Client connection made from {client_address}")
 
         while self._read:
             try:
                 msg = self._conn.recv(4096)
+                if not msg:
+                    self.logger.info("Client disconnected")
+                    if self.reconnect:
+                        self.logger.info("Waiting for new connection")
+                        # attempt to reconnect
+                        self._conn, client_address = self._sock.accept()
+                        self.logger.info(f"Client connection made from {client_address}")
+                        continue
+                    else:
+                        self.logger.info("Shutting down")
+                        break
+
             # Was seeing this on tests in the cryomech agent
             except ConnectionResetError:
-                print('Caught connection reset on Agent clean up')
+                self.logger.info('Caught connection reset on Agent clean up')
                 break
             if self.encoding:
                 msg = msg.strip().decode(self.encoding)
             if msg:
-                print(f"msg='{msg}'")
+                self.logger.debug(f"msg='{msg}'")
 
-                response = self._get_response(msg)
+                response = self.get_response(msg)
 
                 # Avoid user providing bytes-like response
                 if isinstance(response, bytes) and self.encoding is not None:
@@ -251,7 +290,7 @@ class DeviceEmulator:
                 if response is None:
                     continue
 
-                print(f"response='{response}'")
+                self.logger.debug(f"response='{response}'")
                 if self.encoding:
                     response = response.encode(self.encoding)
                 self._conn.sendall(response)
@@ -273,12 +312,35 @@ class DeviceEmulator:
         Args:
             port (int): Port for the TCP relay to listen for connections on.
 
+        Notes:
+            This will not return until the socket is properly bound to the
+            given port. If this setup is not working it is likely another
+            device emulator instance is not yet finished or has not been
+            properly shutdown.
+
         """
         self._type = 'tcp'
+        self._sock_bound = False
         bkg_read = threading.Thread(name='background',
                                     target=self._read_socket,
                                     kwargs={'port': port})
         bkg_read.start()
+
+        # wait for socket to bind properly before returning
+        while not self._sock_bound:
+            time.sleep(0.1)
+
+    def update_responses(self, responses: Dict):
+        """
+        Updates the current responses. See ``define_responses`` for more detail.
+
+        Args
+        ------
+        responses: dict
+            Dict of commands to use to update the current responses.
+        """
+        self.responses.update(responses)
+        self.logger.info(f"responses set to {self.responses}")
 
     def define_responses(self, responses, default_response=None):
         """Define what responses are available to reply with on the configured
@@ -306,7 +368,7 @@ class DeviceEmulator:
             ``encoding=None``.
 
         """
-        print(f"responses set to {responses}")
-        self.responses = responses
-        print(f"default response set to '{default_response}'")
+        self.logger.info(f"responses set to {responses}")
+        self.responses = deepcopy(responses)
+        self.logger.info(f"default response set to '{default_response}'")
         self.default_response = default_response

@@ -14,9 +14,9 @@ via RS-232 (D-sub 9pin cable).
 The agent communicates with the converter via Ethernet.
 
 .. argparse::
-   :filename: ../agents/wiregrid_kikusui/kikusui_agent.py
+   :filename: ../socs/agents/wiregrid_kikusui/agent.py
    :func: make_parser
-   :prog: python3 kikusui_agent.py
+   :prog: python3 agent.py
 
 Configuration File Examples
 ---------------------------
@@ -46,29 +46,25 @@ An example site-config-file block::
 Docker Compose
 ``````````````
 
-An example docker-compose configuration::
+An example docker compose configuration::
 
     ocs-wgkikusui-agent:
-      image: simonsobs/ocs-wgkikusui-agent:latest
-      restart: always
+      image: simonsobs/socs:latest
       hostname: ocs-docker
       network_mode: "host"
-      depends_on:
-        - "crossbar"
+      command:
+        - INSTANCE_ID=wgkikusui
       volumes:
         - ${OCS_CONFIG_DIR}:/config:ro
-        - "<local directory to record log file>:/data/wg-data"
-      command:
-        - "--instance-id=wgkikusui"
+        - "<local directory to record log file>:/data/wg-data/action"
 
 - Since the agent within the container needs to communicate with hardware on the
   host network you must use ``network_mode: "host"`` in your compose file.
 - To control the wire-grid rotation accurately,
-  the agent uses the output of the ``Wiregrid Encoder Agent``.
-  Therefore, mounting the volume of the ``ocs-wgencoder-agent`` is necessary.
+  the agent uses the OCS output of the ``Wiregrid Encoder Agent``.
 - For the ``calibration_wg()`` function and debug mode (assigned by ``--debug`` option),
   a directory path to log files should be assigned in the ``volumes`` section
-  (``/data/wg-data`` is the default path in the docker).
+  (``/data/wg-data/action`` is the path in the docker).
 
 
 Description
@@ -107,7 +103,7 @@ However, if you want to rotate the wire-grid continuousely, you can use the foll
 Agent API
 ---------
 
-.. autoclass:: agents.wiregrid_kikusui.kikusui_agent.WiregridKikusuiAgent
+.. autoclass:: socs.agents.wiregrid_kikusui.agent.WiregridKikusuiAgent
     :members:
 
 

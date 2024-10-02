@@ -1,21 +1,13 @@
 import os
-import pytest
 
 import ocs
+import pytest
+from integration.util import docker_compose_file  # noqa: F401
+from integration.util import create_crossbar_fixture
 from ocs.base import OpCode
-
-from ocs.testing import (
-    create_agent_runner_fixture,
-    create_client_fixture,
-)
-
-from integration.util import (
-    create_crossbar_fixture
-)
+from ocs.testing import create_agent_runner_fixture, create_client_fixture
 
 from socs.testing.device_emulator import create_device_emulator
-
-pytest_plugins = ("docker_compose")
 
 # Set the OCS_CONFIG_DIR so we read the local default.yaml file always
 os.environ['OCS_CONFIG_DIR'] = os.getcwd()
@@ -49,7 +41,7 @@ def format_reply(data):
 
 wait_for_crossbar = create_crossbar_fixture()
 run_agent = create_agent_runner_fixture(
-    '../agents/pfeiffer_tc400/pfeiffer_tc400_agent.py', 'tc400_agent')
+    '../socs/agents/pfeiffer_tc400/agent.py', 'tc400_agent')
 client = create_client_fixture('pfeifferturboA')
 emulator = create_device_emulator({}, relay_type='tcp')
 

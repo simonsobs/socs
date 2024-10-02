@@ -1,7 +1,8 @@
-import socket
 import argparse
-import numpy as np
 import logging
+import socket
+
+import numpy as np
 
 BUFF_SIZE = 1024
 
@@ -93,9 +94,9 @@ class Lakeshore240_Simulator:
                 if e.errno == 48:
                     self.log.warning(f"Address {p} is already in use")
                 else:
-                    raise(e)
+                    raise e
         else:
-            print(f"Could not connect to ports in {range(self.port, self.port+5)}")
+            print(f"Could not connect to ports in {range(self.port, self.port + 5)}")
 
         sock.listen(1)
 

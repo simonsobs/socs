@@ -11,8 +11,13 @@ in-place = true
 recursive = true
 aggressive = 2
 exclude =
-    agents/meinberg_m1000/mibs/MBG-SNMP-LTNG-MIB.py,
-    agents/meinberg_m1000/mibs/SNMPv2-MIB.py,
-    agents/meinberg_m1000/mibs/MBG-SNMP-ROOT-MIB.py,
-    versioneer.py,
+    socs/mibs/MBG-SNMP-LTNG-MIB.py,
+    socs/mibs/SNMPv2-MIB.py,
+    socs/mibs/MBG-SNMP-ROOT-MIB.py,
+    socs/mibs/IBOOTPDU-MIB.py,
+    socs/mibs/UPS-MIB.py,
+    socs/mibs/MBG-SYNCBOX-N2X-MIB.py,
     docs/conf.py,
+per-file-ignores =
+    # Windows only dependency
+    socs/agents/thorlabs_mc2000b/agent.py:F405

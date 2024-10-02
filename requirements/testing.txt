@@ -1,8 +1,9 @@
+http-server-mock
 pytest
 pytest-cov
-pytest-docker-compose
+pytest-docker
 pytest-dependency
 pytest-order
+pytest-twisted
 so3g
-
--r ../agents/pfeiffer_tc400/requirements.txt
+thola-snmpsim
