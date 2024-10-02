@@ -1,7 +1,7 @@
 import random
-import selectors
-import socket
 import struct
+
+from socs.tcp import TCPInterface
 
 STX = '\x02'
 ADDR = '\x10'
@@ -15,7 +15,7 @@ ESC_CR = '\x31'
 ESC_ESC = '\x32'
 
 
-class PTC:
+class PTC(TCPInterface):
     def __init__(self, ip_address, port=502, timeout=10, fake_errors=False):
         self.fake_errors = fake_errors
 
@@ -23,89 +23,15 @@ class PTC:
         self.serial = None
         self.software_revision = None
 
-        self.ip_address = ip_address
-        self.port = int(port)
-        self.timeout = timeout
-        self.comm = self._connect((self.ip_address, self.port))
-
-    def _connect(self, address):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(self.timeout)
-        try:
-            sock.connect(address)
-        except TimeoutError:
-            print(f"Connection not established within {self.timeout}.")
-            return
-        except OSError as e:
-            print(f"Unable to connect. {e}")
-            return
-        except Exception as e:
-            print(f"Caught unexpected {type(e).__name__} while connecting:")
-            print(f"  {e}")
-            return
-        return sock
-
-    def reset(self):
-        print("Resetting the connection to the compressor.")
-        self.comm = self._connect((self.ip_address, self.port))
-
-    def _write(self, msg):
-        if self.comm is None:
-            print("Connection not established. Unable to send command.")
-            self.reset()
-            return
-
-        try:
-            self.comm.sendall(msg)
-            return
-        except (BrokenPipeError, ConnectionResetError) as e:
-            print(f"Connection error: {e}")
-            self.reset()
-        except TimeoutError as e:
-            print(f"Timeout error while writing: {e}")
-            self.reset()
-        except Exception as e:
-            print(f"Caught unexpected {type(e).__name__} during write:")
-            print(f"  {e}")
-            self.reset()
-
-        # Try a second time before giving up
-        try:
-            self.comm.sendall(msg)
-        except (BrokenPipeError, ConnectionResetError) as e:
-            print(f"Connection error: {e}")
-            raise ConnectionError
-        except TimeoutError as e:
-            print(f"Timeout error while writing: {e}")
-            raise ConnectionError
-        except AttributeError:
-            raise ConnectionError("Unable to reset connection.")
-        except Exception as e:
-            print(f"Caught unexpected {type(e).__name__} during write:")
-            print(f"  {e}")
-            raise ConnectionError
-
-    def _check_ready(self):
-        """Check socket is ready to read from."""
-        if self.comm is None:
-            raise ConnectionError("Connection not established, not ready to read.")
-
-        sel = selectors.DefaultSelector()
-        sel.register(self.comm, selectors.EVENT_READ)
-        if not sel.select(self.timeout):
-            raise ConnectionError
-
-    def _read(self):
-        self._check_ready()
-        data = self.comm.recv(1024)
-        return data
+        # Setup the TCP Interface
+        super().__init__(ip_address, port, timeout)
 
     def get_data(self):
         """
         Gets the raw data from the ptc and returns it in a usable format.
         """
-        self._write(self.buildRegistersQuery())
-        data = self._read()
+        self.write(self.buildRegistersQuery())
+        data = self.read()
         data_flag, brd = self.breakdownReplyData(data)
 
         return data_flag, brd
@@ -246,10 +172,3 @@ class PTC:
                   f"Skipping this data block. Bad output string is {rawdata}")
 
         return data_flag, data
-
-    def __del__(self):
-        """
-        If the PTC class instance is destroyed, close the connection to the
-        ptc.
-        """
-        self.comm.close()
