@@ -16,6 +16,28 @@ ESC_ESC = '\x32'
 
 
 class PTC(TCPInterface):
+    """Interface class for connecting to the pulse tube compressor.
+
+    Parameters
+    ----------
+    ip_address : str
+        IP address of the device.
+    port : int
+        Associated port for TCP communication. Default is 502.
+    timeout : float
+        Duration in seconds that operations wait before giving up. Default is
+        10 seconds.
+    fake_errors : bool
+        Flag that generates random fake errors if True. Does not generate
+        errors if False. Defaults to False.
+
+    Attributes
+    ----------
+    comm : socket.socket
+        Socket object that forms the connection to the compressor.
+
+    """
+
     def __init__(self, ip_address, port=502, timeout=10, fake_errors=False):
         self.fake_errors = fake_errors
 
@@ -28,7 +50,7 @@ class PTC(TCPInterface):
 
     def get_data(self):
         """
-        Gets the raw data from the ptc and returns it in a usable format.
+        Gets the raw data from the PTC and returns it in a usable format.
         """
         self.send(self.buildRegistersQuery())
         data = self.recv()
