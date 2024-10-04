@@ -54,14 +54,14 @@ class TCPInterface:
         print("Resetting the connection to the device.")
         self.comm = self._connect((self.ip_address, self.port))
 
-    def write(self, msg):
-        """Write command to socket.
+    def send(self, msg):
+        """Send message to socket.
 
         This method will try to send the message and if it runs into any issues
         will try to re-establish the socket connection before trying to send
         the message again. If it fails a second time it raises an exception.
 
-        If the connection has failed to reset from a previous ``write``, or has
+        If the connection has failed to reset from a previous ``send``, or has
         not yet been established, it will first try to connnect before sending
         the message. If it fails to establish the connection it will raise an
         exception.
@@ -92,7 +92,7 @@ class TCPInterface:
             print(f"Timeout error while writing: {e}")
             self._reset()
         except Exception as e:
-            print(f"Caught unexpected {type(e).__name__} during write:")
+            print(f"Caught unexpected {type(e).__name__} during send:")
             print(f"  {e}")
             self._reset()
 
@@ -108,7 +108,7 @@ class TCPInterface:
         except AttributeError:
             raise ConnectionError("Unable to reset connection.")
         except Exception as e:
-            print(f"Caught unexpected {type(e).__name__} during write:")
+            print(f"Caught unexpected {type(e).__name__} during send:")
             print(f"  {e}")
             raise ConnectionError
 
@@ -122,11 +122,11 @@ class TCPInterface:
         if not sel.select(self.timeout):
             raise ConnectionError("Socket not ready to read. Possible timeout.")
 
-    def read(self):
-        """Read response from the device.
+    def recv(self):
+        """Receive response from the device.
 
         This method will check if the socket is ready to be read from before
-        performing the read. If there is no data to read, or the socket is
+        performing the recv. If there is no data to read, or the socket is
         otherwise unready an exception is raised.
 
         Returns
