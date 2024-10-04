@@ -78,9 +78,10 @@ class TCPInterface:
 
         """
         if self.comm is None:
-            print("Connection not established. Unable to send command.")
+            print("Connection not established.")
             self._reset()
-            return
+            if self.comm is None:
+                raise ConnectionError("Unable to establish connection.")
 
         try:
             self.comm.sendall(msg)
