@@ -100,6 +100,15 @@ socs.snmp
     :undoc-members:
     :show-inheritance:
 
+socs.tcp
+---------
+
+.. automodule:: socs.tcp
+    :members:
+    :undoc-members:
+    :show-inheritance:
+    :noindex:
+
 socs.testing
 ------------
 
