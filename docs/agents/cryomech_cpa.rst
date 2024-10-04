@@ -91,3 +91,4 @@ Supporting APIs
 
 .. autoclass:: socs.agents.cryomech_cpa.agent.PTC
     :members:
+    :show-inheritance:
