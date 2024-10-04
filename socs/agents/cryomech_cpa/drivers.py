@@ -50,6 +50,11 @@ class PTC:
         self.comm = self._connect((self.ip_address, self.port))
 
     def _write(self, msg):
+        if self.comm is None:
+            print("Connection not established. Unable to send command.")
+            self.reset()
+            return
+
         try:
             self.comm.sendall(msg)
             return
@@ -73,6 +78,8 @@ class PTC:
         except TimeoutError as e:
             print(f"Timeout error while writing: {e}")
             raise ConnectionError
+        except AttributeError:
+            raise ConnectionError("Unable to reset connection.")
         except Exception as e:
             print(f"Caught unexpected {type(e).__name__} during write:")
             print(f"  {e}")
@@ -80,6 +87,9 @@ class PTC:
 
     def _check_ready(self):
         """Check socket is ready to read from."""
+        if self.comm is None:
+            raise ConnectionError("Connection not established, not ready to read.")
+
         sel = selectors.DefaultSelector()
         sel.register(self.comm, selectors.EVENT_READ)
         if not sel.select(self.timeout):
