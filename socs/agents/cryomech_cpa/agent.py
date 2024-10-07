@@ -72,7 +72,11 @@ class PTCAgent:
                            fake_errors=self.fake_errors)
 
             # Test connection and display identifying info
-            self.ptc.get_data()
+            try:
+                self.ptc.get_data()
+            except ConnectionError:
+                self.log.error("Could not establish connection to compressor.")
+                return False, "PTC agent initialization failed"
             print("PTC Model:", self.ptc.model)
             print("PTC Serial Number:", self.ptc.serial)
             print("Software Revision is:", self.ptc.software_revision)
@@ -141,7 +145,16 @@ class PTCAgent:
                 # Publish data, waiting 1/f_sample seconds in between calls.
                 pub_data = {'timestamp': time.time(),
                             'block_name': 'ptc_status'}
-                data_flag, data = self.ptc.get_data()
+                try:
+                    data_flag, data = self.ptc.get_data()
+                    if session.degraded:
+                        self.log.info("Connection re-established.")
+                        session.degraded = False
+                except ConnectionError:
+                    self.log.error("Failed to get data from compressor. Check network connection.")
+                    session.degraded = True
+                    time.sleep(1)
+                    continue
                 pub_data['data'] = data
                 # If there is an error in compressor output (data_flag = True),
                 # do not publish
