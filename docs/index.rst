@@ -97,7 +97,8 @@ API Reference        Full API documentation for core parts of the SOCS library.
     :caption: Developer Guide
     :maxdepth: 2
 
-    developer/snmp
+    developer/interfaces/snmp
+    developer/interfaces/tcp
     developer/testing
 
 .. toctree::
