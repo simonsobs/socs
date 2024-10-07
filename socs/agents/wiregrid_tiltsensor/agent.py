@@ -31,7 +31,7 @@ class WiregridTiltSensorAgent:
         self.take_data = False
 
         self.ip = ip
-        self.port = port
+        self.port = int(port)
         self.sensor_type = sensor_type
         self.tiltsensor = connect(self.ip, self.port, self.sensor_type)
         self.pm = Pacemaker(2, quantize=True)

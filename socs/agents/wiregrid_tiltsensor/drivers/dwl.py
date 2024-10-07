@@ -126,7 +126,7 @@ class DWL:
                 "Aborted DWL._conn() due to no "
                 "TCP port specified")
         elif tcp_ip is not None and tcp_port is not None:
-            self.ser = mx.Serial_TCPServer((tcp_ip, tcp_port), timeout)
+            self.ser = mx.Serial_TCPServer((tcp_ip, tcp_port), timeout, encoded=False)
             self.tcp_ip = tcp_ip
             self.tcp_port = int(tcp_port)
             self.using_tcp = True
