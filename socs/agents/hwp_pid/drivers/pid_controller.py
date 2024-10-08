@@ -14,7 +14,7 @@ def retry_multiple_times(loops=3):
                 except BaseException:
                     time.sleep(0.2)
             print(f'Could not complete {func.__name__} after {loops} attempt(s)')
-            return None
+            return DecodedResponse(msg_type='error', msg='Read Error')
         return inner
     return dec_wrapper
 
@@ -255,7 +255,7 @@ class PID:
             print(responses)
             print(decoded_resp)
         if decoded_resp.msg_type == 'measure':
-            return decoded_resp.measure
+            return decoded_resp
         elif decoded_resp.msg_type == 'error':
             print(f"Error reading freq: {decoded_resp.msg}")
             raise ValueError
@@ -283,7 +283,7 @@ class PID:
             print(responses)
             print(decoded_resp)
         if decoded_resp.msg_type == 'read':
-            return decoded_resp.measure
+            return decoded_resp
         elif decoded_resp.msg_type == 'error':
             print(f"Error reading target: {decoded_resp.msg}")
             raise ValueError
@@ -314,7 +314,7 @@ class PID:
             print(responses)
             print(decoded_resp)
         if decoded_resp.msg_type == 'read':
-            return decoded_resp.measure
+            return decoded_resp
         elif decoded_resp.msg_type == 'error':
             print(f"Error reading direction: {decoded_resp.msg}")
             raise ValueError
