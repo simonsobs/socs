@@ -132,12 +132,15 @@ class HWPPIDAgent:
 
         pid_state = get_pid_state(pid)
         if pid_state['healthy']:
-            data['data'].update(pid_state['state'])
-            session.data.update(pid_state['state'])
-            session.data['last_updated'] = time.time()
-            self.agent.publish_to_feed("hwppid", data)
+            pid_state['state'].update({'quality': 'ok'})
         else:
             print('Warning: state monitor degraded')
+            pid_state['state'].update({'quality': 'degraded'})
+
+        data['data'].update(pid_state['state'])
+        session.data.update(pid_state['state'])
+        session.data['last_updated'] = time.time()
+        self.agent.publish_to_feed("hwppid", data)
 
     def _process_actions(self, pid):
         while not self.action_queue.empty():
