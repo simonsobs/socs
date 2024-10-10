@@ -132,10 +132,10 @@ class HWPPIDAgent:
 
         pid_state = get_pid_state(pid)
         if pid_state['healthy']:
-            pid_state['state'].update({'quality': 'ok'})
+            session.degraded = False
         else:
             print('Warning: state monitor degraded')
-            pid_state['state'].update({'quality': 'degraded'})
+            session.degraded = True
 
         data['data'].update(pid_state['state'])
         session.data.update(pid_state['state'])
