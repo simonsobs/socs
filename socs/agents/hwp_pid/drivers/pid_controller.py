@@ -5,6 +5,20 @@ from dataclasses import dataclass, field
 from typing import Optional, Union
 
 
+def retry_multiple_times(loops=3):
+    def dec_wrapper(func):
+        def inner(*args, **kwargs):
+            for i in range(loops):
+                try:
+                    return func(*args, **kwargs)
+                except BaseException:
+                    time.sleep(0.2)
+            print(f'Could not complete {func.__name__} after {loops} attempt(s)')
+            return DecodedResponse(msg_type='error', msg='Read Error')
+        return inner
+    return dec_wrapper
+
+
 @dataclass
 class DecodedResponse:
     msg_type: str
@@ -221,6 +235,7 @@ class PID:
         tune_params = [0.2, 63, 0]
         self.set_pid(tune_params)
 
+    @retry_multiple_times(loops=3)
     def get_freq(self):
         """Returns the current frequency of the CHWP.
 
@@ -236,17 +251,19 @@ class PID:
         responses = []
         responses.append(self.send_message("*X01"))
         decoded_resp = self.return_messages(responses)[0]
-        attempts = 3
-        for attempt in range(attempts):
-            if self.verb:
-                print(responses)
-                print(decoded_resp)
-            if decoded_resp.msg_type == 'measure':
-                return decoded_resp.measure
-            elif decoded_resp.msg_type == 'error':
-                print(f"Error reading freq: {decoded_resp.msg}")
-        raise ValueError('Could not get current frequency')
+        if self.verb:
+            print(responses)
+            print(decoded_resp)
+        if decoded_resp.msg_type == 'measure':
+            return decoded_resp
+        elif decoded_resp.msg_type == 'error':
+            print(f"Error reading freq: {decoded_resp.msg}")
+            raise ValueError
+        else:
+            print("Unknown freq response")
+            raise ValueError
 
+    @retry_multiple_times(loops=3)
     def get_target(self):
         """Returns the target frequency of the CHWP.
 
@@ -262,17 +279,19 @@ class PID:
         responses = []
         responses.append(self.send_message("*R01"))
         decoded_resp = self.return_messages(responses)[0]
-        attempts = 3
-        for attempt in range(attempts):
-            if self.verb:
-                print(responses)
-                print(decoded_resp)
-            if decoded_resp.msg_type == 'read':
-                return decoded_resp.measure
-            elif decoded_resp.msg_type == 'error':
-                print(f"Error reading target: {decoded_resp.msg}")
-        raise ValueError('Could not get target frequency')
+        if self.verb:
+            print(responses)
+            print(decoded_resp)
+        if decoded_resp.msg_type == 'read':
+            return decoded_resp
+        elif decoded_resp.msg_type == 'error':
+            print(f"Error reading target: {decoded_resp.msg}")
+            raise ValueError
+        else:
+            print('Unknown target response')
+            raise ValueError
 
+    @retry_multiple_times(loops=3)
     def get_direction(self):
         """Get the current rotation direction.
 
@@ -291,16 +310,17 @@ class PID:
         responses = []
         responses.append(self.send_message("*R02"))
         decoded_resp = self.return_messages(responses)[0]
-        attempts = 3
-        for attempt in range(attempts):
-            if self.verb:
-                print(responses)
-                print(decoded_resp)
-            if decoded_resp.msg_type == 'read':
-                return decoded_resp.measure
-            elif decoded_resp.msg_type == 'error':
-                print(f"Error reading direction: {decoded_resp.msg}")
-        raise ValueError('Could not get direction')
+        if self.verb:
+            print(responses)
+            print(decoded_resp)
+        if decoded_resp.msg_type == 'read':
+            return decoded_resp
+        elif decoded_resp.msg_type == 'error':
+            print(f"Error reading direction: {decoded_resp.msg}")
+            raise ValueError
+        else:
+            print('Unknown direction response')
+            raise ValueError
 
     def set_pid(self, params):
         """Sets the PID parameters of the controller.
@@ -525,6 +545,8 @@ class PID:
         """
         end_string = string.split('\r')[-1]
         read_type = end_string[1:3]
+        if len(end_string) != 9:
+            return DecodedResponse(msg_type='error', msg='Unrecognized Read Length')
         # Decode target
         if read_type == '01':
             target = float(int(end_string[4:], 16) / 1000.)
@@ -536,7 +558,7 @@ class PID:
             else:
                 return DecodedResponse(msg_type='read', msg='Direction = Forward', measure=0)
         else:
-            return DecodedResponse(msg_type='error', msg='Unrecognized Read')
+            return DecodedResponse(msg_type='error', msg='Unrecognized Read Type')
 
     @staticmethod
     def _decode_write(string):
