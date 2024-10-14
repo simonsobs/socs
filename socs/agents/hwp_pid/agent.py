@@ -33,13 +33,13 @@ def get_pid_state(pid: pd.PID):
                   'target_freq': pid.get_target,
                   'direction': pid.get_direction}
 
-    return_dict = {'healthy': True, 'state': {}}
+    return_dict = {'healthy': True}
     for name, func in state_func.items():
         resp = func()
         if resp.msg_type == 'error':
             return_dict['healthy'] = False
         else:
-            return_dict['state'][name] = resp.measure
+            return_dict[name] = resp.measure
     return return_dict
 
 
@@ -97,7 +97,7 @@ class Actions:
         def process(self, pid: pd.PID):
             pid_state = get_pid_state(pid)
             if pid_state['healthy']:
-                return pid_state['state']
+                return pid_state
             else:
                 print('Error getting state')
                 raise ValueError
@@ -137,8 +137,8 @@ class HWPPIDAgent:
             print('Warning: state monitor degraded')
             session.degraded = True
 
-        data['data'].update(pid_state['state'])
-        session.data.update(pid_state['state'])
+        data['data'].update(pid_state)
+        session.data.update(pid_state)
         session.data['last_updated'] = time.time()
         self.agent.publish_to_feed("hwppid", data)
 
