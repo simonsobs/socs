@@ -189,7 +189,7 @@ class HWPEmulator:
             elif cmd == "*X01":  # Get frequency
                 return f"X01{self.state.cur_freq:0.3f}"
             elif cmd == "*R01":  # Get Target
-                return f"R01{PID._convert_to_hex(self.state.pid.freq_setpoint, 3)}"
+                return f"R0140{PID._convert_to_hex(self.state.pid.freq_setpoint, 3)}"
             elif cmd == "*R02":  # Get Direction
                 if self.state.pid.direction == "forward":
                     return "R02400000"
