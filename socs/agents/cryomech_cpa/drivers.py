@@ -53,7 +53,7 @@ class PTC(TCPInterface):
         Gets the raw data from the PTC and returns it in a usable format.
         """
         self.send(self.buildRegistersQuery())
-        data = self.recv()
+        data = self.recv(1024)
         data_flag, brd = self.breakdownReplyData(data)
 
         return data_flag, brd

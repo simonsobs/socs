@@ -123,12 +123,17 @@ class TCPInterface:
         if not sel.select(self.timeout):
             raise ConnectionError("Socket not ready to read. Possible timeout.")
 
-    def recv(self):
+    def recv(self, bufsize=4096):
         """Receive response from the device.
 
         This method will check if the socket is ready to be read from before
         performing the recv. If there is no data to read, or the socket is
         otherwise unready an exception is raised.
+
+        Parameters
+        ----------
+        bufsize : int
+            Amount of data to be recieved in bytes. Defaults to 4096.
 
         Returns
         -------
@@ -143,7 +148,7 @@ class TCPInterface:
 
         """
         self._check_ready()
-        data = self.comm.recv(1024)
+        data = self.comm.recv(bufsize)
         return data
 
     def __del__(self):
