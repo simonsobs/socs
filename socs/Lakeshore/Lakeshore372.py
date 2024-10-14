@@ -1,10 +1,11 @@
 # Lakeshore372.py
 
-import socket
 import sys
 import time
 
 import numpy as np
+
+from socs.tcp import TCPInterface
 
 # Lookup keys for command parameters.
 autorange_key = {'0': 'off',
@@ -173,38 +174,7 @@ heater_display_key = {'1': 'current',
 heater_display_lock = {v: k for k, v in heater_display_key.items()}
 
 
-def _establish_socket_connection(ip, timeout, port=7777):
-    """Establish socket connection to the LS372.
-
-    Parameters
-    ----------
-    ip : str
-        IP address of the LS372
-    timeout : int
-        timeout period for the socket connection in seconds
-    port : int
-        Port for the connection, defaults to the default LS372 port of 7777
-
-    Returns
-    -------
-    socket.socket
-        The socket object with open connection to the 372
-
-    """
-    com = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    try:
-        com.connect((ip, port))
-    except OSError as e:
-        if 'No route to host' in e.strerror:
-            raise ConnectionError("Cannot connect to LS372")
-        else:
-            raise e
-    com.settimeout(timeout)
-
-    return com
-
-
-class LS372:
+class LS372(TCPInterface):
     """
         Lakeshore 372 class.
 
@@ -213,9 +183,11 @@ class LS372:
                    index 0 corresponding to the control channel, 'A'
     """
 
-    def __init__(self, ip, timeout=10, num_channels=16):
-        self.com = _establish_socket_connection(ip, timeout)
+    def __init__(self, ip_address, port=7777, timeout=10, num_channels=16):
         self.num_channels = num_channels
+
+        # Setup the TCP Interface
+        super().__init__(ip_address, port, timeout)
 
         self.id = self.get_id()
         self.autoscan = self.get_autoscan()
@@ -237,11 +209,7 @@ class LS372:
         self.still_heater = Heater(self, 2)
 
     def msg(self, message):
-        """Send message to the Lakeshore 372 over ethernet.
-
-        If we're asking for something from the Lakeshore (indicated by a ? in
-        the message string), then we will attempt to ask twice before giving up
-        due to potential communication timeouts.
+        """Send message to the Lakeshore 372 over TCP.
 
         Parameters
         ----------
@@ -257,20 +225,10 @@ class LS372:
         msg_str = f'{message}\r\n'.encode()
 
         if '?' in message:
-            self.com.send(msg_str)
-            # Try once, if we timeout, try again. Usually gets around single event glitches.
-            for attempt in range(2):
-                try:
-                    resp = str(self.com.recv(4096), 'utf-8').strip()
-                    break
-                except socket.timeout:
-                    print("Warning: Caught timeout waiting for response to '%s', trying again "
-                          "before giving up" % message)
-                    if attempt == 1:
-                        raise RuntimeError('Query response to Lakeshore timed out after two '
-                                           'attempts. Check connection.')
+            self.send(msg_str)
+            resp = str(self.recv(), 'utf-8').strip()
         else:
-            self.com.send(msg_str)
+            self.send(msg_str)
             resp = ''
 
         return resp
