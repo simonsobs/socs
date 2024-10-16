@@ -13,6 +13,8 @@ from twisted.internet import reactor
 
 from socs.Lakeshore.Lakeshore372 import LS372
 
+txaio.use_twisted()
+
 
 def still_power_to_perc(power, res, lead, max_volts):
     cur = np.sqrt(power / res)
@@ -1384,10 +1386,6 @@ def make_parser(parser=None):
 
 
 def main(args=None):
-    # For logging
-    txaio.use_twisted()
-    txaio.make_logger()
-
     # Start logging
     txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
 
