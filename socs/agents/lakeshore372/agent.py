@@ -149,6 +149,64 @@ class _ScanTracker:
             self.previous_channel = self.module.get_active_channel()
 
 
+class _PIDController:
+    # System constants
+    STILL_HEATER_R = 120  # [ohms]
+    STILL_LEAD_R = 14.679  # [ohms]
+    DELTA_T = 0.32  # rough intrinsic sampling period of the LS372 (s)
+    MAX_VOLTAGE = 10  # [V]
+
+    def __init__(self, params):
+        self.log = txaio.make_logger()
+
+        self.setpoint = params['setpoint']
+        self.heater = params['heater']
+        self.ch = params['channel']
+        self.P_val = params['P']
+        self.I_val = params['I']
+        self.update_time = params['update_time']
+        self.sample_heater_range = params['sample_heater_range']
+
+        self.last_pid = time.time()
+        self.heater_I = 0
+
+    def update(self, current_values):
+        temps, resistances, times = current_values
+
+        attempted_heater_pow = 0
+        # Calculate and apply the PID based on the most recent temperature set
+        if times[-1] - self.last_pid > self.update_time:
+            heater_P = self.P_val * (self.setpoint - np.mean(np.array(temps)))
+
+            # Update the I_val of the PID
+            # The I_val should not become negative because negative heater values are unphysical
+            d_heater_I = self.P_val * self.I_val \
+                * (_PIDController.DELTA_T * np.sum(self.setpoint - np.array(temps)))
+            self.heater_I = max(0.0, self.heater_I + d_heater_I)
+
+            attempted_heater_pow = heater_P + self.heater_I
+            self.log.info(f"Attempted Power: {attempted_heater_pow}, Heater_I: {self.heater_I}")
+            heater_pow = max(0.0, attempted_heater_pow)
+
+            # Reset for the next PID iteration
+            self.last_pid = time.time()
+
+            # TODO: Extract from _PIDController -- should be independent of self.module interaction
+            # Make something like, system.update(returned_heater_value)
+            if self.heater == 'still':
+                heater_frac = still_power_to_perc(
+                    heater_pow,
+                    _PIDController.STILL_HEATER_R,
+                    _PIDController.STILL_LEAD_R,
+                    _PIDController.MAX_VOLTAGE
+                )
+                self.module.still_heater.set_heater_output(heater_frac)
+                return heater_frac
+            if self.heater == 'sample':
+                self.module.sample_heater.set_heater_output(heater_pow)
+                return heater_pow
+
+
 class LS372_Agent:
     """Agent to connect to a single Lakeshore 372 device.
 
@@ -914,6 +972,89 @@ class LS372_Agent:
         return True, f"Channel {channel} has measurement inputs {input_setup} = [mode," \
             "excitation, auto range, range, cs_shunt, units]"
 
+    def _prepare_for_pid_control(self, session, controller):
+        """Ensure heaters and scanner are ready for PID.
+
+        Parameters:
+            controller (_PIDController): PID Controller object.
+
+        """
+        # Get heaters in the correct configuration
+        if controller.heater == 'sample':
+            # Set heater range
+            if controller.sample_heater_range == self.module.sample_heater.get_heater_range():
+                self.log.info(f"Heater range already set to {controller.sample_heater_range} amps")
+            else:
+                self.module.sample_heater.set_heater_range(controller.sample_heater_range)
+
+            # Check we're in correct control mode for servo.
+            if self.module.sample_heater.mode != 'Open Loop':
+                session.add_message('Changing control to Open Loop mode for sample PID.')
+                self.module.sample_heater.set_mode("Open Loop")
+
+            # Check we're in the correct display mode for servo.
+            # The custom PID expects that the sample heater is in 'current' mode
+            if self.module.sample_heater.display != "current":
+                session.add_message("Changing display mode to \'current\' for sample PID.")
+                self.module.sample_heater.set_heater_display("current")
+
+        if controller.heater == 'still':
+            # Check we're in correct control mode for servo.
+            if self.module.still_heater.mode != 'Open Loop':
+                session.add_message('Changing control to Open Loop mode for still PID.')
+                self.module.still_heater.set_mode("Open Loop")
+
+        # Check we aren't autoscanning.
+        if self.module.get_autoscan() is True:
+            session.add_message('Autoscan is enabled, disabling for still PID control on dedicated channel.')
+            self.module.disable_autoscan()
+
+        # Check we're scanning same channel expected by heater for control.
+        if self.module.get_active_channel().channel_num != controller.ch:
+            session.add_message(f'Changing active channel to {controller.ch} for still PID')
+            self.module.set_active_channel(controller.ch)
+
+        self.log.info(f"Starting PID on heater {controller.heater}, ch {controller.ch} to setpoint {controller.setpoint} K")
+
+    def _publish_pid_data(self, session, data, controller, value):
+        temps, resistances, times = data
+        heater = controller.heater
+
+        # Publish heater values
+        if heater == 'still':
+            heater_data = {
+                'timestamp': controller.last_pid,
+                'block_name': 'still_heater_out',
+                'data': {'still_heater_out': value}
+            }
+            session.app.publish_to_feed('temperatures', heater_data)
+
+        if heater == 'sample':
+            heater_data = {
+                'timestamp': controller.last_pid,
+                'block_name': 'sample_heater_out',
+                'data': {'sample_heater_out': value}
+            }
+            session.app.publish_to_feed('temperatures', heater_data)
+
+        # Publish T and R values
+        active_channel = self.module.get_active_channel()
+        channel_str = active_channel.name.replace(' ', '_')
+        temp_data = {
+            'timestamps': times,
+            'block_name': active_channel.name,
+            'data': {channel_str + '_T': temps,
+                     channel_str + '_R': resistances}
+        }
+        session.app.publish_to_feed('temperatures', temp_data)
+
+        # For session.data
+        field_dict = {channel_str: {"T": temps,
+                                    "R": resistances,
+                                    "timestamps": times}}
+        session.data['fields'].update(field_dict)
+        self.log.debug("{data}", data=session.data)
+
     @ocs_agent.param('setpoint', type=float)
     @ocs_agent.param('heater', type=str)
     @ocs_agent.param('channel', type=int)
@@ -971,127 +1112,35 @@ class LS372_Agent:
 
             session.data = {"fields": {}}
 
-            setpoint = params['setpoint']
-            heater = params['heater']
-            ch = params['channel']
-            P_val = params['P']
-            I_val = params['I']
-            update_time = params['update_time']
-            sample_heater_range = params['sample_heater_range']
+            controller = _PIDController(params)
 
-            # Constants
-            still_heater_R = 120  # [ohms]
-            still_lead_R = 14.679  # [ohms]
-            delta_t = 0.32  # rough intrinsic sampling period of the LS372 (s)
-            max_voltage = 10  # [V]
-
-            # Get heaters in the correct configuration
-            if heater == 'sample':
-                # Set heater range
-                if sample_heater_range == self.module.sample_heater.get_heater_range():
-                    self.log.info(f"Heater range already set to {sample_heater_range} amps")
-                else:
-                    self.module.sample_heater.set_heater_range(sample_heater_range)
-
-                # Check we're in correct control mode for servo.
-                if self.module.sample_heater.mode != 'Open Loop':
-                    session.add_message('Changing control to Open Loop mode for sample PID.')
-                    self.module.sample_heater.set_mode("Open Loop")
-
-                # Check we're in the correct display mode for servo.
-                # The custom PID expects that the sample heater is in 'current' mode
-                if self.module.sample_heater.display != "current":
-                    session.add_message("Changing display mode to \'current\' for sample PID.")
-                    self.module.sample_heater.set_heater_display("current")
-
-            if heater == 'still':
-                # Check we're in correct control mode for servo.
-                if self.module.still_heater.mode != 'Open Loop':
-                    session.add_message('Changing control to Open Loop mode for still PID.')
-                    self.module.still_heater.set_mode("Open Loop")
-
-            # Check we aren't autoscanning.
-            if self.module.get_autoscan() is True:
-                session.add_message('Autoscan is enabled, disabling for still PID control on dedicated channel.')
-                self.module.disable_autoscan()
-
-            # Check we're scanning same channel expected by heater for control.
-            if self.module.get_active_channel().channel_num != ch:
-                session.add_message(f'Changing active channel to {ch} for still PID')
-                self.module.set_active_channel(ch)
+            # Make sure heaters + scanning are properly configured
+            self._prepare_for_pid_control(session, controller)
 
             # Start the PID
             self.custom_pid = True
-            active_channel = self.module.get_active_channel()
-            channel_str = active_channel.name.replace(' ', '_')
-            last_pid = time.time()
-            heater_I = 0
             temps, resistances, times = [], [], []
-            self.log.info(f"Starting PID on heater {heater}, ch {ch} to setpoint {setpoint} K")
 
             while self.custom_pid:
                 pm.sleep()
 
+                # TODO: Abstract away somehow, then pass the resulting object where needed
                 # Get a list of T and R at the maximum sample frequency
-                temps.append(self.module.get_temp(unit='kelvin', chan=ch))
-                resistances.append(self.module.get_temp(unit='ohms', chan=ch))
+                temps.append(self.module.get_temp(unit='kelvin', chan=controller.ch))
+                resistances.append(self.module.get_temp(unit='ohms', chan=controller.ch))
                 times.append(time.time())
 
-                attempted_heater_pow = 0
-                # Calculate and apply the PID based on the most recent temperature set
-                if times[-1] - last_pid > update_time:
-                    heater_P = P_val * (setpoint - np.mean(np.array(temps)))
+                new_heater_value = controller.update((temps, resistances, times))
 
-                    # Update the I_val of the PID
-                    # The I_val should not become negative because negative heater values are unphysical
-                    d_heater_I = P_val * I_val * (delta_t * np.sum(setpoint - np.array(temps)))
-                    heater_I = max(0.0, heater_I + d_heater_I)
-
-                    attempted_heater_pow = heater_P + heater_I
-                    self.log.info(f"Attempted Power: {attempted_heater_pow}, Heater_I: {heater_I}")
-                    heater_pow = max(0.0, attempted_heater_pow)
-                    if heater == 'still':
-                        heater_frac = still_power_to_perc(heater_pow, still_heater_R, still_lead_R, max_voltage)
-                        self.module.still_heater.set_heater_output(heater_frac)
-                    if heater == 'sample':
-                        self.module.sample_heater.set_heater_output(heater_pow)
-
-                    # Publish heater values
-                    if heater == 'still':
-                        heater_data = {
-                            'timestamp': last_pid,
-                            'block_name': 'still_heater_out',
-                            'data': {'still_heater_out': heater_frac}
-                        }
-                        session.app.publish_to_feed('temperatures', heater_data)
-
-                    if heater == 'sample':
-                        heater_data = {
-                            'timestamp': last_pid,
-                            'block_name': 'sample_heater_out',
-                            'data': {'sample_heater_out': heater_pow}
-                        }
-                        session.app.publish_to_feed('temperatures', heater_data)
-
-                    # Publish T and R values
-                    temp_data = {
-                        'timestamps': times,
-                        'block_name': active_channel.name,
-                        'data': {channel_str + '_T': temps,
-                                 channel_str + '_R': resistances}
-                    }
-                    session.app.publish_to_feed('temperatures', temp_data)
-
-                    # For session.data
-                    field_dict = {channel_str: {"T": temps,
-                                                "R": resistances,
-                                                "timestamps": times}}
-                    session.data['fields'].update(field_dict)
-                    self.log.debug("{data}", data=session.data)
+                if new_heater_value:
+                    self._publish_pid_data(
+                        session,
+                        (temps, resistances, times),
+                        controller,
+                        new_heater_value)
 
                     # Reset for the next PID iteration
                     temps, resistances, times = [], [], []
-                    last_pid = time.time()
 
                     # Relinquish sampling lock temporarily
                     if not self._lock.release_and_acquire(timeout=10):
