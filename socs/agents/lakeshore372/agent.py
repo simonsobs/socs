@@ -321,6 +321,42 @@ class LS372_Agent:
                                     "timestamp": current_time}}
         session.data['fields'].update(field_dict)
 
+    def _query_and_publish_control_channel(self, session):
+        temp = self.module.get_temp(unit='kelvin', chan=0)
+        res = self.module.get_temp(unit='ohms', chan=0)
+        cur_time = time.time()
+        data = {
+            'timestamp': time.time(),
+            'block_name': 'control_chan',
+            'data': {
+                'control_T': temp,
+                'control_R': res
+            }
+        }
+        session.app.publish_to_feed('temperatures', data)
+        self.log.debug("{data}", data=session.data)
+        # Updates session data w/ control field
+        session.data['fields'].update({
+            'control': {
+                'T': temp, 'R': res, 'timestamp': cur_time
+            }
+        })
+
+    def _query_and_publish_sample_heater(self, session):
+        # Sample Heater
+        heater = self.module.sample_heater
+        hout = heater.get_sample_heater_output()
+
+        current_time = time.time()
+        htr_data = {
+            'timestamp': current_time,
+            'block_name': "heaters",
+            'data': {}
+        }
+        htr_data['data']['sample_heater_output'] = hout
+
+        session.app.publish_to_feed('temperatures', htr_data)
+
     @ocs_agent.param('sample_heater', default=False, type=bool)
     @ocs_agent.param('run_once', default=False, type=bool)
     def acq(self, session, params=None):
@@ -385,42 +421,11 @@ class LS372_Agent:
 
                 self._query_and_publish_active_channel(session)
 
-                # Also queries control channel if enabled
                 if self.control_chan_enabled:
-                    temp = self.module.get_temp(unit='kelvin', chan=0)
-                    res = self.module.get_temp(unit='ohms', chan=0)
-                    cur_time = time.time()
-                    data = {
-                        'timestamp': time.time(),
-                        'block_name': 'control_chan',
-                        'data': {
-                            'control_T': temp,
-                            'control_R': res
-                        }
-                    }
-                    session.app.publish_to_feed('temperatures', data)
-                    self.log.debug("{data}", data=session.data)
-                    # Updates session data w/ control field
-                    session.data['fields'].update({
-                        'control': {
-                            'T': temp, 'R': res, 'timestamp': cur_time
-                        }
-                    })
+                    self._query_and_publish_control_channel(session)
 
                 if params.get("sample_heater", False):
-                    # Sample Heater
-                    heater = self.module.sample_heater
-                    hout = heater.get_sample_heater_output()
-
-                    current_time = time.time()
-                    htr_data = {
-                        'timestamp': current_time,
-                        'block_name': "heaters",
-                        'data': {}
-                    }
-                    htr_data['data']['sample_heater_output'] = hout
-
-                    session.app.publish_to_feed('temperatures', htr_data)
+                    self._query_and_publish_sample_heater(session)
 
                 if params['run_once']:
                     break
