@@ -293,6 +293,34 @@ class LS372_Agent:
 
         return True, 'Lakeshore module initialized.'
 
+    def _query_and_publish_active_channel(self, session):
+        active_channel = self.module.get_active_channel()
+        current_time = time.time()
+        data = {
+            'timestamp': current_time,
+            'block_name': active_channel.name,
+            'data': {}
+        }
+
+        # Collect both temperature and resistance values from each Channel
+        channel_str = active_channel.name.replace(' ', '_')
+        temp_reading = self.module.get_temp(unit='kelvin',
+                                            chan=active_channel.channel_num)
+        res_reading = self.module.get_temp(unit='ohms',
+                                           chan=active_channel.channel_num)
+
+        # For data feed
+        data['data'][channel_str + '_T'] = temp_reading
+        data['data'][channel_str + '_R'] = res_reading
+        session.app.publish_to_feed('temperatures', data)
+        self.log.debug("{data}", data=session.data)
+
+        # For session.data
+        field_dict = {channel_str: {"T": temp_reading,
+                                    "R": res_reading,
+                                    "timestamp": current_time}}
+        session.data['fields'].update(field_dict)
+
     @ocs_agent.param('sample_heater', default=False, type=bool)
     @ocs_agent.param('run_once', default=False, type=bool)
     def acq(self, session, params=None):
@@ -355,31 +383,7 @@ class LS372_Agent:
 
                 tracker.wait_after_channel_change(delay=self.dwell_time_delay)
 
-                current_time = time.time()
-                data = {
-                    'timestamp': current_time,
-                    'block_name': tracker.active_channel.name,
-                    'data': {}
-                }
-
-                # Collect both temperature and resistance values from each Channel
-                channel_str = tracker.active_channel.name.replace(' ', '_')
-                temp_reading = self.module.get_temp(unit='kelvin',
-                                                    chan=tracker.active_channel.channel_num)
-                res_reading = self.module.get_temp(unit='ohms',
-                                                   chan=tracker.active_channel.channel_num)
-
-                # For data feed
-                data['data'][channel_str + '_T'] = temp_reading
-                data['data'][channel_str + '_R'] = res_reading
-                session.app.publish_to_feed('temperatures', data)
-                self.log.debug("{data}", data=session.data)
-
-                # For session.data
-                field_dict = {channel_str: {"T": temp_reading,
-                                            "R": res_reading,
-                                            "timestamp": current_time}}
-                session.data['fields'].update(field_dict)
+                self._query_and_publish_active_channel(session)
 
                 # Also queries control channel if enabled
                 if self.control_chan_enabled:
