@@ -76,6 +76,79 @@ class YieldingLock:
             yield result
 
 
+class _ScanTracker:
+    """Object to track the scan state.
+
+    Args:
+        module (socs.Lakeshore.Lakeshore372.LS372): Lakeshore interface object.
+
+    Attributes:
+        module (socs.Lakeshore.Lakeshore372.LS372): Lakeshore interface object.
+        log (txaio.tx.Logger): Logger object.
+        active_channel (socs.Lakeshore.Lakeshore372.Channel): Currently active
+            channel.
+        previous_channel (socs.Lakeshore.Lakeshore372.Channel): Previously
+            active channel.
+
+    """
+
+    def __init__(self, module):
+        self.module = module
+        self.log = txaio.make_logger()
+        self.active_channel = None
+        self.previous_channel = None
+
+    def wait_after_channel_change(self, delay):
+        """Wait for, at minimum, the channel pause time plus the specified
+        delay.
+
+        The 372 reports the last updated measurement repeatedly during the "pause
+        change time", this results in several stale datapoints being recorded. To
+        get around this we query the pause time and sleep during it if the channel
+        has changed (as it would if autoscan is enabled.)
+
+        Args:
+            delay (float): Additional delay time to wait in addition to the
+                active channel's pause time before continuing.
+
+        """
+        self.active_channel = self.module.get_active_channel()
+
+        if self.previous_channel != self.active_channel:
+            if self.previous_channel is not None:
+                pause_time = self.active_channel.get_pause()
+                self.log.debug("Pause time for {c}: {p}",
+                               c=self.active_channel.channel_num,
+                               p=pause_time)
+
+                dwell_time = self.active_channel.get_dwell()
+                self.log.debug("User set dwell_time_delay: {p}",
+                               p=delay)
+
+                # Check user set dwell time isn't too long
+                if delay > dwell_time:
+                    self.log.warn("WARNING: User set dwell_time_delay of "
+                                  + "{delay} s is larger than channel "
+                                  + "dwell time of {chan_time} s. If "
+                                  + "you are autoscanning this will "
+                                  + "cause no data to be collected. "
+                                  + "Reducing dwell time delay to {s} s.",
+                                  delay=delay,
+                                  chan_time=dwell_time,
+                                  s=dwell_time - 1)
+                    total_time = pause_time + dwell_time - 1
+                else:
+                    total_time = pause_time + delay
+
+                for i in range(total_time):
+                    self.log.debug("Sleeping for {t} more seconds...",
+                                   t=total_time - i)
+                    time.sleep(1)
+
+            # Track the last channel we measured
+            self.previous_channel = self.module.get_active_channel()
+
+
 class LS372_Agent:
     """Agent to connect to a single Lakeshore 372 device.
 
@@ -263,7 +336,7 @@ class LS372_Agent:
                 return False, "Could not acquire lock"
 
             self.log.info("Starting data acquisition for {}".format(self.agent.agent_address))
-            previous_channel = None
+            tracker = _ScanTracker(self.module)
             last_release = time.time()
 
             session.data = {"fields": {}}
@@ -280,61 +353,21 @@ class LS372_Agent:
                                       f"currently held by {self._lock.job}.")
                         continue
 
-                active_channel = self.module.get_active_channel()
-
-                # The 372 reports the last updated measurement repeatedly
-                # during the "pause change time", this results in several
-                # stale datapoints being recorded. To get around this we
-                # query the pause time and skip data collection during it
-                # if the channel has changed (as it would if autoscan is
-                # enabled.)
-                if previous_channel != active_channel:
-                    if previous_channel is not None:
-                        pause_time = active_channel.get_pause()
-                        self.log.debug("Pause time for {c}: {p}",
-                                       c=active_channel.channel_num,
-                                       p=pause_time)
-
-                        dwell_time = active_channel.get_dwell()
-                        self.log.debug("User set dwell_time_delay: {p}",
-                                       p=self.dwell_time_delay)
-
-                        # Check user set dwell time isn't too long
-                        if self.dwell_time_delay > dwell_time:
-                            self.log.warn("WARNING: User set dwell_time_delay of "
-                                          + "{delay} s is larger than channel "
-                                          + "dwell time of {chan_time} s. If "
-                                          + "you are autoscanning this will "
-                                          + "cause no data to be collected. "
-                                          + "Reducing dwell time delay to {s} s.",
-                                          delay=self.dwell_time_delay,
-                                          chan_time=dwell_time,
-                                          s=dwell_time - 1)
-                            total_time = pause_time + dwell_time - 1
-                        else:
-                            total_time = pause_time + self.dwell_time_delay
-
-                        for i in range(total_time):
-                            self.log.debug("Sleeping for {t} more seconds...",
-                                           t=total_time - i)
-                            time.sleep(1)
-
-                    # Track the last channel we measured
-                    previous_channel = self.module.get_active_channel()
+                tracker.wait_after_channel_change(delay=self.dwell_time_delay)
 
                 current_time = time.time()
                 data = {
                     'timestamp': current_time,
-                    'block_name': active_channel.name,
+                    'block_name': tracker.active_channel.name,
                     'data': {}
                 }
 
                 # Collect both temperature and resistance values from each Channel
-                channel_str = active_channel.name.replace(' ', '_')
+                channel_str = tracker.active_channel.name.replace(' ', '_')
                 temp_reading = self.module.get_temp(unit='kelvin',
-                                                    chan=active_channel.channel_num)
+                                                    chan=tracker.active_channel.channel_num)
                 res_reading = self.module.get_temp(unit='ohms',
-                                                   chan=active_channel.channel_num)
+                                                   chan=tracker.active_channel.channel_num)
 
                 # For data feed
                 data['data'][channel_str + '_T'] = temp_reading
