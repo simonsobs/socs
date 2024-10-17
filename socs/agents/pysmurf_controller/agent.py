@@ -994,7 +994,7 @@ class PysmurfController:
 
         Args
         -----
-        bg: int, list, optional
+        bgs: int, list, optional
             Bias group (bg), or list of bgs to set. If None, will set all bgs.
         bias: int, float, list
             Biases to set. If a float is passed, this will be used for all
@@ -1031,7 +1031,7 @@ class PysmurfController:
 
         Args
         -----
-        bg: int, list, optional
+        bgs: int, list, optional
             bg, or list of bgs to zero. If None, will zero all bgs.
         """
         params['bias'] = 0
