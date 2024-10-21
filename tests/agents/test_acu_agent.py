@@ -39,7 +39,7 @@ def test_avoidance():
     path, analysis = sun.select_move(paths)
     assert path is not None
     assert len(path['moves'].nodes) == 3
-    del sun.policy['axes_sequential']
+    sun.policy['axes_sequential'] = False
 
     # Find safe paths to here (no moves)
     paths = sun.analyze_paths(270, 40, 270, 40)
