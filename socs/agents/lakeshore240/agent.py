@@ -12,7 +12,7 @@ from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import Pacemaker
 
 from socs.Lakeshore.Lakeshore240 import Module
-from socs.util import BaseAction, OcsOpReturnType, register_task_from_action
+from socs.actions import BaseAction, OcsOpReturnType, register_task_from_action
 
 txaio.use_twisted()
 
@@ -125,7 +125,7 @@ class LS240_Agent:
         def queue_action(action: LS240Action):
             self.action_queue.put(action)
 
-        # Register Operaionts
+        # Register Operations
         register_task_from_action(
             agent, "set_values", SetValues, queue_action
         )
