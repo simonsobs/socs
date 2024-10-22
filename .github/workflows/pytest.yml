@@ -64,15 +64,11 @@ jobs:
 
     # Coverage
     - name: Report test coverage
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         mv ./tests/.coverage.* ./
-        pip install -U coveralls
         coverage combine
         coverage xml
         coverage report
-        coveralls --service=github
 
     - name: Upload results to Codecov
       uses: codecov/codecov-action@v4
