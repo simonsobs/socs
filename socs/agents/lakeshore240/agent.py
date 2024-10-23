@@ -17,7 +17,9 @@ from socs.Lakeshore.Lakeshore240 import Module
 txaio.use_twisted()
 
 
-log = txaio.make_logger()  # pylint: disable=E1101
+on_rtd = os.environ.get("READTHEDOCS") == "True"
+if not on_rtd:
+    log = txaio.make_logger()  # pylint: disable=E1101
 
 
 class LS240Action(BaseAction):
