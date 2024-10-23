@@ -17,9 +17,7 @@ from socs.actions import BaseAction, OcsOpReturnType, register_task_from_action
 txaio.use_twisted()
 
 
-on_rtd = os.environ.get("READTHEDOCS") == "True"
-if not on_rtd:
-    log = txaio.make_logger()  # pylint: disable=E1101
+log = txaio.make_logger()  # pylint: disable=E1101
 
 
 class LS240Action(BaseAction):
