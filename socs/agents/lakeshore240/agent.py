@@ -29,9 +29,13 @@ class LS240Action(BaseAction):
 
 @dataclass
 class UploadCalCurve(LS240Action):
-    """upload_cal_curve(channel, filename)
+    """
+    **OCS Task**
 
-    **Task** - Upload a calibration curve to a channel.
+    Action class to Upload a calibration curve to a channel. This is an OCS
+    Task that can be run through a client as follows::
+
+        >> client.upload_cal_curve(channel=channel, filename=filename)
 
     Args
     ------
@@ -40,7 +44,6 @@ class UploadCalCurve(LS240Action):
     filename (str):
         Filename for calibration curve.
     """
-
     channel: int
     filename: str
 
@@ -53,10 +56,22 @@ class UploadCalCurve(LS240Action):
 
 @dataclass
 class SetValues(LS240Action):
-    """set_values(channel, sensor=None, auto_range=None, range=None,\
-            current_reversal=None, units=None, enabled=None, name=None)
+    """
+    **OCS TASK**
 
-    **Task** - Set sensor parameters for a Lakeshore240 Channel.
+    Action class for setting sensor parameters for a Lakeshore240 Channel.
+    This can be called through an OCS client using::
+
+        >> client.set_values(
+            channel=channel,
+            sensor=sensor,
+            auto_range=auto_range,
+            range=range,
+            current_reversal=current_reversal,
+            units=units,
+            enabled=enabled,
+            name=name,
+        )
 
     Args
     ---------
