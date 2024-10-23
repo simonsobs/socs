@@ -11,8 +11,8 @@ import txaio  # type: ignore
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import Pacemaker
 
-from socs.Lakeshore.Lakeshore240 import Module
 from socs.actions import BaseAction, OcsOpReturnType, register_task_from_action
+from socs.Lakeshore.Lakeshore240 import Module
 
 txaio.use_twisted()
 

@@ -5,7 +5,6 @@ from typing import (Any, Callable, Dict, Optional, Tuple, Type, TypeVar, Union,
 
 from ocs import ocs_agent
 
-
 ActionResultType = Optional[Dict[str, Any]]
 OcsOpReturnType = Tuple[bool, str]
 
