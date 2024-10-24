@@ -598,7 +598,7 @@ class PysmurfController:
             if result.traceback is not None:
                 self.log.error("Error occurred:\n{tb}", tb=result.traceback)
 
-            return result.success, "Finished UXM Setup"
+            return result.success, "Finished UXM Relock"
 
     @ocs_agent.param('duration', default=30., type=float)
     @ocs_agent.param('kwargs', default=None)
