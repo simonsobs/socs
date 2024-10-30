@@ -1637,16 +1637,16 @@ class HWPSupervisor:
         """
         if params['fast']:
             state = ControlState.FastBrake(
-            freq_tol=params['freq_tol'],
-            freq_tol_duration=params['freq_tol_duration'],
-            brake_voltage=30.,
+                freq_tol=params['freq_tol'],
+                freq_tol_duration=params['freq_tol_duration'],
+                brake_voltage=30.,
             )
         else:
             state = ControlState.Brake(
                 freq_tol=params['freq_tol'],
                 freq_tol_duration=params['freq_tol_duration'],
                 brake_voltage=params['brake_voltage'],
-                )
+            )
         action = self.control_state_machine.request_new_action(state)
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
