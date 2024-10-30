@@ -658,6 +658,26 @@ class ControlState:
         prev_freq: float = None
 
     @dataclass
+    class FastBrake:
+        """
+        Configure the PID and PCU agents to more actively brake the HWP
+        """
+        freq_tol: float
+        freq_tol_duration: float
+        brake_voltage: float
+
+    @dataclass
+    class WaitForFastBrake:
+        """
+        Waits until the HWP has slowed down enough before shutting off PMX.
+
+        min_freq : float
+            Frequency (Hz) below which the PMX should be shut off.
+        """
+        min_freq: float
+        prev_freq: float = None
+
+    @dataclass
     class PmxOff:
         """
         Turns off the PMX
@@ -1143,6 +1163,42 @@ class ControlStateMachine:
                         freq_tol_duration=30,
                     ))
                     return
+            elif isinstance(state, ControlState.FastBrake):
+                # Flip PID direciton and tune stop
+                pid_dir = int(query_pid_state()['direction'])
+                if pid_dir == 1:
+                    self.run_and_validate(
+                        clients.pcu.send_command,
+                        kwargs={'command': 'on_2'}, timeout=None
+                    )
+                else:
+                    self.run_and_validate(
+                        clients.pcu.send_command,
+                        kwargs={'command': 'on_1'}, timeout=None
+                    )
+                self.run_and_validate(clients.pmx.ign_ext)
+                self.run_and_validate(clients.pmx.set_v, kwargs={'volt': state.brake_voltage})
+                self.run_and_validate(clients.pmx.set_on)
+
+                time.sleep(10)
+                self.action.set_state(ControlState.WaitForFastBrake(
+                    min_freq=0.2,
+                    prev_freq=hwp_state.enc_freq,
+                ))
+
+            elif isinstance(state, ControlState.WaitForFastBrake):
+                f0 = query_pid_state()['current_freq']
+                time.sleep(5)
+                f1 = query_pid_state()['current_freq']
+                if f0 < 0.2 or (f1 > f0):
+                    self.log.info("Turning off PMX and putting PCU in stop mode")
+                    self.run_and_validate(clients.pmx.set_off)
+                    self.run_and_validate(
+                        clients.pcu.send_command,
+                        kwargs={'command': 'stop'}, timeout=None
+                    )
+                    time.sleep(5)
+                    return
 
             elif isinstance(state, ControlState.EnableDriverBoard):
                 def set_outlet_state(outlet: int, outlet_state: bool):
@@ -1549,6 +1605,7 @@ class HWPSupervisor:
     @ocs_agent.param('freq_tol', type=float, default=0.05)
     @ocs_agent.param('freq_tol_duration', type=float, default=10)
     @ocs_agent.param('brake_voltage', type=float, default=10.)
+    @ocs_agent.param('fast', type=bool, default=False)
     def brake(self, session, params):
         """brake(freq_thresh=0.05, freq_thresh_duration=10, brake_voltage=10)
 
@@ -1578,11 +1635,18 @@ class HWPSupervisor:
                 'success': True}
             }
         """
-        state = ControlState.Brake(
+        if params['fast']:
+            state = ControlState.FastBrake(
             freq_tol=params['freq_tol'],
             freq_tol_duration=params['freq_tol_duration'],
-            brake_voltage=params['brake_voltage'],
-        )
+            brake_voltage=30.,
+            )
+        else:
+            state = ControlState.Brake(
+                freq_tol=params['freq_tol'],
+                freq_tol_duration=params['freq_tol_duration'],
+                brake_voltage=params['brake_voltage'],
+                )
         action = self.control_state_machine.request_new_action(state)
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
