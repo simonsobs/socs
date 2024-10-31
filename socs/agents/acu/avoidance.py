@@ -60,6 +60,12 @@ settings:
     setting only affects point-to-point motions; "escape" paths will
     always consider all available elevations.
 
+  ``axes_sequential``
+    If True, a point-to-point motion will only be accepted if each leg
+    is a constant el or constant az move. When this setting is False,
+    legs that move simultaneously in az and el are permitted (and
+    probably preferred) as long as they are safe.
+
 
 A "Sun-safe" position is a pointing of the boresight that currently
 has a ``sun_time`` that meets or exceeds the ``min_sun_time``
@@ -100,6 +106,7 @@ DEFAULT_POLICY = {
     'el_dodging': False,
     'min_sun_time': HOUR,
     'response_time': HOUR * 4,
+    'axes_sequential': False,
 }
 
 
@@ -557,6 +564,10 @@ class SunTracker:
 
             els = m['req_start'][1], m['req_stop'][1]
 
+            if _p['axes_sequential'] and m['moves'].includes_mixed_moves():
+                reject(d, 'Path includes simultaneous az+el legs (forbidden in policy).')
+                continue
+
             if (m['sun_time_start'] < _p['min_sun_time']):
                 # If the path is starting in danger zone, then only
                 # enforce that the move takes the platform to a better place.
@@ -688,3 +699,13 @@ class MoveSequence:
             xx.append(np.linspace(x0, x1, n))
             yy.append(np.linspace(y0, y1, n))
         return np.hstack(tuple(xx)), np.hstack(tuple(yy))
+
+    def includes_mixed_moves(self):
+        """Returns True if any of the legs include simultaneous
+        changes in az and el.
+
+        """
+        for (x0, y0), (x1, y1) in self.get_legs():
+            if (x0 != x1) and (y0 != y1):
+                return True
+        return False

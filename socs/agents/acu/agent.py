@@ -2118,12 +2118,13 @@ class ACUAgent:
         _p['active_avoidance'] = config['enabled']
         _p['policy'] = config['policy']
 
-        # And add in platform limits
+        # And add in platform limits and move policies
         _p['policy'].update({
             'min_az': self.motion_limits['azimuth']['lower'],
             'max_az': self.motion_limits['azimuth']['upper'],
             'min_el': self.motion_limits['elevation']['lower'],
             'max_el': self.motion_limits['elevation']['upper'],
+            'axes_sequential': self.motion_limits.get('axes_sequential', False),
         })
 
         self.sun_params = _p
@@ -2598,10 +2599,23 @@ class ACUAgent:
         the target position in it.
 
         When Sun avoidance is not enabled, this function returns as
-        though the direct path to the target is a safe one.
+        though the direct path to the target is a safe one (though
+        axes_sequential=True may turn this into a move with two legs).
 
         """
+        # Get current position.
+        try:
+            az, el = [self.data['status']['summary'][f'{ax}_current_position']
+                      for ax in ['Azimuth', 'Elevation']]
+            if az is None or el is None:
+                raise KeyError
+        except KeyError:
+            return None, 'Current position could not be determined.'
+
         if not self._get_sun_policy('sunsafe_moves'):
+            if self.motion_limits.get('axes_sequential'):
+                # Move in az first, then el.
+                return [(target_az, el), (target_az, target_el)], None
             return [(target_az, target_el)], None
 
         if not self._get_sun_policy('map_valid'):
@@ -2610,15 +2624,6 @@ class ACUAgent:
         # Check the target position and block it outright.
         if self.sun.check_trajectory([target_az], [target_el])['sun_time'] <= 0:
             return None, 'Requested target position is not Sun-Safe.'
-
-        # Ok, so where are we now ...
-        try:
-            az, el = [self.data['status']['summary'][f'{ax}_current_position']
-                      for ax in ['Azimuth', 'Elevation']]
-            if az is None or el is None:
-                raise KeyError
-        except KeyError:
-            return None, 'Current position could not be determined.'
 
         moves = self.sun.analyze_paths(az, el, target_az, target_el)
         move, decisions = self.sun.select_move(moves)
