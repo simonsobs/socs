@@ -70,7 +70,12 @@ jobs:
         coverage xml
         coverage report
 
+    # Temporary to verify coverage report is present
+    - name: List files
+      run: ls -R
+
     - name: Upload results to Codecov
       uses: codecov/codecov-action@v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
+        verbose: true

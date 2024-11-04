@@ -3,7 +3,7 @@ codecov:
   branch: main
 
 # https://docs.codecov.com/docs/pull-request-comments#disable-comment
-comment: false
+comment: true
 
 # https://docs.codecov.com/docs/commit-status
 coverage:
@@ -14,7 +14,7 @@ coverage:
         threshold: 3
         paths:
           - "socs/"
-    patch: false
+    patch: true
 
 # When modifying this file, please validate using
 # curl -X POST --data-binary @codecov.yml https://codecov.io/validate
