@@ -15,7 +15,6 @@ on:
 jobs:
   test:
     uses: ./.github/workflows/pytest.yml
-    secrets: inherit
 
   build:
     name: build and deploy test images
