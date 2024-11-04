@@ -1,6 +1,8 @@
 ---
 codecov:
   branch: main
+  # https://docs.codecov.com/docs/common-recipe-list#see-coverage-on-ci-test-failures
+  require_ci_to_pass: false
 
 # https://docs.codecov.com/docs/pull-request-comments#disable-comment
 comment: true
