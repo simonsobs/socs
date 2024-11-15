@@ -52,8 +52,10 @@ acu = [
 # Note: Not including the holography deps, which are Python 3.8 only. Also not
 # including any dependencies with only direct references.
 all = [
+    "imutils",
     "labjack-ljm",
     "numexpr",
+    "opencv-python",
     "pandas",
     "pfeiffer-vacuum-protocol==0.4",
     "pixell",
@@ -77,6 +79,11 @@ magpie = [
     "pandas",
     "scipy",
     "so3g",
+]
+# Camera control
+camera = [
+    "opencv-python",
+    "imutils",
 ]
 # Pfeiffer TC 400 Agent
 pfeiffer = [

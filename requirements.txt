@@ -33,6 +33,10 @@ labjack-ljm
 scipy
 pandas
 
+# camera control
+imutils
+opencv-python
+
 # pfeiffer tc 400
 pfeiffer-vacuum-protocol==0.4
 

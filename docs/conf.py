@@ -109,6 +109,8 @@ autodoc_mock_imports = ['spt3g',
                         'sodetlib.det_config',
                         'src',
                         'src.pid_controller',
+                        'cv2',
+                        'imutils',
                         ]
 from unittest import mock
 
