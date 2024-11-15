@@ -69,6 +69,7 @@ API Reference        Full API documentation for core parts of the SOCS library.
     agents/pfeiffer_tc400
     agents/pysmurf-controller
     agents/pysmurf-monitor
+    agents/rtsp_camera
     agents/scpi_psu
     agents/smurf_crate_monitor
     agents/smurf_timing_card
