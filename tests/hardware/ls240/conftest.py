@@ -14,5 +14,5 @@ def client(request):
     c = MatchedClient(inst, args=[])
     print("Initializing Lakeshore.....")
     c.init_lakeshore.start()
-    x = c.init_lakeshore.wait()
+    c.init_lakeshore.wait()
     return c

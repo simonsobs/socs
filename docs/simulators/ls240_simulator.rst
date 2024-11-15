@@ -42,15 +42,15 @@ Lakeshore240Agent. This address must match the container name for the simulator:
 Docker
 ``````
 The simulator should be configured to run in a Docker container. An example
-docker-compose service configuration is shown here::
+docker compose service configuration is shown here::
 
   ls240-sim:
     image: simonsobs/ocs-lakeshore240-simulator:latest
     hostname: ocs-docker
 
-It is helpful to have other live monitor components such as Grafana and either
-the sisock quick look components or an InfluxDB container for quickly
-visualizing whether the 240 Agent is getting data from the simulator.
+It is helpful to have other live monitor components such as Grafana and an
+InfluxDB container for quickly visualizing whether the 240 Agent is getting
+data from the simulator.
 
 Running Outside of Docker
 -------------------------

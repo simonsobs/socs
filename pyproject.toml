@@ -1,0 +1,138 @@
+[build-system]
+requires = [
+    "hatch-vcs",
+    "hatchling",
+]
+build-backend = "hatchling.build"
+
+[project]
+name = "socs"
+dynamic = ["version"]
+description = "Simons Observatory Control System"
+readme = "README.rst"
+requires-python = ">=3.7"
+classifiers = [
+    "Framework :: Twisted",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Astronomy",
+]
+dependencies = [
+    "autobahn[serialization]",
+    "numpy",
+    "ocs",
+    "pyasn1==0.4.8",
+    "pyModbusTCP",
+    "pyserial",
+    "pysmi",
+    "pysnmp==4.4.12",
+    "pyyaml",
+    "requests",
+    "sqlalchemy>=1.4",
+    "tqdm",
+    "twisted",
+]
+
+[project.entry-points."ocs.plugins"]
+socs = "socs.plugin"
+
+[project.optional-dependencies]
+# ACU Agent
+acu = [
+    "pixell",
+    "so3g",
+    # "soaculib @ git+https://github.com/simonsobs/soaculib.git@master",
+]
+# Note: Not including the holography deps, which are Python 3.8 only. Also not
+# including any dependencies with only direct references.
+all = [
+    "imutils",
+    "labjack-ljm",
+    "numexpr",
+    "opencv-python",
+    "pandas",
+    "pfeiffer-vacuum-protocol==0.4",
+    "pixell",
+    "pyepics",
+    "scipy",
+    "so3g",
+]
+# Holography FPGA and Synthesizer Agents
+# holography = [  # Note: supports python 3.8 only!
+#     "casperfpga @ git+https://github.com/casper-astro/casperfpga.git@py38",
+#     "holog_daq @ git+https://github.com/McMahonCosmologyGroup/holog_daq.git@main",
+# ]
+# Labjack Agent
+labjack = [
+    "labjack-ljm",
+    "numexpr",
+    "scipy",
+]
+# Magpie Agent
+magpie = [
+    "pandas",
+    "scipy",
+    "so3g",
+]
+# Camera control
+camera = [
+    "opencv-python",
+    "imutils",
+]
+# Pfeiffer TC 400 Agent
+pfeiffer = [
+    "pfeiffer-vacuum-protocol==0.4",
+]
+# Pysmurf Controller Agent
+pysmurf = [
+    "pyepics",
+    # "pysmurf @ git+https://github.com/slaclab/pysmurf.git@main",
+    # "sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master",
+    # "sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master",
+]
+# SMuRF File Emulator, SMuRF Stream Simulator
+smurf_sim = [
+    "so3g",
+]
+# Timing Master Monitor
+timing_master = [
+    "pyepics",
+]
+# LATRt XY Stage Agent
+# xy_stage = [
+#     "xy_stage_control @ git+https://github.com/kmharrington/xy_stage_control.git@main",
+# ]
+
+[project.scripts]
+suprsync = "socs.db.suprsync_cli:main"
+
+[project.urls]
+"Bug Tracker" = "https://github.com/simonsobs/ocs/issues"
+Documentation = "https://ocs.readthedocs.io/"
+Homepage = "https://github.com/simonsobs/socs"
+"Source Code" = "https://github.com/simonsobs/ocs"
+
+[tool.hatch.version]
+source = "vcs"
+
+# closest scheme to versioneer behavior, avoids auto-incremented version number
+# https://setuptools-scm.readthedocs.io/en/latest/usage/#default-versioning-scheme
+[tool.hatch.version.raw-options]
+version_scheme = "no-guess-dev"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "socs/_version.py"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/socs",
+]
+
+[tool.isort]
+skip = ["versioneer.py", "socs/_version.py"]
