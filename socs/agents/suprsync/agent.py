@@ -46,7 +46,7 @@ class SupRsync:
         Time (sec) after which a copy command will timeout
     """
 
-    def __init__(self, agent, args):
+    def __init__(self, agent: ocs_agent.OCSAgent, args: argparse.Namespace) -> None:
         self.agent = agent
         self.instance_id = args.instance_id
         self.log = txaio.make_logger()
@@ -65,6 +65,9 @@ class SupRsync:
         self.compression = args.compression
         self.bwlimit = args.bwlimit
         self.suprsync_file_root = args.suprsync_file_root
+        self.db_echo: bool = args.db_echo
+        self.db_pool_size: int = args.db_pool_size
+        self.db_pool_max_overflow: int = args.db_pool_max_overflow
 
         # Feed for counting transfer errors, loop iterations.
         self.agent.register_feed('transfer_stats',
@@ -112,7 +115,10 @@ class SupRsync:
                 }
         """
 
-        srfm = SupRsyncFilesManager(self.db_path, create_all=True)
+        srfm = SupRsyncFilesManager(
+            self.db_path, create_all=True, echo=self.db_echo,
+            pool_size=self.db_pool_size, max_overflow=self.db_pool_max_overflow
+        )
 
         handler = SupRsyncFileHandler(
             srfm, self.archive_name, self.remote_basedir, ssh_host=self.ssh_host,
@@ -122,7 +128,6 @@ class SupRsync:
         )
 
         self.running = True
-        session.set_status('running')
 
         # Note this will also be stored directly in session.data
         counters = {
@@ -139,6 +144,10 @@ class SupRsync:
         }
 
         next_feed_update = 0
+
+        # update tcdirs every six-hours
+        last_tcdir_update = 0
+        tcdir_update_interval = 6 * 3600
 
         while self.running:
             counters['iterations'] += 1
@@ -160,6 +169,15 @@ class SupRsync:
                 counters['errors_nonzero'] += 1
 
             now = time.time()
+
+            if now - last_tcdir_update > tcdir_update_interval:
+                # add timecode-dirs for all files from the last week
+                self.log.info("Creating timecode dirs for recent files.....")
+                srfm.create_all_timecode_dirs(
+                    self.archive_name, min_ctime=now - (7 * 24 * 3600)
+                )
+                self.log.info("Finished creating tcdirs")
+                last_tcdir_update = now
 
             archive_stats = srfm.get_archive_stats(self.archive_name)
             if archive_stats is not None:
@@ -239,6 +257,16 @@ def make_parser(parser=None):
                         help="Bandwidth limit arg (passed through to rsync)")
     pgroup.add_argument('--suprsync-file-root', type=str, required=True,
                         help="Local path where agent will write suprsync files")
+    pgroup.add_argument('--db-echo', action='store_true', help="Echos db queries")
+    pgroup.add_argument(
+        '--db-pool-size', type=int, default=5,
+        help="Number of connections to the suprsync db to keep open inside the "
+             "connection pool"
+    )
+    pgroup.add_argument(
+        '--db-pool-max-overflow', type=int, default=10,
+        help="Number of connections to allow in the overflow pool."
+    )
     return parser
 
 

@@ -201,12 +201,18 @@ class SupRsyncFilesManager:
             If true, writes sql statements to stdout
     """
 
-    def __init__(self, db_path, create_all=True, echo=False):
+    def __init__(
+        self, db_path: str, create_all: bool = True, echo: bool = False,
+        pool_size: int = 5, max_overflow: int = 10
+    ) -> None:
         db_path = os.path.abspath(db_path)
         if not os.path.exists(os.path.dirname(db_path)):
             os.makedirs(os.path.dirname(db_path))
 
-        self._engine = create_engine(f'sqlite:///{db_path}', echo=echo)
+        self._engine = create_engine(
+            f'sqlite:///{db_path}', echo=echo,
+            pool_size=pool_size, max_overflow=max_overflow,
+        )
         self.Session = sessionmaker(bind=self._engine)
 
         if create_all:
@@ -347,7 +353,8 @@ class SupRsyncFilesManager:
         query = session.query(SupRsyncFile).filter(
             SupRsyncFile.removed == None,  # noqa: E711
             SupRsyncFile.archive_name == archive_name,
-            SupRsyncFile.failed_copy_attempts < max_copy_attempts
+            SupRsyncFile.failed_copy_attempts < max_copy_attempts,
+            SupRsyncFile.ignore == False,  # noqa: E712
         )
 
         files = []
@@ -394,7 +401,7 @@ class SupRsyncFilesManager:
 
         return files
 
-    def get_known_files(self, archive_name, session=None):
+    def get_known_files(self, archive_name, session=None, min_ctime=None):
         """Gets all files.  This can be used to help avoid
         double-registering files.
 
@@ -404,12 +411,19 @@ class SupRsyncFilesManager:
                 Name of archive to pull files from
             session : sqlalchemy session
                 Session to use to query files.
+            min_ctime : float, optional
+                minimum ctime to use when querying files.
+
         """
         if session is None:
             session = self.Session()
 
+        if min_ctime is None:
+            min_ctime = 0
+
         query = session.query(SupRsyncFile).filter(
             SupRsyncFile.archive_name == archive_name,
+            SupRsyncFile.timestamp > min_ctime,
         ).order_by(asc(SupRsyncFile.timestamp))
 
         return list(query.all())
@@ -437,9 +451,10 @@ class SupRsyncFilesManager:
         session.add(tcdir)
         return tcdir
 
-    def create_all_timecode_dirs(self, archive_name):
+    def create_all_timecode_dirs(self, archive_name, min_ctime=None):
         with self.Session.begin() as session:
-            files = self.get_known_files(archive_name, session=session)
+            files = self.get_known_files(
+                archive_name, session=session, min_ctime=min_ctime)
             for file in files:
                 self._add_file_tcdir(file, session)
 

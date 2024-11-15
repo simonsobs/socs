@@ -1,6 +1,5 @@
 import argparse
 import os
-import random
 import threading
 import time
 from contextlib import contextmanager
@@ -81,8 +80,6 @@ class LS372_Agent:
     Args:
         name (ApplicationSession): ApplicationSession for the Agent.
         ip (str): IP Address for the 372 device.
-        fake_data (bool, optional): generates random numbers without connecting
-            to LS if True.
         dwell_time_delay (int, optional): Amount of time, in seconds, to
             delay data collection after switching channels. Note this time
             should not include the change pause time, which is automatically
@@ -97,7 +94,7 @@ class LS372_Agent:
             input_configfile by default
     """
 
-    def __init__(self, agent, name, ip, fake_data=False, dwell_time_delay=0,
+    def __init__(self, agent, name, ip, dwell_time_delay=0,
                  enable_control_chan=False, configfile=None):
 
         # self._acq_proc_lock is held for the duration of the acq Process.
@@ -114,7 +111,6 @@ class LS372_Agent:
 
         self.name = name
         self.ip = ip
-        self.fake_data = fake_data
         self.dwell_time_delay = dwell_time_delay
         self.module = None
         self.thermometers = []
@@ -194,28 +190,21 @@ class LS372_Agent:
                               f"{self._acq_proc_lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            session.set_status('running')
+            try:
+                self.module = LS372(self.ip)
+            except ConnectionError:
+                self.log.error("Could not connect to the LS372. Exiting.")
+                reactor.callFromThread(reactor.stop)
+                return False, 'Lakeshore initialization failed'
+            except Exception as e:
+                self.log.error(f"Unhandled exception encountered: {e}")
+                reactor.callFromThread(reactor.stop)
+                return False, 'Lakeshore initialization failed'
 
-            if self.fake_data:
-                self.res = random.randrange(1, 1000)
-                session.add_message("No initialization since faking data")
-                self.thermometers = ["thermA", "thermB"]
-            else:
-                try:
-                    self.module = LS372(self.ip)
-                except ConnectionError:
-                    self.log.error("Could not connect to the LS372. Exiting.")
-                    reactor.callFromThread(reactor.stop)
-                    return False, 'Lakeshore initialization failed'
-                except Exception as e:
-                    self.log.error(f"Unhandled exception encountered: {e}")
-                    reactor.callFromThread(reactor.stop)
-                    return False, 'Lakeshore initialization failed'
+            print("Initialized Lakeshore module: {!s}".format(self.module))
+            session.add_message("Lakeshore initilized with ID: %s" % self.module.id)
 
-                print("Initialized Lakeshore module: {!s}".format(self.module))
-                session.add_message("Lakeshore initilized with ID: %s" % self.module.id)
-
-                self.thermometers = [channel.name for channel in self.module.channels]
+            self.thermometers = [channel.name for channel in self.module.channels]
 
             self.initialized = True
 
@@ -271,7 +260,6 @@ class LS372_Agent:
                               f"{self._lock.job} is holding the lock")
                 return False, "Could not acquire lock"
 
-            session.set_status('running')
             self.log.info("Starting data acquisition for {}".format(self.agent.agent_address))
             previous_channel = None
             last_release = time.time()
@@ -290,107 +278,95 @@ class LS372_Agent:
                                       f"currently held by {self._lock.job}.")
                         continue
 
-                if self.fake_data:
+                active_channel = self.module.get_active_channel()
+
+                # The 372 reports the last updated measurement repeatedly
+                # during the "pause change time", this results in several
+                # stale datapoints being recorded. To get around this we
+                # query the pause time and skip data collection during it
+                # if the channel has changed (as it would if autoscan is
+                # enabled.)
+                if previous_channel != active_channel:
+                    if previous_channel is not None:
+                        pause_time = active_channel.get_pause()
+                        self.log.debug("Pause time for {c}: {p}",
+                                       c=active_channel.channel_num,
+                                       p=pause_time)
+
+                        dwell_time = active_channel.get_dwell()
+                        self.log.debug("User set dwell_time_delay: {p}",
+                                       p=self.dwell_time_delay)
+
+                        # Check user set dwell time isn't too long
+                        if self.dwell_time_delay > dwell_time:
+                            self.log.warn("WARNING: User set dwell_time_delay of "
+                                          + "{delay} s is larger than channel "
+                                          + "dwell time of {chan_time} s. If "
+                                          + "you are autoscanning this will "
+                                          + "cause no data to be collected. "
+                                          + "Reducing dwell time delay to {s} s.",
+                                          delay=self.dwell_time_delay,
+                                          chan_time=dwell_time,
+                                          s=dwell_time - 1)
+                            total_time = pause_time + dwell_time - 1
+                        else:
+                            total_time = pause_time + self.dwell_time_delay
+
+                        for i in range(total_time):
+                            self.log.debug("Sleeping for {t} more seconds...",
+                                           t=total_time - i)
+                            time.sleep(1)
+
+                    # Track the last channel we measured
+                    previous_channel = self.module.get_active_channel()
+
+                current_time = time.time()
+                data = {
+                    'timestamp': current_time,
+                    'block_name': active_channel.name,
+                    'data': {}
+                }
+
+                # Collect both temperature and resistance values from each Channel
+                channel_str = active_channel.name.replace(' ', '_')
+                temp_reading = self.module.get_temp(unit='kelvin',
+                                                    chan=active_channel.channel_num)
+                res_reading = self.module.get_temp(unit='ohms',
+                                                   chan=active_channel.channel_num)
+
+                # For data feed
+                data['data'][channel_str + '_T'] = temp_reading
+                data['data'][channel_str + '_R'] = res_reading
+                session.app.publish_to_feed('temperatures', data)
+                self.log.debug("{data}", data=session.data)
+
+                # For session.data
+                field_dict = {channel_str: {"T": temp_reading,
+                                            "R": res_reading,
+                                            "timestamp": current_time}}
+                session.data['fields'].update(field_dict)
+
+                # Also queries control channel if enabled
+                if self.control_chan_enabled:
+                    temp = self.module.get_temp(unit='kelvin', chan=0)
+                    res = self.module.get_temp(unit='ohms', chan=0)
+                    cur_time = time.time()
                     data = {
                         'timestamp': time.time(),
-                        'block_name': 'fake-data',
-                        'data': {}
+                        'block_name': 'control_chan',
+                        'data': {
+                            'control_T': temp,
+                            'control_R': res
+                        }
                     }
-                    for therm in self.thermometers:
-                        reading = np.random.normal(self.res, 20)
-                        data['data'][therm] = reading
-                    time.sleep(.1)
-
-                else:
-                    active_channel = self.module.get_active_channel()
-
-                    # The 372 reports the last updated measurement repeatedly
-                    # during the "pause change time", this results in several
-                    # stale datapoints being recorded. To get around this we
-                    # query the pause time and skip data collection during it
-                    # if the channel has changed (as it would if autoscan is
-                    # enabled.)
-                    if previous_channel != active_channel:
-                        if previous_channel is not None:
-                            pause_time = active_channel.get_pause()
-                            self.log.debug("Pause time for {c}: {p}",
-                                           c=active_channel.channel_num,
-                                           p=pause_time)
-
-                            dwell_time = active_channel.get_dwell()
-                            self.log.debug("User set dwell_time_delay: {p}",
-                                           p=self.dwell_time_delay)
-
-                            # Check user set dwell time isn't too long
-                            if self.dwell_time_delay > dwell_time:
-                                self.log.warn("WARNING: User set dwell_time_delay of "
-                                              + "{delay} s is larger than channel "
-                                              + "dwell time of {chan_time} s. If "
-                                              + "you are autoscanning this will "
-                                              + "cause no data to be collected. "
-                                              + "Reducing dwell time delay to {s} s.",
-                                              delay=self.dwell_time_delay,
-                                              chan_time=dwell_time,
-                                              s=dwell_time - 1)
-                                total_time = pause_time + dwell_time - 1
-                            else:
-                                total_time = pause_time + self.dwell_time_delay
-
-                            for i in range(total_time):
-                                self.log.debug("Sleeping for {t} more seconds...",
-                                               t=total_time - i)
-                                time.sleep(1)
-
-                        # Track the last channel we measured
-                        previous_channel = self.module.get_active_channel()
-
-                    current_time = time.time()
-                    data = {
-                        'timestamp': current_time,
-                        'block_name': active_channel.name,
-                        'data': {}
-                    }
-
-                    # Collect both temperature and resistance values from each Channel
-                    channel_str = active_channel.name.replace(' ', '_')
-                    temp_reading = self.module.get_temp(unit='kelvin',
-                                                        chan=active_channel.channel_num)
-                    res_reading = self.module.get_temp(unit='ohms',
-                                                       chan=active_channel.channel_num)
-
-                    # For data feed
-                    data['data'][channel_str + '_T'] = temp_reading
-                    data['data'][channel_str + '_R'] = res_reading
                     session.app.publish_to_feed('temperatures', data)
                     self.log.debug("{data}", data=session.data)
-
-                    # For session.data
-                    field_dict = {channel_str: {"T": temp_reading,
-                                                "R": res_reading,
-                                                "timestamp": current_time}}
-                    session.data['fields'].update(field_dict)
-
-                    # Also queries control channel if enabled
-                    if self.control_chan_enabled:
-                        temp = self.module.get_temp(unit='kelvin', chan=0)
-                        res = self.module.get_temp(unit='ohms', chan=0)
-                        cur_time = time.time()
-                        data = {
-                            'timestamp': time.time(),
-                            'block_name': 'control_chan',
-                            'data': {
-                                'control_T': temp,
-                                'control_R': res
-                            }
+                    # Updates session data w/ control field
+                    session.data['fields'].update({
+                        'control': {
+                            'T': temp, 'R': res, 'timestamp': cur_time
                         }
-                        session.app.publish_to_feed('temperatures', data)
-                        self.log.debug("{data}", data=session.data)
-                        # Updates session data w/ control field
-                        session.data['fields'].update({
-                            'control': {
-                                'T': temp, 'R': res, 'timestamp': cur_time
-                            }
-                        })
+                    })
 
                 if params.get("sample_heater", False):
                     # Sample Heater
@@ -447,8 +423,6 @@ class LS372_Agent:
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            session.set_status('running')
-
             heater_string = params.get('heater', 'sample')
             if heater_string.lower() == 'sample':
                 heater = self.module.sample_heater
@@ -486,8 +460,6 @@ class LS372_Agent:
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            session.set_status('running')
-
             self.module.channels[params['channel']].set_excitation_mode(params['mode'])
             session.add_message(f'post message in agent for Set channel {params["channel"]} excitation mode to {params["mode"]}')
             print(f'print statement in agent for Set channel {params["channel"]} excitation mode to {params["mode"]}')
@@ -515,8 +487,6 @@ class LS372_Agent:
                 self.log.warn(f"Could not start Task because "
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
-
-            session.set_status('running')
 
             current_excitation = self.module.channels[params['channel']].get_excitation()
             mode = self.module.channels[params["channel"]].get_excitation_mode()
@@ -546,8 +516,6 @@ class LS372_Agent:
                 self.log.warn(f"Could not start Task because "
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
-
-            session.set_status('running')
 
             current_excitation = self.module.channels[params["channel"]].get_excitation()
             mode = self.module.channels[params["channel"]].get_excitation_mode()
@@ -582,8 +550,6 @@ class LS372_Agent:
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            session.set_status('running')
-
             current_resistance_range = self.module.channels[params['channel']].get_resistance_range()
 
             if params['resistance_range'] == current_resistance_range:
@@ -610,8 +576,6 @@ class LS372_Agent:
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            session.set_status('running')
-
             current_resistance_range = self.module.channels[params['channel']].get_resistance_range()
             session.add_message(f'Channel {params["channel"]} resistance range is {current_resistance_range}')
             session.data = {"resistance_range": current_resistance_range}
@@ -637,8 +601,6 @@ class LS372_Agent:
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            session.set_status('running')
-
             self.module.channels[params["channel"]].set_dwell(params["dwell"])
             session.add_message(f'Set dwell to {params["dwell"]}')
 
@@ -659,8 +621,6 @@ class LS372_Agent:
                 self.log.warn(f"Could not start Task because "
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
-
-            session.set_status('running')
 
             current_dwell = self.module.channels[params["channel"]].get_dwell()
             session.add_message(f'Dwell time for channel {params["channel"]} is {current_dwell}')
@@ -691,8 +651,6 @@ class LS372_Agent:
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            session.set_status('running')
-
             self.module.sample_heater.set_pid(params["P"], params["I"], params["D"])
             session.add_message(f'post message text for Set PID to {params["P"]}, {params["I"]}, {params["D"]}')
             print(f'print text for Set PID to {params["P"]}, {params["I"]}, {params["D"]}')
@@ -715,8 +673,6 @@ class LS372_Agent:
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            session.set_status('running')
-
             self.module.set_active_channel(params["channel"])
             session.add_message(f'post message text for set channel to {params["channel"]}')
             print(f'print text for set channel to {params["channel"]}')
@@ -738,8 +694,6 @@ class LS372_Agent:
                 self.log.warn(f"Could not start Task because "
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
-
-            session.set_status('running')
 
             if params['autoscan']:
                 self.module.enable_autoscan()
@@ -765,8 +719,6 @@ class LS372_Agent:
                 self.log.warn(f"Could not start Task because "
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
-
-            session.set_status('running')
 
             # Check we're in correct control mode for servo.
             if self.module.sample_heater.mode != 'Closed Loop':
@@ -813,8 +765,6 @@ class LS372_Agent:
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            session.set_status('running')
-
             channel = params['channel']
             state = params['state']
             if state == 'on':
@@ -840,8 +790,6 @@ class LS372_Agent:
                 self.log.warn(f"Could not start Task because "
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
-
-            session.set_status('running')
 
             channel = params['channel']
             state = params['state']
@@ -870,8 +818,6 @@ class LS372_Agent:
                 self.log.warn(f"Could not start Task because "
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
-
-            session.set_status('running')
 
             channel = params['channel']
             curve_number = params['curve_number']
@@ -908,8 +854,6 @@ class LS372_Agent:
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            session.set_status('running')
-
             channel = params['channel']
 
             ls_chann_setting = self.module.channels[channel]
@@ -924,19 +868,20 @@ class LS372_Agent:
                             "units": ls_chann_setting.units}
 
         return True, f"Channel {channel} has measurement inputs {input_setup} = [mode," \
-                     "excitation, auto range, range, cs_shunt, units]"
+            "excitation, auto range, range, cs_shunt, units]"
 
     @ocs_agent.param('setpoint', type=float)
     @ocs_agent.param('heater', type=str)
     @ocs_agent.param('channel', type=int)
-    @ocs_agent.param('P', type=int)
+    @ocs_agent.param('P', type=float)
     @ocs_agent.param('I', type=float)
-    @ocs_agent.param('update_time', type=int)
+    @ocs_agent.param('update_time', type=float)
+    @ocs_agent.param('query_rate', type=float, default=10.)
     @ocs_agent.param('sample_heater_range', type=float, default=10e-3)
     @ocs_agent.param('test_mode', type=bool, default=False)
     def custom_pid(self, session, params):
         """custom_pid(setpoint, heater, channel, P, \
-                      I, update_time, sample_heater_range=10e-3, \
+                      I, update_time, query_rate=10., sample_heater_range=10e-3, \
                       test_mode=False)
 
         **Process** - Set custom software PID parameters for servo control of fridge
@@ -946,9 +891,10 @@ class LS372_Agent:
             setpoint (float): Setpoint in Kelvin
             heater (str): 'still' or 'sample'
             channel (int): LS372 Channel to PID off of
-            P (int): Proportional value in Watts/Kelvin
-            I (int): Integral Value in Hz
-            update_time (int): Time between PID updates in seconds
+            P (float): Proportional value in Watts/Kelvin
+            I (float): Integral Value in Hz
+            update_time (float): Time between PID updates in seconds
+            query_rate (float): Rate at which to query temp data in Hz.
             sample_heater_range (float): Range for sample heater in Amps.
                                          Default is 10e-3.
             test_mode (bool, optional): Run the Process loop only once.
@@ -965,6 +911,7 @@ class LS372_Agent:
                     {"Channel_02": {"T": 293.644, "R": 33.752, "timestamps": 1601924482.722671}}
                 }
         """
+        pm = Pacemaker(params['query_rate'])
 
         with self._acq_proc_lock.acquire_timeout(timeout=0, job='custom_pid') \
                 as acq_acquired, \
@@ -978,7 +925,6 @@ class LS372_Agent:
                               f"{self._lock.job} is holding the lock")
                 return False, "Could not acquire lock"
 
-            session.set_status('running')
             session.data = {"fields": {}}
 
             setpoint = params['setpoint']
@@ -1008,6 +954,12 @@ class LS372_Agent:
                     session.add_message('Changing control to Open Loop mode for sample PID.')
                     self.module.sample_heater.set_mode("Open Loop")
 
+                # Check we're in the correct display mode for servo.
+                # The custom PID expects that the sample heater is in 'current' mode
+                if self.module.sample_heater.display != "current":
+                    session.add_message("Changing display mode to \'current\' for sample PID.")
+                    self.module.sample_heater.set_heater_display("current")
+
             if heater == 'still':
                 # Check we're in correct control mode for servo.
                 if self.module.still_heater.mode != 'Open Loop':
@@ -1034,16 +986,26 @@ class LS372_Agent:
             self.log.info(f"Starting PID on heater {heater}, ch {ch} to setpoint {setpoint} K")
 
             while self.custom_pid:
+                pm.sleep()
+
                 # Get a list of T and R at the maximum sample frequency
                 temps.append(self.module.get_temp(unit='kelvin', chan=ch))
                 resistances.append(self.module.get_temp(unit='ohms', chan=ch))
                 times.append(time.time())
 
+                attempted_heater_pow = 0
                 # Calculate and apply the PID based on the most recent temperature set
                 if times[-1] - last_pid > update_time:
                     heater_P = P_val * (setpoint - np.mean(np.array(temps)))
-                    heater_I += P_val * I_val * (delta_t * np.sum(setpoint - np.array(temps)))
-                    heater_pow = max(0.0, heater_P + heater_I)
+
+                    # Update the I_val of the PID
+                    # The I_val should not become negative because negative heater values are unphysical
+                    d_heater_I = P_val * I_val * (delta_t * np.sum(setpoint - np.array(temps)))
+                    heater_I = max(0.0, heater_I + d_heater_I)
+
+                    attempted_heater_pow = heater_P + heater_I
+                    self.log.info(f"Attempted Power: {attempted_heater_pow}, Heater_I: {heater_I}")
+                    heater_pow = max(0.0, attempted_heater_pow)
                     if heater == 'still':
                         heater_frac = still_power_to_perc(heater_pow, still_heater_R, still_lead_R, max_voltage)
                         self.module.still_heater.set_heater_output(heater_frac)
@@ -1128,8 +1090,6 @@ class LS372_Agent:
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            session.set_status('running')
-
             setpoint = float(self.module.sample_heater.get_setpoint())
 
             if params is None:
@@ -1177,8 +1137,6 @@ class LS372_Agent:
                 self.log.warn(f"Could not start Task because "
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
-
-            session.set_status('running')
 
             if params['heater'].lower() == 'still':
                 self.module.still_heater.set_mode(params['mode'])
@@ -1231,8 +1189,6 @@ class LS372_Agent:
 
             self.log.info("Set {} heater display to {}, output to {}".format(heater, display, output))
 
-            session.set_status('running')
-
             data = {'timestamp': time.time(),
                     'block_name': '{}_heater_out'.format(heater),
                     'data': {'{}_heater_out'.format(heater): output}
@@ -1266,8 +1222,6 @@ class LS372_Agent:
 
             self.log.info("Set still output to {}".format(output))
 
-            session.set_status('running')
-
             data = {'timestamp': time.time(),
                     'block_name': 'still_heater_still_out',
                     'data': {'still_heater_still_out': output}
@@ -1300,7 +1254,6 @@ class LS372_Agent:
 
             self.log.info("Current still output is {}".format(still_output))
 
-            session.set_status('running')
             session.data = {"still_heater_still_out": still_output}
 
         return True, "Current still output is {}".format(still_output)
@@ -1339,8 +1292,6 @@ class LS372_Agent:
 
             device_config = config[ls_serial]['device_settings']
             ls_chann_settings = config[ls_serial]['channel']
-
-            session.set_status('running')
 
             # enable/disable autoscan
             if device_config['autoscan'] == 'on':
@@ -1461,7 +1412,6 @@ def main(args=None):
     agent, runner = ocs_agent.init_site_agent(args)
 
     lake_agent = LS372_Agent(agent, args.serial_number, args.ip_address,
-                             fake_data=args.fake_data,
                              dwell_time_delay=args.dwell_time_delay,
                              enable_control_chan=args.enable_control_chan,
                              configfile=args.configfile)

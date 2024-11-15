@@ -2,7 +2,7 @@ from socs.agents.hwp_pid.drivers.pid_controller import PID
 from socs.testing.device_emulator import create_device_emulator
 
 pid_emu = create_device_emulator(
-    {'*W02400000': 'W02\r'}, relay_type='tcp', port=3003)
+    {'*W02400000': 'W02\r'}, relay_type='tcp', port=3003, reconnect=False)
 
 
 def test_send_message(pid_emu):
@@ -39,9 +39,14 @@ def test_decode_write():
     print(PID._decode_write('W02'))
 
 
-def test_decode_array():
-    print(PID._decode_array(['R02400000']))
+def test_decode_measure():
+    print(PID._decode_measure('X012.000'))
 
 
 def test_decode_measure_unknown():
-    assert PID._decode_measure(['R02400000']) == 9.999
+    decoded_resp = PID._decode_measure('X022.000')
+    assert decoded_resp.msg_type == 'error'
+
+
+def test_decode_array():
+    print(PID._decode_array(['R02400000']))

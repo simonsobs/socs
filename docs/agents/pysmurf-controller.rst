@@ -33,6 +33,12 @@ These can be installed via pip:
     $ python -m pip install 'sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master'
     $ python -m pip install 'sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master'
 
+Additionally, ``socs`` should be installed with the ``pysmurf`` group:
+
+.. code-block:: bash
+
+    $ pip install -U socs[pysmurf]
+
 Configuration File Examples
 -----------------------------------
 
@@ -58,7 +64,7 @@ mount in a development copy of SODETLIB so that we have the most recent version
 without having to rebuild this container.
 
 
-The docker-compose for the pysmurf-controller that publishes to a container
+The docker compose for the pysmurf-controller that publishes to a container
 named ``ocs-pysmurf-monitor`` might look something like::
 
     ocs-pysmurf:

@@ -65,8 +65,21 @@ class UCSCRadiometerAgent:
         pm = Pacemaker(1 / 60, quantize=False)
 
         self.take_data = True
+
         while self.take_data:
-            r = requests.get(self.url)
+            try:
+                r = requests.get(self.url, timeout=60)
+            except ValueError:
+                pm.sleep()
+                continue
+            except requests.exceptions.ConnectionError as e:
+                self.log.warn(f"Connection error occured: {e}")
+                pm.sleep()
+                continue
+            except requests.exceptions.Timeout as e:
+                self.log.warn(f"Timeout exception occurred: {e}")
+                pm.sleep()
+                continue
             data = r.json()
             last_pwv = data['pwv']
             last_timestamp = data['timestamp']
@@ -85,9 +98,7 @@ class UCSCRadiometerAgent:
                 self.last_published_reading = (last_pwv, last_timestamp)
 
             session.data = {"timestamp": last_timestamp,
-                            "pwv": {}}
-
-            session.data['pwv'] = last_pwv
+                            "pwv": last_pwv}
 
             if params['test_mode']:
                 break
