@@ -1258,9 +1258,9 @@ class LS372_Agent:
 
         return True, "Current still output is {}".format(still_output)
 
-    @ocs_agent.param('configfile', type=str)
+    @ocs_agent.param('configfile', type=str, default=None)
     def input_configfile(self, session, params=None):
-        """input_configfile(configfile)
+        """input_configfile(configfile=None)
 
         **Task** - Upload 372 configuration file to initialize channel/device
         settings.
