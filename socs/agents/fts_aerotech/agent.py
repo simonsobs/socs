@@ -197,7 +197,7 @@ class FTSAerotechAgent:
         # so does not require the lock
         self.initialized = True
         if self.auto_acq:
-            self.agent.start('acq')
+            self.agent.start('acq', params={'sampling_frequency': self.sampling_frequency})
         return True, 'Stage Initialized.'
 
     @ocs_agent.param('_')

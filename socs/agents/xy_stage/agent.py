@@ -78,7 +78,7 @@ class LATRtXYStageAgent:
         # so does not require the lock
         self.initialized = True
         if self.auto_acq:
-            self.agent.start('acq')
+            self.agent.start('acq', params={'sampling_frequency': self.sampling_frequency})
         return True, 'XY Stages Initialized.'
 
     @ocs_agent.param('distance', type=float)
@@ -164,7 +164,39 @@ class LATRtXYStageAgent:
             self.xy_stage.position = params['position']
         return True, "Position Updated"
 
-    @ocs_agent.param('sampling_frequency', type=float)
+    @ocs_agent.param('_')
+    def set_enabled(self, session, params=None):
+        """set_enabled()
+
+        **Task** - Tell the controller to hold stages enabled.
+
+        """
+        with self.lock.acquire_timeout(timeout=3, job='set_enabled') as acquired:
+            if not acquired:
+                self.log.warn(
+                    f"Could not set position because lock held by {self.lock.job}")
+                return False, "Could not acquire lock"
+
+            self.xy_stage.enable()
+        return True, "Enabled"
+
+    @ocs_agent.param('_')
+    def set_disabled(self, session, params=None):
+        """set_disabled()
+
+        **Task** - Tell the controller to hold stages disabled.
+
+        """
+        with self.lock.acquire_timeout(timeout=3, job='set_disabled') as acquired:
+            if not acquired:
+                self.log.warn(
+                    f"Could not set position because lock held by {self.lock.job}")
+                return False, "Could not acquire lock"
+
+            self.xy_stage.disable()
+        return True, "Disabled"
+
+    @ocs_agent.param('sampling_frequency', default=None, type=float)
     def acq(self, session, params=None):
         """acq(sampling_frequency=2)
 
@@ -265,7 +297,6 @@ def main(args=None):
     args = site_config.parse_args(agent_class='LATRtXYStageAgent',
                                   parser=parser,
                                   args=args)
-
     agent, runner = ocs_agent.init_site_agent(args)
 
     xy_agent = LATRtXYStageAgent(agent, args.ip_address, args.port, args.mode, args.sampling_frequency)
