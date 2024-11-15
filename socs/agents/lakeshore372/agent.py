@@ -1260,7 +1260,7 @@ class LS372_Agent:
 
     @ocs_agent.param('configfile', type=str, default=None)
     def input_configfile(self, session, params=None):
-        """input_configfile(configfile)
+        """input_configfile(configfile=None)
 
         **Task** - Upload 372 configuration file to initialize channel/device
         settings.
