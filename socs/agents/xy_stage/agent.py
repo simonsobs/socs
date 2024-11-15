@@ -227,7 +227,6 @@ class LATRtXYStageAgent:
                 return False, "Could not acquire lock."
 
             self.log.info(f"Starting Data Acquisition for XY Stages at {f_sample} Hz")
-            session.set_status('running')
             self.take_data = True
             last_release = time.time()
 

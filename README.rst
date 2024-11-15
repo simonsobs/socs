@@ -2,27 +2,8 @@
 SOCS - Simons Observatory Control System
 ========================================
 
-.. image:: https://img.shields.io/github/actions/workflow/status/simonsobs/socs/develop.yml?branch=develop
-    :target: https://github.com/simonsobs/socs/actions?query=workflow%3A%22Build+Develop+Images%22
-    :alt: GitHub Workflow Status
-
-.. image:: https://readthedocs.org/projects/socs/badge/?version=develop
-    :target: https://socs.readthedocs.io/en/develop/?badge=develop
-    :alt: Documentation Status
-
-.. image:: https://coveralls.io/repos/github/simonsobs/socs/badge.svg?branch=develop
-    :target: https://coveralls.io/github/simonsobs/socs?branch=develop
-
-.. image:: https://img.shields.io/badge/dockerhub-latest-blue
-    :target: https://hub.docker.com/r/simonsobs/ocs/tags
-
-.. image:: https://img.shields.io/pypi/v/socs
-   :target: https://pypi.org/project/socs/
-   :alt: PyPI Package
-
-.. image:: https://results.pre-commit.ci/badge/github/simonsobs/socs/develop.svg
-   :target: https://results.pre-commit.ci/latest/github/simonsobs/socs/develop
-   :alt: pre-commit.ci status
+| |pypi| |versions| |docker| |license|
+| |tests| |pre-commit| |coverage| |docs|
 
 Overview
 --------
@@ -56,14 +37,14 @@ If you would like to install all optional dependencies use the special varient
 **Note:** Not all optional dependencies can be installed this way. See the
 `Installation Documentation`_ for more info on specific agent dependencies.
 
-.. _`Installation Documentation`: https://socs.readthedocs.io/en/develop/user/installation.html
+.. _`Installation Documentation`: https://socs.readthedocs.io/en/main/user/installation.html
 
 Installing from Source
 ``````````````````````
 
-If you are considering contributing to SOCS, or would like to use the
-development branch, you will want to install from source. To do so,
-clone the repository and install using pip:
+If you are considering contributing to SOCS, or would like to use an unreleased
+feature, you will want to install from source. To do so, clone this repository
+and install using pip:
 
 .. code-block:: bash
 
@@ -86,7 +67,7 @@ configured host if it does not already exist:
 
 See the `ocs docs`_ for more details.
 
-.. _`ocs docs`: https://ocs.readthedocs.io/en/develop/developer/site_config.html
+.. _`ocs docs`: https://ocs.readthedocs.io/en/main/developer/site_config.html
 
 Docker Images
 -------------
@@ -95,11 +76,11 @@ releases will be tagged with their release version, i.e. ``v0.1.0``. These are
 only built on release, and the ``latest`` tag will point to the latest of these
 released tags. These should be considered stable.
 
-Development images will be tagged with the latest released version tag, the
-number of commits ahead of that release, the latest commit hash, and the tag
-``-dev``, i.e.  ``v0.0.2-81-g9c10ba6-dev``. These get built on each commit to
-the ``develop`` branch, and are useful for testing and development, but should
-be considered unstable.
+Test images will be tagged with the latest released version tag, the number of
+commits ahead of that release, the latest commit hash, i.e.
+``v0.0.2-81-g9c10ba6-dev``. These get built on each commit to the ``main``
+branch, and are useful for testing and development, but should be considered
+unstable.
 
 .. _Docker Hub: https://hub.docker.com/u/simonsobs
 
@@ -128,17 +109,47 @@ The tests for SOCS are run using pytest, and should be run from the
 
 For more details see `tests/README.rst <tests_>`_.
 
-.. _tests: https://github.com/simonsobs/socs/blob/master/tests/README.rst
+.. _tests: https://github.com/simonsobs/socs/blob/main/tests/README.rst
 
 Contributing
 ------------
 For guidelines on how to contribute to OCS see `CONTRIBUTING.rst`_.
 
-.. _CONTRIBUTING.rst: https://github.com/simonsobs/socs/blob/master/CONTRIBUTING.rst
+.. _CONTRIBUTING.rst: https://github.com/simonsobs/socs/blob/main/CONTRIBUTING.rst
 
 License
 --------
 This project is licensed under the BSD 2-Clause License - see the
 `LICENSE.txt`_ file for details.
 
-.. _LICENSE.txt: https://github.com/simonsobs/socs/blob/master/LICENSE.txt
+.. _LICENSE.txt: https://github.com/simonsobs/socs/blob/main/LICENSE.txt
+
+
+.. |coverage| image:: https://coveralls.io/repos/github/simonsobs/socs/badge.svg
+    :target: https://coveralls.io/github/simonsobs/socs
+
+.. |docker| image:: https://img.shields.io/badge/dockerhub-latest-blue
+    :target: https://hub.docker.com/r/simonsobs/socs
+
+.. |docs| image:: https://readthedocs.org/projects/socs/badge/?version=main
+    :target: https://socs.readthedocs.io/en/main/?badge=main
+    :alt: Documentation Status
+
+.. |license| image:: https://img.shields.io/pypi/l/socs
+    :target: LICENSE.txt
+    :alt: PyPI - License
+
+.. |pre-commit| image:: https://results.pre-commit.ci/badge/github/simonsobs/socs/main.svg
+   :target: https://results.pre-commit.ci/latest/github/simonsobs/socs/main
+   :alt: pre-commit.ci status
+
+.. |pypi| image:: https://img.shields.io/pypi/v/socs
+   :target: https://pypi.org/project/socs/
+   :alt: PyPI Package
+
+.. |tests| image:: https://github.com/simonsobs/socs/actions/workflows/develop.yml/badge.svg?branch=main
+    :target: https://github.com/simonsobs/socs/actions/workflows/develop.yml
+    :alt: GitHub Workflow Status
+
+.. |versions| image:: https://img.shields.io/pypi/pyversions/socs
+    :alt: PyPI - Python Version

@@ -47,7 +47,7 @@ An example site-config-file block::
 Docker Compose
 ``````````````
 
-An example docker-compose configuration::
+An example docker compose configuration::
 
     ocs-wgactuator-agent:
         image: simonsobs/ocs-wgactuator-agent:latest
@@ -77,6 +77,10 @@ The main functions are ``insert()`` and ``eject()``.
 In the both of the functions, after the inserting/ejecting, the stopper locks the actuators again.
 However, the motor power is not turned ON or OFF during the both functions.
 
+The parameter details are here:
+
+- speedrate: Actuator speed rate [0.0, 5.0] (default: 1.0)
+
 **Test Functions**
  - check_limitswitch(): Check ON/OFF of the limit switches
  - check_stopper(): Check ON/OFF (lock/unlock) of the stoppers
@@ -98,7 +102,7 @@ In the test mode, you can choose the moving distance [mm] and speed rate.
 The parameter details are here:
 
 - distance: Actuator moving distance [mm] (default: 10)
-- speedrate: Actuator speed rate [0.0, 1.0] (default: 0.2)
+- speedrate: Actuator speed rate [0.0, 5.0] (default: 0.2)
 
 
 Hardware Configurations

@@ -16,7 +16,7 @@ exclude =
     socs/mibs/MBG-SNMP-ROOT-MIB.py,
     socs/mibs/IBOOTPDU-MIB.py,
     socs/mibs/UPS-MIB.py,
-    versioneer.py,
+    socs/mibs/MBG-SYNCBOX-N2X-MIB.py,
     docs/conf.py,
 per-file-ignores =
     # Windows only dependency

@@ -6,15 +6,20 @@ twisted
 
 # hardware communication
 pyserial
-pysnmp
+pysnmp==4.4.12
 pysmi
+pyasn1==0.4.8
 
 # common dependencies - used by multiple agents
 numpy
 pyyaml
+requests
+tqdm
 
 # acu agent
 soaculib @ git+https://github.com/simonsobs/soaculib.git@master
+so3g
+pixell
 
 # holography agent - python 3.8 only!
 # -r requirements/holography.txt
@@ -28,16 +33,21 @@ labjack-ljm
 scipy
 pandas
 
+# camera control
+imutils
+opencv-python
+
 # pfeiffer tc 400
 pfeiffer-vacuum-protocol==0.4
 
 # pysmurf controller
+pyepics
 pysmurf @ git+https://github.com/slaclab/pysmurf.git@main
 sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master
 sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master
 
-# synacc agent
-requests
+# timing master monitor
+pyepics
 
 # xy_stage
 xy_stage_control @ git+https://github.com/kmharrington/xy_stage_control.git@main
@@ -47,8 +57,15 @@ pysmurf @ git+https://github.com/slaclab/pysmurf.git@main
 sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master
 sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master
 
+# modbus
+pyModbusTCP
+
 # Docs
 # see docs/requirements.txt
 
-# testing
+# testing + development
+setuptools-scm
 -r requirements/testing.txt
+
+# Contributing
+pre-commit

@@ -8,6 +8,8 @@ on:
       - '**.md'
       - '.flake8'
       - '.pre-commit-config.yaml'
+      - '.readthedocs.yaml'
+      - '.github/dependabot.yml'
 
 jobs:
   build:
@@ -17,11 +19,11 @@ jobs:
     steps:
     # Fetch all history for all tags and branches
     - name: clone socs
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
     # Dockerize
     - name: Build docker images
       run: |
-        docker-compose build
+        docker compose build

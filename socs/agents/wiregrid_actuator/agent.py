@@ -90,7 +90,7 @@ class WiregridActuatorAgent:
         if LSonoff:
             self.log.info(
                 '_move(): Stopped moving because '
-                'one of {} limit-switches is ON (LSL1={}, LSR1={})!'
+                'one of {} limit-switches is ON (LSL={}, LSR={})!'
                 .format(LSlabel, LSL, LSR))
         return True, \
             '_move(): Finish move(distance={}, speedrate={}, limit-switch={})'\
@@ -102,7 +102,7 @@ class WiregridActuatorAgent:
         if distance < 0.:
             distance = abs(distance)
         ret, msg, LSonoff = self._move(
-            distance, speedrate, 'LSL1', 'LSR1', 'inside')
+            distance, speedrate, 'LSL2', 'LSR2', 'inside')
         return ret, \
             '_forward(): '\
             'Finish forward(distance={}, speedrate={}, limit-switch={})'\
@@ -114,7 +114,7 @@ class WiregridActuatorAgent:
         if distance > 0.:
             distance = -1. * abs(distance)
         ret, msg, LSonoff = self._move(
-            distance, speedrate, 'LSL2', 'LSR2', 'outside')
+            distance, speedrate, 'LSL1', 'LSR1', 'outside')
         return ret, \
             '_backward(): '\
             'Finish backward(distance={}, speedrate={}, limit-switch={})'\
@@ -125,7 +125,7 @@ class WiregridActuatorAgent:
             self, main_distance=920, main_speedrate=1.0, is_insert=True):
         # Function label
         flabel = 'insert' if is_insert else 'eject'
-        initial_ls_names = ['LSL2', 'LSR2'] if is_insert else ['LSL1', 'LSR1']
+        initial_ls_names = ['LSL1', 'LSR1'] if is_insert else ['LSL2', 'LSR2']
         move_func = self._forward if is_insert else self._backward
 
         # Check connection
@@ -276,13 +276,29 @@ class WiregridActuatorAgent:
     ##################
     # Return: status(True or False), message
 
+    @ocs_agent.param('speedrate', default=1.0, type=float,
+                     check=lambda x: 0.0 < x <= 5.0)
+    @ocs_agent.param('high_speed', default=False, type=bool)
     def insert(self, session, params=None):
-        """insert()
+        """insert(speedrate=1.0, high_speed=False)
 
         **Task** - Insert the wire-grid into the forebaffle interface above the
         SAT.
 
+        Parameters:
+            speedrate (float): Actuator speed rate [0.0, 5.0] (default: 1.0)
+                DO NOT use ``speedrate > 1.0`` if ``el != 90 deg``!
+            high_speed (bool): If False, speedrate is limited to 1.0. Defaults
+                to False.
         """
+        # Get parameters
+        speedrate = params.get('speedrate')
+        high_speed = params.get('high_speed')
+        if not high_speed:
+            speedrate = min(speedrate, 1.0)
+        self.log.info('insert(): set speed rate = {}'
+                      .format(speedrate))
+
         with self.lock.acquire_timeout(timeout=3, job='insert') as acquired:
             if not acquired:
                 self.log.warn(
@@ -293,22 +309,38 @@ class WiregridActuatorAgent:
             # Wait for a second before moving
             time.sleep(1)
             # Moving commands
-            ret, msg = self._insert(920, 1.0)
+            ret, msg = self._insert(920, speedrate)
             if not ret:
                 msg = 'insert(): '\
-                      'ERROR!: Failed insert() in _insert(850,1.0) | {}'\
-                      .format(msg)
+                      'ERROR!: Failed insert() in _insert(920,{}) | {}'\
+                      .format(speedrate, msg)
                 self.log.error(msg)
                 return False, msg
             return True, 'insert(): Successfully finish!'
 
+    @ocs_agent.param('speedrate', default=1.0, type=float,
+                     check=lambda x: 0.0 < x <= 5.0)
+    @ocs_agent.param('high_speed', default=False, type=bool)
     def eject(self, session, params=None):
-        """eject()
+        """eject(speedrate=1.0, high_speed=False)
 
         **Task** - Eject the wire-grid from the forebaffle interface above the
         SAT.
 
+        Parameters:
+            speedrate (float): Actuator speed rate [0.0, 5.0] (default: 1.0)
+                DO NOT use ``speedrate > 1.0`` if ``el != 90 deg``!
+            high_speed (bool): If False, speedrate is limited to 1.0. Defaults
+                to False.
         """
+        # Get parameters
+        speedrate = params.get('speedrate')
+        high_speed = params.get('high_speed')
+        if not high_speed:
+            speedrate = min(speedrate, 1.0)
+        self.log.info('eject(): set speed rate = {}'
+                      .format(speedrate))
+
         with self.lock.acquire_timeout(timeout=3, job='eject') as acquired:
             if not acquired:
                 self.log.warn(
@@ -319,10 +351,10 @@ class WiregridActuatorAgent:
             # Wait for a second before moving
             time.sleep(1)
             # Moving commands
-            ret, msg = self._eject(920, 1.0)
+            ret, msg = self._eject(920, speedrate)
             if not ret:
-                msg = 'eject(): ERROR!: Failed in _eject(850,1.0) | {}'\
-                    .format(msg)
+                msg = 'eject(): ERROR!: Failed in _eject(920,{}) | {}'\
+                    .format(speedrate, msg)
                 self.log.error(msg)
                 return False, msg
             return True, 'eject(): Successfully finish!'
@@ -349,7 +381,7 @@ class WiregridActuatorAgent:
                     'check_limitswitch(): '
                     'Lock could not be acquired because it is held by {}.'
                     .format(self.lock.job))
-                return False,\
+                return False, \
                     'check_limitswitch(): '\
                     'Could not acquire lock'
 
@@ -451,20 +483,27 @@ class WiregridActuatorAgent:
 
     @ocs_agent.param('distance', default=10., type=float)
     @ocs_agent.param('speedrate', default=0.2, type=float,
-                     check=lambda x: 0.0 < x <= 1.0)
+                     check=lambda x: 0.0 < x <= 5.0)
+    @ocs_agent.param('high_speed', default=False, type=bool)
     def insert_test(self, session, params):
-        """insert_test(distance=10, speedrate=0.1)
+        """insert_test(distance=10, speedrate=0.2, high_speed=False)
 
         **Task** - Insert slowly the wire-grid into the forebaffle interface
         above the SAT with a small distance.
 
         Parameters:
             distance (float): Actuator moving distance [mm] (default: 10)
-            speedrate (float): Actuator speed rate [0.0, 1.0] (default: 0.2)
+            speedrate (float): Actuator speed rate [0.0, 5.0] (default: 0.2)
+                DO NOT use ``speedrate > 1.0`` if ``el != 90 deg``!
+            high_speed (bool): If False, speedrate is limited to 1.0. Defaults
+                to False.
         """
         # Get parameters
         distance = params.get('distance')
         speedrate = params.get('speedrate')
+        high_speed = params.get('high_speed')
+        if not high_speed:
+            speedrate = min(speedrate, 1.0)
         self.log.info('insert_test(): set distance   = {} mm'
                       .format(distance))
         self.log.info('insert_test(): set speed rate = {}'
@@ -502,20 +541,27 @@ class WiregridActuatorAgent:
 
     @ocs_agent.param('distance', default=10., type=float)
     @ocs_agent.param('speedrate', default=0.2, type=float,
-                     check=lambda x: 0.0 < x <= 1.0)
+                     check=lambda x: 0.0 < x <= 5.0)
+    @ocs_agent.param('high_speed', default=False, type=bool)
     def eject_test(self, session, params):
-        """eject_test(distance=10, speedrate=0.1)
+        """eject_test(distance=10, speedrate=0.2, high_speed=False)
 
         **Task** - Eject slowly the wire-grid from the forebaffle interface
         above the SAT with a small distance.
 
         Parameters:
-            distance:  Actuator moving distance [mm] (default: 10)
-            speedrate: Actuator speed rate [0.0, 1.0] (default: 0.2)
+            distance (float): Actuator moving distance [mm] (default: 10)
+            speedrate (float): Actuator speed rate [0.0, 5.0] (default: 0.2)
+                DO NOT use ``speedrate > 1.0`` if ``el != 90 deg``!
+            high_speed (bool): If False, speedrate is limited to 1.0. Defaults
+                to False.
         """
         # Get parameters
         distance = params.get('distance', 10)
         speedrate = params.get('speedrate', 0.2)
+        high_speed = params.get('high_speed')
+        if not high_speed:
+            speedrate = min(speedrate, 1.0)
         self.log.info('eject_test(): set distance   = {} mm'
                       .format(distance))
         self.log.info('eject_test(): set speed rate = {}'
@@ -751,8 +797,6 @@ class WiregridActuatorAgent:
                 return False, 'acq(): Could not acquire lock.'
             self.log.info('acq(): Got the lock')
 
-            session.set_status('running')
-
             self.run_acq = True
             last_release = time.time()
             session.data = {'fields': {}}
@@ -764,7 +808,7 @@ class WiregridActuatorAgent:
                             'acq(): '
                             'Could not re-acquire lock now held by {}.'
                             .format(self.lock.job))
-                        return False,\
+                        return False, \
                             'acq(): Could not re-acquire lock (timeout)'
 
                 current_time = time.time()
