@@ -194,7 +194,7 @@ class RTSPCameraAgent:
 
                 >>> response.session['data']
                 {
-                    'address': 'camera-c1.simonsobs.org',
+                    'address': 'camera-c1.example.org',
                     'timestamp': 1701983575.123456,
                     'path': '/ocs/cameras_rtsp/c1/img_2023-12-29T02:44:47+00:00.jpg',
                 }

@@ -29,15 +29,15 @@ common arguments. Many options do not normally need to be changed::
 
       {'agent-class': 'RTSPCameraAgent',
        'instance-id': 'camera-c3',
-       'arguments': [['--mode', 'acq'],
-                     ['--directory', '/camera']
-                     ['--address', 'camera-c3.simonsobs.org'],
-                     ['--user', 'ocs'],
-                     ['--password', '<password>'],
-                     ['--motion_start', '19:00:00-04:00'],
-                     ['--motion_stop', '07:00:00-04:00'],
-                     ['--snapshot_seconds', '10'],
-                     ['--record_duration', '120']]},
+       'arguments': ['--mode', 'acq',
+                     '--directory', '/camera',
+                     '--address', 'camera-c3.example.org',
+                     '--user', 'ocs',
+                     '--password', '<password>',
+                     '--motion_start', '19:00:00-04:00',
+                     '--motion_stop', '07:00:00-04:00',
+                     '--snapshot_seconds', '10',
+                     '--record_duration', '120']},
 
 Docker Compose
 ``````````````
