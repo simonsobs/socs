@@ -166,7 +166,10 @@ class LATRtXYStageAgent:
 
     @ocs_agent.param('_')
     def set_enabled(self, session, params=None):
-        """Tell the controller to hold stages enabled
+        """set_enabled()
+
+        **Task** - Tell the controller to hold stages enabled.
+
         """
         with self.lock.acquire_timeout(timeout=3, job='set_enabled') as acquired:
             if not acquired:
@@ -179,7 +182,10 @@ class LATRtXYStageAgent:
 
     @ocs_agent.param('_')
     def set_disabled(self, session, params=None):
-        """Tell the controller to hold stages enabled
+        """set_disabled()
+
+        **Task** - Tell the controller to hold stages disabled.
+
         """
         with self.lock.acquire_timeout(timeout=3, job='set_disabled') as acquired:
             if not acquired:
