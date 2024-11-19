@@ -1,8 +1,6 @@
 import argparse
 import os
-import threading
 import time
-from contextlib import contextmanager
 
 import numpy as np
 import txaio
@@ -18,60 +16,6 @@ def still_power_to_perc(power, res, lead, max_volts):
     cur = np.sqrt(power / res)
     volt = (lead + res) * cur
     return 100 * volt / max_volts
-
-
-class YieldingLock:
-    """A lock protected by a lock.  This braided arrangement guarantees
-    that a thread waiting on the lock will get priority over a thread
-    that has just released the lock and wants to reacquire it.
-
-    The typical use case is a Process that wants to hold the lock as
-    much as possible, but occasionally release the lock (without
-    sleeping for long) so another thread can access a resource.  The
-    method release_and_acquire() is provided to make this a one-liner.
-
-    """
-
-    def __init__(self, default_timeout=None):
-        self.job = None
-        self._next = threading.Lock()
-        self._active = threading.Lock()
-        self._default_timeout = default_timeout
-
-    def acquire(self, timeout=None, job=None):
-        if timeout is None:
-            timeout = self._default_timeout
-        if timeout is None or timeout == 0.:
-            kw = {'blocking': False}
-        else:
-            kw = {'blocking': True, 'timeout': timeout}
-        result = False
-        if self._next.acquire(**kw):
-            if self._active.acquire(**kw):
-                self.job = job
-                result = True
-            self._next.release()
-        return result
-
-    def release(self):
-        self.job = None
-        return self._active.release()
-
-    def release_and_acquire(self, timeout=None):
-        job = self.job
-        self.release()
-        return self.acquire(timeout=timeout, job=job)
-
-    @contextmanager
-    def acquire_timeout(self, timeout=None, job='unnamed'):
-        result = self.acquire(timeout=timeout, job=job)
-        if result:
-            try:
-                yield result
-            finally:
-                self.release()
-        else:
-            yield result
 
 
 class LS372_Agent:
@@ -104,10 +48,10 @@ class LS372_Agent:
 
         # self._lock is held by the acq Process only when accessing
         # the hardware but released occasionally so that (short) Tasks
-        # may run.  Use a YieldingLock to guarantee that a waiting
+        # may run. Use a TimeoutLock to guarantee that a waiting
         # Task gets activated preferentially, even if the acq thread
         # immediately tries to reacquire.
-        self._lock = YieldingLock(default_timeout=5)
+        self._lock = TimeoutLock(default_timeout=5)
 
         self.name = name
         self.ip = ip
