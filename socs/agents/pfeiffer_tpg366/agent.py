@@ -3,9 +3,9 @@
 # Zhilei Xu, Tanay Bhandarkar
 
 import argparse
+import os
 import socket
 import time
-from os import environ
 
 import numpy as np
 import txaio
@@ -231,7 +231,7 @@ def make_parser(parser=None):
 
 def main(args=None):
     # Start logging
-    txaio.start_logging(level=environ.get("LOGLEVEL", "info"))
+    txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
 
     parser = make_parser()
     args = site_config.parse_args(agent_class='PfeifferAgent',
