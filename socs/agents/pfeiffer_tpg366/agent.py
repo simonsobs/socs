@@ -12,11 +12,11 @@ import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
+# For logging
 txaio.use_twisted()
 
 BUFF_SIZE = 128
 ENQ = '\x05'
-LOG = txaio.make_logger()
 
 
 class Pfeiffer:
@@ -61,7 +61,7 @@ class Pfeiffer:
         power_states = np.array(power_str[0].split(','), dtype=int)
         if any(chan != 2 for chan in power_states):
             channel_states = [index + 1 for index, state in enumerate(power_states) if state != 2]
-            LOG.info("The following channels are off:{}".format(channel_states))
+            self.log.info("The following channels are off:{}".format(channel_states))
         return channel_states
 
     def check_channel_stage_changes(self, old_state):
