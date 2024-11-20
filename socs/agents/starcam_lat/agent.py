@@ -31,13 +31,8 @@ class StarcamHelper:
         pack_and_send_cmds()
 
         **Process**
-<<<<<<< HEAD
         packs commands and parameters to be sent to starcamera and sends
 
-=======
-        packs commands and parameters to be sent to star camera and sends
-
->>>>>>> 82252e753327de73c687591486c64dca8f4a8638
         **Return**
         returns list of values sent
         """
@@ -115,23 +110,23 @@ class StarcamHelper:
         (scdata_raw, _) = self.comm.recvfrom(224)
         data = struct.unpack_from("dddddddddddddiiiiiiiiddiiiiiiiiiiiiiifiii",
                                   scdata_raw)
-        sc_keys = ['c_time',
-                   'gmt',
-                   'blob_num',
-                   'obs_ra',
-                   'astrom_ra',
-                   'obs_dec',
-                   'fr',
-                   'ps',
-                   'alt',
-                   'az',
-                   'ir',
-                   'astrom_solve_time',
-                   'camera_time']
+        keys = ['c_time',
+                'gmt',
+                'blob_num',
+                'obs_ra',
+                'astrom_ra',
+                'obs_dec',
+                'fr',
+                'ps',
+                'alt',
+                'az',
+                'ir',
+                'astrom_solve_time',
+                'camera_time']
         # Create a dictionary of the unpacked data
-        astr_data = [data[i] for i in range(len(sc_keys))]
-        astr_data_dict = {keys[i]: astr_data[i] for i in range(len(sc_keys))}
-        return astr_data_dict
+        astrom_data = [data[i] for i in range(len(keys))]
+        astrom_data_dict = {keys[i]: astrom_data[i] for i in range(len(keys))}
+        return astrom_data_dict
 
     def close(self):
         """
@@ -191,23 +186,17 @@ class StarcamAgent:
         acquires data from starcam and publishes to feed
 
         **Return**
-<<<<<<< HEAD
         once the acq() loop exits (wherein data is retrieved from
         the camera and pulished), a touple with True/False and a string
         describing whether or not the loop was exited after the end of
         an acquisition.
-=======
-        once the acq() loop exits (wherein data is retrieved from the camera and pulished),
-        a touple with True/False and a string describing whether or not the loop was exited
-        after the end of an acquisition.
->>>>>>> 82252e753327de73c687591486c64dca8f4a8638
         """
         if params is None:
             params = {}
         with self.lock.acquire_timeout(timeout=100, job='acq') as acquired:
             if not acquired:
-                self.log.warn("Could not start init because {} is already
-                              running".format(self.lock.job))
+                self.log.warn("Could not start init because {} is already "
+                              "running".format(self.lock.job))
                 return False, "Could not acquire lock"
             session.set_status('running')
             self.log.info("Starting acquisition")
@@ -219,14 +208,9 @@ class StarcamAgent:
                     'data': {}
                 }
                 # get astrometry data
-                astrom_data = self.StarcamHelper.get_astrom_data()
-<<<<<<< HEAD
+                astrom_data_dict = self.StarcamHelper.get_astrom_data()
                 # update the data dictionary+session and publish
                 data['data'].update(astrom_data_dict)
-=======
-                # update the data dictionary, update the session, and publish
-                data['data'].update(astrom_data_dict)
->>>>>>> 82252e753327de73c687591486c64dca8f4a8638
                 session.data.update(data['data'])
                 self.agent.publish_to_feed('starcamera', data)
 
