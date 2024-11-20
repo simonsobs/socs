@@ -33,7 +33,7 @@ class StarcamHelper:
         **Process**
 <<<<<<< HEAD
         packs commands and parameters to be sent to starcamera and sends
-        
+
 =======
         packs commands and parameters to be sent to star camera and sends
 
@@ -94,7 +94,7 @@ class StarcamHelper:
                   n_sigma_value,
                   star_spacing_value]
         # Pack values into the command for the camera
-        self.cmds_for_camera = struct.pack('ddddddfiiiiiiiiiifffffffff', 
+        self.cmds_for_camera = struct.pack('ddddddfiiiiiiiiiifffffffff',
                                            *values)
         # send commands to the camera
         self.comm.sendto(self.cmds_for_camera, (self.ip, self.port))
@@ -153,7 +153,7 @@ class StarcamAgent:
         self.take_data = False
         self.lock = TimeoutLock()
         agg_params = {'frame_length': 60}
-        self.agent.register_feed("starcamera", record=True, 
+        self.agent.register_feed("starcamera", record=True,
                                  agg_params=agg_params, buffer_time=1)
         try:
             self.StarcamHelper = StarcamHelper(ip_address, port)
@@ -192,9 +192,9 @@ class StarcamAgent:
 
         **Return**
 <<<<<<< HEAD
-        once the acq() loop exits (wherein data is retrieved from 
-        the camera and pulished), a touple with True/False and a string 
-        describing whether or not the loop was exited after the end of 
+        once the acq() loop exits (wherein data is retrieved from
+        the camera and pulished), a touple with True/False and a string
+        describing whether or not the loop was exited after the end of
         an acquisition.
 =======
         once the acq() loop exits (wherein data is retrieved from the camera and pulished),
@@ -206,7 +206,7 @@ class StarcamAgent:
             params = {}
         with self.lock.acquire_timeout(timeout=100, job='acq') as acquired:
             if not acquired:
-                self.log.warn("Could not start init because {} is already 
+                self.log.warn("Could not start init because {} is already
                               running".format(self.lock.job))
                 return False, "Could not acquire lock"
             session.set_status('running')
@@ -222,7 +222,7 @@ class StarcamAgent:
                 astrom_data = self.StarcamHelper.get_astrom_data()
 <<<<<<< HEAD
                 # update the data dictionary+session and publish
-                data['data'].update(astrom_data_dict) 
+                data['data'].update(astrom_data_dict)
 =======
                 # update the data dictionary, update the session, and publish
                 data['data'].update(astrom_data_dict)
@@ -239,7 +239,7 @@ class StarcamAgent:
             self.take_data = False
             ok = True
             # self.StarcamHelper.close()
-        return (ok, {True: 'Requested process to stop', 
+        return (ok, {True: 'Requested process to stop',
                      False: 'Failed to request process stop.'}[ok])
 
 
@@ -247,9 +247,9 @@ def add_agent_args(parser=None):
     if parser is None:
         parser = argparse.ArgumentParser()
     pgroup = parser.add_argument_group('Agent Options')
-    pgroup.add_argument("--ip-address", type=str, 
+    pgroup.add_argument("--ip-address", type=str,
                         help="IP address of starcam computer")
-    pgroup.add_argument("--port", default="8000", type=int, 
+    pgroup.add_argument("--port", default="8000", type=int,
                         help="Port of starcam computer")
     return parser
 
@@ -265,9 +265,9 @@ def main(args=None):
     parser = add_agent_args()
     args = site_config.parse_args(agent_class="StarcamAgent", parser=parser)
     agent, runner = ocs_agent.init_site_agent(args)
-    starcam_agent = StarcamAgent(agent, ip_address=args.ip_address, 
+    starcam_agent = StarcamAgent(agent, ip_address=args.ip_address,
                                  port=args.port)
-    agent.register_task('send_commands', starcam_agent.send_commands, 
+    agent.register_task('send_commands', starcam_agent.send_commands,
                         startup=True)
     agent.register_process('acq', starcam_agent.acq, starcam_agent._stop_acq)
     runner.run(agent, auto_reconnect=False)
