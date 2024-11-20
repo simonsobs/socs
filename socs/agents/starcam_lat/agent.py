@@ -5,7 +5,7 @@ import time
 from os import environ
 
 import txaio
-from ocs import ocs_agent, site_confiig
+from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
 
@@ -242,7 +242,7 @@ def add_agent_args(parser=None):
 def main(args=None):
     # for logging
     txaio.use_twisted()
-    LOG = txaio.make_logger()
+    txaio.make_logger()
 
     # start logging
     txaio.start_logging(level=environ.get("LOGLEVEL", "info"))
