@@ -31,7 +31,7 @@ class StarcamHelper:
         pack_and_send_cmds()
         
         **Process**
-        packs commands and parameters to be sent to star camera and sends
+        packs commands and parameters to be sent to starcamera and sends
         
         **Return**
         returns list of values sent
@@ -89,7 +89,8 @@ class StarcamHelper:
                   n_sigma_value,
                   star_spacing_value]
         # Pack values into the command for the camera
-        self.cmds_for_camera = struct.pack('ddddddfiiiiiiiiiifffffffff', *values)
+        self.cmds_for_camera = struct.pack('ddddddfiiiiiiiiiifffffffff', 
+                                           *values)
         # send commands to the camera
         self.comm.sendto(self.cmds_for_camera, (self.ip, self.port))
         print(“Commands sent to camera”)
@@ -106,25 +107,26 @@ class StarcamHelper:
         **Return**
         returns dictionary of unpacked data
         """
-        (starcamdata_raw, _) = self.comm.recvfrom(224)
-        starcamdata_unpacked = struct.unpack_from("dddddddddddddiiiiiiiiddiiiiiiiiiiiiiifiii", starcamdata_raw)
-        starcam_data_keys = ['c_time',
-                             'gmt',
-                             'blob_num',
-                             'obs_ra',
-                             'astrom_ra',
-                             'obs_dec',
-                             'fr',
-                             'ps',
-                             'alt',
-                             'az',
-                             'ir',
-                             'astrom_solve_time',
-                             'camera_time']
+        (scdata_raw, _) = self.comm.recvfrom(224)
+        data = struct.unpack_from("dddddddddddddiiiiiiiiddiiiiiiiiiiiiiifiii",
+                                  scdata_raw)
+        sc_keys = ['c_time',
+                   'gmt',
+                   'blob_num',
+                   'obs_ra',
+                   'astrom_ra',
+                   'obs_dec',
+                   'fr',
+                   'ps',
+                   'alt',
+                   'az',
+                   'ir',
+                   'astrom_solve_time',
+                   'camera_time']
         # Create a dictionary of the unpacked data
-        astrom_data = [starcamdata_unpacked[i] for i in range(len(starcam_data_keys))]
-        astrom_data_dict = {keys[i]: astrom_data[i] for i in range(len(starcam_data_keys))}
-        return astrom_data_dict
+        astr_data = [data[i] for i in range(len(sc_keys))]
+        astr_data_dict = {keys[i]: astr_data[i] for i in range(len(sc_keys))}
+        return astr_data_dict
 
     def close(self):
         """
@@ -146,7 +148,8 @@ class StarcamAgent:
         self.take_data = False
         self.lock = TimeoutLock()
         agg_params = {'frame_length': 60}
-        self.agent.register_feed("starcamera", record=True, agg_params=agg_params, buffer_time=1)
+        self.agent.register_feed("starcamera", record=True, 
+                                 agg_params=agg_params, buffer_time=1)
         try:
             self.StarcamHelper = StarcamHelper(ip_address, port)
         except socket.timeout:
@@ -162,12 +165,13 @@ class StarcamAgent:
         packs and sends camera+astrometry-related commands to starcam
 
         **Return**
-        returns a touple with True/False and a string describing whether or not
-        a lock could be acquired and commands were sent to the starcamera
+        returns a touple with True/False and a string describing whether
+        or not a lock could be acquired and commands were sent to the sc
         """
         with self.lock.acquire_timeout(job='send_commands') as acquired:
             if not acquired:
-                self.log.warn(f"Could not start Task because "f"{self._lock.job} is already running")
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
             self.log.info("Sending commands")
             self.StarcamHelper.pack_and_send_cmds()
@@ -182,15 +186,17 @@ class StarcamAgent:
         acquires data from starcam and publishes to feed
         
         **Return**
-        once the acq() loop exits (wherein data is retrieved from the camera and pulished), 
-        a touple with True/False and a string describing whether or not the loop was exited
-        after the end of an acquisition.
+        once the acq() loop exits (wherein data is retrieved from 
+        the camera and pulished), a touple with True/False and a string 
+        describing whether or not the loop was exited after the end of 
+        an acquisition.
         """
         if params is None:
             params = {}
         with self.lock.acquire_timeout(timeout=100, job='acq') as acquired:
             if not acquired:
-                self.log.warn("Could not start init because {} is already running".format(self.lock.job))
+                self.log.warn("Could not start init because {} is already 
+                              running".format(self.lock.job))
                 return False, "Could not acquire lock"
             session.set_status('running')
             self.log.info("Starting acquisition")
@@ -203,7 +209,7 @@ class StarcamAgent:
                 }
                 # get astrometry data
                 astrom_data = self.StarcamHelper.get_astrom_data()
-                # update the data dictionary, update the session, and publish
+                # update the data dictionary+session and publish
                 data['data'].update(astrom_data_dict) 
                 session.data.update(data['data'])
                 self.agent.publish_to_feed('starcamera', data)
@@ -217,15 +223,18 @@ class StarcamAgent:
             self.take_data = False
             ok = True
             # self.StarcamHelper.close()
-        return (ok, {True: 'Requested process to stop', False: 'Failed to request process stop.'}[ok])
+        return (ok, {True: 'Requested process to stop', 
+                     False: 'Failed to request process stop.'}[ok])
 
 
 def add_agent_args(parser=None):
     if parser is None:
         parser = argparse.ArgumentParser()
     pgroup = parser.add_argument_group('Agent Options')
-    pgroup.add_argument("--ip-address", type=str, help="IP address of starcam computer")
-    pgroup.add_argument("--port", default="8000", type=int, help="Port of starcam computer")
+    pgroup.add_argument("--ip-address", type=str, 
+                        help="IP address of starcam computer")
+    pgroup.add_argument("--port", default="8000", type=int, 
+                        help="Port of starcam computer")
     return parser
 
 
@@ -240,8 +249,10 @@ def main(args=None):
     parser = add_agent_args()
     args = site_config.parse_args(agent_class="StarcamAgent", parser=parser)
     agent, runner = ocs_agent.init_site_agent(args)
-    starcam_agent = StarcamAgent(agent, ip_address=args.ip_address, port=args.port)
-    agent.register_task('send_commands', starcam_agent.send_commands, startup=True)
+    starcam_agent = StarcamAgent(agent, ip_address=args.ip_address, 
+                                 port=args.port)
+    agent.register_task('send_commands', starcam_agent.send_commands, 
+                        startup=True)
     agent.register_process('acq', starcam_agent.acq, starcam_agent._stop_acq)
     runner.run(agent, auto_reconnect=False)
 
