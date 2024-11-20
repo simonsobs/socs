@@ -2,11 +2,11 @@ import argparse
 import socket
 import struct
 import time
-import txaio
+from os import environ
 
+import txaio
 from ocs import ocs_agent, site_confiig
 from ocs.ocs_twisted import TimeoutLock
-from os import environ
 
 
 class StarcamHelper:
