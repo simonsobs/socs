@@ -1,9 +1,9 @@
+import argparse
 import socket
 import struct
 import time
-import txaio
-import argparse
 
+import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
@@ -29,10 +29,15 @@ class StarcamHelper:
     def pack_and_send_cmds(self):
         """
         pack_and_send_cmds()
-        
+
         **Process**
+<<<<<<< HEAD
         packs commands and parameters to be sent to starcamera and sends
         
+=======
+        packs commands and parameters to be sent to star camera and sends
+
+>>>>>>> 82252e753327de73c687591486c64dca8f4a8638
         **Return**
         returns list of values sent
         """
@@ -94,13 +99,13 @@ class StarcamHelper:
         # send commands to the camera
         self.comm.sendto(self.cmds_for_camera, (self.ip, self.port))
         print(“Commands sent to camera”)
-        # Return the list of values 
+        # Return the list of values
         return values
 
     def get_astrom_data(self):
         """
         get_astrom_data()
-        
+
         **Process**
         receives and unpacks data from camera
 
@@ -131,7 +136,7 @@ class StarcamHelper:
     def close(self):
         """
         close()
-        
+
         **Process**
         closes the socket of the connection
         """
@@ -160,7 +165,7 @@ class StarcamAgent:
     def send_commands(self, session, params=None):
         """
         send_commands()
-        
+
         **Process**
         packs and sends camera+astrometry-related commands to starcam
 
@@ -184,12 +189,18 @@ class StarcamAgent:
 
         **Process**
         acquires data from starcam and publishes to feed
-        
+
         **Return**
+<<<<<<< HEAD
         once the acq() loop exits (wherein data is retrieved from 
         the camera and pulished), a touple with True/False and a string 
         describing whether or not the loop was exited after the end of 
         an acquisition.
+=======
+        once the acq() loop exits (wherein data is retrieved from the camera and pulished),
+        a touple with True/False and a string describing whether or not the loop was exited
+        after the end of an acquisition.
+>>>>>>> 82252e753327de73c687591486c64dca8f4a8638
         """
         if params is None:
             params = {}
@@ -209,8 +220,13 @@ class StarcamAgent:
                 }
                 # get astrometry data
                 astrom_data = self.StarcamHelper.get_astrom_data()
+<<<<<<< HEAD
                 # update the data dictionary+session and publish
                 data['data'].update(astrom_data_dict) 
+=======
+                # update the data dictionary, update the session, and publish
+                data['data'].update(astrom_data_dict)
+>>>>>>> 82252e753327de73c687591486c64dca8f4a8638
                 session.data.update(data['data'])
                 self.agent.publish_to_feed('starcamera', data)
 
