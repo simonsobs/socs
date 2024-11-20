@@ -98,7 +98,7 @@ class StarcamHelper:
                                            *values)
         # send commands to the camera
         self.comm.sendto(self.cmds_for_camera, (self.ip, self.port))
-        print(“Commands sent to camera”)
+        print("Commands sent to camera")
         # Return the list of values
         return values
 
