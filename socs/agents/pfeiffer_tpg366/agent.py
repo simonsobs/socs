@@ -66,24 +66,6 @@ class Pfeiffer:
             self.log.debug("The following channels are off: {}".format(channel_states))
         return channel_states
 
-    def check_channel_stage_changes(self, old_state):
-        '''
-        Function to check whether a channel has been turned off and on.
-        Args:
-            old_state: The last known record of channel states
-        '''
-        msg = 'SEN\r\n'
-        self.comm.send(msg.encode())
-        self.comm.recv(BUFF_SIZE).decode()
-        self.comm.send(ENQ.encode())
-        read_str = self.comm.recv(BUFF_SIZE).decode()
-        power_str = read_str.split('\r')
-        power_states = np.array(power_str[0].split(','), dtype=int)
-        if any(chan == 1 for chan in power_states):
-            channel_states = [index + 1 for index, state in enumerate(power_states) if state == 1]
-        if channel_states != old_state:
-            print("Something changed!")
-
     def read_pressure(self, ch_no):
         """
         Function to measure the pressure of one given channel
@@ -188,7 +170,6 @@ class PfeifferAgent:
                     'data': {}
                 }
                 self.gauge.channel_power()
-                self.gauge.check_channel_stage_changes(self.gauge.channel_power())
                 pressure_array = self.gauge.read_pressure_all()
                 # Loop through all the channels on the device
                 for channel in range(len(pressure_array)):
