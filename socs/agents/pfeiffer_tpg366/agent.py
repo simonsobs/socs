@@ -44,14 +44,16 @@ class Pfeiffer:
         self.log = txaio.make_logger()
 
     def channel_power(self):
-        '''
-        Function to check the power status of all channels
+        """
+        Function to check the power status of all channels.
 
         Args:
             None
+
         Returns:
-            None
-        '''
+            List of channel states.
+
+        """
         msg = 'SEN\r\n'
         self.comm.send(msg.encode())
         self.comm.recv(BUFF_SIZE).decode()
