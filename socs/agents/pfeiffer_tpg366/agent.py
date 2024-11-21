@@ -169,7 +169,9 @@ class PfeifferAgent:
                     'block_name': 'pressures',
                     'data': {}
                 }
-                self.gauge.channel_power()
+                # Useful for debugging, but should separate to a task to cut
+                # down on queries in the main acq() loop.
+                # self.gauge.channel_power()
                 pressure_array = self.gauge.read_pressure_all()
                 # Loop through all the channels on the device
                 for channel in range(len(pressure_array)):
