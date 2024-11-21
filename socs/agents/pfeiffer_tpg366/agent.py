@@ -61,7 +61,7 @@ class Pfeiffer:
         power_states = np.array(power_str[0].split(','), dtype=int)
         if any(chan == 1 for chan in power_states):
             channel_states = [index + 1 for index, state in enumerate(power_states) if state == 1]
-            self.log.info("The following channels are off: {}".format(channel_states))
+            self.log.debug("The following channels are off: {}".format(channel_states))
         return channel_states
 
     def check_channel_stage_changes(self, old_state):
