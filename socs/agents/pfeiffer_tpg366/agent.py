@@ -59,9 +59,9 @@ class Pfeiffer:
         read_str = self.comm.recv(BUFF_SIZE).decode()
         power_str = read_str.split('\r')
         power_states = np.array(power_str[0].split(','), dtype=int)
-        if any(chan != 2 for chan in power_states):
-            channel_states = [index + 1 for index, state in enumerate(power_states) if state != 2]
-            self.log.info("The following channels are off:{}".format(channel_states))
+        if any(chan == 1 for chan in power_states):
+            channel_states = [index + 1 for index, state in enumerate(power_states) if state == 1]
+            self.log.info("The following channels are off: {}".format(channel_states))
         return channel_states
 
     def check_channel_stage_changes(self, old_state):
@@ -77,8 +77,8 @@ class Pfeiffer:
         read_str = self.comm.recv(BUFF_SIZE).decode()
         power_str = read_str.split('\r')
         power_states = np.array(power_str[0].split(','), dtype=int)
-        if any(chan != 2 for chan in power_states):
-            channel_states = [index + 1 for index, state in enumerate(power_states) if state != 2]
+        if any(chan == 1 for chan in power_states):
+            channel_states = [index + 1 for index, state in enumerate(power_states) if state == 1]
         if channel_states != old_state:
             print("Something changed!")
 
