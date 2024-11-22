@@ -2,8 +2,8 @@ import argparse
 import time
 from dataclasses import dataclass
 from queue import Queue
-import serial
 
+import serial
 import txaio
 from twisted.internet import defer, reactor, threads
 
@@ -117,7 +117,7 @@ class HWPPCUAgent:
                     self.log.info('Connected to PCU')
                     PCU.clear_buffer()
                     self.log.info('Cleared buffer')
-                except ConnectionRefusedError:
+                except (ConnectionRefusedError, serial.serialutil.SerialException):
                     self.log.error(
                         "Could not connect to PCU. "
                         "Retrying after 30 sec..."
