@@ -139,6 +139,7 @@ class HWPPCUAgent:
                     "Reconnect after 30 sec..."
                 )
                 PCU.close()
+                PCU = None
                 session.degraded = True
                 time.sleep(30)
                 continue
