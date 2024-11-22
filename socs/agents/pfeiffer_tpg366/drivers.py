@@ -34,6 +34,35 @@ class TPG336(TCPInterface):
         # Setup the TCP Interface
         super().__init__(ip_address, port, timeout)
 
+    def send_and_recv(self, message):
+        """Send message and request transmission of queried data from device.
+
+        The flow control for querying the TPG366 involves first sending a
+        message to set the measuring mode, receiving positive feedback from the
+        device, then sending a request for transmission from the device,
+        followed finally by receiving the measurement data.
+
+        This method combines these four steps into one, and check for a NACK
+        response from the device.
+
+        Parameters
+        ----------
+        message : str
+            Mnemonic command code message with parameters.
+
+        Returns
+        -------
+        Decoded response from the device.
+
+        """
+        self.send(message.encode())
+        # TODO: check and handle ACK/NACK response
+        self.recv(bufsize=BUFF_SIZE).decode()
+        self.send(ENQ.encode())
+        read_str = self.recv(bufsize=BUFF_SIZE).decode()
+
+        return read_str
+
     def channel_power(self):
         """
         Function to check the power status of all channels.
@@ -46,10 +75,7 @@ class TPG336(TCPInterface):
 
         """
         msg = 'SEN\r\n'
-        self.send(msg.encode())
-        self.recv(bufsize=BUFF_SIZE).decode()
-        self.send(ENQ.encode())
-        read_str = self.recv(bufsize=BUFF_SIZE).decode()
+        read_str = self.send_and_recv(msg)
         power_str = read_str.split('\r')
         power_states = np.array(power_str[0].split(','), dtype=int)
         if any(chan == 1 for chan in power_states):
@@ -70,10 +96,7 @@ class TPG336(TCPInterface):
             pressure as a float
         """
         msg = 'PR%d\r\n' % ch_no
-        self.send(msg.encode())
-        self.recv(bufsize=BUFF_SIZE).decode()
-        self.send(ENQ.encode())
-        read_str = self.recv(bufsize=BUFF_SIZE).decode()
+        read_str = self.send_and_recv(msg)
         pressure_str = read_str.split(',')[-1].split('\r')[0]
         pressure = float(pressure_str)
         return pressure
@@ -90,11 +113,7 @@ class TPG336(TCPInterface):
             pressure reading, as floats
         """
         msg = 'PRX\r\n'
-        self.send(msg.encode())
-        # Could use this to catch exemptions, for troubleshooting
-        self.recv(bufsize=BUFF_SIZE).decode()
-        self.send(ENQ.encode())
-        read_str = self.recv(bufsize=BUFF_SIZE).decode()
+        read_str = self.send_and_recv(msg)
         pressure_str = read_str.split('\r')[0]
         gauge_states = pressure_str.split(',')[::2]
         gauge_states = np.array(gauge_states, dtype=int)
