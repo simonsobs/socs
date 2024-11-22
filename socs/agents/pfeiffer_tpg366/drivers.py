@@ -1,35 +1,38 @@
 # Original script by Zhilei Xu and Tanay Bhandarkar.
 
-import socket
-
 import numpy as np
+
+from socs.tcp import TCPInterface
 
 BUFF_SIZE = 128
 ENQ = '\x05'
 
 
-class Pfeiffer:
-    """CLASS to control and retrieve data from the pfeiffer tpg366
-    pressure gauge controller
+class TPG366(TCPInterface):
+    """Interface class for connecting to the Pfeiffer TPG366 maxigauge
+    controller.
 
 
-    Args:
-        ip_address: IP address of the deivce
-        porti (int): 8000 (fixed for the device)
+    Parameters
+    ----------
+    ip_address : str
+        IP address of the device.
+    port : int
+        Associated port for TCP communication. Default is 8000.
+    timeout : float
+        Duration in seconds that operations wait before giving up. Default is
+        10 seconds.
 
-    Attributes:
-       read_pressure reads the pressure from one channel (given as an argument)
-       read_pressure_all reads pressures from the six channels
-       close closes the socket
+    Attributes
+    ----------
+    comm : socket.socket
+        Socket object that forms the connection to the compressor.
+
     """
 
-    def __init__(self, ip_address, port, timeout=10,
-                 f_sample=1.):
-        self.ip_address = ip_address
-        self.port = port
-        self.comm = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.comm.connect((self.ip_address, self.port))
-        self.comm.settimeout(timeout)
+    def __init__(self, ip_address, port=8000, timeout=10):
+        # Setup the TCP Interface
+        super().__init__(ip_address, port, timeout)
 
     def channel_power(self):
         """
@@ -43,10 +46,10 @@ class Pfeiffer:
 
         """
         msg = 'SEN\r\n'
-        self.comm.send(msg.encode())
-        self.comm.recv(BUFF_SIZE).decode()
-        self.comm.send(ENQ.encode())
-        read_str = self.comm.recv(BUFF_SIZE).decode()
+        self.send(msg.encode())
+        self.recv(bufsize=BUFF_SIZE).decode()
+        self.send(ENQ.encode())
+        read_str = self.recv(bufsize=BUFF_SIZE).decode()
         power_str = read_str.split('\r')
         power_states = np.array(power_str[0].split(','), dtype=int)
         if any(chan == 1 for chan in power_states):
@@ -66,10 +69,10 @@ class Pfeiffer:
             pressure as a float
         """
         msg = 'PR%d\r\n' % ch_no
-        self.comm.send(msg.encode())
-        self.comm.recv(BUFF_SIZE).decode()
-        self.comm.send(ENQ.encode())
-        read_str = self.comm.recv(BUFF_SIZE).decode()
+        self.send(msg.encode())
+        self.recv(bufsize=BUFF_SIZE).decode()
+        self.send(ENQ.encode())
+        read_str = self.recv(bufsize=BUFF_SIZE).decode()
         pressure_str = read_str.split(',')[-1].split('\r')[0]
         pressure = float(pressure_str)
         return pressure
@@ -86,11 +89,11 @@ class Pfeiffer:
             pressure reading, as floats
         """
         msg = 'PRX\r\n'
-        self.comm.send(msg.encode())
+        self.send(msg.encode())
         # Could use this to catch exemptions, for troubleshooting
-        self.comm.recv(BUFF_SIZE).decode()
-        self.comm.send(ENQ.encode())
-        read_str = self.comm.recv(BUFF_SIZE).decode()
+        self.recv(bufsize=BUFF_SIZE).decode()
+        self.send(ENQ.encode())
+        read_str = self.recv(bufsize=BUFF_SIZE).decode()
         pressure_str = read_str.split('\r')[0]
         gauge_states = pressure_str.split(',')[::2]
         gauge_states = np.array(gauge_states, dtype=int)
@@ -101,7 +104,3 @@ class Pfeiffer:
             for j in index[0]:
                 pressures[j] = 0.
         return pressures
-
-    def close(self):
-        """Close the socket of the connection"""
-        self.comm.close()
