@@ -2,6 +2,7 @@ import argparse
 import time
 from dataclasses import dataclass
 from queue import Queue
+import serial
 
 import txaio
 from twisted.internet import defer, reactor, threads
@@ -123,13 +124,24 @@ class HWPPCUAgent:
                     )
                     time.sleep(30)
                     continue
-            now = time.time()
-            if now - last_daq > 5:
-                self._get_and_publish_data(PCU, session)
-                last_daq = now
+            try:
+                now = time.time()
+                if now - last_daq > 5:
+                    self._get_and_publish_data(PCU, session)
+                    last_daq = now
 
-            self._process_actions(PCU)
-            time.sleep(0.1)
+                self._process_actions(PCU)
+                session.degraded = False
+                time.sleep(0.1)
+            except serial.serialutil.SerialException:
+                self.log.error(
+                    "Decive reports readiness to read but returned no data. "
+                    "Reconnect after 30 sec..."
+                )
+                PCU.close()
+                session.degraded = True
+                time.sleep(30)
+                continue
 
         PCU.close()
 
