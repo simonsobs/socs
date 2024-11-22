@@ -8,7 +8,7 @@ import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
-from socs.agents.pfeiffer_tpg366.drivers import Pfeiffer
+from socs.agents.pfeiffer_tpg366.drivers import TPG366
 
 # For logging
 txaio.use_twisted()
@@ -23,7 +23,7 @@ class PfeifferAgent:
         self.lock = TimeoutLock()
         self.f_sample = f_sample
         self.take_data = False
-        self.gauge = Pfeiffer(ip_address, int(port))
+        self.gauge = TPG366(ip_address, int(port))
         agg_params = {'frame_length': 60, }
         self.agent.register_feed('pressures',
                                  record=True,
