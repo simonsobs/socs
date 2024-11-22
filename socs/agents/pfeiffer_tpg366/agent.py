@@ -1,123 +1,17 @@
-# Script to log and readout pfeiffer TPG 366 gauge contoller
-# via Ethernet connection
-# Zhilei Xu, Tanay Bhandarkar
+# Original script by Zhilei Xu and Tanay Bhandarkar.
 
 import argparse
 import os
-import socket
 import time
 
-import numpy as np
 import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
+from socs.agents.pfeiffer_tpg366.drivers import TPG366
+
 # For logging
 txaio.use_twisted()
-
-BUFF_SIZE = 128
-ENQ = '\x05'
-
-
-class Pfeiffer:
-    """CLASS to control and retrieve data from the pfeiffer tpg366
-    pressure gauge controller
-
-
-    Args:
-        ip_address: IP address of the deivce
-        porti (int): 8000 (fixed for the device)
-
-    Attributes:
-       read_pressure reads the pressure from one channel (given as an argument)
-       read_pressure_all reads pressures from the six channels
-       close closes the socket
-    """
-
-    def __init__(self, ip_address, port, timeout=10,
-                 f_sample=1.):
-        self.ip_address = ip_address
-        self.port = port
-        self.comm = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.comm.connect((self.ip_address, self.port))
-        self.comm.settimeout(timeout)
-        self.log = txaio.make_logger()
-
-    def channel_power(self):
-        """
-        Function to check the power status of all channels.
-
-        Args:
-            None
-
-        Returns:
-            List of channel states.
-
-        """
-        msg = 'SEN\r\n'
-        self.comm.send(msg.encode())
-        self.comm.recv(BUFF_SIZE).decode()
-        self.comm.send(ENQ.encode())
-        read_str = self.comm.recv(BUFF_SIZE).decode()
-        power_str = read_str.split('\r')
-        power_states = np.array(power_str[0].split(','), dtype=int)
-        if any(chan == 1 for chan in power_states):
-            channel_states = [index + 1 for index, state in enumerate(power_states) if state == 1]
-            self.log.debug("The following channels are off: {}".format(channel_states))
-        return channel_states
-
-    def read_pressure(self, ch_no):
-        """
-        Function to measure the pressure of one given channel
-        ch_no is the chanel to be measured (e.g. 1-6)
-        returns the measured pressure as a float
-
-        Args:
-            ch_no: The channel to be measured (1-6)
-
-        Returns:
-            pressure as a float
-        """
-        msg = 'PR%d\r\n' % ch_no
-        self.comm.send(msg.encode())
-        self.comm.recv(BUFF_SIZE).decode()
-        self.comm.send(ENQ.encode())
-        read_str = self.comm.recv(BUFF_SIZE).decode()
-        pressure_str = read_str.split(',')[-1].split('\r')[0]
-        pressure = float(pressure_str)
-        return pressure
-
-    def read_pressure_all(self):
-        """measure the pressure of all channel
-        Return an array of 6 pressure values as a float array
-
-        Args:
-            None
-
-        Returns:
-            6 element array corresponding to each channels
-            pressure reading, as floats
-        """
-        msg = 'PRX\r\n'
-        self.comm.send(msg.encode())
-        # Could use this to catch exemptions, for troubleshooting
-        self.comm.recv(BUFF_SIZE).decode()
-        self.comm.send(ENQ.encode())
-        read_str = self.comm.recv(BUFF_SIZE).decode()
-        pressure_str = read_str.split('\r')[0]
-        gauge_states = pressure_str.split(',')[::2]
-        gauge_states = np.array(gauge_states, dtype=int)
-        pressures = pressure_str.split(',')[1::2]
-        pressures = [float(p) for p in pressures]
-        if any(state != 0 for state in gauge_states):
-            index = np.where(gauge_states != 0)
-            for j in index[0]:
-                pressures[j] = 0.
-        return pressures
-
-    def close(self):
-        """Close the socket of the connection"""
-        self.comm.close()
 
 
 class PfeifferAgent:
@@ -129,7 +23,7 @@ class PfeifferAgent:
         self.lock = TimeoutLock()
         self.f_sample = f_sample
         self.take_data = False
-        self.gauge = Pfeiffer(ip_address, int(port))
+        self.gauge = TPG366(ip_address, int(port))
         agg_params = {'frame_length': 60, }
         self.agent.register_feed('pressures',
                                  record=True,
