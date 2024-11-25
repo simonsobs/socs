@@ -136,13 +136,11 @@ class HWPPCUAgent:
             except serial.serialutil.SerialException:
                 self.log.error(
                     "Decive reports readiness to read but returned no data. "
-                    "Reconnect after 30 sec..."
+                    "Reconnect to PCU."
                 )
                 PCU.close()
                 PCU = None
                 session.degraded = True
-                time.sleep(30)
-                continue
 
         PCU.close()
 
