@@ -758,7 +758,9 @@ class WiregridActuatorAgent:
                          'STR2': 0 or 1, (0: OFF, 1:ON)
                          .
                          .
-                         }
+                         },
+                     'position':
+                        'inside' or 'outside' or 'unknown'
                     },
                  'timestamp':1601925677.6914878
                 }
@@ -845,12 +847,26 @@ class WiregridActuatorAgent:
                         zip(onoff_st, self.actuator.st.io_names):
                     data['data']['stopper_{}'.format(name)] = onoff
                     onoff_dict_st[name] = onoff
+                # Data for position
+                if (onoff_dict_ls['LSR1'] == 1 or onoff_dict_ls['LSL1'] == 1) \
+                        and not (onoff_dict_ls['LSR2'] == 1 or onoff_dict_ls['LSL2'] == 1):
+                    position = 'outside'
+                elif (onoff_dict_ls['LSR2'] == 1 or onoff_dict_ls['LSL2'] == 1) \
+                        and not (onoff_dict_ls['LSR1'] == 1 or onoff_dict_ls['LSL1'] == 1):
+                    position = 'inside'
+                else:
+                    position = 'unknown'
+                    self.log.warn(
+                        'acq(): '
+                        'Unknown position!')
+                data['data']['position'] = position
                 # publish data
                 self.agent.publish_to_feed('wgactuator', data)
                 # store session.data
                 field_dict = {'motor': onoff_mt,
                               'limitswitch': onoff_dict_ls,
-                              'stopper': onoff_dict_st}
+                              'stopper': onoff_dict_st,
+                              'position': position}
                 session.data['timestamp'] = current_time
                 session.data['fields'] = field_dict
 
