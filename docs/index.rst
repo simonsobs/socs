@@ -62,6 +62,7 @@ API Reference        Full API documentation for core parts of the SOCS library.
     agents/lakeshore372
     agents/lakeshore425
     agents/latrt_xy_stage
+    agents/ld_monitor
     agents/magpie
     agents/meinberg_m1000_agent
     agents/meinberg_syncbox_agent
