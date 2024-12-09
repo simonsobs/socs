@@ -5,6 +5,7 @@
 import glob
 import os
 import re
+import shutil
 from collections import deque
 from datetime import datetime, timezone
 
@@ -182,11 +183,11 @@ class CircularMediaBuffer:
             del buffer
             self._deque[pos] = (file, None)
 
-        # Update latest symlink
+        # Update latest copy
         link = os.path.join(self.dir, f"latest.{self.suffix}")
         if os.path.exists(link):
             os.remove(link)
-        os.symlink(path, link)
+        shutil.copy2(path, link)
 
     def fetch_recent(self):
         result = list()
