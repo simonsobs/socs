@@ -37,6 +37,8 @@ WORKDIR /app/socs/
 # Work around https://github.com/pypa/setuptools/issues/4483/ temporarily
 RUN python -m pip install -U "setuptools<71.0.0"
 RUN python -m pip install -r requirements.txt
+RUN python -m pip uninstall -y opencv-python && \
+    python -m pip install opencv-python-headless
 
 # Copy the current directory contents into the container at /app
 COPY . /app/socs/
