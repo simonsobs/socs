@@ -184,10 +184,8 @@ class CircularMediaBuffer:
             self._deque[pos] = (file, None)
 
         # Update latest copy
-        link = os.path.join(self.dir, f"latest.{self.suffix}")
-        if os.path.exists(link):
-            os.remove(link)
-        shutil.copy2(path, link)
+        latest = os.path.join(self.dir, f"latest.{self.suffix}")
+        shutil.copy2(path, latest)
 
     def fetch_recent(self):
         result = list()
