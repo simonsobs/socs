@@ -59,6 +59,18 @@ class Actions:
             self.log.info("Cancel shutdown...")
 
     @dataclass
+    class CheckI(BaseAction):
+        def process(self, module):
+            msg, val = module.check_current()
+            self.log.info(msg + "...")
+
+    @dataclass
+    class CheckV(BaseAction):
+        def process(self, module):
+            msg, val = module.check_voltage()
+            self.log.info(msg + "...")
+
+    @dataclass
     class SetI(BaseAction):
         curr: float
 
@@ -72,6 +84,18 @@ class Actions:
 
         def process(self, module):
             msg, val = module.set_voltage(self.volt)
+            self.log.info(msg + "...")
+
+    @dataclass
+    class CheckILim(BaseAction):
+        def process(self, module):
+            msg, val = module.check_current_limit()
+            self.log.info(msg + "...")
+
+    @dataclass
+    class CheckVLim(BaseAction):
+        def process(self, module):
+            msg, val = module.check_voltage_limit()
             self.log.info(msg + "...")
 
     @dataclass
@@ -184,7 +208,27 @@ class HWPPMXAgent:
         return True, 'Set PMX Kikusui to direct control'
 
     @defer.inlineCallbacks
-    @ocs_agent.param('curr', default=0, type=float, check=lambda x: 0 <= x <= 3)
+    def check_i(self, session, params):
+        """check_i()
+        **Task** - Set the current setting.
+        """
+        action = Actions.CheckI(**params)
+        self.action_queue.put(action)
+        session.data = yield action.deferred
+        return True, 'Check current is done'
+
+    @defer.inlineCallbacks
+    def check_v(self, session, params):
+        """check_v()
+        **Task** - Set the voltage setting.
+        """
+        action = Actions.CheckV(**params)
+        self.action_queue.put(action)
+        session.data = yield action.deferred
+        return True, 'Check voltage is done'
+
+    @defer.inlineCallbacks
+    @ocs_agent.param('curr', default=0, type=float)
     def set_i(self, session, params):
         """set_i(curr=0)
         **Task** - Set the current.
@@ -198,7 +242,7 @@ class HWPPMXAgent:
         return True, 'Set current is done'
 
     @defer.inlineCallbacks
-    @ocs_agent.param('volt', default=0, type=float, check=lambda x: 0 <= x <= 35)
+    @ocs_agent.param('volt', default=0, type=float)
     def set_v(self, session, params):
         """set_v(volt=0)
         **Task** - Set the voltage.
@@ -212,7 +256,27 @@ class HWPPMXAgent:
         return True, 'Set voltage is done'
 
     @defer.inlineCallbacks
-    @ocs_agent.param('curr', default=1., type=float, check=lambda x: 0. <= x <= 3.)
+    def check_i_lim(self, session, params):
+        """check_i_lim()
+        **Task** - Check the current protection limit.
+        """
+        action = Actions.CheckILim(**params)
+        self.action_queue.put(action)
+        session.data = yield action.deferred
+        return True, 'Check current protection limit is done'
+
+    @defer.inlineCallbacks
+    def check_v_lim(self, session, params):
+        """check_v_lim()
+        **Task** - Check the voltage protection limit.
+        """
+        action = Actions.CheckVLim(**params)
+        self.action_queue.put(action)
+        session.data = yield action.deferred
+        return True, 'Check voltage protection limit is done'
+
+    @defer.inlineCallbacks
+    @ocs_agent.param('curr', default=1.3, type=float)
     def set_i_lim(self, session, params):
         """set_i_lim(curr=1)
         **Task** - Set the drive current limit.
@@ -226,7 +290,7 @@ class HWPPMXAgent:
         return True, 'Set voltage limit is done'
 
     @defer.inlineCallbacks
-    @ocs_agent.param('volt', default=32., type=float, check=lambda x: 0. <= x <= 35.)
+    @ocs_agent.param('volt', default=37., type=float)
     def set_v_lim(self, session, params):
         """set_v_lim(volt=32)
         **Task** - Set the drive voltage limit.
@@ -475,8 +539,12 @@ def main(args=None):
     agent.register_task('set_on', PMX.set_on, blocking=False)
     agent.register_task('set_off', PMX.set_off, blocking=False)
     agent.register_task('clear_alarm', PMX.clear_alarm, blocking=False)
+    agent.register_task('check_i', PMX.check_i, blocking=False)
+    agent.register_task('check_v', PMX.check_v, blocking=False)
     agent.register_task('set_i', PMX.set_i, blocking=False)
     agent.register_task('set_v', PMX.set_v, blocking=False)
+    agent.register_task('check_i_lim', PMX.check_i_lim, blocking=False)
+    agent.register_task('check_v_lim', PMX.check_v_lim, blocking=False)
     agent.register_task('set_i_lim', PMX.set_i_lim, blocking=False)
     agent.register_task('set_v_lim', PMX.set_v_lim, blocking=False)
     agent.register_task('use_ext', PMX.use_ext, blocking=False)
