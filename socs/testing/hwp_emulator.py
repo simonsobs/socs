@@ -4,20 +4,20 @@ HWP Emulation module
 
 import argparse
 import logging
+import pickle as pkl
+import socket
 import threading
 import time
-from dataclasses import dataclass, field, asdict
-from typing import List, Optional, Tuple, Dict, Any
-import socket
-from ocs.ocs_twisted import Pacemaker
-import pickle as pkl
 import traceback as tb
+from dataclasses import asdict, dataclass, field
+from typing import Any, Dict, List, Optional, Tuple
 
+import numpy as np
 import pytest
+from ocs.ocs_twisted import Pacemaker
 
 from socs.agents.hwp_pid.drivers.pid_controller import PID
 from socs.testing import device_emulator
-import numpy as np
 
 
 def hex_str_to_dec(hex_value, decimal=3):
@@ -59,7 +59,7 @@ class PCUState:
     )
 
 
-### Gripper state information, taken from sobonelib: https://github.com/simonsobs/sobonelib/blob/main/hwp_gripper/control/state_monitor.py
+# Gripper state information, taken from sobonelib: https://github.com/simonsobs/sobonelib/blob/main/hwp_gripper/control/state_monitor.py
 
 
 cold_limit_pos = 13.0  # mm
