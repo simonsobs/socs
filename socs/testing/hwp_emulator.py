@@ -20,6 +20,15 @@ from socs.agents.hwp_pid.drivers.pid_controller import PID
 from socs.testing import device_emulator
 
 
+def _find_open_port() -> int:
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    sock.bind(("127.0.0.1", 0))
+    port = sock.getsockname()[1]
+    sock.close()
+    return port
+
+
 def hex_str_to_dec(hex_value, decimal=3):
     """Converts a hex string to a decimal float"""
     return float(int(hex_value, 16)) / 10**decimal
@@ -205,7 +214,7 @@ class HWPEmulator:
         gripper_port=0,
         pcu_port="./responder",
         log_level=logging.INFO,
-        enc_port=50912,
+        enc_port=0,
         lerp_frac=0.9,
     ):
         self.pid_port = pid_port
@@ -239,6 +248,9 @@ class HWPEmulator:
         self.enc_thread = threading.Thread(target=self.encoder_thread_func)
         self.run_enc_thread = False
 
+        if self.enc_port == 0:
+            self._enc_port = _find_open_port()
+
         self.logger = _create_logger("HWP", log_level=log_level)
 
     def start(self):
@@ -264,11 +276,12 @@ class HWPEmulator:
         """Shutdown TCP Sockets and update loop"""
         self.run_update = False
         self.run_enc_thread = False
+        self.update_thread.join()
+        self.enc_thread.join()
         self.pid_device.shutdown()
         self.pmx_device.shutdown()
         self.pcu_device.shutdown()
-        self.update_thread.join()
-        self.enc_thread.join()
+        self.logger.info("Finished shutdown")
 
     def encoder_thread_func(self):
         # Function that sends UDP packets to be interpreted by the encoder agent.
@@ -310,6 +323,7 @@ class HWPEmulator:
                 ).tobytes()
                 sock.sendto(byte_data, addr)
                 time.sleep(ENC_COUNTER_LEN / (2 * self.state.cur_freq * NUM_SLITS))
+        self.log.info("Stopping encoder thread")
 
     def update_loop(self) -> None:
         """Update HWP state"""
@@ -323,6 +337,7 @@ class HWPEmulator:
                     s.cur_freq = lerp(s.cur_freq, s.pid.freq_setpoint, self.lerp_frac)
                 s.gripper.update()
             time.sleep(0.2)
+        self.log.info("Stopping update thread")
 
     def process_pcu_msg(self, data) -> str:
         self.logger.debug(data)
