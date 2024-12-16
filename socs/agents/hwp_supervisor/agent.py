@@ -439,13 +439,13 @@ class HWPState:
         if op['status'] != 'ok':
             self.temp = None
             self.temp_status = 'no_data'
-            return
+            return op
 
         fields = op['data']['fields']
         if self.temp_field not in fields:
             self.temp = None
             self.temp_status = 'no_data'
-            return
+            return op
 
         self.temp = fields[self.temp_field]['T']
 
@@ -564,10 +564,10 @@ class HWPState:
         now = time.time()
         with self.lock:
             ops = {
-                'temperature': self.update_temp_state(),
-                'encoder': self.update_enc_state(),
-                'pmx': self.update_pmx_state(),
-                'pid': self.update_pid_state(),
+                'temperature': self.update_temp_state(test_mode=test_mode),
+                'encoder': self.update_enc_state(test_mode=test_mode),
+                'pmx': self.update_pmx_state(test_mode=test_mode),
+                'pid': self.update_pid_state(test_mode=test_mode),
                 'ups': self.update_ups_state(),
             }
 
@@ -1472,13 +1472,11 @@ class HWPSupervisor:
             }
         }
 
-        kw = {'test_mode': test_mode, 'log': self.log}
-
         while session.status in ['starting', 'running']:
             now = time.time()
             session.data['timestamp'] = now
 
-            ops = self.hwp_state.update()
+            ops = self.hwp_state.update(test_mode = test_mode)
             session.data['monitored_sessions'] = ops
             session.data['hwp_state'] = asdict(self.hwp_state)
 

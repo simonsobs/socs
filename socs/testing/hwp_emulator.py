@@ -10,11 +10,10 @@ import threading
 import time
 import traceback as tb
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pytest
-from ocs.ocs_twisted import Pacemaker
 
 from socs.agents.hwp_pid.drivers.pid_controller import PID
 from socs.testing import device_emulator
@@ -477,8 +476,6 @@ class HWPEmulator:
                     return pkl.dumps({"result": False, "log": []})
                 elif (not state.is_cold) and new_pos >= warm_limit_pos:
                     state.actuators[act_idx].pos = warm_limit_pos
-                    print("HEREEE")
-                    print(state.actuators[act_idx])
                     return pkl.dumps({"result": False, "log": []})
                 else:
                     state.actuators[act_idx].pos = new_pos

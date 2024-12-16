@@ -187,10 +187,8 @@ def test_supervisor_grip(hwp_em, supervisor_agent, sup_client) -> None:
     state = get_hwp_state(sup_client)
     pprint(state)
     assert state["gripper"]["grip_state"] == "ungripped"
-    pprint(hwp_em.state.gripper.actuators[0])
-    res = sup_client.grip_hwp()
+    sup_client.grip_hwp()
     state = get_hwp_state(sup_client)
-    pprint(hwp_em.state.gripper.actuators[0])
     assert state["gripper"]["grip_state"] == "warm"
 
 
