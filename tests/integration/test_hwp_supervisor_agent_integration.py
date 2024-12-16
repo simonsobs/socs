@@ -1,5 +1,5 @@
 from pprint import pprint
-from typing import Generator
+from typing import Generator, Dict, Any
 
 import coverage.data
 import pytest
@@ -20,7 +20,15 @@ gripper_client = create_client_fixture("hwp-gripper")
 wait_for_crossbar = create_crossbar_fixture()
 
 
-def _shutdown_agent_runner(runner: _AgentRunner):
+@pytest.fixture()
+def hwp_em() -> Generator[HWPEmulator, None, None]:
+    em = HWPEmulator(pid_port=0, pmx_port=0, enc_port=0)
+    em.start()
+    yield em
+    em.shutdown()
+
+
+def _shutdown_agent_runner(runner: _AgentRunner) -> None:
     """
     Shutdown the agent process using SIGKILL.
     """
@@ -32,23 +40,15 @@ def _shutdown_agent_runner(runner: _AgentRunner):
     try:
         runner.proc.communicate(timeout=SIGINT_TIMEOUT)
     except subprocess.TimeoutExpired:
-        runner._raise_subprocess('Agent did not terminate within '
-                                f'{SIGINT_TIMEOUT} seconds on SIGINT.')
+        runner._raise_subprocess(
+            "Agent did not terminate within " f"{SIGINT_TIMEOUT} seconds on SIGINT."
+        )
 
     if runner._timedout:
         stdout, stderr = runner.proc.communicate(timeout=SIGINT_TIMEOUT)
-        print(f'Here is stdout from {runner.agent_name}:\n{stdout}')
-        print(f'Here is stderr from {runner.agent_name}:\n{stderr}')
-        raise RuntimeError('Agent timed out.')
-
-
-
-@pytest.fixture()
-def hwp_em() -> Generator[HWPEmulator, None, None]:
-    em = HWPEmulator(pid_port=0, pmx_port=0, enc_port=0)
-    em.start()
-    yield em
-    em.shutdown()
+        print(f"Here is stdout from {runner.agent_name}:\n{stdout}")
+        print(f"Here is stderr from {runner.agent_name}:\n{stderr}")
+        raise RuntimeError("Agent timed out.")
 
 
 def _cleanup_runner(runner: _AgentRunner, cov) -> None:
@@ -179,22 +179,22 @@ def supervisor_agent(
     _cleanup_runner(runner, cov)
 
 
-def get_hwp_state(client):
-    return client.monitor.status().session["data"]["hwp_state"]
+def get_hwp_state(client) -> Dict[str, Any]:
+    return client.query_hwp_state().session["data"]["state"]
 
 
-def test_supervisor_grip(hwp_em, supervisor_agent, sup_client):
-    state = sup_client.monitor.status().session["data"]["hwp_state"]
+def test_supervisor_grip(hwp_em, supervisor_agent, sup_client) -> None:
+    state = get_hwp_state(sup_client)
     pprint(state)
     assert state["gripper"]["grip_state"] == "ungripped"
     pprint(hwp_em.state.gripper.actuators[0])
     res = sup_client.grip_hwp()
-    state = sup_client.monitor.status().session["data"]["hwp_state"]
+    state = get_hwp_state(sup_client)
     pprint(hwp_em.state.gripper.actuators[0])
     assert state["gripper"]["grip_state"] == "warm"
 
 
-def test_hwp_spinup(supervisor_agent, sup_client):
+def test_hwp_spinup(supervisor_agent, sup_client) -> None:
     assert not get_hwp_state(sup_client)["is_spinning"]
     sup_client.pid_to_freq(target_freq=2.0)
     assert get_hwp_state(sup_client)["is_spinning"]
