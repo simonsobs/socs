@@ -19,10 +19,22 @@ wait_for_crossbar = create_crossbar_fixture()
 
 @pytest.fixture()
 def hwp_em() -> Generator[HWPEmulator, None, None]:
-    em = HWPEmulator(pid_port=0, pmx_port=0)
+    em = HWPEmulator(pid_port=0, pmx_port=0, enc_port=0)
     em.start()
     yield em
     em.shutdown()
+
+
+def _cleanup_runner(runner: _AgentRunner, cov) -> None:
+    runner.shutdown()
+    # report coverage
+    agentcov = coverage.data.CoverageData(
+        basename=f".coverage.agent.{runner.agent_name}"
+    )
+    agentcov.read()
+    # protect against missing --cov flag
+    if cov is not None:
+        cov.get_data().update(agentcov)
 
 
 @pytest.fixture()
@@ -40,16 +52,10 @@ def pid_agent(
         "--instance-id",
         "hwp-pid",
     ]
-    runner = _AgentRunner(agent_path, agent_name, args)
+    runner = _AgentRunner(agent_path, agent_name, args, kill_to_exit=True)
     runner.run(timeout=timeout)
     yield
-    runner.shutdown(kill=True)
-    # report coverage
-    agentcov = coverage.data.CoverageData(basename=f".coverage.agent.{agent_name}")
-    agentcov.read()
-    # protect against missing --cov flag
-    if cov is not None:
-        cov.get_data().update(agentcov)
+    _cleanup_runner(runner, cov)
 
 
 @pytest.fixture()
@@ -67,16 +73,10 @@ def encoder_agent(
         "--instance-id",
         "hwp-enc",
     ]
-    runner = _AgentRunner(agent_path, agent_name, args)
+    runner = _AgentRunner(agent_path, agent_name, args, kill_to_exit=True)
     runner.run(timeout=timeout)
     yield
-    runner.shutdown(kill=True)
-    # report coverage
-    agentcov = coverage.data.CoverageData(basename=f".coverage.agent.{agent_name}")
-    agentcov.read()
-    # protect against missing --cov flag
-    if cov is not None:
-        cov.get_data().update(agentcov)
+    _cleanup_runner(runner, cov)
 
 
 @pytest.fixture()
@@ -92,16 +92,10 @@ def pmx_agent(
         "--port",
         str(hwp_em.pmx_device.socket_port),
     ]
-    runner = _AgentRunner(agent_path, agent_name, args)
+    runner = _AgentRunner(agent_path, agent_name, args, kill_to_exit=True)
     runner.run(timeout=timeout)
     yield
-    runner.shutdown(kill=True)
-    # report coverage
-    agentcov = coverage.data.CoverageData(basename=f".coverage.agent.{agent_name}")
-    agentcov.read()
-    # protect against missing --cov flag
-    if cov is not None:
-        cov.get_data().update(agentcov)
+    _cleanup_runner(runner, cov)
 
 
 @pytest.fixture()
@@ -117,16 +111,10 @@ def pcu_agent(
         "--port",
         "./responder",
     ]
-    runner = _AgentRunner(agent_path, agent_name, args)
+    runner = _AgentRunner(agent_path, agent_name, args, kill_to_exit=True)
     runner.run(timeout=timeout)
     yield
-    runner.shutdown(kill=True)
-    # report coverage
-    agentcov = coverage.data.CoverageData(basename=f".coverage.agent.{agent_name}")
-    agentcov.read()
-    # protect against missing --cov flag
-    if cov is not None:
-        cov.get_data().update(agentcov)
+    _cleanup_runner(runner, cov)
 
 
 @pytest.fixture()
@@ -142,16 +130,10 @@ def gripper_agent(
         "--control-port",
         str(hwp_em.gripper_device.socket_port),
     ]
-    runner = _AgentRunner(agent_path, agent_name, args)
+    runner = _AgentRunner(agent_path, agent_name, args, kill_to_exit=True)
     runner.run(timeout=timeout)
     yield
-    runner.shutdown(kill=True)
-    # report coverage
-    agentcov = coverage.data.CoverageData(basename=f".coverage.agent.{agent_name}")
-    agentcov.read()
-    # protect against missing --cov flag
-    if cov is not None:
-        cov.get_data().update(agentcov)
+    _cleanup_runner(runner, cov)
 
 
 @pytest.fixture()
@@ -165,29 +147,26 @@ def supervisor_agent(
         "--log-dir",
         log_dir,
     ]
-    runner = _AgentRunner(agent_path, agent_name, args)
+    runner = _AgentRunner(agent_path, agent_name, args, kill_to_exit=True)
     runner.run(timeout=timeout)
     yield
-    runner.shutdown(kill=True)
-    # report coverage
-    agentcov = coverage.data.CoverageData(basename=f".coverage.agent.{agent_name}")
-    agentcov.read()
-    # protect against missing --cov flag
-    if cov is not None:
-        cov.get_data().update(agentcov)
+    _cleanup_runner(runner, cov)
+
+
+def get_hwp_state(client):
+    return client.monitor.status().session["data"]["hwp_state"]
 
 
 def test_supervisor_grip(hwp_em, supervisor_agent, sup_client):
     state = sup_client.monitor.status().session["data"]["hwp_state"]
     pprint(state)
-    assert  state["gripper"]["grip_state"] == "ungripped"
+    assert state["gripper"]["grip_state"] == "ungripped"
     pprint(hwp_em.state.gripper.actuators[0])
     res = sup_client.grip_hwp()
     state = sup_client.monitor.status().session["data"]["hwp_state"]
     pprint(hwp_em.state.gripper.actuators[0])
-    assert  state["gripper"]["grip_state"] == "warm"
-    pprint(res.session['data'])
-    assert False
+    assert state["gripper"]["grip_state"] == "warm"
+    pprint(res.session["data"])
 
 
 def test_hwp_spinup(supervisor_agent, sup_client):
