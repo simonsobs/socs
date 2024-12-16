@@ -5,7 +5,7 @@ import time
 import traceback
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, Generator, List, Literal, Optional
+from typing import Any, Dict, Generator, List, Literal, Optional, Tuple
 
 import numpy as np
 import ocs
@@ -114,6 +114,58 @@ class HWPClients:
     driver_iboot: Optional[OCSClient] = None
     pcu: Optional[OCSClient] = None
     gripper: Optional[OCSClient] = None
+
+
+@dataclass
+class GripperState:
+    instance_id: str
+    limit_warm_grip_state: List[bool] = field(default_factory=lambda:[False, False, False])
+    limit_cold_grip_state: List[bool] = field(default_factory=lambda:[False, False, False])
+    emg: List[bool] = field(default_factory=lambda:[False, False, False])
+    brake: List[bool] = field(default_factory=lambda:[False, False, False])
+    grip_state: Literal['cold', 'warm', 'ungripped', 'unknown'] = 'unknown'
+    last_updated: Optional[float] = None
+    gripper_max_time_since_update: float = 60.0
+
+    def _verify_update_time(self) -> None:
+        """
+        Will check if gripper state has been updated within the allowed time.
+        If not, this will set the grip_state to "unknown".
+        """
+        if self.last_updated is None:
+            self.grip_state = 'unknown'
+        elif time.time() - self.last_updated > self.gripper_max_time_since_update:
+            self.grip_state = 'unknown'
+
+
+    def update(self) -> None:
+        op = get_op_data(self.instance_id, 'monitor_state', test_mode=False)
+        if op['status'] != 'ok':
+            self._verify_update_time()
+            return
+
+        d = op['data']
+        state = d['state']
+        self.last_updated = d['last_updated']
+
+        for i, axis in enumerate([1, 2, 3]):
+            self.limit_warm_grip_state[i] = state[f'act{axis}_limit_warm_grip_state']
+            self.limit_cold_grip_state[i] = state[f'act{axis}_limit_cold_grip_state']
+            self.emg[i] = state[f'act{axis}_emg']
+            self.brake[i] = state[f'act{axis}_brake']
+
+        if np.all(self.limit_cold_grip_state):
+            self.grip_state = 'cold'
+        elif np.any(self.limit_cold_grip_state):
+            self.grip_state = 'unknown'
+        elif np.all(self.limit_warm_grip_state):
+            self.grip_state = 'warm'
+        elif np.any(self.limit_warm_grip_state):
+            self.grip_state = 'unknown'
+        else:
+            self.grip_state = 'ungripped'
+
+        self._verify_update_time()
 
 
 @dataclass
@@ -258,6 +310,7 @@ class HWPState:
     ups_last_connection_attempt: Optional[bool] = None
 
     pid_current_freq: Optional[float] = None
+    pid_current_tolerance: float = 0.1
     pid_target_freq: Optional[float] = None
     pid_direction: Optional[str] = None
     pid_last_updated: Optional[float] = None
@@ -277,10 +330,13 @@ class HWPState:
 
     acu: Optional[ACUState] = None
 
+    is_spinning: Optional[bool] = None
+    gripper: Optional[GripperState] = None
+
     supervisor_control_state: Optional[Dict[str, Any]] = None
 
     @classmethod
-    def from_args(cls, args: argparse.Namespace):
+    def from_args(cls, args: argparse.Namespace) -> "HWPState":
         log = txaio.make_logger()  # pylint: disable=E1101
         self = cls(
             temp_field=args.ybco_temp_field,
@@ -318,6 +374,11 @@ class HWPState:
                      id=self.acu.instance_id)
         else:
             log.warn("The no-acu option has been set. ACU state checking disabled.")
+
+        if args.hwp_gripper_id is not None:
+            self.gripper = GripperState(args.hwp_gripper_id)
+        else:
+            log.warn("HWP Gripper ID is not set. This will not be monitored in the HWP state.")
 
         return self
 
@@ -1284,7 +1345,7 @@ class HWPSupervisor:
         )
 
     @ocs_agent.param('test_mode', type=bool, default=False)
-    def monitor(self, session, params):
+    def monitor(self, session, params) -> Tuple[bool, str]:
         """monitor()
 
         **Process** -- Monitors various HWP related HK systems.
@@ -1344,13 +1405,17 @@ class HWPSupervisor:
             'timestamp': time.time(),
             'monitored_sessions': {},
             'hwp_state': {},
-            'actions': {},
+            'actions': {
+                'pmx': 'no_data',
+                'gripper': 'no_data',
+            }
         }
 
         kw = {'test_mode': test_mode, 'log': self.log}
 
         while session.status in ['starting', 'running']:
-            session.data['timestamp'] = time.time()
+            now = time.time()
+            session.data['timestamp'] = now
 
             # 1. Gather data from relevant operations
             temp_op = get_op_data(self.ybco_lakeshore_id, 'acq', **kw)
@@ -1380,6 +1445,17 @@ class HWPSupervisor:
                 self.hwp_state.gripper_iboot.update()
             if self.hwp_state.acu is not None:
                 self.hwp_state.acu.update()
+            if self.hwp_state.gripper is not None:
+                self.hwp_state.gripper.update()
+
+            if self.hwp_state.pid_last_updated is None or self.hwp_state.pid_current_freq is None:
+                self.hwp_state.is_spinning = None
+            elif now - self.hwp_state.pid_last_updated > self.hwp_state.pid_max_time_since_update:
+                self.hwp_state.is_spinning = None
+            elif self.hwp_state.pid_current_freq > self.hwp_state.pid_current_tolerance:
+                self.hwp_state.is_spinning = True
+            else:
+                self.hwp_state.is_spinning = False
 
             session.data['hwp_state'] = asdict(self.hwp_state)
 
