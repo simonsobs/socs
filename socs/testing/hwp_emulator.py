@@ -322,7 +322,7 @@ class HWPEmulator:
                 ).tobytes()
                 sock.sendto(byte_data, addr)
                 time.sleep(ENC_COUNTER_LEN / (2 * self.state.cur_freq * NUM_SLITS))
-        self.log.info("Stopping encoder thread")
+        self.logger.info("Stopping encoder thread")
 
     def update_loop(self) -> None:
         """Update HWP state"""
@@ -336,7 +336,7 @@ class HWPEmulator:
                     s.cur_freq = lerp(s.cur_freq, s.pid.freq_setpoint, self.lerp_frac)
                 s.gripper.update()
             time.sleep(0.2)
-        self.log.info("Stopping update thread")
+        self.logger.info("Stopping update thread")
 
     def process_pcu_msg(self, data) -> str:
         self.logger.debug(data)
