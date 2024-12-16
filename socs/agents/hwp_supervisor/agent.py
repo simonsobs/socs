@@ -612,7 +612,6 @@ class HWPState:
             return 'stop'
 
 
-
 class ControlStateInfo:
     def __init__(self, state):
         """
