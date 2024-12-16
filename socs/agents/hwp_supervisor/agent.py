@@ -119,10 +119,10 @@ class HWPClients:
 @dataclass
 class GripperState:
     instance_id: str
-    limit_warm_grip_state: List[bool] = field(default_factory=lambda:[False, False, False])
-    limit_cold_grip_state: List[bool] = field(default_factory=lambda:[False, False, False])
-    emg: List[bool] = field(default_factory=lambda:[False, False, False])
-    brake: List[bool] = field(default_factory=lambda:[False, False, False])
+    limit_warm_grip_state: List[bool] = field(default_factory=lambda: [False, False, False])
+    limit_cold_grip_state: List[bool] = field(default_factory=lambda: [False, False, False])
+    emg: List[bool] = field(default_factory=lambda: [False, False, False])
+    brake: List[bool] = field(default_factory=lambda: [False, False, False])
     grip_state: Literal['cold', 'warm', 'ungripped', 'unknown'] = 'unknown'
     last_updated: Optional[float] = None
     gripper_max_time_since_update: float = 60.0
@@ -136,7 +136,6 @@ class GripperState:
             self.grip_state = 'unknown'
         elif time.time() - self.last_updated > self.gripper_max_time_since_update:
             self.grip_state = 'unknown'
-
 
     def update(self) -> None:
         op = get_op_data(self.instance_id, 'monitor_state', test_mode=False)

@@ -1,12 +1,13 @@
-from socs.testing.hwp_emulator import HWPEmulator
-import pytest
-import coverage.data
+from pprint import pprint
 from typing import Generator
-from ocs.testing import _AgentRunner, create_client_fixture
+
+import coverage.data
+import pytest
 from integration.util import docker_compose_file  # noqa: F401
 from integration.util import create_crossbar_fixture
-from pprint import pprint
+from ocs.testing import _AgentRunner, create_client_fixture
 
+from socs.testing.hwp_emulator import HWPEmulator
 
 log_dir = "./logs/"
 
@@ -166,7 +167,6 @@ def test_supervisor_grip(hwp_em, supervisor_agent, sup_client):
     state = sup_client.monitor.status().session["data"]["hwp_state"]
     pprint(hwp_em.state.gripper.actuators[0])
     assert state["gripper"]["grip_state"] == "warm"
-    pprint(res.session["data"])
 
 
 def test_hwp_spinup(supervisor_agent, sup_client):
