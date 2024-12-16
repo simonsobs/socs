@@ -5,7 +5,9 @@ import coverage.data
 import pytest
 from integration.util import docker_compose_file  # noqa: F401
 from integration.util import create_crossbar_fixture
-from ocs.testing import _AgentRunner, create_client_fixture
+from ocs.testing import _AgentRunner, create_client_fixture, SIGINT_TIMEOUT
+import subprocess
+import signal
 
 from socs.testing.hwp_emulator import HWPEmulator
 
@@ -18,6 +20,29 @@ gripper_client = create_client_fixture("hwp-gripper")
 wait_for_crossbar = create_crossbar_fixture()
 
 
+def _shutdown_agent_runner(runner: _AgentRunner):
+    """
+    Shutdown the agent process using SIGKILL.
+    """
+    # don't send SIGINT if we've already sent SIGKILL
+    if not runner._timedout:
+        runner.proc.send_signal(signal.SIGKILL)
+    runner._timer.cancel()
+
+    try:
+        runner.proc.communicate(timeout=SIGINT_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        runner._raise_subprocess('Agent did not terminate within '
+                                f'{SIGINT_TIMEOUT} seconds on SIGINT.')
+
+    if runner._timedout:
+        stdout, stderr = runner.proc.communicate(timeout=SIGINT_TIMEOUT)
+        print(f'Here is stdout from {runner.agent_name}:\n{stdout}')
+        print(f'Here is stderr from {runner.agent_name}:\n{stderr}')
+        raise RuntimeError('Agent timed out.')
+
+
+
 @pytest.fixture()
 def hwp_em() -> Generator[HWPEmulator, None, None]:
     em = HWPEmulator(pid_port=0, pmx_port=0, enc_port=0)
@@ -27,7 +52,7 @@ def hwp_em() -> Generator[HWPEmulator, None, None]:
 
 
 def _cleanup_runner(runner: _AgentRunner, cov) -> None:
-    runner.shutdown()
+    _shutdown_agent_runner(runner)
     # report coverage
     agentcov = coverage.data.CoverageData(
         basename=f".coverage.agent.{runner.agent_name}"
@@ -53,7 +78,7 @@ def pid_agent(
         "--instance-id",
         "hwp-pid",
     ]
-    runner = _AgentRunner(agent_path, agent_name, args, kill_to_exit=True)
+    runner = _AgentRunner(agent_path, agent_name, args)
     runner.run(timeout=timeout)
     yield
     _cleanup_runner(runner, cov)
@@ -74,7 +99,7 @@ def encoder_agent(
         "--instance-id",
         "hwp-enc",
     ]
-    runner = _AgentRunner(agent_path, agent_name, args, kill_to_exit=True)
+    runner = _AgentRunner(agent_path, agent_name, args)
     runner.run(timeout=timeout)
     yield
     _cleanup_runner(runner, cov)
@@ -93,7 +118,7 @@ def pmx_agent(
         "--port",
         str(hwp_em.pmx_device.socket_port),
     ]
-    runner = _AgentRunner(agent_path, agent_name, args, kill_to_exit=True)
+    runner = _AgentRunner(agent_path, agent_name, args)
     runner.run(timeout=timeout)
     yield
     _cleanup_runner(runner, cov)
@@ -112,7 +137,7 @@ def pcu_agent(
         "--port",
         "./responder",
     ]
-    runner = _AgentRunner(agent_path, agent_name, args, kill_to_exit=True)
+    runner = _AgentRunner(agent_path, agent_name, args)
     runner.run(timeout=timeout)
     yield
     _cleanup_runner(runner, cov)
@@ -131,7 +156,7 @@ def gripper_agent(
         "--control-port",
         str(hwp_em.gripper_device.socket_port),
     ]
-    runner = _AgentRunner(agent_path, agent_name, args, kill_to_exit=True)
+    runner = _AgentRunner(agent_path, agent_name, args)
     runner.run(timeout=timeout)
     yield
     _cleanup_runner(runner, cov)
@@ -148,7 +173,7 @@ def supervisor_agent(
         "--log-dir",
         log_dir,
     ]
-    runner = _AgentRunner(agent_path, agent_name, args, kill_to_exit=True)
+    runner = _AgentRunner(agent_path, agent_name, args)
     runner.run(timeout=timeout)
     yield
     _cleanup_runner(runner, cov)
