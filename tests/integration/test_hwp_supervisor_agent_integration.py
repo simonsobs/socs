@@ -23,9 +23,12 @@ wait_for_crossbar = create_crossbar_fixture()
 @pytest.fixture()
 def hwp_em() -> Generator[HWPEmulator, None, None]:
     em = HWPEmulator(pid_port=0, pmx_port=0, enc_port=0)
-    em.start()
-    yield em
-    em.shutdown()
+    try:
+        em.start()
+        yield em
+    finally:
+        em.shutdown()
+
 
 
 def _shutdown_agent_runner(runner: _AgentRunner) -> None:
@@ -78,10 +81,12 @@ def pid_agent(
         "--instance-id",
         "hwp-pid",
     ]
-    runner = _AgentRunner(agent_path, agent_name, args)
-    runner.run(timeout=timeout)
-    yield
-    _cleanup_runner(runner, cov)
+    try:
+        runner = _AgentRunner(agent_path, agent_name, args)
+        runner.run(timeout=timeout)
+        yield
+    finally:
+        _cleanup_runner(runner, cov)
 
 
 @pytest.fixture()
@@ -99,10 +104,12 @@ def encoder_agent(
         "--instance-id",
         "hwp-enc",
     ]
-    runner = _AgentRunner(agent_path, agent_name, args)
-    runner.run(timeout=timeout)
-    yield
-    _cleanup_runner(runner, cov)
+    try:
+        runner = _AgentRunner(agent_path, agent_name, args)
+        runner.run(timeout=timeout)
+        yield
+    finally:
+        _cleanup_runner(runner, cov)
 
 
 @pytest.fixture()
@@ -118,10 +125,12 @@ def pmx_agent(
         "--port",
         str(hwp_em.pmx_device.socket_port),
     ]
-    runner = _AgentRunner(agent_path, agent_name, args)
-    runner.run(timeout=timeout)
-    yield
-    _cleanup_runner(runner, cov)
+    try:
+        runner = _AgentRunner(agent_path, agent_name, args)
+        runner.run(timeout=timeout)
+        yield
+    finally:
+        _cleanup_runner(runner, cov)
 
 
 @pytest.fixture()
@@ -137,10 +146,12 @@ def pcu_agent(
         "--port",
         "./responder",
     ]
-    runner = _AgentRunner(agent_path, agent_name, args)
-    runner.run(timeout=timeout)
-    yield
-    _cleanup_runner(runner, cov)
+    try:
+        runner = _AgentRunner(agent_path, agent_name, args)
+        runner.run(timeout=timeout)
+        yield
+    finally:
+        _cleanup_runner(runner, cov)
 
 
 @pytest.fixture()
@@ -173,10 +184,12 @@ def supervisor_agent(
         "--log-dir",
         log_dir,
     ]
-    runner = _AgentRunner(agent_path, agent_name, args)
-    runner.run(timeout=timeout)
-    yield
-    _cleanup_runner(runner, cov)
+    try:
+        runner = _AgentRunner(agent_path, agent_name, args)
+        runner.run(timeout=timeout)
+        yield
+    finally:
+        _cleanup_runner(runner, cov)
 
 
 def get_hwp_state(client) -> Dict[str, Any]:
