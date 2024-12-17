@@ -1,4 +1,5 @@
 import argparse
+import os
 import random
 import struct
 import time
@@ -19,7 +20,7 @@ from twisted.internet.defer import DeferredList, inlineCallbacks
 
 from socs.agents.acu import avoidance
 from socs.agents.acu import drivers as sh
-from socs.agents.acu import exercisor
+from socs.agents.acu import exercisor, hwp_iface
 
 #: The number of free ProgramTrack positions, when stack is empty.
 FULL_STACK = 10000
@@ -160,6 +161,18 @@ class ACUAgent:
         self._reset_sun_params(enabled=avoid_sun,
                                radius=fov_radius)
 
+        # HWP MONITOR
+        # get + parse config ...
+        hwp_scf = os.path.join(os.path.split(__file__)[0], 'acu-hwp-rules.yaml')
+
+        rule_key = 'standard'
+        hwp_instance_id = 'hwp-supervisor'
+        hwp_super_config = yaml.safe_load(open(hwp_scf, 'rb'))
+        self.hwp_rules = hwp_iface.parse_config(hwp_super_config[rule_key])
+        self.hwp_check = True
+
+        hwp_startup = startup and (hwp_instance_id is not None)
+
         self.named_positions = {}
         if named_positions:
             for text in named_positions:
@@ -191,8 +204,10 @@ class ACUAgent:
                                 'ACU_emergency': {},
                                 'corotator': {},
                                 },
-                     'broadcast': {},
-                     }
+                     'hwp': {
+        },
+            'broadcast': {},
+        }
 
         self.agent = agent
 
@@ -228,6 +243,11 @@ class ACUAgent:
                                self._simple_process_stop,
                                blocking=False,
                                startup=startup)
+        agent.register_process('monitor_hwp',
+                               self.monitor_hwp,
+                               self._simple_process_stop,
+                               blocking=False,
+                               startup=hwp_startup)
         agent.register_process('generate_scan',
                                self.generate_scan,
                                self._simple_process_stop,
@@ -922,6 +942,16 @@ class ACUAgent:
             return False
         return True
 
+    def _current_azel(self):
+        try:
+            az0, el0 = [self.data['status']['summary'][f'{ax}_current_position']
+                        for ax in ['Azimuth', 'Elevation']]
+            if az0 is None or el0 is None:
+                raise KeyError
+        except KeyError:
+            return (None, None), 'Current position could not be determined.'
+        return (az0, el0), f'Current (az, el) = ({az0:.4f},{el0:.4f})'
+
     @inlineCallbacks
     def _check_ready_motion(self, session):
         bcast_check = yield self._check_daq_streams('broadcast')
@@ -1397,19 +1427,29 @@ class ACUAgent:
 
             self.log.info(f'Requested position: az={target_az}, el={target_el}')
 
-            legs, msg = yield self._get_sunsafe_moves(target_az, target_el,
-                                                      zero_legs_ok=False)
+            legs, msg = yield self._get_sunsafe_moves(target_az, target_el)
             if msg is not None:
                 self.log.error(msg)
                 return False, msg
 
-            if len(legs) > 1:
-                self.log.info(f'Executing move via {len(legs)} separate legs (sun optimized)')
+            if len(legs) > 2:
+                self.log.info(f'Executing move via {len(legs)-1} separate legs (sun optimized)')
 
-            for leg_az, leg_el in legs:
-                all_ok, msg = yield self._go_to_axes(session, az=leg_az, el=leg_el)
-                if not all_ok:
-                    break
+            # Check HWP safety
+            hwp_safe, msg = yield self._check_hwpsafe_legs(legs)
+            if not hwp_safe:
+                self.log.info(msg)
+                return False, msg
+
+            for leg_az, leg_el in legs[1:]:
+                # 4 lines
+                print(f'FAKE moving to {leg_az},{leg_el}.')
+                all_ok = True
+                yield dsleep(1)
+                if 0:
+                    all_ok, msg = yield self._go_to_axes(session, az=leg_az, el=leg_el)
+                    if not all_ok:
+                        break
 
             if all_ok and params['end_stop']:
                 yield self._set_modes(az='Stop', el='Stop')
@@ -1433,6 +1473,11 @@ class ACUAgent:
             if not acquired:
                 return False, f"Operation failed: {self.boresight_lock.job} is running."
 
+            hwp_ok, msg = self._check_hwpsafe_here(['third'])
+            if not hwp_ok:
+                self.log.warn(msg)
+                return False, f"Motion not HWP-safe: {msg}"
+
             self.log.info('Clearing faults to prepare for motion.')
             yield self.acu_control.clear_faults()
             yield dsleep(1)
@@ -1452,7 +1497,11 @@ class ACUAgent:
 
             self.log.info(f'Commanded position: boresight={target}')
 
-            ok, msg = yield self._go_to_axis(session, 'Boresight', target)
+            # 3 lines
+            print(f'FAKE move boresight -> {target}')
+            ok = True
+            if 0:
+                ok, msg = yield self._go_to_axis(session, 'Boresight', target)
 
             if ok and params['end_stop']:
                 yield self._set_modes(third='Stop')
@@ -1857,21 +1906,41 @@ class ACUAgent:
         if not ok:
             return False, msg
 
-        # Seek to starting position.  Note we ask for at least one leg
-        # here, because go_to_axes knows how to wait for the warning
-        # horn to finish before returning, which relieves us from
-        # handling that delay in the (already onerous) scan point
-        # timing.
+        # Seek to starting position.  Execute a move even if we're
+        # already there, because go_to_axes knows how to wait (in an
+        # optimal way) for the warning horn to finish before
+        # returning, which relieves us from handling that delay in the
+        # ProgramTrack phase.
         self.log.info(f'Moving to start position, az={plan["init_az"]}, el={init_el}')
-        legs, msg = yield self._get_sunsafe_moves(plan['init_az'], init_el,
-                                                  zero_legs_ok=False)
+        legs, msg = yield self._get_sunsafe_moves(plan['init_az'], init_el)
         if msg is not None:
             self.log.error(msg)
             return False, msg
+        hwp_safe, msg = yield self._check_hwpsafe_legs(legs)
+        if not hwp_safe:
+            msg = f'Move to start position not permitted: {msg}'
+            self.log.info(msg)
+            return False, msg
+
+        # Also validate the scan generally -- need to be movable in az.
+        hwp_safe, msg = yield self._check_hwpsafe(el=init_el, axes=['az'])
+        if not hwp_safe:
+            msg = f'Const-el scan not permitted: {msg}'
+            self.log.info(msg)
+            return False, msg
+
         for leg_az, leg_el in legs:
-            ok, msg = yield self._go_to_axes(session, az=leg_az, el=leg_el)
-            if not ok:
-                return False, f'Start position seek failed with message: {msg}'
+            # 4 lines
+            print(f'FAKE moving to {leg_az},{leg_el}.')
+            ok = True
+            yield dsleep(1)
+            if 0:
+                ok, msg = yield self._go_to_axes(session, az=leg_az, el=leg_el)
+                if not ok:
+                    return False, f'Start position seek failed with message: {msg}'
+
+        # 2 lines
+        return True, 'Just kidding, no scan tho.'
 
         # Prepare the point generator.
         g = sh.generate_constant_velocity_scan(az_endpoint1=az_endpoint1,
@@ -2582,7 +2651,7 @@ class ACUAgent:
 
         return safe, msg
 
-    def _get_sunsafe_moves(self, target_az, target_el, zero_legs_ok=True):
+    def _get_sunsafe_moves(self, target_az, target_el):
         """Given a target position, find a Sun-safe way to get there.  This
         will either be a direct move, or else an ordered slew in az
         before el (or vice versa).
@@ -2591,32 +2660,29 @@ class ACUAgent:
         Sun-safe path could be found; msg is an error message.  If a
         path can be found, the legs is a list of intermediate move
         targets, ``[(az0, el0), (az1, el1) ...]``, terminating on
-        ``(target_az, target_el)``.  msg is None in that case.
+        ``(target_az, target_el)``.  msg is None in that case.  The
+        first position (az0, el0) is the current position of the
+        platform.
 
-        In the case that platform is already at the target position,
-        an empty list of legs will be returned unless zero_legs_ok is
-        False in which case a 1-entry list of legs is returned, with
-        the target position in it.
+        In the case that the platform is already at the target
+        position, the returned list will still have 2 entries.
 
         When Sun avoidance is not enabled, this function returns as
         though the direct path to the target is a safe one (though
-        axes_sequential=True may turn this into a move with two legs).
+        axes_sequential=True may cause an intermediate step to be
+        added).
 
         """
         # Get current position.
-        try:
-            az, el = [self.data['status']['summary'][f'{ax}_current_position']
-                      for ax in ['Azimuth', 'Elevation']]
-            if az is None or el is None:
-                raise KeyError
-        except KeyError:
-            return None, 'Current position could not be determined.'
+        (az0, el0), msg = self._current_azel()
+        if az0 is None:
+            return None, msg
 
         if not self._get_sun_policy('sunsafe_moves'):
             if self.motion_limits.get('axes_sequential'):
                 # Move in az first, then el.
-                return [(target_az, el), (target_az, target_el)], None
-            return [(target_az, target_el)], None
+                return [(target_az, el0), (target_az, target_el)], None
+            return [(az0, el0), (target_az, target_el)], None
 
         if not self._get_sun_policy('map_valid'):
             return None, 'Sun Safety Map not computed or stale; run the monitor_sun process.'
@@ -2625,15 +2691,130 @@ class ACUAgent:
         if self.sun.check_trajectory([target_az], [target_el])['sun_time'] <= 0:
             return None, 'Requested target position is not Sun-Safe.'
 
-        moves = self.sun.analyze_paths(az, el, target_az, target_el)
+        moves = self.sun.analyze_paths(az0, el0, target_az, target_el)
         move, decisions = self.sun.select_move(moves)
         if move is None:
             return None, 'No Sun-Safe moves could be identified!'
 
         legs = list(move['moves'].nodes)
-        if len(legs) == 1 and not zero_legs_ok:
-            return legs, None
-        return legs[1:], None
+        if len(legs) == 1:
+            # Pad to two entries.
+            return [legs[0], legs[1]], None
+        return legs, None
+
+    #
+    # HWP State Safety
+    #
+
+    @inlineCallbacks
+    def monitor_hwp(self, session, params):
+        """DOCSTRING DOCSTRING DOCSTRING"""
+        pacer = Pacemaker(1.)
+        hwp_supervisor = hwp_iface.HWPSupervisorClient(
+            agent_id='hwp-supervisor')
+        while session.status == 'running':
+            new_data = yield threads.deferToThread(hwp_supervisor.update)
+            new_sd = {
+                'supervisor_data': new_data,
+            }
+            if self.hwp_rules:
+                allowed = self.hwp_rules.test_range(
+                    (self.motion_limits['elevation']['lower'],
+                     self.motion_limits['elevation']['upper']),
+                    new_data.get('grip_state'),
+                    new_data.get('spin_state'),
+                    full_output=True)
+                new_sd.update({k: v['allowed_el'] for k, v in allowed.items()})
+
+            self.session.data = new_sd
+            self.data['hwp'] = new_data
+
+            yield pacer.dsleep()
+        return True, "Bye."
+
+    @ocs_agent.param('reset', type=bool, default=None)
+    @ocs_agent.param('enable', type=bool, default=None)
+    @ocs_agent.param('temporary_disable', type=float, default=None)
+    def update_hwp(self, session, params):
+        """update_hwp(reset=None, enable=None, temporary_disable=None)
+
+        **Task** - Update HWP state monitoring and safety parameters.
+
+        All arguments are optional.
+
+        Args:
+          #reset (bool): If True, reset all hwp params to the platform
+          #  defaults.  (The "defaults" includes any overrides
+          #  specified on Agent command line.)
+          enable (bool): If True, enable HWP state checks.  If checks
+            were temporarily disabled, they are re-enabled.  If False,
+            disable HWP state checks (non-temporarily).
+          #temporary_disable (float): If set, disable HWP state checks for
+          #  this number of seconds.
+
+        """
+        self.log.info('update_hwp params: {params}',
+                      params={k: v for k, v in params.items()
+                              if v is not None})
+
+        if params['enable'] is not None:
+            self.hwp_check = params['enable']
+
+        return True, 'Params updated.'
+
+    def _check_hwpsafe_legs(self, legs):
+        if not self.hwp_check:
+            return (True, "HWP monitoring is disabled.")
+
+        hwp_data = self.data['hwp']
+        for leg1, leg2 in zip(legs[:-1], legs[1:]):
+            axes = []
+            if abs(leg1.el - leg2.el) > self.hwp_rules.tolerance:
+                axes.append('el')
+            if abs(leg1.az - leg2.az) > self.hwp_rules.tolerance:
+                axes.append('az')
+            ok, msg = self._check_hwpsafe(leg1.el, leg2.el, axes, hwp_data=hwp_data)
+            if not ok:
+                return False, msg
+        return (True, "All moves passed HWP safety checks.")
+
+    def _check_hwpsafe_here(self, axes):
+        if not self.hwp_check:
+            return (True, "HWP monitoring is disabled.")
+
+        (_, el), msg = self._current_azel()
+        if el is None:
+            return False, f'HWP safety could not be ensured: {msg}'
+        return self._check_hwpsafe(el, el, axes)
+
+    def _check_hwpsafe(self, el1, el2, axes, hwp_data=None):
+        if not self.hwp_check:
+            return (True, "HWP monitoring is disabled.")
+
+        # Grab a self-consistent copy...
+        if hwp_data is None:
+            hwp_data = self.data['hwp']
+
+        # Check staleness
+        if time.time() - hwp_data.get('timestamp', 0) > 10:
+            return False, "HWP monitoring dataset is stale; cannot validate move."
+
+        # Check it.
+        state_args = {
+            'el_range': [el1, el2],
+            'grip_state': hwp_data.get('gripper'),
+            'spin_state': hwp_data.get('is_spinning'),
+        }
+        axes_ok = self.hwp_rules.test_range(**state_args)
+        for ax in axes:
+            if not axes_ok[ax]:
+                return (False, (f"Motion in {ax} not permitted due to HWP rules "
+                                f"for {state_args}."))
+        return axes_ok, 'All requested axes pass the HWP rules.'
+
+    #
+    # Exercise!
+    #
 
     @ocs_agent.param('starting_index', type=int, default=0)
     def exercise(self, session, params):

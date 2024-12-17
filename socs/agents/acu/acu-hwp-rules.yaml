@@ -1,0 +1,67 @@
+legacy:
+  tolerance: 0.1
+  rules:
+    - el_range: [48, 90]
+      grip_states: ['*']
+      spin_states: ['*']
+      allow_moves:
+        el: true
+        az: true
+        third: true
+
+standard:
+  tolerance: 0.1
+  rules:
+    - el_range: [18, 90]
+      grip_states: ['cold', 'warm']
+      spin_states: ['*']
+      allow_moves:
+        el: true
+        az: true
+        third: false
+    - el_range: [40, 90]
+      grip_states: ['ungripped']
+      spin_states: ['not_spinning']
+      allow_moves:
+        el: true
+        az: true
+        third: false
+    - el_range: [48, 60]
+      grip_states: ['ungripped']
+      spin_states: ['*']
+      allow_moves:
+        el: true
+        az: true
+        third: false
+    - el_range: [48, 60]
+      grip_states: ['ungripped']
+      spin_states: ['not_spinning']
+      allow_moves:
+        el: true
+        az: true
+        third: true
+
+satp3:
+  tolerance: 0.1
+  rules:
+    - el_range: [40, 90]
+      grip_states: ['cold', 'warm']
+      spin_states: ['*']
+      allow_moves:
+        el: true
+        az: true
+        third: false
+    - el_range: [48, 70]
+      grip_states: ['ungripped']
+      spin_states: ['not_spinning']
+      allow_moves:
+        el: true
+        az: true
+        third: false
+    - el_range: [48, 70]
+      grip_states: ['ungripped']
+      spin_states: ['*']
+      allow_moves:
+        el: true
+        az: true
+        third: false
