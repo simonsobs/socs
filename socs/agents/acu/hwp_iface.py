@@ -175,20 +175,47 @@ class HWPSupervisorClient:
         try:
             _, _, session = ocs_client.OCSReply(*self.cclient.request('status', 'monitor'))
             if session is not None:
-                hs = session.data.get('hwp_state', {})
-                acu = session.data.get('acu', {})
+                hs = session['data'].get('hwp_state', {})
+                acu = session['data'].get('acu', {})
                 ok = True
         except client_http.ControlClientError as e:
             err_msg = f'Error getting status: {e}'
         except Exception as e:
             err_msg = f'Surprising error: {e}'
 
+        # Enhanced spin state logic...
+        is_spinning = hs.get('is_spinning')  # bool or None
+        target_freq = hs.get('pid_target_freq')  # float or None I guess
+        if is_spinning or target_freq not in [None, 0]:
+            spin_state = 'spinning'
+        elif is_spinning is False and target_freq in [0.]:
+            spin_state = 'not_spinning'
+        else:
+            spin_state = 'unknown'
+
+        # Enhanced gripper state logic...
+        _grip_state = hs.get('gripper', {}).get('grip_state')
+        brakes = hs.get('gripper', {}).get('brake')  # 1 1 1 when stable
+        brakes_on = False
+        try:
+            brakes_on = len(brakes) and all(brakes)
+        except BaseException:
+            pass
+        if _grip_state is not None and brakes_on:
+            grip_state = _grip_state
+        else:
+            grip_state = 'unknown'
+
         return {
             'timestamp': time.time(),
             'ok': ok,
-            'err_mesg': err_msg,
-            'gripper': hs.get('gripper'),
-            'is_spinning': hs.get('is_spinning'),
+            'err_msg': err_msg,
+            '_grip_brakes': brakes,
+            '_grip_state': _grip_state,
+            '_is_spinning': is_spinning,
+            '_target_freq': target_freq,
+            'grip_state': grip_state,
+            'spin_state': spin_state,
             'request_block_motion': acu.get('request_block_motion'),
             'request_block_motion_timestamp': acu.get('request_block_motion_timestamp'),
         }

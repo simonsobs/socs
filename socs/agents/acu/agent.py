@@ -162,14 +162,17 @@ class ACUAgent:
                                radius=fov_radius)
 
         # HWP MONITOR
-        # get + parse config ...
-        hwp_scf = os.path.join(os.path.split(__file__)[0], 'acu-hwp-rules.yaml')
-
-        rule_key = 'standard'
-        hwp_instance_id = 'hwp-supervisor'
-        hwp_super_config = yaml.safe_load(open(hwp_scf, 'rb'))
-        self.hwp_rules = hwp_iface.parse_config(hwp_super_config[rule_key])
-        self.hwp_check = True
+        if 0:
+            hwp_scf = os.path.join(os.path.split(__file__)[0], 'acu-hwp-rules.yaml')
+            rule_key = 'standard'
+            hwp_instance_id = 'hwp-supervisor'
+            hwp_super_config = yaml.safe_load(open(hwp_scf, 'rb'))
+            self.hwp_rules = hwp_iface.parse_config(hwp_super_config[rule_key])
+            self.hwp_check = True
+        else:
+            self.hwp_rules = None
+            self.hwp_check = False
+            hwp_instance_id = None
 
         hwp_startup = startup and (hwp_instance_id is not None)
 
@@ -337,6 +340,9 @@ class ACUAgent:
                             self.escape_sun_now,
                             blocking=False,
                             aborter=self._simple_task_abort)
+        agent.register_task('update_hwp',
+                            self.update_hwp,
+                            blocking=False)
 
         # Automatic exercise program...
         if exercise_plan:
@@ -1438,18 +1444,13 @@ class ACUAgent:
             # Check HWP safety
             hwp_safe, msg = yield self._check_hwpsafe_legs(legs)
             if not hwp_safe:
-                self.log.info(msg)
+                self.log.info('{msg}', msg=msg)
                 return False, msg
 
             for leg_az, leg_el in legs[1:]:
-                # 4 lines
-                print(f'FAKE moving to {leg_az},{leg_el}.')
-                all_ok = True
-                yield dsleep(1)
-                if 0:
-                    all_ok, msg = yield self._go_to_axes(session, az=leg_az, el=leg_el)
-                    if not all_ok:
-                        break
+                all_ok, msg = yield self._go_to_axes(session, az=leg_az, el=leg_el)
+                if not all_ok:
+                    break
 
             if all_ok and params['end_stop']:
                 yield self._set_modes(az='Stop', el='Stop')
@@ -1475,7 +1476,7 @@ class ACUAgent:
 
             hwp_ok, msg = self._check_hwpsafe_here(['third'])
             if not hwp_ok:
-                self.log.warn(msg)
+                self.log.info('{msg}', msg=msg)
                 return False, f"Motion not HWP-safe: {msg}"
 
             self.log.info('Clearing faults to prepare for motion.')
@@ -1497,11 +1498,7 @@ class ACUAgent:
 
             self.log.info(f'Commanded position: boresight={target}')
 
-            # 3 lines
-            print(f'FAKE move boresight -> {target}')
-            ok = True
-            if 0:
-                ok, msg = yield self._go_to_axis(session, 'Boresight', target)
+            ok, msg = yield self._go_to_axis(session, 'Boresight', target)
 
             if ok and params['end_stop']:
                 yield self._set_modes(third='Stop')
@@ -1919,28 +1916,20 @@ class ACUAgent:
         hwp_safe, msg = yield self._check_hwpsafe_legs(legs)
         if not hwp_safe:
             msg = f'Move to start position not permitted: {msg}'
-            self.log.info(msg)
+            self.log.info('{msg}', msg=msg)
             return False, msg
 
         # Also validate the scan generally -- need to be movable in az.
-        hwp_safe, msg = yield self._check_hwpsafe(el=init_el, axes=['az'])
+        hwp_safe, msg = yield self._check_hwpsafe(init_el, init_el, axes=['az'])
         if not hwp_safe:
             msg = f'Const-el scan not permitted: {msg}'
             self.log.info(msg)
             return False, msg
 
         for leg_az, leg_el in legs:
-            # 4 lines
-            print(f'FAKE moving to {leg_az},{leg_el}.')
-            ok = True
-            yield dsleep(1)
-            if 0:
-                ok, msg = yield self._go_to_axes(session, az=leg_az, el=leg_el)
-                if not ok:
-                    return False, f'Start position seek failed with message: {msg}'
-
-        # 2 lines
-        return True, 'Just kidding, no scan tho.'
+            ok, msg = yield self._go_to_axes(session, az=leg_az, el=leg_el)
+            if not ok:
+                return False, f'Start position seek failed with message: {msg}'
 
         # Prepare the point generator.
         g = sh.generate_constant_velocity_scan(az_endpoint1=az_endpoint1,
@@ -2711,7 +2700,7 @@ class ACUAgent:
         """DOCSTRING DOCSTRING DOCSTRING"""
         pacer = Pacemaker(1.)
         hwp_supervisor = hwp_iface.HWPSupervisorClient(
-            agent_id='hwp-supervisor')
+            instance_id='hwp-supervisor')
         while session.status == 'running':
             new_data = yield threads.deferToThread(hwp_supervisor.update)
             new_sd = {
@@ -2726,7 +2715,7 @@ class ACUAgent:
                     full_output=True)
                 new_sd.update({k: v['allowed_el'] for k, v in allowed.items()})
 
-            self.session.data = new_sd
+            session.data = new_sd
             self.data['hwp'] = new_data
 
             yield pacer.dsleep()
@@ -2767,13 +2756,13 @@ class ACUAgent:
             return (True, "HWP monitoring is disabled.")
 
         hwp_data = self.data['hwp']
-        for leg1, leg2 in zip(legs[:-1], legs[1:]):
+        for (az1, el1), (az2, el2) in zip(legs[:-1], legs[1:]):
             axes = []
-            if abs(leg1.el - leg2.el) > self.hwp_rules.tolerance:
+            if abs(el2 - el1) > self.hwp_rules.tolerance:
                 axes.append('el')
-            if abs(leg1.az - leg2.az) > self.hwp_rules.tolerance:
+            if abs(az2 - az1) > self.hwp_rules.tolerance:
                 axes.append('az')
-            ok, msg = self._check_hwpsafe(leg1.el, leg2.el, axes, hwp_data=hwp_data)
+            ok, msg = self._check_hwpsafe(el1, el2, axes, hwp_data=hwp_data)
             if not ok:
                 return False, msg
         return (True, "All moves passed HWP safety checks.")
@@ -2802,8 +2791,8 @@ class ACUAgent:
         # Check it.
         state_args = {
             'el_range': [el1, el2],
-            'grip_state': hwp_data.get('gripper'),
-            'spin_state': hwp_data.get('is_spinning'),
+            'grip_state': hwp_data.get('grip_state'),
+            'spin_state': hwp_data.get('spin_state'),
         }
         axes_ok = self.hwp_rules.test_range(**state_args)
         for ax in axes:
