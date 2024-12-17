@@ -30,7 +30,6 @@ def hwp_em() -> Generator[HWPEmulator, None, None]:
         em.shutdown()
 
 
-
 def _shutdown_agent_runner(runner: _AgentRunner) -> None:
     """
     Shutdown the agent process using SIGKILL.
@@ -196,6 +195,7 @@ def get_hwp_state(client) -> Dict[str, Any]:
     return client.query_hwp_state().session["data"]["state"]
 
 
+@pytest.mark.integtest
 def test_supervisor_grip(hwp_em, supervisor_agent, sup_client) -> None:
     state = get_hwp_state(sup_client)
     pprint(state)
@@ -205,6 +205,7 @@ def test_supervisor_grip(hwp_em, supervisor_agent, sup_client) -> None:
     assert state["gripper"]["grip_state"] == "warm"
 
 
+@pytest.mark.integtest
 def test_hwp_spinup(supervisor_agent, sup_client) -> None:
     assert not get_hwp_state(sup_client)["is_spinning"]
     sup_client.pid_to_freq(target_freq=2.0)
