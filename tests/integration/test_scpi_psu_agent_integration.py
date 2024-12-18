@@ -3,6 +3,7 @@ import pytest
 from integration.util import docker_compose_file  # noqa: F401
 from integration.util import create_crossbar_fixture
 from ocs.base import OpCode
+import time
 from ocs.testing import create_agent_runner_fixture, create_client_fixture
 
 from socs.testing.device_emulator import create_device_emulator
@@ -45,6 +46,7 @@ def test_scpi_psu_init_psu(wait_for_crossbar, gpib_emu, run_agent, client):
 
 @pytest.mark.integtest
 def test_scpi_psu_init_psu_acq_mode(wait_for_crossbar, gpib_emu, run_agent_acq, client):
+    time.sleep(3)
     resp = client.init.status()
     check_resp_success(resp)
 
