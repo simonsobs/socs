@@ -187,6 +187,9 @@ class EncoderParser:
 
         # Creates a UDP socket to connect to the Beaglebone
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # This helps with testing and rebinding to the same port after reset...
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
         # Binds the socket to a specific ip address and port
         # The ip address can be blank for accepting any UDP packet to the port
         self.sock.bind(('', beaglebone_port))
