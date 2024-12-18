@@ -248,7 +248,7 @@ class HWPEmulator:
         self.run_enc_thread = False
 
         if self.enc_port == 0:
-            self._enc_port = _find_open_port()
+            self.enc_port = _find_open_port()
 
         self.logger = _create_logger("HWP", log_level=log_level)
 
@@ -321,6 +321,7 @@ class HWPEmulator:
                     [header, clock, clock_overflow, edge_count]
                 ).tobytes()
                 sock.sendto(byte_data, addr)
+
                 time.sleep(ENC_COUNTER_LEN / (2 * self.state.cur_freq * NUM_SLITS))
         self.logger.info("Stopping encoder thread")
 

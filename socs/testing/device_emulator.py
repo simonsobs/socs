@@ -10,6 +10,7 @@ from typing import Dict
 
 import pytest
 import serial
+from serial.serialutil import SerialException
 
 
 def create_device_emulator(responses, relay_type, port=9001, encoding='utf-8',
@@ -190,7 +191,13 @@ class DeviceEmulator:
 
         while self._read:
             if self.ser.in_waiting > 0:
-                msg = self.ser.readline()
+                try:
+                    msg = self.ser.readline()
+                except SerialException as e:
+                    self.logger.error(f"Serial error: {e}")
+                    self.ser.close()
+                    return
+
                 if self.encoding:
                     msg = msg.strip().decode(self.encoding)
                 self.logger.debug(f"msg='{msg}'")
@@ -327,10 +334,10 @@ class DeviceEmulator:
         """
         self._type = 'tcp'
         self._sock_bound = False
-        self._bkg_read = threading.Thread(name='background',
+        bkg_read = threading.Thread(name='background',
                                           target=self._read_socket,
                                           kwargs={'port': port})
-        self._bkg_read.start()
+        bkg_read.start()
 
         # wait for socket to bind properly before returning
         while not self._sock_bound:
