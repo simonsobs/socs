@@ -53,7 +53,8 @@ def start_responder():
         p = Process(target=responder.main)
         p.start()
         yield
-        os.kill(p.pid, signal.SIGKILL)
+        p.kill()
+        p.join()
 
 
 @pytest.mark.integtest
