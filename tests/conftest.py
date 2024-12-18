@@ -1,7 +1,9 @@
 
-import psutil
 import os
+
+import psutil
 import pytest
+
 
 @pytest.fixture(autouse=True)
 def check_subprocesses():

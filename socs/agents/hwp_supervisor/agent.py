@@ -1476,7 +1476,7 @@ class HWPSupervisor:
             now = time.time()
             session.data['timestamp'] = now
 
-            ops = self.hwp_state.update(test_mode = test_mode)
+            ops = self.hwp_state.update(test_mode=test_mode)
             session.data['monitored_sessions'] = ops
             session.data['hwp_state'] = asdict(self.hwp_state)
 

@@ -335,8 +335,8 @@ class DeviceEmulator:
         self._type = 'tcp'
         self._sock_bound = False
         bkg_read = threading.Thread(name='background',
-                                          target=self._read_socket,
-                                          kwargs={'port': port})
+                                    target=self._read_socket,
+                                    kwargs={'port': port})
         bkg_read.start()
 
         # wait for socket to bind properly before returning
