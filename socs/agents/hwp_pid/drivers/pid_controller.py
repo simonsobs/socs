@@ -355,6 +355,7 @@ class PID:
         responses.append(self.send_message(f"*W18{i_value}"))
         responses.append(self.send_message(f"*W19{d_value}"))
         responses.append(self.send_message("*Z02"))
+        time.sleep(2)
         if self.verb:
             print(responses)
             print(self.return_messages(responses))
