@@ -468,9 +468,13 @@ class HWPGripperAgent:
             data['responses'].append(return_dict)
             return return_dict
 
-        # We should check if hwp is already gripper or not
+        # Check controller alarm and if hwp is already gripper or not
         return_dict = run_and_append(self.client.get_state, job='grip',
                                      check_shutdown=check_shutdown)
+        if return_dict['result']['jxc']['alarm']:
+            self.log.error(
+                f"Detected contoller alarm: {return_dict['result']['jxc']['alarm']}")
+            return False, data
         act_results = return_dict['result']['actuators']
         limit_switch_state = act_results[0]['limits']['warm_grip']['state'] | \
             act_results[1]['limits']['warm_grip']['state'] | \
@@ -628,6 +632,14 @@ class HWPGripperAgent:
             return_dict = self._run_client_func(func, *args, **kwargs)
             data['responses'].append(return_dict)
             return return_dict
+
+        # Check controller alarm
+        return_dict = run_and_append(self.client.get_state, job='ungrip',
+                                     check_shutdown=check_shutdown)
+        if return_dict['result']['jxc']['alarm']:
+            self.log.error(
+                f"Detected contoller alarm: {return_dict['result']['jxc']['alarm']}")
+            return False, data
 
         run_and_append(self.client.reset, job='ungrip', check_shutdown=check_shutdown)
         # Enable power to actuators
