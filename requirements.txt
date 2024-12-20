@@ -44,18 +44,14 @@ pfeiffer-vacuum-protocol==0.4
 pyepics
 pysmurf @ git+https://github.com/slaclab/pysmurf.git@main
 sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master
-sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master
+# pin to just before 3.8 support dropped
+sotodlib @ git+https://github.com/simonsobs/sotodlib.git@5d613d5915b1716c401abecb5446088bce5fc1a4
 
 # timing master monitor
 pyepics
 
 # xy_stage
 xy_stage_control @ git+https://github.com/kmharrington/xy_stage_control.git@main
-
-# pysmurf controller
-pysmurf @ git+https://github.com/slaclab/pysmurf.git@main
-sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master
-sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master
 
 # modbus
 pyModbusTCP
