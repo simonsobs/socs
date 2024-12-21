@@ -103,7 +103,7 @@ class Actions:
         curr: float
 
         def process(self, module):
-            msg = module.set_current_limit(self.curr)
+            msg, val = module.set_current_limit(self.curr)
             self.log.info(msg + "...")
 
     @dataclass
@@ -111,7 +111,7 @@ class Actions:
         volt: float
 
         def process(self, module):
-            msg = module.set_voltage_limit(self.volt)
+            msg, val = module.set_voltage_limit(self.volt)
             self.log.info(msg + "...")
 
 
