@@ -22,7 +22,7 @@ wait_for_crossbar = create_crossbar_fixture()
 
 @pytest.fixture()
 def hwp_em() -> Generator[HWPEmulator, None, None]:
-    em = HWPEmulator(pid_port=0, pmx_port=0, enc_port=0)
+    em = HWPEmulator(pid_port=0, pmx_port=0, enc_port=0, gripper_port=0)
     try:
         em.start()
         yield em

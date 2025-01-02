@@ -280,6 +280,7 @@ class HWPEmulator:
         self.pid_device.shutdown()
         self.pmx_device.shutdown()
         self.pcu_device.shutdown()
+        self.gripper_device.shutdown()
         self.logger.info("Finished shutdown")
 
     def encoder_thread_func(self):
@@ -514,12 +515,13 @@ def create_hwp_emulator_fixture(**kwargs):
     @pytest.fixture()
     def create_emulator():
         em = HWPEmulator(**kwargs)
-        em.start()
-        yield em
-        em.shutdown()
+        try:
+            em.start()
+            yield em
+        finally:
+            em.shutdown()
 
     return create_emulator
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
