@@ -523,6 +523,7 @@ def create_hwp_emulator_fixture(**kwargs):
 
     return create_emulator
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--pid-port", type=int, default=0)

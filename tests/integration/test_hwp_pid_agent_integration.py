@@ -1,18 +1,20 @@
 import logging
+import signal
+import subprocess
 import time
+from typing import Generator
 
+import coverage.data
 import ocs
 import pytest
 from integration.util import docker_compose_file  # noqa: F401
 from integration.util import create_crossbar_fixture
 from ocs.base import OpCode
-from ocs.testing import create_agent_runner_fixture, create_client_fixture, _AgentRunner, SIGINT_TIMEOUT
-import coverage.data
-from typing import Generator
-import subprocess
-import signal
+from ocs.testing import (SIGINT_TIMEOUT, _AgentRunner,
+                         create_agent_runner_fixture, create_client_fixture)
 
-from socs.testing.hwp_emulator import create_hwp_emulator_fixture, HWPEmulator
+from socs.testing.hwp_emulator import HWPEmulator, create_hwp_emulator_fixture
+
 log_dir = './logs'
 
 
@@ -23,6 +25,7 @@ run_agent_idle = create_agent_runner_fixture(
     '../socs/agents/hwp_pid/agent.py', 'hwp_pid_agent', args=['--mode', 'init', '--log-dir', './logs/'])
 client = create_client_fixture('hwp-pid')
 hwp_em = create_hwp_emulator_fixture(pid_port=0, log_level=logging.DEBUG)
+
 
 def _shutdown_agent_runner(runner: _AgentRunner) -> None:
     """
@@ -57,6 +60,7 @@ def _cleanup_runner(runner: _AgentRunner, cov) -> None:
     # protect against missing --cov flag
     if cov is not None:
         cov.get_data().update(agentcov)
+
 
 @pytest.fixture()
 def pid_agent(
