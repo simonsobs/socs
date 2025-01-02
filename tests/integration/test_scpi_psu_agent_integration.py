@@ -1,5 +1,3 @@
-import time
-
 import ocs
 import pytest
 from integration.util import docker_compose_file  # noqa: F401
@@ -47,7 +45,6 @@ def test_scpi_psu_init_psu(wait_for_crossbar, gpib_emu, run_agent, client):
 
 @pytest.mark.integtest
 def test_scpi_psu_init_psu_acq_mode(wait_for_crossbar, gpib_emu, run_agent_acq, client):
-    time.sleep(3)
     resp = client.init.status()
     check_resp_success(resp)
 

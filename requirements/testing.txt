@@ -1,5 +1,4 @@
 http-server-mock
-psutil
 pytest
 pytest-cov
 pytest-docker

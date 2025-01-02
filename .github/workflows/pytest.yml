@@ -60,8 +60,7 @@ jobs:
     - name: Run integration tests
       working-directory: ./tests
       run: |
-        COVERAGE_FILE=.coverage.int python3 -m pytest --cov -m 'integtest' -s
-        ps aux
+        COVERAGE_FILE=.coverage.int python3 -m pytest --cov -m 'integtest'
 
     # Coverage
     - name: Report test coverage
