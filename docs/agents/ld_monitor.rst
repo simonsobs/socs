@@ -37,7 +37,7 @@ An example docker-compose configuration::
         image: simonsobs/socs:latest
         hostname: ocs-docker
         ports:
-          - "1110:1110"
+          - "1110:1110/udp"
         environment:
           - INSTANCE_ID=ld-monitor
           - SITE_HUB=ws://127.0.0.1:8001/ws
