@@ -25,17 +25,19 @@ OCS Site Config
 An example site-config-file block::
 
     {'agent-class': 'LDMonitorAgent',
-     'instance-id': 'ld_monitor',
-     'arguments': [['--mode', 'acq']},
+     'instance-id': 'ld-monitor',
+     'arguments': ['--mode', 'acq']},
 
 Docker Compose
 ``````````````
 
 An example docker-compose configuration::
 
-    ocs-template:
+    ocs-ld-monitor:
         image: simonsobs/socs:latest
         hostname: ocs-docker
+        ports:
+          - "1110:1110"
         environment:
           - LOGLEVEL=info
         volumes:
