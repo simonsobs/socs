@@ -31,7 +31,7 @@ class LDMonitor:
         Logs the time at which initialization was carried out
     data_dict : dictionary
         Dictionary data stored from the lightning detector
-    newdata_dict : dictioanry
+    newdata_dict : dictionary
         Dictionary where new data is received
     """
 
@@ -114,15 +114,15 @@ class LDMonitor:
             # "lightning strike" sentence
             if param == 'LI':
                 data_split = self.data.split(',')[1:]
-                if data_split[2].split('*')[0] == 'Miles':
+                if data_split[1].split('*')[0] == 'Miles':
                     unit_d = 0
-                elif data_split[2].split('*')[0] == 'Km':
+                elif data_split[1].split('*')[0] == 'Km':
                     unit_d = 1
 
                 self.newdata_dict = {
                     'd_type': 1,
                     'time_last': time.time(),
-                    'dist': int(data_split[1]),
+                    'dist': int(data_split[0]),
                     'unit_d': unit_d
                 }
                 self.data_dict.update(self.newdata_dict)
