@@ -72,7 +72,7 @@ Docker Compose
 ``````````````
 
 The Meinberg M1000 Agent should be configured to run in a Docker container. An
-example docker-compose service configuration is shown here::
+example docker compose service configuration is shown here::
 
   ocs-m1000:
     image: simonsobs/socs:latest

@@ -45,7 +45,7 @@ Docker Compose
 ``````````````
 
 The Generator Agent should be configured to run in a Docker container. An
-example docker-compose service configuration is shown here::
+example docker compose service configuration is shown here::
 
   ocs-generator:
     image: simonsobs/socs:latest

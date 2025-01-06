@@ -26,7 +26,7 @@ def extract(value):
     """
     binary = bin(int(value, 16))[2:].zfill(32)
     _b_flow = binary[0:16]
-    _b_temp = binary[17:30]
+    _b_temp = binary[16:30]
 
     flow = int(_b_flow, 2) / 10
     temp = int(_b_temp, 2)
@@ -102,7 +102,6 @@ class FlowmeterAgent:
         """
         pm = Pacemaker(1, quantize=True)
         self.take_data = True
-        session.set_status('running')
 
         while self.take_data:
             pm.sleep()
@@ -111,7 +110,12 @@ class FlowmeterAgent:
             adr = "/iolinkmaster/port[{}]/iolinkdevice/pdin/getdata".format(dp)
             url = 'http://{}'.format(self.ip_address)
 
-            r = requests.post(url, json={"code": "request", "cid": -1, "adr": adr})
+            try:
+                r = requests.post(url, json={"code": "request", "cid": -1, "adr": adr})
+            except requests.exceptions.ConnectionError as e:
+                self.log.warn(f"Connection error occured: {e}")
+                continue
+
             value = r.json()['data']['value']
 
             flow_gpm, temp_f = extract(value)  # units [gallons/minute], [F]
