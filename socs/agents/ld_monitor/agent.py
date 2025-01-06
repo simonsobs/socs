@@ -270,8 +270,6 @@ class LDMonitorAgent:
                               "{} is already running".format(self.lock.job))
                 return False, "Could not acquire lock."
 
-            session.set_status('starting')
-
             self._connect()
             if not self.initialized:
                 return False, 'Could not connect to LD'
@@ -314,8 +312,6 @@ class LDMonitorAgent:
                 self.log.warn("Could not start acq because {} is already running"
                               .format(self.lock.job))
                 return False, "Could not acquire lock."
-
-            session.set_status('running')
 
             self.take_data = True
 
