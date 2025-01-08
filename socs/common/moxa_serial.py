@@ -52,11 +52,14 @@ class Serial_TCPServer(object):
     Args:
         port (tuple): (IP addr, TCP port)
         timeout (float): Timeout for reading from the moxa box
+        encoded (bool): Encode/decode messages before/after sending/receiving if True.
+                        Send messages unmodified if False. Defaults to True.
 
     """
 
-    def __init__(self, port, timeout=MOXA_DEFAULT_TIMEOUT):
+    def __init__(self, port, timeout=MOXA_DEFAULT_TIMEOUT, encoded=True):
         self.port = port
+        self.encoded = encoded
 
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setblocking(0)
@@ -88,7 +91,10 @@ class Serial_TCPServer(object):
                 pass
         # Flush the message out if you got everything
         if len(msg) == n:
-            msg = self.sock.recv(n).decode()
+            if self.encoded:
+                msg = self.sock.recv(n).decode()
+            else:
+                msg = self.sock.recv(n)
         # Otherwise tell nothing and leave the data in the buffer
         else:
             msg = ''
@@ -193,7 +199,10 @@ class Serial_TCPServer(object):
                 needed.
 
         """
-        self.sock.send(msg.encode())
+        if self.encoded:
+            self.sock.send(msg.encode())
+        else:
+            self.sock.send(msg)
 
     def writeread(self, msg):
         self.flushInput()

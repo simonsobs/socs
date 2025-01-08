@@ -33,6 +33,14 @@ def test_avoidance():
     assert path is not None
     assert len(path['moves'].nodes) == 2
 
+    # .. even if policy forbids mixed-axis moves
+    sun.policy['axes_sequential'] = True
+    paths = sun.analyze_paths(270.01, 40.01, 270, 40)
+    path, analysis = sun.select_move(paths)
+    assert path is not None
+    assert len(path['moves'].nodes) == 3
+    sun.policy['axes_sequential'] = False
+
     # Find safe paths to here (no moves)
     paths = sun.analyze_paths(270, 40, 270, 40)
     path, analysis = sun.select_move(paths)

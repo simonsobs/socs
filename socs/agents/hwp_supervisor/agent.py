@@ -3,18 +3,19 @@ import os
 import threading
 import time
 import traceback
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
-from typing import Dict, List, Literal, Optional
+from typing import Any, Dict, Generator, List, Literal, Optional
 
 import numpy as np
 import ocs
 import txaio
 from ocs import client_http, ocs_agent, site_config
-from ocs.client_http import ControlClientError
+from ocs.client_http import ControlClient, ControlClientError
 from ocs.ocs_client import OCSClient, OCSReply
 from ocs.ocs_twisted import Pacemaker
 
-client_cache = {}
+client_cache: Dict[str, ControlClient] = {}
 
 
 def get_op_data(agent_id, op_name, log=None, test_mode=False):
@@ -112,18 +113,19 @@ class HWPClients:
     gripper_iboot: Optional[OCSClient] = None
     driver_iboot: Optional[OCSClient] = None
     pcu: Optional[OCSClient] = None
+    gripper: Optional[OCSClient] = None
 
 
 @dataclass
 class IBootState:
     instance_id: str
     outlets: List[int]
+    agent_type: Literal['iboot, synaccess']
     outlet_state: Dict[int, Optional[int]] = None
     op_data: Optional[Dict] = None
 
     def __post_init__(self):
         self.outlet_state = {o: None for o in self.outlets}
-        self.outlet_labels = {o: f'outletStatus_{o}' for o in self.outlets}
 
     def update(self):
         op = get_op_data(self.instance_id, 'acq', test_mode=False)
@@ -132,10 +134,111 @@ class IBootState:
             self.outlet_state = {o: None for o in self.outlets}
             return
 
-        self.outlet_state = {
-            outlet: op['data'][label]['status']
-            for outlet, label in self.outlet_labels.items()
-        }
+        if self.agent_type == 'iboot':
+            self.outlet_labels = {o: f'outletStatus_{o - 1}' for o in self.outlets}
+            self.outlet_state = {
+                outlet: op['data'][label]['status']
+                for outlet, label in self.outlet_labels.items()
+            }
+        elif self.agent_type == 'synaccess':
+            self.outlet_labels = {o: str(o - 1) for o in self.outlets}
+            self.outlet_state = {
+                outlet: op['data']['fields'][label]['status']
+                for outlet, label in self.outlet_labels.items()
+            }
+        else:
+            raise ValueError(
+                f"Invalid agent_type: {self.agent_type}. "
+                "Must be in ['iboot', 'synaccess']"
+            )
+
+
+@dataclass
+class ACUState:
+    """
+    Class containing ACU state information.
+
+    Args
+    ------
+    instance_id : str
+        Instance ID of ACU agent
+    min_el : float
+        Minimum elevation allowed before restricting spin-up [deg]
+    max_el : float
+        Maximum elevation allowed before restricting spin-up [deg]
+    max_time_since_update : float
+        Maximum time since last update before restricting spin-up[sec]
+    mount_velocity_grip_thresh: float
+        Maximum mount velocity for gripping the HWP [deg/s] .
+    grip_max_boresight_angle: float
+        Maximum absolute boresight angle [deg] for which operating the grippers
+        is allowed.
+
+    Attributes
+    ------------
+    el_current_position : float
+        Current el position [deg]
+    el_commanded_position : float
+        Commanded el position [deg]
+    el_current_velocity : float
+        Current el velocity [deg/s]
+    az_current_velocity : float
+        Current az velocity [deg/s]
+    bor_current_position : float
+        Current bor position [deg]
+    bor_commanded_position : float
+        Commanded bor position [deg]
+    last_updated : float
+        Time of last update [sec]. If this is None, you cannot trust other
+        state variables.
+    """
+    instance_id: str
+    min_el: float
+    max_el: float
+    max_time_since_update: float
+    mount_velocity_grip_thresh: float
+    grip_max_boresight_angle: float
+
+    last_updated: Optional[float] = None
+    el_current_position: float = 0.0
+    el_commanded_position: float = 0.0
+    el_current_velocity: float = 0.0
+    az_current_velocity: float = 0.0
+    bor_current_position: float = 0.0
+    bor_commanded_position: float = 0.0
+
+    # This will only be set by spin-control agent for communication with ACU
+    request_block_motion: bool = False
+    request_block_motion_timestamp: float = 0.0
+
+    ACU_motion_blocked: Optional[bool] = None  # This flag is only set by the ACU agent
+    use_acu_blocking: bool = False
+    block_motion_timeout: float = 60.0
+
+    def set_request_block_motion(self, state: bool) -> None:
+        self.request_block_motion = state
+        self.request_block_motion_timestamp = time.time()
+
+    def update(self):
+        op = get_op_data(self.instance_id, 'monitor')
+        if op['status'] != 'ok':
+            return
+
+        d = op['data'].get("StatusDetailed")
+        if d is None:
+            return
+
+        self.el_current_position = d['Elevation current position']
+        self.el_commanded_position = d['Elevation commanded position']
+        self.el_current_velocity = d['Elevation current velocity']
+        self.az_current_velocity = d['Azimuth current velocity']
+        self.bor_current_position = d['Boresight current position']
+        self.bor_commanded_position = d['Boresight commanded position']
+
+        t = d.get('timestamp_agent')
+        if t is None:
+            t = time.time()
+        self.last_updated = t
 
 
 @dataclass
@@ -158,6 +261,7 @@ class HWPState:
     pid_target_freq: Optional[float] = None
     pid_direction: Optional[str] = None
     pid_last_updated: Optional[float] = None
+    pid_max_time_since_update: float = 60.0
 
     pmx_current: Optional[float] = None
     pmx_voltage: Optional[float] = None
@@ -171,17 +275,50 @@ class HWPState:
     gripper_iboot: Optional[IBootState] = None
     driver_iboot: Optional[IBootState] = None
 
+    acu: Optional[ACUState] = None
+
+    supervisor_control_state: Optional[Dict[str, Any]] = None
+
     @classmethod
     def from_args(cls, args: argparse.Namespace):
+        log = txaio.make_logger()  # pylint: disable=E1101
         self = cls(
             temp_field=args.ybco_temp_field,
             temp_thresh=args.ybco_temp_thresh,
             ups_minutes_remaining_thresh=args.ups_minutes_remaining_thresh,
+            pid_max_time_since_update=args.pid_max_time_since_update,
         )
+
         if args.gripper_iboot_id is not None:
-            self.gripper_iboot = IBootState(args.gripper_iboot_id, args.gripper_iboot_outlets)
+            self.gripper_iboot = IBootState(args.gripper_iboot_id, args.gripper_iboot_outlets,
+                                            args.gripper_power_agent_type)
+            log.info("Gripper Ibootbar id set: {id}", id=args.gripper_iboot_id)
+        else:
+            log.warn("Gripper Ibootbar id not set")
+
         if args.driver_iboot_id is not None:
-            self.driver_iboot = IBootState(args.driver_iboot_id, args.driver_iboot_outlets)
+            self.driver_iboot = IBootState(args.driver_iboot_id, args.driver_iboot_outlets,
+                                           args.driver_power_agent_type)
+            log.info("Driver Ibootbar id set: {id}", id=args.driver_iboot_id)
+        else:
+            log.warn("Driver Ibootbar id not set")
+
+        if not args.no_acu:
+            self.acu = ACUState(
+                instance_id=args.acu_instance_id,
+                min_el=args.acu_min_el,
+                max_el=args.acu_max_el,
+                max_time_since_update=args.acu_max_time_since_update,
+                mount_velocity_grip_thresh=args.mount_velocity_grip_thresh,
+                grip_max_boresight_angle=args.grip_max_boresight_angle,
+                use_acu_blocking=args.use_acu_blocking,
+                block_motion_timeout=args.acu_block_motion_timeout,
+            )
+            log.info("ACU state checking enabled: instance_id={id}",
+                     id=self.acu.instance_id)
+        else:
+            log.warn("The no-acu option has been set. ACU state checking disabled.")
+
         return self
 
     def _update_from_keymap(self, op, keymap):
@@ -205,6 +342,7 @@ class HWPState:
         """
         self._update_from_keymap(op, {
             'enc_freq': 'approx_hwp_freq',
+            'encoder_last_updated': 'encoder_last_updated',
             'last_quad': 'last_quad',
             'last_quad_time': 'last_quad_time',
         })
@@ -532,6 +670,18 @@ class ControlState:
         success: bool = True
 
     @dataclass
+    class GripHWP:
+        """
+        Grips the HWP
+        """
+
+    @dataclass
+    class UngripHWP:
+        """
+        Ungrips the HWP
+        """
+
+    @dataclass
     class Abort:
         """Abort current action"""
         pass
@@ -655,8 +805,101 @@ class ControlAction:
             time.sleep(dt)
 
 
+@contextmanager
+def ensure_grip_safety(hwp_state: HWPState, log: txaio.ILogger) -> Generator[None, None, None]:
+    """
+    Run required checks for gripper safety. This will check ACU parameters such
+    as az/el position and velocity. If `use_acu_blocking` is set, this will
+    also attempt to block out ACU motion for the duration of the operation.
+
+    Args
+    ------
+    hwp_state : HWPState
+        HWP state object. In addition to reading ACU state vars, this will
+        set the `request_block_ACU_motion` flag if `use_acu_blocking` is set.
+    timeout: float
+        Timeout for waiting for the ACU blockout before an error will be raised.
+    """
+    now = time.time()
+
+    if hwp_state.pid_current_freq is None or hwp_state.pid_last_updated is None:
+        raise RuntimeError("Cannot determine current HWP Freq")
+
+    tdiff = now - hwp_state.pid_last_updated
+    if tdiff > hwp_state.pid_max_time_since_update:
+        raise RuntimeError(f"HWP PID state has not been updated in {tdiff} sec")
+
+    if np.abs(hwp_state.pid_current_freq) > 0.02:
+        raise RuntimeError("Cannot grip HWP while spinning")
+    log.info("Rotation safety checks have passed")
+
+    acu = hwp_state.acu
+    if acu is None:
+        yield
+        return
+
+    # Run checks of ACU state
+    if acu.last_updated is None:
+        raise RuntimeError(
+            f"No ACU data has been received from instance-id {acu.instance_id}"
+        )
+
+    tdiff = time.time() - acu.last_updated
+    if tdiff > acu.max_time_since_update:
+        raise RuntimeError(f"ACU state has not been updated in {tdiff} sec")
+
+    if not (acu.min_el <= acu.el_current_position <= acu.max_el):
+        raise RuntimeError(
+            f"ACU elevation is {acu.el_current_position} deg, "
+            f"outside of allowed range ({acu.min_el}, {acu.max_el})"
+        )
+    if not (acu.min_el <= acu.el_commanded_position <= acu.max_el):
+        raise RuntimeError(
+            f"ACU commanded elevation is {acu.el_commanded_position} deg, "
+            f"outside of allowed range ({acu.min_el}, {acu.max_el})"
+        )
+    if np.abs(acu.az_current_velocity) > np.abs(acu.mount_velocity_grip_thresh):
+        raise RuntimeError(
+            f"ACU az-velocity is {acu.az_current_velocity} deg/s, "
+            f"above threshold of {acu.mount_velocity_grip_thresh} deg/s"
+        )
+    if np.abs(acu.el_current_velocity) > np.abs(acu.mount_velocity_grip_thresh):
+        raise RuntimeError(
+            f"ACU el-velocity is {acu.el_current_velocity} deg/s, "
+            f"above threshold of {acu.mount_velocity_grip_thresh} deg/s"
+        )
+    if np.abs(acu.bor_current_position) > np.abs(acu.grip_max_boresight_angle):
+        raise RuntimeError(
+            f"boresight current angle of {acu.bor_current_position} deg, "
+            f"above threshold of {acu.grip_max_boresight_angle} deg"
+        )
+    if np.abs(acu.bor_commanded_position) > np.abs(acu.grip_max_boresight_angle):
+        raise RuntimeError(
+            f"boresight commanded angle of {acu.bor_commanded_position} deg, "
+            f"above threshold of {acu.grip_max_boresight_angle} deg"
+        )
+    log.info("ACU safety checks have passed")
+
+    if not acu.use_acu_blocking:
+        yield
+        return
+
+    try:  # If use_acu_blocking, do handshake with ACU agent to block motino
+        acu.set_request_block_motion(True)
+        log.info("Requesting ACU to block motion")
+        while not acu.ACU_motion_blocked:
+            if time.time() - acu.request_block_motion_timestamp > acu.block_motion_timeout:
+                raise RuntimeError("ACU motion was not blocked within timeout")
+            time.sleep(1)
+        log.info("ACU motion has been blocked")
+        yield
+    finally:
+        log.info("Releasing ACU motion block")
+        acu.set_request_block_motion(False)
+
+
 class ControlStateMachine:
-    def __init__(self):
+    def __init__(self) -> None:
         self.action: ControlAction = ControlAction(ControlState.Idle())
         self.action_history: List[ControlAction] = []
         self.max_action_history_count = 100
@@ -708,7 +951,7 @@ class ControlStateMachine:
 
         return session
 
-    def update(self, clients, hwp_state):
+    def update(self, clients, hwp_state: HWPState):
         """Run the next series of actions for the current state"""
         try:
             self.lock.acquire()
@@ -720,7 +963,23 @@ class ControlStateMachine:
                 self.log.info("pid state: {data}", data=data)
                 return data
 
+            def check_acu_ok_for_spinup():
+                acu = hwp_state.acu
+                if acu is not None:
+                    if acu.last_updated is None:
+                        raise RuntimeError(f"No ACU data has been received from instance-id {acu.instance_id}")
+                    tdiff = time.time() - acu.last_updated
+                    if tdiff > acu.max_time_since_update:
+                        raise RuntimeError(f"ACU state has not been updated in {tdiff} sec")
+                    if not (acu.min_el <= acu.el_current_position <= acu.max_el):
+                        raise RuntimeError(f"ACU elevation is {acu.el_current_position} deg, "
+                                           f"outside of allowed range ({acu.min_el}, {acu.max_el})")
+                    if not (acu.min_el <= acu.el_commanded_position <= acu.max_el):
+                        raise RuntimeError(f"ACU commanded elevation is {acu.el_commanded_position} deg, "
+                                           f"outside of allowed range ({acu.min_el}, {acu.max_el})")
+
             if isinstance(state, ControlState.PIDToFreq):
+                check_acu_ok_for_spinup()
                 self.run_and_validate(clients.pid.set_direction,
                                       kwargs={'direction': state.direction})
                 self.run_and_validate(clients.pid.declare_freq,
@@ -813,6 +1072,8 @@ class ControlStateMachine:
                     self.action.set_state(ControlState.Done(success=True))
 
             elif isinstance(state, ControlState.ConstVolt):
+                if state.voltage > 0:
+                    check_acu_ok_for_spinup()
                 self.run_and_validate(clients.pmx.set_on)
                 self.run_and_validate(clients.pid.set_direction,
                                       kwargs={'direction': state.direction})
@@ -832,6 +1093,16 @@ class ControlStateMachine:
                 )
                 self.action.set_state(ControlState.Done(success=state.success))
 
+            elif isinstance(state, ControlState.GripHWP):
+                with ensure_grip_safety(hwp_state, self.log):
+                    self.run_and_validate(clients.gripper.grip)
+                self.action.set_state(ControlState.Done(success=True))
+
+            elif isinstance(state, ControlState.UngripHWP):
+                with ensure_grip_safety(hwp_state, self.log):
+                    self.run_and_validate(clients.gripper.ungrip)
+                self.action.set_state(ControlState.Done(success=True))
+
             elif isinstance(state, ControlState.Brake):
                 self.run_and_validate(
                     clients.pcu.send_command,
@@ -844,10 +1115,10 @@ class ControlStateMachine:
                 self.run_and_validate(clients.pid.set_direction,
                                       kwargs=dict(direction=new_d))
                 self.run_and_validate(clients.pid.tune_stop)
-                self.run_and_validate(clients.pmx.set_on)
 
-                self.run_and_validate(clients.pmx.set_v, kwargs={'volt': state.brake_voltage})
                 self.run_and_validate(clients.pmx.ign_ext)
+                self.run_and_validate(clients.pmx.set_v, kwargs={'volt': state.brake_voltage})
+                self.run_and_validate(clients.pmx.set_on)
 
                 time.sleep(10)
                 self.action.set_state(ControlState.WaitForBrake(
@@ -1009,6 +1280,7 @@ class HWPSupervisor:
             lakeshore=get_client(self.ybco_lakeshore_id),
             gripper_iboot=get_client(self.gripper_iboot_id),
             driver_iboot=get_client(self.driver_iboot_id),
+            gripper=get_client(self.args.hwp_gripper_id),
         )
 
     @ocs_agent.param('test_mode', type=bool, default=False)
@@ -1106,6 +1378,8 @@ class HWPSupervisor:
                 self.hwp_state.driver_iboot.update()
             if self.hwp_state.gripper_iboot is not None:
                 self.hwp_state.gripper_iboot.update()
+            if self.hwp_state.acu is not None:
+                self.hwp_state.acu.update()
 
             session.data['hwp_state'] = asdict(self.hwp_state)
 
@@ -1154,13 +1428,24 @@ class HWPSupervisor:
         """
         clients = self._get_hwp_clients()
 
+        def update_supervisor_state():
+            state_info = self.control_state_machine.action.cur_state_info.encode()
+            self.hwp_state.supervisor_control_state = state_info
+            if session.data:
+                session.data['current_state_type'] = self.control_state_machine.action.cur_state_info.state_type
+
         while session.status in ['starting', 'running']:
+            # Update session data beginning and end of update call, because its
+            # possible for an action change to happen due to external request from
+            # task.
+            update_supervisor_state()
             self.control_state_machine.update(clients, self.hwp_state)
-            session.data = {
+            update_supervisor_state()
+            session.data.update({
                 'current_action': self.control_state_machine.action.encode(),
                 'action_history': [a.encode() for a in self.control_state_machine.action_history],
-                'timestamp': time.time()
-            }
+                'timestamp': time.time(),
+            })
             if params['test_mode']:
                 break
             time.sleep(1)
@@ -1326,6 +1611,54 @@ class HWPSupervisor:
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
+    def grip_hwp(self, session, params):
+        """grip_hwp()
+
+        **Task** - Grip the HWP if ACU and HWP state passes checks.
+
+        Notes
+        --------
+
+        Example of ``session.data``::
+
+            >>> session['data']
+            {'action':
+                {'action_id': 3,
+                'completed': True,
+                'cur_state': {'class': 'Done', 'msg': None, 'success': True},
+                'state_history': List[ConrolState],
+                'success': True}
+            }
+        """
+        state = ControlState.GripHWP()
+        action = self.control_state_machine.request_new_action(state)
+        action.sleep_until_complete(session=session)
+        return action.success, f"Completed with state: {action.cur_state_info.state}"
+
+    def ungrip_hwp(self, session, params):
+        """ungrip_hwp()
+
+        **Task** - Ungrip the HWP if ACU and HWP state passes checks.
+
+        Notes
+        --------
+
+        Example of ``session.data``::
+
+            >>> session['data']
+            {'action':
+                {'action_id': 3,
+                'completed': True,
+                'cur_state': {'class': 'Done', 'msg': None, 'success': True},
+                'state_history': List[ConrolState],
+                'success': True}
+            }
+        """
+        state = ControlState.UngripHWP()
+        action = self.control_state_machine.request_new_action(state)
+        action.sleep_until_complete(session=session)
+        return action.success, f"Completed with state: {action.cur_state_info.state}"
+
     def abort_action(self, session, params):
         """abort_action()
 
@@ -1429,10 +1762,16 @@ def make_parser(parser=None):
                         help="Instance ID for HWP pid agent")
     pgroup.add_argument('--hwp-pcu-id',
                         help="Instance ID for HWP PCU agent")
+    pgroup.add_argument('--hwp-gripper-id',
+                        help="Instance ID for HWP Gripper agent")
     pgroup.add_argument('--ups-id', help="Instance ID for UPS agent")
     pgroup.add_argument('--ups-minutes-remaining-thresh', type=float,
                         help="Threshold for UPS minutes remaining before a "
                              "shutdown is triggered")
+    pgroup.add_argument(
+        '--pid-max-time-since-update', type=float, default=60.0,
+        help="Max amount of time since last PID update before data is considered stale.",
+    )
 
     pgroup.add_argument(
         '--driver-iboot-id',
@@ -1456,6 +1795,48 @@ def make_parser(parser=None):
     pgroup.add_argument(
         '--gripper-iboot-outlets', nargs='+', type=int,
         help="Outlets for gripper iboot power")
+    pgroup.add_argument(
+        '--gripper-power-agent-type', choices=['iboot', 'synaccess'], default=None,
+        help="Type of agent used for controlling the gripper power")
+
+    pgroup.add_argument(
+        '--acu-instance-id', default='acu',
+        help="Instance ID for the ACU agent."
+    )
+    pgroup.add_argument(
+        '--no-acu', action='store_true',
+        help="If set, will not attempt to connect to the ACU or perform any ACU "
+             "checks for grip and spin-up"
+    )
+    pgroup.add_argument(
+        '--acu-min-el', type=float, default=48.0,
+        help="Min elevation that HWP spin up is allowed",
+    )
+    pgroup.add_argument(
+        '--acu-max-el', type=float, default=90.0,
+        help="Max elevation that HWP spin up is allowed",
+    )
+    pgroup.add_argument(
+        '--acu-max-time-since-update', type=float, default=30.0,
+        help="Max amount of time since last ACU update before allowing HWP spin up",
+    )
+    pgroup.add_argument(
+        '--mount-velocity-grip-thresh', type=float, default=0.005,
+        help="Max mount velocity (both az and el) for gripping the HWP"
+    )
+    pgroup.add_argument(
+        '--grip-max-boresight-angle', type=float, default=1.,
+        help="Maximum absolute value of boresight angle (deg) for gripping the HWP"
+    )
+    pgroup.add_argument(
+        '--use-acu-blocking', action='store_true',
+        help="If True, will use blocking flags to make sure ACU is not moving "
+             "during HWP gripper commands."
+    )
+    pgroup.add_argument(
+        '--acu-block-motion-timeout', type=float, default=60.,
+        help="Time to wait for ACU motion to be blocked before aborting gripper command."
+    )
 
     pgroup.add_argument('--forward-dir', choices=['cw', 'ccw'], default="cw",
                         help="Whether the PID 'forward' direction is cw or ccw")
@@ -1479,9 +1860,11 @@ def main(args=None):
     agent.register_task('set_const_voltage', hwp.set_const_voltage)
     agent.register_task('brake', hwp.brake)
     agent.register_task('pmx_off', hwp.pmx_off)
-    agent.register_task('abort_action', hwp.abort_action)
+    agent.register_task('grip_hwp', hwp.grip_hwp)
+    agent.register_task('ungrip_hwp', hwp.ungrip_hwp)
     agent.register_task('enable_driver_board', hwp.enable_driver_board)
     agent.register_task('disable_driver_board', hwp.disable_driver_board)
+    agent.register_task('abort_action', hwp.abort_action)
 
     runner.run(agent, auto_reconnect=True)
 

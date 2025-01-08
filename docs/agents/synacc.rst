@@ -39,7 +39,7 @@ Docker Compose
 ``````````````
 
 The Synaccess Agent should be configured to run in a Docker container.
-An example docker-compose service configuration is shown here::
+An example docker compose service configuration is shown here::
 
   ocs-synacc:
     image: simonsobs/socs:latest

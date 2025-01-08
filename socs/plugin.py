@@ -1,6 +1,5 @@
 package_name = 'socs'
 agents = {
-    'ACTiCameraAgent': {'module': 'socs.agents.acti_camera.agent', 'entry_point': 'main'},
     'ACUAgent': {'module': 'socs.agents.acu.agent', 'entry_point': 'main'},
     'BlueforsAgent': {'module': 'socs.agents.bluefors.agent', 'entry_point': 'main'},
     'CrateAgent': {'module': 'socs.agents.smurf_crate_monitor.agent', 'entry_point': 'main'},
@@ -11,6 +10,7 @@ agents = {
     'FTSAerotechAgent': {'module': 'socs.agents.fts_aerotech.agent', 'entry_point': 'main'},
     'GeneratorAgent': {'module': 'socs.agents.generator.agent', 'entry_point': 'main'},
     'Hi6200Agent': {'module': 'socs.agents.hi6200.agent', 'entry_point': 'main'},
+    'HTTPCameraAgent': {'module': 'socs.agents.http_camera.agent', 'entry_point': 'main'},
     'HWPBBBAgent': {'module': 'socs.agents.hwp_encoder.agent', 'entry_point': 'main'},
     'HWPGripperAgent': {'module': 'socs.agents.hwp_gripper.agent', 'entry_point': 'main'},
     'HWPPCUAgent': {'module': 'socs.agents.hwp_pcu.agent', 'entry_point': 'main'},
@@ -26,6 +26,7 @@ agents = {
     'Lakeshore372Agent': {'module': 'socs.agents.lakeshore372.agent', 'entry_point': 'main'},
     'Lakeshore425Agent': {'module': 'socs.agents.lakeshore425.agent', 'entry_point': 'main'},
     'LATRtXYStageAgent': {'module': 'socs.agents.xy_stage.agent', 'entry_point': 'main'},
+    'LDMonitorAgent': {'module': 'socs.agents.ld_monitor.agent', 'entry_point': 'main'},
     'MagpieAgent': {'module': 'socs.agents.magpie.agent', 'entry_point': 'main'},
     'MeinbergM1000Agent': {'module': 'socs.agents.meinberg_m1000.agent', 'entry_point': 'main'},
     'MeinbergSyncboxAgent': {'module': 'socs.agents.meinberg_syncbox.agent', 'entry_point': 'main'},
@@ -33,6 +34,7 @@ agents = {
     'PfeifferTC400Agent': {'module': 'socs.agents.pfeiffer_tc400.agent', 'entry_point': 'main'},
     'PysmurfController': {'module': 'socs.agents.pysmurf_controller.agent', 'entry_point': 'main'},
     'PysmurfMonitor': {'module': 'socs.agents.pysmurf_monitor.agent', 'entry_point': 'main'},
+    'RTSPCameraAgent': {'module': 'socs.agents.rtsp_camera.agent', 'entry_point': 'main'},
     'ScpiPsuAgent': {'module': 'socs.agents.scpi_psu.agent', 'entry_point': 'main'},
     'SmurfFileEmulator': {'module': 'socs.agents.smurf_file_emulator.agent', 'entry_point': 'main'},
     'SmurfStreamSimulator': {'module': 'socs.agents.smurf_stream_simulator.agent', 'entry_point': 'main'},
@@ -48,4 +50,5 @@ agents = {
     'WiregridActuatorAgent': {'module': 'socs.agents.wiregrid_actuator.agent', 'entry_point': 'main'},
     'WiregridEncoderAgent': {'module': 'socs.agents.wiregrid_encoder.agent', 'entry_point': 'main'},
     'WiregridKikusuiAgent': {'module': 'socs.agents.wiregrid_kikusui.agent', 'entry_point': 'main'},
+    'WiregridTiltSensorAgent': {'module': 'socs.agents.wiregrid_tiltsensor.agent', 'entry_point': 'main'},
 }
