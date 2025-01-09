@@ -7,11 +7,10 @@ import time
 
 import txaio
 from ocs import ocs_agent, site_config
-from ocs.ocs_twisted import TimeoutLock
+from ocs.ocs_twisted import TimeoutLock, Pacemaker
 
-from socs.agents.devantech_dS378.drivers import dS378
+from socs.agents.devantech_dS378.drivers import DS378
 
-IP_DEFAULT = '192.168.215.241'
 PORT_DEFAULT = 17123
 
 LOCK_RELEASE_SEC = 1.
@@ -19,27 +18,25 @@ LOCK_RELEASE_TIMEOUT = 10
 ACQ_TIMEOUT = 100
 
 
-class dS378Agent:
-    '''OCS agent class for dS378 ethernet relay
-    '''
+class DS378Agent:
+    """OCS agent class for dS378 ethernet relay
 
-    def __init__(self, agent, ip=IP_DEFAULT, port=17123):
-        '''
-        Parameters
-        ----------
-        ip : string
-            IP address
-        port : int
-            Port number
-        '''
+    Parameters
+    ----------
+    ip : string
+        IP address
+    port : int
+        Port number
+    """
 
+    def __init__(self, agent, ip, port=PORT_DEFAULT):
         self.active = True
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
         self.take_data = False
 
-        self._dev = dS378(ip=ip, port=port)
+        self._dev = DS378(ip=ip, port=port)
 
         self.initialized = False
 
@@ -49,22 +46,35 @@ class dS378Agent:
                                  agg_params=agg_params,
                                  buffer_time=1)
 
-    def start_acq(self, session, params):
-        '''Starts acquiring data.
-        '''
+    def acq(self, session, params):
+        """acq()
+
+        **Process** - Monitor status of the relay.
+
+        Notes
+        -----
+        An example of the session data::
+
+            >>> response.session['data']
+            {"fields":
+                {'V_sppl': 11.8,
+                 'T_int': 30.8,
+                 'Relay_1': 0,
+                 'Relay_2': ...
+                 }
+            }
+        """
         if params is None:
             params = {}
 
         f_sample = params.get('sampling_frequency', 0.5)
-        sleep_time = 1 / f_sample - 0.1
+        pace_maker = Pacemaker(f_sample)
 
         with self.lock.acquire_timeout(timeout=0, job='acq') as acquired:
             if not acquired:
                 self.log.warn(
                     f'Could not start acq because {self.lock.job} is already running')
                 return False, 'Could not acquire lock.'
-
-            session.set_status('running')
 
             self.take_data = True
             session.data = {"fields": {}}
@@ -82,48 +92,69 @@ class dS378Agent:
                 current_time = time.time()
                 data = {'timestamp': current_time, 'block_name': 'relay', 'data': {}}
 
-                d_status = self._dev.get_status()
-                relay_list = self._dev.get_relays()
+                try:
+                    d_status = self._dev.get_status()
+                    relay_list = self._dev.get_relays()
+                    if session.degraded:
+                        self.log.info('Connection re-established.')
+                        session.degraded = False
+                except ConnectionError:
+                    self.log.error('Failed to get data from relay. Check network connection.')
+                    session.degraded = True
+                    time.sleep(1)
+                    continue
+
                 data['data']['V_sppl'] = d_status['V_sppl']
                 data['data']['T_int'] = d_status['T_int']
                 for i in range(8):
                     data['data'][f'Relay_{i + 1}'] = relay_list[i]
 
-                field_dict = {'relay': {'V_sppl': d_status['V_sppl'],
-                                        'T_int': d_status['T_int']}}
+                field_dict = {'V_sppl': d_status['V_sppl'],
+                              'T_int': d_status['T_int']}
+                
+                for i in range(8):
+                    field_dict[f'Relay_{i + 1}'] = relay_list[i]
+
                 session.data['fields'].update(field_dict)
 
                 self.agent.publish_to_feed('relay', data)
                 session.data.update({'timestamp': current_time})
 
-                time.sleep(sleep_time)
+                pace_maker.sleep()
 
             self.agent.feeds['relay'].flush_buffer()
 
         return True, 'Acquisition exited cleanly.'
 
-    def stop_acq(self, session, params=None):
-        """
-        Stops the data acquisiton.
-        """
+    def _stop_acq(self, session, params=None):
         if self.take_data:
             self.take_data = False
             return True, 'requested to stop taking data.'
 
         return False, 'acq is not currently running.'
 
+    @ocs_agent.param('relay_number', type=int, check=lambda x: 1 <= x <= 8)
+    @ocs_agent.param('on_off', type=int)
+    @ocs_agent.param('pulse_time', default=None, type=int)
     def set_relay(self, session, params=None):
-        '''Turns the relay on/off or pulses it
+        """set_relay(relay_number, on_off, pulse_time=None)
+
+        **Task** - Turns the relay on/off or pulses it
 
         Parameters
         ----------
         relay_number : int
-            relay_number, 1 -- 8
-        on_off : int or RelayStatus
-            1: on, 0: off
-        pulse_time : int, 32 bit
-            See document
-        '''
+            Relay number to manipulate. 
+        on_off : int
+            1 (0) to turn on (off).
+        pulse_time : int, optional
+            Pulse time in ms.
+
+        Notes
+        -----
+        This command pulses relay for a given period when `pulse_time` argument is specified,
+        otherwise just turns a relay on or off.
+        """
         if params is None:
             params = {}
 
@@ -143,7 +174,20 @@ class dS378Agent:
         return True, 'Set values'
 
     def get_relays(self, session, params=None):
-        ''' Get relay states'''
+        """get_relays()
+
+        **Task** - Returns current relay status.
+
+        Notes
+        -----
+        The most recent data collected is stored in session.data in the
+        structure::
+
+            >>> response.session['data']
+            {'Relay_1': 1,
+             'Relay_2': ...
+            }
+        """
         if params is None:
             params = {}
 
@@ -173,16 +217,16 @@ def make_parser(parser=None):
 
 
 def main(args=None):
-    '''Boot OCS agent'''
+    """Boot OCS agent"""
     txaio.start_logging(level=os.environ.get('LOGLEVEL', 'info'))
 
     parser = make_parser()
-    args = site_config.parse_args(agent_class='dS378Agent',
+    args = site_config.parse_args(agent_class='DS378Agent',
                                   parser=parser,
                                   args=args)
 
     agent_inst, runner = ocs_agent.init_site_agent(args)
-    ds_agent = dS378Agent(agent_inst, ip=args.ip_address, port=args.port)
+    ds_agent = DS378Agent(agent_inst, ip=args.ip_address, port=args.port)
 
     agent_inst.register_task(
         'set_relay',
@@ -196,8 +240,8 @@ def main(args=None):
 
     agent_inst.register_process(
         'acq',
-        ds_agent.start_acq,
-        ds_agent.stop_acq,
+        ds_agent.acq,
+        ds_agent._stop_acq,
         startup=True
     )
 

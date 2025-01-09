@@ -61,7 +61,7 @@ shutter and powercycling devices such as motor controller or KR260 board.
 
 The driver code assumes the board is configured to communicate with binary codes.
 This configuration can be changed via web interface (but requires USB connection as well,
-see documentation provided from the manufacturer).
+see `documentation <http://www.robot-electronics.co.uk/files/dScriptPublish-4-14.zip>`_ provided from the manufacturer).
 You can also configure the ip address and the port number with the same interface.
 
 The device only accepts 10/100BASE communication.
@@ -69,5 +69,11 @@ The device only accepts 10/100BASE communication.
 Agent API
 ---------
 
-.. autoclass:: socs.agents.devantech_dS378.agent.dS378Agent
+.. autoclass:: socs.agents.devantech_dS378.agent.DS378Agent
+   :members:
+
+.. autoclass:: socs.agents.devantech_dS378.drivers.DS378
+   :members:
+
+.. autoclass:: socs.agents.devantech_dS378.drivers.RelayStatus
    :members:
