@@ -19,6 +19,7 @@ GET_COUNTERS = 0x36, 8
 N_TRIAL = 2
 LEN_BUFF = 1024
 
+
 class RelayStatus(IntEnum):
     """Relay status"""
     on = 1

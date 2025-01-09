@@ -7,7 +7,7 @@ import time
 
 import txaio
 from ocs import ocs_agent, site_config
-from ocs.ocs_twisted import TimeoutLock, Pacemaker
+from ocs.ocs_twisted import Pacemaker, TimeoutLock
 
 from socs.agents.devantech_dS378.drivers import DS378
 
@@ -111,7 +111,7 @@ class DS378Agent:
 
                 field_dict = {'V_sppl': d_status['V_sppl'],
                               'T_int': d_status['T_int']}
-                
+
                 for i in range(8):
                     field_dict[f'Relay_{i + 1}'] = relay_list[i]
 
@@ -144,7 +144,7 @@ class DS378Agent:
         Parameters
         ----------
         relay_number : int
-            Relay number to manipulate. 
+            Relay number to manipulate.
         on_off : int
             1 (0) to turn on (off).
         pulse_time : int, optional
