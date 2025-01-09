@@ -308,7 +308,8 @@ class PysmurfController:
                 'pysmurf_action_timestamp': Current pysmurf-action timestamp,
                 'stream_tag': stream-tag for the current g3 stream,
                 'last_update':  Time that session-data was last updated,
-                'stream_id': Stream-id of the controlled smurf instance
+                'stream_id': Stream-id of the controlled smurf instance,
+                'num_active_channels': Number of channels outputting tones
             }
         """
         S, cfg = self._get_smurf_control(load_tune=False, no_dir=True)
