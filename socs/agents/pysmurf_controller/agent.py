@@ -317,6 +317,11 @@ class PysmurfController:
         kw = {'retry_on_fail': False}
         while session.status in ['starting', 'running']:
             try:
+
+                num_active_channels = 0.0
+                for band in range(8):
+                    num_active_channels += len(S.which_on(band))
+
                 d = dict(
                     channel_mask=S.get_channel_mask(**kw).tolist(),
                     downsample_factor=S.get_downsample_factor(**kw),
@@ -327,6 +332,7 @@ class PysmurfController:
                     stream_tag=reg.stream_tag.get(**kw, as_string=True),
                     last_update=time.time(),
                     stream_id=cfg.stream_id,
+                    num_active_channels=num_active_channels,
                 )
                 session.data.update(d)
             except (RuntimeError, epics.ca.ChannelAccessGetFailure):
