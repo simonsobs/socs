@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """dS378 ethernet relay"""
-import socket
 import sys
 from enum import IntEnum
 
