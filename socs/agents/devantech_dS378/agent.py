@@ -139,21 +139,22 @@ class DS378Agent:
     def set_relay(self, session, params=None):
         """set_relay(relay_number, on_off, pulse_time=None)
 
-        **Task** - Turns the relay on/off or pulses it
+        **Task** - Turns the relay on/off or pulses it.
 
         Parameters
         ----------
         relay_number : int
-            Relay number to manipulate.
+            Relay number to manipulate. Values must be in range [1, 8].
         on_off : int
             1 (0) to turn on (off).
         pulse_time : int, optional
-            Pulse time in ms.
+            Pulse time in ms. Values must be in range [0, 4294967295].
 
         Notes
         -----
-        This command pulses relay for a given period when `pulse_time` argument is specified,
-        otherwise just turns a relay on or off.
+        This command pulses relay for a given period when ``pulse_time``
+        argument is specified, otherwise just turns a relay on or off.
+
         """
         if params is None:
             params = {}
