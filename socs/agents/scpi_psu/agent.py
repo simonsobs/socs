@@ -268,7 +268,6 @@ class ScpiPsuAgent:
                         'channel': chan,
                         'current': self.psu.get_curr(chan)
                     }
-
                     session.data = data
                 else:
                     return False, "Cannot measure output when output is disabled."
@@ -330,7 +329,6 @@ class ScpiPsuAgent:
                     'state': self.psu.get_output(chan)
                 }
                 session.data = data
-                enabled = bool(data['state'])
             else:
                 return False, "Could not acquire lock."
         if enabled:
