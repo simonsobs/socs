@@ -72,6 +72,9 @@ Agent API
 .. autoclass:: socs.agents.devantech_dS378.agent.DS378Agent
    :members:
 
+Supporting APIs
+---------------
+
 .. autoclass:: socs.agents.devantech_dS378.drivers.DS378
    :members:
 
