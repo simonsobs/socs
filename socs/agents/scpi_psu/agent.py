@@ -329,6 +329,7 @@ class ScpiPsuAgent:
                     'state': self.psu.get_output(chan)
                 }
                 session.data = data
+                enabled = bool(data['state'])
             else:
                 return False, "Could not acquire lock."
         if enabled:
