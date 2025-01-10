@@ -268,7 +268,6 @@ class ScpiPsuAgent:
                         'channel': chan,
                         'current': self.psu.get_curr(chan)
                     }
-
                     session.data = data
                 else:
                     return False, "Cannot measure output when output is disabled."
