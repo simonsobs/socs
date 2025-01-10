@@ -156,9 +156,6 @@ class DS378Agent:
         argument is specified, otherwise just turns a relay on or off.
 
         """
-        if params is None:
-            params = {}
-
         with self.lock.acquire_timeout(3, job='set_values') as acquired:
             if not acquired:
                 self.log.warn('Could not start set_values because '
