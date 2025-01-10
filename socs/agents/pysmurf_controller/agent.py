@@ -598,7 +598,7 @@ class PysmurfController:
             if result.traceback is not None:
                 self.log.error("Error occurred:\n{tb}", tb=result.traceback)
 
-            return result.success, "Finished UXM Setup"
+            return result.success, "Finished UXM Relock"
 
     @ocs_agent.param('duration', default=30., type=float)
     @ocs_agent.param('kwargs', default=None)
@@ -994,7 +994,7 @@ class PysmurfController:
 
         Args
         -----
-        bg: int, list, optional
+        bgs: int, list, optional
             Bias group (bg), or list of bgs to set. If None, will set all bgs.
         bias: int, float, list
             Biases to set. If a float is passed, this will be used for all
@@ -1031,7 +1031,7 @@ class PysmurfController:
 
         Args
         -----
-        bg: int, list, optional
+        bgs: int, list, optional
             bg, or list of bgs to zero. If None, will zero all bgs.
         """
         params['bias'] = 0
