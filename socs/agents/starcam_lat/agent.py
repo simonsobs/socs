@@ -10,13 +10,11 @@ from ocs.ocs_twisted import TimeoutLock
 
 
 class StarcamHelper:
-
-    """
-    CLASS to control and retrieve data from the starcamera
+    """Controls and retrieves data from the starcam.
 
     Args:
-        ip_address: IP address of the starcamera computer
-        port: port of the starcamera
+        ip_address: IP address of the starcam computer.
+        port: Port of the starcam.
     """
 
     def __init__(self, ip_address, port, timeout=10):
@@ -28,14 +26,11 @@ class StarcamHelper:
         self.comm.settimeout(timeout)
 
     def pack_and_send_cmds(self):
-        """
-        pack_and_send_cmds()
+        """Packs commands and parameters to be sent to the starcam and sends.
 
-        **Process**
-        packs commands and parameters to be sent to starcamera and sends
+        Returns:
+            list: Values sent to the starcam.
 
-        **Return**
-        returns list of values sent
         """
         logodds = 1e8
         latitude = -22.9586
@@ -94,19 +89,15 @@ class StarcamHelper:
                                            *values)
         # send commands to the camera
         self.comm.sendto(self.cmds_for_camera, (self.ip, self.port))
-        print("Commands sent to camera")
+        print("Commands sent to camera.")
         # Return the list of values
         return values
 
     def get_astrom_data(self):
-        """
-        get_astrom_data()
+        """Receives and unpacks data from the starcam.
 
-        **Process**
-        receives and unpacks data from camera
-
-        **Return**
-        returns dictionary of unpacked data
+        Returns:
+            dictionary: Dictionary of unpacked data.
         """
         (scdata_raw, _) = self.comm.recvfrom(224)
         data = struct.unpack_from("dddddddddddddiiiiiiiiddiiiiiiiiiiiiiifiii",
@@ -130,11 +121,7 @@ class StarcamHelper:
         return astrom_data_dict
 
     def close(self):
-        """
-        close()
-
-        **Process**
-        closes the socket of the connection
+        """Closes the socket of the connection.
         """
         self.comm.close()
 
@@ -154,43 +141,33 @@ class StarcamAgent:
         try:
             self.StarcamHelper = StarcamHelper(ip_address, port)
         except socket.timeout:
-            self.log.error("Starcamera connection has times out")
+            self.log.error("Starcam connection has timed out.")
             return False, "Timeout"
 
     @ocs_agent.param('_')
     def send_commands(self, session, params=None):
-        """
-        send_commands()
+        """Packs and sends camera+astrometry-related commands to the starcam.
 
-        **Process**
-        packs and sends camera+astrometry-related commands to starcam
-
-        **Return**
-        returns a touple with True/False and a string describing whether
-        or not a lock could be acquired and commands were sent to the sc
+        Returns:
+            touple: Contains True/False and a string describing whether or not
+                    a lock could be acquired+commands were sent to the starcam.
         """
         with self.lock.acquire_timeout(job='send_commands') as acquired:
             if not acquired:
-                self.log.warn(f"Could not start Task because "
-                              f"{self._lock.job} is already running")
-                return False, "Could not acquire lock"
-            self.log.info("Sending commands")
+                self.log.warn(f"Could not start task because "
+                              f"{self._lock.job} is already running.")
+                return False, "Could not acquire lock."
+            self.log.info("Sending commands.")
             self.StarcamHelper.pack_and_send_cmds()
-        return True, "Sent commands to starcamera"
+        return True, "Sent commands to the starcam."
 
     @ocs_agent.param('_')
     def acq(self, session, params=None):
-        """
-        acq()
+        """Acquires data from the starcam and publishes to feed.
 
-        **Process**
-        acquires data from starcam and publishes to feed
-
-        **Return**
-        once the acq() loop exits (wherein data is retrieved from
-        the camera and pulished), a touple with True/False and a string
-        describing whether or not the loop was exited after the end of
-        an acquisition.
+        Returns:
+            touple: Contains True/False and a string describing whether or not
+                    the loop was exited after the end of an acquisition.
         """
         if params is None:
             params = {}
@@ -198,9 +175,9 @@ class StarcamAgent:
             if not acquired:
                 self.log.warn("Could not start init because {} is already "
                               "running".format(self.lock.job))
-                return False, "Could not acquire lock"
+                return False, "Could not acquire lock."
             session.set_status('running')
-            self.log.info("Starting acquisition")
+            self.log.info("Starting acquisition.")
             self.take_data = True
             while self.take_data:
                 data = {
@@ -215,7 +192,7 @@ class StarcamAgent:
                 session.data.update(data['data'])
                 self.agent.publish_to_feed('starcamera', data)
 
-        return True, 'Acquisition exited cleanly'
+        return True, 'Acquisition exited cleanly.'
 
     def _stop_acq(self, session, params):
         ok = False
@@ -224,7 +201,7 @@ class StarcamAgent:
             self.take_data = False
             ok = True
             # self.StarcamHelper.close()
-        return (ok, {True: 'Requested process to stop',
+        return (ok, {True: 'Requested process to stop.',
                      False: 'Failed to request process stop.'}[ok])
 
 
