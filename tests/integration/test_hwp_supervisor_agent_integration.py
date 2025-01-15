@@ -30,7 +30,6 @@ def hwp_em() -> Generator[HWPEmulator, None, None]:
         em.shutdown()
 
 
-
 def _cleanup_runner(runner: _AgentRunner, cov) -> None:
     runner.shutdown()
     agentcov = coverage.data.CoverageData(

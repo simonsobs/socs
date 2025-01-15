@@ -311,7 +311,7 @@ class EncoderParser:
         """
         self.stop = False
 
-        while not self.stop: # This can be toggled by encoder agent to unblock
+        while not self.stop:  # This can be toggled by encoder agent to unblock
             # If there is data from the socket attached to the beaglebone then
             #     ready[0] = true
             # If not then continue checking for 2 seconds and if there is still no data
