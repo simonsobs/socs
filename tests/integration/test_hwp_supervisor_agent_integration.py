@@ -30,32 +30,9 @@ def hwp_em() -> Generator[HWPEmulator, None, None]:
         em.shutdown()
 
 
-def _shutdown_agent_runner(runner: _AgentRunner) -> None:
-    """
-    Shutdown the agent process using SIGKILL.
-    """
-    # don't send SIGINT if we've already sent SIGKILL
-    if not runner._timedout:
-        runner.proc.send_signal(signal.SIGKILL)
-    runner._timer.cancel()
-
-    try:
-        runner.proc.communicate(timeout=SIGINT_TIMEOUT)
-    except subprocess.TimeoutExpired:
-        runner._raise_subprocess(
-            "Agent did not terminate within " f"{SIGINT_TIMEOUT} seconds on SIGINT."
-        )
-
-    if runner._timedout:
-        stdout, stderr = runner.proc.communicate(timeout=SIGINT_TIMEOUT)
-        print(f"Here is stdout from {runner.agent_name}:\n{stdout}")
-        print(f"Here is stderr from {runner.agent_name}:\n{stderr}")
-        raise RuntimeError("Agent timed out.")
-
 
 def _cleanup_runner(runner: _AgentRunner, cov) -> None:
-    _shutdown_agent_runner(runner)
-    # report coverage
+    runner.shutdown()
     agentcov = coverage.data.CoverageData(
         basename=f".coverage.agent.{runner.agent_name}"
     )
@@ -93,7 +70,7 @@ def encoder_agent(
     wait_for_crossbar, hwp_em: HWPEmulator, cov
 ) -> Generator[None, None, None]:
     agent_path = "../socs/agents/hwp_encoder/agent.py"
-    agent_name = "pid"
+    agent_name = "encoder"
     timeout = 60
     args = [
         "--log-dir",
