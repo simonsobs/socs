@@ -9,7 +9,6 @@ from ocs.testing import _AgentRunner, create_client_fixture
 
 from socs.testing.hwp_emulator import HWPEmulator
 
-
 AGENT_TIMEOUT = 5 * 60
 
 log_dir = "./logs/"
