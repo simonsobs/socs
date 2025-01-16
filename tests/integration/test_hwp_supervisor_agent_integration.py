@@ -1,5 +1,3 @@
-import signal
-import subprocess
 from pprint import pprint
 from typing import Any, Dict, Generator
 
@@ -7,7 +5,7 @@ import coverage.data
 import pytest
 from integration.util import docker_compose_file  # noqa: F401
 from integration.util import create_crossbar_fixture
-from ocs.testing import SIGINT_TIMEOUT, _AgentRunner, create_client_fixture
+from ocs.testing import _AgentRunner, create_client_fixture
 
 from socs.testing.hwp_emulator import HWPEmulator
 
