@@ -11,6 +11,9 @@ from ocs.testing import SIGINT_TIMEOUT, _AgentRunner, create_client_fixture
 
 from socs.testing.hwp_emulator import HWPEmulator
 
+
+AGENT_TIMEOUT = 5 * 60
+
 log_dir = "./logs/"
 
 pid_client = create_client_fixture("hwp-pid")
@@ -47,7 +50,6 @@ def pid_agent(
 ) -> Generator[None, None, None]:
     agent_path = "../socs/agents/hwp_pid/agent.py"
     agent_name = "pid"
-    timeout = 60
     args = [
         "--log-dir",
         log_dir,
@@ -58,7 +60,7 @@ def pid_agent(
     ]
     try:
         runner = _AgentRunner(agent_path, agent_name, args)
-        runner.run(timeout=timeout)
+        runner.run(timeout=AGENT_TIMEOUT)
         yield
     finally:
         _cleanup_runner(runner, cov)
@@ -70,7 +72,6 @@ def encoder_agent(
 ) -> Generator[None, None, None]:
     agent_path = "../socs/agents/hwp_encoder/agent.py"
     agent_name = "encoder"
-    timeout = 60
     args = [
         "--log-dir",
         log_dir,
@@ -81,7 +82,7 @@ def encoder_agent(
     ]
     try:
         runner = _AgentRunner(agent_path, agent_name, args)
-        runner.run(timeout=timeout)
+        runner.run(timeout=AGENT_TIMEOUT)
         yield
     finally:
         _cleanup_runner(runner, cov)
@@ -93,7 +94,6 @@ def pmx_agent(
 ) -> Generator[None, None, None]:
     agent_path = "../socs/agents/hwp_pmx/agent.py"
     agent_name = "pmx"
-    timeout = 60
     args = [
         "--log-dir",
         log_dir,
@@ -102,7 +102,7 @@ def pmx_agent(
     ]
     try:
         runner = _AgentRunner(agent_path, agent_name, args)
-        runner.run(timeout=timeout)
+        runner.run(timeout=AGENT_TIMEOUT)
         yield
     finally:
         _cleanup_runner(runner, cov)
@@ -114,7 +114,6 @@ def pcu_agent(
 ) -> Generator[None, None, None]:
     agent_path = "../socs/agents/hwp_pcu/agent.py"
     agent_name = "pcu"
-    timeout = 60
     args = [
         "--log-dir",
         log_dir,
@@ -123,7 +122,7 @@ def pcu_agent(
     ]
     try:
         runner = _AgentRunner(agent_path, agent_name, args)
-        runner.run(timeout=timeout)
+        runner.run(timeout=AGENT_TIMEOUT)
         yield
     finally:
         _cleanup_runner(runner, cov)
@@ -135,7 +134,6 @@ def gripper_agent(
 ) -> Generator[None, None, None]:
     agent_path = "../socs/agents/hwp_gripper/agent.py"
     agent_name = "gripper"
-    timeout = 60
     args = [
         "--log-dir",
         log_dir,
@@ -143,7 +141,7 @@ def gripper_agent(
         str(hwp_em.gripper_device.socket_port),
     ]
     runner = _AgentRunner(agent_path, agent_name, args)
-    runner.run(timeout=timeout)
+    runner.run(timeout=AGENT_TIMEOUT)
     yield
     _cleanup_runner(runner, cov)
 
@@ -154,14 +152,13 @@ def supervisor_agent(
 ) -> Generator[None, None, None]:
     agent_path = "../socs/agents/hwp_supervisor/agent.py"
     agent_name = "supervisor"
-    timeout = 60
     args = [
         "--log-dir",
         log_dir,
     ]
     try:
         runner = _AgentRunner(agent_path, agent_name, args)
-        runner.run(timeout=timeout)
+        runner.run(timeout=AGENT_TIMEOUT)
         yield
     finally:
         _cleanup_runner(runner, cov)
