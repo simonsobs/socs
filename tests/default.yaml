@@ -50,6 +50,33 @@ hosts:
                      ['--port', '5025'],
                     ]
       },
+      {'agent-class': 'HWPPCUAgent',
+       'instance-id': 'hwp-pcu',
+       'arguments': [
+          '--port', './responder'
+      ]},
+      {'agent-class': 'HWPBBBAgent',
+       'instance-id': 'hwp-enc',
+       'arguments': [
+          '--ip', '127.0.0.1'
+      ]},
+      {'agent-class': 'HWPGripperAgent',
+       'instance-id': 'hwp-gripper',
+       'arguments': [
+          '--mcu-ip', '127.0.0.1',
+          '--supervisor-id', 'hwp-supervisor',
+      ]},
+      {'agent-class': 'HWPSupervisor',
+       'instance-id': 'hwp-supervisor',
+       'arguments': [
+          '--sleep-time', 0.5,
+          '--hwp-pmx-id', 'hwp-pmx',
+          '--hwp-pid-id', 'hwp-pid',
+          '--hwp-pcu-id', 'hwp-pcu',
+          '--hwp-encoder-id', 'hwp-enc',
+          '--hwp-gripper-id', 'hwp-gripper',
+          '--no-acu',
+      ]},
       {'agent-class': 'CryomechCPAAgent',
        'instance-id': 'cryomech',
        'arguments':[['--ip-address', '127.0.0.1'],

@@ -5,7 +5,7 @@ import time
 import traceback
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, Generator, List, Literal, Optional
+from typing import Any, Dict, Generator, List, Literal, Optional, Tuple
 
 import numpy as np
 import ocs
@@ -114,6 +114,79 @@ class HWPClients:
     driver_iboot: Optional[OCSClient] = None
     pcu: Optional[OCSClient] = None
     gripper: Optional[OCSClient] = None
+
+
+@dataclass
+class GripperState:
+    """
+    Attributes
+    -------------
+    instance_id: str
+        Instance ID of gripper agent being monitored
+    limit_warm_grip_state: List[bool]
+        State of the warm-grip limit switches for the three actuators
+    limit_cold_grip_state: List[bool]
+        State of the cold-grip limit switches for the three actuators
+    emg: List[bool]
+        For each actuator, this will be true if the actuator is receiving power
+        from the motor controller.
+    brake: List[bool]
+        For each actuator, this will be true if the brake is enabled.
+    grip_state: Literal['cold', 'warm', 'ungripped', 'unknown']
+        A string representing the state of the gripper based on limit switches
+        and other information.
+    last_updated: Optional[float]
+        Timestamp of last update.
+    gripper_max_time_since_update: float
+        Max amount of time without an update before the grip_state reverts to 'unknown'.
+    """
+    instance_id: str
+    limit_warm_grip_state: List[bool] = field(default_factory=lambda: [False, False, False])
+    limit_cold_grip_state: List[bool] = field(default_factory=lambda: [False, False, False])
+    emg: List[bool] = field(default_factory=lambda: [False, False, False])
+    brake: List[bool] = field(default_factory=lambda: [False, False, False])
+    grip_state: Literal['cold', 'warm', 'ungripped', 'unknown'] = 'unknown'
+    last_updated: Optional[float] = None
+    gripper_max_time_since_update: float = 60.0
+
+    def _verify_update_time(self) -> None:
+        """
+        Will check if gripper state has been updated within the allowed time.
+        If not, this will set the grip_state to "unknown".
+        """
+        if self.last_updated is None:
+            self.grip_state = 'unknown'
+        elif time.time() - self.last_updated > self.gripper_max_time_since_update:
+            self.grip_state = 'unknown'
+
+    def update(self) -> None:
+        op = get_op_data(self.instance_id, 'monitor_state', test_mode=False)
+        if op['status'] != 'ok':
+            self._verify_update_time()
+            return
+
+        d = op['data']
+        state = d['state']
+        self.last_updated = d['last_updated']
+
+        for i, axis in enumerate([1, 2, 3]):
+            self.limit_warm_grip_state[i] = state[f'act{axis}_limit_warm_grip_state']
+            self.limit_cold_grip_state[i] = state[f'act{axis}_limit_cold_grip_state']
+            self.emg[i] = state[f'act{axis}_emg']
+            self.brake[i] = state[f'act{axis}_brake']
+
+        if np.all(self.limit_cold_grip_state):
+            self.grip_state = 'cold'
+        elif np.any(self.limit_cold_grip_state):
+            self.grip_state = 'unknown'
+        elif np.all(self.limit_warm_grip_state):
+            self.grip_state = 'warm'
+        elif np.any(self.limit_warm_grip_state):
+            self.grip_state = 'unknown'
+        else:
+            self.grip_state = 'ungripped'
+
+        self._verify_update_time()
 
 
 @dataclass
@@ -243,6 +316,14 @@ class ACUState:
 
 @dataclass
 class HWPState:
+    last_updated: Optional[float] = None
+
+    lakeshore_instance_id: Optional[str] = None
+    ups_instance_id: Optional[str] = None
+    pid_instance_id: Optional[str] = None
+    pmx_instance_id: Optional[str] = None
+    enc_instance_id: Optional[str] = None
+
     temp: Optional[float] = None
     temp_status: Optional[str] = None
     temp_thresh: Optional[float] = None
@@ -258,6 +339,7 @@ class HWPState:
     ups_last_connection_attempt: Optional[bool] = None
 
     pid_current_freq: Optional[float] = None
+    pid_freq_tolerance: float = 0.1
     pid_target_freq: Optional[float] = None
     pid_direction: Optional[str] = None
     pid_last_updated: Optional[float] = None
@@ -276,13 +358,24 @@ class HWPState:
     driver_iboot: Optional[IBootState] = None
 
     acu: Optional[ACUState] = None
+    gripper: Optional[GripperState] = None
+
+    is_spinning: Optional[bool] = None
 
     supervisor_control_state: Optional[Dict[str, Any]] = None
 
+    def __post_init__(self) -> None:
+        self.lock: threading.Semaphore = threading.Semaphore()
+
     @classmethod
-    def from_args(cls, args: argparse.Namespace):
+    def from_args(cls, args: argparse.Namespace) -> "HWPState":
         log = txaio.make_logger()  # pylint: disable=E1101
         self = cls(
+            lakeshore_instance_id=args.ybco_lakeshore_id,
+            ups_instance_id=args.ups_id,
+            pid_instance_id=args.hwp_pid_id,
+            pmx_instance_id=args.hwp_pmx_id,
+            enc_instance_id=args.hwp_encoder_id,
             temp_field=args.ybco_temp_field,
             temp_thresh=args.ybco_temp_thresh,
             ups_minutes_remaining_thresh=args.ups_minutes_remaining_thresh,
@@ -319,6 +412,11 @@ class HWPState:
         else:
             log.warn("The no-acu option has been set. ACU state checking disabled.")
 
+        if args.hwp_gripper_id is not None:
+            self.gripper = GripperState(args.hwp_gripper_id)
+        else:
+            log.warn("HWP Gripper ID is not set. This will not be monitored in the HWP state.")
+
         return self
 
     def _update_from_keymap(self, op, keymap):
@@ -330,7 +428,7 @@ class HWPState:
         for k, v in keymap.items():
             setattr(self, k, op['data'].get(v))
 
-    def update_enc_state(self, op):
+    def update_enc_state(self, test_mode=False):
         """
         Updates state values from the encoder acq operation results.
 
@@ -340,14 +438,16 @@ class HWPState:
             Dict containing the operations (from get_op_data) from the encoder
             ``acq`` process
         """
+        op = get_op_data(self.enc_instance_id, 'acq', test_mode=test_mode)
         self._update_from_keymap(op, {
             'enc_freq': 'approx_hwp_freq',
             'encoder_last_updated': 'encoder_last_updated',
             'last_quad': 'last_quad',
             'last_quad_time': 'last_quad_time',
         })
+        return op
 
-    def update_temp_state(self, op):
+    def update_temp_state(self, test_mode=False):
         """
         Updates state values from the Lakeshore acq operation results.
 
@@ -357,16 +457,17 @@ class HWPState:
             Dict containing the operations (from get_op_data) from the lakeshore
             ``acq`` process
         """
+        op = get_op_data(self.lakeshore_instance_id, 'acq', test_mode=test_mode)
         if op['status'] != 'ok':
             self.temp = None
             self.temp_status = 'no_data'
-            return
+            return op
 
         fields = op['data']['fields']
         if self.temp_field not in fields:
             self.temp = None
             self.temp_status = 'no_data'
-            return
+            return op
 
         self.temp = fields[self.temp_field]['T']
 
@@ -377,8 +478,9 @@ class HWPState:
                 self.temp_status = 'ok'
         else:
             self.temp_status = 'ok'
+        return op
 
-    def update_pmx_state(self, op):
+    def update_pmx_state(self, test_mode=False):
         """
         Updates state values from the pmx main operation results.
 
@@ -388,11 +490,13 @@ class HWPState:
             Dict containing the operations (from get_op_data) from the pmx
             ``main`` process
         """
+        op = get_op_data(self.pmx_instance_id, 'main', test_mode=test_mode)
         keymap = {'pmx_current': 'curr', 'pmx_voltage': 'volt',
                   'pmx_source': 'source', 'pmx_last_updated': 'last_updated'}
         self._update_from_keymap(op, keymap)
+        return op
 
-    def update_pid_state(self, op):
+    def update_pid_state(self, test_mode=False):
         """
         Updates state values from the pid main operation results.
 
@@ -402,14 +506,16 @@ class HWPState:
             Dict containing the operations (from get_op_data) from the pid
             ``main`` process
         """
+        op = get_op_data(self.pid_instance_id, 'main', test_mode=test_mode)
         self._update_from_keymap(op, {
             'pid_current_freq': 'current_freq',
             'pid_target_freq': 'target_freq',
             'pid_direction': 'direction',
             'pid_last_updated': 'last_updated'
         })
+        return op
 
-    def update_ups_state(self, op):
+    def update_ups_state(self, test_mode=False):
         """
         Updates state values from the UPS acq operation results.
 
@@ -419,6 +525,7 @@ class HWPState:
             Dict containing the operations (from get_op_data) from the UPS
             ``acq`` process
         """
+        op = get_op_data(self.ups_instance_id, 'acq', test_mode=test_mode)
         ups_keymap = {
             'ups_output_source': ('upsOutputSource', 'description'),
             'ups_estimated_minutes_remaining': ('upsEstimatedMinutesRemaining', 'status'),
@@ -474,6 +581,38 @@ class HWPState:
             return 'no_data'
 
         return 'ok'
+
+    def update(self, test_mode=False) -> Dict[str, Any]:
+        now = time.time()
+        with self.lock:
+            ops = {
+                'temperature': self.update_temp_state(test_mode=test_mode),
+                'encoder': self.update_enc_state(test_mode=test_mode),
+                'pmx': self.update_pmx_state(test_mode=test_mode),
+                'pid': self.update_pid_state(test_mode=test_mode),
+                'ups': self.update_ups_state(),
+            }
+
+            self.last_updated = now
+            if self.driver_iboot is not None:
+                self.driver_iboot.update()
+            if self.gripper_iboot is not None:
+                self.gripper_iboot.update()
+            if self.acu is not None:
+                self.acu.update()
+            if self.gripper is not None:
+                self.gripper.update()
+
+            if self.pid_last_updated is None or self.pid_current_freq is None:
+                self.is_spinning = None
+            elif now - self.pid_last_updated > self.pid_max_time_since_update:
+                self.is_spinning = None
+            elif self.pid_current_freq > self.pid_freq_tolerance:
+                self.is_spinning = True
+            else:
+                self.is_spinning = False
+
+        return ops
 
     @property
     def gripper_action(self):
@@ -1283,8 +1422,20 @@ class HWPSupervisor:
             gripper=get_client(self.args.hwp_gripper_id),
         )
 
+    def query_hwp_state(self, session, params) -> Tuple[bool, str]:
+        """query_hwp_state()
+
+        **Task** -- Forces an update of the HWP State, and returns the result.
+
+        For information on session.data["state"], see the docstrings for the
+        ``monitor`` process.
+        """
+        self.hwp_state.update()
+        session.data['state'] = asdict(self.hwp_state)
+        return True, "Queried HWP state"
+
     @ocs_agent.param('test_mode', type=bool, default=False)
-    def monitor(self, session, params):
+    def monitor(self, session, params) -> Tuple[bool, str]:
         """monitor()
 
         **Process** -- Monitors various HWP related HK systems.
@@ -1315,22 +1466,61 @@ class HWPSupervisor:
                         'status': 'ok',  # See ``get_op_data`` docstring for choices
                         'timestamp': 1680273288.6200094},
                     },
-                    'rotation': {see above},
                     'temperature': {see above},
-                    'ups': {see above}
-                    'iboot': {see above}},
+                    'ups': {see above},
+                    'pmx': {see above},
+                    'pid': {see above}}
                 # State data parsed from monitored sessions
                 'state': {
-                    'hwp_freq': None,
-                    'ybco_temp': 20.0,
-                    'ybco_temp_status': 'ok',  # `no_data`, `ok`, or `over`
-                    'ybco_temp_thresh': 75.0,
+                    'acu': None,
+                    'driver_iboot': None,
+                    'enc_freq': None,
+                    'enc_instance_id': 'hwp-enc',
+                    'gripper': {
+                        'brake': [0, 0, 0],
+                        'emg': [0, 0, 0],
+                        'grip_state': 'ungripped',
+                        'gripper_max_time_since_update': 60.0,
+                        'instance_id': 'hwp-gripper',
+                        'last_updated': 1737132296.0509753,
+                        'limit_cold_grip_state': [0, 0, 0],
+                        'limit_warm_grip_state': [0, 0, 0]},
+                    'gripper_iboot': None,
+                    'is_spinning': False,
+                    'lakeshore_instance_id': None,
+                    'last_quad': None,
+                    'last_quad_time': None,
+                    'last_updated': 1737132297.6445067,
+                    'pid_current_freq': 0.0,
+                    'pid_direction': 0,
+                    'pid_freq_tolerance': 0.1,
+                    'pid_instance_id': 'hwp-pid',
+                    'pid_last_updated': 1737132293.4787645,
+                    'pid_max_time_since_update': 60.0,
+                    'pid_target_freq': 0.0,
+                    'pmx_current': 0.0,
+                    'pmx_instance_id': 'hwp-pmx',
+                    'pmx_last_updated': 1737132292.9470851,
+                    'pmx_source': 'volt',
+                    'pmx_voltage': 0.0,
+                    'supervisor_control_state': {
+                        'last_update_time': 1737132297.3006465,
+                        'start_time': 1737132296.9819815,
+                        'state_type': 'Idle'},
+                    'temp': None,
+                    'temp_field': None,
+                    'temp_status': 'no_data',
+                    'temp_thresh': None,
                     'ups_battery_current': 0,
                     'ups_battery_voltage': 136,
-                    'ups_estimated_minutes_remaining': 50,
-                    'ups_minutes_remaining_thresh': 45.0,
-                    'ups_output_source': 'normal'  # See UPS agent docs for choices
-                },
+                    'ups_connected': None,
+                    'ups_estimated_charge_remaining': 50,
+                    'ups_estimated_minutes_remaining': 45,
+                    'ups_instance_id': ups,
+                    'ups_last_connection_attempt': None,
+                    'ups_minutes_remaining_thresh': None,
+                    'ups_output_source': None}
+
                  # Subsystem action recommendations determined from state data
                 'actions': {
                     'pmx': 'ok'  # 'ok', 'stop', or 'no_data'
@@ -1344,43 +1534,18 @@ class HWPSupervisor:
             'timestamp': time.time(),
             'monitored_sessions': {},
             'hwp_state': {},
-            'actions': {},
+            'actions': {
+                'pmx': 'no_data',
+                'gripper': 'no_data',
+            }
         }
 
-        kw = {'test_mode': test_mode, 'log': self.log}
-
         while session.status in ['starting', 'running']:
-            session.data['timestamp'] = time.time()
+            now = time.time()
+            session.data['timestamp'] = now
 
-            # 1. Gather data from relevant operations
-            temp_op = get_op_data(self.ybco_lakeshore_id, 'acq', **kw)
-            enc_op = get_op_data(self.hwp_encoder_id, 'acq', **kw)
-            pmx_op = get_op_data(self.hwp_pmx_id, 'main', **kw)
-            pid_op = get_op_data(self.hwp_pid_id, 'main', **kw)
-            ups_op = get_op_data(self.ups_id, 'acq', **kw)
-
-            session.data['monitored_sessions'] = {
-                'temperature': temp_op,
-                'encoder': enc_op,
-                'pmx': pmx_op,
-                'pid': pid_op,
-                'ups': ups_op,
-            }
-
-            # gather state info
-            self.hwp_state.update_pid_state(pid_op)
-            self.hwp_state.update_pmx_state(pmx_op)
-            self.hwp_state.update_temp_state(temp_op)
-            self.hwp_state.update_ups_state(ups_op)
-            self.hwp_state.update_enc_state(enc_op)
-
-            if self.hwp_state.driver_iboot is not None:
-                self.hwp_state.driver_iboot.update()
-            if self.hwp_state.gripper_iboot is not None:
-                self.hwp_state.gripper_iboot.update()
-            if self.hwp_state.acu is not None:
-                self.hwp_state.acu.update()
-
+            ops = self.hwp_state.update(test_mode=test_mode)
+            session.data['monitored_sessions'] = ops
             session.data['hwp_state'] = asdict(self.hwp_state)
 
             # Get actions for each hwp subsystem
@@ -1574,7 +1739,7 @@ class HWPSupervisor:
                 {'action_id': 3,
                 'completed': True,
                 'cur_state': {'class': 'Done', 'msg': None, 'success': True},
-                'state_history': List[ConrolState],
+                'state_history': List[ControlState],
                 'success': True}
             }
         """
@@ -1856,6 +2021,7 @@ def main(args=None):
                            startup=True)
     agent.register_process(
         'spin_control', hwp.spin_control, hwp._stop_spin_control, startup=True)
+    agent.register_task('query_hwp_state', hwp.query_hwp_state)
     agent.register_task('pid_to_freq', hwp.pid_to_freq)
     agent.register_task('set_const_voltage', hwp.set_const_voltage)
     agent.register_task('brake', hwp.brake)
