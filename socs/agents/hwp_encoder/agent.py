@@ -185,8 +185,14 @@ class EncoderParser:
         # Will be continually updated with unix in seconds
         self.current_time = 0
 
+        # If True, will stop trying to read data from socket
+        self.stop = False
+
         # Creates a UDP socket to connect to the Beaglebone
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # This helps with testing and rebinding to the same port after reset...
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
         # Binds the socket to a specific ip address and port
         # The ip address can be blank for accepting any UDP packet to the port
         self.sock.bind(('', beaglebone_port))
@@ -303,7 +309,9 @@ class EncoderParser:
            Error 2: data length is shorter than the IRIG info
                     even though the IRIG packet header is found.
         """
-        while True:
+        self.stop = False
+
+        while not self.stop:  # This can be toggled by encoder agent to unblock
             # If there is data from the socket attached to the beaglebone then
             #     ready[0] = true
             # If not then continue checking for 2 seconds and if there is still no data
@@ -714,6 +722,7 @@ class HWPBBBAgent:
         """
         if self.take_data:
             self.take_data = False
+            self.parser.stop = True
             return True, 'requested to stop taking data.'
 
         return False, 'acq is not currently running.'
