@@ -27,32 +27,8 @@ client = create_client_fixture('hwp-pid')
 hwp_em = create_hwp_emulator_fixture(pid_port=0, log_level=logging.DEBUG)
 
 
-def _shutdown_agent_runner(runner: _AgentRunner) -> None:
-    """
-    Shutdown the agent process using SIGKILL.
-    """
-    # don't send SIGINT if we've already sent SIGKILL
-    if not runner._timedout:
-        runner.proc.send_signal(signal.SIGKILL)
-    runner._timer.cancel()
-
-    try:
-        runner.proc.communicate(timeout=SIGINT_TIMEOUT)
-    except subprocess.TimeoutExpired:
-        runner._raise_subprocess(
-            "Agent did not terminate within " f"{SIGINT_TIMEOUT} seconds on SIGINT."
-        )
-
-    if runner._timedout:
-        stdout, stderr = runner.proc.communicate(timeout=SIGINT_TIMEOUT)
-        print(f"Here is stdout from {runner.agent_name}:\n{stdout}")
-        print(f"Here is stderr from {runner.agent_name}:\n{stderr}")
-        raise RuntimeError("Agent timed out.")
-
-
 def _cleanup_runner(runner: _AgentRunner, cov) -> None:
-    _shutdown_agent_runner(runner)
-    # report coverage
+    runner.shutdown()
     agentcov = coverage.data.CoverageData(
         basename=f".coverage.agent.{runner.agent_name}"
     )

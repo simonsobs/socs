@@ -70,9 +70,9 @@ class PCUState:
 # Gripper state information, taken from sobonelib: https://github.com/simonsobs/sobonelib/blob/main/hwp_gripper/control/state_monitor.py
 
 
-cold_limit_pos = 13.0  # mm
-warm_limit_pos = 10.0  # mm
-limit_tolerance = 1.0  # mm
+COLD_LIMIT_POS = 13.0  # mm
+WARM_LIMIT_POS = 10.0  # mm
+LIMIT_TOLERANCE = 1.0  # mm
 
 
 @dataclass
@@ -94,8 +94,8 @@ class ActuatorState:
     emg: bool = False
 
     def update(self) -> None:
-        self.limits["cold_grip"].state = self.pos >= cold_limit_pos - limit_tolerance
-        self.limits["warm_grip"].state = self.pos >= warm_limit_pos - limit_tolerance
+        self.limits["cold_grip"].state = self.pos >= COLD_LIMIT_POS - LIMIT_TOLERANCE
+        self.limits["warm_grip"].state = self.pos >= WARM_LIMIT_POS - LIMIT_TOLERANCE
 
 
 @dataclass
@@ -473,11 +473,11 @@ class HWPEmulator:
             elif cmd[0] == "MOVE":
                 act_idx = int(cmd[2]) - 1
                 new_pos = state.actuators[act_idx].pos + float(cmd[3])
-                if state.is_cold and new_pos >= cold_limit_pos:
-                    state.actuators[act_idx].pos = cold_limit_pos
+                if state.is_cold and new_pos >= COLD_LIMIT_POS:
+                    state.actuators[act_idx].pos = COLD_LIMIT_POS
                     return pkl.dumps({"result": False, "log": []})
-                elif (not state.is_cold) and new_pos >= warm_limit_pos:
-                    state.actuators[act_idx].pos = warm_limit_pos
+                elif (not state.is_cold) and new_pos >= WARM_LIMIT_POS:
+                    state.actuators[act_idx].pos = WARM_LIMIT_POS
                     return pkl.dumps({"result": False, "log": []})
                 else:
                     state.actuators[act_idx].pos = new_pos

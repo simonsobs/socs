@@ -118,6 +118,28 @@ class HWPClients:
 
 @dataclass
 class GripperState:
+    """
+    Attributes
+    -------------
+    instance_id: str
+        Instance ID of gripper agent being monitored
+    limit_warm_grip_state: List[bool]
+        State of the warm-grip limit switches for the three actuators
+    limit_cold_grip_state: List[bool]
+        State of the cold-grip limit switches for the three actuators
+    emg: List[bool]
+        For each actuator, this will be true if the actuator is receiving power
+        from the motor controller.
+    brake: List[bool]
+        For each actuator, this will be true if the brake is enabled.
+    grip_state: Literal['cold', 'warm', 'ungripped', 'unknown']
+        A string representing the state of the gripper based on limit switches
+        and other information.
+    last_updated: Optional[float]
+        Timestamp of last update.
+    gripper_max_time_since_update: float
+        Max amount of time without an update before the grip_state reverts to 'unknown'.
+    """
     instance_id: str
     limit_warm_grip_state: List[bool] = field(default_factory=lambda: [False, False, False])
     limit_cold_grip_state: List[bool] = field(default_factory=lambda: [False, False, False])
@@ -317,7 +339,7 @@ class HWPState:
     ups_last_connection_attempt: Optional[bool] = None
 
     pid_current_freq: Optional[float] = None
-    pid_current_tolerance: float = 0.1
+    pid_freq_tolerance: float = 0.1
     pid_target_freq: Optional[float] = None
     pid_direction: Optional[str] = None
     pid_last_updated: Optional[float] = None
@@ -585,7 +607,7 @@ class HWPState:
                 self.is_spinning = None
             elif now - self.pid_last_updated > self.pid_max_time_since_update:
                 self.is_spinning = None
-            elif self.pid_current_freq > self.pid_current_tolerance:
+            elif self.pid_current_freq > self.pid_freq_tolerance:
                 self.is_spinning = True
             else:
                 self.is_spinning = False
@@ -1401,6 +1423,13 @@ class HWPSupervisor:
         )
 
     def query_hwp_state(self, session, params) -> Tuple[bool, str]:
+        """query_hwp_state()
+
+        **Task** -- Forces an update of the HWP State, and returns the result.
+
+        For information on session.data["state"], see the docstrings for the
+        ``monitor`` process.
+        """
         self.hwp_state.update()
         session.data['state'] = asdict(self.hwp_state)
         return True, "Queried HWP state"
@@ -1437,22 +1466,61 @@ class HWPSupervisor:
                         'status': 'ok',  # See ``get_op_data`` docstring for choices
                         'timestamp': 1680273288.6200094},
                     },
-                    'rotation': {see above},
                     'temperature': {see above},
-                    'ups': {see above}
-                    'iboot': {see above}},
+                    'ups': {see above},
+                    'pmx': {see above},
+                    'pid': {see above}}
                 # State data parsed from monitored sessions
                 'state': {
-                    'hwp_freq': None,
-                    'ybco_temp': 20.0,
-                    'ybco_temp_status': 'ok',  # `no_data`, `ok`, or `over`
-                    'ybco_temp_thresh': 75.0,
+                    'acu': None,
+                    'driver_iboot': None,
+                    'enc_freq': None,
+                    'enc_instance_id': 'hwp-enc',
+                    'gripper': {
+                        'brake': [0, 0, 0],
+                        'emg': [0, 0, 0],
+                        'grip_state': 'ungripped',
+                        'gripper_max_time_since_update': 60.0,
+                        'instance_id': 'hwp-gripper',
+                        'last_updated': 1737132296.0509753,
+                        'limit_cold_grip_state': [0, 0, 0],
+                        'limit_warm_grip_state': [0, 0, 0]},
+                    'gripper_iboot': None,
+                    'is_spinning': False,
+                    'lakeshore_instance_id': None,
+                    'last_quad': None,
+                    'last_quad_time': None,
+                    'last_updated': 1737132297.6445067,
+                    'pid_current_freq': 0.0,
+                    'pid_direction': 0,
+                    'pid_freq_tolerance': 0.1,
+                    'pid_instance_id': 'hwp-pid',
+                    'pid_last_updated': 1737132293.4787645,
+                    'pid_max_time_since_update': 60.0,
+                    'pid_target_freq': 0.0,
+                    'pmx_current': 0.0,
+                    'pmx_instance_id': 'hwp-pmx',
+                    'pmx_last_updated': 1737132292.9470851,
+                    'pmx_source': 'volt',
+                    'pmx_voltage': 0.0,
+                    'supervisor_control_state': {
+                        'last_update_time': 1737132297.3006465,
+                        'start_time': 1737132296.9819815,
+                        'state_type': 'Idle'},
+                    'temp': None,
+                    'temp_field': None,
+                    'temp_status': 'no_data',
+                    'temp_thresh': None,
                     'ups_battery_current': 0,
                     'ups_battery_voltage': 136,
-                    'ups_estimated_minutes_remaining': 50,
-                    'ups_minutes_remaining_thresh': 45.0,
-                    'ups_output_source': 'normal'  # See UPS agent docs for choices
-                },
+                    'ups_connected': None,
+                    'ups_estimated_charge_remaining': 50,
+                    'ups_estimated_minutes_remaining': 45,
+                    'ups_instance_id': ups,
+                    'ups_last_connection_attempt': None,
+                    'ups_minutes_remaining_thresh': None,
+                    'ups_output_source': None}
+
                  # Subsystem action recommendations determined from state data
                 'actions': {
                     'pmx': 'ok'  # 'ok', 'stop', or 'no_data'
@@ -1671,7 +1739,7 @@ class HWPSupervisor:
                 {'action_id': 3,
                 'completed': True,
                 'cur_state': {'class': 'Done', 'msg': None, 'success': True},
-                'state_history': List[ConrolState],
+                'state_history': List[ControlState],
                 'success': True}
             }
         """

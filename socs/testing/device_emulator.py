@@ -229,7 +229,7 @@ class DeviceEmulator:
         """
         # print('shutting down background reading')
         self._read = False
-        # time.sleep(1)
+        time.sleep(1)
         if self._type == 'serial':
             # print('shutting down socat relay')
             self.proc.terminate()
