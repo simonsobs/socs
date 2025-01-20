@@ -46,27 +46,30 @@ class DS378Agent:
                                  agg_params=agg_params,
                                  buffer_time=1)
 
+    @ocs_agent.param('sampling_frequency', default=0.5, type=float)
     def acq(self, session, params):
         """acq()
 
         **Process** - Monitor status of the relay.
+
+        Parameters
+        ----------
+        sampling_frequency : float, optional
+            Sampling frequency in Hz, defaults to 0.5 Hz.
 
         Notes
         -----
         An example of the session data::
 
             >>> response.session['data']
-            {"fields":
-                {'V_sppl': 11.8,
-                 'T_int': 30.8,
-                 'Relay_1': 0,
-                 'Relay_2': ...
-                 }
+
+            {'V_sppl': 11.8,
+             'T_int': 30.8,
+             'Relay_1': 0,
+             'Relay_2': ...,
+             'timestamp': 1736541796.779634
             }
         """
-        if params is None:
-            params = {}
-
         f_sample = params.get('sampling_frequency', 0.5)
         pace_maker = Pacemaker(f_sample)
 
@@ -77,7 +80,7 @@ class DS378Agent:
                 return False, 'Could not acquire lock.'
 
             self.take_data = True
-            session.data = {"fields": {}}
+            session.data = {}
             last_release = time.time()
 
             while self.take_data:
@@ -115,7 +118,7 @@ class DS378Agent:
                 for i in range(8):
                     field_dict[f'Relay_{i + 1}'] = relay_list[i]
 
-                session.data['fields'].update(field_dict)
+                session.data.update(field_dict)
 
                 self.agent.publish_to_feed('relay', data)
                 session.data.update({'timestamp': current_time})
@@ -134,8 +137,8 @@ class DS378Agent:
         return False, 'acq is not currently running.'
 
     @ocs_agent.param('relay_number', type=int, check=lambda x: 1 <= x <= 8)
-    @ocs_agent.param('on_off', type=int)
-    @ocs_agent.param('pulse_time', default=None, type=int)
+    @ocs_agent.param('on_off', type=int, choices=[0, 1])
+    @ocs_agent.param('pulse_time', default=None, type=int, check=lambda x: 0 <= x <= 2**32 - 1)
     def set_relay(self, session, params=None):
         """set_relay(relay_number, on_off, pulse_time=None)
 
@@ -183,12 +186,10 @@ class DS378Agent:
 
             >>> response.session['data']
             {'Relay_1': 1,
-             'Relay_2': ...
+             'Relay_2': ...,
+             'timestamp': 1736541796.779634
             }
         """
-        if params is None:
-            params = {}
-
         with self.lock.acquire_timeout(3, job='get_relays') as acquired:
             if not acquired:
                 self.log.warn('Could not start get_relays because '
@@ -197,6 +198,7 @@ class DS378Agent:
 
             d_status = self._dev.get_relays()
             session.data = {f'Relay_{i + 1}': d_status[i] for i in range(8)}
+            session.data.update({'timestamp': time.time()})
 
         return True, 'Got relay status'
 

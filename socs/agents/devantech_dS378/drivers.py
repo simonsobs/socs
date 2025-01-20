@@ -48,6 +48,8 @@ class DS378(TCPInterface):
         return self._recv()[0]
 
     def _send_recv(self, msg, length):
+        # Check the length of the received message
+        # to drop invalid response when reconnecting.
         for _ in range(N_TRIAL):
             self._send(msg)
             msg_rcv = self._recv()
