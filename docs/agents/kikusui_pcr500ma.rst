@@ -58,6 +58,8 @@ PCR500MA is an AC power supply that can be cotrolled via ethernet.
 This power supply will be used to the stimulator heater to raise its temperature.
 
 The device only accepts 10/100BASE communication.
+Manual can be found `here <https://manual.kikusui.co.jp/P/PCR_MA_USER_E4.pdf>`_.
+
 
 Agent API
 ---------
@@ -65,8 +67,8 @@ Agent API
 .. autoclass:: socs.agents.kikusui_pcr500ma.agent.PCRAgent
    :members:
 
-.. autoclass:: socs.agents.devantech_dS378.drivers.DS378
+.. autoclass:: socs.agents.kikusui_pcr500ma.drivers.PCR500MA
    :members:
 
-.. autoclass:: socs.agents.devantech_dS378.drivers.RelayStatus
+.. autoclass:: socs.agents.kikusui_pcr500ma.drivers.PCRCoupling
    :members:

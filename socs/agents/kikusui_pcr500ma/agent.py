@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 '''OCS agent for dS378 ethernet relay
 '''
+import argparse
 import os
 import time
 
@@ -8,8 +9,7 @@ import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import Pacemaker, TimeoutLock
 
-from socs.agents.kikusui_pcr500ma.drivers import (PCR500MA, TIMEOUT_DEFAULT,
-                                                  VOLT_ULIM_SOFT)
+from socs.agents.kikusui_pcr500ma.drivers import PCR500MA, VOLT_ULIM_SOFT
 
 PORT_DEFAULT = 5025
 
@@ -29,14 +29,14 @@ class PCRAgent:
         Port number
     """
 
-    def __init__(self, agent, ip_addr, port=PORT_DEFAULT, timeout=TIMEOUT_DEFAULT):
+    def __init__(self, agent, ip_addr, port=PORT_DEFAULT):
         self.active = True
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
         self.take_data = False
 
-        self._dev = PCR500MA(ip_addr=ip_addr, port=port, timeout=timeout)
+        self._dev = PCR500MA(ip_addr=ip_addr, port=port)
 
         self.initialized = False
 
@@ -46,30 +46,30 @@ class PCRAgent:
                                  agg_params=agg_params,
                                  buffer_time=1)
 
+    @ocs_agent.param('sampling_frequency', default=0.2, type=float)
     def acq(self, session, params):
-        """acq()
+        """acq(sampling_frequency=0.2)
 
         **Process** - Monitor status of the relay.
+
+        Parameters
+        ----------
+        sampling_frequency : float, optional
+            Sampling frequency in Hz, defaults to 0.2 Hz.
 
         Notes
         -----
         An example of the session data::
 
             >>> response.session['data']
-            {"fields":
-                {"heater_source":
-                    {"I_AC": ...,
-                     "V_AC": ...,
-                     "P_AC": ...,
-                     "output": 1
-                    }
-                 }
+            {"I_AC": 0.00475843,
+             "V_AC": 0.0371215,
+             "P_AC": 0.0,
+             "output": 0,
+             "timestamp": 1737367649.2595236
             }
         """
-        if params is None:
-            params = {}
-
-        f_sample = params.get('sampling_frequency', 0.2)
+        f_sample = params.get('sampling_frequency')
         pace_maker = Pacemaker(f_sample)
 
         with self.lock.acquire_timeout(timeout=0, job='acq') as acquired:
@@ -79,7 +79,6 @@ class PCRAgent:
                 return False, 'Could not acquire lock.'
 
             self.take_data = True
-            session.data = {'fields': {}}
             last_release = time.time()
 
             while self.take_data:
@@ -94,20 +93,31 @@ class PCRAgent:
                 current_time = time.time()
                 data = {'timestamp': current_time, 'block_name': 'heater_source', 'data': {}}
 
-                i_ac = self._dev.meas_current_ac()
-                v_ac = self._dev.meas_volt_ac()
-                p_ac = self._dev.meas_power_ac()
-                sw_status = self._dev.get_output()
+                try:
+                    i_ac = self._dev.meas_current_ac()
+                    v_ac = self._dev.meas_volt_ac()
+                    p_ac = self._dev.meas_power_ac()
+                    sw_status = self._dev.get_output()
+                    if session.degraded:
+                        self.log.info('Connection re-established.')
+                        session.degraded = False
+                except ConnectionError:
+                    self.log.error('Failed to get data from Kikusui PCR. Check network connection.')
+                    session.degraded = True
+                    time.sleep(1)
+                    continue
+
                 data['data']['I_AC'] = i_ac
                 data['data']['V_AC'] = v_ac
                 data['data']['P_AC'] = p_ac
                 data['data']['output'] = 1 if sw_status else 0
 
-                field_dict = {'heater_source': {'I_AC': i_ac,
-                                                'V_AC': v_ac,
-                                                'P_AC': p_ac,
-                                                'output': 1 if sw_status else 0}}
-                session.data['fields'].update(field_dict)
+                field_dict = {'I_AC': i_ac,
+                              'V_AC': v_ac,
+                              'P_AC': p_ac,
+                              'output': 1 if sw_status else 0}
+
+                session.data.update(field_dict)
 
                 self.agent.publish_to_feed('heater_source', data)
                 session.data.update({'timestamp': current_time})
@@ -119,9 +129,6 @@ class PCRAgent:
         return True, 'Acquisition exited cleanly.'
 
     def _stop_acq(self, session, params=None):
-        """
-        Stops the data acquisiton.
-        """
         if self.take_data:
             self.take_data = False
             return True, 'requested to stop taking data.'
@@ -190,7 +197,9 @@ class PCRAgent:
         structure::
 
             >>> response.session['data']
-            {'output': True}
+            {'output': True,
+             'timestamp': 1737367649.2595236
+            }
         """
         with self.lock.acquire_timeout(ACQ_TIMEOUT, job='get_output') as acquired:
             if not acquired:
@@ -199,7 +208,8 @@ class PCRAgent:
                 return False, 'Could not acquire lock.'
 
             d_status = self._dev.get_output()
-            session.data = {'output': d_status}
+            session.data = {'output': d_status,
+                            'timestamp': time.time()}
 
         return True, f'Got output status of PCR: {d_status}'
 
@@ -236,7 +246,9 @@ class PCRAgent:
         structure::
 
             >>> response.session['data']
-            {'volt_set': 10.0}
+            {'volt_set': 10.0,
+             'timestamp': 1737367649.2595236
+            }
         '''
         with self.lock.acquire_timeout(ACQ_TIMEOUT, job='get_volt_ac') as acquired:
             if not acquired:
@@ -245,10 +257,12 @@ class PCRAgent:
                 return False, 'Could not acquire lock.'
 
             volt_set = self._dev.get_volt_ac()
-            session.data = {'volt_set': volt_set}
+            session.data = {'volt_set': volt_set,
+                            'timestamp': time.time()}
 
         return True, f'Got AC voltage setting: {volt_set}'
 
+    @ocs_agent.param('_')
     def meas(self, session, params=None):
         '''meas()
 
@@ -260,10 +274,11 @@ class PCRAgent:
         structure::
 
             >>> response.session['data']
-            {'i_ac': 0.1,
-             'v_ac': 1.0,
-             'p_ac': 0.1,
-             'f_ac': 32.0}
+            {'i_ac': 0.00471643,
+             'v_ac': 0.0367027,
+             'p_ac': 0.0,
+             'f_ac': 60.0,
+             'timestamp': 1737367649.2595236}
         '''
         with self.lock.acquire_timeout(ACQ_TIMEOUT, job='meas') as acquired:
             if not acquired:
@@ -278,30 +293,39 @@ class PCRAgent:
             session.data = {'i_ac': i_ac,
                             'v_ac': v_ac,
                             'p_ac': p_ac,
-                            'f_ac': f_ac}
+                            'f_ac': f_ac,
+                            'timestamp': time.time()}
 
         return True, f'Measured AC parameters: {v_ac}'
 
 
-def main():
+def make_parser(parser=None):
+    if parser is None:
+        parser = argparse.ArgumentParser()
+
+    pgroup = parser.add_argument_group('Agent Options')
+    pgroup.add_argument('--port', default=PORT_DEFAULT, type=int,
+                        help='Port number for TCP communication.')
+    pgroup.add_argument('--ip_address',
+                        help='IP address of the device.')
+
+    return parser
+
+
+def main(args=None):
     '''Boot OCS agent'''
     txaio.start_logging(level=os.environ.get('LOGLEVEL', 'info'))
 
     parser = site_config.add_arguments()
 
-    args = parser.parse_args()
-    site_config.reparse_args(args, 'PCRAgent')
+    parser = make_parser()
+    args = site_config.parse_args(agent_class='PCRAgent',
+                                  parser=parser,
+                                  args=args)
 
     agent_inst, runner = ocs_agent.init_site_agent(args)
 
-    kwargs = {}
-
-    if args.port is not None:
-        kwargs['port'] = args.port
-    if args.ip is not None:
-        kwargs['ip_addr'] = args.ip
-
-    pcr_agent = PCRAgent(agent_inst, **kwargs)
+    pcr_agent = PCRAgent(agent_inst, ip_addr=args.ip_address, port=args.port)
 
     agent_inst.register_task(
         'set_output',

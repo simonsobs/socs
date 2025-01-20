@@ -137,8 +137,8 @@ class PCR500MA(TCPInterface):
 
         return PCRCoupling(message)
 
-    def clear_alerm(self):
-        """Clear alerm"""
+    def clear_alarm(self):
+        """Clear alarm"""
         self._send('OUTP:PROT:CLE')
 
     def set_current_limit_ac(self, current_amp):
