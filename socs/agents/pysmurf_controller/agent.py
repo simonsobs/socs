@@ -319,7 +319,7 @@ class PysmurfController:
         while session.status in ['starting', 'running']:
             try:
 
-                num_active_channels = 0.0
+                num_active_channels = 0
                 for band in range(8):
                     num_active_channels += len(S.which_on(band))
 
