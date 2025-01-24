@@ -308,7 +308,8 @@ class PysmurfController:
                 'pysmurf_action_timestamp': Current pysmurf-action timestamp,
                 'stream_tag': stream-tag for the current g3 stream,
                 'last_update':  Time that session-data was last updated,
-                'stream_id': Stream-id of the controlled smurf instance
+                'stream_id': Stream-id of the controlled smurf instance,
+                'num_active_channels': Number of channels outputting tones
             }
         """
         S, cfg = self._get_smurf_control(load_tune=False, no_dir=True)
@@ -317,6 +318,11 @@ class PysmurfController:
         kw = {'retry_on_fail': False}
         while session.status in ['starting', 'running']:
             try:
+
+                num_active_channels = 0
+                for band in range(8):
+                    num_active_channels += len(S.which_on(band))
+
                 d = dict(
                     channel_mask=S.get_channel_mask(**kw).tolist(),
                     downsample_factor=S.get_downsample_factor(**kw),
@@ -327,6 +333,7 @@ class PysmurfController:
                     stream_tag=reg.stream_tag.get(**kw, as_string=True),
                     last_update=time.time(),
                     stream_id=cfg.stream_id,
+                    num_active_channels=num_active_channels,
                 )
                 session.data.update(d)
             except (RuntimeError, epics.ca.ChannelAccessGetFailure):
