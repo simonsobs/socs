@@ -99,7 +99,7 @@ class StarcamHelper:
         Returns:
             dictionary: Dictionary of unpacked data.
         """
-        (scdata_raw, _) = self.comm.recvfrom(224)
+        (scdata_raw, _) = self.comm.recvfrom(256)
         data = struct.unpack_from("dddddddddddddiiiiiiiiddiiiiiiiiiiiiiifiii",
                                   scdata_raw)
         keys = ['c_time',
