@@ -185,7 +185,7 @@ class RTSPCameraAgent:
             cap = cv2.VideoCapture(self.connection)
         if not cap.isOpened():
             self.log.error(f"Cannot open RTSP stream at {self.connection}")
-            return False, "Could not open RTSP stream"
+            return None
 
         return cap
 
@@ -217,7 +217,6 @@ class RTSPCameraAgent:
 
         frames_per_snapshot = int(self.seconds * self.record_fps)
 
-        session.set_status("running")
         self.is_streaming = True
 
         # Open camera stream
@@ -326,7 +325,6 @@ class RTSPCameraAgent:
         **Task** - Stop task associated with acq process.
         """
         if self.is_streaming:
-            session.set_status("stopping")
             self.is_streaming = False
             return True, "Stopping Acquisition"
         else:
@@ -357,7 +355,7 @@ class RTSPCameraAgent:
             self.log.info("Recording:  opening camera stream")
             cap = self._init_stream()
             if not cap:
-                return False
+                return False, "Cannot connect to camera."
 
             # Total number of frames
             total_frames = int(self.record_fps * self.record_duration)
