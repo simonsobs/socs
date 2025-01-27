@@ -314,11 +314,6 @@ def main(args=None):
         pcr_agent.get_volt_ac
     )
 
-    agent_inst.register_task(
-        'meas',
-        pcr_agent.meas
-    )
-
     agent_inst.register_process(
         'acq',
         pcr_agent.acq,
