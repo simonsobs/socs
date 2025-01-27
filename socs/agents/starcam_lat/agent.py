@@ -130,9 +130,7 @@ class StarcamAgent:
 
     def __init__(self, agent, ip_address, port):
         self.agent = agent
-        self.active = True
         self.log = agent.log
-        self.job = None
         self.take_data = False
         self.lock = TimeoutLock()
         agg_params = {'frame_length': 60}
@@ -169,8 +167,6 @@ class StarcamAgent:
             touple: Contains True/False and a string describing whether or not
                     the loop was exited after the end of an acquisition.
         """
-        if params is None:
-            params = {}
         with self.lock.acquire_timeout(timeout=100, job='acq') as acquired:
             if not acquired:
                 self.log.warn("Could not start init because {} is already "
@@ -200,7 +196,6 @@ class StarcamAgent:
             session.set_status('stopping')
             self.take_data = False
             ok = True
-            # self.StarcamHelper.close()
         return (ok, {True: 'Requested process to stop.',
                      False: 'Failed to request process stop.'}[ok])
 
