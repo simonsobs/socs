@@ -68,6 +68,7 @@ API Reference        Full API documentation for core parts of the SOCS library.
     agents/magpie
     agents/meinberg_m1000_agent
     agents/meinberg_syncbox_agent
+    agents/orientalmotor_blh
     agents/pfeiffer
     agents/pfeiffer_tc400
     agents/pysmurf-controller
