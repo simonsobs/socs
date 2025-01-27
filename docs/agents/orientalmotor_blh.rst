@@ -19,8 +19,7 @@ and you can specify the device file using the `--port` option in the argument.
 Configuration File Examples
 ---------------------------
 
-Below are configuration examples for the ocs config file and for running the
-Agent in a docker container.
+Below are configuration examples for the ocs config file.
 
 OCS Site Config
 `````````````````````
@@ -49,4 +48,10 @@ Agent API
 ---------
 
 .. autoclass:: socs.agents.orientalmotor_blh.agent.BLHAgent
+   :members:
+
+Supporting APIs
+---------------
+
+.. autoclass:: socs.agents.orientalmotor_blh.drivers.BLH
    :members:

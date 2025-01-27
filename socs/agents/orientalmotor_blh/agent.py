@@ -7,7 +7,7 @@ import time
 
 import txaio
 from ocs import ocs_agent, site_config
-from ocs.ocs_twisted import TimeoutLock
+from ocs.ocs_twisted import Pacemaker, TimeoutLock
 
 from socs.agents.orientalmotor_blh.drivers import BLH
 
@@ -19,16 +19,15 @@ INIT_TIMEOUT = 100
 
 
 class BLHAgent:
-    '''OCS agent class for BLH motor driver
-    '''
+    """OCS agent class for BLH motor driver
+
+    Parameters
+    ----------
+    port : string
+        Port to connect, default to /dev/ttyACM0
+    """
 
     def __init__(self, agent, port=PORT_DEFAULT):
-        '''
-        Parameters
-        ----------
-        port : string
-            Port to connect
-        '''
         self.active = True
         self.agent = agent
         self.log = agent.log
@@ -46,8 +45,12 @@ class BLHAgent:
                                  buffer_time=1)
         self.speed = 0.0
 
+    @ocs_agent('_')
     def init_blh(self, session, params=None):
-        '''Initialization of BLH motor driver'''
+        """init_blh(
+
+        **Task** - Initialize motor driver.
+        """
         if self.initialized:
             return True, 'Already initialized'
 
@@ -66,14 +69,29 @@ class BLHAgent:
 
         return True, 'BLH module initialized.'
 
-    def start_acq(self, session, params):
-        '''Starts acquiring data.
-        '''
-        if params is None:
-            params = {}
+    @ocs_agent('sampling_frequency', default=2.5, type=float)
+    def acq(self, session, params):
+        """acq()
 
-        f_sample = params.get('sampling_frequency', 2.5)
-        sleep_time = 1 / f_sample - 0.1
+        **Process** - Monitor status of the motor.
+
+        Parameters
+        ----------
+        sampling_frequency : float, optional
+            Sampling frequency in Hz, defaults to 2.5 Hz
+
+        Notes
+        -----
+        An example of the session data::
+
+            >>> response.session['data']
+
+            {'RPM': 0.0,
+             'timestamp': 1736541796.779634
+            }
+        """
+        f_sample = params['sampling_frequency']
+        pace_maker = Pacemaker(f_sample)
 
         if not self.initialized:
             self.agent.start('init_blh')
@@ -91,10 +109,8 @@ class BLHAgent:
                     f'Could not start acq because {self.lock.job} is already running')
                 return False, 'Could not acquire lock.'
 
-            session.set_status('running')
-
             self.take_data = True
-            session.data = {"fields": {}}
+            session.data = {}
             last_release = time.time()
 
             while self.take_data:
@@ -109,26 +125,24 @@ class BLHAgent:
                 current_time = time.time()
                 data = {'timestamp': current_time, 'block_name': 'motor', 'data': {}}
 
-                speed = self._blh.get_status()
+                speed, error = self._blh.get_status()
                 data['data']['RPM'] = speed
+                data['data']['error'] = error
                 self.speed = speed
 
-                field_dict = {'motor': {'RPM': speed}}
-                session.data['fields'].update(field_dict)
+                field_dict = {'RPM': speed, 'error': error}
+                session.data.update(field_dict)
 
                 self.agent.publish_to_feed('motor', data)
                 session.data.update({'timestamp': current_time})
 
-                time.sleep(sleep_time)
+                pace_maker.sleep()
 
             self.agent.feeds['motor'].flush_buffer()
 
         return True, 'Acquisition exited cleanly.'
 
-    def stop_acq(self, session, params=None):
-        """
-        Stops the data acquisiton.
-        """
+    def _stop_acq(self, session, params=None):
         self.agent.start('stop_rotation')
         while self.speed > 0.1:
             time.sleep(1)
@@ -139,49 +153,55 @@ class BLHAgent:
 
         return False, 'acq is not currently running.'
 
+    @ocs_agent.param('speed', default=None, type=int, check=lambda x: 50 <= x <= 3000)
+    @ocs_agent.param('accl_time', default=None, type=float, check=lambda x: 0.5 <= x <= 15)
+    @ocs_agent.param('decl_time', default=None, type=float, check=lambda x: 0.5 <= x <= 15)
     def set_values(self, session, params=None):
-        '''A task to set parameters for BLH motor driver
+        """set_values(speed=None, accl_time=None, decl_time=None)
+
+        **Task** - Set parameters for BLH motor driver.
 
         Parameters
         ----------
-        speed : int
-            Motor rotation speed in RPM
-        accl_time : float
-            Acceleration time
-        decl_time : float
-            Deceleration time
-        '''
-        if params is None:
-            params = {}
-
+        speed : int, optional
+            Motor rotation speed in RPM. Values must be in range [50, 3000].
+        accl_time : float, optional
+            Acceleration time. Values must be in range [0.5, 15]
+        decl_time : float, optional
+            Deceleration time. Values must be in range [0.5, 15]
+        """
         with self.lock.acquire_timeout(3, job='set_values') as acquired:
             if not acquired:
                 self.log.warn('Could not start set_values because '
                               f'{self.lock.job} is already running')
                 return False, 'Could not acquire lock.'
 
-            speed = params.get('speed')
+            speed = params['speed']
+            accl_time = params['accl_time']
+            decl_time = params['decl_time']
+
             if speed is not None:
                 self._blh.set_speed(speed)
 
-            accl_time = params.get('accl_time')
             if accl_time is not None:
                 self._blh.set_accl_time(accl_time, accl=True)
 
-            decl_time = params.get('decl_time')
             if decl_time is not None:
                 self._blh.set_accl_time(decl_time, accl=False)
 
         return True, 'Set values for BLH'
 
+    @ocs_agent.param('forward', default=True, type=bool)
     def start_rotation(self, session, params=None):
-        '''Start rotation
+        """start_rotation(forward=True)
+
+        **Task** - Start motor rotation.
 
         Parameters
         ----------
         forward : bool, default True
             Move forward if True
-        '''
+        """
         if params is None:
             params = {}
 
@@ -208,12 +228,18 @@ class BLHAgent:
             if forward is None:
                 forward = True
 
-            self._blh.start(forward=forward)
+            result = self._blh.start(forward=forward)
+            if not result:
+                return False, 'Could not start rotation.'
 
         return True, 'BLH rotation started.'
 
+    @ocs_agent.param('_')
     def stop_rotation(self, session, params=None):
-        '''Stop rotation'''
+        """stop_rotation()
+
+        **Task** - Stop motor rotation.
+        """
         if params is None:
             params = {}
 
@@ -223,7 +249,9 @@ class BLHAgent:
                               f'{self.lock.job} is already running')
                 return False, 'Could not acquire lock.'
 
-            self._blh.stop()
+            result = self._blh.stop()
+            if not result:
+                return False, 'Could not stop rotation.'
 
         return True, 'BLH rotation stop command was published.'
 
@@ -239,7 +267,7 @@ def make_parser(parser=None):
 
 
 def main(args=None):
-    '''Boot OCS agent'''
+    """Boot OCS agent"""
     txaio.start_logging(level=os.environ.get('LOGLEVEL', 'info'))
 
     parser = make_parser()
@@ -273,8 +301,8 @@ def main(args=None):
 
     agent_inst.register_process(
         'acq',
-        blh_agent.start_acq,
-        blh_agent.stop_acq,
+        blh_agent.acq,
+        blh_agent._stop_acq,
         startup=True
     )
 
