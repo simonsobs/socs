@@ -25,7 +25,7 @@ OCS Site Config
 
 An example site-config-file block::
 
-    {'agent-class': 'PCRAgent',
+    {'agent-class': 'PCR500MAAgent',
      'instance-id': 'pcr500ma',
      'arguments': [['--port', 5025],
                    ['--ip-address', '192.168.0.100']]

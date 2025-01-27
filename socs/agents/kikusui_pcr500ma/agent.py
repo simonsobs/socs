@@ -286,7 +286,7 @@ def main(args=None):
     parser = site_config.add_arguments()
 
     parser = make_parser()
-    args = site_config.parse_args(agent_class='PCRAgent',
+    args = site_config.parse_args(agent_class='PCR500MAAgent',
                                   parser=parser,
                                   args=args)
 
