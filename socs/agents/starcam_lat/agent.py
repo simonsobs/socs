@@ -137,7 +137,7 @@ class StarcamAgent:
         self.agent.register_feed("starcamera", record=True,
                                  agg_params=agg_params, buffer_time=1)
         try:
-            self.StarcamHelper = StarcamHelper(ip_address, port)
+            self.starcam = StarcamHelper(ip_address, port)
         except socket.timeout:
             self.log.error("Starcam connection has timed out.")
             return False, "Timeout"
@@ -156,7 +156,7 @@ class StarcamAgent:
                               f"{self._lock.job} is already running.")
                 return False, "Could not acquire lock."
             self.log.info("Sending commands.")
-            self.StarcamHelper.pack_and_send_cmds()
+            self.starcam.pack_and_send_cmds()
         return True, "Sent commands to the starcam."
 
     @ocs_agent.param('_')
@@ -182,7 +182,7 @@ class StarcamAgent:
                     'data': {}
                 }
                 # get astrometry data
-                astrom_data_dict = self.StarcamHelper.get_astrom_data()
+                astrom_data_dict = self.starcam.get_astrom_data()
                 # update the data dictionary+session and publish
                 data['data'].update(astrom_data_dict)
                 session.data.update(data['data'])
