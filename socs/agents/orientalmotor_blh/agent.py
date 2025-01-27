@@ -45,9 +45,8 @@ class BLHAgent:
                                  buffer_time=1)
         self.speed = 0.0
 
-    @ocs_agent('_')
     def init_blh(self, session, params=None):
-        """init_blh(
+        """init_blh()
 
         **Task** - Initialize motor driver.
         """
@@ -69,7 +68,7 @@ class BLHAgent:
 
         return True, 'BLH module initialized.'
 
-    @ocs_agent('sampling_frequency', default=2.5, type=float)
+    @ocs_agent.param('sampling_frequency', default=2.5, type=float)
     def acq(self, session, params):
         """acq()
 
