@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-'''OCS agent for dS378 ethernet relay
-'''
 import argparse
 import os
 import time
@@ -153,9 +151,10 @@ class PCRAgent:
 
         Notes
         -----
-        This function measures output voltage when turning off
-        and check setting voltage value when turning on by default
-        to avoid abrupt change in applied voltage.
+        This function measures the output voltage when turning off
+        and checks the voltage setting when turning on by default. If the
+        voltage is too high it will not change state to avoid an abrupt
+        change in applied voltage.
         Set `force` option to `True` when this behavior is unwanted.
         """
         with self.lock.acquire_timeout(ACQ_TIMEOUT, job='set_output') as acquired:

@@ -66,6 +66,8 @@ Agent API
 
 .. autoclass:: socs.agents.kikusui_pcr500ma.agent.PCRAgent
    :members:
+Supporting APIs
+---------------
 
 .. autoclass:: socs.agents.kikusui_pcr500ma.drivers.PCR500MA
    :members:
