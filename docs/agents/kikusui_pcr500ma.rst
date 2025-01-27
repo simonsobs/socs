@@ -28,7 +28,7 @@ An example site-config-file block::
     {'agent-class': 'PCRAgent',
      'instance-id': 'pcr500ma',
      'arguments': [['--port', 5025],
-                   ['--ip_address', '192.168.0.100']]
+                   ['--ip-address', '192.168.0.100']]
      },
 
 
@@ -64,7 +64,7 @@ Manual can be found `here <https://manual.kikusui.co.jp/P/PCR_MA_USER_E4.pdf>`_.
 Agent API
 ---------
 
-.. autoclass:: socs.agents.kikusui_pcr500ma.agent.PCRAgent
+.. autoclass:: socs.agents.kikusui_pcr500ma.agent.PCR500MAAgent
    :members:
 Supporting APIs
 ---------------

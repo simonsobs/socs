@@ -13,10 +13,10 @@ PORT_DEFAULT = 5025
 
 LOCK_RELEASE_SEC = 1.
 LOCK_RELEASE_TIMEOUT = 10
-ACQ_TIMEOUT = 20
+ACQ_TIMEOUT = 5
 
 
-class PCRAgent:
+class PCR500MAAgent:
     """OCS agent class for PCR500MA current source
 
     Parameters
@@ -63,6 +63,7 @@ class PCRAgent:
             {"I_AC": 0.00475843,
              "V_AC": 0.0371215,
              "P_AC": 0.0,
+             "f_AC": 60.0,
              "output": 0,
              "timestamp": 1737367649.2595236
             }
@@ -95,6 +96,7 @@ class PCRAgent:
                     i_ac = self._dev.meas_current_ac()
                     v_ac = self._dev.meas_volt_ac()
                     p_ac = self._dev.meas_power_ac()
+                    f_ac = self._dev.meas_freq()
                     sw_status = self._dev.get_output()
                     if session.degraded:
                         self.log.info('Connection re-established.')
@@ -108,11 +110,13 @@ class PCRAgent:
                 data['data']['I_AC'] = i_ac
                 data['data']['V_AC'] = v_ac
                 data['data']['P_AC'] = p_ac
+                data['data']['f_AC'] = f_ac
                 data['data']['output'] = 1 if sw_status else 0
 
                 field_dict = {'I_AC': i_ac,
                               'V_AC': v_ac,
                               'P_AC': p_ac,
+                              'f_AC': f_ac,
                               'output': 1 if sw_status else 0}
 
                 session.data.update(field_dict)
@@ -214,15 +218,15 @@ class PCRAgent:
 
     @ocs_agent.param('volt_set', type=float, check=lambda x: 0 <= x <= VOLT_ULIM_SOFT)
     def set_volt_ac(self, session, params=None):
-        '''set_volt_ac(volt_set)
+        """set_volt_ac(volt_set)
 
         **Task** - Set AC voltage value.
 
         Parameters
         ----------
         volt_set : float
-            AC voltage setting in V.
-        '''
+            AC voltage setting in V. Values must be in range [0, 51].
+        """
         with self.lock.acquire_timeout(ACQ_TIMEOUT, job='set_volt_ac') as acquired:
             if not acquired:
                 self.log.warn('Could not start set_volt_ac because '
@@ -235,7 +239,7 @@ class PCRAgent:
 
     @ocs_agent.param('_')
     def get_volt_ac(self, session, params=None):
-        '''get_volt_ac()
+        """get_volt_ac()
 
         **Task** - Get AC voltage setting.
 
@@ -248,7 +252,7 @@ class PCRAgent:
             {'volt_set': 10.0,
              'timestamp': 1737367649.2595236
             }
-        '''
+        """
         with self.lock.acquire_timeout(ACQ_TIMEOUT, job='get_volt_ac') as acquired:
             if not acquired:
                 self.log.warn('Could not start get_volt_ac because '
@@ -261,42 +265,6 @@ class PCRAgent:
 
         return True, f'Got AC voltage setting: {volt_set}'
 
-    @ocs_agent.param('_')
-    def meas(self, session, params=None):
-        '''meas()
-
-        **Task** - Get measured current, voltage, power and frequency.
-
-        Notes
-        -----
-        The most recent data collected is stored in session.data in the
-        structure::
-
-            >>> response.session['data']
-            {'i_ac': 0.00471643,
-             'v_ac': 0.0367027,
-             'p_ac': 0.0,
-             'f_ac': 60.0,
-             'timestamp': 1737367649.2595236}
-        '''
-        with self.lock.acquire_timeout(ACQ_TIMEOUT, job='meas') as acquired:
-            if not acquired:
-                self.log.warn('Could not start meas because '
-                              f'{self.lock.job} is already running')
-                return False, 'Could not acquire lock.'
-
-            i_ac = self._dev.meas_current_ac()
-            v_ac = self._dev.meas_volt_ac()
-            p_ac = self._dev.meas_power_ac()
-            f_ac = self._dev.meas_freq()
-            session.data = {'i_ac': i_ac,
-                            'v_ac': v_ac,
-                            'p_ac': p_ac,
-                            'f_ac': f_ac,
-                            'timestamp': time.time()}
-
-        return True, f'Measured AC parameters: {v_ac}'
-
 
 def make_parser(parser=None):
     if parser is None:
@@ -305,14 +273,14 @@ def make_parser(parser=None):
     pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--port', default=PORT_DEFAULT, type=int,
                         help='Port number for TCP communication.')
-    pgroup.add_argument('--ip_address',
+    pgroup.add_argument('--ip-address',
                         help='IP address of the device.')
 
     return parser
 
 
 def main(args=None):
-    '''Boot OCS agent'''
+    """Boot OCS agent"""
     txaio.start_logging(level=os.environ.get('LOGLEVEL', 'info'))
 
     parser = site_config.add_arguments()
@@ -324,7 +292,7 @@ def main(args=None):
 
     agent_inst, runner = ocs_agent.init_site_agent(args)
 
-    pcr_agent = PCRAgent(agent_inst, ip_addr=args.ip_address, port=args.port)
+    pcr_agent = PCR500MAAgent(agent_inst, ip_addr=args.ip_address, port=args.port)
 
     agent_inst.register_task(
         'set_output',

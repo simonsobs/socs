@@ -39,12 +39,6 @@ class PCR500MA(TCPInterface):
     def __init__(self, ip_addr, port=PORT, timeout=TIMEOUT_DEFAULT):
         super().__init__(ip_addr, port, timeout)
 
-    def __w(self, msg):
-        self.send(msg)
-
-    def __r(self, length):
-        return self.recv(length)
-
     def _send(self, message):
         """Send message to PCR500MA
 
@@ -56,11 +50,11 @@ class PCR500MA(TCPInterface):
         if not message[-1] == '\n':
             message += '\n'
 
-        self.__w(message.encode())
+        self.send(message.encode())
 
     def _recv(self):
         """Receive message from PCR500MA"""
-        msg_byte = self.__r(BUFFSIZE)
+        msg_byte = self.recv(BUFFSIZE)
 
         return msg_byte.decode()
 
@@ -89,7 +83,7 @@ class PCR500MA(TCPInterface):
         self._send(message)
 
     def turn_on(self):
-        """Trun on"""
+        """Turn on"""
         self.set_output(True)
 
     def turn_off(self):
