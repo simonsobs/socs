@@ -56,6 +56,7 @@ API Reference        Full API documentation for core parts of the SOCS library.
     agents/holo_synth
     agents/ibootbar
     agents/ifm_sbn246_flowmeter
+    agents/kikusui_pcr500ma
     agents/labjack
     agents/lakeshore240
     agents/lakeshore336
