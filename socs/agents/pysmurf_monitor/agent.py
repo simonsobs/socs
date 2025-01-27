@@ -3,7 +3,11 @@ import json
 import os
 import queue
 import time
+import traceback
+from typing import Any, Dict, Optional, Tuple
 
+import sqlalchemy
+import txaio  # type: ignore
 from ocs import ocs_agent, ocs_feed, site_config
 from twisted.internet import reactor
 from twisted.internet.protocol import DatagramProtocol
@@ -11,7 +15,7 @@ from twisted.internet.protocol import DatagramProtocol
 from socs.db.suprsync import SupRsyncFilesManager, create_file
 
 
-def create_remote_path(meta, archive_name):
+def create_remote_path(meta: Dict[str, Any], archive_name: str) -> str:
     """
     Creates "remote path" for file.
 
@@ -52,6 +56,8 @@ def create_remote_path(meta, archive_name):
         )
     elif archive_name == 'timestreams':
         return str(os.path.join(*os.path.normpath(meta['path']).split(os.sep)[-3:]))
+    else:
+        raise ValueError(f"Unknown archive name: {archive_name}")
 
 
 class PysmurfMonitor(DatagramProtocol):
@@ -87,17 +93,17 @@ class PysmurfMonitor(DatagramProtocol):
             suprsync db.
     """
 
-    def __init__(self, agent, args):
+    def __init__(self, agent: ocs_agent.OCSAgent, args: argparse.Namespace) -> None:
         self.agent: ocs_agent.OCSAgent = agent
-        self.log = agent.log
-        self.file_queue = queue.Queue()
-        self.db_path = args.db_path
-        self.running = False
-        self.echo_sql = args.echo_sql
+        self.log: txaio.interfaces.ILogger = agent.log
+        self.file_queue: queue.Queue[Dict[str, Any]] = queue.Queue()
+        self.db_path: str = args.db_path
+        self.running: bool = False
+        self.echo_sql: bool = args.echo_sql
 
         self.agent.register_feed('pysmurf_session_data')
 
-    def datagramReceived(self, _data, addr):
+    def datagramReceived(self, _data: bytes, addr: Tuple[str, int]) -> None:
         """
         Called whenever UDP data is received.
 
@@ -152,7 +158,11 @@ class PysmurfMonitor(DatagramProtocol):
             self.agent.publish_to_feed(feed_name, feed_data, from_reactor=True)
 
     @ocs_agent.param('test_mode', default=False, type=bool)
-    def run(self, session, params=None):
+    def run(
+        self,
+        session: ocs_agent.OpSession,
+        params: Any = None,
+    ) -> Tuple[bool, str]:
         """run(test_mode=False)
 
         **Process** - Main process for the pysmurf monitor agent. Processes
@@ -163,13 +173,12 @@ class PysmurfMonitor(DatagramProtocol):
             test_mode (bool, optional):
                 Stop the Process loop after processing any file(s).
                 This is meant only for testing. Default is False.
-
         """
         srfm = SupRsyncFilesManager(self.db_path, create_all=True, echo=self.echo_sql)
 
         self.running = True
+        files_to_add = []
         while self.running:
-            files = []
             while not self.file_queue.empty():
                 meta = self.file_queue.get()
                 # Archive name defaults to pysmurf because that is currently
@@ -194,7 +203,7 @@ class PysmurfMonitor(DatagramProtocol):
                             if key in local_path:
                                 deletable = False
 
-                    files.append(
+                    files_to_add.append(
                         create_file(local_path, remote_path, archive_name,
                                     deletable=deletable)
                     )
@@ -205,9 +214,19 @@ class PysmurfMonitor(DatagramProtocol):
                         meta=meta, e=e
                     )
 
-            if files:
-                with srfm.Session.begin() as session:
-                    session.add_all(files)
+            if files_to_add:
+                try:
+                    with srfm.Session.begin() as db_session:
+                        db_session.add_all(files_to_add)
+                    session.degraded = False
+                    files_to_add = []
+                except sqlalchemy.exc.OperationalError:
+                    session.degraded = True
+                    self.log.error("Error adding files to database...")
+                    self.log.error("{e}", e=traceback.format_exc())
+                    self.log.info("Sleeping 5 sec and then trying again...")
+                    time.sleep(5)
+                    continue
 
             if params['test_mode']:
                 break
@@ -216,13 +235,17 @@ class PysmurfMonitor(DatagramProtocol):
 
         return True, 'Monitor exited cleanly.'
 
-    def _stop(self, session, params=None):
+    def _stop(
+        self,
+        session: ocs_agent.OpSession,
+        params: Any = True,
+    ) -> Tuple[bool, str]:
         self.running = False
         session.set_status('stopping')
         return True, 'Done monitoring.'
 
 
-def make_parser(parser=None):
+def make_parser(parser: Optional[argparse.ArgumentParser] = None) -> argparse.ArgumentParser:
     if parser is None:
         parser = argparse.ArgumentParser()
 
@@ -241,7 +264,7 @@ def make_parser(parser=None):
     return parser
 
 
-def main(args=None):
+def main(args=None) -> None:
     parser = make_parser()
     args = site_config.parse_args(agent_class='PysmurfMonitor',
                                   parser=parser,

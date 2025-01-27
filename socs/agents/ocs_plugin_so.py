@@ -11,14 +11,15 @@ import ocs
 root = os.path.abspath(os.path.split(__file__)[0])
 
 for n, f in [
-        ('ACTiCameraAgent', 'acti_camera/agent.py'),
         ('ACUAgent', 'acu/agent.py'),
         ('BlueforsAgent', 'bluefors/agent.py'),
         ('CrateAgent', 'smurf_crate_monitor/agent.py'),
         ('CryomechCPAAgent', 'cryomech_cpa/agent.py'),
+        ('dS378Agent', 'devantech_dS378/agent.py'),
         ('FlowmeterAgent', 'ifm_sbn246_flowmeter/agent.py'),
         ('FPGAAgent', 'holo_fpga/agent.py'),
         ('FTSAerotechAgent', 'fts_aerotech/agent.py'),
+        ('HTTPCameraAgent', 'http_camera/agent.py'),
         ('HWPBBBAgent', 'hwp_encoder/agent.py'),
         ('HWPPCUAgent', 'hwp_pcu/agent.py'),
         ('HWPPicoscopeAgent', 'hwp_picoscope/agent.py'),
@@ -39,6 +40,7 @@ for n, f in [
         ('PfeifferTC400Agent', 'pfeiffer_tc400/agent.py'),
         ('PysmurfController', 'pysmurf_controller/agent.py'),
         ('PysmurfMonitor', 'pysmurf_monitor/agent.py'),
+        ('RTSPCameraAgent', 'rtsp_camera/agent.py'),
         ('ScpiPsuAgent', 'scpi_psu/agent.py'),
         ('SmurfFileEmulator', 'smurf_file_emulator/agent.py'),
         ('SmurfStreamSimulator', 'smurf_stream_simulator/agent.py'),
@@ -54,5 +56,6 @@ for n, f in [
         ('WiregridActuatorAgent', 'wiregrid_actuator/agent.py'),
         ('WiregridEncoderAgent', 'wiregrid_encoder/agent.py'),
         ('WiregridKikusuiAgent', 'wiregrid_kikusui/agent.py'),
+        ('WiregridTiltSensorAgent', 'wiregrid_tiltsensor/agent.py'),
 ]:
     ocs.site_config.register_agent_class(n, os.path.join(root, f))

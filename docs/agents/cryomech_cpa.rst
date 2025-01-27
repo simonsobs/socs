@@ -47,7 +47,7 @@ Docker Compose
 ``````````````
 
 The Cryomech CPA Agent should be configured to run in a Docker container.
-An example docker-compose service configuration is shown here::
+An example docker compose service configuration is shown here::
 
   ocs-ptc1:
     image: simonsobs/socs:latest
@@ -91,3 +91,4 @@ Supporting APIs
 
 .. autoclass:: socs.agents.cryomech_cpa.agent.PTC
     :members:
+    :show-inheritance:

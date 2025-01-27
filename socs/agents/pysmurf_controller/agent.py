@@ -24,7 +24,7 @@ from sodetlib.det_config import DetConfig
 from sodetlib.operations import bias_dets
 
 from socs.agents.pysmurf_controller.smurf_subprocess_util import (
-    RunCfg, RunResult, run_smurf_func)
+    QuantileData, RunCfg, RunResult, run_smurf_func)
 
 
 class PysmurfScriptProtocol(protocol.ProcessProtocol):
@@ -129,7 +129,10 @@ class PysmurfController:
                 'observatory.{}.feeds.pysmurf_session_data'.format(args.monitor_id),
             )
 
-        self.agent.register_feed('bias_step_quantiles', record=True)
+        self.agent.register_feed('bias_step_results', record=True)
+        self.agent.register_feed('noise_results', record=True)
+        self.agent.register_feed('iv_results', record=True)
+        self.agent.register_feed('bias_wave_results', record=True)
 
     def _on_session_data(self, _data):
         data, feed = _data
@@ -305,7 +308,8 @@ class PysmurfController:
                 'pysmurf_action_timestamp': Current pysmurf-action timestamp,
                 'stream_tag': stream-tag for the current g3 stream,
                 'last_update':  Time that session-data was last updated,
-                'stream_id': Stream-id of the controlled smurf instance
+                'stream_id': Stream-id of the controlled smurf instance,
+                'num_active_channels': Number of channels outputting tones
             }
         """
         S, cfg = self._get_smurf_control(load_tune=False, no_dir=True)
@@ -314,6 +318,11 @@ class PysmurfController:
         kw = {'retry_on_fail': False}
         while session.status in ['starting', 'running']:
             try:
+
+                num_active_channels = 0
+                for band in range(8):
+                    num_active_channels += len(S.which_on(band))
+
                 d = dict(
                     channel_mask=S.get_channel_mask(**kw).tolist(),
                     downsample_factor=S.get_downsample_factor(**kw),
@@ -324,6 +333,7 @@ class PysmurfController:
                     stream_tag=reg.stream_tag.get(**kw, as_string=True),
                     last_update=time.time(),
                     stream_id=cfg.stream_id,
+                    num_active_channels=num_active_channels,
                 )
                 session.data.update(d)
             except (RuntimeError, epics.ca.ChannelAccessGetFailure):
@@ -595,7 +605,7 @@ class PysmurfController:
             if result.traceback is not None:
                 self.log.error("Error occurred:\n{tb}", tb=result.traceback)
 
-            return result.success, "Finished UXM Setup"
+            return result.success, "Finished UXM Relock"
 
     @ocs_agent.param('duration', default=30., type=float)
     @ocs_agent.param('kwargs', default=None)
@@ -655,6 +665,18 @@ class PysmurfController:
 
             result = run_smurf_func(cfg)
             set_session_data(session, result)
+            if result.success:
+                block_data = {}
+                for qd in result.return_val['quantiles'].values():
+                    if isinstance(qd, dict):
+                        qd = QuantileData(**qd)
+                    block_data.update(qd.to_block_data())
+                d = {
+                    'timestamp': time.time(),
+                    'block_name': 'noise_results',
+                    'data': block_data
+                }
+                self.agent.publish_to_feed('noise_results', d)
             return result.success, "Finished taking noise"
 
     @ocs_agent.param('kwargs', default=None)
@@ -747,11 +769,11 @@ class PysmurfController:
 
             >> response.session['data']
             {
-                'bands': Bands number of each resonator
-                'channels': Channel number of each resonator
-                'bgmap': BGMap assignment for each resonator
-                'R_n': Normal resistance for each resonator
                 'filepath': Filepath of saved IVAnalysis object
+                'quantiles': {
+                    'Rn': Rn quantiles
+                    'p_sat': electrical power at 90% Rn quantiles
+                }
             }
         """
         if params['kwargs'] is None:
@@ -770,6 +792,18 @@ class PysmurfController:
             )
             result = run_smurf_func(cfg)
             set_session_data(session, result)
+            if result.success:
+                block_data = {}
+                for qd in result.return_val['quantiles'].values():
+                    if isinstance(qd, dict):
+                        qd = QuantileData(**qd)
+                    block_data.update(qd.to_block_data())
+                d = {
+                    'timestamp': time.time(),
+                    'block_name': 'iv_results',
+                    'data': block_data
+                }
+                self.agent.publish_to_feed('iv_results', d)
             return result.success, "Finished taking IV"
 
     @ocs_agent.param('kwargs', default=None)
@@ -807,14 +841,11 @@ class PysmurfController:
                 'filepath': Filepath of saved BiasStepAnalysis object
                 'biased_total': Total number of detectors biased into rfrac_range
                 'biased_per_bg': List containing number of biased detectors on each bias line
-                'Rtes_quantiles': {
-                    'Rtes': List of 15%, 25%, 50%, 75%, 85% Rtes quantiles,
-                    'quantiles': List of quantile labels
-                    'count': Total count of the distribution
+                'quantiles': {
+                    'Rtes': Rtes quantiles,
+                    'Rfrac': Rfrac quantiles,
+                    'Si': Si quantiles,
                 }
-                'responsivity_quantiles': Same as above for responsivity
-                'Rfrac_quantiles': Same as above for Rfrac
-
             }
         """
 
@@ -838,15 +869,21 @@ class PysmurfController:
             result = run_smurf_func(cfg)
             set_session_data(session, result)
             if result.success:  # Publish quantile results
-                for name, d in result.return_val['quantiles'].items():
-                    block = dict(zip(d['labels'], d['values']))
-                    block[f'{name}_count'] = d['count']
-                    pub_data = {
-                        'timestamp': time.time(),
-                        'block_name': f'{name}_quantile',
-                        'data': block
-                    }
-                    self.agent.publish_to_feed('bias_step_quantiles', pub_data)
+                block_data = {
+                    f'biased_bg{bg}': v
+                    for bg, v in enumerate(result.return_val['biased_per_bg'])
+                }
+                block_data['biased_total'] = result.return_val['biased_total']
+                for qd in result.return_val['quantiles'].values():
+                    if isinstance(qd, dict):
+                        qd = QuantileData(**qd)
+                    block_data.update(qd.to_block_data())
+                data = {
+                    'timestamp': time.time(),
+                    'block_name': 'bias_steps_results',
+                    'data': block_data
+                }
+                self.agent.publish_to_feed('bias_step_results', data)
 
             return result.success, "Finished taking bias steps"
 
@@ -883,14 +920,11 @@ class PysmurfController:
                 'filepath': Filepath of saved BiasWaveAnalysis object
                 'biased_total': Total number of detectors biased into rfrac_range
                 'biased_per_bg': List containing number of biased detectors on each bias line
-                'Rtes_quantiles': {
-                    'Rtes': List of 15%, 25%, 50%, 75%, 85% Rtes quantiles,
-                    'quantiles': List of quantile labels
-                    'count': Total count of the distribution
+                'quantiles': {
+                    'Rtes': Rtes quantiles,
+                    'Rfrac': Rfrac quantiles,
+                    'Si': Si quantiles,
                 }
-                'responsivity_quantiles': Same as above for responsivity
-                'Rfrac_quantiles': Same as above for Rfrac
-
             }
         """
 
@@ -914,15 +948,19 @@ class PysmurfController:
             result = run_smurf_func(cfg)
             set_session_data(session, result)
             if result.success:  # Publish quantile results
-                for name, d in result.return_val['quantiles'].items():
-                    block = dict(zip(d['labels'], d['values']))
-                    block[f'{name}_count'] = d['count']
-                    pub_data = {
-                        'timestamp': time.time(),
-                        'block_name': f'{name}_quantile',
-                        'data': block
-                    }
-                    self.agent.publish_to_feed('bias_wave_quantiles', pub_data)
+                block_data = {
+                    f'biased_bg{bg}': v
+                    for bg, v in enumerate(result.return_val['biased_per_bg'])
+                }
+                block_data['biased_total'] = result.return_val['biased_total']
+                for qd in result.return_val['quantiles'].values():
+                    block_data.update(QuantileData(**qd).to_block_data())
+                data = {
+                    'timestamp': time.time(),
+                    'block_name': 'bias_wave_results',
+                    'data': block_data
+                }
+                self.agent.publish_to_feed('bias_wave_results', data)
 
             return result.success, "Finished taking bias steps"
 
@@ -963,7 +1001,7 @@ class PysmurfController:
 
         Args
         -----
-        bg: int, list, optional
+        bgs: int, list, optional
             Bias group (bg), or list of bgs to set. If None, will set all bgs.
         bias: int, float, list
             Biases to set. If a float is passed, this will be used for all
@@ -1000,7 +1038,7 @@ class PysmurfController:
 
         Args
         -----
-        bg: int, list, optional
+        bgs: int, list, optional
             bg, or list of bgs to zero. If None, will zero all bgs.
         """
         params['bias'] = 0

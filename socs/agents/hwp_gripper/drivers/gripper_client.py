@@ -1,15 +1,19 @@
 import pickle as pkl
 import socket
+import time
 
 
 class GripperClient(object):
     def __init__(self, ip, port):
         self.ip = ip
         self.port = port
-        self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.s.connect((self.ip, self.port))
-
+        self.control_socket = self._init_connection(self.ip, self.port)
         self.data = b''
+
+    def _init_connection(self, ip, port):
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect((ip, port))
+        return s
 
     def power(self, state):
         if not isinstance(state, bool):
@@ -76,6 +80,9 @@ class GripperClient(object):
     def alarm(self):
         return self.send_command('ALARM')
 
+    def alarm_group(self):
+        return self.send_command('ALARM_GROUP')
+
     def reset(self):
         return self.send_command('RESET')
 
@@ -105,12 +112,34 @@ class GripperClient(object):
 
     def send_command(self, command):
         if isinstance(command, str):
-            self.s.sendall(bytes(command, 'utf-8'))
+            self.control_socket.sendall(bytes(command, 'utf-8'))
         elif isinstance(command, bytes):
-            self.s.sendall(command)
+            self.control_socket.sendall(command)
 
-        return pkl.loads(self.s.recv(4096))
+        return pkl.loads(self.control_socket.recv(4096))
+
+    def restart(self):
+        log = []
+        try:
+            self.close()
+            log.append('Previous connection closed')
+        except BaseException:
+            log.append('Previous connection already closed')
+
+        _restart_socket = self._init_connection(self.ip, 5656)
+        _restart_socket.sendall(('reset\n').encode())
+        time.sleep(0.5)
+
+        resp = _restart_socket.recv(4096).decode().strip()
+        log.append(f'Restart command response: {resp}')
+        result = True if resp == 'Success' else False
+        _restart_socket.close()
+        time.sleep(10)
+
+        self.control_socket = self._init_connection(self.ip, self.port)
+        log.append('Control socket reconnected')
+        return {'result': result, 'log': log}
 
     def close(self):
         """Close socket connection"""
-        self.s.close()
+        self.control_socket.close()
