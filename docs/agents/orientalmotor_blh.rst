@@ -10,6 +10,11 @@ This agent is designed to interface with Oriental Motor's BLH series motor contr
 Only controllers with a model number that includes '-KD' are compatible with this agent.
 The controller is identified as a serial port,
 and you can specify the device file using the `--port` option in the argument.
+On Ubuntu, the device is recognized without requiring any driver installation and will
+appear as `/dev/ttyACM*` (e.g., `/dev/ttyACM0`, `/dev/ttyACM1`, etc.), where the number varies
+depending on the system.
+A symbolic link to the device file is also available under `/dev/serial/by-id/` as
+`usb-ORIENTAL_MOTOR_CO._LTD._ORIENTAL_MOTOR_USB-Deviice_0000000000-if00`.
 
 .. argparse::
     :filename: ../socs/agents/orientalmotor_blh/agent.py
