@@ -46,7 +46,7 @@ class BLHAgent:
         self.speed = 0.0
 
     @ocs_agent.param('_')
-    def init_blh(self, session, params=None):
+    def init_blh(self, session, params):
         """init_blh()
 
         **Task** - Initialize motor driver.
@@ -140,7 +140,7 @@ class BLHAgent:
 
         return True, 'Acquisition exited cleanly.'
 
-    def _stop_acq(self, session, params=None):
+    def _stop_acq(self, session, params):
         self.agent.start('stop_rotation')
         while self.speed > 0.1:
             time.sleep(1)
@@ -154,7 +154,7 @@ class BLHAgent:
     @ocs_agent.param('speed', default=None, type=int, check=lambda x: 50 <= x <= 3000)
     @ocs_agent.param('accl_time', default=None, type=float, check=lambda x: 0.5 <= x <= 15)
     @ocs_agent.param('decl_time', default=None, type=float, check=lambda x: 0.5 <= x <= 15)
-    def set_values(self, session, params=None):
+    def set_values(self, session, params):
         """set_values(speed=None, accl_time=None, decl_time=None)
 
         **Task** - Set parameters for BLH motor driver.
@@ -190,7 +190,7 @@ class BLHAgent:
         return True, 'Set values for BLH'
 
     @ocs_agent.param('forward', default=True, type=bool)
-    def start_rotation(self, session, params=None):
+    def start_rotation(self, session, params):
         """start_rotation(forward=True)
 
         **Task** - Start motor rotation.
@@ -200,9 +200,6 @@ class BLHAgent:
         forward : bool, default True
             Move forward if True
         """
-        if params is None:
-            params = {}
-
         if not self.take_data:
             self.agent.start('acq')
             for _ in range(ACQ_TIMEOUT):
