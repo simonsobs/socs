@@ -45,6 +45,7 @@ class BLHAgent:
                                  buffer_time=1)
         self.speed = 0.0
 
+    @ocs_agent.param('_')
     def init_blh(self, session, params=None):
         """init_blh()
 
@@ -58,8 +59,6 @@ class BLHAgent:
                 self.log.warn('Could not start init because '
                               '{} is already running'.format(self.lock.job))
                 return False, 'Could not acquire lock.'
-
-            session.set_status('starting')
 
             self._blh.connect()
             session.add_message('BLH initialized.')
@@ -234,14 +233,11 @@ class BLHAgent:
         return True, 'BLH rotation started.'
 
     @ocs_agent.param('_')
-    def stop_rotation(self, session, params=None):
+    def stop_rotation(self, session, params):
         """stop_rotation()
 
         **Task** - Stop motor rotation.
         """
-        if params is None:
-            params = {}
-
         with self.lock.acquire_timeout(3, job='set_values') as acquired:
             if not acquired:
                 self.log.warn('Could not start set_values because '
@@ -253,6 +249,25 @@ class BLHAgent:
                 return False, 'Could not stop rotation.'
 
         return True, 'BLH rotation stop command was published.'
+
+    @ocs_agent.param('_')
+    def clear_alarm(self, session, params):
+        """clear_alarm()
+
+        **Task** - Clear alarm of the driver.
+        """
+        with self.lock.acquire_timeout(3, job='set_values') as acquired:
+            if not acquired:
+                self.log.warn('Could not start clear_alarm because '
+                              f'{self.lock.job} is already running')
+                return False, 'Could not acquire lock.'
+
+            self._blh.clear_alarm()
+            _, error = self._blh.get_status()
+            if error != 0:
+                return False, 'Could not clear alarm.'
+
+        return True, 'Alarm clear command was published.'
 
 
 def make_parser(parser=None):
@@ -296,6 +311,11 @@ def main(args=None):
     agent_inst.register_task(
         'init_blh',
         blh_agent.init_blh
+    )
+
+    agent_inst.register_task(
+        'clear_alarm',
+        blh_agent.clear_alarm
     )
 
     agent_inst.register_process(
