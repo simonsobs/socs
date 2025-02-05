@@ -11,7 +11,7 @@ boards with the PTP timing reference.
 This agent runs inside the KR260 to publish captured data to the crossbar.
 
 .. argparse::
-    :filename: ../socs/agents/stm_encoder/agent.py
+    :filename: ../socs/agents/stimulator_encoder/agent.py
     :func: make_parser
     :prog: python3 agent.py
 
@@ -23,12 +23,12 @@ running the agent in a docker container.
 OCS Site Config
 ```````````````
 
-To configure the stimulator encoder agent we need to add a StmEncAgent
+To configure the stimulator encoder agent we need to add a StimEncAgent
 block to our ocs configuration file. Here is an example configuration block
 using all of the available arguments::
 
-       {'agent-class': 'StmEncAgent',
-        'instance-id': 'stm_enc',
+       {'agent-class': 'StimEncAgent',
+        'instance-id': 'stim-enc',
         'arguments':[]}
 
 
@@ -51,5 +51,21 @@ This offset is hard-coded in `drivers.py`.
 Agent API
 ---------
 
-.. autoclass:: socs.agents.stm_encoder.agent.StmEncAgent
+.. autoclass:: socs.agents.stimulator_encoder.agent.StimEncAgent
+    :members:
+
+
+Supporting APIs
+---------------
+
+.. autoclass:: socs.agents.stimulator_encoder.drivers.StimEncError
+    :members:
+
+.. autoclass:: socs.agents.stimulator_encoder.drivers.StimEncTime
+    :members:
+
+.. autoclass:: socs.agents.stimulator_encoder.drivers.StimEncData
+    :members:
+
+.. autoclass:: socs.agents.stimulator_encoder.drivers.StimEncReader
     :members:

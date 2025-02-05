@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-'''Module to read stimulator encoder.
-'''
+"""Module to read stimulator encoder.
+"""
 import fcntl
 import mmap
 import os
@@ -14,18 +14,18 @@ import numpy as np
 
 ADDR_AXI = 0x80020000
 PATH_DEV_BASE = Path(f'/sys/devices/platform/axi/{ADDR_AXI:08x}.str_rd/uio')
-PATH_LOCK = Path(__file__).parent.joinpath('.lock')
+PATH_LOCK = Path('/tmp/').joinpath('.stim-lock')
 LEAP_OFFSET = 37
 
 
-class StmEncError(Exception):
-    '''
+class StimEncError(Exception):
+    """
     Exception rased by stimulator encoder reader.
-    '''
+    """
 
 
-class StmEncTime:
-    '''
+class StimEncTime:
+    """
     Stimulator encoder time.
 
     Parameter
@@ -33,83 +33,83 @@ class StmEncTime:
     time_raw : int
         Raw time format from TSU.
         [sec 48 bits][nsec 30 bits][sub-nsec 16 bits]
-    '''
+    """
 
     def __init__(self, time_raw):
         self._time_raw = time_raw
 
     @property
     def sec(self):
-        '''
+        """
         Seconds part of timestamp.
 
         Returns
         -------
         sec : int
             Seconds part of timestamp.
-        '''
+        """
         return self._time_raw >> 46
 
     @property
     def nsec(self):
-        '''
+        """
         Nano second part of timestamp.
 
         Returns
         -------
         nsec : int
             Nano-sec part of timestamp.
-        '''
+        """
         return (0x_00000000_00003fff_ffff0000 & self._time_raw) >> 16
 
     @property
     def tai(self):
-        '''
+        """
         Time in seconds from TAI epoch.
 
         Returns
         -------
         tai : float
             Seconds from TAI epoch.
-        '''
+        """
         return self.sec + (self.nsec / 1e9)
 
     @property
     def utc(self):
-        '''
+        """
         Time in seconds in UTC.
 
         Returns
         -------
         utc : float
             UnixTime.
-        '''
+        """
         return self.tai - LEAP_OFFSET
 
     @property
     def g3(self):
-        '''
+        """
         G3Time.
 
         Returns
         -------
         time_g3 : np.int64
             G3Time
-        '''
+        """
         time_g3 = np.floor((self.utc) * 1e8)
 
         return np.int64(time_g3)
 
 
-class StmEncData:
-    '''
+class StimEncData:
+    """
     Stimulator encoder data.
 
     Parameter
     ---------
     data_raw : ndarray
         Raw data from PL FIFO.
-    '''
+    """
 
     def __init__(self, data_bytes):
         self._data_bytes = data_bytes
@@ -121,42 +121,42 @@ class StmEncData:
 
     @property
     def time_raw(self):
-        '''94 bit TSU timestamp.
+        """94 bit TSU timestamp.
 
         Returns
         -------
         time_raw : int
             94 bit TSU timestamp.
-        '''
+        """
         return self._data_int & 0x3F_FF_FF_FF_FFFFFFFF_FFFFFFFF
 
     @property
     def time(self):
-        '''
+        """
         TSU timestamp.
 
         Returns
         -------
-        time : StmTime
+        time : StimTime
             TSU timestamp abstraction.
-        '''
-        return StmEncTime(self.time_raw)
+        """
+        return StimEncTime(self.time_raw)
 
     def __str__(self):
         return f'time={int(self.time.g3) / 1e8:.8f} data={self.state:02b}'
 
 
 def get_path_dev():
-    '''
+    """
     Acquire devicefile path for `str_rd` IP core.
 
     Returns
     -------
     path_dev : Path
         Path to the device file.
-    '''
+    """
     if not PATH_DEV_BASE.exists():
-        raise StmEncError('Device is not found. Check firmware and device tree.')
+        raise StimEncError('Device is not found. Check firmware and device tree.')
 
     name_dev = list(PATH_DEV_BASE.glob('uio*'))[0].name
     path_dev = Path(f'/dev/{name_dev}')
@@ -164,8 +164,8 @@ def get_path_dev():
     return path_dev
 
 
-class StmEncReader:
-    '''Class to read encoder data.
+class StimEncReader:
+    """Class to read encoder data.
 
     Parameters
     ----------
@@ -173,7 +173,7 @@ class StmEncReader:
         Path to the generic-uio device file for str_rd IP.
     path_lock : str or pathlib.Path
         Path to the lockfile.
-    '''
+    """
 
     def __init__(self, path_dev, path_lock=PATH_LOCK, verbose=True):
         # Verbose level
@@ -184,7 +184,7 @@ class StmEncReader:
         try:
             fcntl.flock(self._fp_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except IOError:
-            raise StmEncError('locked.')
+            raise StimEncError('locked.')
 
         # Connection
         self._path_dev = path_dev
@@ -222,12 +222,12 @@ class StmEncReader:
     def _get_data(self):
         data = np.frombuffer(self._dev, np.uint32, 4, offset=16)
 
-        return StmEncData(data)
+        return StimEncData(data)
 
     def fill(self):
-        '''
+        """
         Get data from PL fifo and put into software fifo.
-        '''
+        """
         while True:
             r_len, w_len, residue = self._get_info()
 
@@ -242,37 +242,37 @@ class StmEncReader:
             sleep(0.1)
 
     def run(self):
-        '''
+        """
         Run infinite loop of data filling.
-        '''
+        """
         self._running = True
         self._thread = Thread(target=self._loop)
         self._thread.start()
 
     def stop(self):
         if not self._running:
-            raise StmEncError('Not started yet.')
+            raise StimEncError('Not started yet.')
 
         self._running = False
         self._thread.join()
 
 
 def main():
-    '''Main function to boot infinite loop'''
-    stm_enc = StmEncReader(get_path_dev(), verbose=True)
+    """Main function to boot infinite loop"""
+    stim_enc = StimEncReader(get_path_dev(), verbose=True)
 
     # Filler loop
     fd = open('test.dat', 'w')
-    stm_enc.run()
+    stim_enc.run()
     while True:
         try:
-            while not stm_enc.fifo.empty():
-                data = stm_enc.fifo.get()
+            while not stim_enc.fifo.empty():
+                data = stim_enc.fifo.get()
                 print(data)
                 fd.write(str(data) + '\n')
             sleep(0.1)
         except KeyboardInterrupt:
-            stm_enc.stop()
+            stim_enc.stop()
             fd.close()
             break
 
