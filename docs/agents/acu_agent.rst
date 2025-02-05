@@ -90,6 +90,7 @@ example configuration block is below::
                 'upper': 360.,
             },
             'acc': (8./1.88),
+            'axes_sequential': False,
         },
     }
 
