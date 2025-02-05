@@ -1117,8 +1117,18 @@ class ControlStateMachine:
                         raise RuntimeError(f"ACU commanded elevation is {acu.el_commanded_position} deg, "
                                            f"outside of allowed range ({acu.min_el}, {acu.max_el})")
 
+            def check_gripper_ok_for_spinup():
+                if hwp_state.gripper is None:  # No gripper was specified in the config file -- ignore
+                    return
+                grip_state = hwp_state.gripper.grip_state
+                if grip_state != "ungripped":
+                    raise RuntimeError(
+                        f"Spinup attempted while grip state is: {grip_state}"
+                    )
+
             if isinstance(state, ControlState.PIDToFreq):
                 check_acu_ok_for_spinup()
+                check_gripper_ok_for_spinup()
                 self.run_and_validate(clients.pid.set_direction,
                                       kwargs={'direction': state.direction})
                 self.run_and_validate(clients.pid.declare_freq,
@@ -1213,6 +1223,7 @@ class ControlStateMachine:
             elif isinstance(state, ControlState.ConstVolt):
                 if state.voltage > 0:
                     check_acu_ok_for_spinup()
+                    check_gripper_ok_for_spinup()
                 self.run_and_validate(clients.pmx.set_on)
                 self.run_and_validate(clients.pid.set_direction,
                                       kwargs={'direction': state.direction})
