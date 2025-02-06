@@ -61,7 +61,7 @@ class StimEncAgent:
 
             >>> response.session['data']
 
-            {'ts': 1736541796.679634,
+            {'timestamp_tai': 1736541833.679634,
              'state': 1,
              'timestamp': 1736541796.779634
             }
@@ -90,14 +90,14 @@ class StimEncAgent:
 
                 while not self._dev.fifo.empty():
                     _d = self._dev.fifo.get()
-                    ts_list.append(_d.time.utc)
+                    ts_list.append(_d.time.tai)
                     en_st_list.append(_d.state)
 
                 if len(ts_list) != 0:
-                    data['data']['timestamps'] = ts_list
+                    data['data']['timestamps_tai'] = ts_list
                     data['data']['state'] = en_st_list
 
-                    field_dict = {'ts': ts_list[-1],
+                    field_dict = {'timestamp_tai': ts_list[-1],
                                   'state': en_st_list[-1]}
 
                     session.data.update(field_dict)
@@ -109,7 +109,7 @@ class StimEncAgent:
                         data_downsampled = {'timestamp': current_time,
                                             'block_name': 'stim_enc_downsampled',
                                             'data': {
-                                                'timestamps': ts_list[-1],
+                                                'timestamps_tai': ts_list[-1],
                                                 'state': en_st_list[-1]
                                             }}
                         self.agent.publish_to_feed('stim_enc_downsampled',

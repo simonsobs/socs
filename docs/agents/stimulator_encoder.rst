@@ -42,10 +42,7 @@ Changes in the encoder states are captured with the PTP-based timestamp provided
 The packet containing the encoder states and the timestamp is sent to the FIFO inside the PL and is then read from the processor via the AXI interface.
 The interface is memory-mapped with the uio (User Space I/O) driver.
 
-The timestamp provided by the TSU is in the TAI format.
-Since TAI is uniformly incremented even during leap seconds,
-translation from TAI to Unix time requires the cumulative offset inserted for leap seconds.
-This offset is hard-coded in `drivers.py`.
+The hardware timestamp of the PTP origin is provided in TAI format, which is offset by 37 seconds from UTC at least until December 31, 2025.
 
 
 Agent API

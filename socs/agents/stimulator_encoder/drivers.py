@@ -15,7 +15,6 @@ import numpy as np
 ADDR_AXI = 0x80020000
 PATH_DEV_BASE = Path(f'/sys/devices/platform/axi/{ADDR_AXI:08x}.str_rd/uio')
 PATH_LOCK = Path('/tmp/').joinpath('.stim-lock')
-LEAP_OFFSET = 37
 
 
 class StimEncError(Exception):
@@ -73,32 +72,6 @@ class StimEncTime:
             Seconds from TAI epoch.
         """
         return self.sec + (self.nsec / 1e9)
-
-    @property
-    def utc(self):
-        """
-        Time in seconds in UTC.
-
-        Returns
-        -------
-        utc : float
-            UnixTime.
-        """
-        return self.tai - LEAP_OFFSET
-
-    @property
-    def g3(self):
-        """
-        G3Time.
-
-        Returns
-        -------
-        time_g3 : np.int64
-            G3Time
-        """
-        time_g3 = np.floor((self.utc) * 1e8)
-
-        return np.int64(time_g3)
 
 
 class StimEncData:
