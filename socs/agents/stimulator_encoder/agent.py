@@ -38,10 +38,16 @@ class StimEncAgent:
 
         self.initialized = False
 
-        agg_params = {'frame_length': 60}
+        agg_params = {'frame_length': 60, 'exclude_influx': True}
         self.agent.register_feed('stim_enc',
                                  record=True,
                                  agg_params=agg_params,
+                                 buffer_time=1)
+
+        agg_params_downsampled = {'frame_length': 60}
+        self.agent.register_feed('stim_enc_downsampled',
+                                 record=True,
+                                 agg_params=agg_params_downsampled,
                                  buffer_time=1)
 
     def acq(self, session, params):
@@ -73,6 +79,7 @@ class StimEncAgent:
 
             self._dev.run()
 
+            downsample_time = time.time()
             while self.take_data:
                 # Data acquisition
                 current_time = time.time()
@@ -97,6 +104,17 @@ class StimEncAgent:
 
                     self.agent.publish_to_feed('stim_enc', data)
                     session.data.update({'timestamp': current_time})
+
+                    if current_time - downsample_time > 0.1:
+                        data_downsampled = {'timestamp': current_time,
+                                            'block_name': 'stim_enc_downsampled',
+                                            'data': {
+                                                'timestamps': ts_list[-1],
+                                                'state': en_st_list[-1]
+                                            }}
+                        self.agent.publish_to_feed('stim_enc_downsampled',
+                                                   data_downsampled)
+                        downsample_time = current_time
 
                 pace_maker.sleep()
 
