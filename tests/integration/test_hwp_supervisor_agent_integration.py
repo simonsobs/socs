@@ -5,6 +5,7 @@ import coverage.data
 import pytest
 from integration.util import docker_compose_file  # noqa: F401
 from integration.util import create_crossbar_fixture
+from ocs.ocs_client import OCSReply
 from ocs.testing import _AgentRunner, create_client_fixture
 
 from socs.testing.hwp_emulator import HWPEmulator
@@ -174,6 +175,13 @@ def test_supervisor_grip(hwp_em, supervisor_agent, sup_client) -> None:
     state = get_hwp_state(sup_client)
     assert state["gripper"]["grip_state"] == "warm"
 
+    # Verify that spinning is blocked while the HWP is gripped
+    reply: OCSReply = sup_client.pid_to_freq(target_freq=2.0)
+    if reply.session['success']:
+        print("Spin up process successful though  HWP was gripped...")
+        print(reply.session)
+        assert False
+
 
 @pytest.mark.integtest
 def test_hwp_spinup(supervisor_agent, sup_client) -> None:
@@ -182,3 +190,10 @@ def test_hwp_spinup(supervisor_agent, sup_client) -> None:
     assert get_hwp_state(sup_client)["is_spinning"]
     status = sup_client.pid_to_freq.status()
     pprint(status.session["data"])
+
+    # Verify that gripping the HWP is blocked while the HWP is spinning
+    reply: OCSReply = sup_client.grip_hwp()
+    if reply.session['success']:
+        print("Grip attempted even though HWP is spinning")
+        print(reply.session)
+        assert False
