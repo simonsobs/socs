@@ -1,6 +1,6 @@
 .. highlight:: rst
 
-.. _stm_thermometer:
+.. _stimulator_thermometer:
 
 ============================
 Stimulator Thermometer Agent
@@ -8,7 +8,7 @@ Stimulator Thermometer Agent
 This is an OCS agent to acquire temperature data of the stimulator.
 
 .. argparse::
-   :module: socs.agents.stm_thermo.agent
+   :module: socs.agents.stimulator_thermometer.agent
    :func: make_parser
    :prog: agent.py
 
@@ -17,15 +17,15 @@ Configuration File Examples
 Below are useful configurations examples for the relevant OCS files and for
 running the agent.
 
-ocs-config
-``````````
-To configure the stimulator thermometer agent we need to add a StmThermometerAgent
+OCS Site Config
+```````````````
+To configure the stimulator thermometer agent we need to add a StimThermometerAgent
 block to our ocs configuration file. Here is an example configuration block
 using all of the available arguments::
 
-       {'agent-class': 'StmThermometerAgent',
-        'instance-id': 'stm_thermo',
-        'arguments': [['--paths_spinode', [
+       {'agent-class': 'StimThermometerAgent',
+        'instance-id': 'stim_thermo',
+        'arguments': [['--paths-spinode', [
           '/sys/bus/spi/devices/spi3.0/',
           '/sys/bus/spi/devices/spi3.1/',
           '/sys/bus/spi/devices/spi3.2/',
@@ -62,5 +62,20 @@ The agent reads these files and publishes the acquired data to the feed.
 Agent API
 ---------
 
-.. autoclass:: socs.agents.stm_thermo.agent.StmThermometerAgent
+.. autoclass:: socs.agents.stimulator_thermometer.agent.StimThermometerAgent
+    :members:
+
+Supporting APIs
+---------------
+
+.. autoclass:: socs.agents.stimulator_thermometer.drivers.StimThermoError
+    :members:
+
+.. autoclass:: socs.agents.stimulator_thermometer.drivers.Iio
+    :members:
+
+.. autoclass:: socs.agents.stimulator_thermometer.drivers.Max31856
+    :members:
+
+.. autoclass:: socs.agents.stimulator_thermometer.drivers.Max31865
     :members:

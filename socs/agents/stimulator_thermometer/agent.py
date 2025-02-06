@@ -1,37 +1,38 @@
 #!/usr/bin/env python3
-'''OCS agent for thermometer board in the stimulator box
-'''
+"""OCS agent for thermometer board in the stimulator box
+"""
 import argparse
 import os
 import time
 
 import txaio
 from ocs import ocs_agent, site_config
-from ocs.ocs_twisted import TimeoutLock
+from ocs.ocs_twisted import Pacemaker, TimeoutLock
 
-from socs.agents.stm_thermo.drivers import Max31856, from_spi_node_path
+from socs.agents.stimulator_thermometer.drivers import (Max31856,
+                                                        from_spi_node_path)
 
 LOCK_RELEASE_SEC = 1.
 LOCK_RELEASE_TIMEOUT = 10
 
 
-class StmThermometerAgent:
-    '''OCS agent class for stimulator thermometer.
+class StimThermometerAgent:
+    """OCS agent class for stimulator thermometer.
 
     Parameters
     ----------
     devices : list of str or pathlib.Path
         List of path to SPI nodes of temperature devices.
-    '''
+    """
 
-    def __init__(self, agent, devices):
+    def __init__(self, agent, paths_spinode):
         self.active = True
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
         self.take_data = False
 
-        self.devices = devices
+        self.devices = [from_spi_node_path(path) for path in paths_spinode]
 
         self.initialized = False
 
@@ -41,14 +42,33 @@ class StmThermometerAgent:
                                  agg_params=agg_params,
                                  buffer_time=1)
 
+    @ocs_agent.param('sampling_frequency', type=float, default=1)
     def acq(self, session, params):
         """acq()
 
         **Process** - Fetch temperatures from the thermometer readers.
 
+        Parameters
+        ----------
+        sampling_frequency : float, optional
+            Sampling frequency in Hz, default to 1 Hz.
+
+        Notes
+        -----
+        An example of the session data::
+
+            >>> response.session['data']
+
+            {"Channel_0": {"T":15.092116135817285},
+             "Channel_1": {"T":15.092116135817285},
+             "Channel_2": {"T":15.40625,"T_cj":16.796875},
+             "Channel_3": {"T":15.4921875,"T_cj":16.453125}},
+             ...
+             "timestamp": 1738827824.2523127
+            }
         """
-        f_sample = params.get('sampling_frequency', 1)
-        sleep_time = 1 / f_sample - 0.1
+        f_sample = params['sampling_frequency']
+        pace_maker = Pacemaker(f_sample)
 
         with self.lock.acquire_timeout(timeout=0, job='acq') as acquired:
             if not acquired:
@@ -56,10 +76,8 @@ class StmThermometerAgent:
                     f'Could not start acq because {self.lock.job} is already running')
                 return False, 'Could not acquire lock.'
 
-            session.set_status('running')
-
             self.take_data = True
-            session.data = {"fields": {}}
+            session.data = {}
             last_release = time.time()
 
             while self.take_data:
@@ -70,13 +88,14 @@ class StmThermometerAgent:
                         return False, 'Could not re-acquire lock.'
 
                 current_time = time.time()
-                data = {'timestamp': current_time, 'block_name': 'temps', 'data': {}}
 
                 for ch_num, dev in enumerate(self.devices):
+                    data = {'timestamp': current_time, 'block_name': f'temp_{ch_num}', 'data': {}}
                     chan_string = f'Channel_{ch_num}'
 
                     temp = dev.get_temp()
                     data['data'][chan_string + '_T'] = temp
+                    self.agent.publish_to_feed('temperatures', data)
 
                     if isinstance(dev, Max31856):
                         cjtemp = dev.get_temp_ambient()
@@ -85,22 +104,16 @@ class StmThermometerAgent:
                     else:
                         field_dict = {chan_string: {'T': temp}}
 
-                    session.data['fields'].update(field_dict)
+                    session.data.update(field_dict)
 
-                self.agent.publish_to_feed('temperatures', data)
                 session.data.update({'timestamp': current_time})
-                time.sleep(sleep_time)
+                pace_maker.sleep()
 
             self.agent.feeds['temperatures'].flush_buffer()
 
         return True, 'Acquisition exited cleanly.'
 
-    def stop_acq(self, session, params=None):
-        """_stop_acq()
-
-        **Task** - Stop task associated with acq process.
-
-        """
+    def _stop_acq(self, session, params=None):
         if self.take_data:
             self.take_data = False
             return True, 'requested to stop taking data.'
@@ -113,30 +126,28 @@ def make_parser(parser=None):
         parser = argparse.ArgumentParser()
 
     pgroup = parser.add_argument_group('Agent Options')
-    pgroup.add_argument('--paths_spinode', nargs='*', type=str, required=True,
+    pgroup.add_argument('--paths-spinode', nargs='*', type=str, required=True,
                         help="Path to the spi nodes.")
 
     return parser
 
 
 def main(args=None):
-    '''Boot OCS agent'''
+    """Boot OCS agent"""
     txaio.start_logging(level=os.environ.get('LOGLEVEL', 'info'))
 
     parser = make_parser()
-    args = site_config.parse_args('StmThermometerAgent',
+    args = site_config.parse_args('StimThermometerAgent',
                                   parser=parser,
                                   args=args)
 
     agent_inst, runner = ocs_agent.init_site_agent(args)
-    devices = [from_spi_node_path(path) for path in args.paths_spinode]
-
-    stm_max_agent = StmThermometerAgent(agent_inst, devices)
+    stim_max_agent = StimThermometerAgent(agent_inst, args.paths_spinode)
 
     agent_inst.register_process(
         'acq',
-        stm_max_agent.acq,
-        stm_max_agent.stop_acq,
+        stim_max_agent.acq,
+        stim_max_agent._stop_acq,
         startup=True
     )
 
