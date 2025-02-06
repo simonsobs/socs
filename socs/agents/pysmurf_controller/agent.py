@@ -308,7 +308,8 @@ class PysmurfController:
                 'pysmurf_action_timestamp': Current pysmurf-action timestamp,
                 'stream_tag': stream-tag for the current g3 stream,
                 'last_update':  Time that session-data was last updated,
-                'stream_id': Stream-id of the controlled smurf instance
+                'stream_id': Stream-id of the controlled smurf instance,
+                'num_active_channels': Number of channels outputting tones
             }
         """
         S, cfg = self._get_smurf_control(load_tune=False, no_dir=True)
@@ -317,6 +318,11 @@ class PysmurfController:
         kw = {'retry_on_fail': False}
         while session.status in ['starting', 'running']:
             try:
+
+                num_active_channels = 0
+                for band in range(8):
+                    num_active_channels += len(S.which_on(band))
+
                 d = dict(
                     channel_mask=S.get_channel_mask(**kw).tolist(),
                     downsample_factor=S.get_downsample_factor(**kw),
@@ -327,6 +333,7 @@ class PysmurfController:
                     stream_tag=reg.stream_tag.get(**kw, as_string=True),
                     last_update=time.time(),
                     stream_id=cfg.stream_id,
+                    num_active_channels=num_active_channels,
                 )
                 session.data.update(d)
             except (RuntimeError, epics.ca.ChannelAccessGetFailure):
@@ -598,7 +605,7 @@ class PysmurfController:
             if result.traceback is not None:
                 self.log.error("Error occurred:\n{tb}", tb=result.traceback)
 
-            return result.success, "Finished UXM Setup"
+            return result.success, "Finished UXM Relock"
 
     @ocs_agent.param('duration', default=30., type=float)
     @ocs_agent.param('kwargs', default=None)
@@ -765,6 +772,7 @@ class PysmurfController:
                 'filepath': Filepath of saved IVAnalysis object
                 'quantiles': {
                     'Rn': Rn quantiles
+                    'p_sat': electrical power at 90% Rn quantiles
                 }
             }
         """
@@ -993,7 +1001,7 @@ class PysmurfController:
 
         Args
         -----
-        bg: int, list, optional
+        bgs: int, list, optional
             Bias group (bg), or list of bgs to set. If None, will set all bgs.
         bias: int, float, list
             Biases to set. If a float is passed, this will be used for all
@@ -1030,7 +1038,7 @@ class PysmurfController:
 
         Args
         -----
-        bg: int, list, optional
+        bgs: int, list, optional
             bg, or list of bgs to zero. If None, will zero all bgs.
         """
         params['bias'] = 0

@@ -987,13 +987,15 @@ class ACUAgent:
         return limit_func, limits
 
     @inlineCallbacks
-    def _go_to_axis(self, session, axis, target):
+    def _go_to_axis(self, session, axis, target,
+                    state_feedback=None):
         """Execute a movement, using "Preset" mode, on a specific axis.
 
         Args:
           session: session object variable of the parent operation.
           axis (str): one of 'Azimuth', 'Elevation', 'Boresight'.
           target (float): target position.
+          state_feedback (dict): place to record state (see notes).
 
         Returns:
           ok (bool): True if the motion completed successfully and
@@ -1006,6 +1008,13 @@ class ACUAgent:
           warning horn sounds, this function should block until that
           completes, even if the requested position has been achieved
           (i.e. no actual motion was needed).
+
+          The state_feedback may be used to pipeline the initial parts
+          of the movement, so two functions aren't trying to command
+          at the same time.  The ``state_feedback`` dict should be
+          passed in initialized with ``{'state': 'init'}``.  When
+          initial commanding is finished, this function will update it
+          to `state="wait"`, and then on completion to `state="done"`.
 
         """
         # Step time in event loop.
@@ -1054,6 +1063,10 @@ class ACUAgent:
         State = Enum(f'{axis}State',
                      ['INIT', 'WAIT_MOVING', 'WAIT_STILL', 'FAIL', 'DONE'])
 
+        if state_feedback is None:
+            state_feedback = {}
+        state_feedback['state'] = 'init'
+
         # If this axis is "ignore", skip it.
         for _axis, short_name in [
                 ('Azimuth', 'az'),
@@ -1062,6 +1075,7 @@ class ACUAgent:
         ]:
             if _axis == axis and short_name in self.ignore_axes:
                 self.log.warn('Ignoring requested motion on {axis}', axis=axis)
+                state_feedback['state'] = 'done'
                 yield dsleep(1)
                 return True, 'axis successfully ignored'
 
@@ -1109,6 +1123,11 @@ class ACUAgent:
 
             def get_mode(_self):
                 return self.data['status']['corotator']['Corotator_mode']
+
+            def get_active(_self):
+                return bool(
+                    self.data['status']['corotator']['Corotator_brakes_released']
+                    and not self.data['status']['corotator']['Corotator_axis_stop'])
 
         ctrl = None
         if axis == 'Azimuth':
@@ -1222,6 +1241,7 @@ class ACUAgent:
 
             elif state == State.WAIT_STILL:
                 # Once moving, watch for end of motion.
+                state_feedback['state'] = 'wait'
                 if not mode_ok:
                     self.log.error('Unexpected axis mode transition; exiting.')
                     state = State.FAIL
@@ -1258,6 +1278,8 @@ class ACUAgent:
             msg = 'Move aborted!'
         else:
             msg = 'Irregularity during motion!'
+
+        state_feedback['state'] = 'done'
         return success, msg
 
     @inlineCallbacks
@@ -1281,6 +1303,10 @@ class ACUAgent:
             axis).
 
         """
+        # Construct args for each _go_to_axis command... don't create
+        # the Deferred here, because we will want to clear_faults
+        # first (and the Deferred might start running before that
+        # completes).
         move_defs = []
         for axis_name, short_name, target in [
                 ('Azimuth', 'az', az),
@@ -1289,7 +1315,8 @@ class ACUAgent:
         ]:
             if target is not None:
                 move_defs.append(
-                    (short_name, self._go_to_axis(session, axis_name, target)))
+                    (short_name, (session, axis_name, target)))
+
         if len(move_defs) is None:
             return True, 'No motion requested.'
 
@@ -1297,7 +1324,18 @@ class ACUAgent:
             yield self.acu_control.clear_faults()
             yield dsleep(1)
 
-        moves = yield DeferredList([d for n, d in move_defs])
+        # Start each move, waiting for each to pass the "init" state
+        # before beginning the next one.
+        moves = []
+        for name, args in move_defs:
+            fb = {'state': 'init'}
+            move_def = self._go_to_axis(*args, state_feedback=fb)
+            while fb['state'] == 'init':
+                yield dsleep(.1)
+            moves.append(move_def)
+
+        # Now wait for all to complete.
+        moves = yield DeferredList(moves)
         all_ok, msgs = True, []
         for _ok, result in moves:
             if _ok:
@@ -1310,7 +1348,8 @@ class ACUAgent:
         if all_ok:
             msg = msgs[0]
         else:
-            msg = ' '.join([f'{n}: {msg}' for (n, d), msg in zip(move_defs, msgs)])
+            msg = ' '.join([f'{name}: {msg}'
+                            for (name, args), msg in zip(move_defs, msgs)])
         return all_ok, msg
 
     @ocs_agent.param('az', type=float)
@@ -1761,13 +1800,17 @@ class ACUAgent:
             az_accel = max_turnaround_accel
 
         # If el is not specified, drop in the current elevation.
-        init_el = None
         if el_endpoint1 is None:
             el_endpoint1 = self.data['status']['summary']['Elevation_current_position']
-        else:
-            init_el = el_endpoint1
         if el_endpoint2 is None:
             el_endpoint2 = el_endpoint1
+
+        # If requested el is just outside acceptable range, tweak it in.
+        _f, _ = self._get_limit_func('elevation')
+        el_endpoint1, _untweaked_el = _f(el_endpoint1), el_endpoint1
+        if abs(el_endpoint1 - _untweaked_el) > 0.1:
+            return False, "Current elevation (%.4f) is well outside limits." % _untweaked_el
+        init_el = el_endpoint1
 
         azonly = params.get('az_only', True)
         scan_upload_len = params.get('scan_upload_length')
@@ -2075,12 +2118,13 @@ class ACUAgent:
         _p['active_avoidance'] = config['enabled']
         _p['policy'] = config['policy']
 
-        # And add in platform limits
+        # And add in platform limits and move policies
         _p['policy'].update({
             'min_az': self.motion_limits['azimuth']['lower'],
             'max_az': self.motion_limits['azimuth']['upper'],
             'min_el': self.motion_limits['elevation']['lower'],
             'max_el': self.motion_limits['elevation']['upper'],
+            'axes_sequential': self.motion_limits.get('axes_sequential', False),
         })
 
         self.sun_params = _p
@@ -2555,10 +2599,23 @@ class ACUAgent:
         the target position in it.
 
         When Sun avoidance is not enabled, this function returns as
-        though the direct path to the target is a safe one.
+        though the direct path to the target is a safe one (though
+        axes_sequential=True may turn this into a move with two legs).
 
         """
+        # Get current position.
+        try:
+            az, el = [self.data['status']['summary'][f'{ax}_current_position']
+                      for ax in ['Azimuth', 'Elevation']]
+            if az is None or el is None:
+                raise KeyError
+        except KeyError:
+            return None, 'Current position could not be determined.'
+
         if not self._get_sun_policy('sunsafe_moves'):
+            if self.motion_limits.get('axes_sequential'):
+                # Move in az first, then el.
+                return [(target_az, el), (target_az, target_el)], None
             return [(target_az, target_el)], None
 
         if not self._get_sun_policy('map_valid'):
@@ -2567,15 +2624,6 @@ class ACUAgent:
         # Check the target position and block it outright.
         if self.sun.check_trajectory([target_az], [target_el])['sun_time'] <= 0:
             return None, 'Requested target position is not Sun-Safe.'
-
-        # Ok, so where are we now ...
-        try:
-            az, el = [self.data['status']['summary'][f'{ax}_current_position']
-                      for ax in ['Azimuth', 'Elevation']]
-            if az is None or el is None:
-                raise KeyError
-        except KeyError:
-            return None, 'Current position could not be determined.'
 
         moves = self.sun.analyze_paths(az, el, target_az, target_el)
         move, decisions = self.sun.select_move(moves)

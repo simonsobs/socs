@@ -41,6 +41,13 @@ class HWPGripperAgent:
 
         self.client: Optional[cli.GripperClient] = None
 
+        self.decoded_alarm_group = {False: 'No alarm was detected',
+                                    'A': 'Unrecognized error',
+                                    'B': 'Controller saved parameter issue',
+                                    'C': 'Issue with position calibration',
+                                    'D': 'Could not reach position within time limit',
+                                    'E': 'General controller erorr'}
+
         agg_params = {'frame_length': 60}
         self.agent.register_feed('hwp_gripper', record=True, agg_params=agg_params)
         self.agent.register_feed('gripper_action', record=True)
@@ -272,6 +279,43 @@ class HWPGripperAgent:
         return_dict = self._run_client_func(
             self.client.alarm, job='alarm', check_shutdown=False)
         session.data['response'] = return_dict
+        return return_dict['result'], f"Success: {return_dict['result']}"
+
+    def alarm_group(self, session, params=None):
+        """alarm_group()
+
+        **Task** - Queries the actuator controller alarm group
+
+        Notes:
+            Return one of six values depending on the controller alarm state
+                False: No alarm was detected
+                'A': Unrecognized error
+                'B': Controller saved parameter issue
+                'C': Issue with position calibration
+                'D': Could not reach position within time limit
+                'E': General controller error
+
+            The most recent data collected is stored in session data in the
+            structure:
+
+                >>> response.session['response']
+                {'result': 'B',
+                 'log': ["ALARM GROUP B detected"]}
+        """
+        state_return_dict = self._run_client_func(
+            self.client.get_state, job='get_state', check_shutdown=False)
+
+        if not bool(state_return_dict['result']['jxc']['alarm']):
+            return_dict = {'result': False, 'log': ['Alarm not triggered']}
+        else:
+            return_dict = self._run_client_func(
+                self.client.alarm_group, job='alarm_group', check_shutdown=False)
+
+            if return_dict['result'] is None:
+                return_dict['result'] = 'A'
+
+        session.data['response'] = return_dict
+        session.data['decoded_alarm_group'] = self.decoded_alarm_group[return_dict['result']]
         return return_dict['result'], f"Success: {return_dict['result']}"
 
     def reset(self, session, params=None):
@@ -633,6 +677,26 @@ class HWPGripperAgent:
         self.shutdown_mode = False
         return True, 'Cancelled shutdown mode'
 
+    def restart(self, session, params=None):
+        """restart()
+
+        **Task** - Restarts the beaglebone processes and the socket connection
+
+        Notes:
+            The most recent data collected is stored in session data in the
+            structure:
+
+                >>> response.session['response']
+                {'result': True,
+                 'log': ["Previous connection closed",
+                         "Restart command response: Success",
+                         "Control socket reconnected"]}
+        """
+        return_dict = self._run_client_func(
+            self.client.restart, job='restart', check_shutdown=False)
+        session.data['response'] = return_dict
+        return return_dict['result'], f"Success: {return_dict['result']}"
+
     def monitor_state(self, session, params=None):
         """monitor_state()
 
@@ -652,6 +716,7 @@ class HWPGripperAgent:
                            'jxc_inp': False,
                            'jxc_svre': False,
                            'jxc_alarm': False,
+                           'jxc_alarm_message': 'No alarm was detected',
                            'jxc_out': 0,
                            'act{axis}_pos': 0,
                            'act{axis}_limit_warm_grip_state': False,
@@ -691,6 +756,22 @@ class HWPGripperAgent:
                 'jxc_alarm': int(state['jxc']['alarm']),
                 'jxc_out': int(state['jxc']['out']),
             })
+
+            alarm_group_mapping = {4: 'B',
+                                   2: 'C',
+                                   1: 'D',
+                                   0: 'E'}
+
+            if bool(state['jxc']['alarm']):
+                out_value = int(state['jxc']['out']) % 16
+                if out_value in alarm_group_mapping.keys():
+                    alarm_message = self.decoded_alarm_group[alarm_group_mapping]
+                else:
+                    alarm_message = self.decoded_alarm_group['A']
+            else:
+                alarm_message = self.decoded_alarm_group[False]
+
+            data.update({'jxc_alarm_message': alarm_message})
 
             for act in state['actuators']:
                 axis = act['axis']
@@ -851,6 +932,7 @@ def main(args=None):
     agent.register_task('home', gripper_agent.home)
     agent.register_task('inp', gripper_agent.inp)
     agent.register_task('alarm', gripper_agent.alarm)
+    agent.register_task('alarm_group', gripper_agent.alarm_group)
     agent.register_task('reset', gripper_agent.reset)
     agent.register_task('act', gripper_agent.act)
     agent.register_task('is_cold', gripper_agent.is_cold)
@@ -859,6 +941,7 @@ def main(args=None):
     agent.register_task('grip', gripper_agent.grip)
     agent.register_task('ungrip', gripper_agent.ungrip)
     agent.register_task('cancel_shutdown', gripper_agent.cancel_shutdown)
+    agent.register_task('restart', gripper_agent.restart)
 
     runner.run(agent, auto_reconnect=True)
 

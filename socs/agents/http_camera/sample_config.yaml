@@ -1,0 +1,18 @@
+cameras:
+  # ACTi cameras must include `resolution` which contains resolution and
+  # quality. Ex: N640x480,100 where the image is 640x480 size and the quality is 100%
+  # Note: Certain models (A815) do not accept the quality. In this case simply
+  # include the image size such as 'N1280x960' for `resolution`
+  - address: '192.168.xx.xx'
+    location: 'highbay_cargo'
+    resolution: 'N640x480,100'
+    user: 'user'
+    password: 'password'
+    brand: 'acti'
+
+  # Reolink cameras should NOT include `resolution`
+  - address: '192.168.xx.xx'
+    location: 'satp1'
+    user: 'user'
+    password: 'password'
+    brand: 'reolink'
