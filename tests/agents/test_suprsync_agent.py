@@ -1,5 +1,6 @@
 import os
 import time
+import stat
 
 import numpy as np
 import txaio
@@ -109,6 +110,8 @@ def test_suprsync_handle_files(tmp_path):
         fname = f"{i}.npy"
         path = str(data_dir / fname)
         np.save(path, file_data)
+        perms = os.stat(path).st_mode
+        os.chmod(path, perms & ~stat.S_IWGRP)  #remove group-write permissions
         srfm.add_file(path, f'test_remote/{fname}', archive_name,
                       deletable=True)
 
@@ -119,12 +122,17 @@ def test_suprsync_handle_files(tmp_path):
                   deletable=False)
 
     # This is done in the suprsync run process
-    handler = SupRsyncFileHandler(srfm, 'test', remote_basedir)
+    handler = SupRsyncFileHandler(srfm, 'test', remote_basedir, chmod="ug+w")
     handler.copy_files()
     handler.delete_files(0)
 
     # Check data path is empty
     assert len(os.listdir(data_dir)) == 1
 
+     # Assert that group-write permissions are granted on copy
     ncopied = len(os.listdir(os.path.join(remote_basedir, 'test_remote')))
+    for f in os.listdir(os.path.join(remote_basedir, 'test_remote')):
+        path = os.path.join(remote_basedir, 'test_remote', f)
+        assert os.stat(path).st_mode & stat.S_IWGRP, f"File {path} not granted write permissions"
+
     assert ncopied == nfiles + 1
