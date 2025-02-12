@@ -146,7 +146,7 @@ class StarcamAgent:
     def send_commands(self, session, params=None):
         """send_commands()
 
-        **Process** - Packs and sends camera and astrometry-related commands 
+        **Process** - Packs and sends camera and astrometry-related commands
                       to the starcam.
         """
         with self.lock.acquire_timeout(job='send_commands') as acquired:
