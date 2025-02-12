@@ -147,7 +147,7 @@ class StarcamAgent:
         """send_commands()
 
         **Process** - Packs and sends camera and astrometry-related commands 
-                   to the starcam.
+                      to the starcam.
         """
         with self.lock.acquire_timeout(job='send_commands') as acquired:
             if not acquired:
@@ -162,7 +162,7 @@ class StarcamAgent:
     def acq(self, session, params=None):
         """acq()
 
-        **Task** - Acquires data from the starcam, updates session data, 
+        **Task** - Acquires data from the starcam, updates session data,
                    and publishes to feed.
 
         Notes:
