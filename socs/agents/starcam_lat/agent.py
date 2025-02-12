@@ -146,12 +146,8 @@ class StarcamAgent:
     def send_commands(self, session, params=None):
         """send_commands()
 
-        **Task** - Packs and sends camera and astrometry-related commands 
+        **Process** - Packs and sends camera and astrometry-related commands 
                    to the starcam.
-
-        Returns:
-            touple: Contains True/False and a string describing whether or not
-                    a lock could be acquired+commands were sent to the starcam.
         """
         with self.lock.acquire_timeout(job='send_commands') as acquired:
             if not acquired:
@@ -169,10 +165,6 @@ class StarcamAgent:
         **Task** - Acquires data from the starcam, updates session data, 
                    and publishes to feed.
 
-        Returns:
-            touple: Contains True/False and a string describing whether or not
-                    the loop was exited after the end of an acquisition.
-        
         Notes:
             An example of the updated session data:
 
