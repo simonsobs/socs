@@ -146,7 +146,7 @@ class StarcamAgent:
     def send_commands(self, session, params=None):
         """send_commands()
 
-        **Task** - Packs and sends camera and astrometry-related commands 
+        **Task** - Packs and sends camera and astrometry-related commands
                    to the starcam.
 
         Returns:
@@ -166,13 +166,13 @@ class StarcamAgent:
     def acq(self, session, params=None):
         """acq()
 
-        **Task** - Acquires data from the starcam, updates session data, 
+        **Task** - Acquires data from the starcam, updates session data,
                    and publishes to feed.
 
         Returns:
             touple: Contains True/False and a string describing whether or not
                     the loop was exited after the end of an acquisition.
-        
+
         Notes:
             An example of the updated session data:
 
