@@ -144,7 +144,10 @@ class StarcamAgent:
 
     @ocs_agent.param('_')
     def send_commands(self, session, params=None):
-        """Packs and sends camera+astrometry-related commands to the starcam.
+        """send_commands()
+
+        **Task** - Packs and sends camera and astrometry-related commands 
+                   to the starcam.
 
         Returns:
             touple: Contains True/False and a string describing whether or not
@@ -161,15 +164,43 @@ class StarcamAgent:
 
     @ocs_agent.param('_')
     def acq(self, session, params=None):
-        """Acquires data from the starcam and publishes to feed.
+        """acq()
+
+        **Task** - Acquires data from the starcam, updates session data, 
+                   and publishes to feed.
 
         Returns:
             touple: Contains True/False and a string describing whether or not
                     the loop was exited after the end of an acquisition.
+        
+        Notes:
+            An example of the updated session data:
+
+                >>>response.session['data']
+                {'timestamp': 1734668749.643134,
+                 'block_name': 'astrometry',
+                 'data':
+                    {'c_time': 1734668749,
+                     'gmt': Dec 20 04:25:49,
+                     'blob_num': 6,
+                     'obs_ra': 87.339171,
+                     'astrom_ra': 87.391578,
+                     'obs_dec': -22.956034,
+                     'astrom_dec': -22.964401,
+                     'fr': 36.591606,
+                     'ps': 6.220203,
+                     'alt': 89.758799574147034,
+                     'az': 270.55842800340095,
+                     'ir': 54.068988,
+                     'astrom_solve_time': 507.617792,
+                     'camera_time': 508.128256,
+                     }
+                }
+
         """
-        with self.lock.acquire_timeout(timeout=100, job='acq') as acquired:
+        with self.lock.acquire_timeout(timeout=10, job='acq') as acquired:
             if not acquired:
-                self.log.warn("Could not start init because {} is already "
+                self.log.warn("Could not start acq because {} is already "
                               "running".format(self.lock.job))
                 return False, "Could not acquire lock."
             session.set_status('running')
