@@ -278,7 +278,7 @@ class HWPPMXAgent:
     @defer.inlineCallbacks
     @ocs_agent.param('curr', default=1.3, type=float)
     def set_i_lim(self, session, params):
-        """set_i_lim(curr=1)
+        """set_i_lim(curr=1.3)
         **Task** - Set the drive current limit.
 
         Parameters:
@@ -292,7 +292,7 @@ class HWPPMXAgent:
     @defer.inlineCallbacks
     @ocs_agent.param('volt', default=37., type=float)
     def set_v_lim(self, session, params):
-        """set_v_lim(volt=32)
+        """set_v_lim(volt=37)
         **Task** - Set the drive voltage limit.
 
         Parameters:
