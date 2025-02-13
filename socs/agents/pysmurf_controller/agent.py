@@ -1033,7 +1033,8 @@ class PysmurfController:
 
     @ocs_agent.param('bgs', default=None)
     def zero_biases(self, session, params):
-        """
+        """zero_biases(bgs=None)
+
         **Task** - Zeros TES biases for specified bias groups.
 
         Args
