@@ -995,7 +995,7 @@ class PysmurfController:
     @ocs_agent.param('bias')
     @ocs_agent.param('bgs', default=None)
     def set_biases(self, session, params):
-        """set_biases(bias, bg=None)
+        """set_biases(bias, bgs=None)
 
         **Task** - Task used to set TES biases.
 
