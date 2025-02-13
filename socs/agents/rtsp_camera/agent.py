@@ -177,6 +177,18 @@ class RTSPCameraAgent:
         else:
             return False
 
+    def _init_stream(self):
+        """Connect to camera and initialize video stream."""
+        if self.fake:
+            cap = FakeCamera()
+        else:
+            cap = cv2.VideoCapture(self.connection)
+        if not cap.isOpened():
+            self.log.error(f"Cannot open RTSP stream at {self.connection}")
+            return None
+
+        return cap
+
     @ocs_agent.param("test_mode", default=False, type=bool)
     def acq(self, session, params=None):
         """acq(test_mode=False)
@@ -205,17 +217,13 @@ class RTSPCameraAgent:
 
         frames_per_snapshot = int(self.seconds * self.record_fps)
 
-        session.set_status("running")
         self.is_streaming = True
 
         # Open camera stream
-        if self.fake:
-            cap = FakeCamera()
-        else:
-            cap = cv2.VideoCapture(self.connection)
-        if not cap.isOpened():
-            self.log.error(f"Cannot open RTSP stream at {self.connection}")
-            return False, "Could not open RTSP stream"
+        cap = self._init_stream()
+        connected = True
+        if not cap:
+            connected = False
 
         # Tracking state of whether we are currently recording motion detection
         detecting = False
@@ -225,6 +233,10 @@ class RTSPCameraAgent:
 
         snap_count = 0
         while self.is_streaming:
+            if not connected:
+                self.log.info("Trying to reconnect.")
+                cap = self._init_stream()
+
             # Use UTC
             timestamp = time.time()
             data = dict()
@@ -237,7 +249,9 @@ class RTSPCameraAgent:
             if not success:
                 msg = "Failed to retrieve snapshot image from stream"
                 self.log.error(msg)
-                return False, "Broken stream"
+                connected = False
+                continue
+            connected = True
 
             # Motion detection.  We ignore the first few snapshots and also
             # any changes that happen while we are already recording.
@@ -276,6 +290,7 @@ class RTSPCameraAgent:
                 "address": self.address,
                 "timestamp": timestamp,
                 "path": path,
+                "connected": connected
             }
 
             # Update session.data and publish
@@ -288,6 +303,7 @@ class RTSPCameraAgent:
                 "data": {
                     "address": self.address,
                     "path": path,
+                    "connected": connected
                 },
             }
             session.app.publish_to_feed(self.feed_name, message)
@@ -309,7 +325,6 @@ class RTSPCameraAgent:
         **Task** - Stop task associated with acq process.
         """
         if self.is_streaming:
-            session.set_status("stopping")
             self.is_streaming = False
             return True, "Stopping Acquisition"
         else:
@@ -338,13 +353,9 @@ class RTSPCameraAgent:
 
             # Open camera stream
             self.log.info("Recording:  opening camera stream")
-            if self.fake:
-                cap = FakeCamera()
-            else:
-                cap = cv2.VideoCapture(self.connection)
-            if not cap.isOpened():
-                self.log.error(f"Cannot open RTSP stream at {self.connection}")
-                return False, "Cannot connect to camera"
+            cap = self._init_stream()
+            if not cap:
+                return False, "Cannot connect to camera."
 
             # Total number of frames
             total_frames = int(self.record_fps * self.record_duration)

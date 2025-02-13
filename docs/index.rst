@@ -40,6 +40,7 @@ API Reference        Full API documentation for core parts of the SOCS library.
     agents/acu_agent
     agents/bluefors_agent
     agents/cryomech_cpa
+    agents/devantech_dS378
     agents/fts_agent
     agents/generator
     agents/hi6200
@@ -55,6 +56,7 @@ API Reference        Full API documentation for core parts of the SOCS library.
     agents/holo_synth
     agents/ibootbar
     agents/ifm_sbn246_flowmeter
+    agents/kikusui_pcr500ma
     agents/labjack
     agents/lakeshore240
     agents/lakeshore336
@@ -62,9 +64,11 @@ API Reference        Full API documentation for core parts of the SOCS library.
     agents/lakeshore372
     agents/lakeshore425
     agents/latrt_xy_stage
+    agents/ld_monitor
     agents/magpie
     agents/meinberg_m1000_agent
     agents/meinberg_syncbox_agent
+    agents/orientalmotor_blh
     agents/pfeiffer
     agents/pfeiffer_tc400
     agents/pysmurf-controller

@@ -10,6 +10,7 @@ from typing import Dict
 
 import pytest
 import serial
+from serial.serialutil import SerialException
 
 
 def create_device_emulator(responses, relay_type, port=9001, encoding='utf-8',
@@ -96,6 +97,7 @@ class DeviceEmulator:
         self._type = None
         self._read = True
         self._conn = None
+        self.socket_port = None
 
         self.logger = logging.getLogger(self.__class__.__name__)
         self.logger.setLevel(logging.DEBUG)
@@ -106,7 +108,7 @@ class DeviceEmulator:
             self.logger.addHandler(handler)
 
     @staticmethod
-    def _setup_socat():
+    def _setup_socat(responder_link='./responder'):
         """Setup a data relay with socat.
 
         The "./responder" link is the external end of the relay, which the Agent
@@ -115,7 +117,7 @@ class DeviceEmulator:
 
         """
         socat = shutil.which('socat')
-        cmd = [socat, '-d', '-d', 'pty,link=./responder,b57600', 'pty,link=./internal,b57600']
+        cmd = [socat, '-d', '-d', f'pty,link={responder_link},b57600', 'pty,link=./internal,b57600']
         proc = subprocess.Popen(cmd,
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE)
@@ -123,7 +125,7 @@ class DeviceEmulator:
 
         return proc
 
-    def create_serial_relay(self):
+    def create_serial_relay(self, responder_link='./responder'):
         """Create the serial relay, emulating a hardware device connected over
         serial.
 
@@ -140,7 +142,7 @@ class DeviceEmulator:
 
         """
         self._type = 'serial'
-        self.proc = self._setup_socat()
+        self.proc = self._setup_socat(responder_link=responder_link)
         self.ser = serial.Serial(
             './internal',
             baudrate=57600,
@@ -189,7 +191,13 @@ class DeviceEmulator:
 
         while self._read:
             if self.ser.in_waiting > 0:
-                msg = self.ser.readline()
+                try:
+                    msg = self.ser.readline()
+                except SerialException as e:
+                    self.logger.error(f"Serial error: {e}")
+                    self.ser.close()
+                    return
+
                 if self.encoding:
                     msg = msg.strip().decode(self.encoding)
                 self.logger.debug(f"msg='{msg}'")
@@ -228,9 +236,12 @@ class DeviceEmulator:
             out, err = self.proc.communicate()
             # print(out, err)
         if self._type == 'tcp':
-            # print('shutting down background tcp relay')
             if self._conn:
                 self._conn.close()
+                self.socket_port = None
+            else:
+                # No connection has been made, force a connection to cleanly shutdown thread
+                socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect(('127.0.0.1', self.socket_port))
                 self._sock.close()
 
     def _read_socket(self, port):
@@ -249,6 +260,8 @@ class DeviceEmulator:
             try:
                 self._sock.bind(('127.0.0.1', port))
                 self._sock_bound = True
+                # Save port address, useful for if an arbitrary port 0 is used
+                self.socket_port = self._sock.getsockname()[1]
             except OSError:
                 self.logger.error(f"Failed to bind to port {port}, trying again...")
                 time.sleep(1)
