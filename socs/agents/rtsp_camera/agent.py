@@ -236,6 +236,9 @@ class RTSPCameraAgent:
             if not connected:
                 self.log.info("Trying to reconnect.")
                 cap = self._init_stream()
+                if not cap:
+                    pm.sleep()
+                    continue
 
             # Use UTC
             timestamp = time.time()
