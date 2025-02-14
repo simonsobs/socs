@@ -10,11 +10,14 @@ from ocs.ocs_twisted import TimeoutLock
 
 
 class StarcamHelper:
-    """Controls and retrieves data from the starcam.
+    """Functions to control and retrieve data from the starcam.
 
-    Args:
-        ip_address: IP address of the starcam computer.
-        port: Port of the starcam.
+    Parameters
+    ----------
+    ip_addres: str
+        IP address of the starcam computer.
+    port: int
+        Port of the starcam computer.
     """
 
     def __init__(self, ip_address, port, timeout=10):
@@ -127,6 +130,27 @@ class StarcamHelper:
 
 
 class StarcamAgent:
+    """Communicate with the starcam.
+    
+    Parameters
+    ----------
+    agent: OCSAgent
+        OCSAgent object for this agent.
+    ip_address: str
+        IP address of starcam computer.
+    port: int
+        Port of the starcam computer.
+
+    Attributes
+    ----------
+    agent: OCSAgent
+        OCSAgent object for this agent.
+    take_data: bool
+        Tracks whether or not the agent is trying to retrieve data from the
+        starcam computer. Setting to false stops this process.
+    log: txaio.tx.Logger
+        txaoi logger object, created by OCSAgent.
+    """
 
     def __init__(self, agent, ip_address, port):
         self.agent = agent
@@ -162,32 +186,33 @@ class StarcamAgent:
     def acq(self, session, params=None):
         """acq()
 
-        **Task** - Acquires data from the starcam, updates session data,
+        **Process** - Acquires data from the starcam, updates session data,
                    and publishes to feed.
 
-        Notes:
-            An example of the updated session data:
+        Notes
+        -----
+        An example of the updated session data:
 
-                >>>response.session['data']
-                {'timestamp': 1734668749.643134,
-                 'block_name': 'astrometry',
-                 'data':
-                    {'c_time': 1734668749,
-                     'gmt': Dec 20 04:25:49,
-                     'blob_num': 6,
-                     'obs_ra': 87.339171,
-                     'astrom_ra': 87.391578,
-                     'obs_dec': -22.956034,
-                     'astrom_dec': -22.964401,
-                     'fr': 36.591606,
-                     'ps': 6.220203,
-                     'alt': 89.758799574147034,
-                     'az': 270.55842800340095,
-                     'ir': 54.068988,
-                     'astrom_solve_time': 507.617792,
-                     'camera_time': 508.128256,
-                     }
-                }
+            >>>response.session['data']
+            {'timestamp': 1734668749.643134,
+             'block_name': 'astrometry',
+             'data':
+                 {'c_time': 1734668749,
+                  'gmt': Dec 20 04:25:49,
+                  'blob_num': 6,
+                  'obs_ra': 87.339171,
+                  'astrom_ra': 87.391578,
+                  'obs_dec': -22.956034,
+                  'astrom_dec': -22.964401,
+                  'fr': 36.591606,
+                  'ps': 6.220203,
+                  'alt': 89.758799574147034,
+                  'az': 270.55842800340095,
+                  'ir': 54.068988,
+                  'astrom_solve_time': 507.617792,
+                  'camera_time': 508.128256,
+                  }
+            }
 
         """
         with self.lock.acquire_timeout(timeout=10, job='acq') as acquired:
@@ -214,6 +239,9 @@ class StarcamAgent:
         return True, 'Acquisition exited cleanly.'
 
     def _stop_acq(self, session, params):
+        """
+        Stops acq process.
+        """
         ok = False
         if self.take_data:
             session.set_status('stopping')
