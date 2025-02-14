@@ -131,7 +131,7 @@ class StarcamHelper:
 
 class StarcamAgent:
     """Communicate with the starcam.
-    
+
     Parameters
     ----------
     agent: OCSAgent
