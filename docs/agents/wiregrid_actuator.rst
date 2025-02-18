@@ -26,8 +26,8 @@ and starting services(dbus, avahi-daemon, and gcapsd) in the docker.
 These preparations are automatically made in Dockerfile and wg-actuator-entrypoint.sh.
 Reference links for gclib:
 
-- Adding repository: https://www.galil.com/sw/pub/all/doc/global/html/ubuntu2004.html
-- Installation via apt: https://www.galil.com/sw/pub/all/doc/gclib/html/ubuntu.html
+- Installation via apt: https://www.galil.com/sw/pub/all/doc/global/install/linux/debian/
+- Python library installation: https://www.galil.com/sw/pub/all/doc/gclib/html/
 
 Configuration File Examples
 ---------------------------
