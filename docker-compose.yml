@@ -14,12 +14,11 @@ services:
     image: "ocs-pysmurf-agent"
     build: ./docker/pysmurf_controller/
 
-  # Temporarily disabled until build is fixed.
-  #ocs-wgactuator-agent:
-  #  image: "ocs-wgactuator-agent"
-  #  build: ./docker/wiregrid_actuator/
-  #  depends_on:
-  #    - "socs"
+  ocs-wgactuator-agent:
+    image: "ocs-wgactuator-agent"
+    build: ./docker/wiregrid_actuator/
+    depends_on:
+      - "socs"
 
   # Only works with --privileged, will insist users build image themselves
   # ocs-hwp-picoscope-agent:
