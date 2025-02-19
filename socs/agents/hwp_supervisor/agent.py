@@ -803,10 +803,13 @@ class ControlState:
 
         Attributes
         -----------
-        start_time : float
-            Time that the state was entered
+        success : bool
+            Whether the last state was completed successfully
+        wait_stop : Optional[bool] default is False
+            Whether to wait until hwp stops
         """
         success: bool = True
+        wait_stop: Optional[bool] = False
 
     @dataclass
     class GripHWP:
@@ -1217,8 +1220,12 @@ class ControlStateMachine:
                     state.freq_within_tol_start = time.time()
 
                 time_within_tol = time.time() - state.freq_within_tol_start
+                # if the frequency doen't get close enough within tolerance, power off
                 if time_within_tol > state.freq_tol_duration:
-                    self.action.set_state(ControlState.Done(success=True))
+                    self.action.set_state(ControlState.PMXOff(
+                        success=True,
+                        wait_stop=False,
+                    ))
 
             elif isinstance(state, ControlState.ConstVolt):
                 if state.voltage > 0:
@@ -1241,7 +1248,15 @@ class ControlStateMachine:
                     clients.pcu.send_command,
                     kwargs={'command': 'stop'}, timeout=None
                 )
-                self.action.set_state(ControlState.Done(success=state.success))
+                if state.wait_stop:
+                    self.action.set_state(ControlState.WaitForTargetFreq(
+                        target_freq=state.target_freq,
+                        freq_tol=state.freq_tol,
+                        freq_tol_duration=state.freq_tol_duration,
+                        direction=state.direction,
+                    ))
+                else:
+                    self.action.set_state(ControlState.Done(success=state.success))
 
             elif isinstance(state, ControlState.GripHWP):
                 with ensure_grip_safety(hwp_state, self.log):
@@ -1763,10 +1778,16 @@ class HWPSupervisor:
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
+    @ocs_agent.param('wait_stop', type=bool, default=False)
     def pmx_off(self, session, params):
         """pmx_off()
 
         **Task** - Sets the control state to turn off the PMX.
+
+        Args
+        -------
+        wait_stop : bool
+            Whether to wait until hwp stops.
 
         Notes
         --------
@@ -1782,7 +1803,9 @@ class HWPSupervisor:
                 'success': True}
             }
         """
-        state = ControlState.PmxOff()
+        state = ControlState.PmxOff(
+            wait_stop=params['wait_stop']
+        )
         action = self.control_state_machine.request_new_action(state)
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
