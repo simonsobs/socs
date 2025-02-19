@@ -1222,7 +1222,7 @@ class ControlStateMachine:
                 time_within_tol = time.time() - state.freq_within_tol_start
                 # if the frequency doen't get close enough within tolerance, power off
                 if time_within_tol > state.freq_tol_duration:
-                    self.action.set_state(ControlState.PMXOff(
+                    self.action.set_state(ControlState.PmxOff(
                         success=True,
                         wait_stop=False,
                     ))
