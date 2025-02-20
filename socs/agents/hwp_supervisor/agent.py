@@ -1763,9 +1763,9 @@ class HWPSupervisor:
 
         Args
         -------
-        freq_thresh : float
-            Frequency threshold (Hz) for determining when the HWP is at the target frequency.
-        freq_thresh_duration : float
+        freq_tol : float
+            Frequency tolerance (Hz) for determining when the HWP is at the target frequency.
+        freq_tol_duration : float
             Duration (seconds) for which the HWP must be within ``freq_thresh`` of the
             ``target_freq`` to be considered successful.
         brake_voltage: float
@@ -1806,6 +1806,10 @@ class HWPSupervisor:
         -------
         wait_stop : bool
             Whether to wait until hwp stops.
+        freq_tol : float
+            Tolerance of frequency to consider hwp is stopped.
+        freq_tol_duration : float
+            Duration in seconds that the frequency must be within the tolerance
 
         Notes
         --------
