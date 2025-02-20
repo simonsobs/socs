@@ -729,6 +729,7 @@ class ControlState:
         freq_tol_duration: float
         freq_within_tol_start: Optional[float] = None
         max_duration: Optional[float] = None
+        start_time: Optional[float] = None
         direction: str = ''
         _pcu_enabled: bool = field(init=False, default=False)
 
@@ -815,9 +816,9 @@ class ControlState:
         success : bool
             Whether the last state was completed successfully
         """
-        wait_stop: bool
-        freq_tol: float
-        freq_tol_duration: float
+        wait_stop: bool = False
+        freq_tol: float = 0.05
+        freq_tol_duration: float = 30
         success: bool = True
 
     @dataclass
@@ -1202,7 +1203,9 @@ class ControlStateMachine:
                 # This will make sure we remain within the frequency threshold for
                 # ``self.freq_tol_duration`` seconds before switching to DONE
                 f = hwp_state.pid_current_freq
-                t0 = time.time()
+
+                if state.start_time is None:
+                    state.start_time = time.time()
 
                 # Enable pcu if spinning up faster than 1.5 Hz
                 if state.target_freq > 1.5 and f > 1.0 and not state._pcu_enabled:
@@ -1219,6 +1222,12 @@ class ControlStateMachine:
                         )
                     state._pcu_enabled = True
 
+                # If the frequency doen't get close enough within max diration
+                # power off
+                if state.max_duration is not None:
+                    if time.time() - state.start_time > state.max_duration:
+                        self.action.set_state(ControlState.PmxOff())
+
                 if f is None:
                     state.freq_within_tol_start = None
                     return
@@ -1234,14 +1243,6 @@ class ControlStateMachine:
                 time_within_tol = time.time() - state.freq_within_tol_start
                 if time_within_tol > state.freq_tol_duration:
                     self.action.set_state(ControlState.Done(success=True))
-
-                # If the frequency doen't get close enough within max diration
-                # power off
-                if state.max_duration is not None:
-                    if time.time() - t0 > state.max_duration:
-                        self.action.set_state(ControlState.PmxOff(
-                            wait_stop=False,
-                        ))
 
             elif isinstance(state, ControlState.ConstVolt):
                 if state.voltage > 0:
