@@ -41,6 +41,7 @@ agents = {
     'SmurfFileEmulator': {'module': 'socs.agents.smurf_file_emulator.agent', 'entry_point': 'main'},
     'SmurfStreamSimulator': {'module': 'socs.agents.smurf_stream_simulator.agent', 'entry_point': 'main'},
     'SmurfTimingCardAgent': {'module': 'socs.agents.smurf_timing_card.agent', 'entry_point': 'main'},
+    'StimThermometerAgent': {'module': 'socs.agents.stimulator_thermometer.agent', 'entry_point': 'main'},
     'SupRsync': {'module': 'socs.agents.suprsync.agent', 'entry_point': 'main'},
     'SynaccessAgent': {'module': 'socs.agents.synacc.agent', 'entry_point': 'main'},
     'SynthAgent': {'module': 'socs.agents.holo_synth.agent', 'entry_point': 'main'},
