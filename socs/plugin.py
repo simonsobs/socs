@@ -5,7 +5,7 @@ agents = {
     'BlueforsAgent': {'module': 'socs.agents.bluefors.agent', 'entry_point': 'main'},
     'CrateAgent': {'module': 'socs.agents.smurf_crate_monitor.agent', 'entry_point': 'main'},
     'CryomechCPAAgent': {'module': 'socs.agents.cryomech_cpa.agent', 'entry_point': 'main'},
-    'dS378Agent': {'module': 'socs.agents.devantech_dS378.agent', 'entry_point': 'main'},
+    'DS378Agent': {'module': 'socs.agents.devantech_dS378.agent', 'entry_point': 'main'},
     'FPGAAgent': {'module': 'socs.agents.holo_fpga.agent', 'entry_point': 'main'},
     'FlowmeterAgent': {'module': 'socs.agents.ifm_sbn246_flowmeter.agent', 'entry_point': 'main'},
     'FTSAerotechAgent': {'module': 'socs.agents.fts_aerotech.agent', 'entry_point': 'main'},
