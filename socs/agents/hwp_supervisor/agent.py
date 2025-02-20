@@ -719,6 +719,8 @@ class ControlState:
             Duration in seconds that the frequency must be within the tolerance
         freq_within_thresh_start : float
             Time that the frequency entered the tolerance range
+        max_duration : float
+            Maximum duration of time to wait in seconds
         start_time : float
             Time that the state was entered
         """
@@ -726,6 +728,7 @@ class ControlState:
         freq_tol: float
         freq_tol_duration: float
         freq_within_tol_start: Optional[float] = None
+        max_duration: Optional[float] = None
         direction: str = ''
         _pcu_enabled: bool = field(init=False, default=False)
 
@@ -1163,6 +1166,7 @@ class ControlStateMachine:
                         target_freq=state.target_freq,
                         freq_tol=state.freq_tol,
                         freq_tol_duration=state.freq_tol_duration,
+                        max_duration=1800,
                         direction=state.direction,
                     ))
                     return
@@ -1189,6 +1193,7 @@ class ControlStateMachine:
                     target_freq=state.target_freq,
                     freq_tol=state.freq_tol,
                     freq_tol_duration=state.freq_tol_duration,
+                    max_duration=1800,
                     direction=state.direction,
                 ))
 
@@ -1197,6 +1202,7 @@ class ControlStateMachine:
                 # This will make sure we remain within the frequency threshold for
                 # ``self.freq_tol_duration`` seconds before switching to DONE
                 f = hwp_state.pid_current_freq
+                t0 = time.time()
 
                 # Enable pcu if spinning up faster than 1.5 Hz
                 if state.target_freq > 1.5 and f > 1.0 and not state._pcu_enabled:
@@ -1226,12 +1232,16 @@ class ControlStateMachine:
                     state.freq_within_tol_start = time.time()
 
                 time_within_tol = time.time() - state.freq_within_tol_start
-                # if the frequency doen't get close enough within tolerance, power off
                 if time_within_tol > state.freq_tol_duration:
-                    self.action.set_state(ControlState.PmxOff(
-                        success=True,
-                        wait_stop=False,
-                    ))
+                    self.action.set_state(ControlState.Done(success=True))
+
+                # If the frequency doen't get close enough within max diration
+                # power off
+                if state.max_duration is not None:
+                    if time.time() - t0 > state.max_duration:
+                        self.action.set_state(ControlState.PmxOff(
+                            wait_stop=False,
+                        ))
 
             elif isinstance(state, ControlState.ConstVolt):
                 if state.voltage > 0:
@@ -1785,7 +1795,7 @@ class HWPSupervisor:
 
     @ocs_agent.param('wait_stop', type=bool, default=False)
     @ocs_agent.param('freq_tol', type=float, default=0.05)
-    @ocs_agent.param('freq_tol_duration', type=float, default=10)
+    @ocs_agent.param('freq_tol_duration', type=float, default=30)
     def pmx_off(self, session, params):
         """pmx_off()
 
