@@ -803,13 +803,19 @@ class ControlState:
 
         Attributes
         -----------
+        wait_stop : bool
+            Whether to wait until hwp stops
+        freq_tol : float
+            Tolerance of frequency to consider hwp is stopped.
+        freq_tol_duration : float
+            Duration in seconds that the frequency must be within the tolerance
         success : bool
             Whether the last state was completed successfully
-        wait_stop : Optional[bool] default is False
-            Whether to wait until hwp stops
         """
+        wait_stop: bool
+        freq_tol: float
+        freq_tol_duration: float
         success: bool = True
-        wait_stop: Optional[bool] = False
 
     @dataclass
     class GripHWP:
@@ -1250,10 +1256,9 @@ class ControlStateMachine:
                 )
                 if state.wait_stop:
                     self.action.set_state(ControlState.WaitForTargetFreq(
-                        target_freq=state.target_freq,
+                        target_freq=0,
                         freq_tol=state.freq_tol,
                         freq_tol_duration=state.freq_tol_duration,
-                        direction=state.direction,
                     ))
                 else:
                     self.action.set_state(ControlState.Done(success=state.success))
@@ -1779,6 +1784,8 @@ class HWPSupervisor:
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
     @ocs_agent.param('wait_stop', type=bool, default=False)
+    @ocs_agent.param('freq_tol', type=float, default=0.05)
+    @ocs_agent.param('freq_tol_duration', type=float, default=10)
     def pmx_off(self, session, params):
         """pmx_off()
 
@@ -1804,7 +1811,9 @@ class HWPSupervisor:
             }
         """
         state = ControlState.PmxOff(
-            wait_stop=params['wait_stop']
+            wait_stop=params['wait_stop'],
+            freq_tol=params['freq_tol'],
+            freq_tol_duration=params['freq_tol_duration'],
         )
         action = self.control_state_machine.request_new_action(state)
         action.sleep_until_complete(session=session)
