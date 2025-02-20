@@ -88,7 +88,7 @@ class Max31856(Iio):
         """
         return self.get_temp_raw() / 2**7
 
-    def get_temp_abmient_raw(self):
+    def get_temp_ambient_raw(self):
         """Get raw ambient temperature.
 
         Returns
@@ -106,7 +106,7 @@ class Max31856(Iio):
         temp_ambient : float
             Ambient temperature in degrees Celsius.
         """
-        return self.get_temp_abmient_raw() / 2**6
+        return self.get_temp_ambient_raw() / 2**6
 
 
 class Max31865(Iio):

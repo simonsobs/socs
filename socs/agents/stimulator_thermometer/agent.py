@@ -21,7 +21,7 @@ class StimThermometerAgent:
 
     Parameters
     ----------
-    devices : list of str or pathlib.Path
+    paths_spinode : list of str or pathlib.Path
         List of path to SPI nodes of temperature devices.
     """
 
