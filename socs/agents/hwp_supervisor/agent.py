@@ -719,6 +719,8 @@ class ControlState:
             Duration in seconds that the frequency must be within the tolerance
         freq_within_thresh_start : float
             Time that the frequency entered the tolerance range
+        max_duration : float
+            Maximum duration of time to wait in seconds
         start_time : float
             Time that the state was entered
         """
@@ -726,6 +728,8 @@ class ControlState:
         freq_tol: float
         freq_tol_duration: float
         freq_within_tol_start: Optional[float] = None
+        max_duration: Optional[float] = None
+        start_time: Optional[float] = None
         direction: str = ''
         _pcu_enabled: bool = field(init=False, default=False)
 
@@ -803,9 +807,18 @@ class ControlState:
 
         Attributes
         -----------
-        start_time : float
-            Time that the state was entered
+        wait_stop : bool
+            Whether to wait until hwp stops
+        freq_tol : float
+            Tolerance of frequency to consider hwp is stopped.
+        freq_tol_duration : float
+            Duration in seconds that the frequency must be within the tolerance
+        success : bool
+            Whether the last state was completed successfully
         """
+        wait_stop: bool = False
+        freq_tol: float = 0.05
+        freq_tol_duration: float = 30
         success: bool = True
 
     @dataclass
@@ -1154,6 +1167,7 @@ class ControlStateMachine:
                         target_freq=state.target_freq,
                         freq_tol=state.freq_tol,
                         freq_tol_duration=state.freq_tol_duration,
+                        max_duration=1800,
                         direction=state.direction,
                     ))
                     return
@@ -1180,6 +1194,7 @@ class ControlStateMachine:
                     target_freq=state.target_freq,
                     freq_tol=state.freq_tol,
                     freq_tol_duration=state.freq_tol_duration,
+                    max_duration=1800,
                     direction=state.direction,
                 ))
 
@@ -1188,6 +1203,9 @@ class ControlStateMachine:
                 # This will make sure we remain within the frequency threshold for
                 # ``self.freq_tol_duration`` seconds before switching to DONE
                 f = hwp_state.pid_current_freq
+
+                if state.start_time is None:
+                    state.start_time = time.time()
 
                 # Enable pcu if spinning up faster than 1.5 Hz
                 if state.target_freq > 1.5 and f > 1.0 and not state._pcu_enabled:
@@ -1203,6 +1221,12 @@ class ControlStateMachine:
                             kwargs={'command': 'on_2'}, timeout=None
                         )
                     state._pcu_enabled = True
+
+                # If the frequency doen't get close enough within max diration
+                # power off
+                if state.max_duration is not None:
+                    if time.time() - state.start_time > state.max_duration:
+                        self.action.set_state(ControlState.PmxOff())
 
                 if f is None:
                     state.freq_within_tol_start = None
@@ -1241,7 +1265,14 @@ class ControlStateMachine:
                     clients.pcu.send_command,
                     kwargs={'command': 'stop'}, timeout=None
                 )
-                self.action.set_state(ControlState.Done(success=state.success))
+                if state.wait_stop:
+                    self.action.set_state(ControlState.WaitForTargetFreq(
+                        target_freq=0,
+                        freq_tol=state.freq_tol,
+                        freq_tol_duration=state.freq_tol_duration,
+                    ))
+                else:
+                    self.action.set_state(ControlState.Done(success=state.success))
 
             elif isinstance(state, ControlState.GripHWP):
                 with ensure_grip_safety(hwp_state, self.log):
@@ -1732,9 +1763,9 @@ class HWPSupervisor:
 
         Args
         -------
-        freq_thresh : float
-            Frequency threshold (Hz) for determining when the HWP is at the target frequency.
-        freq_thresh_duration : float
+        freq_tol : float
+            Frequency tolerance (Hz) for determining when the HWP is at the target frequency.
+        freq_tol_duration : float
             Duration (seconds) for which the HWP must be within ``freq_thresh`` of the
             ``target_freq`` to be considered successful.
         brake_voltage: float
@@ -1763,10 +1794,22 @@ class HWPSupervisor:
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
+    @ocs_agent.param('wait_stop', type=bool, default=False)
+    @ocs_agent.param('freq_tol', type=float, default=0.05)
+    @ocs_agent.param('freq_tol_duration', type=float, default=30)
     def pmx_off(self, session, params):
         """pmx_off()
 
         **Task** - Sets the control state to turn off the PMX.
+
+        Args
+        -------
+        wait_stop : bool
+            Whether to wait until hwp stops.
+        freq_tol : float
+            Tolerance of frequency to consider hwp is stopped.
+        freq_tol_duration : float
+            Duration in seconds that the frequency must be within the tolerance
 
         Notes
         --------
@@ -1782,7 +1825,11 @@ class HWPSupervisor:
                 'success': True}
             }
         """
-        state = ControlState.PmxOff()
+        state = ControlState.PmxOff(
+            wait_stop=params['wait_stop'],
+            freq_tol=params['freq_tol'],
+            freq_tol_duration=params['freq_tol_duration'],
+        )
         action = self.control_state_machine.request_new_action(state)
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
