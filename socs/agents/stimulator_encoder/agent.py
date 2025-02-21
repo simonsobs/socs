@@ -83,21 +83,24 @@ class StimEncAgent:
             while self.take_data:
                 # Data acquisition
                 current_time = time.time()
-                data = {'timestamp': current_time, 'block_name': 'stim_enc', 'data': {}}
+                data = {'block_name': 'stim_enc', 'data': {}}
 
+                tai_list = []
                 ts_list = []
                 en_st_list = []
 
                 while not self._dev.fifo.empty():
                     _d = self._dev.fifo.get()
-                    ts_list.append(_d.time.tai)
+                    tai_list.append(_d.time.tai)
+                    ts_list.append(time.time())
                     en_st_list.append(_d.state)
 
-                if len(ts_list) != 0:
-                    data['data']['timestamps_tai'] = ts_list
+                if len(tai_list) != 0:
+                    data['timestamps'] = ts_list
+                    data['data']['timestamps_tai'] = tai_list
                     data['data']['state'] = en_st_list
 
-                    field_dict = {'timestamp_tai': ts_list[-1],
+                    field_dict = {'timestamp_tai': tai_list[-1],
                                   'state': en_st_list[-1]}
 
                     session.data.update(field_dict)
@@ -109,7 +112,7 @@ class StimEncAgent:
                         data_downsampled = {'timestamp': current_time,
                                             'block_name': 'stim_enc_downsampled',
                                             'data': {
-                                                'timestamps_tai': ts_list[-1],
+                                                'timestamps_tai': tai_list[-1],
                                                 'state': en_st_list[-1]
                                             }}
                         self.agent.publish_to_feed('stim_enc_downsampled',
