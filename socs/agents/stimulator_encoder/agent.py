@@ -63,10 +63,11 @@ class StimEncAgent:
 
             {'timestamp_tai': 1736541833.679634,
              'state': 1,
+             'freq': 10.1,
              'timestamp': 1736541796.779634
             }
         """
-        pace_maker = Pacemaker(100)
+        pace_maker = Pacemaker(0.5)
 
         with self.lock.acquire_timeout(timeout=0, job='acq') as acquired:
             if not acquired:
@@ -79,10 +80,14 @@ class StimEncAgent:
 
             self._dev.run()
 
-            downsample_time = time.time()
+            tai_latest = 0.
+            en_st_latest = 0
+            pulse_count = 0
+
+            time_prev = time.time()
             while self.take_data:
                 # Data acquisition
-                current_time = time.time()
+                time_now = time.time()
                 data = {'block_name': 'stim_enc', 'data': {}}
 
                 tai_list = []
@@ -92,32 +97,38 @@ class StimEncAgent:
                 while not self._dev.fifo.empty():
                     _d = self._dev.fifo.get()
                     tai_list.append(_d.time.tai)
-                    ts_list.append(time.time())
+                    ts_list.append(_d.utime)
                     en_st_list.append(_d.state)
 
                 if len(tai_list) != 0:
                     data['timestamps'] = ts_list
                     data['data']['timestamps_tai'] = tai_list
                     data['data']['state'] = en_st_list
-
-                    field_dict = {'timestamp_tai': tai_list[-1],
-                                  'state': en_st_list[-1]}
-
-                    session.data.update(field_dict)
-
                     self.agent.publish_to_feed('stim_enc', data)
-                    session.data.update({'timestamp': current_time})
 
-                    if current_time - downsample_time > 0.1:
-                        data_downsampled = {'timestamp': current_time,
-                                            'block_name': 'stim_enc_downsampled',
-                                            'data': {
-                                                'timestamps_tai': tai_list[-1],
-                                                'state': en_st_list[-1]
-                                            }}
-                        self.agent.publish_to_feed('stim_enc_downsampled',
-                                                   data_downsampled)
-                        downsample_time = current_time
+                    tai_latest = tai_list[-1]
+                    en_st_latest = en_st_list[-1]
+                    pulse_count += len(en_st_list)
+
+                # Slow feed for InfluxDB and session.data
+                freq = pulse_count / (time_now - time_prev)
+                field_dict = {'timestamp_tai': tai_latest,
+                              'state': en_st_latest,
+                              'freq': freq,
+                              'timestamp': time_now}
+                session.data.update(field_dict)
+
+                data_downsampled = {'timestamp': time_now,
+                                    'block_name': 'stim_enc_downsampled',
+                                    'data': {
+                                        'timestamps_tai': tai_latest,
+                                        'state': en_st_latest,
+                                        'freq': freq
+                                    }}
+                self.agent.publish_to_feed('stim_enc_downsampled',
+                                           data_downsampled)
+                time_prev = time_now
+                pulse_count = 0
 
                 pace_maker.sleep()
 

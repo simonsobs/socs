@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 from queue import Queue
 from threading import Thread
-from time import sleep
+from time import sleep, time
 
 import numpy as np
 
@@ -34,11 +34,11 @@ class StimEncTime:
         [sec 48 bits][nsec 30 bits][sub-nsec 16 bits]
     """
 
-    def __init__(self, time_raw):
+    def __init__(self, time_raw: int):
         self._time_raw = time_raw
 
     @property
-    def sec(self):
+    def sec(self) -> int:
         """
         Seconds part of timestamp.
 
@@ -50,7 +50,7 @@ class StimEncTime:
         return self._time_raw >> 46
 
     @property
-    def nsec(self):
+    def nsec(self) -> int:
         """
         Nano second part of timestamp.
 
@@ -62,7 +62,7 @@ class StimEncTime:
         return (0x_00000000_00003fff_ffff0000 & self._time_raw) >> 16
 
     @property
-    def tai(self):
+    def tai(self) -> float:
         """
         Time in seconds from TAI epoch.
 
@@ -87,13 +87,14 @@ class StimEncData:
     def __init__(self, data_bytes):
         self._data_bytes = data_bytes
         self._data_int = int(data_bytes[0]) + (int(data_bytes[1]) << 32) + (int(data_bytes[2]) << 64)
+        self._utime = time()
 
     @property
-    def state(self):
+    def state(self) -> int:
         return (self._data_int & 0xC0_00_00_00_00000000_00000000) >> 94
 
     @property
-    def time_raw(self):
+    def time_raw(self) -> int:
         """94 bit TSU timestamp.
 
         Returns
@@ -104,7 +105,7 @@ class StimEncData:
         return self._data_int & 0x3F_FF_FF_FF_FFFFFFFF_FFFFFFFF
 
     @property
-    def time(self):
+    def time(self) -> StimEncTime:
         """
         TSU timestamp.
 
@@ -115,11 +116,22 @@ class StimEncData:
         """
         return StimEncTime(self.time_raw)
 
+    @property
+    def utime(self) -> float:
+        """
+        Unix timestamp at class creation.
+
+        Returns
+        -------
+        utime : Unix timestamp when this object is created.
+        """
+        return self._utime
+
     def __str__(self):
         return f'time={int(self.time.g3) / 1e8:.8f} data={self.state:02b}'
 
 
-def get_path_dev():
+def get_path_dev() -> Path:
     """
     Acquire devicefile path for `str_rd` IP core.
 
@@ -165,7 +177,7 @@ class StimEncReader:
         self._dev = mmap.mmap(self._dfile, 0x100, mmap.MAP_SHARED, mmap.PROT_READ, offset=0)
 
         # Data FIFO
-        self.fifo = Queue()
+        self.fifo: "Queue[StimEncData]" = Queue()
 
         # Runner
         self._thread = None
@@ -192,7 +204,7 @@ class StimEncReader:
 
         return r_len, w_len, residue
 
-    def _get_data(self):
+    def _get_data(self) -> StimEncData:
         data = np.frombuffer(self._dev, np.uint32, 4, offset=16)
 
         return StimEncData(data)
