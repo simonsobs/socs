@@ -78,6 +78,7 @@ API Reference        Full API documentation for core parts of the SOCS library.
     agents/smurf_crate_monitor
     agents/smurf_timing_card
     agents/stimulator_encoder
+    agents/stimulator_thermometer
     agents/suprsync
     agents/synacc
     agents/tektronix3021c
