@@ -15,6 +15,8 @@ from ocs.client_http import ControlClient, ControlClientError
 from ocs.ocs_client import OCSClient, OCSReply
 from ocs.ocs_twisted import Pacemaker
 
+MAX_SPIN_UP_DURATION: float = 1800.
+
 client_cache: Dict[str, ControlClient] = {}
 
 
@@ -719,6 +721,8 @@ class ControlState:
             Duration in seconds that the frequency must be within the tolerance
         freq_within_thresh_start : float
             Time that the frequency entered the tolerance range
+        max_duration : float
+            Maximum duration of time to wait in seconds
         start_time : float
             Time that the state was entered
         """
@@ -726,6 +730,8 @@ class ControlState:
         freq_tol: float
         freq_tol_duration: float
         freq_within_tol_start: Optional[float] = None
+        max_duration: Optional[float] = None
+        start_time: float = field(default_factory=time.time)
         direction: str = ''
         _pcu_enabled: bool = field(init=False, default=False)
 
@@ -803,9 +809,18 @@ class ControlState:
 
         Attributes
         -----------
-        start_time : float
-            Time that the state was entered
+        wait_stop : bool
+            Whether to wait until hwp stops
+        freq_tol : float
+            Tolerance of frequency to consider hwp is stopped.
+        freq_tol_duration : float
+            Duration in seconds that the frequency must be within the tolerance
+        success : bool
+            Whether the last state was completed successfully
         """
+        wait_stop: bool = False
+        freq_tol: float = 0.05
+        freq_tol_duration: float = 30
         success: bool = True
 
     @dataclass
@@ -1154,6 +1169,7 @@ class ControlStateMachine:
                         target_freq=state.target_freq,
                         freq_tol=state.freq_tol,
                         freq_tol_duration=state.freq_tol_duration,
+                        max_duration=MAX_SPIN_UP_DURATION,
                         direction=state.direction,
                     ))
                     return
@@ -1180,6 +1196,7 @@ class ControlStateMachine:
                     target_freq=state.target_freq,
                     freq_tol=state.freq_tol,
                     freq_tol_duration=state.freq_tol_duration,
+                    max_duration=MAX_SPIN_UP_DURATION,
                     direction=state.direction,
                 ))
 
@@ -1203,6 +1220,12 @@ class ControlStateMachine:
                             kwargs={'command': 'on_2'}, timeout=None
                         )
                     state._pcu_enabled = True
+
+                # If the frequency doen't get close enough within max diration
+                # power off
+                if state.max_duration is not None:
+                    if time.time() - state.start_time > state.max_duration:
+                        self.action.set_state(ControlState.PmxOff())
 
                 if f is None:
                     state.freq_within_tol_start = None
@@ -1241,7 +1264,14 @@ class ControlStateMachine:
                     clients.pcu.send_command,
                     kwargs={'command': 'stop'}, timeout=None
                 )
-                self.action.set_state(ControlState.Done(success=state.success))
+                if state.wait_stop:
+                    self.action.set_state(ControlState.WaitForTargetFreq(
+                        target_freq=0,
+                        freq_tol=state.freq_tol,
+                        freq_tol_duration=state.freq_tol_duration,
+                    ))
+                else:
+                    self.action.set_state(ControlState.Done(success=state.success))
 
             elif isinstance(state, ControlState.GripHWP):
                 with ensure_grip_safety(hwp_state, self.log):
@@ -1635,7 +1665,7 @@ class HWPSupervisor:
     @ocs_agent.param('freq_tol', type=float, default=0.05)
     @ocs_agent.param('freq_tol_duration', type=float, default=10)
     def pid_to_freq(self, session, params):
-        """pid_to_freq(target_freq=2.0, freq_thresh=0.05, freq_thresh_duration=10)
+        """pid_to_freq(target_freq=2.0, freq_tol=0.05, freq_tol_duration=10)
 
         **Task** - Sets the control state to PID the HWP to the given ``target_freq``.
 
@@ -1645,10 +1675,10 @@ class HWPSupervisor:
             Target frequency of the HWP (Hz). This is aa signed float where
             positive values correspond to counter-clockwise motion, as seen when
             looking at the cryostat from the sky.
-        freq_thresh : float
+        freq_tol : float
             Frequency threshold (Hz) for determining when the HWP is at the target frequency.
-        freq_thresh_duration : float
-            Duration (seconds) for which the HWP must be within ``freq_thresh`` of the
+        freq_tol_duration : float
+            Duration (seconds) for which the HWP must be within ``freq_tol`` of the
             ``target_freq`` to be considered successful.
 
         Notes
@@ -1726,16 +1756,16 @@ class HWPSupervisor:
     @ocs_agent.param('freq_tol_duration', type=float, default=10)
     @ocs_agent.param('brake_voltage', type=float, default=10.)
     def brake(self, session, params):
-        """brake(freq_thresh=0.05, freq_thresh_duration=10, brake_voltage=10)
+        """brake(freq_tol=0.05, freq_tol_duration=10, brake_voltage=10)
 
         **Task** - Sets the control state to brake the HWP.
 
         Args
         -------
-        freq_thresh : float
-            Frequency threshold (Hz) for determining when the HWP is at the target frequency.
-        freq_thresh_duration : float
-            Duration (seconds) for which the HWP must be within ``freq_thresh`` of the
+        freq_tol : float
+            Frequency tolerance (Hz) for determining when the HWP is at the target frequency.
+        freq_tol_duration : float
+            Duration (seconds) for which the HWP must be within ``freq_tol`` of the
             ``target_freq`` to be considered successful.
         brake_voltage: float
             Voltage to use when braking the HWP.
@@ -1763,10 +1793,22 @@ class HWPSupervisor:
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
+    @ocs_agent.param('wait_stop', type=bool, default=False)
+    @ocs_agent.param('freq_tol', type=float, default=0.05)
+    @ocs_agent.param('freq_tol_duration', type=float, default=30)
     def pmx_off(self, session, params):
         """pmx_off()
 
         **Task** - Sets the control state to turn off the PMX.
+
+        Args
+        -------
+        wait_stop : bool
+            Whether to wait until hwp stops.
+        freq_tol : float
+            Tolerance of frequency to consider hwp is stopped.
+        freq_tol_duration : float
+            Duration in seconds that the frequency must be within the tolerance
 
         Notes
         --------
@@ -1782,7 +1824,11 @@ class HWPSupervisor:
                 'success': True}
             }
         """
-        state = ControlState.PmxOff()
+        state = ControlState.PmxOff(
+            wait_stop=params['wait_stop'],
+            freq_tol=params['freq_tol'],
+            freq_tol_duration=params['freq_tol_duration'],
+        )
         action = self.control_state_machine.request_new_action(state)
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
