@@ -15,6 +15,8 @@ from ocs.client_http import ControlClient, ControlClientError
 from ocs.ocs_client import OCSClient, OCSReply
 from ocs.ocs_twisted import Pacemaker
 
+MAX_SPIN_UP_DURATION: float = 1800.
+
 client_cache: Dict[str, ControlClient] = {}
 
 
@@ -729,7 +731,7 @@ class ControlState:
         freq_tol_duration: float
         freq_within_tol_start: Optional[float] = None
         max_duration: Optional[float] = None
-        start_time: Optional[float] = None
+        start_time: float = field(default_factory=time.time)
         direction: str = ''
         _pcu_enabled: bool = field(init=False, default=False)
 
@@ -1167,7 +1169,7 @@ class ControlStateMachine:
                         target_freq=state.target_freq,
                         freq_tol=state.freq_tol,
                         freq_tol_duration=state.freq_tol_duration,
-                        max_duration=1800,
+                        max_duration=MAX_SPIN_UP_DURATION,
                         direction=state.direction,
                     ))
                     return
@@ -1194,7 +1196,7 @@ class ControlStateMachine:
                     target_freq=state.target_freq,
                     freq_tol=state.freq_tol,
                     freq_tol_duration=state.freq_tol_duration,
-                    max_duration=1800,
+                    max_duration=MAX_SPIN_UP_DURATION,
                     direction=state.direction,
                 ))
 
@@ -1203,9 +1205,6 @@ class ControlStateMachine:
                 # This will make sure we remain within the frequency threshold for
                 # ``self.freq_tol_duration`` seconds before switching to DONE
                 f = hwp_state.pid_current_freq
-
-                if state.start_time is None:
-                    state.start_time = time.time()
 
                 # Enable pcu if spinning up faster than 1.5 Hz
                 if state.target_freq > 1.5 and f > 1.0 and not state._pcu_enabled:
@@ -1666,7 +1665,7 @@ class HWPSupervisor:
     @ocs_agent.param('freq_tol', type=float, default=0.05)
     @ocs_agent.param('freq_tol_duration', type=float, default=10)
     def pid_to_freq(self, session, params):
-        """pid_to_freq(target_freq=2.0, freq_thresh=0.05, freq_thresh_duration=10)
+        """pid_to_freq(target_freq=2.0, freq_tol=0.05, freq_tol_duration=10)
 
         **Task** - Sets the control state to PID the HWP to the given ``target_freq``.
 
@@ -1676,10 +1675,10 @@ class HWPSupervisor:
             Target frequency of the HWP (Hz). This is aa signed float where
             positive values correspond to counter-clockwise motion, as seen when
             looking at the cryostat from the sky.
-        freq_thresh : float
+        freq_tol : float
             Frequency threshold (Hz) for determining when the HWP is at the target frequency.
-        freq_thresh_duration : float
-            Duration (seconds) for which the HWP must be within ``freq_thresh`` of the
+        freq_tol_duration : float
+            Duration (seconds) for which the HWP must be within ``freq_tol`` of the
             ``target_freq`` to be considered successful.
 
         Notes
@@ -1757,7 +1756,7 @@ class HWPSupervisor:
     @ocs_agent.param('freq_tol_duration', type=float, default=10)
     @ocs_agent.param('brake_voltage', type=float, default=10.)
     def brake(self, session, params):
-        """brake(freq_thresh=0.05, freq_thresh_duration=10, brake_voltage=10)
+        """brake(freq_tol=0.05, freq_tol_duration=10, brake_voltage=10)
 
         **Task** - Sets the control state to brake the HWP.
 
@@ -1766,7 +1765,7 @@ class HWPSupervisor:
         freq_tol : float
             Frequency tolerance (Hz) for determining when the HWP is at the target frequency.
         freq_tol_duration : float
-            Duration (seconds) for which the HWP must be within ``freq_thresh`` of the
+            Duration (seconds) for which the HWP must be within ``freq_tol`` of the
             ``target_freq`` to be considered successful.
         brake_voltage: float
             Voltage to use when braking the HWP.
