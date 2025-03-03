@@ -992,21 +992,21 @@ class PysmurfController:
 
         return True, "Finished Overbiasing TES"
 
-    @ocs_agent.param('bgs', default=None)
     @ocs_agent.param('bias')
+    @ocs_agent.param('bgs', default=None)
     def set_biases(self, session, params):
-        """set_biases(bg=None, bias)
+        """set_biases(bias, bgs=None)
 
         **Task** - Task used to set TES biases.
 
         Args
         -----
-        bgs: int, list, optional
-            Bias group (bg), or list of bgs to set. If None, will set all bgs.
         bias: int, float, list
             Biases to set. If a float is passed, this will be used for all
             specified bgs. If a list of floats is passed, it must be the same
             size of the list of bgs.
+        bgs: int, list, optional
+            Bias group (bg), or list of bgs to set. If None, will set all bgs.
         """
         if params['bgs'] is None:
             bgs = np.arange(12)
@@ -1033,7 +1033,8 @@ class PysmurfController:
 
     @ocs_agent.param('bgs', default=None)
     def zero_biases(self, session, params):
-        """
+        """zero_biases(bgs=None)
+
         **Task** - Zeros TES biases for specified bias groups.
 
         Args
