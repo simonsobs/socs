@@ -1797,7 +1797,7 @@ class HWPSupervisor:
     @ocs_agent.param('freq_tol', type=float, default=0.05)
     @ocs_agent.param('freq_tol_duration', type=float, default=30)
     def pmx_off(self, session, params):
-        """pmx_off()
+        """pmx_off(wait_stop=False, freq_tol=0.05, freq_tol_duration=30)
 
         **Task** - Sets the control state to turn off the PMX.
 
