@@ -10,6 +10,7 @@ from socs.db.suprsync import (SupRsyncFileHandler, SupRsyncFilesManager,
 
 txaio.use_twisted()
 
+
 def check_group_write_perms(path: str) -> bool:
     return os.stat(path).st_mode & stat.S_IWGRP
 
