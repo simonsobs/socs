@@ -658,7 +658,7 @@ class SupRsyncFileHandler:
 
                 cmd = ['rsync', '-Lrt']
                 if self.chmod:
-                    cmd += [f'--chmod={self.chmod}']
+                    cmd += ['-p', f'--chmod={self.chmod}']
                 if self.compression:
                     cmd.append('-z')
                 if self.bwlimit:
