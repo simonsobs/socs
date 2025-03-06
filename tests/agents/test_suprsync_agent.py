@@ -138,7 +138,6 @@ def test_suprsync_handle_files(tmp_path):
     for f in os.listdir(os.path.join(remote_basedir, 'test_remote')):
         path = os.path.join(remote_basedir, 'test_remote', f)
         group_perms = check_group_write_perms(path)
-        print(path, group_perms)
         assert group_perms, f"File {path} not granted write permissions"
 
     assert ncopied == nfiles + 1
