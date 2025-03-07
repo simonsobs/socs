@@ -68,6 +68,7 @@ class SupRsync:
         self.db_echo: bool = args.db_echo
         self.db_pool_size: int = args.db_pool_size
         self.db_pool_max_overflow: int = args.db_pool_max_overflow
+        self.chmod = args.chmod
 
         # Feed for counting transfer errors, loop iterations.
         self.agent.register_feed('transfer_stats',
@@ -124,7 +125,7 @@ class SupRsync:
             srfm, self.archive_name, self.remote_basedir, ssh_host=self.ssh_host,
             ssh_key=self.ssh_key, cmd_timeout=self.cmd_timeout,
             copy_timeout=self.copy_timeout, compression=self.compression,
-            bwlimit=self.bwlimit
+            bwlimit=self.bwlimit, chmod=self.chmod
         )
 
         self.running = True
@@ -267,6 +268,9 @@ def make_parser(parser=None):
         '--db-pool-max-overflow', type=int, default=10,
         help="Number of connections to allow in the overflow pool."
     )
+    pgroup.add_argument('--chmod', type=str, default="g+rwX",
+                        help="Comma-separated chmod strings to apply to file permissions "
+                             "on transfer. Defauls to making sure files are group-writeable.")
     return parser
 
 

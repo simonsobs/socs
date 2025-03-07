@@ -555,7 +555,8 @@ class SupRsyncFileHandler:
 
     def __init__(self, file_manager, archive_name, remote_basedir,
                  ssh_host=None, ssh_key=None, cmd_timeout=None,
-                 copy_timeout=None, compression=None, bwlimit=None):
+                 copy_timeout=None, compression=None, bwlimit=None,
+                 chmod=None):
         self.srfm = file_manager
         self.archive_name = archive_name
         self.ssh_host = ssh_host
@@ -566,6 +567,7 @@ class SupRsyncFileHandler:
         self.copy_timeout = copy_timeout
         self.compression = compression
         self.bwlimit = bwlimit
+        self.chmod = chmod
 
     def run_on_remote(self, cmd, timeout=None):
         """
@@ -655,6 +657,8 @@ class SupRsyncFileHandler:
                     file_map[remote_path] = file
 
                 cmd = ['rsync', '-Lrt']
+                if self.chmod:
+                    cmd += ['-p', f'--chmod={self.chmod}']
                 if self.compression:
                     cmd.append('-z')
                 if self.bwlimit:
