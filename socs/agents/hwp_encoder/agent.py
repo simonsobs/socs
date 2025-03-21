@@ -29,6 +29,7 @@ HWPEncoder:
 
    (HWPEncoder_irig)
    irig_time: decoded time in second since the unix epoch
+   irig_minus_sys: difference between irig time and system time in second
    rising_edge_cont: BBB clcok count values
                      for the IRIG on-time reference marker risinge edge
    irig_sec: seconds decoded from IRIG-B
@@ -595,6 +596,7 @@ class HWPBBBAgent:
                     sys_time = irig_data[4]
                     data = {'timestamp': sys_time, 'block_name': 'HWPEncoder_irig', 'data': {}}
                     data['data']['irig_time'] = irig_time
+                    data['data']['irig_minus_sys'] = irig_time - sys_time
                     data['data']['rising_edge_count'] = rising_edge_count
                     data['data']['irig_sec'] = de_irig(irig_info[0], 1)
                     data['data']['irig_min'] = de_irig(irig_info[1], 0)
