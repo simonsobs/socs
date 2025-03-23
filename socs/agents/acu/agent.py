@@ -1921,13 +1921,21 @@ class ACUAgent:
         # refill threshold.
         MIN_STACK_POP = 6  # points
 
-        if point_batch_count is None:
-            point_batch_count = 0
+        # Minimum amount of time (seconds), in advance, to populate
+        # the trajectory.  In cases where step_time is short, this
+        # creates a longer track window to survive agent outages.
+        # (The cost is that stopping a scan may take a little longer.)
+        MIN_STACK_ADVANCE_TIME = 3.
 
-        STACK_REFILL_THRESHOLD = FULL_STACK - \
-            max(MIN_STACK_POP + LOOP_STEP / step_time, point_batch_count)
-        STACK_TARGET = FULL_STACK - \
-            max(MIN_STACK_POP * 2 + LOOP_STEP / step_time, point_batch_count * 2)
+        # Minimum nuber of points to keep in the stack.
+        _pbc = max(MIN_STACK_POP, MIN_STACK_ADVANCE_TIME / step_time)
+        if point_batch_count is None or _pbc > point_batch_count:
+            point_batch_count = _pbc
+
+        STACK_REFILL_THRESHOLD = \
+            FULL_STACK - point_batch_count - LOOP_STEP / step_time
+        STACK_TARGET = \
+            FULL_STACK - point_batch_count * 2 - LOOP_STEP / step_time
 
         # Special error bits to watch here
         PTRACK_FAULT_KEYS = [
