@@ -2672,7 +2672,7 @@ class ACUAgent:
         def log(msg):
             session.add_message(msg)
 
-        log('requested action={params["action"]}')
+        log(f'requested action={params["action"]}')
 
         if params['action'] == 'open':
             dset_cmd = 'ShutterOpen'
@@ -2681,10 +2681,13 @@ class ACUAgent:
             dset_cmd = 'ShutterClose'
             desired_key, undesired_key = 'Shutter_closed', 'Shutter_open'
 
-
         OK_RESPONSE = b'OK, Command executed.'
 
-        BASIC_WAIT = 5.
+        # This just needs to be longer than 1 loop time.
+        STATE_WAIT = 5.
+
+        # Shutter typically closes in ~45 seconds.  But in early tests
+        # it sometimes takes an additional 45 seconds for moving->0.
         MOVING_WAIT = 120.
 
         state = 'init'
@@ -2713,7 +2716,7 @@ class ACUAgent:
                 result = yield self.acu_control.Command(self.shutter_dataset, dset_cmd)
                 if result == OK_RESPONSE:
                     state = 'wait-moving'
-                    timeout = time.time() + BASIC_WAIT
+                    timeout = time.time() + STATE_WAIT
                 else:
                     state = 'error'
                     message = 'Failed to issue shutter command.'
@@ -2732,7 +2735,7 @@ class ACUAgent:
                     message = 'Shutter will not stop moving.'
                 elif not shutter['Shutter_moving']:
                     state = 'wait-final'
-                    timeout = now + BASIC_WAIT
+                    timeout = now + STATE_WAIT
 
             elif state == 'wait-final':
                 if now > timeout:
