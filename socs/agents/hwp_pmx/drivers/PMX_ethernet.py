@@ -38,7 +38,7 @@ class PMX:
             except (ConnectionRefusedError, OSError):
                 print(f"Failed to connect to device at {ip}:{port}")
         else:
-            raise RuntimeError('Could not connect to PID controller')
+            raise RuntimeError('Could not connect to PMX.')
         return conn
 
     def close(self):
