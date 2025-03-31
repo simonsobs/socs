@@ -2660,7 +2660,7 @@ class ACUAgent:
     @ocs_agent.param('action', choices=['open', 'close'])
     @inlineCallbacks
     def set_shutter(self, session, params):
-        """set_shutter(action=None)
+        """set_shutter(action)
 
         **Task** - Request a (LAT) shutter action, wait for it to
         complete or fail.
@@ -2673,6 +2673,9 @@ class ACUAgent:
             session.add_message(msg)
 
         log(f'requested action={params["action"]}')
+
+        if self.data['status'].get('shutter', {}).get('Shutter_open') is None:
+            return False, 'Shutter dataset does not seem to be populating.'
 
         if params['action'] == 'open':
             dset_cmd = 'ShutterOpen'
