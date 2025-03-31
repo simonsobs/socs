@@ -133,6 +133,11 @@ class ACUAgent:
         self.monitor_fields = status_keys.status_fields[self.acu_config['platform']]['status_fields']
         self.motion_limits = self.acu_config['motion_limits']
 
+        # And a shutter one...
+        self.shutter_dataset = None
+        if self.acu_config['platform'] == 'ccat':
+            self.shutter_dataset = 'DataSets.Shutter'
+
         if min_el:
             self.log.warn(f'Override: min_el={min_el}')
             self.motion_limits['elevation']['lower'] = min_el
@@ -190,6 +195,7 @@ class ACUAgent:
                                 'platform_status': {},
                                 'ACU_emergency': {},
                                 'corotator': {},
+                                'shutter': {},
                                 },
                      'broadcast': {},
                      }
@@ -317,6 +323,11 @@ class ACUAgent:
                             self.escape_sun_now,
                             blocking=False,
                             aborter=self._simple_task_abort)
+        if self.shutter_dataset:
+            agent.register_task('set_shutter',
+                                self.set_shutter,
+                                blocking=False,
+                                aborter=self._simple_task_abort)
 
         # Automatic exercise program...
         if exercise_plan:
@@ -534,15 +545,22 @@ class ACUAgent:
                           'Corotator_mode': None,
                           }
 
-        j = yield self.acu_read.http.Values(self.acu8100)
-        if self.acu3rdaxis:
-            j2 = yield self.acu_read.http.Values(self.acu3rdaxis)
-        else:
-            j2 = {}
-        session.data.update({'StatusDetailed': j,
-                             'Status3rdAxis': j2,
-                             'StatusResponseRate': n_ok / (query_t - report_t)})
+        @inlineCallbacks
+        def _get_status():
+            j1 = yield self.acu_read.Values(self.acu8100)
+            j2, j3 = {}, {}
+            if self.acu3rdaxis:
+                j2 = yield self.acu_read.Values(self.acu3rdaxis)
+            if self.shutter_dataset:
+                j3 = yield self.acu_read.Values(self.shutter_dataset)
+            return {
+                'StatusDetailed': j1,
+                'Status3rdAxis': j2,
+                'StatusShutter': j3,
+            }
 
+        session.data['StatusResponseRate'] = n_ok / (query_t - report_t)
+        session.data.update((yield _get_status()))
         qual_pacer = Pacemaker(.1)
 
         was_remote = False
@@ -587,13 +605,8 @@ class ACUAgent:
                 self.agent.publish_to_feed('data_qual', block)
 
             try:
-                j = yield self.acu_read.http.Values(self.acu8100)
-                if self.acu3rdaxis:
-                    j2 = yield self.acu_read.http.Values(self.acu3rdaxis)
-                else:
-                    j2 = {}
-                session.data.update({'StatusDetailed': j, 'Status3rdAxis': j2,
-                                     'connected': True})
+                session.data.update((yield _get_status()))
+                session.data['connected'] = True
                 n_ok += 1
                 last_complaint = 0
             except Exception as e:
@@ -732,6 +745,7 @@ class ACUAgent:
                     ('ACU_platform_status', 'platform_status'),
                     ('ACU_emergency', 'ACU_emergency'),
                     ('ACU_corotator', 'corotator'),
+                    ('ACU_shutter', 'shutter'),
             ]:
                 new_blocks[block_name] = {
                     'timestamp': self.data['status']['summary']['ctime'],
@@ -2642,6 +2656,114 @@ class ACUAgent:
         if len(legs) == 1 and not zero_legs_ok:
             return legs, None
         return legs[1:], None
+
+    @ocs_agent.param('action', choices=['open', 'close'])
+    @inlineCallbacks
+    def set_shutter(self, session, params):
+        """set_shutter(action)
+
+        **Task** - Request a (LAT) shutter action, wait for it to
+        complete or fail.
+
+        Args:
+          action (str): 'open' or 'close'
+
+        """
+        def log(msg):
+            session.add_message(msg)
+
+        log(f'requested action={params["action"]}')
+
+        if self.data['status'].get('shutter', {}).get('Shutter_open') is None:
+            return False, 'Shutter dataset does not seem to be populating.'
+
+        if params['action'] == 'open':
+            dset_cmd = 'ShutterOpen'
+            desired_key, undesired_key = 'Shutter_open', 'Shutter_closed'
+        else:
+            dset_cmd = 'ShutterClose'
+            desired_key, undesired_key = 'Shutter_closed', 'Shutter_open'
+
+        OK_RESPONSE = b'OK, Command executed.'
+
+        # This just needs to be longer than 1 loop time.
+        STATE_WAIT = 5.
+
+        # Shutter typically closes in ~45 seconds.  But in early tests
+        # it sometimes takes an additional 45 seconds for moving->0.
+        MOVING_WAIT = 120.
+
+        state = 'init'
+        session.data = {'state': state,
+                        'timestamp': time.time()}
+
+        while (session.status in ['starting', 'running']
+               and state not in ['done', 'error']):
+            last_state = state
+            now = time.time()
+
+            az, el = [self.data['status']['summary'][f'{ax}_current_position']
+                      for ax in ['Azimuth', 'Elevation']]
+            shutter = self.data['status']['shutter']
+
+            for bad_key in ['Shutter_timeout', 'Shutter_failure']:
+                if shutter[bad_key]:
+                    state = 'error'
+                    message = f'Detected error state: {bad_key}'
+
+            if state in ['error', 'done']:
+                pass
+
+            elif state == 'init':
+                # Issue the command
+                result = yield self.acu_control.Command(self.shutter_dataset, dset_cmd)
+                if result == OK_RESPONSE:
+                    state = 'wait-moving'
+                    timeout = time.time() + STATE_WAIT
+                else:
+                    state = 'error'
+                    message = 'Failed to issue shutter command.'
+
+            elif state == 'wait-moving':
+                if now > timeout:
+                    state = 'error'
+                    message = 'Shutter failed to start moving.'
+                elif shutter['Shutter_moving']:
+                    state = 'wait-stopped'
+                    timeout = now + MOVING_WAIT
+
+            elif state == 'wait-stopped':
+                if now > timeout:
+                    state = 'error'
+                    message = 'Shutter will not stop moving.'
+                elif not shutter['Shutter_moving']:
+                    state = 'wait-final'
+                    timeout = now + STATE_WAIT
+
+            elif state == 'wait-final':
+                if now > timeout:
+                    state = 'error'
+                    message = 'Shutter failed to reach final expected state.'
+                elif shutter[desired_key] and not shutter[undesired_key]:
+                    state = 'done'
+                    message = 'Shutter move successful.'
+
+            else:
+                message = f'invalid state: {state}'
+                state = 'error'
+
+            session.data['state'] = state
+            if state != last_state:
+                log(f'set_shutter: state is now "{state}"')
+                last_state = state
+            yield dsleep(1)
+
+        if state == 'done':
+            return True, message
+        elif state == 'error':
+            return False, message
+
+        return False, 'Aborted in state {state}'
 
     @ocs_agent.param('starting_index', type=int, default=0)
     def exercise(self, session, params):
