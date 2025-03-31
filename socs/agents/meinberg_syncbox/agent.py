@@ -17,6 +17,7 @@ CONVERT_OIDS = ['mbgSyncboxN2XPtpUTCOffset',
                 'mbgSyncboxN2XPtpOffsetToGrandmaster',
                 'mbgSyncboxN2XPtpMeanPathDelay']
 
+
 def _extract_oid_field_and_value(get_result):
     """Extract field names and OID values from SNMP GET results.
 
@@ -67,18 +68,19 @@ def _extract_oid_field_and_value(get_result):
     if (field_name.split('_')[0] in CONVERT_OIDS) and (oid_value is not None):
         unit_multipliers = {
             "s": 1000000,   # seconds to microseconds
+            "sec": 1000000,  # seconds to microseconds
             "ms": 1000,     # milliseconds to microseconds
             "us": 1,        # microseconds
             "ns": 0.001     # nanoseconds to microseconds
         }
-        
+
         value, unit = oid_value.split()
         value = float(value)
 
         # Normalize to microseconds
         if unit in unit_multipliers:
             oid_value = value * unit_multipliers[unit]
-        
+
         # Change the field name to differentiate from raw output
         field_name = field_name + "_value"
 
@@ -229,8 +231,7 @@ class MeinbergSyncboxAgent:
                 'mbgSyncboxN2XPtpGrandmasterClockAccuracy',
                 'mbgSyncboxN2XPtpGrandmasterClockVariance',
                 'mbgSyncboxN2XPtpOffsetToGrandmaster',
-                'mbgSyncboxN2XPtpMeanPathDelay',
-                'mbgSyncboxN2XNtpRefSourceOffset']
+                'mbgSyncboxN2XPtpMeanPathDelay']
         output_oids = ['mbgSyncboxN2XOutputMode']
         mib = 'MBG-SYNCBOX-N2X-MIB'
 
@@ -405,7 +406,7 @@ class MeinbergSyncboxAgent:
                 Units:: microseconds
             mbgSyncboxN2XPtpMeanPathDelay::
                 Units:: microseconds
-            
+
         """
 
         self.is_streaming = True
