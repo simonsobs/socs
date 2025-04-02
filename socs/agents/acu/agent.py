@@ -105,7 +105,7 @@ class ACUAgent:
                  min_el=None, max_el=None,
                  ):
 
-        ### Agent support
+        # Agent support
 
         self.agent = agent
         self.log = agent.log
@@ -114,8 +114,7 @@ class ACUAgent:
         self.azel_lock = TimeoutLock()
         self.boresight_lock = TimeoutLock()
 
-
-        ### Config file processing
+        # Config file processing
 
         self.acu_config_name = acu_config
         self.acu_config = aculib.guess_config(acu_config)
@@ -140,7 +139,7 @@ class ACUAgent:
 
         self.monitor_fields = status_keys.status_fields[self.platform_type]['status_fields']
 
-        ### Config file + overrides processing
+        # Config file + overrides processing
 
         # Motion limits (az / el / third ranges).
         self.motion_limits = self.acu_config['motion_limits']
@@ -195,8 +194,7 @@ class ACUAgent:
         startup_idle_reset = (self.platform_type in ['lat', 'ccat']
                               and not disable_idle_reset)
 
-
-        ### The connections to the ACU.
+        # The connections to the ACU.
 
         tclient._HTTP11ClientFactory.noisy = False
 
@@ -205,7 +203,7 @@ class ACUAgent:
         self.acu_read = aculib.AcuControl(
             acu_config, backend=TwistedHttpBackend(persistent=True), readonly=True)
 
-        ### Structures for passing status data around
+        # Structures for passing status data around
 
         # self.data provides a place to reference data from the monitors.
         # 'status' is populated by the monitor operation
@@ -237,7 +235,7 @@ class ACUAgent:
             'time_offset': 0,
         }
 
-        ### Task, Process, Feed registration.
+        # Task, Process, Feed registration.
 
         agent.register_process('monitor',
                                self.monitor,
