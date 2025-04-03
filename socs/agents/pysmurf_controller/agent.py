@@ -336,6 +336,14 @@ class PysmurfController:
                     num_active_channels=num_active_channels,
                 )
                 session.data.update(d)
+
+                data = {
+                    'timestamp': time.time(),
+                    'block_name': 'state_results',
+                    'data': {'open_g3stream': d['open_g3stream'],
+                             'num_active_channels': d['num_active_channels']}
+                }
+                self.agent.publish_to_feed('state_results', data)
             except (RuntimeError, epics.ca.ChannelAccessGetFailure):
                 self.log.warn("Could not connect to epics server! Waiting and "
                               "then trying again")
