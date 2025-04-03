@@ -50,20 +50,25 @@ file. An example configuration block using all availabile arguments is below::
 soaculib
 ````````
 
-We additionally need to add a block to the soaculib configuration file. An
-example configuration block is below::
+The ACU configuration file is parsed by ``soaculib``.  A template is
+included within that library; it can be copied into the OCS
+configuration area and modified.  ``soaculib`` will use the config
+file pointed to by environment variable ``ACU_CONFIG``.  The
+``--acu_config`` agent instance argument must correspond to a key in
+the ``devices`` section of the ACU configuration file.
+
+Here is an example of a device definition for a SATP::
 
     'satp1': {
         'base_url': 'http://192.168.1.111:8100',
         'readonly_url': 'http://192.168.1.111:8110',
         'dev_url': 'http://192.168.1.111:8080',
         'interface_ip': '192.168.1.110',
-        'motion_waittime': 5.0,
         'streams': {
             'main': {
                 'acu_name': 'PositionBroadcast',
                 'port': 10004,
-                'schema': 'v2'
+                'schema': 'v5'
             },
             'ext': {
                 'acu_name': 'PositionBroadcastExt',
@@ -79,20 +84,115 @@ example configuration block is below::
         'motion_limits': {
             'azimuth': {
                 'lower': -90.0,
-                'upper': 480.0,
+                'upper': 450.0,
             },
             'elevation': {
-                'lower': 20.0,
-                'upper': 50.0,
+                'lower': 18.5,
+                'upper': 90.0,
             },
             'boresight': {
-                'lower': 0.0,
-                'upper': 360.,
+                'lower': -55.0,
+                'upper': 55.0,
             },
-            'acc': (8./1.88),
             'axes_sequential': False,
         },
+
+        'ignore_axes': [],
+
+        'named_positions': {
+          'home': [180, 60]
+        },
+
+        'scan_params': {},
+
+        'sun_avoidance': {},
     }
+
+
+See next section for some details of the configurable parameters.
+
+
+Configuration Notes
+-------------------
+
+Hostnames and port numbers
+``````````````````````````
+
+The ``base_url``, ``readonly_url``, and ``dev_url`` should all point
+to the IP address of the ACU.  The port numbers refer to different
+servers or server configurations and probably don't need to be
+altered.
+
+The ``interface_ip`` is the address of the system where the Agent is
+running -- this is used to direct UDP frames from the ACU to the
+Agent.
+
+Motion limits and restrictions
+``````````````````````````````
+
+Settings that affect motion limits, scan parameters, and axis
+ignorance:
+
+- ``motion_limits``:
+
+  - Axis limits (``azimuth``, ``elevation``, ``boresight``): These are
+    software limits enforced in the Agent.  They are distinct from the
+    ACU software limits, and from the hardware limits (enforced by
+    limit switches and a PLC).  Generally these will be set equal to,
+    or sub-ranges of, the ACU software limits.  Note the identifier
+    "boresight" is used for both SATP and the LAT co-rotator.
+  - ``axes_sequential``: If True, then (az, el) moves are not
+    performed simultaneously.  First one axis is moved, and then the
+    next. The Sun Avoidance code is made aware of this restriction and
+    optimizes paths with that constraint in mind.
+
+- ``ignore_axes``: If set, should be a list containing any combination
+  of "az", "el", "third", and "none".  See further explanation in
+  :class:`ACUAgent <socs.agents.acu.agent.ACUAgent>`.
+- ``scan_params``: Default scan parameters; currently ``az_speed``
+  (float, deg/s) and ``az_accel`` (float, deg/s/s).  If not specfied,
+  these are given default values depending on the platform type.
+
+
+Other agent functions
+`````````````````````
+
+The ``named_positions`` is a dict mapping a position name
+(e.g. "home", "stow") to a list ``[az, el]``.  These are made
+available to the ``go_to_named`` task.  Here's an example (in YAML
+style):
+
+.. code-block:: yaml
+
+    named_positions:
+      home: [180, 60]
+      stow: [180, 20]
+
+The ``sun_avoidance`` block controls Sun avoidance parameters, most
+importantly the default enable/disable of Sun Avoidance and the
+exclusion radius.  Any of the "user-defined policy" parameters can be
+included in this block.  Additionally, the key ``enabled`` (boolean)
+determines whether active Sun Avoidance is enabled on agent startup.
+Here are are some examples:
+
+.. code-block:: yaml
+
+    # Enable Sun avoidance, with 39 deg radius.
+    sun_avoidance:
+      enabled: true
+      exclusion_radius: 39
+
+.. code-block:: yaml
+
+    # Do not enable Sun avoidance by default, but extend the danger
+    # zone to 2 hours, for information purposes.
+    sun_avoidance:
+      enabled: false
+      min_sun_time: 7200
+
+When Sun avoidance is configured, but not enabled on startup, it can
+be enabled during the run through the
+:func:`update_sun <socs.agents.acu.agent.ACUAgent.update_sun>` Task.
 
 
 Sun Avoidance
@@ -108,17 +208,16 @@ determined like this:
 
 - Default parameters for each platform (LAT and SATP) are in the Agent
   code.
-- On start-up the default parameters for platform are modified
-  according to any command-line parameters passed in by the user.
-- Some parameters can be altered using the command line.
+- On start-up of the Agent, the ACU config file ``sun_avoidance``
+  block is parsed, and that modifies the platform default parameters.
+- Command-line parameters can modify Sun Safety, through the
+  ``--disable-sun-avoidance``, ``--min-el``, and ``--max-el``
+  arguments.
 
 The avoidance policy is defined by a few key parameters and concepts;
 please see the descriptions of ``sun_dist``, ``sun_time``,
 ``exclusion_radius``, and more in the :mod:`socs.agents.acu.avoidance`
 module documentation.
-
-The ``exclusion_radius`` can be configured from the Agent command
-line, and also through the ``update_sun`` Task.
 
 When Sun Avoidance is active (``active_avoidance`` is ``True``), the
 following will be enforced:

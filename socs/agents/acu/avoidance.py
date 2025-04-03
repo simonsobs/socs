@@ -667,7 +667,7 @@ class MoveSequence:
             assert (len(args) % 2 == 0)
             args = [(args[i], args[i + 1]) for i in range(0, len(args), 2)]
         for (az, el) in args:
-            self.nodes.append((az, el))
+            self.nodes.append((float(az), float(el)))
         if simplify:
             # Remove repeated nodes.
             idx = 0
