@@ -570,7 +570,7 @@ class ACUAgent:
                     output[collection] = (
                         yield self.acu_read.Values(self.datasets[short]))
                 else:
-                    output['collection'] = {}
+                    output[collection] = {}
             return output
 
         session.data['StatusResponseRate'] = n_ok / (query_t - report_t)
