@@ -133,6 +133,7 @@ class PysmurfController:
         self.agent.register_feed('noise_results', record=True)
         self.agent.register_feed('iv_results', record=True)
         self.agent.register_feed('bias_wave_results', record=True)
+        self.agent.register_feed('state_results', record=True)
 
     def _on_session_data(self, _data):
         data, feed = _data
