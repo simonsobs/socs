@@ -135,7 +135,7 @@ class WiregridEncoderAgent:
             irig_fdata = {'timestamps': [],
                           'block_name': 'wgencoder_irig_raw',
                           'data': {}
-            }
+                          }
             enc_rdata = {
                 'timestamps': [],
                 'block_name': 'wgencoder_rough',
