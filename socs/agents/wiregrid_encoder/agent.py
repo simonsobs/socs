@@ -134,13 +134,8 @@ class WiregridEncoderAgent:
             irig_last_updated = 0
             irig_fdata = {'timestamps': [],
                           'block_name': 'wgencoder_irig_raw',
-                          'data': {
-                              'quadrature': [],
-                              'pru_clock': [],
-                              'reference_degree': [],
-                              'error': []
-            }
-            }
+                          'data': {}
+                          }
             enc_rdata = {
                 'timestamps': [],
                 'block_name': 'wgencoder_rough',
@@ -178,6 +173,7 @@ class WiregridEncoderAgent:
                     synch_pulse_clock_counts = irig_data[3]
                     sys_time = irig_data[4]
 
+                    irig_rdata['timestamp'] = sys_time
                     irig_rdata['data']['irig_time'] = irig_time
                     irig_rdata['data']['rising_edge_count'] = rising_edge_count
                     irig_rdata['data']['edge_diff']\
