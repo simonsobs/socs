@@ -13,6 +13,7 @@ import yaml
 from autobahn.twisted.util import sleep as dsleep
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import Pacemaker, TimeoutLock
+from soaculib.retwisted_backend import RetwistedHttpBackend
 from soaculib.twisted_backend import TwistedHttpBackend
 from twisted.internet import protocol, reactor, threads
 from twisted.internet.defer import DeferredList, inlineCallbacks
@@ -199,7 +200,7 @@ class ACUAgent:
         tclient._HTTP11ClientFactory.noisy = False
 
         self.acu_control = aculib.AcuControl(
-            acu_config, backend=TwistedHttpBackend(persistent=False))
+            acu_config, backend=RetwistedHttpBackend(persistent=False))
         self.acu_read = aculib.AcuControl(
             acu_config, backend=TwistedHttpBackend(persistent=True), readonly=True)
 
@@ -2074,9 +2075,19 @@ class ACUAgent:
                     if len(upload_lines):
                         # Discard the group flag and upload all.
                         text = ''.join([line for _flag, line in upload_lines])
-                        # This seems to return b'Ok.' no matter ~what,
-                        # so not much point checking it.
-                        yield self.acu_control.http.UploadPtStack(text)
+                        for attempt in range(5):
+                            _dt = time.time()
+                            try:
+                                # This seems to return b'Ok.' no matter ~what,
+                                # so not much point checking it.
+                                yield self.acu_control.http.UploadPtStack(text)
+                                break
+                            except Exception as err:
+                                _dt = time.time() - _dt
+                                self.log.warn(f'Upload {len(upload_lines)} failed (attempt {attempt}) after {_dt:.3f} seconds')
+                                self.log.warn('Exception was: {err}', err=err)
+                        else:
+                            raise RuntimeError('Upload fail.')
                         if first_upload_time is None:
                             first_upload_time = time.time()
 
