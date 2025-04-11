@@ -1064,8 +1064,9 @@ class ACUAgent:
         # How long to wait after initiation for signs of motion,
         # before giving up.  This is normally within 2 or 3 seconds
         # (SATP), but in "cold" cases where siren needs to sound, this
-        # can be as long as 12 seconds.
-        MAX_STARTUP_TIME = 13.
+        # can be as long as 12 seconds.  For the LAT, can take an
+        # extra couple seconds if there were faults to clear.
+        MAX_STARTUP_TIME = 15.
 
         # How long does it take to sound the warning horn?  It takes
         # 10 seconds.  Don't wait longer than this.
