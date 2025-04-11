@@ -1817,6 +1817,13 @@ class ACUAgent:
         # empirical 0.85 adjustment) is stated in the SATP ACU ICD.
         min_turnaround_time = (0.85 * az_speed / 9 * 11.616)**.5
         max_turnaround_accel = 2 * az_speed / min_turnaround_time
+
+        # You must also not exceed the platform max accel.
+        if self.motion_limits['azimuth'].get('accel'):
+            max_turnaround_accel = min(
+                max_turnaround_accel,
+                self.motion_limits['azimuth'].get('accel') / 1.88)
+
         if az_accel > max_turnaround_accel:
             self.log.warn('WARNING: user requested accel=%.2f; limiting to %.2f' %
                           (az_accel, max_turnaround_accel))

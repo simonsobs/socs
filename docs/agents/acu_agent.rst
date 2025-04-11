@@ -85,6 +85,7 @@ Here is an example of a device definition for a SATP::
             'azimuth': {
                 'lower': -90.0,
                 'upper': 450.0,
+                'accel': 4.0,
             },
             'elevation': {
                 'lower': 18.5,
@@ -140,7 +141,10 @@ ignorance:
     ACU software limits, and from the hardware limits (enforced by
     limit switches and a PLC).  Generally these will be set equal to,
     or sub-ranges of, the ACU software limits.  Note the identifier
-    "boresight" is used for both SATP and the LAT co-rotator.
+    "boresight" is used for both SATP and the LAT co-rotator.  The
+    ``lower`` limit should be numerically less than the ``upper``
+    limit.  If specified, the ``accel`` parameter (in deg/s/s) is used
+    to limit the minimum turn-around time in ProgramTrack mode.
   - ``axes_sequential``: If True, then (az, el) moves are not
     performed simultaneously.  First one axis is moved, and then the
     next. The Sun Avoidance code is made aware of this restriction and
