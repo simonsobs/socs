@@ -13,6 +13,7 @@ import yaml
 from autobahn.twisted.util import sleep as dsleep
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import Pacemaker, TimeoutLock
+from soaculib.retwisted_backend import RetwistedHttpBackend
 from soaculib.twisted_backend import TwistedHttpBackend
 from twisted.internet import protocol, reactor, threads
 from twisted.internet.defer import DeferredList, inlineCallbacks
@@ -199,7 +200,7 @@ class ACUAgent:
         tclient._HTTP11ClientFactory.noisy = False
 
         self.acu_control = aculib.AcuControl(
-            acu_config, backend=TwistedHttpBackend(persistent=False))
+            acu_config, backend=RetwistedHttpBackend(persistent=False))
         self.acu_read = aculib.AcuControl(
             acu_config, backend=TwistedHttpBackend(persistent=True), readonly=True)
 
@@ -1063,8 +1064,9 @@ class ACUAgent:
         # How long to wait after initiation for signs of motion,
         # before giving up.  This is normally within 2 or 3 seconds
         # (SATP), but in "cold" cases where siren needs to sound, this
-        # can be as long as 12 seconds.
-        MAX_STARTUP_TIME = 13.
+        # can be as long as 12 seconds.  For the LAT, can take an
+        # extra couple seconds if there were faults to clear.
+        MAX_STARTUP_TIME = 15.
 
         # How long does it take to sound the warning horn?  It takes
         # 10 seconds.  Don't wait longer than this.
@@ -1816,6 +1818,13 @@ class ACUAgent:
         # empirical 0.85 adjustment) is stated in the SATP ACU ICD.
         min_turnaround_time = (0.85 * az_speed / 9 * 11.616)**.5
         max_turnaround_accel = 2 * az_speed / min_turnaround_time
+
+        # You must also not exceed the platform max accel.
+        if self.motion_limits['azimuth'].get('accel'):
+            max_turnaround_accel = min(
+                max_turnaround_accel,
+                self.motion_limits['azimuth'].get('accel') / 1.88)
+
         if az_accel > max_turnaround_accel:
             self.log.warn('WARNING: user requested accel=%.2f; limiting to %.2f' %
                           (az_accel, max_turnaround_accel))
@@ -2074,9 +2083,19 @@ class ACUAgent:
                     if len(upload_lines):
                         # Discard the group flag and upload all.
                         text = ''.join([line for _flag, line in upload_lines])
-                        # This seems to return b'Ok.' no matter ~what,
-                        # so not much point checking it.
-                        yield self.acu_control.http.UploadPtStack(text)
+                        for attempt in range(5):
+                            _dt = time.time()
+                            try:
+                                # This seems to return b'Ok.' no matter ~what,
+                                # so not much point checking it.
+                                yield self.acu_control.http.UploadPtStack(text)
+                                break
+                            except Exception as err:
+                                _dt = time.time() - _dt
+                                self.log.warn(f'Upload {len(upload_lines)} failed (attempt {attempt}) after {_dt:.3f} seconds')
+                                self.log.warn('Exception was: {err}', err=err)
+                        else:
+                            raise RuntimeError('Upload fail.')
                         if first_upload_time is None:
                             first_upload_time = time.time()
 
