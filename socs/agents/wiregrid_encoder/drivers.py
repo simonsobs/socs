@@ -223,7 +223,7 @@ class EncoderParser:
         try:
             st_time = time.strptime(
                 "%d %d %d:%d:%d" % (year, day, hours, mins, secs),
-                "%Y %j %H:%M:%S")
+                "%y %j %H:%M:%S")
             self.current_time = calendar.timegm(st_time)
         except ValueError:
             self.log.error(f'Invalid IRIG-B timestamp: '
