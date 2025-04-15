@@ -20,6 +20,7 @@ agents = {
     'HWPPMXAgent': {'module': 'socs.agents.hwp_pmx.agent', 'entry_point': 'main'},
     'HWPSupervisor': {'module': 'socs.agents.hwp_supervisor.agent', 'entry_point': 'main'},
     'ibootbarAgent': {'module': 'socs.agents.ibootbar.agent', 'entry_point': 'main'},
+    'ibbn20Agent': {'module': 'socs.agents.ibb_n20.agent', 'entry_point': 'main'},
     'LabJackAgent': {'module': 'socs.agents.labjack.agent', 'entry_point': 'main'},
     'Lakeshore240Agent': {'module': 'socs.agents.lakeshore240.agent', 'entry_point': 'main'},
     'Lakeshore336Agent': {'module': 'socs.agents.lakeshore336.agent', 'entry_point': 'main'},
