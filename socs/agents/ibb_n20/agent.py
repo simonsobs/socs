@@ -7,7 +7,6 @@ from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 from twisted.internet.defer import inlineCallbacks
 
-import asyncio
 import telnetlib
 
 txaio.use_twisted()
@@ -21,9 +20,9 @@ class ibbn20Agent:
     agent : OCSAgent
         OCSAgent object which forms this Agent
     ip : str
-        IP address of the ibb_n20
+        IP address
     port : int
-        Telnet port to issue GETs to, default to 23
+        Telnet port, default to 23
     verbosity : str
         Verbosity of ibb_n20 output
 
@@ -32,8 +31,7 @@ class ibbn20Agent:
     agent : OCSAgent
         OCSAgent object which forms this Agent
     is_streaming : bool
-        Tracks whether or not the agent is actively issuing telnet GET commands
-        to the device. Setting to false stops sending commands.
+        Tracks whether or not the agent is actively monitoring the device state.
     log : txaio.tx.Logger
         txaio logger object, created by the OCSAgent
     """
@@ -47,18 +45,19 @@ class ibbn20Agent:
         self.lastGet = 0
         self.sample_period = 30
 
+        self.ip = ip
+        self.port = port
         self.verbosity = verbosity
-        self.establish_connection(ip, port)
-        self.connected = True
+        self.establish_connection()
 
         agg_params = {'frame_length': 60}
         self.agent.register_feed('ibb_n20',
                                  record=True,
                                  agg_params=agg_params)
 
-    def establish_connection(self, ip, port):
+    def establish_connection(self):
         try:
-            self.tn = telnetlib.Telnet(ip, port)
+            self.tn = telnetlib.Telnet(self.ip, self.port)
             output = self.read(b"User Name:")
             if self.verbosity:
                 print(output)
@@ -70,28 +69,31 @@ class ibbn20Agent:
             output = self.read()
             if self.verbosity:
                 print(output)
-        except Exception as e:
-            print(e)
-
+            self.connected = True
+        except Exception:
+            self.log.error(
+                "Could not connect. "
+                "Retry after 1 minute."
+            )
+            self.connected = False
 
     def read(self, until=b"iBootBar >"):
         output = self.tn.read_until(until)
         output = output.decode('utf-8')
         return output
 
-
     def get_outlets(self):
         self.tn.write(b"get outlets\n")
         output = self.read()
         if self.verbosity:
             print(output)
-        outlets = [{'N': 1, 'F': 0}.get(v) for v in output.split('\n')[2][29:51:3]]
+        # N means on, F means off
+        outlets = [{'N': 1, 'F': 0}[v] for v in output.split('\n')[2][29:51:3]]
         current = float(output.split('\n')[2][55:58])
         status = {'current': current}
         for i, s in enumerate(outlets):
             status[f'outletstatus_{i + 1}'] = s
         return status
-
 
     @ocs_agent.param('outlet', choices=[1, 2, 3, 4, 5, 6, 7, 8])
     @ocs_agent.param('state', choices=['on', 'off', 'cycle'])
@@ -99,12 +101,12 @@ class ibbn20Agent:
     def set_outlet(self, session, params=None):
         """set_outlet(outlet, state)
 
-        **Task** - Set a particular outlet to on/off.
+        **Task** - Set a particular outlet to on/off/cycle.
 
         Parameters
         ----------
         outlet : int
-            Outlet number to set. Choices are 1-8 (physical outlets).
+            Outlet number to set. Choices are 1-8.
         state : str
             State to set outlet to, which may be 'on', 'off' or 'cycle'
         """
@@ -123,12 +125,11 @@ class ibbn20Agent:
         return True, 'Set outlet {} to {}'.\
             format(params['outlet'], params['state'])
 
-
     @inlineCallbacks
     def acq(self, session, params=None):
         """acq()
 
-        **Process** - Acqure data from the ibb_n20 via Telnet.
+        **Process** - Acquire data from the ibb_n20 via Telnet.
 
         Notes
         -----
@@ -138,8 +139,8 @@ class ibbn20Agent:
             >>> response.session['data']
             {'fields':
                 {'current': 4.4,
-                 1: {'status': 1, 'name': 'outlet_1'},
-                 2: {'status': 0, 'name': 'outlet_2'},
+                 'outletstatus_1: 1,
+                 'outletstatus_2: 0,
                  ...
                 },
             'timestamp': 1744756162.206159}
@@ -148,7 +149,7 @@ class ibbn20Agent:
         self.is_streaming = True
         while self.is_streaming:
             if not self.connected:
-                self.log.info('Trying to reconnect.')
+                self.establish_connection()
 
             read_time = time.time()
 
@@ -164,24 +165,17 @@ class ibbn20Agent:
             data['data'] = status
             self.agent.publish_to_feed('ibb_n20', data)
 
-            status_dict = {'current': status['current']}
-            for i in range(1, 9):
-                status_dict[i] = {
-                    'status': status[f'outletstatus_{i}'],
-                    'name': f'outlet_{i}',
-                }
             session.data['timestamp'] = current_time
-            session.data['fields'] = status_dict
+            session.data['fields'] = status
 
             self.lastGet = time.time()
 
         self.agent.feeds['ibb_n20'].flush_buffer()
         return True, "Finished Recording"
 
-
     def _stop_acq(self, session, params=None):
         """_stop_acq()
-        **Task** - Stop task associated with acq process.
+        **Task** - Stop acq process.
         """
         if self.is_streaming:
             self.is_streaming = False
@@ -199,10 +193,8 @@ def add_agent_args(parser=None):
         parser = argparse.ArgumentParser()
 
     pgroup = parser.add_argument_group("Agent Options")
-    pgroup.add_argument("--address", default='192.168.13.24', help="Address to listen to.")
-    pgroup.add_argument("--port", default=23,
-                        help="Port to listen on.")
-    pgroup.add_argument("--mode", default='acq')
+    pgroup.add_argument("--ip")
+    pgroup.add_argument("--port", default=23)
     pgroup.add_argument(
         "--verbose",
         "-v",
@@ -223,15 +215,10 @@ def main(args=None):
                                   parser=parser,
                                   args=args)
 
-    if args.mode == 'acq':
-        init_params = True
-    elif args.mode == 'test':
-        init_params = False
-
     agent, runner = ocs_agent.init_site_agent(args)
     p = ibbn20Agent(
         agent,
-        ip=args.address,
+        ip=args.ip,
         port=int(args.port),
         verbosity=args.verbose,
     )
@@ -239,7 +226,7 @@ def main(args=None):
     agent.register_process("acq",
                            p.acq,
                            p._stop_acq,
-                           startup=init_params)
+                           startup=True)
     agent.register_task("set_outlet", p.set_outlet, blocking=False)
 
     runner.run(agent, auto_reconnect=True)
@@ -247,5 +234,3 @@ def main(args=None):
 
 if __name__ == "__main__":
     main()
-    pgroup.add_argument("--lock-outlet", nargs='+', type=int,
-                        help="List of outlets to lock on startup.")

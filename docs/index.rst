@@ -54,6 +54,7 @@ API Reference        Full API documentation for core parts of the SOCS library.
     agents/hwp_supervisor_agent
     agents/holo_fpga
     agents/holo_synth
+    agents/ibb_n20
     agents/ibootbar
     agents/ifm_sbn246_flowmeter
     agents/kikusui_pcr500ma
