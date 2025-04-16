@@ -76,9 +76,10 @@ class ibbn20Agent:
                 "Retry after 1 minute."
             )
             self.connected = False
+            time.sleep(60)
 
     def read(self, until=b"iBootBar >"):
-        output = self.tn.read_until(until)
+        output = self.tn.read_until(until, timeout=5)
         output = output.decode('utf-8')
         return output
 
@@ -97,7 +98,6 @@ class ibbn20Agent:
 
     @ocs_agent.param('outlet', choices=[1, 2, 3, 4, 5, 6, 7, 8])
     @ocs_agent.param('state', choices=['on', 'off', 'cycle'])
-    @inlineCallbacks
     def set_outlet(self, session, params=None):
         """set_outlet(outlet, state)
 
@@ -114,16 +114,17 @@ class ibbn20Agent:
             if not acquired:
                 return False, "Could not acquire lock"
 
-            self.tn.write(b('set outlet {} {}\n'.\
-                format(params['outlet'], params['state'])))
+            self.tn.write('set outlet {} {}\n'.format(
+                params['outlet'], params['state']).encode('utf-8'))
             output = self.read()
-            self.log.debug(output)
+            if self.verbosity:
+                print(output)
 
-        # Foce GET status commands by rewinding the lastGet time by sample period
-        self.lastGet = self.lastGet - self.sample_period
+            # Foce GET status commands by rewinding the lastGet time by sample period
+            self.lastGet = self.lastGet - self.sample_period
 
-        return True, 'Set outlet {} to {}'.\
-            format(params['outlet'], params['state'])
+            return True, 'Set outlet {} to {}'.\
+                format(params['outlet'], params['state'])
 
     @inlineCallbacks
     def acq(self, session, params=None):
@@ -216,7 +217,7 @@ def main(args=None):
                                   args=args)
 
     agent, runner = ocs_agent.init_site_agent(args)
-    p = ibbn20Agent(
+    ibb = ibbn20Agent(
         agent,
         ip=args.ip,
         port=int(args.port),
@@ -224,10 +225,10 @@ def main(args=None):
     )
 
     agent.register_process("acq",
-                           p.acq,
-                           p._stop_acq,
+                           ibb.acq,
+                           ibb._stop_acq,
                            startup=True)
-    agent.register_task("set_outlet", p.set_outlet, blocking=False)
+    agent.register_task("set_outlet", ibb.set_outlet)
 
     runner.run(agent, auto_reconnect=True)
 
