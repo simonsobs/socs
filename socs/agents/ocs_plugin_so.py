@@ -26,6 +26,7 @@ for n, f in [
         ('HWPPicoscopeAgent', 'hwp_picoscope/agent.py'),
         ('HWPPIDAgent', 'hwp_pid/agent.py'),
         ('HWPPMXAgent', 'hwp_pmx/agent.py'),
+        ('ibbn20Agent', 'ibb_n20/agent.py'),
         ('ibootbarAgent', 'ibootbar/agent.py'),
         ('LabJackAgent', 'labjack/agent.py'),
         ('Lakeshore240Agent', 'lakeshore240/agent.py'),
