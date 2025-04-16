@@ -582,7 +582,7 @@ class PysmurfController:
         SODETLIB functions such as ``uxm_relock`` and any other functions called
         will add relevant data to the ``session.data`` object to  a unique key.
         For example, if all is successful ``session.data`` may look like::
-            
+
             >> response.session['data']
             {
                 'filepath': Filepath of saved TrackingResults object
