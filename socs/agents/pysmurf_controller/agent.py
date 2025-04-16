@@ -129,6 +129,7 @@ class PysmurfController:
                 'observatory.{}.feeds.pysmurf_session_data'.format(args.monitor_id),
             )
 
+        self.agent.register_feed('tracking_results', record=True)
         self.agent.register_feed('bias_step_results', record=True)
         self.agent.register_feed('noise_results', record=True)
         self.agent.register_feed('iv_results', record=True)
@@ -581,19 +582,12 @@ class PysmurfController:
         SODETLIB functions such as ``uxm_relock`` and any other functions called
         will add relevant data to the ``session.data`` object to  a unique key.
         For example, if all is successful ``session.data`` may look like::
-
+            
             >> response.session['data']
             {
-                'timestamps': [('setup_amps', 1651162263.0204525), ...],
-                'setup_amps_summary': {
-                   'success': True,
-                   'amp_50k_Id': 15.0,
-                   'amp_hemt_Id': 8.0,
-                   'amp_50k_Vg': -0.52,
-                   'amp_hemt_Vg': -0.829,
-                },
-                'noise': {
-                   'band_medians': List of median white noise for each band
+                'filepath': Filepath of saved TrackingResults object
+                'all_det_num': Total number of detectors for each band
+                'good_det_num': Total number of good tracking detectors for each band
                 }
             }
         """
@@ -611,6 +605,17 @@ class PysmurfController:
             )
             result = run_smurf_func(cfg)
             set_session_data(session, result)
+            if result.success:
+                block_data = {}
+                for iband, (iall, igood) in enumerate(zip(result.return_val['all_det_num'], result.return_val['good_det_num'])):
+                    block_data['alldet_band{iband}'] = iall
+                    block_data['gooddet_band{iband}'] = igood
+                data = {
+                    'timestamp': time.time(),
+                    'block_name': 'tracking_results',
+                    'data': block_data
+                }
+                self.agent.publish_to_feed('tracking_results', data)
             if result.traceback is not None:
                 self.log.error("Error occurred:\n{tb}", tb=result.traceback)
 
