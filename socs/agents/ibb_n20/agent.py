@@ -1,13 +1,12 @@
 import argparse
 import os
+import telnetlib
 import time
 
 import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 from twisted.internet.defer import inlineCallbacks
-
-import telnetlib
 
 txaio.use_twisted()
 
