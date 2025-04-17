@@ -161,8 +161,8 @@ def run_uxm_relock(bands=None, kwargs=None):
     tr = summary['tracking_setup_results']
     data = {
         'filepath': tr.filepath,
-        'all_det_num': np.array([len(tr.is_good[tr.bands == iband]) for iband in range(0, 8)], dtype=int),
-        'good_det_num': np.array([len(np.where(tr.is_good[tr.bands == iband])[0]) for iband in range(0, 8)], dtype=int),
+        'all_det_num': [len(tr.is_good[tr.bands == iband]) for iband in range(0, 8)],
+        'good_det_num': [len(np.where(tr.is_good[tr.bands == iband])[0]) for iband in range(0, 8)],
     }
     return data
 
