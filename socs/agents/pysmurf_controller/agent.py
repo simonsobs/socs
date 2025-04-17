@@ -608,8 +608,8 @@ class PysmurfController:
             if result.success:
                 block_data = {}
                 for iband, (iall, igood) in enumerate(zip(result.return_val['all_det_num'], result.return_val['good_det_num'])):
-                    block_data['alldet_band{iband}'] = iall
-                    block_data['gooddet_band{iband}'] = igood
+                    block_data[f'alldet_band{iband}'] = iall
+                    block_data[f'gooddet_band{iband}'] = igood
                 data = {
                     'timestamp': time.time(),
                     'block_name': 'tracking_results',
