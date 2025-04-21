@@ -1,4 +1,5 @@
 from socs.agents.acu import avoidance as av
+from socs.agents.acu import drivers
 from socs.agents.acu.agent import ACUAgent  # noqa: F401
 
 
@@ -61,3 +62,25 @@ def test_avoidance():
     assert path is not None
     path = sun.find_escape_paths(az0 + 10, el0)
     assert path is not None
+
+
+def test_tracks():
+    # Basic function testing.
+    g = drivers.generate_constant_velocity_scan(
+        60, 80, 1, 1, 50, 50,
+        start_time=1800000000)
+    lines = next(iter(g)).get_lines(timestamp_offset=3,
+                                    with_group_flag=True)
+    with open('lines.txt', 'w') as fout:
+        for flag, line in lines:
+            fout.write(line)
+
+    g = drivers.generate_constant_velocity_scan(
+        60, 80, 1, 1, 50, 50,
+        start_time=1800000000,
+        ptstack_fmt=False)
+
+    block = next(iter(g))
+    block.asarrays()
+    block.get_lines(timestamp_offset=12.)
+    block.get_lines(with_group_flag=True)
