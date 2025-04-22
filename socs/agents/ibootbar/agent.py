@@ -180,7 +180,8 @@ class ibootbarAgent:
         txaio logger object, created by the OCSAgent
     """
 
-    def __init__(self, agent, address, port=161, version=2, lock_outlet=None):
+    def __init__(self, agent, address, port=161, ibootbar_type='IBOOTPDU',
+                 version=2, lock_outlet=None):
         self.agent = agent
         self.is_streaming = False
         self.log = self.agent.log
@@ -196,6 +197,7 @@ class ibootbarAgent:
                     self.outlet_locked[i] = False
 
         self.log.info(f'Using SNMP version {version}.')
+        self.ibootbar_type = ibootbar_type
         self.version = version
         self.address = address
         self.snmp = SNMPTwister(address, port)
@@ -264,8 +266,8 @@ class ibootbarAgent:
 
             # Create the lists of OIDs to send get commands
             for i in range(8):
-                get_list.append(('IBOOTPDU-MIB', 'outletStatus', i))
-                name_list.append(('IBOOTPDU-MIB', 'outletName', i))
+                get_list.append((self.ibootbar_type + '-MIB', 'outletStatus', i))
+                name_list.append((self.ibootbar_type + '-MIB', 'outletName', i))
 
             # Issue SNMP GET commands
             get_result = yield self.snmp.get(get_list, self.version)
@@ -468,6 +470,9 @@ def add_agent_args(parser=None):
     pgroup.add_argument("--address", help="Address to listen to.")
     pgroup.add_argument("--port", default=161,
                         help="Port to listen on.")
+    pgroup.add_argument("--ibootbar-type", default='IBOOTPDU',
+                        choices=['IBOOTPDU', 'IBOOTBAR'],
+                        help='Type of dataprobe ibootbar')
     pgroup.add_argument("--snmp-version", default='2', choices=['1', '2', '3'],
                         help="SNMP version for communication. Must match "
                              + "configuration on the ibootbar.")
@@ -496,6 +501,7 @@ def main(args=None):
     p = ibootbarAgent(agent,
                       address=args.address,
                       port=int(args.port),
+                      ibootbar_type=args.ibootbar_type,
                       version=int(args.snmp_version),
                       lock_outlet=args.lock_outlet)
 
