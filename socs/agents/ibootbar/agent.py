@@ -164,6 +164,9 @@ class ibootbarAgent:
         Address of the ibootbar.
     port : int
         SNMP port to issue GETs to, default to 161.
+    ibootbar_type : str
+        Type of dataprobe ibootbar (IBOOTPDU or IBOOTBAR), defaults to
+        IBOOTPDU.
     version : int
         SNMP version for communication (1, 2, or 3), defaults to 2.
     lock_outlet : list of ints
@@ -352,7 +355,10 @@ class ibootbarAgent:
                 state = 0
 
             # Issue SNMP SET command to given outlet
-            outlet = [('IBOOTPDU-MIB', 'outletControl', outlet_id)]
+            if self.ibootbar_type == 'IBOOTPDU':
+                outlet = [('IBOOTPDU-MIB', 'outletControl', outlet_id)]
+            elif self.ibootbar_type == 'IBOOTBAR':
+                outlet = [('IBOOTBAR-MIB', 'outletCommand', outlet_id)]
             setcmd = yield self.snmp.set(outlet, self.version, state)
             self.log.info('{}'.format(setcmd))
 
@@ -387,12 +393,18 @@ class ibootbarAgent:
                 return False, 'Outlet {} is locked. Cannot cycle outlet.'.format(params['outlet'])
 
             # Issue SNMP SET command for cycle time
-            set_cycle = [('IBOOTPDU-MIB', 'outletCycleTime', outlet_id)]
+            if self.ibootbar_type == 'IBOOTPDU':
+                set_cycle = [('IBOOTPDU-MIB', 'outletCycleTime', outlet_id)]
+            elif self.ibootbar_type == 'IBOOTBAR':
+                set_cycle = [('IBOOTBAR-MIB', 'cycleTime', outlet_id)]
             setcmd1 = yield self.snmp.set(set_cycle, self.version, params['cycle_time'])
             self.log.info('{}'.format(setcmd1))
 
             # Issue SNMP SET command to given outlet
-            outlet = [('IBOOTPDU-MIB', 'outletControl', outlet_id)]
+            if self.ibootbar_type == 'IBOOTPDU':
+                outlet = [('IBOOTPDU-MIB', 'outletControl', outlet_id)]
+            elif self.ibootbar_type == 'IBOOTBAR':
+                outlet = [('IBOOTBAR-MIB', 'outletCommand', outlet_id)]
             setcmd2 = yield self.snmp.set(outlet, self.version, 2)
             self.log.info('{}'.format(setcmd2))
             self.log.info('Cycling outlet {} for {} seconds'.
@@ -416,6 +428,9 @@ class ibootbarAgent:
         Performs a software reboot. The outlets are then set to their
         respective initial states. This takes about 30 seconds.
         """
+        if self.ibootbar_type == 'IBOOTBAR':
+            return True, 'Skipped because this is not supported for IBOOTBAR.'
+
         with self.lock.acquire_timeout(3, job='reboot') as acquired:
             if not acquired:
                 return False, "Could not acquire lock"
