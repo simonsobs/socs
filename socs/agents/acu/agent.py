@@ -2374,6 +2374,7 @@ class ACUAgent:
                 78.24269024936028,
                 60.919554369324096
               ],
+              "sun_down": false,
               "sun_dist": 41.75087242151837,
               "sun_safe_time": 71760
             },
@@ -2431,6 +2432,8 @@ class ACUAgent:
             'sun_el': (('sun_pos', 'sun_azel', 1), float),
             'sun_dist': (('sun_pos', 'sun_dist'), float),
             'sun_safe_time': (('sun_pos', 'sun_safe_time'), float),
+            'sun_down': (('sun_pos', 'sun_down'), int),
+            'platform_down': (('sun_pos', 'platform_down'), int),
         }
         for k in ['warning_zone', 'danger_zone',
                   'escape_triggered', 'escape_active']:
