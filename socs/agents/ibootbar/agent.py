@@ -429,7 +429,7 @@ class ibootbarAgent:
         respective initial states. This takes about 30 seconds.
         """
         if self.ibootbar_type == 'IBOOTBAR':
-            return True, 'Skipped because this is not supported for IBOOTBAR.'
+            return False, 'Software reboot is not supported for IBOOTBAR type devices.'
 
         with self.lock.acquire_timeout(3, job='reboot') as acquired:
             if not acquired:
