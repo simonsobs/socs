@@ -292,8 +292,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                                     batch_size=500,
                                     az_start='mid_inc',
                                     az_first_pos=None,
-                                    az_drift=None,
-                                    ptstack_fmt=True):
+                                    az_drift=None):
     """Python generator to produce times, azimuth and elevation positions,
     azimuth and elevation velocities, azimuth and elevation flags for
     arbitrarily long constant-velocity azimuth scans.

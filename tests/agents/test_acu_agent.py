@@ -69,18 +69,6 @@ def test_tracks():
     g = drivers.generate_constant_velocity_scan(
         60, 80, 1, 1, 50, 50,
         start_time=1800000000)
-    lines = next(iter(g)).get_lines(timestamp_offset=3,
-                                    with_group_flag=True)
-    with open('lines.txt', 'w') as fout:
-        for flag, line in lines:
-            fout.write(line)
-
-    g = drivers.generate_constant_velocity_scan(
-        60, 80, 1, 1, 50, 50,
-        start_time=1800000000,
-        ptstack_fmt=False)
-
-    block = next(iter(g))
-    block.asarrays()
-    block.get_lines(timestamp_offset=12.)
-    block.get_lines(with_group_flag=True)
+    points = next(iter(g))
+    drivers.get_track_points_text(points, text_block=True,
+                                  timestamp_offset=3)
