@@ -363,6 +363,7 @@ class HWPState:
     gripper: Optional[GripperState] = None
 
     is_spinning: Optional[bool] = None
+    direction: Optional[str] = None
 
     supervisor_control_state: Optional[Dict[str, Any]] = None
 
@@ -556,6 +557,32 @@ class HWPState:
         self.ups_last_connection_attempt = data['ups_connection']['last_attempt']
         self.ups_connected = data['ups_connection']['connected']
 
+    def update_spin_state(self):
+        """
+        Updates hwp spin state values from the pid_state and control_state.
+        """
+        if self.pid_last_updated is None or self.pid_current_freq is None or \
+                self.pid_target_direction is None:
+            self.is_spinning = None
+            self.direction = None
+        elif time.time() - self.pid_last_updated > self.pid_max_time_since_update:
+            self.is_spinning = None
+            self.direction = None
+        elif self.pid_current_freq > self.pid_freq_tolerance:
+            self.is_spinning = True
+        else:
+            self.is_spinning = False
+            self.direction = None
+        if self.is_spinning and self.supervisor_control_state is not None:
+            control_state = self.supervisor_control_state['state_type']
+            # If hwp is braking, pid_direction is different from actual direction.
+            # Therefore, we keep previous value and do not update direction.
+            if control_state not in ('Brake', 'WaitForBrake'):
+                if self.pid_direction == 0:
+                    self.direction = 'cw' if self.forward_is_cw else 'ccw'
+                elif self.pid_direction == 1:
+                    self.direction = 'ccw' if self.forward_is_cw else 'cw'
+
     @property
     def pmx_action(self):
         """
@@ -594,6 +621,7 @@ class HWPState:
                 'pid': self.update_pid_state(test_mode=test_mode),
                 'ups': self.update_ups_state(),
             }
+            self.update_spin_state()
 
             self.last_updated = now
             if self.driver_iboot is not None:
@@ -604,15 +632,6 @@ class HWPState:
                 self.acu.update()
             if self.gripper is not None:
                 self.gripper.update()
-
-            if self.pid_last_updated is None or self.pid_current_freq is None:
-                self.is_spinning = None
-            elif now - self.pid_last_updated > self.pid_max_time_since_update:
-                self.is_spinning = None
-            elif self.pid_current_freq > self.pid_freq_tolerance:
-                self.is_spinning = True
-            else:
-                self.is_spinning = False
 
         return ops
 
@@ -2059,9 +2078,11 @@ def make_parser(parser=None):
         '--acu-block-motion-timeout', type=float, default=60.,
         help="Time to wait for ACU motion to be blocked before aborting gripper command."
     )
-
-    pgroup.add_argument('--forward-dir', choices=['cw', 'ccw'], default="cw",
-                        help="Whether the PID 'forward' direction is cw or ccw")
+    pgroup.add_argument(
+        '--forward-dir', choices=['cw', 'ccw'], default="cw",
+        help="Whether the PID 'forward' direction is cw or ccw. "
+             "cw or ccw is defined when hwp is viewed from the sky side."
+    )
     return parser
 
 
