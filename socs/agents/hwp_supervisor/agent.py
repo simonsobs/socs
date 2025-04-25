@@ -1715,9 +1715,9 @@ class HWPSupervisor:
             }
         """
         if params['target_freq'] >= 0:
-            d = '0' if self.forward_is_cw else '1'
-        else:
             d = '1' if self.forward_is_cw else '0'
+        else:
+            d = '0' if self.forward_is_cw else '1'
 
         state = ControlState.PIDToFreq(
             target_freq=np.abs(params['target_freq']),
