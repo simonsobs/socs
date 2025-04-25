@@ -2079,7 +2079,7 @@ def make_parser(parser=None):
         help="Time to wait for ACU motion to be blocked before aborting gripper command."
     )
     pgroup.add_argument(
-        '--forward-dir', choices=['cw', 'ccw'], default="cw",
+        '--forward-dir', choices=['cw', 'ccw'], default='cw',
         help="Whether the PID 'forward' direction is cw or ccw. "
              "cw or ccw is defined when hwp is viewed from the sky side."
     )
