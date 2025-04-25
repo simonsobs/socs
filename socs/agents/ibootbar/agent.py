@@ -164,6 +164,9 @@ class ibootbarAgent:
         Address of the ibootbar.
     port : int
         SNMP port to issue GETs to, default to 161.
+    ibootbar_type : str
+        Type of dataprobe ibootbar (IBOOTPDU or IBOOTBAR), defaults to
+        IBOOTPDU.
     version : int
         SNMP version for communication (1, 2, or 3), defaults to 2.
     lock_outlet : list of ints
@@ -180,7 +183,8 @@ class ibootbarAgent:
         txaio logger object, created by the OCSAgent
     """
 
-    def __init__(self, agent, address, port=161, version=2, lock_outlet=None):
+    def __init__(self, agent, address, port=161, ibootbar_type='IBOOTPDU',
+                 version=2, lock_outlet=None):
         self.agent = agent
         self.is_streaming = False
         self.log = self.agent.log
@@ -196,6 +200,7 @@ class ibootbarAgent:
                     self.outlet_locked[i] = False
 
         self.log.info(f'Using SNMP version {version}.')
+        self.ibootbar_type = ibootbar_type
         self.version = version
         self.address = address
         self.snmp = SNMPTwister(address, port)
@@ -264,8 +269,8 @@ class ibootbarAgent:
 
             # Create the lists of OIDs to send get commands
             for i in range(8):
-                get_list.append(('IBOOTPDU-MIB', 'outletStatus', i))
-                name_list.append(('IBOOTPDU-MIB', 'outletName', i))
+                get_list.append((self.ibootbar_type + '-MIB', 'outletStatus', i))
+                name_list.append((self.ibootbar_type + '-MIB', 'outletName', i))
 
             # Issue SNMP GET commands
             get_result = yield self.snmp.get(get_list, self.version)
@@ -350,7 +355,10 @@ class ibootbarAgent:
                 state = 0
 
             # Issue SNMP SET command to given outlet
-            outlet = [('IBOOTPDU-MIB', 'outletControl', outlet_id)]
+            if self.ibootbar_type == 'IBOOTPDU':
+                outlet = [('IBOOTPDU-MIB', 'outletControl', outlet_id)]
+            elif self.ibootbar_type == 'IBOOTBAR':
+                outlet = [('IBOOTBAR-MIB', 'outletCommand', outlet_id)]
             setcmd = yield self.snmp.set(outlet, self.version, state)
             self.log.info('{}'.format(setcmd))
 
@@ -385,12 +393,18 @@ class ibootbarAgent:
                 return False, 'Outlet {} is locked. Cannot cycle outlet.'.format(params['outlet'])
 
             # Issue SNMP SET command for cycle time
-            set_cycle = [('IBOOTPDU-MIB', 'outletCycleTime', outlet_id)]
+            if self.ibootbar_type == 'IBOOTPDU':
+                set_cycle = [('IBOOTPDU-MIB', 'outletCycleTime', outlet_id)]
+            elif self.ibootbar_type == 'IBOOTBAR':
+                set_cycle = [('IBOOTBAR-MIB', 'cycleTime', outlet_id)]
             setcmd1 = yield self.snmp.set(set_cycle, self.version, params['cycle_time'])
             self.log.info('{}'.format(setcmd1))
 
             # Issue SNMP SET command to given outlet
-            outlet = [('IBOOTPDU-MIB', 'outletControl', outlet_id)]
+            if self.ibootbar_type == 'IBOOTPDU':
+                outlet = [('IBOOTPDU-MIB', 'outletControl', outlet_id)]
+            elif self.ibootbar_type == 'IBOOTBAR':
+                outlet = [('IBOOTBAR-MIB', 'outletCommand', outlet_id)]
             setcmd2 = yield self.snmp.set(outlet, self.version, 2)
             self.log.info('{}'.format(setcmd2))
             self.log.info('Cycling outlet {} for {} seconds'.
@@ -414,6 +428,9 @@ class ibootbarAgent:
         Performs a software reboot. The outlets are then set to their
         respective initial states. This takes about 30 seconds.
         """
+        if self.ibootbar_type == 'IBOOTBAR':
+            return False, 'Software reboot is not supported for IBOOTBAR type devices.'
+
         with self.lock.acquire_timeout(3, job='reboot') as acquired:
             if not acquired:
                 return False, "Could not acquire lock"
@@ -468,6 +485,9 @@ def add_agent_args(parser=None):
     pgroup.add_argument("--address", help="Address to listen to.")
     pgroup.add_argument("--port", default=161,
                         help="Port to listen on.")
+    pgroup.add_argument("--ibootbar-type", default='IBOOTPDU',
+                        choices=['IBOOTPDU', 'IBOOTBAR'],
+                        help='Type of dataprobe ibootbar')
     pgroup.add_argument("--snmp-version", default='2', choices=['1', '2', '3'],
                         help="SNMP version for communication. Must match "
                              + "configuration on the ibootbar.")
@@ -496,6 +516,7 @@ def main(args=None):
     p = ibootbarAgent(agent,
                       address=args.address,
                       port=int(args.port),
+                      ibootbar_type=args.ibootbar_type,
                       version=int(args.snmp_version),
                       lock_outlet=args.lock_outlet)
 
