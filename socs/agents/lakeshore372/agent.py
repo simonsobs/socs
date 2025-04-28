@@ -11,6 +11,9 @@ from twisted.internet import reactor
 
 from socs.Lakeshore.Lakeshore372 import LS372
 
+heater_display_key = {'1': 'current',
+                      '2': 'power'}
+
 
 def still_power_to_perc(power, res, lead, max_volts):
     cur = np.sqrt(power / res)
@@ -383,6 +386,42 @@ class LS372_Agent:
                 time.sleep(params.get('wait', 0))
 
         return True, f'Set {heater_string} heater range to {params["range"]}'
+
+    @ocs_agent.param('_')
+    def get_sample_output(self, session, params):
+        """get_sample_output()
+
+        **Task** - Query sample heater ouput (res, display mode, output in %)
+        for servoing cryostat.
+
+        Notes:
+            The sample heater output is stored in the session data
+            object in the format::
+
+              >>> response.session['data']
+              {'sample_resistance': 1020.0,
+               'display_mode': 'current',
+               'heater_power_percent': 0.0005}
+
+        """
+        with self._lock.acquire_timeout(job='get_sample_output') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            session.set_status('running')
+
+            heater_perc = self.module.sample_heater.get_sample_heater_output()
+            heater_settings = self.module.sample_heater.get_heater_setup()
+            res = float(heater_settings[0])
+            display_mode = heater_display_key[heater_settings[3]]
+
+            session.data = {"sample_resistance": res,
+                            "display_mode": display_mode,
+                            "heater_power_percent": heater_perc}
+
+        return True, 'Sample heater res {} ohms, display mode set to {} at {}%'.format(res, display_mode, heater_perc)
 
     @ocs_agent.param('channel', type=int, check=lambda x: 1 <= x <= 16)
     @ocs_agent.param('mode', type=str, choices=['current', 'voltage'])
@@ -1383,6 +1422,7 @@ def main(args=None):
     agent.register_task('set_heater_output', lake_agent.set_heater_output)
     agent.register_task('set_still_output', lake_agent.set_still_output)
     agent.register_task('get_still_output', lake_agent.get_still_output)
+    agent.register_task('get_sample_output', lake_agent.get_sample_output)
     agent.register_process('acq', lake_agent.acq, lake_agent._stop_acq)
     agent.register_process('custom_pid', lake_agent.custom_pid, lake_agent._stop_custom_pid)
     agent.register_task('enable_control_chan', lake_agent.enable_control_chan)
