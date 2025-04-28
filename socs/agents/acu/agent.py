@@ -1996,24 +1996,30 @@ class ACUAgent:
 
             # Values for mode are:
             # - 'go' -- keep uploading points (unless there are no more to upload).
-            # - 'stop' -- do not request more points from generator; finish the ones you have.
-            # - 'abort' -- do not upload more points; exit loop and clear stack.
+            # - 'stop' -- do not request more points from generator;
+            #   finish the ones that are already in "points", let the stack empty,
+            #   and wait for settling condition.
+            # - 'abort' -- do not upload more points; exit loop with error; wait
+            #   a few seconds and clear the stack.
             mode = 'go'
 
             lines = []
             last_mode = None
-            was_graceful_exit = True
+            last_upload_az = None
             start_time = time.time()
             got_progtrack = False
             faults = {}
             got_points_in = False
             first_upload_time = None
+            wait_stop_timeout = None
 
             while True:
                 now = time.time()
                 current_modes = {'Az': self.data['status']['summary']['Azimuth_mode'],
                                  'El': self.data['status']['summary']['Elevation_mode'],
                                  'Remote': self.data['status']['platform_status']['Remote_mode']}
+                az_state = {'pos': self.data['status']['summary']['Azimuth_current_position'],
+                            'vel': self.data['status']['summary']['Azimuth_current_velocity']}
                 free_positions = self.data['status']['summary']['Free_upload_positions']
 
                 # Use this var to detect case where we're uploading
@@ -2039,11 +2045,9 @@ class ACUAgent:
                         if got_progtrack:
                             self.log.warn('Unexpected exit from ProgramTrack mode!')
                             mode = 'abort'
-                            was_graceful_exit = False
                         elif now - start_time > MAX_PROGTRACK_SET_TIME:
                             self.log.warn('Failed to set ProgramTrack mode in a timely fashion.')
                             mode = 'abort'
-                            was_graceful_exit = False
                     if not got_points_in and (first_upload_time is not None) \
                        and (now - first_upload_time > 10):
                         self.log.warn('ACU seems to be dumping our track. Vel too high?')
@@ -2051,9 +2055,10 @@ class ACUAgent:
                     if current_modes['Remote'] == 0:
                         self.log.warn('ACU no longer in remote mode!')
                         mode = 'abort'
-                        was_graceful_exit = False
                     if session.status == 'stopping':
-                        mode = 'abort'
+                        mode = 'stop'
+                        stop_message = 'User-requested stop.'
+                        lines = []
 
                 if mode == 'abort':
                     lines = []
@@ -2067,22 +2072,24 @@ class ACUAgent:
                     # after "grabbing the minimum batch", below, there
                     # is still >= 1 line left.  The lines-is-empty
                     # check is used to decide we're done.
-                    while mode == 'go' and (len(lines) <= new_line_target or lines[-1][0] != 0):
+                    while mode == 'go' and (len(lines) <= new_line_target or lines[-1].group_flag != 0):
                         try:
                             lines.extend(next(point_gen))
                         except StopIteration:
                             mode = 'stop'
+                            stop_message = 'Stop due to end of the planned track.'
 
                     # Grab the minimum batch
                     upload_lines, lines = lines[:new_line_target], lines[new_line_target:]
 
                     # If the last line has a "group" flag, keep transferring lines.
-                    while len(lines) and len(upload_lines) and upload_lines[-1][0] != 0:
+                    while len(lines) and len(upload_lines) and upload_lines[-1].group_flag != 0:
                         upload_lines.append(lines.pop(0))
 
                     if len(upload_lines):
                         # Discard the group flag and upload all.
-                        text = ''.join([line for _flag, line in upload_lines])
+                        text = sh.get_track_points_text(
+                            upload_lines, timestamp_offset=3, text_block=True)
                         for attempt in range(5):
                             _dt = time.time()
                             try:
@@ -2098,24 +2105,39 @@ class ACUAgent:
                             raise RuntimeError('Upload fail.')
                         if first_upload_time is None:
                             first_upload_time = time.time()
+                        last_upload_az = upload_lines[-1].az
 
                 if len(lines) == 0 and free_positions >= FULL_STACK - 1:
-                    break
+                    if mode == 'stop':
+                        if wait_stop_timeout is None:
+                            self.log.info('Stack is empty; waiting for settling...')
+                            wait_stop_timeout = now + 20.
+                        elif now > wait_stop_timeout:
+                            self.log.warn('Graceful stop condition not met in a timely fashion.')
+                            mode = 'abort'
+                        # Await safe exit condition.
+                        pos_ok = last_upload_az is None or (
+                            abs(az_state['pos'] - last_upload_az) < 0.01)
+                        vel_ok = abs(abs(az_state['vel']) < .01)
+                        if pos_ok and vel_ok:
+                            break
+                    else:
+                        self.log.warn('Somehow ran out of points!')
+                        break
 
                 yield dsleep(LOOP_STEP)
 
             # Go to Stop mode?
             # yield self.acu_control.stop()
 
-            # Clear the stack, but wait a bit or it can cause a fault.
-            # Yes, sometimes you have to wait a very long time ...
-            yield dsleep(10)
+            # Wait a couple more seconds and clear the stack.
+            yield dsleep(2)
             yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
                                                 'Clear Stack')
 
-        if not was_graceful_exit:
+        if mode == 'abort':
             return False, 'Problems during scan'
-        return True, 'Scan ended cleanly'
+        return True, f'Scan ended. {stop_message}'
 
     #
     # Sun Safety Monitoring and Active Avoidance

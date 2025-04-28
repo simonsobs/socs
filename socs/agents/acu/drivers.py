@@ -2,6 +2,7 @@ import calendar
 import datetime
 import math
 import time
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -11,6 +12,72 @@ DAY = 86400
 #: Minimum number of points to group together on the start of a new
 # leg, to not trigger programtrack error.
 MIN_GROUP_NEW_LEG = 4
+
+
+def _progtrack_format_time(timestamp):
+    fmt = '%j, %H:%M:%S'
+    return (time.strftime(fmt, time.gmtime(timestamp))
+            + '{:.6f}'.format(timestamp % 1.)[1:])
+
+
+@dataclass
+class TrackPoint:
+    #: Timestamp of the point (unix timestamp)
+    timestamp: float
+
+    #: Azimuth (deg).
+    az: float
+
+    #: Elevation (deg).
+    el: float
+
+    #: Azimuth velocity (deg/s).
+    az_vel: float
+
+    #: Elevation velocity (deg/s).
+    el_vel: float
+
+    #: Az flag: 0 if stationary, 1 if non-final point of const-vel
+    #: scan segment; 2 if final point of const-vel segment.
+    az_flag: int = 0
+
+    #: El flag: like az_flag but for el.
+    el_flag: int = 0
+
+    #: If 1, indicates that once this point is uploaded the next point
+    #: in sequence also needs to be soon uploaded.  Used at start of a
+    #: new const-vel scan segment.
+    group_flag: int = 0
+
+
+def get_track_points_text(tpl, timestamp_offset=None, with_group_flag=False,
+                          text_block=False):
+    """Get a list of ProgramTrack lines for upload to ACU.
+
+    Args:
+      tpl (list): list of TrackPoint to convert.
+      timestamp_offset (float): offset to add to all timestamps
+        before rendering (defaults to 0).
+      with_group_flag (bool): If True return each line as
+        (group_flag, text).
+      text_block (bool): If True, return all lines joined together
+        into a single string.
+
+    """
+    if timestamp_offset is None:
+        timestamp_offset = 0
+    fmted_times = [_progtrack_format_time(p.timestamp + timestamp_offset)
+                   for p in tpl]
+    all_lines = [('{t}; {p.az:.6f}; {p.el:.6f}; {p.az_vel:.4f}; '
+                  '{p.el_vel:.4f}; {p.az_flag}; {p.el_flag}\r\n')
+                 .format(p=p, t=t)
+                 for p, t in zip(tpl, fmted_times)]
+
+    if text_block:
+        return ''.join(all_lines)
+    if with_group_flag:
+        all_lines = [(p.group_flag, line) for p, line in zip(tpl, all_lines)]
+    return all_lines
 
 
 def constant_velocity_scanpoints(azpts, el, azvel, acc, ntimes):
@@ -225,8 +292,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                                     batch_size=500,
                                     az_start='mid_inc',
                                     az_first_pos=None,
-                                    az_drift=None,
-                                    ptstack_fmt=True):
+                                    az_drift=None):
     """Python generator to produce times, azimuth and elevation positions,
     azimuth and elevation velocities, azimuth and elevation flags for
     arbitrarily long constant-velocity azimuth scans.
@@ -270,11 +336,10 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
         az_drift (float): The rate (deg / s) at which to shift the
             scan endpoints in time.  This can be used to better track
             celestial sources in targeted scans.
-        ptstack_fmt (bool): determine whether values are produced with the
-            necessary format to upload to the ACU. If False, this function will
-            produce lists of time, azimuth, elevation, azimuth velocity,
-            elevation velocity, azimuth flags, and elevation flags. Default is
-            True.
+
+    Yields:
+        points (list): a list of TrackPoint objects.  Raises
+          StopIteration once exit condition, if defined, is met.
 
     """
     def get_target_az(current_az, current_t, increasing):
@@ -363,16 +428,13 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
     i = 0
     while i < stop_iter and check_num_scans():
         i += 1
-        point_block = [[], [], [], [], [], [], [], []]
+        point_block = []
         for j in range(batch_size):
-            point_block[0].append(t + t0)
-            point_block[1].append(az)
-            point_block[2].append(el)
-            point_block[3].append(az_vel)
-            point_block[4].append(el_vel)
-            point_block[5].append(az_flag)
-            point_block[6].append(el_flag)
-            point_block[7].append(int(point_group_batch > 0))
+            point_block.append(TrackPoint(
+                timestamp=t + t0,
+                az=az, el=el, az_vel=az_vel, el_vel=el_vel,
+                az_flag=az_flag, el_flag=el_flag,
+                group_flag=int(point_group_batch > 0)))
 
             if point_group_batch > 0:
                 point_group_batch -= 1
@@ -436,18 +498,11 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                 # Kill the velocity on the last point and exit -- this
                 # was recommended at LAT FAT for smoothly stopping the
                 # motion at end of program.
-                point_block[3][-1] = 0
-                point_block[4][-1] = 0
+                point_block[-1].az_vel = 0
+                point_block[-1].el_vel = 0
                 break
 
-        if ptstack_fmt:
-            yield ptstack_format(point_block[0], point_block[1],
-                                 point_block[2], point_block[3],
-                                 point_block[4], point_block[5],
-                                 point_block[6], point_block[7],
-                                 start_offset=3, absolute=True)
-        else:
-            yield tuple(point_block)
+        yield point_block
 
 
 def plan_scan(az_end1, az_end2, el, v_az=1, a_az=1, az_start=None):

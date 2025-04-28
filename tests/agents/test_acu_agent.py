@@ -1,4 +1,5 @@
 from socs.agents.acu import avoidance as av
+from socs.agents.acu import drivers
 from socs.agents.acu.agent import ACUAgent  # noqa: F401
 
 
@@ -61,3 +62,13 @@ def test_avoidance():
     assert path is not None
     path = sun.find_escape_paths(az0 + 10, el0)
     assert path is not None
+
+
+def test_tracks():
+    # Basic function testing.
+    g = drivers.generate_constant_velocity_scan(
+        60, 80, 1, 1, 50, 50,
+        start_time=1800000000)
+    points = next(iter(g))
+    drivers.get_track_points_text(points, text_block=True,
+                                  timestamp_offset=3)
