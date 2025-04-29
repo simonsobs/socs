@@ -562,7 +562,7 @@ class HWPState:
         Updates hwp spin state values from the pid_state and control_state.
         """
         if self.pid_last_updated is None or self.pid_current_freq is None or \
-                self.pid_target_direction is None:
+                self.pid_direction is None:
             self.is_spinning = None
             self.direction = None
         elif time.time() - self.pid_last_updated > self.pid_max_time_since_update:
