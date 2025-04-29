@@ -18,6 +18,28 @@ CONVERT_OIDS = ['mbgSyncboxN2XPtpUTCOffset',
                 'mbgSyncboxN2XPtpMeanPathDelay']
 
 
+def _convert_oid_value(field_name, oid_value):
+    unit_multipliers = {
+        "s": 1000000,    # seconds to microseconds
+        "sec": 1000000,  # seconds to microseconds
+        "ms": 1000,      # milliseconds to microseconds
+        "us": 1,         # microseconds
+        "ns": 0.001      # nanoseconds to microseconds
+    }
+
+    value, unit = oid_value.split()
+    value = float(value)
+
+    # Normalize to microseconds
+    if unit in unit_multipliers:
+        oid_value = value * unit_multipliers[unit]
+
+    # Change the field name to differentiate from raw output
+    field_name = field_name + "_value"
+
+    return field_name, oid_value
+
+
 def _extract_oid_field_and_value(get_result):
     """Extract field names and OID values from SNMP GET results.
 
@@ -65,25 +87,6 @@ def _extract_oid_field_and_value(get_result):
     if not isinstance(oid_value, (int, bytes, str)):
         oid_value = None
 
-    if (field_name.split('_')[0] in CONVERT_OIDS) and (oid_value is not None):
-        unit_multipliers = {
-            "s": 1000000,   # seconds to microseconds
-            "sec": 1000000,  # seconds to microseconds
-            "ms": 1000,     # milliseconds to microseconds
-            "us": 1,        # microseconds
-            "ns": 0.001     # nanoseconds to microseconds
-        }
-
-        value, unit = oid_value.split()
-        value = float(value)
-
-        # Normalize to microseconds
-        if unit in unit_multipliers:
-            oid_value = value * unit_multipliers[unit]
-
-        # Change the field name to differentiate from raw output
-        field_name = field_name + "_value"
-
     return field_name, oid_value, oid_description
 
 
@@ -116,6 +119,11 @@ def _build_message(get_result, time):
 
         message['data'][field_name] = oid_value
         message['data'][field_name + "_description"] = oid_description
+
+        if (field_name.split('_')[0] in CONVERT_OIDS):
+            field_name, oid_value = _convert_oid_value(field_name, oid_value)
+            message['data'][field_name] = oid_value
+            message['data'][field_name + "_description"] = oid_description
 
     return message
 
@@ -165,6 +173,11 @@ def update_cache(get_result, timestamp):
         oid_cache['syncbox_connection'] = {'last_attempt': time.time(),
                                            'connected': True}
         oid_cache['timestamp'] = timestamp
+
+        if (field_name.split('_')[0] in CONVERT_OIDS):
+            field_name, oid_value = _convert_oid_value(field_name, oid_value)
+            oid_cache[field_name] = {"status": oid_value}
+            oid_cache[field_name]["description"] = oid_description
 
     return oid_cache
 
@@ -303,7 +316,10 @@ class MeinbergSyncboxAgent:
                 {'status': 0,
                  'description': 'tai'},
             'mbgSyncboxN2XPtpUTCOffset_0':
-                {'status': '37000000',
+                {'status': '37 sec',
+                 'description': '37 sec'},
+            'mbgSyncboxN2XPtpUTCOffset_0_value':
+                {'status': 37000000,
                  'description': '37 sec'},
             'mbgSyncboxN2XPtpLeapSecondAnnounced_0':
                 {'status': 'no',
@@ -327,10 +343,16 @@ class MeinbergSyncboxAgent:
                 {'status': 13563,
                  'description': '13563'},
             'mbgSyncboxN2XPtpOffsetToGrandmaster_0':
-                {'status': '0.01',
+                {'status': '10 ns',
+                 'description': '10 ns'},
+            'mbgSyncboxN2XPtpOffsetToGrandmaster_0_value':
+                {'status': 0.01,
                  'description': '10 ns'},
             'mbgSyncboxN2XPtpMeanPathDelay_0':
-                {'status': '0.875',
+                {'status': '875 ns',
+                 'description': '875 ns'},
+            'mbgSyncboxN2XPtpMeanPathDelay_0_value':
+                {'status': 0.875,
                  'description': '875 ns'},
             'mbgSyncboxN2XOutputMode_1':
                 {'status': 4,
@@ -400,11 +422,11 @@ class MeinbergSyncboxAgent:
                           accurateToWithin1s(47),
                           accurateToWithin10s(48),
                           accurateToGreaterThan10s(49)
-            mbgSyncboxN2XPtpUTCOffset::
+            mbgSyncboxN2XPtpUTCOffset_value::
                 Units:: microseconds
-            mbgSyncboxN2XPtpOffsetToGrandmaster::
+            mbgSyncboxN2XPtpOffsetToGrandmaster_value::
                 Units:: microseconds
-            mbgSyncboxN2XPtpMeanPathDelay::
+            mbgSyncboxN2XPtpMeanPathDelay_value::
                 Units:: microseconds
 
         """
