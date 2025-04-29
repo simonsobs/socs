@@ -1463,7 +1463,7 @@ class ACUAgent:
                 return False, msg
 
             if len(legs) > 2:
-                self.log.info(f'Executing move via {len(legs)-1} separate legs (sun optimized)')
+                self.log.info(f'Executing move via {len(legs) - 1} separate legs (sun optimized)')
 
             # Check HWP safety
             hwp_safe, msg = yield self._check_hwpsafe_legs(legs)
