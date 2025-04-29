@@ -364,6 +364,7 @@ class HWPState:
 
     is_spinning: Optional[bool] = None
     direction: Optional[str] = None
+    forward_is_cw: Optional[bool] = True
 
     supervisor_control_state: Optional[Dict[str, Any]] = None
 
@@ -383,6 +384,7 @@ class HWPState:
             temp_thresh=args.ybco_temp_thresh,
             ups_minutes_remaining_thresh=args.ups_minutes_remaining_thresh,
             pid_max_time_since_update=args.pid_max_time_since_update,
+            forward_is_cw=args.forward_dir == 'cw',
         )
 
         if args.gripper_iboot_id is not None:
