@@ -31,9 +31,9 @@ OCS Site Config
 An example site-config-file block::
 
     {'agent-class': 'StarcamAgent',
-       'instance-id': 'starcam-lat',
-       'arguments': ['--ip-address', '192.168.1.20',
-                     '--port', 8000]},
+     'instance-id': 'starcam-lat',
+     'arguments': ['--ip-address', '192.168.1.20',
+                   '--port', 8000]},
 
 Docker Compose
 ``````````````

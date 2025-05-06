@@ -18,6 +18,9 @@ class StarcamHelper:
         IP address of the starcam computer.
     port: int
         Port of the starcam computer.
+    timeout: float
+        Socket connection timeout in seconds. Defaults to 10 seconds.
+
     """
 
     def __init__(self, ip_address, port, timeout=10):
@@ -100,7 +103,7 @@ class StarcamHelper:
         """Receives and unpacks data from the starcam.
 
         Returns:
-            dictionary: Dictionary of unpacked data.
+            dict: Dictionary of unpacked data.
         """
         (scdata_raw, _) = self.comm.recvfrom(256)
         data = struct.unpack_from("dddddddddddddiiiiiiiiddiiiiiiiiiiiiiifiii",
@@ -124,8 +127,7 @@ class StarcamHelper:
         return astrom_data_dict
 
     def close(self):
-        """Closes the socket of the connection.
-        """
+        """Closes the socket connection."""
         self.comm.close()
 
 
@@ -147,9 +149,9 @@ class StarcamAgent:
         OCSAgent object for this agent.
     take_data: bool
         Tracks whether or not the agent is trying to retrieve data from the
-        starcam computer. Setting to false stops this process.
+        starcam computer. Setting to False stops this process.
     log: txaio.tx.Logger
-        txaoi logger object, created by OCSAgent.
+        txaio logger object, created by OCSAgent.
     """
 
     def __init__(self, agent, ip_address, port):
@@ -170,8 +172,9 @@ class StarcamAgent:
     def send_commands(self, session, params=None):
         """send_commands()
 
-        **Process** - Packs and sends camera and astrometry-related commands
-                      to the starcam.
+        **Process** - Pack and send camera and astrometry-related commands to
+        the starcam.
+
         """
         with self.lock.acquire_timeout(job='send_commands') as acquired:
             if not acquired:
@@ -186,14 +189,13 @@ class StarcamAgent:
     def acq(self, session, params=None):
         """acq()
 
-        **Process** - Acquires data from the starcam, updates session data,
-                   and publishes to feed.
+        **Process** - Acquire data from the starcam.
 
         Notes
         -----
-        An example of the updated session data:
+        An example of the updated session data::
 
-            >>>response.session['data']
+            >>> response.session['data']
             {'timestamp': 1734668749.643134,
              'block_name': 'astrometry',
              'data':
