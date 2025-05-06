@@ -29,6 +29,7 @@ HWPEncoder:
 
    (HWPEncoder_irig)
    irig_time: decoded time in second since the unix epoch
+   irig_minus_sys: difference between irig time and system time in second
    rising_edge_cont: BBB clcok count values
                      for the IRIG on-time reference marker risinge edge
    irig_sec: seconds decoded from IRIG-B
@@ -185,8 +186,14 @@ class EncoderParser:
         # Will be continually updated with unix in seconds
         self.current_time = 0
 
+        # If True, will stop trying to read data from socket
+        self.stop = False
+
         # Creates a UDP socket to connect to the Beaglebone
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # This helps with testing and rebinding to the same port after reset...
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
         # Binds the socket to a specific ip address and port
         # The ip address can be blank for accepting any UDP packet to the port
         self.sock.bind(('', beaglebone_port))
@@ -303,7 +310,9 @@ class EncoderParser:
            Error 2: data length is shorter than the IRIG info
                     even though the IRIG packet header is found.
         """
-        while True:
+        self.stop = False
+
+        while not self.stop:  # This can be toggled by encoder agent to unblock
             # If there is data from the socket attached to the beaglebone then
             #     ready[0] = true
             # If not then continue checking for 2 seconds and if there is still no data
@@ -587,6 +596,7 @@ class HWPBBBAgent:
                     sys_time = irig_data[4]
                     data = {'timestamp': sys_time, 'block_name': 'HWPEncoder_irig', 'data': {}}
                     data['data']['irig_time'] = irig_time
+                    data['data']['irig_minus_sys'] = irig_time - sys_time
                     data['data']['rising_edge_count'] = rising_edge_count
                     data['data']['irig_sec'] = de_irig(irig_info[0], 1)
                     data['data']['irig_min'] = de_irig(irig_info[1], 0)
@@ -714,6 +724,7 @@ class HWPBBBAgent:
         """
         if self.take_data:
             self.take_data = False
+            self.parser.stop = True
             return True, 'requested to stop taking data.'
 
         return False, 'acq is not currently running.'

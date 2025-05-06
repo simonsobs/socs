@@ -38,7 +38,7 @@ class PMX:
             except (ConnectionRefusedError, OSError):
                 print(f"Failed to connect to device at {ip}:{port}")
         else:
-            raise RuntimeError('Could not connect to PID controller')
+            raise RuntimeError('Could not connect to PMX.')
         return conn
 
     def close(self):
@@ -154,21 +154,29 @@ class PMX:
         self.wait()
         return self.check_source()
 
+    def check_current_limit(self):
+        """ Check the PMX current protection limit """
+        val = float(self.send_message(b'curr:prot?\n'))
+        msg = "Current protection limit = {:.3f} A".format(val)
+        return msg, val
+
+    def check_voltage_limit(self):
+        """ Check the PMX voltage protection limit """
+        val = float(self.send_message(b'volt:prot?\n'))
+        msg = "Voltage protection limit = {:.3f} V".format(val)
+        return msg, val
+
     def set_current_limit(self, curr_lim):
-        """ Set the PMX current limit """
+        """ Set the PMX current protection limit """
         self.send_message(b'curr:prot %a\n' % curr_lim, read=False)
         self.wait()
-        val = float(self.send_message(b'curr:prot?\n'))
-        msg = "Current Limit: {:.3f} A".format(val)
-        return msg
+        return self.check_current_limit()
 
     def set_voltage_limit(self, vol_lim):
-        """ Set the PMX voltage limit """
+        """ Set the PMX voltage protection limit """
         self.send_message(b'volt:prot %a\n' % vol_lim, read=False)
         self.wait()
-        val = float(self.send_message(b'volt:prot?\n'))
-        msg = "Voltage Limit: {:.3f} V".format(val)
-        return msg
+        return self.check_voltage_limit()
 
     def check_prot(self):
         """ Check the protection status

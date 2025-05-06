@@ -133,6 +133,7 @@ class PysmurfController:
         self.agent.register_feed('noise_results', record=True)
         self.agent.register_feed('iv_results', record=True)
         self.agent.register_feed('bias_wave_results', record=True)
+        self.agent.register_feed('state_results', record=True)
 
     def _on_session_data(self, _data):
         data, feed = _data
@@ -308,7 +309,8 @@ class PysmurfController:
                 'pysmurf_action_timestamp': Current pysmurf-action timestamp,
                 'stream_tag': stream-tag for the current g3 stream,
                 'last_update':  Time that session-data was last updated,
-                'stream_id': Stream-id of the controlled smurf instance
+                'stream_id': Stream-id of the controlled smurf instance,
+                'num_active_channels': Number of channels outputting tones
             }
         """
         S, cfg = self._get_smurf_control(load_tune=False, no_dir=True)
@@ -317,6 +319,11 @@ class PysmurfController:
         kw = {'retry_on_fail': False}
         while session.status in ['starting', 'running']:
             try:
+
+                num_active_channels = 0
+                for band in range(8):
+                    num_active_channels += len(S.which_on(band))
+
                 d = dict(
                     channel_mask=S.get_channel_mask(**kw).tolist(),
                     downsample_factor=S.get_downsample_factor(**kw),
@@ -327,8 +334,17 @@ class PysmurfController:
                     stream_tag=reg.stream_tag.get(**kw, as_string=True),
                     last_update=time.time(),
                     stream_id=cfg.stream_id,
+                    num_active_channels=num_active_channels,
                 )
                 session.data.update(d)
+
+                data = {
+                    'timestamp': time.time(),
+                    'block_name': 'state_results',
+                    'data': {'open_g3stream': d['open_g3stream'],
+                             'num_active_channels': d['num_active_channels']}
+                }
+                self.agent.publish_to_feed('state_results', data)
             except (RuntimeError, epics.ca.ChannelAccessGetFailure):
                 self.log.warn("Could not connect to epics server! Waiting and "
                               "then trying again")
@@ -985,21 +1001,21 @@ class PysmurfController:
 
         return True, "Finished Overbiasing TES"
 
-    @ocs_agent.param('bgs', default=None)
     @ocs_agent.param('bias')
+    @ocs_agent.param('bgs', default=None)
     def set_biases(self, session, params):
-        """set_biases(bg=None, bias)
+        """set_biases(bias, bgs=None)
 
         **Task** - Task used to set TES biases.
 
         Args
         -----
-        bgs: int, list, optional
-            Bias group (bg), or list of bgs to set. If None, will set all bgs.
         bias: int, float, list
             Biases to set. If a float is passed, this will be used for all
             specified bgs. If a list of floats is passed, it must be the same
             size of the list of bgs.
+        bgs: int, list, optional
+            Bias group (bg), or list of bgs to set. If None, will set all bgs.
         """
         if params['bgs'] is None:
             bgs = np.arange(12)
@@ -1026,7 +1042,8 @@ class PysmurfController:
 
     @ocs_agent.param('bgs', default=None)
     def zero_biases(self, session, params):
-        """
+        """zero_biases(bgs=None)
+
         **Task** - Zeros TES biases for specified bias groups.
 
         Args
@@ -1121,6 +1138,21 @@ class PysmurfController:
 
             return True, "Everything off"
 
+    @ocs_agent.param('_')
+    def restart_rssi(self, session, params):
+        """restart_rssi()
+
+        **Task** - Restarts the RSSI. Use to recover from lock-up.
+        """
+        with self.lock.acquire_timeout(0, job='restart_rssi') as acquired:
+            if not acquired:
+                return False, f"Operation failed: {self.lock.job} is running."
+
+            S, cfg = self._get_smurf_control(session=session)
+            S._caput(S.epics_root + ":AMCc:RestartRssi", 1)
+
+            return True, "RestartRssi sent"
+
 
 def make_parser(parser=None):
     """
@@ -1176,6 +1208,7 @@ def main(args=None):
     agent.register_task('set_biases', controller.set_biases)
     agent.register_task('zero_biases', controller.zero_biases)
     agent.register_task('run_test_func', controller.run_test_func)
+    agent.register_task('restart_rssi', controller.restart_rssi)
 
     runner.run(agent, auto_reconnect=True)
 
