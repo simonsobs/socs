@@ -176,7 +176,7 @@ class StarcamAgent:
         with self.lock.acquire_timeout(job='send_commands') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start task because "
-                              f"{self._lock.job} is already running.")
+                              f"{self.lock.job} is already running.")
                 return False, "Could not acquire lock."
             self.log.info("Sending commands.")
             self.starcam.pack_and_send_cmds()
