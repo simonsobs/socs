@@ -102,8 +102,12 @@ class StarcamHelper:
             dict: Dictionary of unpacked data.
         """
         (scdata_raw, _) = self.comm.recvfrom(256)
+        return self._unpack_response(scdata_raw)
+
+    @staticmethod
+    def _unpack_response(response):
         data = struct.unpack_from("dddddddddddddiiiiiiiiddiiiiiiiiiiiiiifiii",
-                                  scdata_raw)
+                                  response)
         keys = ['c_time',
                 'gmt',
                 'blob_num',
@@ -117,6 +121,7 @@ class StarcamHelper:
                 'ir',
                 'astrom_solve_time',
                 'camera_time']
+
         # Create a dictionary of the unpacked data
         astrom_data = [data[i] for i in range(len(keys))]
         astrom_data_dict = {keys[i]: astrom_data[i] for i in range(len(keys))}
