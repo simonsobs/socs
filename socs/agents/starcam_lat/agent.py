@@ -1,5 +1,4 @@
 import argparse
-import socket
 import time
 from os import environ
 
@@ -38,14 +37,11 @@ class StarcamAgent:
         self.log = agent.log
         self.take_data = False
         self.lock = TimeoutLock()
+        self.starcam = StarcamHelper(ip_address, port)
+
         agg_params = {'frame_length': 60}
         self.agent.register_feed("starcamera", record=True,
                                  agg_params=agg_params, buffer_time=1)
-        try:
-            self.starcam = StarcamHelper(ip_address, port)
-        except socket.timeout:
-            self.log.error("Starcam connection has timed out.")
-            return False, "Timeout"
 
     @ocs_agent.param('_')
     def send_commands(self, session, params=None):
@@ -62,6 +58,7 @@ class StarcamAgent:
                 return False, "Could not acquire lock."
             self.log.info("Sending commands.")
             self.starcam.send_cmds()
+            self.log.info("Commands sent to camera.")
         return True, "Sent commands to the starcam."
 
     @ocs_agent.param('_')
@@ -110,8 +107,16 @@ class StarcamAgent:
                     'block_name': 'astrometry',
                     'data': {}
                 }
-                # get astrometry data
-                astrom_data_dict = self.starcam.get_astrom_data()
+                try:
+                    astrom_data_dict = self.starcam.get_astrom_data()
+                    if session.degraded:
+                        self.log.info("Connection re-established.")
+                        session.degraded = False
+                except ConnectionError:
+                    self.log.error("Failed to get data from star camera. Check network connection.")
+                    session.degraded = True
+                    time.sleep(1)
+                    continue
                 # update the data dictionary+session and publish
                 data['data'].update(astrom_data_dict)
                 session.data.update(data['data'])

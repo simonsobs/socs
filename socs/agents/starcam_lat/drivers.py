@@ -1,8 +1,9 @@
-import socket
 import struct
 
+from socs.tcp import TCPInterface
 
-class StarcamHelper:
+
+class StarcamHelper(TCPInterface):
     """Functions to control and retrieve data from the starcam.
 
     Parameters
@@ -17,19 +18,13 @@ class StarcamHelper:
     """
 
     def __init__(self, ip_address, port, timeout=10):
-        self.ip = ip_address
-        self.port = port
-        self.server_addr = (self.ip, self.port)
-        self.comm = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.comm.connect(self.server_addr)
-        self.comm.settimeout(timeout)
+        # Set up the TCP Interface
+        super().__init__(ip_address, port, timeout)
 
     def send_cmds(self):
         """Send commands and parameters to the starcam."""
         cmds = self._pack_cmds()
-        # send commands to the camera
-        self.comm.sendto(cmds, (self.ip, self.port))
-        print("Commands sent to camera.")
+        self.comm.send(cmds)
 
     @staticmethod
     def _pack_cmds():
@@ -101,7 +96,7 @@ class StarcamHelper:
         Returns:
             dict: Dictionary of unpacked data.
         """
-        (scdata_raw, _) = self.comm.recvfrom(256)
+        scdata_raw = self.comm.recv(256)
         return self._unpack_response(scdata_raw)
 
     @staticmethod
@@ -126,7 +121,3 @@ class StarcamHelper:
         astrom_data = [data[i] for i in range(len(keys))]
         astrom_data_dict = {keys[i]: astrom_data[i] for i in range(len(keys))}
         return astrom_data_dict
-
-    def close(self):
-        """Closes the socket connection."""
-        self.comm.close()
