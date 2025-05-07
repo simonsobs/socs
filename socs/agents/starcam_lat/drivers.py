@@ -24,11 +24,19 @@ class StarcamHelper:
         self.comm.connect(self.server_addr)
         self.comm.settimeout(timeout)
 
-    def pack_and_send_cmds(self):
-        """Packs commands and parameters to be sent to the starcam and sends.
+    def send_cmds(self):
+        """Send commands and parameters to the starcam."""
+        cmds = self._pack_cmds()
+        # send commands to the camera
+        self.comm.sendto(cmds, (self.ip, self.port))
+        print("Commands sent to camera.")
+
+    @staticmethod
+    def _pack_cmds():
+        """Packs commands and parameters to be sent to the starcam.
 
         Returns:
-            list: Values sent to the starcam.
+            bytes: Packed bytes object to send to the starcam.
 
         """
         logodds = 1e8
@@ -83,14 +91,9 @@ class StarcamHelper:
                   filter_return_image_bool,
                   n_sigma_value,
                   star_spacing_value]
+
         # Pack values into the command for the camera
-        self.cmds_for_camera = struct.pack('ddddddfiiiiiiiiiifffffffff',
-                                           *values)
-        # send commands to the camera
-        self.comm.sendto(self.cmds_for_camera, (self.ip, self.port))
-        print("Commands sent to camera.")
-        # Return the list of values
-        return values
+        return struct.pack('ddddddfiiiiiiiiiifffffffff', *values)
 
     def get_astrom_data(self):
         """Receives and unpacks data from the starcam.

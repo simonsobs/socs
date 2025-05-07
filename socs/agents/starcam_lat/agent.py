@@ -61,7 +61,7 @@ class StarcamAgent:
                               f"{self.lock.job} is already running.")
                 return False, "Could not acquire lock."
             self.log.info("Sending commands.")
-            self.starcam.pack_and_send_cmds()
+            self.starcam.send_cmds()
         return True, "Sent commands to the starcam."
 
     @ocs_agent.param('_')
