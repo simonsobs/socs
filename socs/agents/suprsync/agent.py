@@ -270,7 +270,7 @@ def make_parser(parser=None):
     )
     pgroup.add_argument('--chmod', type=str, default="g+rwX,o+rX",
                         help="Comma-separated chmod strings to apply to file permissions "
-                             "on transfer. Defauls to making sure files are group-writeable "
+                             "on transfer. Defaults to making sure files are group-writeable "
                              "and world-readable.")
     return parser
 
