@@ -1148,8 +1148,8 @@ class PysmurfController:
             if not acquired:
                 return False, f"Operation failed: {self.lock.job} is running."
 
-            S, cfg = self._get_smurf_control(session=session)
-            S._caput(S.epics_root + ":AMCc:RestartRssi", 1)
+            # if the system is locked up, spawning a SmurfControl instance will hang
+            epics.caput(f"smurf_server_s{self.slot}:AMCc:RestartRssi", 1)
 
             return True, "RestartRssi sent"
 
