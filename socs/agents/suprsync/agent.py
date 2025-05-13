@@ -268,9 +268,10 @@ def make_parser(parser=None):
         '--db-pool-max-overflow', type=int, default=10,
         help="Number of connections to allow in the overflow pool."
     )
-    pgroup.add_argument('--chmod', type=str, default="g+rwX",
+    pgroup.add_argument('--chmod', type=str, default="g+rwX,o+rX",
                         help="Comma-separated chmod strings to apply to file permissions "
-                             "on transfer. Defauls to making sure files are group-writeable.")
+                             "on transfer. Defaults to making sure files are group-writeable "
+                             "and world-readable.")
     return parser
 
 
