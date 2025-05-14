@@ -20,7 +20,7 @@ from twisted.internet.defer import DeferredList, inlineCallbacks
 
 from socs.agents.acu import avoidance
 from socs.agents.acu import drivers as sh
-from socs.agents.acu import exercisor
+from socs.agents.acu import exercisor, hwp_iface
 
 #: The number of free ProgramTrack positions, when stack is empty.
 FULL_STACK = 10000
@@ -92,6 +92,8 @@ class ACUAgent:
             If True, don't auto-start idle_reset process for LAT.
         disable_sun_avoidance (bool): If set, start up with Sun
             Avoidance completely disabled.
+        disable_hwp_interlocks (bool): If set, start up with HWP
+            Interlocks disabled.
         min_el (float): If not None, override the default configured
             elevation lower limit.
         max_el (float): If not None, override the default configured
@@ -103,6 +105,7 @@ class ACUAgent:
                  startup=False, ignore_axes=None,
                  disable_idle_reset=False,
                  disable_sun_avoidance=False,
+                 disable_hwp_interlocks=False,
                  min_el=None, max_el=None,
                  ):
 
@@ -188,6 +191,12 @@ class ACUAgent:
             except Exception:
                 agent.log.error('Failed to parse named position "{k}"', k=k)
 
+        # HWP interlocks.
+        self.hwp_rules = hwp_iface.HWPInterlocks.from_dict(
+            self.acu_config.get('hwp_interlocks'))
+        if disable_hwp_interlocks:
+            self.hwp_rules.enabled = False
+
         # Exercise plan.
         self.exercise_plan = self.acu_config.get('exercise_plan')
 
@@ -210,23 +219,26 @@ class ACUAgent:
         # 'status' is populated by the monitor operation
         # 'broadcast' is populated by the udp_monitor operation
 
-        self.data = {'status': {'summary': {},
-                                'position_errors': {},
-                                'axis_limits': {},
-                                'axis_faults_errors_overages': {},
-                                'axis_warnings': {},
-                                'axis_failures': {},
-                                'axis_state': {},
-                                'osc_alarms': {},
-                                'commands': {},
-                                'ACU_failures_errors': {},
-                                'platform_status': {},
-                                'ACU_emergency': {},
-                                'corotator': {},
-                                'shutter': {},
-                                },
-                     'broadcast': {},
-                     }
+        self.data = {
+            'status': {
+                'summary': {},
+                'position_errors': {},
+                'axis_limits': {},
+                'axis_faults_errors_overages': {},
+                'axis_warnings': {},
+                'axis_failures': {},
+                'axis_state': {},
+                'osc_alarms': {},
+                'commands': {},
+                'ACU_failures_errors': {},
+                'platform_status': {},
+                'ACU_emergency': {},
+                'corotator': {},
+                'shutter': {},
+            },
+            'hwp': {},
+            'broadcast': {},
+        }
 
         # Structure for the broadcast process to communicate state to
         # the monitor process, for a data quality feed.
@@ -253,6 +265,11 @@ class ACUAgent:
                                self._simple_process_stop,
                                blocking=False,
                                startup=startup)
+        agent.register_process('monitor_hwp',
+                               self.monitor_hwp,
+                               self._simple_process_stop,
+                               blocking=False,
+                               startup=startup)
         agent.register_process('generate_scan',
                                self.generate_scan,
                                self._simple_process_stop,
@@ -263,6 +280,11 @@ class ACUAgent:
                                self._simple_process_stop,
                                blocking=False,
                                startup=startup_idle_reset)
+        agent.register_process('fromfile_scan',
+                               self.fromfile_scan,
+                               self._simple_process_stop,
+                               blocking=False)
+
         basic_agg_params = {'frame_length': 60}
         fullstatus_agg_params = {'frame_length': 60,
                                  'exclude_influx': True,
@@ -314,10 +336,6 @@ class ACUAgent:
         agent.register_task('set_scan_params',
                             self.set_scan_params,
                             blocking=False)
-        agent.register_task('fromfile_scan',
-                            self.fromfile_scan,
-                            blocking=False,
-                            aborter=self._simple_task_abort)
         agent.register_task('set_boresight',
                             self.set_boresight,
                             blocking=False,
@@ -343,6 +361,9 @@ class ACUAgent:
                                 self.set_shutter,
                                 blocking=False,
                                 aborter=self._simple_task_abort)
+        agent.register_task('update_hwp',
+                            self.update_hwp,
+                            blocking=False)
 
         # Automatic exercise program...
         if self.exercise_plan:
@@ -951,6 +972,16 @@ class ACUAgent:
             return False
         return True
 
+    def _current_azel(self):
+        try:
+            az0, el0 = [self.data['status']['summary'][f'{ax}_current_position']
+                        for ax in ['Azimuth', 'Elevation']]
+            if az0 is None or el0 is None:
+                raise KeyError
+        except KeyError:
+            return (None, None), 'Current position could not be determined.'
+        return (az0, el0), f'Current (az, el) = ({az0:.4f},{el0:.4f})'
+
     @inlineCallbacks
     def _check_ready_motion(self, session):
         bcast_check = yield self._check_daq_streams('broadcast')
@@ -1427,16 +1458,21 @@ class ACUAgent:
 
             self.log.info(f'Requested position: az={target_az}, el={target_el}')
 
-            legs, msg = yield self._get_sunsafe_moves(target_az, target_el,
-                                                      zero_legs_ok=False)
+            legs, msg = yield self._get_sunsafe_moves(target_az, target_el)
             if msg is not None:
                 self.log.error(msg)
                 return False, msg
 
-            if len(legs) > 1:
-                self.log.info(f'Executing move via {len(legs)} separate legs (sun optimized)')
+            if len(legs) > 2:
+                self.log.info(f'Executing move via {len(legs) - 1} separate legs (sun optimized)')
 
-            for leg_az, leg_el in legs:
+            # Check HWP safety
+            hwp_safe, msg = yield self._check_hwpsafe_legs(legs)
+            if not hwp_safe:
+                self.log.info('{msg}', msg=msg)
+                return False, msg
+
+            for leg_az, leg_el in legs[1:]:
                 all_ok, msg = yield self._go_to_axes(session, az=leg_az, el=leg_el)
                 if not all_ok:
                     break
@@ -1462,6 +1498,11 @@ class ACUAgent:
         with self.boresight_lock.acquire_timeout(0, job='set_boresight') as acquired:
             if not acquired:
                 return False, f"Operation failed: {self.boresight_lock.job} is running."
+
+            hwp_ok, msg = self._check_hwpsafe_here(['third'])
+            if not hwp_ok:
+                self.log.info('{msg}', msg=msg)
+                return False, f"Motion not HWP-safe: {msg}"
 
             self.log.info('Clearing faults to prepare for motion.')
             yield self.acu_control.clear_faults()
@@ -1646,68 +1687,67 @@ class ACUAgent:
         return True, 'Job completed'
 
     @ocs_agent.param('filename', type=str)
-    @ocs_agent.param('adjust_times', type=bool, default=True)
+    @ocs_agent.param('absolute_times', type=bool, default=False)
     @ocs_agent.param('azonly', type=bool, default=True)
     @inlineCallbacks
     def fromfile_scan(self, session, params=None):
-        """fromfile_scan(filename, adjust_times=True, azonly=True)
+        """fromfile_scan(filename, absolute_times=True, azonly=True)
 
-        **Task** - Upload and execute a scan pattern from numpy file.
+        **Process** - Upload and execute a scan pattern from a file.
 
         Parameters:
-            filename (str): full path to desired numpy file. File should
-                contain an array of shape (5, nsamp) or (7, nsamp).  See Note.
-            adjust_times (bool): If True (the default), the track
-                timestamps are interpreted as relative times, only,
-                and the track will be formatted so the first point
-                happens a few seconds in the future.  If False, the
-                track times will be taken at face value (even if the
-                first one is, like, 0).
+            filename (str): full path to the track file.
+            absolute_times (bool): If True, the track timestamps are
+                taken at face value.  Otherwise, the timestamps are
+                treated as relative to the track start time, which
+                will be a few seconds in the future from when this
+                function is called.
             azonly (bool): If True, the elevation part of the track
                 will be uploaded but the el axis won't be put in
                 ProgramTrack mode.  It might be put in Stop mode
                 though.
 
         Notes:
-            The columns in the numpy array are:
+            See :func:`drivers.from_file` for discussion of the file
+            structure.
 
-            - 0: timestamps, in seconds.
-            - 1: azimuth, in degrees.
-            - 2: elevation, in degrees.
-            - 3: az_vel, in deg/s.
-            - 4: el_vel, in deg/s.
-            - 5: az_flags (2 if last point in a leg; 1 otherwise.)
-            - 6: el_flags (2 if last point in a leg; 1 otherwise.)
-
-            It is acceptable to omit columns 5 and 6.
         """
+        ff_scan = sh.from_file(params['filename'])
 
-        times, azs, els, vas, ves, azflags, elflags = sh.from_file(params['filename'])
-        if min(azs) <= self.motion_limits['azimuth']['lower'] \
-           or max(azs) >= self.motion_limits['azimuth']['upper']:
+        if ff_scan.az_range[0] <= self.motion_limits['azimuth']['lower'] \
+           or ff_scan.az_range[1] >= self.motion_limits['azimuth']['upper']:
             return False, 'Azimuth location out of range!'
-        if min(els) <= self.motion_limits['elevation']['lower'] \
-           or max(els) >= self.motion_limits['elevation']['upper']:
+        if ff_scan.el_range[0] <= self.motion_limits['elevation']['lower'] \
+           or ff_scan.el_range[1] >= self.motion_limits['elevation']['upper']:
             return False, 'Elevation location out of range!'
 
         # Modify times?
-        if params['adjust_times']:
-            times = times + time.time() - times[0] + 5.
+        t_shift = 0
+        if not params['absolute_times']:
+            t_shift = time.time() + 5.
 
         # Turn those lines into a generator.
-        all_lines = sh.ptstack_format(times, azs, els, vas, ves, azflags, elflags,
-                                      absolute=True)
+        def line_batcher(ff_scan, t_shift=0., n=10):
+            lines = [sh.track_point_time_shift(p, t_shift)
+                     for p in ff_scan.points]
+            while True:
+                while len(lines):
+                    some, lines = lines[:n], lines[n:]
+                    yield some
+                if ff_scan.loop_time <= 0:
+                    break
+                t_shift += ff_scan.loop_time
+                lines = [sh.track_point_time_shift(p, t_shift)
+                         for p in ff_scan.points[ff_scan.preamble_count:]]
 
-        def line_batcher(lines, n=10):
-            while len(lines):
-                some, lines = lines[:n], lines[n:]
-                yield some
+        point_gen = line_batcher(ff_scan, t_shift)
 
-        point_gen = line_batcher(all_lines)
-        step_time = np.median(np.diff(times))
-
-        ok, err = yield self._run_track(session, point_gen, step_time,
-                                        azonly=params['azonly'])
+        ok, err = yield self._run_track(
+            session,
+            point_gen,
+            step_time=ff_scan.step_time,
+            free_form=ff_scan.free_form,
+            azonly=params['azonly'])
         return ok, err
 
     @ocs_agent.param('az_endpoint1', type=float)
@@ -1888,17 +1928,29 @@ class ACUAgent:
         if not ok:
             return False, msg
 
-        # Seek to starting position.  Note we ask for at least one leg
-        # here, because go_to_axes knows how to wait for the warning
-        # horn to finish before returning, which relieves us from
-        # handling that delay in the (already onerous) scan point
-        # timing.
+        # Seek to starting position.  Execute a move even if we're
+        # already there, because go_to_axes knows how to wait (in an
+        # optimal way) for the warning horn to finish before
+        # returning, which relieves us from handling that delay in the
+        # ProgramTrack phase.
         self.log.info(f'Moving to start position, az={plan["init_az"]}, el={init_el}')
-        legs, msg = yield self._get_sunsafe_moves(plan['init_az'], init_el,
-                                                  zero_legs_ok=False)
+        legs, msg = yield self._get_sunsafe_moves(plan['init_az'], init_el)
         if msg is not None:
             self.log.error(msg)
             return False, msg
+        hwp_safe, msg = yield self._check_hwpsafe_legs(legs)
+        if not hwp_safe:
+            msg = f'Move to start position not permitted: {msg}'
+            self.log.info('{msg}', msg=msg)
+            return False, msg
+
+        # Also validate the scan generally -- need to be movable in az.
+        hwp_safe, msg = yield self._check_hwpsafe(init_el, init_el, axes=['az'])
+        if not hwp_safe:
+            msg = f'Const-el scan not permitted: {msg}'
+            self.log.info(msg)
+            return False, msg
+
         for leg_az, leg_el in legs:
             ok, msg = yield self._go_to_axes(session, az=leg_az, el=leg_el)
             if not ok:
@@ -1920,7 +1972,7 @@ class ACUAgent:
 
     @inlineCallbacks
     def _run_track(self, session, point_gen, step_time, azonly=False,
-                   point_batch_count=None):
+                   point_batch_count=None, free_form=False):
         """Run a ProgramTrack track scan, with points provided by a
         generator.
 
@@ -1935,6 +1987,8 @@ class ACUAgent:
           point_batch_count: number of points to include in batch
             uploads.  This parameter can be used to increase the value
             beyond the minimum set internally based on step_time.
+          free_form: if True, disable ACU linear interpolation and
+            turn-around profiling.
 
         Returns:
           Tuple (success, msg) where success is a bool.
@@ -1976,16 +2030,32 @@ class ACUAgent:
             'Turnaround_time_too_short',
         ]
 
-        with self.azel_lock.acquire_timeout(0, job='generate_scan') as acquired:
+        if free_form:
+            init_cmds = [
+                ('Clear Stack', 0.),
+                ('Set Profiler Off', 0.),
+                ('Set Interpolation Spline', 0.5)
+            ]
+        else:
+            init_cmds = [
+                ('Clear Stack', 0.),
+                ('Set Profiler On', 0.),
+                ('Set Interpolation Linear', 0.5)
+            ]
 
+        with self.azel_lock.acquire_timeout(0, job='generate_scan') as acquired:
             if not acquired:
                 return False, f"Operation failed: {self.azel_lock.job} is running."
             if session.status not in ['starting', 'running']:
                 return False, "Operation aborted before motion began."
 
-            yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
-                                                'Clear Stack')
-            yield dsleep(0.5)
+            for _c, _d in init_cmds:
+                resp = yield self.acu_control.http.Command(
+                    'DataSets.CmdTimePositionTransfer', _c)
+                if resp != b'OK, Command executed.':
+                    return False, f"Failed to init: {_c}"
+                if _d > 0:
+                    yield dsleep(_d)
 
             if azonly:
                 yield self._set_modes(az='ProgramTrack')
@@ -2659,7 +2729,7 @@ class ACUAgent:
 
         return safe, msg
 
-    def _get_sunsafe_moves(self, target_az, target_el, zero_legs_ok=True):
+    def _get_sunsafe_moves(self, target_az, target_el):
         """Given a target position, find a Sun-safe way to get there.  This
         will either be a direct move, or else an ordered slew in az
         before el (or vice versa).
@@ -2668,32 +2738,29 @@ class ACUAgent:
         Sun-safe path could be found; msg is an error message.  If a
         path can be found, the legs is a list of intermediate move
         targets, ``[(az0, el0), (az1, el1) ...]``, terminating on
-        ``(target_az, target_el)``.  msg is None in that case.
+        ``(target_az, target_el)``.  msg is None in that case.  The
+        first position (az0, el0) is the current position of the
+        platform.
 
-        In the case that platform is already at the target position,
-        an empty list of legs will be returned unless zero_legs_ok is
-        False in which case a 1-entry list of legs is returned, with
-        the target position in it.
+        In the case that the platform is already at the target
+        position, the returned list will still have 2 entries.
 
         When Sun avoidance is not enabled, this function returns as
         though the direct path to the target is a safe one (though
-        axes_sequential=True may turn this into a move with two legs).
+        axes_sequential=True may cause an intermediate step to be
+        added).
 
         """
         # Get current position.
-        try:
-            az, el = [self.data['status']['summary'][f'{ax}_current_position']
-                      for ax in ['Azimuth', 'Elevation']]
-            if az is None or el is None:
-                raise KeyError
-        except KeyError:
-            return None, 'Current position could not be determined.'
+        (az0, el0), msg = self._current_azel()
+        if az0 is None:
+            return None, msg
 
         if not self._get_sun_policy('sunsafe_moves'):
             if self.motion_limits.get('axes_sequential'):
                 # Move in az first, then el.
-                return [(target_az, el), (target_az, target_el)], None
-            return [(target_az, target_el)], None
+                return [(target_az, el0), (target_az, target_el)], None
+            return [(az0, el0), (target_az, target_el)], None
 
         if not self._get_sun_policy('map_valid'):
             return None, 'Sun Safety Map not computed or stale; run the monitor_sun process.'
@@ -2702,15 +2769,228 @@ class ACUAgent:
         if self.sun.check_trajectory([target_az], [target_el])['sun_time'] <= 0:
             return None, 'Requested target position is not Sun-Safe.'
 
-        moves = self.sun.analyze_paths(az, el, target_az, target_el)
+        moves = self.sun.analyze_paths(az0, el0, target_az, target_el)
         move, decisions = self.sun.select_move(moves)
         if move is None:
             return None, 'No Sun-Safe moves could be identified!'
 
         legs = list(move['moves'].nodes)
-        if len(legs) == 1 and not zero_legs_ok:
-            return legs, None
-        return legs[1:], None
+        if len(legs) == 1:
+            # Pad to two entries.
+            return [legs[0], legs[0]], None
+        return legs, None
+
+    #
+    # HWP State Safety
+    #
+
+    @inlineCallbacks
+    def monitor_hwp(self, session, params):
+        """monitor_hwp()
+
+        **Process** - Monitors the state of a HWP, by querying a
+        HWPSupervisor's ``monitor`` Process session data.  Assesses
+        what motions are permitted, given the HWP state.
+
+        session.data example::
+
+        {
+          "interlocks_config": {
+            "configured": true,
+            "enabled": true,
+            "instance_id": "hwp-supervisor",
+            "limit_sun_avoidance": true,
+            "tolerance": 0.1,
+          },
+          "supervisor_data": {
+            "timestamp": 1744692973.185377,
+            "ok": true,
+            "err_msg": "",
+            "_grip_brakes": [1, 1, 1],
+            "_grip_state": "ungripped",
+            "_is_spinning": true,
+            "_target_freq": 2.1,
+            "grip_state": "ungripped",
+            "spin_state": "spinning",
+            "request_block_motion": null,
+            "request_block_motion_timestamp": null
+          },
+          "allowed": {
+            "el": [true, [40, 70], [
+              [40, 70],
+            ],
+            "az": [true, [40, 70], [
+              [40, 70],
+            ],
+            "third": [false, null, []],
+          }
+        }
+
+        """
+        if not self.hwp_rules.configured:
+            session.data = {
+                'interlocks_config': self.hwp_rules.encoded(basic=True),
+            }
+            return True, "HWP Interlocks not configured."
+
+        def _update_sun_lims(el_range):
+            if el_range is None:
+                el_range = (self.motion_limits['elevation']['lower'],
+                            self.motion_limits['elevation']['upper'])
+            # Is this a change to sun policy?
+            if tuple(el_range) != (self.sun_params['policy']['min_el'],
+                                   self.sun_params['policy']['max_el']):
+                self.sun_params['policy']['min_el'] = el_range[0]
+                self.sun_params['policy']['max_el'] = el_range[1]
+                self.sun_params['recompute_req'] = True
+
+        pacer = Pacemaker(1.)
+        last_enabled = False
+        hwp_supervisor = self.hwp_rules.get_client()
+
+        while session.status == 'running':
+            new_data = yield threads.deferToThread(hwp_supervisor.update)
+            new_sd = {
+                'interlocks_config': self.hwp_rules.encoded(basic=True),
+                'supervisor_data': new_data,
+            }
+            (_, el), msg = self._current_azel()
+            allowed = self.hwp_rules.test_range(
+                (None if el is None else (el, el)),
+                new_data.get('grip_state'),
+                new_data.get('spin_state'))
+            new_sd['allowed'] = allowed
+
+            session.data = new_sd
+            self.data['hwp'] = new_data
+
+            if self.hwp_rules.enabled:
+                if self.hwp_rules.limit_sun_avoidance and el is not None:
+                    tol = self.hwp_rules.tolerance
+                    if allowed['el'][0]:
+                        _update_sun_lims(allowed['el'][1])
+                    else:
+                        # If we're in a forbidden spot ... just try to
+                        # keep it at this el for now, and hopefully
+                        # HWPSupervisor will improve things soon.
+                        _update_sun_lims((el - tol, el + tol))
+            elif last_enabled and self.hwp_rules.limit_sun_avoidance:
+                # Restore the sun_params default elevation range.
+                _update_sun_lims(None)
+
+            last_enabled = self.hwp_rules.enabled
+            yield pacer.dsleep()
+        return True, "Bye."
+
+    @ocs_agent.param('enable', type=bool, default=None)
+    def update_hwp(self, session, params):
+        """update_hwp(enable=None)
+
+        **Task** - Update HWP state monitoring and safety parameters.
+
+        All arguments are optional.
+
+        Args:
+          enable (bool): If True, enable HWP state checks.  If False,
+            disable HWP state checks (non-temporarily).
+
+        """
+        self.log.info('update_hwp params: {params}',
+                      params={k: v for k, v in params.items()
+                              if v is not None})
+
+        if not self.hwp_rules.configured:
+            return False, 'HWP interlocks not configured in config file.'
+
+        if params['enable'] is not None:
+            self.hwp_rules.enabled = params['enable']
+
+        return True, 'Params updated.'
+
+    def _check_hwpsafe(self, el1, el2, axes, hwp_data=None):
+        """Checks whether certain axis motions are permitted, over a
+        certain range of elevations.
+
+        Args:
+          el1, el2: elevation range over which the checks should be
+            considered.
+          axes: list of axes to check for permission on (taken from
+            'el', 'az', 'third').
+          hwp_data: dict from which to get grip_state and spin_state;
+            if not provided, uses self.data['hwp'].
+
+        Returns:
+          motions_permitted (bool): whether all requested axes are
+            permitted to move, given the HWP state and el range.
+          message (str): helpful text.
+
+        Note that when hwp_rules are not enabled, motions are
+        generally permitted by this function.
+
+        See additional helper functions, _check_hwpsafe_here and
+        _check_hwpsafe_legs.
+
+        """
+        if not self.hwp_rules.enabled:
+            return (True, "HWP monitoring is disabled.")
+
+        # Grab a self-consistent copy...
+        if hwp_data is None:
+            hwp_data = self.data['hwp']
+
+        # Check staleness
+        if time.time() - hwp_data.get('timestamp', 0) > 10:
+            return False, "HWP monitoring dataset is stale; cannot validate move."
+
+        # Check it.
+        state_args = {
+            'el_range': [el1, el2],
+            'grip_state': hwp_data.get('grip_state'),
+            'spin_state': hwp_data.get('spin_state'),
+        }
+        axes_ok = self.hwp_rules.test_range(**state_args)
+        for ax in axes:
+            if not axes_ok[ax][0]:
+                return (False, (f"Motion in {ax} not permitted due to HWP rules "
+                                f"for {state_args}."))
+        return axes_ok, 'All requested axes pass the HWP rules.'
+
+    def _check_hwpsafe_here(self, axes):
+        """Check whether motion in ``axes`` is permitted, at the
+        present elevation and hwp state.
+
+        """
+        if not self.hwp_rules.enabled:
+            return (True, "HWP monitoring is disabled.")
+
+        (_, el), msg = self._current_azel()
+        if el is None:
+            return False, f'HWP safety could not be ensured: {msg}'
+        return self._check_hwpsafe(el, el, axes)
+
+    def _check_hwpsafe_legs(self, legs):
+        """Check whether motions specified by legs (list of (az, el)
+        positions) are permitted, given the current HWP state.
+
+        """
+        if not self.hwp_rules.enabled:
+            return (True, "HWP monitoring is disabled.")
+
+        hwp_data = self.data['hwp']
+        for (az1, el1), (az2, el2) in zip(legs[:-1], legs[1:]):
+            axes = []
+            if abs(el2 - el1) > self.hwp_rules.tolerance:
+                axes.append('el')
+            if abs(az2 - az1) > self.hwp_rules.tolerance:
+                axes.append('az')
+            ok, msg = self._check_hwpsafe(el1, el2, axes, hwp_data=hwp_data)
+            if not ok:
+                return False, msg
+        return (True, "All moves passed HWP safety checks.")
+
+    #
+    # Exercise!
+    #
 
     @ocs_agent.param('action', choices=['open', 'close'])
     @inlineCallbacks
@@ -2959,6 +3239,8 @@ def add_agent_args(parser_in=None):
                         help="Override the maximum el defined in platform config.")
     pgroup.add_argument("--disable-sun-avoidance", action='store_true',
                         help="Disable Sun Avoidance before startup.")
+    pgroup.add_argument("--disable-hwp-interlocks", action='store_true',
+                        help="Disable HWP interlocks before startup.")
 
     return parser_in
 
@@ -2975,6 +3257,7 @@ def main(args=None):
                  ignore_axes=args.ignore_axes,
                  disable_idle_reset=args.disable_idle_reset,
                  disable_sun_avoidance=args.disable_sun_avoidance,
+                 disable_hwp_interlocks=args.disable_hwp_interlocks,
                  min_el=args.min_el,
                  max_el=args.max_el)
 
