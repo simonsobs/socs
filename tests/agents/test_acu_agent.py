@@ -5,6 +5,8 @@ from socs.agents.acu.agent import ACUAgent  # noqa: F401
 HWP_IFACE_TEST_CONFIG = {
     'enabled': True,
     'tolerance': 0.1,
+    'instance_id': 'hwp-super1',
+    'limit_sun_avoidance': False,
     'rules': [
         {
             'el_range': [18, 90],
@@ -155,9 +157,11 @@ def _gen_rules(*args):
 
 
 def test_hwp_iface():
+    # Test parsing of a full config dict ...
     cfg = HWP_IFACE_TEST_CONFIG
     mo_rules = hwp_iface.HWPInterlocks.from_dict(cfg)
 
+    # Test range combination rules.
     def ex(d, item=0):
         return tuple([d[k][item] for k in ['el', 'az', 'third']])
 

@@ -196,6 +196,7 @@ class ACUAgent:
             self.acu_config.get('hwp_interlocks'))
         if disable_hwp_interlocks:
             self.hwp_rules.enabled = False
+        startup_monitor_hwp = (startup and self.hwp_rules.configured)
 
         # Exercise plan.
         self.exercise_plan = self.acu_config.get('exercise_plan')
@@ -269,7 +270,7 @@ class ACUAgent:
                                self.monitor_hwp,
                                self._simple_process_stop,
                                blocking=False,
-                               startup=startup)
+                               startup=startup_monitor_hwp)
         agent.register_process('generate_scan',
                                self.generate_scan,
                                self._simple_process_stop,
@@ -1928,11 +1929,8 @@ class ACUAgent:
         if not ok:
             return False, msg
 
-        # Seek to starting position.  Execute a move even if we're
-        # already there, because go_to_axes knows how to wait (in an
-        # optimal way) for the warning horn to finish before
-        # returning, which relieves us from handling that delay in the
-        # ProgramTrack phase.
+        # Seek to starting position.  Note "legs" will always include
+        # at least 2 points; first point being current (az, el).
         self.log.info(f'Moving to start position, az={plan["init_az"]}, el={init_el}')
         legs, msg = yield self._get_sunsafe_moves(plan['init_az'], init_el)
         if msg is not None:
@@ -1951,7 +1949,7 @@ class ACUAgent:
             self.log.info(msg)
             return False, msg
 
-        for leg_az, leg_el in legs:
+        for leg_az, leg_el in legs[1:]:
             ok, msg = yield self._go_to_axes(session, az=leg_az, el=leg_el)
             if not ok:
                 return False, f'Start position seek failed with message: {msg}'
@@ -2776,44 +2774,44 @@ class ACUAgent:
 
         session.data example::
 
-        {
-          "interlocks_config": {
-            "configured": true,
-            "enabled": true,
-            "instance_id": "hwp-supervisor",
-            "limit_sun_avoidance": true,
-            "tolerance": 0.1,
-          },
-          "supervisor_data": {
-            "timestamp": 1744692973.185377,
-            "ok": true,
-            "err_msg": "",
-            "_grip_brakes": [1, 1, 1],
-            "_grip_state": "ungripped",
-            "_is_spinning": true,
-            "_target_freq": 2.1,
-            "grip_state": "ungripped",
-            "spin_state": "spinning",
-            "request_block_motion": null,
-            "request_block_motion_timestamp": null
-          },
-          "allowed": {
-            "el": [true, [40, 70], [
-              [40, 70],
-            ],
-            "az": [true, [40, 70], [
-              [40, 70],
-            ],
-            "third": [false, null, []],
+          {
+            "interlocks_config": {
+              "configured": true,
+              "enabled": true,
+              "instance_id": "hwp-supervisor",
+              "limit_sun_avoidance": true,
+              "tolerance": 0.1,
+            },
+            "supervisor_data": {
+              "timestamp": 1744692973.185377,
+              "ok": true,
+              "err_msg": "",
+              "_grip_brakes": [1, 1, 1],
+              "_grip_state": "ungripped",
+              "_is_spinning": true,
+              "_target_freq": 2.1,
+              "grip_state": "ungripped",
+              "spin_state": "spinning",
+              "request_block_motion": null,
+              "request_block_motion_timestamp": null
+            },
+            "allowed": {
+              "el": [true, [40, 70], [
+                [40, 70],
+              ],
+              "az": [true, [40, 70], [
+                [40, 70],
+              ],
+              "third": [false, null, []],
+            }
           }
-        }
 
         """
         if not self.hwp_rules.configured:
             session.data = {
                 'interlocks_config': self.hwp_rules.encoded(basic=True),
             }
-            return True, "HWP Interlocks not configured."
+            return False, "HWP Interlocks not configured - monitoring blocked."
 
         def _update_sun_lims(el_range):
             if el_range is None:

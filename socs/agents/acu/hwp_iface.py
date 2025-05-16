@@ -18,21 +18,15 @@ def _range_contains(a, b):
 
 def _simplify_ranges(*a):
     """Combine and order a set of intervals, to form an ordered,
-    non-abutting list of intevals.
+    non-abutting list of intervals.
 
     """
-    def _merge(a, b):
-        if a[0] > b[0]:
-            return _merge(b, a)
-        if a[1] >= b[0]:
-            return [(a[0], max(b[1], a[1]))]
-        return [a, b]
     reduced = sorted([tuple(_a) for _a in a])
     i0 = 1
     while i0 < len(reduced):
-        j = _merge(reduced[i0 - 1], reduced[i0])
-        if len(j) == 1:
-            reduced[i0 - 1] = j[0]
+        a, b = reduced[i0 - 1], reduced[i0]
+        if a[1] >= b[0]:
+            reduced[i0 - 1] = (a[0], max(b[1], a[1]))
             reduced.pop(i0)
         else:
             i0 += 1
@@ -129,7 +123,11 @@ class HWPInterlocks:
         each axis is permitted.  Then the el_range, if provided is
         tested against those ranges.
 
-        The returned structure looks like this::
+        E.g for a call like::
+
+          test_range((40, 40), 'ungripped', 'not_spinning')
+
+        the returned structure looks like this::
 
           {'el': (True, (30, 70), [(30, 70)]),
            'az': (True, (30, 70), [(30, 70)]),
@@ -167,6 +165,12 @@ class HWPInterlocks:
 
 
 class HWPSupervisorClient:
+    """OCSClient wrapper to query and interpret the state of the
+    HWPSupervisor.  Instantiate with the instance_id of the
+    HWPSupervisor to be monitored.
+
+    """
+
     def __init__(self, instance_id):
         self.instance_id = instance_id
         self.cclient = site_config.get_control_client(instance_id)
