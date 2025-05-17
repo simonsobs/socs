@@ -156,11 +156,12 @@ def _gen_rules(*args):
             'rules': rules}
 
 
-def test_hwp_iface():
+def test_hwp_iface_parse_config():
     # Test parsing of a full config dict ...
-    cfg = HWP_IFACE_TEST_CONFIG
-    mo_rules = hwp_iface.HWPInterlocks.from_dict(cfg)
+    hwp_iface.HWPInterlocks.from_dict(HWP_IFACE_TEST_CONFIG)
 
+
+def test_hwp_iface_rule_eval():
     # Test range combination rules.
     def ex(d, item=0):
         return tuple([d[k][item] for k in ['el', 'az', 'third']])
