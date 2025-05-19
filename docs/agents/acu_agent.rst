@@ -107,6 +107,9 @@ Here is an example of a device definition for a SATP::
         'scan_params': {},
 
         'sun_avoidance': {},
+
+        'hwp_interlocks': {},
+
     }
 
 
@@ -252,6 +255,87 @@ following will be enforced:
   requires that the platform be in Remote operation mode, with no
   persistent faults.
 
+When HWP Interlocks are active (see next section), then HWP state may
+affect the elevations available for Sun escape.
+
+
+HWP Interlocks
+--------------
+
+The ACU Agent can be configured to block certain kinds of motion,
+depending on the state of the Half-Wave Plate.  When configured, the
+ACU will monitor the session data of an HWPSupervisor agent instance
+to determine:
+
+- the "grip_state": this can be one of "ungripped", "warm", "cold", or
+  "unknown",
+- the "spin_state": this can be one of "spinning", "not_spinning",
+  "unknown".
+
+These two HWP state strings are used, along with the current elevation
+(or the elevation range of a move) to determine whether a given move
+should be allowed.
+
+The Agent determines what kinds of moves are permitted by finding
+rules in the configuration table that match with the current spin and
+grip states, and that also overlap with the required range of
+elevation.  If any matching rule grants motion on an axis, then that
+is sufficient for the motion to be allowed.
+
+Here is an example ``hwp_interlocks`` configuration block:
+
+.. code-block:: yaml
+
+  hwp_interlocks:
+    enabled: true
+    limit_sun_avoidance: false
+    rules:
+    - el_range: [20, 90]
+      grip_states: ['warm', 'cold']
+      spin_states: ['*']
+      allow_moves:
+        el: true
+        az: true
+        third: false
+    - el_range: [40, 70]
+      grip_states: ['*']
+      spin_states: ['*']
+      allow_moves:
+        el: true
+        az: true
+        third: false
+    - el_range: [40, 70]
+      grip_states: ['ungripped']
+      spin_states: ['not_spinning']
+      allow_moves:
+        el: false
+        az: false
+        third: true
+
+In words, the above example says the following:
+
+- If the elevation is in (40, 70), any az and el moves are permitted,
+  regardless of the HWP state.
+- In that same elevation range, third axis (boresight) moves are
+  permitted only if the HWP is not gripped and not spinning.
+- To get down to el of 20 or up to el of 90, you must be in "warm" or
+  "cold" gripped states.  In that extended range, you can move in az
+  and el freely, even if spin state is not known.
+- Ignore these restrictions when a motion needs to be made for Sun
+  Avoidance purposes.
+
+If HWP motion constraints should also apply to Sun avoidance
+"escapes", then the setting ``limit_sun_avoidance`` should be set to
+``true`` (this is the default).  Only the limits associated with
+elevation axis motion are considered here -- i.e. the allowed
+elevation movement range, for the current HWP state, is used as the
+allowable elevation range for escapes.  Sun escape azimuth motion is
+not restricted by HWP state.
+
+For more syntax details see :class:`HWPInterlocks
+<socs.agents.acu.hwp_iface.HWPInterlocks>`, :class:`MotionRule
+<socs.agents.acu.hwp_iface.MotionRule>`.
+
 
 Exercisor Mode
 --------------
@@ -324,4 +408,10 @@ avoidance (Sun Avoidance)
 `````````````````````````
 
 .. automodule:: socs.agents.acu.avoidance
+    :members:
+
+hwp_iface (HWP Interlocks)
+``````````````````````````
+
+.. automodule:: socs.agents.acu.hwp_iface
     :members:

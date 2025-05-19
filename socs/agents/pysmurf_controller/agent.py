@@ -1143,6 +1143,21 @@ class PysmurfController:
 
             return True, "Everything off"
 
+    @ocs_agent.param('_')
+    def restart_rssi(self, session, params):
+        """restart_rssi()
+
+        **Task** - Restarts the RSSI. Use to recover from lock-up.
+        """
+        with self.lock.acquire_timeout(0, job='restart_rssi') as acquired:
+            if not acquired:
+                return False, f"Operation failed: {self.lock.job} is running."
+
+            # if the system is locked up, spawning a SmurfControl instance will hang
+            epics.caput(f"smurf_server_s{self.slot}:AMCc:RestartRssi", 1)
+
+            return True, "RestartRssi sent"
+
 
 def make_parser(parser=None):
     """
@@ -1198,6 +1213,7 @@ def main(args=None):
     agent.register_task('set_biases', controller.set_biases)
     agent.register_task('zero_biases', controller.zero_biases)
     agent.register_task('run_test_func', controller.run_test_func)
+    agent.register_task('restart_rssi', controller.restart_rssi)
 
     runner.run(agent, auto_reconnect=True)
 
