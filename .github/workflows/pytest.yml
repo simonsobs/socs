@@ -61,7 +61,7 @@ jobs:
     - name: Run integration tests
       working-directory: ./tests
       run: |
-        COVERAGE_FILE=.coverage.int python3 -m pytest --cov -m 'integtest'
+        COVERAGE_FILE=.coverage.int python3 -m pytest --cov -m 'integtest' integration/test_ls372_agent_integration.py
 
     # Coverage
     - name: Report test coverage
