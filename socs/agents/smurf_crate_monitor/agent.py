@@ -270,7 +270,43 @@ class SmurfCrateMonitor:
             return True, 'requested to stop taking data.'
         else:
             return False, 'acq is not currently running'
+    
+    @ocs_agent.param('slot', type=int, choices=[1,2,3,4,5,6,7], default=None)
+    def deactivate_slot(self, session, params=None):
+        """
+        deactivate_slot()
 
+        **Task** - Deactivates a specific slot in the crate.
+        This is used to ensure that the boards are not active
+        when the boards are being worked on or air cooling is blocked.
+
+        Args:
+            shm_addr (str):
+                Address used to connect to shelf manager.
+            slot (int):
+                Slot number to deactivate. Allowed values are 1-7.
+        """
+        slot = params.get('slot')
+        if slot is None:
+            session.data.update({"fields":{"result": "ERROR: No slot provided"},
+                                 "last_updated": time.time()})
+            return False, 'No slot provided.'
+        
+        cmd = ['ssh', f'{self.shm_addr}', 'clia', 'deactivate', 'board', str(slot)]
+        ssh = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE)
+        result = ssh.stdout.readlines()
+        if result == []:
+            error = ssh.stderr.readlines()
+            session_data = {"fields":{"result": "ERROR: %s" % error},
+                            "last_updated": time.time()}
+            session.data.update(session_data)
+            return False, 'Crate failed to respond.'
+        else:
+            session_data = {"fields":{"result": result},
+                            "last_updated": time.time()}
+            session.data.update(session_data)
+            return True, 'Slot deactivated.'
 
 def make_parser(parser=None):
     """
@@ -302,6 +338,7 @@ def main(args=None):
 
     agent.register_task('init_crate', smurfcrate.init_crate,
                         startup=startup)
+    agent.register_task('deactivate_slot', smurfcrate.deactivate_slot)
     agent.register_process('acq', smurfcrate.acq,
                            smurfcrate._stop_acq)
 
