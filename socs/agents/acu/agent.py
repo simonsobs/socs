@@ -1039,6 +1039,10 @@ class ACUAgent:
         tuple of limits (lower, upper).
 
         """
+        if axis == 'az':
+            axis = 'azimuth'
+        elif axis == 'el':
+            axis = 'elevation'
         limits = self.motion_limits[axis.lower()]
         limits = limits['lower'], limits['upper']
 
@@ -1160,13 +1164,13 @@ class ACUAgent:
         class AzAxis(AxisControl):
             @inlineCallbacks
             def goto(_self, target):
-                result = yield self.acu_control.go_to(az=target)
+                result = yield self.acu_control.go_to(az=target, set_mode='target')
                 return result
 
         class ElAxis(AxisControl):
             @inlineCallbacks
             def goto(_self, target):
-                result = yield self.acu_control.go_to(el=target)
+                result = yield self.acu_control.go_to(el=target, set_mode='target')
                 return result
 
         class ThirdAxis(AxisControl):
@@ -1378,7 +1382,7 @@ class ACUAgent:
                 move_defs.append(
                     (short_name, (session, axis_name, target)))
 
-        if len(move_defs) is None:
+        if len(move_defs) == 0:
             return True, 'No motion requested.'
 
         if clear_faults:
@@ -1413,8 +1417,8 @@ class ACUAgent:
                             for (name, args), msg in zip(move_defs, msgs)])
         return all_ok, msg
 
-    @ocs_agent.param('az', type=float)
-    @ocs_agent.param('el', type=float)
+    @ocs_agent.param('az', type=float, default=None)
+    @ocs_agent.param('el', type=float, default=None)
     @ocs_agent.param('end_stop', default=False, type=bool)
     @inlineCallbacks
     def go_to(self, session, params):
@@ -1422,13 +1426,23 @@ class ACUAgent:
 
         **Task** - Move the telescope to a particular point (azimuth,
         elevation) in Preset mode. When motion has ended and the telescope
-        reaches the preset point, it returns to Stop mode and ends.
+        reaches the preset point, the function returns.
 
         Parameters:
             az (float): destination angle for the azimuth axis
             el (float): destination angle for the elevation axis
-            end_stop (bool): put the telescope in Stop mode at the end of
-                the motion
+            end_stop (bool): put the commanded axes in Stop mode at
+                the end of the motion
+
+        Notes:
+            If az or el is unspecified (None), the axis will not be
+            commanded to a new position and will not be put in Preset
+            mode, and will not be put in Stop (if end_stop) after motion.
+
+            When omitting el, and if Sun Avoidance path-finding
+            decides an elevation change is required to travel from the
+            current position to the implicit target position, the
+            task will exit with error.
 
         """
         with self.azel_lock.acquire_timeout(0, job='go_to') as acquired:
@@ -1446,24 +1460,30 @@ class ACUAgent:
             if not ok:
                 return False, msg
 
-            target_az = params['az']
-            target_el = params['el']
+            targets = {k: params[k] for k in ['az', 'el']}
 
-            for axis, target in {'azimuth': target_az, 'elevation': target_el}.items():
+            def axis_filter_args(az, el):
+                return {k: v for k, v in [('az', az), ('el', el)]
+                        if targets[k] is not None}
+
+            for axis, target in targets.items():
                 limit_func, limits = self._get_limit_func(axis)
-                if target != limit_func(target):
+                if target is not None and target != limit_func(target):
                     raise ocs_agent.ParamError(
                         f'{axis}={target} not in accepted range, '
                         f'[{limits[0]}, {limits[1]}].')
 
-            self.log.info(f'Requested position: az={target_az}, el={target_el}')
+            self.log.info('Requested position: ' + ', '.join(
+                [f'{axis}={target}' for axis, target in targets.items()]))
 
-            legs, msg = yield self._get_sunsafe_moves(target_az, target_el)
+            legs, msg = yield self._get_sunsafe_moves(targets['az'], targets['el'])
             if msg is not None:
                 self.log.error(msg)
                 return False, msg
 
             if len(legs) > 2:
+                if None in targets.values():
+                    return False, "Sun-safe path requires multiple moves, but simple path requested."
                 self.log.info(f'Executing move via {len(legs) - 1} separate legs (sun optimized)')
 
             # Check HWP safety
@@ -1473,12 +1493,12 @@ class ACUAgent:
                 return False, msg
 
             for leg_az, leg_el in legs[1:]:
-                all_ok, msg = yield self._go_to_axes(session, az=leg_az, el=leg_el)
+                all_ok, msg = yield self._go_to_axes(session, **axis_filter_args(leg_az, leg_el))
                 if not all_ok:
                     break
 
             if all_ok and params['end_stop']:
-                yield self._set_modes(az='Stop', el='Stop')
+                yield self._set_modes(**axis_filter_args('Stop', 'Stop'))
 
         return all_ok, msg
 
@@ -2714,6 +2734,9 @@ class ACUAgent:
         will either be a direct move, or else an ordered slew in az
         before el (or vice versa).
 
+        If target_az or target_el are None, they are taken to be the
+        current axis position.
+
         Returns (legs, msg).  If legs is None, it indicates that no
         Sun-safe path could be found; msg is an error message.  If a
         path can be found, the legs is a list of intermediate move
@@ -2735,6 +2758,11 @@ class ACUAgent:
         (az0, el0), msg = self._current_azel()
         if az0 is None:
             return None, msg
+
+        if target_az is None:
+            target_az = az0
+        if target_el is None:
+            target_el = el0
 
         if not self._get_sun_policy('sunsafe_moves'):
             if self.motion_limits.get('axes_sequential'):
