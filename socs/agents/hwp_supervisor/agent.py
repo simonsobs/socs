@@ -1302,7 +1302,7 @@ class ControlStateMachine:
 
             elif isinstance(state, ControlState.UngripHWP):
                 with ensure_grip_safety(hwp_state, self.log):
-                    self.run_and_validate(clients.gripper.ungrip)
+                    self.run_and_validate(clients.gripper.ungrip, timeout=60)
                 self.action.set_state(ControlState.Done(success=True))
 
             elif isinstance(state, ControlState.Brake):
