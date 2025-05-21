@@ -69,6 +69,13 @@ INIT_SUN_CONFIGS = {
 SUN_MAP_REFRESH = 6 * avoidance.HOUR
 
 
+#: Things the ACU might say when you've done things properly
+OK_RESPONSES = [
+    b'OK, Command executed.',
+    b'OK, Command send.',
+]
+
+
 class ACUAgent:
     """Agent to acquire data from an ACU and control telescope pointing with the
     ACU.
@@ -1121,9 +1128,6 @@ class ACUAgent:
         # platform moving around.
         UNREASONABLE_VEL = 0.1
 
-        # Positive acknowledgment of AcuControl.go_to
-        OK_RESPONSE = b'OK, Command executed.'
-
         # Enum for the motion states
         State = Enum(f'{axis}State',
                      ['INIT', 'WAIT_MOVING', 'WAIT_STILL', 'FAIL', 'DONE'])
@@ -1279,7 +1283,7 @@ class ACUAgent:
             if state == State.INIT:
                 # Set target position and change mode to Preset.
                 result = yield ctrl.goto(target)
-                if result == OK_RESPONSE:
+                if result in OK_RESPONSES:
                     state = State.WAIT_MOVING
                 else:
                     self.log.error(f'ACU rejected go_to with message: {result}')
@@ -3027,8 +3031,6 @@ class ACUAgent:
             dset_cmd = 'ShutterClose'
             desired_key, undesired_key = 'Shutter_closed', 'Shutter_open'
 
-        OK_RESPONSE = b'OK, Command executed.'
-
         # This just needs to be longer than 1 loop time.
         STATE_WAIT = 5.
 
@@ -3060,7 +3062,7 @@ class ACUAgent:
             elif state == 'init':
                 # Issue the command
                 result = yield self.acu_control.Command(self.datasets['shutter'], dset_cmd)
-                if result == OK_RESPONSE:
+                if result in OK_RESPONSES:
                     state = 'wait-moving'
                     timeout = time.time() + STATE_WAIT
                 else:
