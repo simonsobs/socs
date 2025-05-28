@@ -170,7 +170,7 @@ class PfeifferTC400:
         Returns
         -------
         bool
-            False for successful, True for failure.
+            True for successful, False for failure.
         """
 
         send_control_command(self.ser, self.turbo_address, 23, "000000")
