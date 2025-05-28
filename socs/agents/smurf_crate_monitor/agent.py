@@ -271,7 +271,6 @@ class SmurfCrateMonitor:
         else:
             return False, 'acq is not currently running'
 
-
     @ocs_agent.param('slot', type=int, choices=[1, 2, 3, 4, 5, 6, 7], default=None)
     def deactivate_slot(self, session, params=None):
         """
@@ -308,7 +307,6 @@ class SmurfCrateMonitor:
             session.data = {"result": result,
                             "last_updated": time.time()}
             return True, 'Slot deactivated.'
-
 
     @ocs_agent.param('slot', type=int, choices=[1, 2, 3, 4, 5, 6, 7], default=None)
     def activate_slot(self, session, params=None):
