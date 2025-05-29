@@ -277,6 +277,7 @@ class SmurfCrateMonitor:
         deactivate_slot(slot)
 
         **Task** - Deactivates a specific slot in the crate.
+
         This is used to ensure that the boards are not active
         when the boards are being worked on or air cooling is blocked.
 
