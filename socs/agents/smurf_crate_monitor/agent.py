@@ -271,7 +271,7 @@ class SmurfCrateMonitor:
         else:
             return False, 'acq is not currently running'
 
-    @ocs_agent.param('slot', type=int, choices=[1, 2, 3, 4, 5, 6, 7], default=None)
+    @ocs_agent.param('slot', type=int, choices=[1, 2, 3, 4, 5, 6, 7])
     def deactivate_slot(self, session, params=None):
         """
         deactivate_slot()
@@ -284,13 +284,7 @@ class SmurfCrateMonitor:
             slot (int):
                 Slot number to deactivate. Allowed values are 1-7.
         """
-        slot = params.get('slot')
-        if slot is None:
-            session.data = {"result": "ERROR: No slot provided",
-                            "last_updated": time.time()}
-            return False, 'No slot provided.'
-
-        cmd = ['ssh', f'{self.shm_addr}', 'clia', 'deactivate', 'board', str(slot)]
+        cmd = ['ssh', f'{self.shm_addr}', 'clia', 'deactivate', 'board', str(params['slot'])]
         ssh = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE,
                                stderr=subprocess.PIPE)
         result = ssh.stdout.readlines()
@@ -308,7 +302,7 @@ class SmurfCrateMonitor:
                             "last_updated": time.time()}
             return True, 'Slot deactivated.'
 
-    @ocs_agent.param('slot', type=int, choices=[1, 2, 3, 4, 5, 6, 7], default=None)
+    @ocs_agent.param('slot', type=int, choices=[1, 2, 3, 4, 5, 6, 7])
     def activate_slot(self, session, params=None):
         """
         activate_slot()
@@ -319,13 +313,7 @@ class SmurfCrateMonitor:
             slot (int):
                 Slot number to activate. Allowed values are 1-7.
         """
-        slot = params.get('slot')
-        if slot is None:
-            session.data = {"result": "ERROR: No slot provided",
-                            "last_updated": time.time()}
-            return False, 'No slot provided.'
-
-        cmd = ['ssh', f'{self.shm_addr}', 'clia', 'activate', 'board', str(slot)]
+        cmd = ['ssh', f'{self.shm_addr}', 'clia', 'activate', 'board', str(params['slot'])]
         ssh = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE,
                                stderr=subprocess.PIPE)
         result = ssh.stdout.readlines()
