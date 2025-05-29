@@ -274,7 +274,7 @@ class SmurfCrateMonitor:
     @ocs_agent.param('slot', type=int, choices=[1, 2, 3, 4, 5, 6, 7])
     def deactivate_slot(self, session, params=None):
         """
-        deactivate_slot()
+        deactivate_slot(slot)
 
         **Task** - Deactivates a specific slot in the crate.
         This is used to ensure that the boards are not active
@@ -305,7 +305,7 @@ class SmurfCrateMonitor:
     @ocs_agent.param('slot', type=int, choices=[1, 2, 3, 4, 5, 6, 7])
     def activate_slot(self, session, params=None):
         """
-        activate_slot()
+        activate_slot(slot)
 
         **Task** - Activates a specific slot in the crate.
 
