@@ -271,6 +271,67 @@ class SmurfCrateMonitor:
         else:
             return False, 'acq is not currently running'
 
+    @ocs_agent.param('slot', type=int, choices=[1, 2, 3, 4, 5, 6, 7])
+    def deactivate_slot(self, session, params=None):
+        """
+        deactivate_slot(slot)
+
+        **Task** - Deactivates a specific slot in the crate.
+
+        This is used to ensure that the boards are not active
+        when the boards are being worked on or air cooling is blocked.
+
+        Args:
+            slot (int):
+                Slot number to deactivate. Allowed values are 1-7.
+        """
+        cmd = ['ssh', f'{self.shm_addr}', 'clia', 'deactivate', 'board', str(params['slot'])]
+        ssh = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE)
+        result = ssh.stdout.readlines()
+        if result == []:
+            error = ssh.stderr.readlines()
+            error = " ".join([e.decode('utf-8') for e in np.atleast_1d(error)])
+            self.log.info(f'/n{error}')
+            session.data = {"result": f"ERROR: {error}",
+                            "last_updated": time.time()}
+            return False, 'Crate failed to respond.'
+        else:
+            result = " ".join([r.decode('utf-8') for r in np.atleast_1d(result)])
+            self.log.info(f'/n{result}')
+            session.data = {"result": result,
+                            "last_updated": time.time()}
+            return True, 'Slot deactivated.'
+
+    @ocs_agent.param('slot', type=int, choices=[1, 2, 3, 4, 5, 6, 7])
+    def activate_slot(self, session, params=None):
+        """
+        activate_slot(slot)
+
+        **Task** - Activates a specific slot in the crate.
+
+        Args:
+            slot (int):
+                Slot number to activate. Allowed values are 1-7.
+        """
+        cmd = ['ssh', f'{self.shm_addr}', 'clia', 'activate', 'board', str(params['slot'])]
+        ssh = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE)
+        result = ssh.stdout.readlines()
+        if result == []:
+            error = ssh.stderr.readlines()
+            error = " ".join([e.decode('utf-8') for e in np.atleast_1d(error)])
+            self.log.info(f'/n{error}')
+            session.data = {"result": f"ERROR: {error}",
+                            "last_updated": time.time()}
+            return False, 'Crate failed to respond.'
+        else:
+            result = " ".join([r.decode('utf-8') for r in np.atleast_1d(result)])
+            self.log.info(f'/n{result}')
+            session.data = {"result": result,
+                            "last_updated": time.time()}
+            return True, 'Slot Activated.'
+
 
 def make_parser(parser=None):
     """
@@ -302,6 +363,8 @@ def main(args=None):
 
     agent.register_task('init_crate', smurfcrate.init_crate,
                         startup=startup)
+    agent.register_task('deactivate_slot', smurfcrate.deactivate_slot)
+    agent.register_task('activate_slot', smurfcrate.activate_slot)
     agent.register_process('acq', smurfcrate.acq,
                            smurfcrate._stop_acq)
 
