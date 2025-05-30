@@ -789,7 +789,7 @@ class HWPGripperAgent:
             if bool(state['jxc']['alarm']):
                 out_value = int(state['jxc']['out']) % 16
                 if out_value in alarm_group_mapping.keys():
-                    alarm_message = self.decoded_alarm_group[alarm_group_mapping]
+                    alarm_message = self.decoded_alarm_group[alarm_group_mapping[out_value]]
                 else:
                     alarm_message = self.decoded_alarm_group['A']
             else:
