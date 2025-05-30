@@ -353,6 +353,7 @@ class HWPState:
     pmx_last_updated: Optional[float] = None
 
     enc_freq: Optional[float] = None
+    encoder_last_updated: Optional[float] = None
     last_quad: Optional[float] = None
     last_quad_time: Optional[float] = None
 
@@ -1539,6 +1540,7 @@ class HWPSupervisor:
                     'driver_iboot': None,
                     'enc_freq': None,
                     'enc_instance_id': 'hwp-enc',
+                    'encoder_last_updated': None,
                     'gripper': {
                         'brake': [0, 0, 0],
                         'emg': [0, 0, 0],
