@@ -765,8 +765,8 @@ class ControlState:
         -----------
         voltage : float
             Voltage to set the PMX to
-        start_time : float
-            Time that the state was entered
+        direction : str
+            Direction to set the PID. Should either be '1' or '0'.
         """
         voltage: float
         direction: str
@@ -782,8 +782,6 @@ class ControlState:
             Whether the last state was completed successfully
         msg : str
             Optional message to include with the Done state
-        start_time : float
-            Time that the state was entered
         """
         success: bool
         msg: str = None
@@ -807,6 +805,13 @@ class ControlState:
     class Brake:
         """
         Configure the PID and PMX agents to actively brake the HWP
+
+        Attributes
+        -----------
+        brake_voltage : float
+            Voltage to use when braking the HWP.
+        fast : bool
+            If True brake HWP more actively
         """
         freq_tol: float
         freq_tol_duration: float
@@ -1310,12 +1315,11 @@ class ControlStateMachine:
             elif isinstance(state, ControlState.Brake):
                 pid_dir = int(query_pid_state()['direction'])
                 if state.fast:
-                    # set pcu fase brake state
+                    # Keep pid target frequency and
+                    # change pcu phase to brake state
                     new_pcu_state = 'on_2' if (pid_dir == 1) else 'on_1'
-                    min_freq = 0.2
                 else:
                     new_pcu_state = 'off'
-                    min_freq = 0.5
                 self.run_and_validate(
                     clients.pcu.send_command,
                     kwargs={'command': new_pcu_state}, timeout=None
@@ -1332,7 +1336,7 @@ class ControlStateMachine:
 
                 time.sleep(10)
                 self.action.set_state(ControlState.WaitForBrake(
-                    min_freq=min_freq,
+                    min_freq=0.5,
                     prev_freq=hwp_state.enc_freq,
                     fast=state.fast
                 ))
@@ -1349,15 +1353,14 @@ class ControlStateMachine:
                         kwargs={'command': 'stop'}, timeout=None
                     )
                     if state.fast:
-                        time.sleep(5)
-                        return
-                    else:
-                        self.action.set_state(ControlState.WaitForTargetFreq(
-                            target_freq=0,
-                            freq_tol=0.05,
-                            freq_tol_duration=30,
-                        ))
-                        return
+                        # Change target frequency to 0 Hz.
+                        self.run_and_validate(clients.pid.tune_stop)
+                    self.action.set_state(ControlState.WaitForTargetFreq(
+                        target_freq=0,
+                        freq_tol=0.05,
+                        freq_tol_duration=30,
+                    ))
+                    return
 
             elif isinstance(state, ControlState.EnableDriverBoard):
                 def set_outlet_state(outlet: int, outlet_state: bool):
@@ -1805,6 +1808,8 @@ class HWPSupervisor:
             ``target_freq`` to be considered successful.
         brake_voltage: float
             Voltage to use when braking the HWP.
+        fast: bool
+            If True, brake HWP more actively.
 
         Notes
         --------
