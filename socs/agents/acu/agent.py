@@ -13,13 +13,14 @@ import yaml
 from autobahn.twisted.util import sleep as dsleep
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import Pacemaker, TimeoutLock
+from soaculib.retwisted_backend import RetwistedHttpBackend
 from soaculib.twisted_backend import TwistedHttpBackend
 from twisted.internet import protocol, reactor, threads
 from twisted.internet.defer import DeferredList, inlineCallbacks
 
 from socs.agents.acu import avoidance
 from socs.agents.acu import drivers as sh
-from socs.agents.acu import exercisor
+from socs.agents.acu import exercisor, hwp_iface
 
 #: The number of free ProgramTrack positions, when stack is empty.
 FULL_STACK = 10000
@@ -28,8 +29,8 @@ FULL_STACK = 10000
 #: Maximum update time (in s) for "monitor" process data, even with no changes
 MONITOR_MAX_TIME_DELTA = 2.
 
-#: Default scan params by platform type
-DEFAULT_SCAN_PARAMS = {
+#: Initial default scan params by platform type.
+INIT_DEFAULT_SCAN_PARAMS = {
     'ccat': {
         'az_speed': 2,
         'az_accel': 1,
@@ -41,32 +42,38 @@ DEFAULT_SCAN_PARAMS = {
 }
 
 
-#: Default Sun avoidance params by platform type (enabled, policy). If
-#: either of escape *or* monitoring is enabled, then the full policy
-#: must be specified.
-SUN_CONFIGS = {
+#: Default Sun avoidance configuration blocks, by platform type.
+#: Individual settings can be overridden in the platform config file.
+#: The full "policy" is constructed from these settings, the
+#: motion_limits, and the DEFAULT_POLICY in avoidance.py.  When
+#: active Sun Avoidance is not enabled, policy parameters are still
+#: useful for assessing Sun safety.
+INIT_SUN_CONFIGS = {
     'ccat': {
         'enabled': False,
-        'policy': {
-            'exclusion_radius': 20,
-            'el_horizon': 10,
-            'min_sun_time': 1800,
-            'response_time': 7200,
-        },
+        'exclusion_radius': 20,
+        'el_horizon': 10,
+        'min_sun_time': 1800,
+        'response_time': 7200,
     },
     'satp': {
         'enabled': True,
-        'policy': {
-            'exclusion_radius': 20,
-            'el_horizon': 10,
-            'min_sun_time': 1800,
-            'response_time': 7200,
-        },
+        'exclusion_radius': 20,
+        'el_horizon': 10,
+        'min_sun_time': 1800,
+        'response_time': 7200,
     },
 }
 
 #: How often to refresh to Sun Safety map (valid up to 2x this time)
 SUN_MAP_REFRESH = 6 * avoidance.HOUR
+
+
+#: Things the ACU might say when you've done things properly
+OK_RESPONSES = [
+    b'OK, Command executed.',
+    b'OK, Command send.',
+]
 
 
 class ACUAgent:
@@ -77,10 +84,6 @@ class ACUAgent:
         acu_config (str):
             The configuration for the ACU, as referenced in aculib.configs.
             Default value is 'guess'.
-        exercise_plan (str):
-            The full path to a scan config file describing motions to cycle
-            through on the ACU.  If this is None, the associated process and
-            feed will not be registered.
         startup (bool):
             If True, immediately start the main monitoring processes
             for status and UDP data.
@@ -89,50 +92,68 @@ class ACUAgent:
             will not be commanded.  If a user requests an action that
             would otherwise move the axis, it is not moved but the
             action is assumed to have succeeded.  The values in this
-            list should be drawn from "az", "el", and "third".
+            list should be drawn from "az", "el", "third", and "none".
+            This argument *replaces* the setting from the config file.
+            ("none" entries will simply be ignored.)
         disable_idle_reset (bool):
             If True, don't auto-start idle_reset process for LAT.
+        disable_sun_avoidance (bool): If set, start up with Sun
+            Avoidance completely disabled.
+        disable_hwp_interlocks (bool): If set, start up with HWP
+            Interlocks disabled.
         min_el (float): If not None, override the default configured
             elevation lower limit.
         max_el (float): If not None, override the default configured
             elevation upper limit.
-        avoid_sun (bool): If set, override the default Sun
-            avoidance setting (i.e. force enable or disable the feature).
-        fov_radius (float): If set, override the default Sun
-            avoidance radius (i.e. the radius of the field of view, in
-            degrees, to use for Sun avoidance purposes).
-        named_positions (list of str): Names and target positions to
-            register for use with go_to_named task.  If provided, each
-            entry in the list should be of the form "name=az,el" with
-            az and el parseable as floats; e.g. "home=180,45.1".
 
     """
 
-    def __init__(self, agent, acu_config='guess', exercise_plan=None,
-                 startup=False, ignore_axes=None, disable_idle_reset=False,
+    def __init__(self, agent, acu_config='guess',
+                 startup=False, ignore_axes=None,
+                 disable_idle_reset=False,
+                 disable_sun_avoidance=False,
+                 disable_hwp_interlocks=False,
                  min_el=None, max_el=None,
-                 avoid_sun=None, fov_radius=None,
-                 named_positions=None):
+                 ):
+
+        # Agent support
+
+        self.agent = agent
         self.log = agent.log
 
         # Separate locks for exclusive access to az/el, and boresight motions.
         self.azel_lock = TimeoutLock()
         self.boresight_lock = TimeoutLock()
 
+        # Config file processing
+
         self.acu_config_name = acu_config
         self.acu_config = aculib.guess_config(acu_config)
-        self.sleeptime = self.acu_config['motion_waittime']
+        self.platform_type = self.acu_config['platform']  # ccat, satp.
+
         self.udp = self.acu_config['streams']['main']
         self.udp_schema = aculib.get_stream_schema(self.udp['schema'])
         self.udp_ext = self.acu_config['streams']['ext']
-        self.acu8100 = self.acu_config['status']['status_name']
 
-        # There may or may not be a special 3rd axis dataset that
-        # needs to be probed.
-        self.acu3rdaxis = self.acu_config['status'].get('3rdaxis_name')
-        self.monitor_fields = status_keys.status_fields[self.acu_config['platform']]['status_fields']
+        # The 'status' dataset is necessary; the 'third' axis can be
+        # None (in SATP it's all included in default); the 'shutter'
+        # is enabled for LAT.
+        _dsets = self.acu_config['_datasets']
+        self.datasets = {
+            'status': _dsets.get('default_dataset'),
+            'third': _dsets.get('third_axis_dataset'),
+            'shutter': _dsets.get('shutter_dataset'),
+        }
+        for k, v in self.datasets.items():
+            if v is not None:
+                self.datasets[k] = dict(_dsets['datasets'])[v]
+
+        self.monitor_fields = status_keys.status_fields[self.platform_type]['status_fields']
+
+        # Config file + overrides processing
+
+        # Motion limits (az / el / third ranges).
         self.motion_limits = self.acu_config['motion_limits']
-
         if min_el:
             self.log.warn(f'Override: min_el={min_el}')
             self.motion_limits['elevation']['lower'] = min_el
@@ -140,65 +161,92 @@ class ACUAgent:
             self.log.warn(f'Override: max_el={max_el}')
             self.motion_limits['elevation']['upper'] = max_el
 
-        # This initializes self.scan_params; these become the default
-        # scan params when calling generate_scan.  They can be changed
-        # during run time; they can also be overridden when calling
-        # generate_scan.
-        self.scan_params = {}
-        self._set_default_scan_params()
+        # Sun avoidance (must be set up *after* finalizing motion limits)
+        self.sun_config = INIT_SUN_CONFIGS[self.platform_type]
+        self.sun_config.update(self.acu_config.get('sun_avoidance', {}))
+        if disable_sun_avoidance:
+            self.sun_config['enabled'] = False
+        self.log.info('On startup, sun_config={sun_config}',
+                      sun_config=self.sun_config)
+        self._reset_sun_params()
 
-        startup_idle_reset = (self.acu_config['platform'] in ['lat', 'ccat']
+        # Scan params (default vel / accel).
+        self.default_scan_params = \
+            dict(INIT_DEFAULT_SCAN_PARAMS[self.platform_type])
+        for _k in self.default_scan_params.keys():
+            _v = self.acu_config.get('scan_params', {}).get(_k)
+            if _v is not None:
+                self.default_scan_params[_k] = _v
+        agent.log.info('On startup, default scan_params={scan_params}',
+                       scan_params=self.default_scan_params)
+        self.scan_params = dict(self.default_scan_params)
+
+        # Axes to ignore.
+        self.ignore_axes = self.acu_config.get('ignore_axes', [])
+        if ignore_axes is not None:
+            self.ignore_axes = [x for x in ignore_axes if x != 'none']
+        if len(self.ignore_axes):
+            assert all([x in ['az', 'el', 'third'] for x in self.ignore_axes])
+            agent.log.warn('Note ignore_axes={i}', i=self.ignore_axes)
+
+        # Named positions.
+        self.named_positions = self.acu_config.get('named_positions', {})
+        for k, v in self.named_positions.items():
+            agent.log.info(f'Using named position {k}: {v[0]},{v[1]}')
+            try:
+                str(k), float(v[0]), float(v[1])
+            except Exception:
+                agent.log.error('Failed to parse named position "{k}"', k=k)
+
+        # HWP interlocks.
+        self.hwp_rules = hwp_iface.HWPInterlocks.from_dict(
+            self.acu_config.get('hwp_interlocks'))
+        if disable_hwp_interlocks:
+            self.hwp_rules.enabled = False
+        startup_monitor_hwp = (startup and self.hwp_rules.configured)
+
+        # Exercise plan.
+        self.exercise_plan = self.acu_config.get('exercise_plan')
+
+        # Other flags.
+        startup_idle_reset = (self.platform_type in ['lat', 'ccat']
                               and not disable_idle_reset)
 
-        if ignore_axes is None:
-            ignore_axes = []
-        assert all([x in ['az', 'el', 'third'] for x in ignore_axes])
-        self.ignore_axes = ignore_axes
-        if len(self.ignore_axes):
-            agent.log.warn('User requested ignore_axes={i}', i=self.ignore_axes)
+        # The connections to the ACU.
 
-        self._reset_sun_params(enabled=avoid_sun,
-                               radius=fov_radius)
+        tclient._HTTP11ClientFactory.noisy = False
 
-        self.named_positions = {}
-        if named_positions:
-            for text in named_positions:
-                try:
-                    name, target = text.split('=')
-                    _az, _el = target.split(',')
-                    self.named_positions[name] = (float(_az), float(_el))
-                except Exception as e:
-                    agent.log.error('Failed to parse named_position string: {text}', text=text)
-                    raise e
+        self.acu_control = aculib.AcuControl(
+            acu_config, backend=RetwistedHttpBackend(persistent=False))
+        self.acu_read = aculib.AcuControl(
+            acu_config, backend=TwistedHttpBackend(persistent=True), readonly=True)
 
-        self.exercise_plan = exercise_plan
+        # Structures for passing status data around
 
         # self.data provides a place to reference data from the monitors.
         # 'status' is populated by the monitor operation
         # 'broadcast' is populated by the udp_monitor operation
 
-        self.data = {'status': {'summary': {},
-                                'position_errors': {},
-                                'axis_limits': {},
-                                'axis_faults_errors_overages': {},
-                                'axis_warnings': {},
-                                'axis_failures': {},
-                                'axis_state': {},
-                                'osc_alarms': {},
-                                'commands': {},
-                                'ACU_failures_errors': {},
-                                'platform_status': {},
-                                'ACU_emergency': {},
-                                'corotator': {},
-                                },
-                     'broadcast': {},
-                     }
-
-        self.agent = agent
-
-        self.take_data = False
-
-        tclient._HTTP11ClientFactory.noisy = False
+        self.data = {
+            'status': {
+                'summary': {},
+                'position_errors': {},
+                'axis_limits': {},
+                'axis_faults_errors_overages': {},
+                'axis_warnings': {},
+                'axis_failures': {},
+                'axis_state': {},
+                'osc_alarms': {},
+                'commands': {},
+                'ACU_failures_errors': {},
+                'platform_status': {},
+                'ACU_emergency': {},
+                'corotator': {},
+                'shutter': {},
+            },
+            'hwp': {},
+            'broadcast': {},
+        }
 
         # Structure for the broadcast process to communicate state to
         # the monitor process, for a data quality feed.
@@ -208,10 +256,7 @@ class ACUAgent:
             'time_offset': 0,
         }
 
-        self.acu_control = aculib.AcuControl(
-            acu_config, backend=TwistedHttpBackend(persistent=False))
-        self.acu_read = aculib.AcuControl(
-            acu_config, backend=TwistedHttpBackend(persistent=True), readonly=True)
+        # Task, Process, Feed registration.
 
         agent.register_process('monitor',
                                self.monitor,
@@ -228,6 +273,11 @@ class ACUAgent:
                                self._simple_process_stop,
                                blocking=False,
                                startup=startup)
+        agent.register_process('monitor_hwp',
+                               self.monitor_hwp,
+                               self._simple_process_stop,
+                               blocking=False,
+                               startup=startup_monitor_hwp)
         agent.register_process('generate_scan',
                                self.generate_scan,
                                self._simple_process_stop,
@@ -247,42 +297,38 @@ class ACUAgent:
                              'exclude_influx': False,
                              'exclude_aggregator': True
                              }
-        self.stop_times = {'az': float('nan'),
-                           'el': float('nan'),
-                           'bs': float('nan'),
-                           }
-        self.agent.register_feed('acu_status',
-                                 record=True,
-                                 agg_params=fullstatus_agg_params,
-                                 buffer_time=1)
-        self.agent.register_feed('acu_status_influx',
-                                 record=True,
-                                 agg_params=influx_agg_params,
-                                 buffer_time=1)
-        self.agent.register_feed('acu_commands_influx',
-                                 record=True,
-                                 agg_params=influx_agg_params,
-                                 buffer_time=1)
-        self.agent.register_feed('acu_udp_stream',
-                                 record=True,
-                                 agg_params=fullstatus_agg_params,
-                                 buffer_time=1)
-        self.agent.register_feed('acu_broadcast_influx',
-                                 record=True,
-                                 agg_params=influx_agg_params,
-                                 buffer_time=1)
-        self.agent.register_feed('acu_error',
-                                 record=True,
-                                 agg_params=basic_agg_params,
-                                 buffer_time=1)
-        self.agent.register_feed('sun',
-                                 record=True,
-                                 agg_params=basic_agg_params,
-                                 buffer_time=0)
-        self.agent.register_feed('data_qual',
-                                 record=True,
-                                 agg_params=basic_agg_params,
-                                 buffer_time=0)
+        agent.register_feed('acu_status',
+                            record=True,
+                            agg_params=fullstatus_agg_params,
+                            buffer_time=1)
+        agent.register_feed('acu_status_influx',
+                            record=True,
+                            agg_params=influx_agg_params,
+                            buffer_time=1)
+        agent.register_feed('acu_commands_influx',
+                            record=True,
+                            agg_params=influx_agg_params,
+                            buffer_time=1)
+        agent.register_feed('acu_udp_stream',
+                            record=True,
+                            agg_params=fullstatus_agg_params,
+                            buffer_time=1)
+        agent.register_feed('acu_broadcast_influx',
+                            record=True,
+                            agg_params=influx_agg_params,
+                            buffer_time=1)
+        agent.register_feed('acu_error',
+                            record=True,
+                            agg_params=basic_agg_params,
+                            buffer_time=1)
+        agent.register_feed('sun',
+                            record=True,
+                            agg_params=basic_agg_params,
+                            buffer_time=0)
+        agent.register_feed('data_qual',
+                            record=True,
+                            agg_params=basic_agg_params,
+                            buffer_time=0)
         agent.register_task('go_to',
                             self.go_to,
                             blocking=False,
@@ -317,19 +363,27 @@ class ACUAgent:
                             self.escape_sun_now,
                             blocking=False,
                             aborter=self._simple_task_abort)
+        if self.datasets['shutter']:
+            agent.register_task('set_shutter',
+                                self.set_shutter,
+                                blocking=False,
+                                aborter=self._simple_task_abort)
+        agent.register_task('update_hwp',
+                            self.update_hwp,
+                            blocking=False)
 
         # Automatic exercise program...
-        if exercise_plan:
+        if self.exercise_plan:
             agent.register_process(
                 'exercise', self.exercise, self._simple_process_stop,
                 stopper_blocking=False)
             # Use longer default frame length ... very low volume feed.
-            self.agent.register_feed('activity',
-                                     record=True,
-                                     buffer_time=0,
-                                     agg_params={
-                                         'frame_length': 600,
-                                     })
+            agent.register_feed('activity',
+                                record=True,
+                                buffer_time=0,
+                                agg_params={
+                                    'frame_length': 600,
+                                })
 
     @inlineCallbacks
     def _simple_task_abort(self, session, params):
@@ -361,7 +415,7 @@ class ACUAgent:
                 continue
             success = True
             try:
-                yield self.acu_control.http.Values(self.acu8100)
+                yield self.acu_control.http.Values(self.datasets['status'])
             except Exception as e:
                 self.log.info(' -- failed to reset Idle Stow time: {err}', err=e)
                 success = False
@@ -534,15 +588,22 @@ class ACUAgent:
                           'Corotator_mode': None,
                           }
 
-        j = yield self.acu_read.http.Values(self.acu8100)
-        if self.acu3rdaxis:
-            j2 = yield self.acu_read.http.Values(self.acu3rdaxis)
-        else:
-            j2 = {}
-        session.data.update({'StatusDetailed': j,
-                             'Status3rdAxis': j2,
-                             'StatusResponseRate': n_ok / (query_t - report_t)})
+        @inlineCallbacks
+        def _get_status():
+            output = {}
+            for short, collection in [
+                    ('status', 'StatusDetailed'),
+                    ('third', 'Status3rdAxis'),
+                    ('shutter', 'StatusShutter')]:
+                if self.datasets[short]:
+                    output[collection] = (
+                        yield self.acu_read.Values(self.datasets[short]))
+                else:
+                    output[collection] = {}
+            return output
 
+        session.data['StatusResponseRate'] = n_ok / (query_t - report_t)
+        session.data.update((yield _get_status()))
         qual_pacer = Pacemaker(.1)
 
         was_remote = False
@@ -587,13 +648,8 @@ class ACUAgent:
                 self.agent.publish_to_feed('data_qual', block)
 
             try:
-                j = yield self.acu_read.http.Values(self.acu8100)
-                if self.acu3rdaxis:
-                    j2 = yield self.acu_read.http.Values(self.acu3rdaxis)
-                else:
-                    j2 = {}
-                session.data.update({'StatusDetailed': j, 'Status3rdAxis': j2,
-                                     'connected': True})
+                session.data.update((yield _get_status()))
+                session.data['connected'] = True
                 n_ok += 1
                 last_complaint = 0
             except Exception as e:
@@ -732,6 +788,7 @@ class ACUAgent:
                     ('ACU_platform_status', 'platform_status'),
                     ('ACU_emergency', 'ACU_emergency'),
                     ('ACU_corotator', 'corotator'),
+                    ('ACU_shutter', 'shutter'),
             ]:
                 new_blocks[block_name] = {
                     'timestamp': self.data['status']['summary']['ctime'],
@@ -922,6 +979,16 @@ class ACUAgent:
             return False
         return True
 
+    def _current_azel(self):
+        try:
+            az0, el0 = [self.data['status']['summary'][f'{ax}_current_position']
+                        for ax in ['Azimuth', 'Elevation']]
+            if az0 is None or el0 is None:
+                raise KeyError
+        except KeyError:
+            return (None, None), 'Current position could not be determined.'
+        return (az0, el0), f'Current (az, el) = ({az0:.4f},{el0:.4f})'
+
     @inlineCallbacks
     def _check_ready_motion(self, session):
         bcast_check = yield self._check_daq_streams('broadcast')
@@ -979,6 +1046,10 @@ class ACUAgent:
         tuple of limits (lower, upper).
 
         """
+        if axis == 'az':
+            axis = 'azimuth'
+        elif axis == 'el':
+            axis = 'elevation'
         limits = self.motion_limits[axis.lower()]
         limits = limits['lower'], limits['upper']
 
@@ -1035,8 +1106,9 @@ class ACUAgent:
         # How long to wait after initiation for signs of motion,
         # before giving up.  This is normally within 2 or 3 seconds
         # (SATP), but in "cold" cases where siren needs to sound, this
-        # can be as long as 12 seconds.
-        MAX_STARTUP_TIME = 13.
+        # can be as long as 12 seconds.  For the LAT, can take an
+        # extra couple seconds if there were faults to clear.
+        MAX_STARTUP_TIME = 15.
 
         # How long does it take to sound the warning horn?  It takes
         # 10 seconds.  Don't wait longer than this.
@@ -1055,9 +1127,6 @@ class ACUAgent:
         # where some other commander has taken over and then kept the
         # platform moving around.
         UNREASONABLE_VEL = 0.1
-
-        # Positive acknowledgment of AcuControl.go_to
-        OK_RESPONSE = b'OK, Command executed.'
 
         # Enum for the motion states
         State = Enum(f'{axis}State',
@@ -1099,13 +1168,13 @@ class ACUAgent:
         class AzAxis(AxisControl):
             @inlineCallbacks
             def goto(_self, target):
-                result = yield self.acu_control.go_to(az=target)
+                result = yield self.acu_control.go_to(az=target, set_mode='target')
                 return result
 
         class ElAxis(AxisControl):
             @inlineCallbacks
             def goto(_self, target):
-                result = yield self.acu_control.go_to(el=target)
+                result = yield self.acu_control.go_to(el=target, set_mode='target')
                 return result
 
         class ThirdAxis(AxisControl):
@@ -1214,7 +1283,7 @@ class ACUAgent:
             if state == State.INIT:
                 # Set target position and change mode to Preset.
                 result = yield ctrl.goto(target)
-                if result == OK_RESPONSE:
+                if result in OK_RESPONSES:
                     state = State.WAIT_MOVING
                 else:
                     self.log.error(f'ACU rejected go_to with message: {result}')
@@ -1317,7 +1386,7 @@ class ACUAgent:
                 move_defs.append(
                     (short_name, (session, axis_name, target)))
 
-        if len(move_defs) is None:
+        if len(move_defs) == 0:
             return True, 'No motion requested.'
 
         if clear_faults:
@@ -1352,8 +1421,8 @@ class ACUAgent:
                             for (name, args), msg in zip(move_defs, msgs)])
         return all_ok, msg
 
-    @ocs_agent.param('az', type=float)
-    @ocs_agent.param('el', type=float)
+    @ocs_agent.param('az', type=float, default=None)
+    @ocs_agent.param('el', type=float, default=None)
     @ocs_agent.param('end_stop', default=False, type=bool)
     @inlineCallbacks
     def go_to(self, session, params):
@@ -1361,13 +1430,23 @@ class ACUAgent:
 
         **Task** - Move the telescope to a particular point (azimuth,
         elevation) in Preset mode. When motion has ended and the telescope
-        reaches the preset point, it returns to Stop mode and ends.
+        reaches the preset point, the function returns.
 
         Parameters:
             az (float): destination angle for the azimuth axis
             el (float): destination angle for the elevation axis
-            end_stop (bool): put the telescope in Stop mode at the end of
-                the motion
+            end_stop (bool): put the commanded axes in Stop mode at
+                the end of the motion
+
+        Notes:
+            If az or el is unspecified (None), the axis will not be
+            commanded to a new position and will not be put in Preset
+            mode, and will not be put in Stop (if end_stop) after motion.
+
+            When omitting el, and if Sun Avoidance path-finding
+            decides an elevation change is required to travel from the
+            current position to the implicit target position, the
+            task will exit with error.
 
         """
         with self.azel_lock.acquire_timeout(0, job='go_to') as acquired:
@@ -1385,34 +1464,45 @@ class ACUAgent:
             if not ok:
                 return False, msg
 
-            target_az = params['az']
-            target_el = params['el']
+            targets = {k: params[k] for k in ['az', 'el']}
 
-            for axis, target in {'azimuth': target_az, 'elevation': target_el}.items():
+            def axis_filter_args(az, el):
+                return {k: v for k, v in [('az', az), ('el', el)]
+                        if targets[k] is not None}
+
+            for axis, target in targets.items():
                 limit_func, limits = self._get_limit_func(axis)
-                if target != limit_func(target):
+                if target is not None and target != limit_func(target):
                     raise ocs_agent.ParamError(
                         f'{axis}={target} not in accepted range, '
                         f'[{limits[0]}, {limits[1]}].')
 
-            self.log.info(f'Requested position: az={target_az}, el={target_el}')
+            self.log.info('Requested position: ' + ', '.join(
+                [f'{axis}={target}' for axis, target in targets.items()]))
 
-            legs, msg = yield self._get_sunsafe_moves(target_az, target_el,
-                                                      zero_legs_ok=False)
+            legs, msg = yield self._get_sunsafe_moves(targets['az'], targets['el'])
             if msg is not None:
                 self.log.error(msg)
                 return False, msg
 
-            if len(legs) > 1:
-                self.log.info(f'Executing move via {len(legs)} separate legs (sun optimized)')
+            if len(legs) > 2:
+                if None in targets.values():
+                    return False, "Sun-safe path requires multiple moves, but simple path requested."
+                self.log.info(f'Executing move via {len(legs) - 1} separate legs (sun optimized)')
 
-            for leg_az, leg_el in legs:
-                all_ok, msg = yield self._go_to_axes(session, az=leg_az, el=leg_el)
+            # Check HWP safety
+            hwp_safe, msg = yield self._check_hwpsafe_legs(legs)
+            if not hwp_safe:
+                self.log.info('{msg}', msg=msg)
+                return False, msg
+
+            for leg_az, leg_el in legs[1:]:
+                all_ok, msg = yield self._go_to_axes(session, **axis_filter_args(leg_az, leg_el))
                 if not all_ok:
                     break
 
             if all_ok and params['end_stop']:
-                yield self._set_modes(az='Stop', el='Stop')
+                yield self._set_modes(**axis_filter_args('Stop', 'Stop'))
 
         return all_ok, msg
 
@@ -1432,6 +1522,11 @@ class ACUAgent:
         with self.boresight_lock.acquire_timeout(0, job='set_boresight') as acquired:
             if not acquired:
                 return False, f"Operation failed: {self.boresight_lock.job} is running."
+
+            hwp_ok, msg = self._check_hwpsafe_here(['third'])
+            if not hwp_ok:
+                self.log.info('{msg}', msg=msg)
+                return False, f"Motion not HWP-safe: {msg}"
 
             self.log.info('Clearing faults to prepare for motion.')
             yield self.acu_control.clear_faults()
@@ -1518,12 +1613,6 @@ class ACUAgent:
         else:
             return False, "Response was not as expected."
 
-    def _set_default_scan_params(self):
-        # A reference to scan_params is cached in monitor, so copy
-        # individual items rather than creating a new dict here.
-        for k, v in DEFAULT_SCAN_PARAMS[self.acu_config['platform']].items():
-            self.scan_params[k] = v
-
     @ocs_agent.param('az_speed', type=float, default=None)
     @ocs_agent.param('az_accel', type=float, default=None)
     @ocs_agent.param('reset', default=False, type=bool)
@@ -1543,7 +1632,7 @@ class ACUAgent:
 
         """
         if params['reset']:
-            self._set_default_scan_params()
+            self.scan_params.update(self.default_scan_params)
         for k in ['az_speed', 'az_accel']:
             if params[k] is not None:
                 self.scan_params[k] = params[k]
@@ -1794,6 +1883,13 @@ class ACUAgent:
         # empirical 0.85 adjustment) is stated in the SATP ACU ICD.
         min_turnaround_time = (0.85 * az_speed / 9 * 11.616)**.5
         max_turnaround_accel = 2 * az_speed / min_turnaround_time
+
+        # You must also not exceed the platform max accel.
+        if self.motion_limits['azimuth'].get('accel'):
+            max_turnaround_accel = min(
+                max_turnaround_accel,
+                self.motion_limits['azimuth'].get('accel') / 1.88)
+
         if az_accel > max_turnaround_accel:
             self.log.warn('WARNING: user requested accel=%.2f; limiting to %.2f' %
                           (az_accel, max_turnaround_accel))
@@ -1857,18 +1953,27 @@ class ACUAgent:
         if not ok:
             return False, msg
 
-        # Seek to starting position.  Note we ask for at least one leg
-        # here, because go_to_axes knows how to wait for the warning
-        # horn to finish before returning, which relieves us from
-        # handling that delay in the (already onerous) scan point
-        # timing.
+        # Seek to starting position.  Note "legs" will always include
+        # at least 2 points; first point being current (az, el).
         self.log.info(f'Moving to start position, az={plan["init_az"]}, el={init_el}')
-        legs, msg = yield self._get_sunsafe_moves(plan['init_az'], init_el,
-                                                  zero_legs_ok=False)
+        legs, msg = yield self._get_sunsafe_moves(plan['init_az'], init_el)
         if msg is not None:
             self.log.error(msg)
             return False, msg
-        for leg_az, leg_el in legs:
+        hwp_safe, msg = yield self._check_hwpsafe_legs(legs)
+        if not hwp_safe:
+            msg = f'Move to start position not permitted: {msg}'
+            self.log.info('{msg}', msg=msg)
+            return False, msg
+
+        # Also validate the scan generally -- need to be movable in az.
+        hwp_safe, msg = yield self._check_hwpsafe(init_el, init_el, axes=['az'])
+        if not hwp_safe:
+            msg = f'Const-el scan not permitted: {msg}'
+            self.log.info(msg)
+            return False, msg
+
+        for leg_az, leg_el in legs[1:]:
             ok, msg = yield self._go_to_axes(session, az=leg_az, el=leg_el)
             if not ok:
                 return False, f'Start position seek failed with message: {msg}'
@@ -1921,13 +2026,21 @@ class ACUAgent:
         # refill threshold.
         MIN_STACK_POP = 6  # points
 
-        if point_batch_count is None:
-            point_batch_count = 0
+        # Minimum amount of time (seconds), in advance, to populate
+        # the trajectory.  In cases where step_time is short, this
+        # creates a longer track window to survive agent outages.
+        # (The cost is that stopping a scan may take a little longer.)
+        MIN_STACK_ADVANCE_TIME = 3.
 
-        STACK_REFILL_THRESHOLD = FULL_STACK - \
-            max(MIN_STACK_POP + LOOP_STEP / step_time, point_batch_count)
-        STACK_TARGET = FULL_STACK - \
-            max(MIN_STACK_POP * 2 + LOOP_STEP / step_time, point_batch_count * 2)
+        # Minimum nuber of points to keep in the stack.
+        _pbc = max(MIN_STACK_POP, MIN_STACK_ADVANCE_TIME / step_time)
+        if point_batch_count is None or _pbc > point_batch_count:
+            point_batch_count = _pbc
+
+        STACK_REFILL_THRESHOLD = \
+            FULL_STACK - point_batch_count - LOOP_STEP / step_time
+        STACK_TARGET = \
+            FULL_STACK - point_batch_count * 2 - LOOP_STEP / step_time
 
         # Special error bits to watch here
         PTRACK_FAULT_KEYS = [
@@ -1957,24 +2070,30 @@ class ACUAgent:
 
             # Values for mode are:
             # - 'go' -- keep uploading points (unless there are no more to upload).
-            # - 'stop' -- do not request more points from generator; finish the ones you have.
-            # - 'abort' -- do not upload more points; exit loop and clear stack.
+            # - 'stop' -- do not request more points from generator;
+            #   finish the ones that are already in "points", let the stack empty,
+            #   and wait for settling condition.
+            # - 'abort' -- do not upload more points; exit loop with error; wait
+            #   a few seconds and clear the stack.
             mode = 'go'
 
             lines = []
             last_mode = None
-            was_graceful_exit = True
+            last_upload_az = None
             start_time = time.time()
             got_progtrack = False
             faults = {}
             got_points_in = False
             first_upload_time = None
+            wait_stop_timeout = None
 
             while True:
                 now = time.time()
                 current_modes = {'Az': self.data['status']['summary']['Azimuth_mode'],
                                  'El': self.data['status']['summary']['Elevation_mode'],
                                  'Remote': self.data['status']['platform_status']['Remote_mode']}
+                az_state = {'pos': self.data['status']['summary']['Azimuth_current_position'],
+                            'vel': self.data['status']['summary']['Azimuth_current_velocity']}
                 free_positions = self.data['status']['summary']['Free_upload_positions']
 
                 # Use this var to detect case where we're uploading
@@ -2000,11 +2119,9 @@ class ACUAgent:
                         if got_progtrack:
                             self.log.warn('Unexpected exit from ProgramTrack mode!')
                             mode = 'abort'
-                            was_graceful_exit = False
                         elif now - start_time > MAX_PROGTRACK_SET_TIME:
                             self.log.warn('Failed to set ProgramTrack mode in a timely fashion.')
                             mode = 'abort'
-                            was_graceful_exit = False
                     if not got_points_in and (first_upload_time is not None) \
                        and (now - first_upload_time > 10):
                         self.log.warn('ACU seems to be dumping our track. Vel too high?')
@@ -2012,9 +2129,10 @@ class ACUAgent:
                     if current_modes['Remote'] == 0:
                         self.log.warn('ACU no longer in remote mode!')
                         mode = 'abort'
-                        was_graceful_exit = False
                     if session.status == 'stopping':
-                        mode = 'abort'
+                        mode = 'stop'
+                        stop_message = 'User-requested stop.'
+                        lines = []
 
                 if mode == 'abort':
                     lines = []
@@ -2028,64 +2146,84 @@ class ACUAgent:
                     # after "grabbing the minimum batch", below, there
                     # is still >= 1 line left.  The lines-is-empty
                     # check is used to decide we're done.
-                    while mode == 'go' and (len(lines) <= new_line_target or lines[-1][0] != 0):
+                    while mode == 'go' and (len(lines) <= new_line_target or lines[-1].group_flag != 0):
                         try:
                             lines.extend(next(point_gen))
                         except StopIteration:
                             mode = 'stop'
+                            stop_message = 'Stop due to end of the planned track.'
 
                     # Grab the minimum batch
                     upload_lines, lines = lines[:new_line_target], lines[new_line_target:]
 
                     # If the last line has a "group" flag, keep transferring lines.
-                    while len(lines) and len(upload_lines) and upload_lines[-1][0] != 0:
+                    while len(lines) and len(upload_lines) and upload_lines[-1].group_flag != 0:
                         upload_lines.append(lines.pop(0))
 
                     if len(upload_lines):
                         # Discard the group flag and upload all.
-                        text = ''.join([line for _flag, line in upload_lines])
-                        # This seems to return b'Ok.' no matter ~what,
-                        # so not much point checking it.
-                        yield self.acu_control.http.UploadPtStack(text)
+                        text = sh.get_track_points_text(
+                            upload_lines, timestamp_offset=3, text_block=True)
+                        for attempt in range(5):
+                            _dt = time.time()
+                            try:
+                                # This seems to return b'Ok.' no matter ~what,
+                                # so not much point checking it.
+                                yield self.acu_control.http.UploadPtStack(text)
+                                break
+                            except Exception as err:
+                                _dt = time.time() - _dt
+                                self.log.warn(f'Upload {len(upload_lines)} failed (attempt {attempt}) after {_dt:.3f} seconds')
+                                self.log.warn('Exception was: {err}', err=err)
+                        else:
+                            raise RuntimeError('Upload fail.')
                         if first_upload_time is None:
                             first_upload_time = time.time()
+                        last_upload_az = upload_lines[-1].az
 
                 if len(lines) == 0 and free_positions >= FULL_STACK - 1:
-                    break
+                    if mode == 'stop':
+                        if wait_stop_timeout is None:
+                            self.log.info('Stack is empty; waiting for settling...')
+                            wait_stop_timeout = now + 20.
+                        elif now > wait_stop_timeout:
+                            self.log.warn('Graceful stop condition not met in a timely fashion.')
+                            mode = 'abort'
+                        # Await safe exit condition.
+                        pos_ok = last_upload_az is None or (
+                            abs(az_state['pos'] - last_upload_az) < 0.01)
+                        vel_ok = abs(abs(az_state['vel']) < .01)
+                        if pos_ok and vel_ok:
+                            break
+                    else:
+                        self.log.warn('Somehow ran out of points!')
+                        break
 
                 yield dsleep(LOOP_STEP)
 
             # Go to Stop mode?
             # yield self.acu_control.stop()
 
-            # Clear the stack, but wait a bit or it can cause a fault.
-            # Yes, sometimes you have to wait a very long time ...
-            yield dsleep(10)
+            # Wait a couple more seconds and clear the stack.
+            yield dsleep(2)
             yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
                                                 'Clear Stack')
 
-        if not was_graceful_exit:
+        if mode == 'abort':
             return False, 'Problems during scan'
-        return True, 'Scan ended cleanly'
+        return True, f'Scan ended. {stop_message}'
 
     #
     # Sun Safety Monitoring and Active Avoidance
     #
 
-    def _reset_sun_params(self, enabled=None, radius=None):
-        """Resets self.sun_params based on defaults for this platform.  Note
-        if enabled or radius are specified here, they update the
-        defaults (so they endure for the life of the agent).
+    def _reset_sun_params(self):
+        """Resets self.sun_params based on the instance defaults, and
+        motion_limits.  This must be called at least once, on startup,
+        to set up Sun monitoring and avoidance properly.
 
         """
-        config = SUN_CONFIGS[self.acu_config['platform']]
-
-        # These params update config for the entire run of agent.
-        if enabled is not None:
-            config['enabled'] = bool(enabled)
-        if radius is not None:
-            config['policy']['exclusion_radius'] = radius
-
+        # Set up sun_params data structure.
         _p = {
             # Global enable (but see "disable_until").
             'active_avoidance': False,
@@ -2111,20 +2249,34 @@ class ACUAgent:
             },
 
             # Avoidance policy, for use in avoidance decisions.
-            'policy': None,
+            'policy': {},
         }
 
-        # Populate default policy based on platform.
-        _p['active_avoidance'] = config['enabled']
-        _p['policy'] = config['policy']
+        # Active avoidance?
+        _p['active_avoidance'] = self.sun_config['enabled']
 
-        # And add in platform limits
+        # Avoidance requires platform limits and move policies
         _p['policy'].update({
             'min_az': self.motion_limits['azimuth']['lower'],
             'max_az': self.motion_limits['azimuth']['upper'],
             'min_el': self.motion_limits['elevation']['lower'],
             'max_el': self.motion_limits['elevation']['upper'],
+            'axes_sequential': self.motion_limits.get('axes_sequential', False),
         })
+
+        # User parameters defining the danger zone, and escape
+        # policies.  This list should be kept consistent with the
+        # preamble docs in avoidance.py.
+        for k in [
+                'exclusion_radius',
+                'min_sun_time',
+                'response_time',
+                'el_horizon',
+                'el_dodging',
+                'axes_sequential',
+        ]:
+            if k in self.sun_config:
+                _p['policy'][k] = self.sun_config[k]
 
         self.sun_params = _p
 
@@ -2394,11 +2546,11 @@ class ACUAgent:
     @ocs_agent.param('enable', type=bool, default=None)
     @ocs_agent.param('temporary_disable', type=float, default=None)
     @ocs_agent.param('escape', type=bool, default=None)
-    @ocs_agent.param('avoidance_radius', type=float, default=None)
+    @ocs_agent.param('exclusion_radius', type=float, default=None)
     @ocs_agent.param('shift_sun_hours', type=float, default=None)
     def update_sun(self, session, params):
-        """update_sun(reset=None, enable=None, temporary_disable=None,
-                      escape=None, avoidance_radius=None,
+        """update_sun(reset=None, enable=None, temporary_disable=None, \
+                      escape=None, exclusion_radius=None, \
                       shift_sun_hours=None)
 
         **Task** - Update Sun monitoring and avoidance parameters.
@@ -2416,7 +2568,7 @@ class ACUAgent:
             this number of seconds.
           escape (bool): If True, schedule an escape drill for 10
             seconds from now.
-          avoidance_radius (float): If set, change the FOV radius
+          exclusion_radius (float): If set, change the FOV radius
             (degrees), for Sun avoidance purposes, to this number.
           shift_sun_hours (float): If set, compute the Sun position as
             though it were this many hours in the future.  This is for
@@ -2441,9 +2593,9 @@ class ACUAgent:
         if params['escape']:
             self.log.warn('Setting sun escape drill to start in 10 seconds.')
             self.sun_params['next_drill'] = now + 10
-        if params['avoidance_radius'] is not None:
+        if params['exclusion_radius'] is not None:
             self.sun_params['policy']['exclusion_radius'] = \
-                params['avoidance_radius']
+                params['exclusion_radius']
             do_recompute = True
         if params['shift_sun_hours'] is not None:
             self.sun_params['safety_map_kw']['sun_time_shift'] = \
@@ -2581,28 +2733,46 @@ class ACUAgent:
 
         return safe, msg
 
-    def _get_sunsafe_moves(self, target_az, target_el, zero_legs_ok=True):
+    def _get_sunsafe_moves(self, target_az, target_el):
         """Given a target position, find a Sun-safe way to get there.  This
         will either be a direct move, or else an ordered slew in az
         before el (or vice versa).
+
+        If target_az or target_el are None, they are taken to be the
+        current axis position.
 
         Returns (legs, msg).  If legs is None, it indicates that no
         Sun-safe path could be found; msg is an error message.  If a
         path can be found, the legs is a list of intermediate move
         targets, ``[(az0, el0), (az1, el1) ...]``, terminating on
-        ``(target_az, target_el)``.  msg is None in that case.
+        ``(target_az, target_el)``.  msg is None in that case.  The
+        first position (az0, el0) is the current position of the
+        platform.
 
-        In the case that platform is already at the target position,
-        an empty list of legs will be returned unless zero_legs_ok is
-        False in which case a 1-entry list of legs is returned, with
-        the target position in it.
+        In the case that the platform is already at the target
+        position, the returned list will still have 2 entries.
 
         When Sun avoidance is not enabled, this function returns as
-        though the direct path to the target is a safe one.
+        though the direct path to the target is a safe one (though
+        axes_sequential=True may cause an intermediate step to be
+        added).
 
         """
+        # Get current position.
+        (az0, el0), msg = self._current_azel()
+        if az0 is None:
+            return None, msg
+
+        if target_az is None:
+            target_az = az0
+        if target_el is None:
+            target_el = el0
+
         if not self._get_sun_policy('sunsafe_moves'):
-            return [(target_az, target_el)], None
+            if self.motion_limits.get('axes_sequential'):
+                # Move in az first, then el.
+                return [(target_az, el0), (target_az, target_el)], None
+            return [(az0, el0), (target_az, target_el)], None
 
         if not self._get_sun_policy('map_valid'):
             return None, 'Sun Safety Map not computed or stale; run the monitor_sun process.'
@@ -2611,24 +2781,334 @@ class ACUAgent:
         if self.sun.check_trajectory([target_az], [target_el])['sun_time'] <= 0:
             return None, 'Requested target position is not Sun-Safe.'
 
-        # Ok, so where are we now ...
-        try:
-            az, el = [self.data['status']['summary'][f'{ax}_current_position']
-                      for ax in ['Azimuth', 'Elevation']]
-            if az is None or el is None:
-                raise KeyError
-        except KeyError:
-            return None, 'Current position could not be determined.'
-
-        moves = self.sun.analyze_paths(az, el, target_az, target_el)
+        moves = self.sun.analyze_paths(az0, el0, target_az, target_el)
         move, decisions = self.sun.select_move(moves)
         if move is None:
             return None, 'No Sun-Safe moves could be identified!'
 
         legs = list(move['moves'].nodes)
-        if len(legs) == 1 and not zero_legs_ok:
-            return legs, None
-        return legs[1:], None
+        if len(legs) == 1:
+            # Pad to two entries.
+            return [legs[0], legs[0]], None
+        return legs, None
+
+    #
+    # HWP State Safety
+    #
+
+    @inlineCallbacks
+    def monitor_hwp(self, session, params):
+        """monitor_hwp()
+
+        **Process** - Monitors the state of a HWP, by querying a
+        HWPSupervisor's ``monitor`` Process session data.  Assesses
+        what motions are permitted, given the HWP state.
+
+        session.data example::
+
+          {
+            "interlocks_config": {
+              "configured": true,
+              "enabled": true,
+              "instance_id": "hwp-supervisor",
+              "limit_sun_avoidance": true,
+              "tolerance": 0.1,
+            },
+            "supervisor_data": {
+              "timestamp": 1744692973.185377,
+              "ok": true,
+              "err_msg": "",
+              "_grip_brakes": [1, 1, 1],
+              "_grip_state": "ungripped",
+              "_is_spinning": true,
+              "_target_freq": 2.1,
+              "grip_state": "ungripped",
+              "spin_state": "spinning",
+              "request_block_motion": null,
+              "request_block_motion_timestamp": null
+            },
+            "allowed": {
+              "el": [true, [40, 70], [
+                [40, 70],
+              ],
+              "az": [true, [40, 70], [
+                [40, 70],
+              ],
+              "third": [false, null, []],
+            }
+          }
+
+        """
+        if not self.hwp_rules.configured:
+            session.data = {
+                'interlocks_config': self.hwp_rules.encoded(basic=True),
+            }
+            return False, "HWP Interlocks not configured - monitoring blocked."
+
+        def _update_sun_lims(el_range):
+            if el_range is None:
+                el_range = (self.motion_limits['elevation']['lower'],
+                            self.motion_limits['elevation']['upper'])
+            # Is this a change to sun policy?
+            if tuple(el_range) != (self.sun_params['policy']['min_el'],
+                                   self.sun_params['policy']['max_el']):
+                self.sun_params['policy']['min_el'] = el_range[0]
+                self.sun_params['policy']['max_el'] = el_range[1]
+                self.sun_params['recompute_req'] = True
+
+        pacer = Pacemaker(1.)
+        last_enabled = False
+        hwp_supervisor = self.hwp_rules.get_client()
+
+        while session.status == 'running':
+            new_data = yield threads.deferToThread(hwp_supervisor.update)
+            new_sd = {
+                'interlocks_config': self.hwp_rules.encoded(basic=True),
+                'supervisor_data': new_data,
+            }
+            (_, el), msg = self._current_azel()
+            allowed = self.hwp_rules.test_range(
+                (None if el is None else (el, el)),
+                new_data.get('grip_state'),
+                new_data.get('spin_state'))
+            new_sd['allowed'] = allowed
+
+            session.data = new_sd
+            self.data['hwp'] = new_data
+
+            if self.hwp_rules.enabled:
+                if self.hwp_rules.limit_sun_avoidance and el is not None:
+                    tol = self.hwp_rules.tolerance
+                    if allowed['el'][0]:
+                        _update_sun_lims(allowed['el'][1])
+                    else:
+                        # If we're in a forbidden spot ... just try to
+                        # keep it at this el for now, and hopefully
+                        # HWPSupervisor will improve things soon.
+                        _update_sun_lims((el - tol, el + tol))
+            elif last_enabled and self.hwp_rules.limit_sun_avoidance:
+                # Restore the sun_params default elevation range.
+                _update_sun_lims(None)
+
+            last_enabled = self.hwp_rules.enabled
+            yield pacer.dsleep()
+        return True, "Bye."
+
+    @ocs_agent.param('enable', type=bool, default=None)
+    def update_hwp(self, session, params):
+        """update_hwp(enable=None)
+
+        **Task** - Update HWP state monitoring and safety parameters.
+
+        All arguments are optional.
+
+        Args:
+          enable (bool): If True, enable HWP state checks.  If False,
+            disable HWP state checks (non-temporarily).
+
+        """
+        self.log.info('update_hwp params: {params}',
+                      params={k: v for k, v in params.items()
+                              if v is not None})
+
+        if not self.hwp_rules.configured:
+            return False, 'HWP interlocks not configured in config file.'
+
+        if params['enable'] is not None:
+            self.hwp_rules.enabled = params['enable']
+
+        return True, 'Params updated.'
+
+    def _check_hwpsafe(self, el1, el2, axes, hwp_data=None):
+        """Checks whether certain axis motions are permitted, over a
+        certain range of elevations.
+
+        Args:
+          el1, el2: elevation range over which the checks should be
+            considered.
+          axes: list of axes to check for permission on (taken from
+            'el', 'az', 'third').
+          hwp_data: dict from which to get grip_state and spin_state;
+            if not provided, uses self.data['hwp'].
+
+        Returns:
+          motions_permitted (bool): whether all requested axes are
+            permitted to move, given the HWP state and el range.
+          message (str): helpful text.
+
+        Note that when hwp_rules are not enabled, motions are
+        generally permitted by this function.
+
+        See additional helper functions, _check_hwpsafe_here and
+        _check_hwpsafe_legs.
+
+        """
+        if not self.hwp_rules.enabled:
+            return (True, "HWP monitoring is disabled.")
+
+        # Grab a self-consistent copy...
+        if hwp_data is None:
+            hwp_data = self.data['hwp']
+
+        # Check staleness
+        if time.time() - hwp_data.get('timestamp', 0) > 10:
+            return False, "HWP monitoring dataset is stale; cannot validate move."
+
+        # Check it.
+        state_args = {
+            'el_range': [el1, el2],
+            'grip_state': hwp_data.get('grip_state'),
+            'spin_state': hwp_data.get('spin_state'),
+        }
+        axes_ok = self.hwp_rules.test_range(**state_args)
+        for ax in axes:
+            if not axes_ok[ax][0]:
+                return (False, (f"Motion in {ax} not permitted due to HWP rules "
+                                f"for {state_args}."))
+        return axes_ok, 'All requested axes pass the HWP rules.'
+
+    def _check_hwpsafe_here(self, axes):
+        """Check whether motion in ``axes`` is permitted, at the
+        present elevation and hwp state.
+
+        """
+        if not self.hwp_rules.enabled:
+            return (True, "HWP monitoring is disabled.")
+
+        (_, el), msg = self._current_azel()
+        if el is None:
+            return False, f'HWP safety could not be ensured: {msg}'
+        return self._check_hwpsafe(el, el, axes)
+
+    def _check_hwpsafe_legs(self, legs):
+        """Check whether motions specified by legs (list of (az, el)
+        positions) are permitted, given the current HWP state.
+
+        """
+        if not self.hwp_rules.enabled:
+            return (True, "HWP monitoring is disabled.")
+
+        hwp_data = self.data['hwp']
+        for (az1, el1), (az2, el2) in zip(legs[:-1], legs[1:]):
+            axes = []
+            if abs(el2 - el1) > self.hwp_rules.tolerance:
+                axes.append('el')
+            if abs(az2 - az1) > self.hwp_rules.tolerance:
+                axes.append('az')
+            ok, msg = self._check_hwpsafe(el1, el2, axes, hwp_data=hwp_data)
+            if not ok:
+                return False, msg
+        return (True, "All moves passed HWP safety checks.")
+
+    #
+    # Exercise!
+    #
+
+    @ocs_agent.param('action', choices=['open', 'close'])
+    @inlineCallbacks
+    def set_shutter(self, session, params):
+        """set_shutter(action)
+
+        **Task** - Request a (LAT) shutter action, wait for it to
+        complete or fail.
+
+        Args:
+          action (str): 'open' or 'close'
+
+        """
+        def log(msg):
+            session.add_message(msg)
+
+        log(f'requested action={params["action"]}')
+
+        if self.data['status'].get('shutter', {}).get('Shutter_open') is None:
+            return False, 'Shutter dataset does not seem to be populating.'
+
+        if params['action'] == 'open':
+            dset_cmd = 'ShutterOpen'
+            desired_key, undesired_key = 'Shutter_open', 'Shutter_closed'
+        else:
+            dset_cmd = 'ShutterClose'
+            desired_key, undesired_key = 'Shutter_closed', 'Shutter_open'
+
+        # This just needs to be longer than 1 loop time.
+        STATE_WAIT = 5.
+
+        # Shutter typically closes in ~45 seconds.  But in early tests
+        # it sometimes takes an additional 45 seconds for moving->0.
+        MOVING_WAIT = 120.
+
+        state = 'init'
+        session.data = {'state': state,
+                        'timestamp': time.time()}
+
+        while (session.status in ['starting', 'running']
+               and state not in ['done', 'error']):
+            last_state = state
+            now = time.time()
+
+            az, el = [self.data['status']['summary'][f'{ax}_current_position']
+                      for ax in ['Azimuth', 'Elevation']]
+            shutter = self.data['status']['shutter']
+
+            for bad_key in ['Shutter_timeout', 'Shutter_failure']:
+                if shutter[bad_key]:
+                    state = 'error'
+                    message = f'Detected error state: {bad_key}'
+
+            if state in ['error', 'done']:
+                pass
+
+            elif state == 'init':
+                # Issue the command
+                result = yield self.acu_control.Command(self.datasets['shutter'], dset_cmd)
+                if result in OK_RESPONSES:
+                    state = 'wait-moving'
+                    timeout = time.time() + STATE_WAIT
+                else:
+                    state = 'error'
+                    message = 'Failed to issue shutter command.'
+
+            elif state == 'wait-moving':
+                if now > timeout:
+                    state = 'error'
+                    message = 'Shutter failed to start moving.'
+                elif shutter['Shutter_moving']:
+                    state = 'wait-stopped'
+                    timeout = now + MOVING_WAIT
+
+            elif state == 'wait-stopped':
+                if now > timeout:
+                    state = 'error'
+                    message = 'Shutter will not stop moving.'
+                elif not shutter['Shutter_moving']:
+                    state = 'wait-final'
+                    timeout = now + STATE_WAIT
+
+            elif state == 'wait-final':
+                if now > timeout:
+                    state = 'error'
+                    message = 'Shutter failed to reach final expected state.'
+                elif shutter[desired_key] and not shutter[undesired_key]:
+                    state = 'done'
+                    message = 'Shutter move successful.'
+
+            else:
+                message = f'invalid state: {state}'
+                state = 'error'
+
+            session.data['state'] = state
+            if state != last_state:
+                log(f'set_shutter: state is now "{state}"')
+                last_state = state
+            yield dsleep(1)
+
+        if state == 'done':
+            return True, message
+        elif state == 'error':
+            return False, message
+
+        return False, 'Aborted in state {state}'
 
     @ocs_agent.param('starting_index', type=int, default=0)
     def exercise(self, session, params):
@@ -2757,10 +3237,9 @@ def add_agent_args(parser_in=None):
         parser_in = argparse.ArgumentParser()
     pgroup = parser_in.add_argument_group('Agent Options')
     pgroup.add_argument("--acu-config")
-    pgroup.add_argument("--exercise-plan")
     pgroup.add_argument("--no-processes", action='store_true',
                         default=False)
-    pgroup.add_argument("--ignore-axes", choices=['el', 'az', 'third'],
+    pgroup.add_argument("--ignore-axes", choices=['el', 'az', 'third', 'none'],
                         nargs='+', help="One or more axes to ignore.")
     pgroup.add_argument("--disable-idle-reset", action='store_true',
                         help="Disable idle_reset, even for LAT.")
@@ -2768,14 +3247,10 @@ def add_agent_args(parser_in=None):
                         help="Override the minimum el defined in platform config.")
     pgroup.add_argument("--max-el", type=float,
                         help="Override the maximum el defined in platform config.")
-    pgroup.add_argument("--avoid-sun", type=int,
-                        help="Pass 0 or 1 to disable or enable Sun avoidance. "
-                        "Overrides the platform default config.")
-    pgroup.add_argument("--fov-radius", type=float,
-                        help="Override the default field-of-view (radius in "
-                        "degrees) for Sun avoidance purposes.")
-    pgroup.add_argument("--named-positions", nargs='+',
-                        help="Define named positions, for go_to_named; e.g. 'home=180,60'.")
+    pgroup.add_argument("--disable-sun-avoidance", action='store_true',
+                        help="Disable Sun Avoidance before startup.")
+    pgroup.add_argument("--disable-hwp-interlocks", action='store_true',
+                        help="Disable HWP interlocks before startup.")
 
     return parser_in
 
@@ -2787,15 +3262,14 @@ def main(args=None):
                                   args=args)
 
     agent, runner = ocs_agent.init_site_agent(args)
-    _ = ACUAgent(agent, args.acu_config, args.exercise_plan,
+    _ = ACUAgent(agent, args.acu_config,
                  startup=not args.no_processes,
                  ignore_axes=args.ignore_axes,
                  disable_idle_reset=args.disable_idle_reset,
-                 avoid_sun=args.avoid_sun,
-                 fov_radius=args.fov_radius,
+                 disable_sun_avoidance=args.disable_sun_avoidance,
+                 disable_hwp_interlocks=args.disable_hwp_interlocks,
                  min_el=args.min_el,
-                 max_el=args.max_el,
-                 named_positions=args.named_positions)
+                 max_el=args.max_el)
 
     runner.run(agent, auto_reconnect=True)
 

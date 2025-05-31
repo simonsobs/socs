@@ -99,6 +99,7 @@ autodoc_mock_imports = ['spt3g',
                         'xy_agent.xy_connect',
                         'soaculib',
                         'scan_helpers',
+                        'soaculib.retwisted_backend',
                         'soaculib.twisted_backend',
                         'soaculib.status_keys',
                         'pfeiffer_vacuum_protocol',
@@ -109,6 +110,8 @@ autodoc_mock_imports = ['spt3g',
                         'sodetlib.det_config',
                         'src',
                         'src.pid_controller',
+                        'cv2',
+                        'imutils',
                         ]
 from unittest import mock
 

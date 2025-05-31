@@ -14,6 +14,7 @@ exclude =
     socs/mibs/MBG-SNMP-LTNG-MIB.py,
     socs/mibs/SNMPv2-MIB.py,
     socs/mibs/MBG-SNMP-ROOT-MIB.py,
+    socs/mibs/IBOOTBAR-MIB.py,
     socs/mibs/IBOOTPDU-MIB.py,
     socs/mibs/UPS-MIB.py,
     socs/mibs/MBG-SYNCBOX-N2X-MIB.py,
