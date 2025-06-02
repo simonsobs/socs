@@ -180,7 +180,7 @@ class PfeifferTC400:
         if turbo_response not in PFEIFFER_BOOL:
             raise ValueError(f"Unrecognized response from turbo: {turbo_response}")
         else:
-            return turbo_response == "111111"
+            return turbo_response == "000000"
 
     def acknowledge_turbo_errors(self):
         """Acknowledges the turbo errors. This is analagous to clearing the errors.

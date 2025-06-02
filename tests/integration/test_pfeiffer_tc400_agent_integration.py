@@ -108,7 +108,7 @@ def test_pfeiffer_tc400_turn_turbo_off(wait_for_crossbar, emulator, run_agent,
                                        client):
     client.init()
 
-    responses = {'0011002306000000013': format_reply('111111'),  # turn_turbo_motor_on()
+    responses = {'0011002306000000013': format_reply('000000'),  # turn_turbo_motor_off()
                  '0011001006000000009': format_reply('111111'),  # unready_turbo()
                  }
     emulator.define_responses(responses)
@@ -123,7 +123,7 @@ def test_pfeiffer_tc400_turn_turbo_off_failed(wait_for_crossbar, emulator,
                                               run_agent, client):
     client.init()
 
-    responses = {'0011002306000000013': format_reply('000000'),  # turn_turbo_motor_on()
+    responses = {'0011002306000000013': format_reply('111111'),  # turn_turbo_motor_off()
                  '0011001006000000009': format_reply('111111'),  # unready_turbo()
                  }
     emulator.define_responses(responses)
@@ -139,7 +139,7 @@ def test_pfeiffer_tc400_turn_turbo_off_failed_unready(wait_for_crossbar,
                                                       client):
     client.init()
 
-    responses = {'0011002306000000013': format_reply('111111'),  # turn_turbo_motor_on()
+    responses = {'0011002306000000013': format_reply('000000'),  # turn_turbo_motor_off()
                  '0011001006000000009': format_reply('000000'),  # unready_turbo()
                  }
     emulator.define_responses(responses)
