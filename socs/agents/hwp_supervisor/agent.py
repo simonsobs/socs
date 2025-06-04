@@ -353,6 +353,7 @@ class HWPState:
     pmx_last_updated: Optional[float] = None
 
     enc_freq: Optional[float] = None
+    encoder_last_updated: Optional[float] = None
     last_quad: Optional[float] = None
     last_quad_time: Optional[float] = None
 
@@ -404,8 +405,8 @@ class HWPState:
         if not args.no_acu:
             self.acu = ACUState(
                 instance_id=args.acu_instance_id,
-                min_el=args.acu_min_el,
-                max_el=args.acu_max_el,
+                min_el=args.acu_min_el - args.acu_tol_el,
+                max_el=args.acu_max_el + args.acu_tol_el,
                 max_time_since_update=args.acu_max_time_since_update,
                 mount_velocity_grip_thresh=args.mount_velocity_grip_thresh,
                 grip_max_boresight_angle=args.grip_max_boresight_angle,
@@ -1539,6 +1540,7 @@ class HWPSupervisor:
                     'driver_iboot': None,
                     'enc_freq': None,
                     'enc_instance_id': 'hwp-enc',
+                    'encoder_last_updated': None,
                     'gripper': {
                         'brake': [0, 0, 0],
                         'emg': [0, 0, 0],
@@ -2059,6 +2061,10 @@ def make_parser(parser=None):
     pgroup.add_argument(
         '--acu-max-el', type=float, default=90.0,
         help="Max elevation that HWP spin up is allowed",
+    )
+    pgroup.add_argument(
+        '--acu-tol-el', type=float, default=0.1,
+        help="Amount of tolerance in elevation allowed when HWP spin up",
     )
     pgroup.add_argument(
         '--acu-max-time-since-update', type=float, default=30.0,
