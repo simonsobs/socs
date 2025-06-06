@@ -7,10 +7,21 @@ import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
-from socs.agents.srs_cg635m.drivers import SRS_CG635m_Interface
+from socs.agents.srs_cg635.drivers import SRSCG635Interface
 
 
-class SRSCG635mAgent:
+class SRSCG635Agent:
+    """Class to retrieve data from the SRS CG635 clock.
+
+    Parameters
+    ----------
+    agent : ocs_agent.OCSAgent
+        Instantiated OCSAgent class for this Agent.
+    ip_address : str
+        IP address of the Prologix GPIB interface.
+    gpib_slot : int
+        GPIB address set on the SRS CG635.
+    """
     def __init__(self, agent, ip_address, gpib_slot):
         self.agent = agent
         self.log = agent.log
@@ -49,7 +60,7 @@ class SRSCG635mAgent:
                 return False, "Could not acquire lock"
 
             try:
-                self.clock = SRS_CG635m_Interface(self.ip_address, self.gpib_slot)
+                self.clock = SRSCG635Interface(self.ip_address, self.gpib_slot)
                 self.idn = self.clock.identify()
 
             except socket.timeout as e:
@@ -70,7 +81,7 @@ class SRSCG635mAgent:
         """acq(wait=1, test_mode=False)
 
         **Process** - Continuously monitor srs clock lock registers
-        and send info to aggregator.
+        and publish to a feed.
 
         The ``session.data`` object stores the most recent published values
         in a dictionary. For example::
@@ -92,7 +103,7 @@ class SRSCG635mAgent:
                 }
             }
 
-        Refer to drivers.py for interpretation of outputs.
+        Refer to drivers for interpretation of outputs.
 
         Parameters
         ----------
@@ -180,7 +191,7 @@ def main(args=None):
     # Get the default ocs agrument parser
     parser = make_parser()
 
-    args = site_config.parse_args(agent_class='SRSCG635mAgent',
+    args = site_config.parse_args(agent_class='SRSCG635Agent',
                                   parser=parser,
                                   args=args)
 
@@ -190,7 +201,7 @@ def main(args=None):
 
     agent, runner = ocs_agent.init_site_agent(args)
 
-    p = SRSCG635mAgent(agent, args.ip_address, int(args.gpib_slot))
+    p = SRSCG635Agent(agent, args.ip_address, int(args.gpib_slot))
 
     agent.register_task('init', p.init, startup=init_params)
     agent.register_process('acq', p.acq, p._stop_acq)
