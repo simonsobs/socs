@@ -75,7 +75,7 @@ class SRSCG635Agent:
             self.agent.start('acq')
 
         return True, 'Initialized Clock.'
-    
+
     def _initialize_interface(self):
         """Initialize the SRSCG635 interface."""
         try:
