@@ -6,7 +6,7 @@ import time
 import txaio
 import yaml
 from sqlalchemy import (Boolean, Column, Float, ForeignKey, Integer, String,
-                        asc, create_engine)
+                        asc, create_engine, text)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
@@ -205,6 +205,7 @@ class SupRsyncFilesManager:
         self, db_path: str, create_all: bool = True, echo: bool = False,
         pool_size: int = 5, max_overflow: int = 10
     ) -> None:
+        self.log = txaio.make_logger()
         db_path = os.path.abspath(db_path)
         if not os.path.exists(os.path.dirname(db_path)):
             os.makedirs(os.path.dirname(db_path))
@@ -213,6 +214,12 @@ class SupRsyncFilesManager:
             f'sqlite:///{db_path}', echo=echo,
             pool_size=pool_size, max_overflow=max_overflow,
         )
+
+        # Use WAL to reduce concurrency issues
+        with self._engine.connect() as conn:
+            result = conn.execute(text("PRAGMA journal_mode=WAL"))
+            self.log.info(f"SQLite journal_mode is: {result.scalar()}")
+
         self.Session = sessionmaker(bind=self._engine)
 
         if create_all:
