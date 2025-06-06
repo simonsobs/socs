@@ -155,3 +155,8 @@ class SRSCG635Interface(PrologixInterface):
             print("Invalid LCKR returned, cannot decode")
 
         return registers
+
+    def clear(self):
+        """Clear all the event registers and error queue."""
+        self.write("*CLS")
+        return True

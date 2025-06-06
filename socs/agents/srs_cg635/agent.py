@@ -64,7 +64,7 @@ class SRSCG635Agent:
                 self.clock = SRSCG635Interface(self.ip_address, self.gpib_slot)
                 self.idn = self.clock.identify()
 
-            except socket.timeout as e:
+            except (socket.timeout, OSError) as e:
                 self.log.error(f"Clock timed out during connect: {e}")
                 return False, "Timeout"
             self.log.info("Connected to Clock: {}".format(self.idn))
@@ -75,6 +75,21 @@ class SRSCG635Agent:
             self.agent.start('acq')
 
         return True, 'Initialized Clock.'
+    
+    def _initialize_interface(self):
+        """Initialize the SRSCG635 interface."""
+        try:
+            self.clock = SRSCG635Interface(self.ip_address, self.gpib_slot)
+        except (socket.timeout, OSError) as e:
+            self.log.error(f"Clock timed out during connect: {e}")
+            self.clock = None
+            return False
+
+        self.idn = self.clock.identify()
+        self.log.info("Connected to Clock: {}".format(self.idn))
+        self.log.info("Clearing event registers and error queue.")
+        self.clock.clear()
+        return True
 
     @ocs_agent.param('test_mode', default=False, type=bool)
     @ocs_agent.param('wait', default=1, type=float)
@@ -117,6 +132,11 @@ class SRSCG635Agent:
         while self.monitor:
             with self.lock.acquire_timeout(1) as acquired:
                 if acquired:
+                    if not self.clock:
+                        self.log.info("Trying to reconnect...")
+                        self._initialize_interface()
+                        continue
+
                     data = {
                         'timestamp': time.time(),
                         'block_name': 'clock_output',
@@ -137,8 +157,9 @@ class SRSCG635Agent:
                             # Two of the registers start with an number
                             data['data']["PLL_" + register] = status
 
-                    except ValueError as e:
-                        self.log.error(f"Error in collecting data: {e}")
+                    except socket.timeout as e:
+                        self.log.error(f"Timeout in retrieving clock data: {e}")
+                        self.clock = None
                         continue
 
                     self.agent.publish_to_feed('srs_clock', data)
@@ -177,8 +198,8 @@ def make_parser(parser=None):
     pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--ip-address', type=str, help="Internal GPIB IP Address")
     pgroup.add_argument('--gpib-slot', type=int, help="Internal SRS GPIB Address")
-    pgroup.add_argument('--mode', type=str, help="Set to acq to run acq on "
-                        + "startup")
+    pgroup.add_argument('--mode', type=str, default='acq', choices=['acq', 'test'],
+                        help="Starting")
 
     return parser
 
