@@ -14,6 +14,7 @@ pyasn1==0.4.8
 numpy
 pyyaml
 requests
+tqdm
 
 # acu agent
 soaculib @ git+https://github.com/simonsobs/soaculib.git@master
@@ -32,6 +33,10 @@ labjack-ljm
 scipy
 pandas
 
+# camera control
+imutils
+opencv-python
+
 # pfeiffer tc 400
 pfeiffer-vacuum-protocol==0.4
 
@@ -39,7 +44,8 @@ pfeiffer-vacuum-protocol==0.4
 pyepics
 pysmurf @ git+https://github.com/slaclab/pysmurf.git@main
 sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master
-sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master
+# pin to just before 3.8 support dropped
+sotodlib @ git+https://github.com/simonsobs/sotodlib.git@5d613d5915b1716c401abecb5446088bce5fc1a4
 
 # timing master monitor
 pyepics
@@ -47,16 +53,15 @@ pyepics
 # xy_stage
 xy_stage_control @ git+https://github.com/kmharrington/xy_stage_control.git@main
 
-# pysmurf controller
-pysmurf @ git+https://github.com/slaclab/pysmurf.git@main
-sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master
-sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master
-
 # modbus
 pyModbusTCP
 
 # Docs
 # see docs/requirements.txt
 
-# testing
+# testing + development
+setuptools-scm
 -r requirements/testing.txt
+
+# Contributing
+pre-commit

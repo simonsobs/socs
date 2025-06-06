@@ -1,3 +1,6 @@
+# dynamic package version
+socs/_version.py
+
 # iPython Notebooks
 *.ipynb
 

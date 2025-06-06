@@ -46,7 +46,7 @@ class SupRsync:
         Time (sec) after which a copy command will timeout
     """
 
-    def __init__(self, agent, args):
+    def __init__(self, agent: ocs_agent.OCSAgent, args: argparse.Namespace) -> None:
         self.agent = agent
         self.instance_id = args.instance_id
         self.log = txaio.make_logger()
@@ -65,6 +65,10 @@ class SupRsync:
         self.compression = args.compression
         self.bwlimit = args.bwlimit
         self.suprsync_file_root = args.suprsync_file_root
+        self.db_echo: bool = args.db_echo
+        self.db_pool_size: int = args.db_pool_size
+        self.db_pool_max_overflow: int = args.db_pool_max_overflow
+        self.chmod = args.chmod
 
         # Feed for counting transfer errors, loop iterations.
         self.agent.register_feed('transfer_stats',
@@ -112,13 +116,16 @@ class SupRsync:
                 }
         """
 
-        srfm = SupRsyncFilesManager(self.db_path, create_all=True)
+        srfm = SupRsyncFilesManager(
+            self.db_path, create_all=True, echo=self.db_echo,
+            pool_size=self.db_pool_size, max_overflow=self.db_pool_max_overflow
+        )
 
         handler = SupRsyncFileHandler(
             srfm, self.archive_name, self.remote_basedir, ssh_host=self.ssh_host,
             ssh_key=self.ssh_key, cmd_timeout=self.cmd_timeout,
             copy_timeout=self.copy_timeout, compression=self.compression,
-            bwlimit=self.bwlimit
+            bwlimit=self.bwlimit, chmod=self.chmod
         )
 
         self.running = True
@@ -251,6 +258,20 @@ def make_parser(parser=None):
                         help="Bandwidth limit arg (passed through to rsync)")
     pgroup.add_argument('--suprsync-file-root', type=str, required=True,
                         help="Local path where agent will write suprsync files")
+    pgroup.add_argument('--db-echo', action='store_true', help="Echos db queries")
+    pgroup.add_argument(
+        '--db-pool-size', type=int, default=5,
+        help="Number of connections to the suprsync db to keep open inside the "
+             "connection pool"
+    )
+    pgroup.add_argument(
+        '--db-pool-max-overflow', type=int, default=10,
+        help="Number of connections to allow in the overflow pool."
+    )
+    pgroup.add_argument('--chmod', type=str, default="g+rwX,o+rX",
+                        help="Comma-separated chmod strings to apply to file permissions "
+                             "on transfer. Defaults to making sure files are group-writeable "
+                             "and world-readable.")
     return parser
 
 
