@@ -198,8 +198,9 @@ def make_parser(parser=None):
     pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--ip-address', type=str, help="Internal GPIB IP Address")
     pgroup.add_argument('--gpib-slot', type=int, help="Internal SRS GPIB Address")
-    pgroup.add_argument('--mode', type=str, default='acq', choices=['acq', 'test'],
-                        help="Starting")
+    pgroup.add_argument('--mode', type=str, default='acq',
+                        choices=['idle', 'init', 'acq'],
+                        help="Starting action for the Agent.")
 
     return parser
 
@@ -217,7 +218,8 @@ def main(args=None):
                                   parser=parser,
                                   args=args)
 
-    init_params = False
+    if args.mode == 'init':
+        init_params = {'auto_acquire': False}
     if args.mode == 'acq':
         init_params = {'auto_acquire': True}
 
