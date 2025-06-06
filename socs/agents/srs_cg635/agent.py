@@ -22,6 +22,7 @@ class SRSCG635Agent:
     gpib_slot : int
         GPIB address set on the SRS CG635.
     """
+
     def __init__(self, agent, ip_address, gpib_slot):
         self.agent = agent
         self.log = agent.log

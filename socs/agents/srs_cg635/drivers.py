@@ -31,7 +31,7 @@ class SRSCG635Interface(PrologixInterface):
         The outputs are represented in volts between the CMOS low and CMOS high with CMOS low = 0V.
 
         The standard CMOS output settings this query can return are are::
-        
+
             -1 = Not a standard CMOS Output
              0 = 1.2V
              1 = 1.8V
@@ -61,7 +61,7 @@ class SRSCG635Interface(PrologixInterface):
         runs = self.read()
 
         return int(runs)
-    
+
     def get_timebase(self):
         """
         Queries the clock for the current timebase (TIMB).
