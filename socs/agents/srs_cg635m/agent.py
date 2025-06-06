@@ -79,9 +79,10 @@ class SRSCG635mAgent:
                 'timestamp': 1598626144.5365012,
                 'block_name': 'clock_output',
                 'data': {
-                    'Frequency': 122880000.0000000
+                    'Frequency': 122880000.0
                     'Standard_CMOS_Output': 3,
                     'Running_State': 1,
+                    'Timebase': 3,
                     'PLL_RF_UNLOCKED': 1,
                     'PLL_19MHZ_UNLOCKED': 1,
                     'PLL_10MHz_UNLOCKED': 0,
@@ -90,6 +91,8 @@ class SRSCG635mAgent:
                     'PLL_Phase_Shift': 0,
                 }
             }
+
+        Refer to drivers.py for interpretation of outputs.
 
         Parameters
         ----------
@@ -112,6 +115,7 @@ class SRSCG635mAgent:
                         data['data']['Frequency'] = self.clock.get_freq()
                         data['data']['Standard_CMOS_Output'] = self.clock.get_stdc()
                         data['data']['Running_State'] = self.clock.get_runs()
+                        data['data']['Timebase'] = self.clock.get_timebase()
 
                         # get_lock_statuses returns a dict of the register bits
                         # Loop through the items to add each to the data

@@ -57,12 +57,29 @@ class SRS_CG635m_Interface(PrologixInterface):
         runs = self.read()
 
         return int(runs)
+    
+    def get_timebase(self):
+        """
+        Queries the clock for the current timebase (TIMB).
+
+        Returns an int which represents the following states:
+            0 = Internal timebase
+            1 = OCXO timebase
+            2 = Rubidium timebase
+            3 = External timebase
+        """
+
+        self.write("TIMB?")
+        timb = self.read()
+
+        return int(timb)
 
     def get_lock_statuses(self):
         """
-        Queries the clock for the current Lock Registers (LCKR).
+        Queries the clock for the Lock Status Registers (LCKR).
 
-        The lock registers represent the current Lock status for following registers:
+        The lock registers represent whether the bits have been set since the register was last
+        read for following registers:
             RF_UNLOCK
             19MHZ_UNLOCK
             10MHZ_UNLOCK
@@ -71,8 +88,9 @@ class SRS_CG635m_Interface(PrologixInterface):
             PHASE_SHIFT
 
         Returns a dict of the registers and registers statuses with the keys being the registers
-            and the values being an int representing the register statuses.
-            1 = True, 0 = False
+        and the values being an int representing the register changes.
+            0 = False (this register has NOT changed since the last read)
+            1 = True (this register has changed since the last read)
         """
         self.write("LCKR?")
         lckr = self.read()
