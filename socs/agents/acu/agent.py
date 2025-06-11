@@ -88,6 +88,7 @@ OK_RESPONSES = [
 #   - None: publish the data at least every X seconds (see
 #     MONITOR_MAX_TIME_DELTA), or if any of the values have changed.
 #   - 'tick': publish every sample (as a reference tick).
+#   - 'changed': publish only when values change (otherwise, stale).
 #
 
 #: Block names and update policy for status fields in monitor process.
@@ -106,6 +107,8 @@ MONITOR_STRUCTURE = [
     ('ACU_emergency', 'ACU_emergency', None),
     ('ACU_corotator', 'corotator', None),
     ('ACU_shutter', 'shutter', None),
+    ('ACU_tilt1', 'tilt_fast', None),
+    ('ACU_tilt2', 'tilt_slow', 'changed'),
 ]
 
 
@@ -180,6 +183,7 @@ class ACUAgent:
             'status': _dsets.get('default_dataset'),
             'third': _dsets.get('third_axis_dataset'),
             'shutter': _dsets.get('shutter_dataset'),
+            'pointing': _dsets.get('pointing_dataset'),
         }
         for k, v in self.datasets.items():
             if v is not None:
@@ -620,6 +624,7 @@ class ACUAgent:
                     ('status', 'StatusDetailed'),
                     ('third', 'Status3rdAxis'),
                     ('shutter', 'StatusShutter'),
+                    ('pointing', 'CmdPointingCorrection'),
             ]:
                 if self.datasets[short]:
                     output[collection] = (
@@ -809,16 +814,17 @@ class ACUAgent:
 
             # Only keep blocks that have changed or have new data.
             for k, _, policy in MONITOR_STRUCTURE:
-                if policy is None:
-                    policy = 'default'
+                B, N = data_blocks.get(k), new_blocks[k]
+                if len(N['data']) == 0:
+                    del new_blocks[k]
+                    continue
+                if B is None:
+                    continue
                 if policy == 'tick':  # always store.
                     continue
-                if k not in data_blocks:
-                    continue
-                B, N = data_blocks[k], new_blocks[k]
                 overdue = (N['timestamp'] - B['timestamp'] > MONITOR_MAX_TIME_DELTA)
                 changes = any([B['data'][_k] != _v for _k, _v in N['data'].items()])
-                if overdue or changes:
+                if ((overdue and policy != 'changed') or changes):
                     continue
                 del new_blocks[k]
 
