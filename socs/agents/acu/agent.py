@@ -77,7 +77,7 @@ OK_RESPONSES = [
 # the "status" readout of the "monitor" process.  Each entry in the
 # list is a tuple:
 #
-#   (block_name, fields_key, policy)
+#   (block_name, fields_key, policy, sample_period)
 #
 # The "block_name" is the block name in the sense of housekeeping data
 # format. The "fields_key" corresponds a labeled group of ACU fields,
@@ -90,25 +90,26 @@ OK_RESPONSES = [
 #   - 'tick': publish every sample (as a reference tick).
 #   - 'changed': publish only when values change (otherwise, stale).
 #
+# The sample_period is the minimum spacing between samples, even if
+# values have changed.
 
 #: Block names and update policy for status fields in monitor process.
 MONITOR_STRUCTURE = [
-    ('ACU_summary_output', 'summary', 'tick'),
-    ('ACU_axis_faults', 'axis_faults_errors_overages', None),
-    ('ACU_position_errors', 'position_errors', None),
-    ('ACU_axis_limits', 'axis_limits', None),
-    ('ACU_axis_warnings', 'axis_warnings', None),
-    ('ACU_axis_failures', 'axis_failures', None),
-    ('ACU_axis_state', 'axis_state', None),
-    ('ACU_oscillation_alarm', 'osc_alarms', None),
-    ('ACU_command_status', 'commands', None),
-    ('ACU_general_errors', 'ACU_failures_errors', None),
-    ('ACU_platform_status', 'platform_status', None),
-    ('ACU_emergency', 'ACU_emergency', None),
-    ('ACU_corotator', 'corotator', None),
-    ('ACU_shutter', 'shutter', None),
-    ('ACU_tilt1', 'tilt_fast', None),
-    ('ACU_tilt2', 'tilt_slow', 'changed'),
+    ('ACU_summary_output', 'summary', 'tick', None),
+    ('ACU_axis_faults', 'axis_faults_errors_overages', None, None),
+    ('ACU_position_errors', 'position_errors', None, None),
+    ('ACU_axis_limits', 'axis_limits', None, None),
+    ('ACU_axis_warnings', 'axis_warnings', None, None),
+    ('ACU_axis_failures', 'axis_failures', None, None),
+    ('ACU_axis_state', 'axis_state', None, None),
+    ('ACU_oscillation_alarm', 'osc_alarms', None, None),
+    ('ACU_command_status', 'commands', None, None),
+    ('ACU_general_errors', 'ACU_failures_errors', None, None),
+    ('ACU_platform_status', 'platform_status', None, None),
+    ('ACU_emergency', 'ACU_emergency', None, None),
+    ('ACU_corotator', 'corotator', None, None),
+    ('ACU_shutter', 'shutter', None, None),
+    ('ACU_tilt', 'tilt_slow', 'changed', 0.5),
 ]
 
 
@@ -274,7 +275,7 @@ class ACUAgent:
             'broadcast': {},
             'hwp': {},
         }
-        for _, k, _ in MONITOR_STRUCTURE:
+        for _, k, _, _ in MONITOR_STRUCTURE:
             self.data['status'][k] = {}
 
         # Structure for the broadcast process to communicate state to
@@ -805,7 +806,7 @@ class ACUAgent:
 
             # Assemble data for aggregator ...
             new_blocks = {}
-            for block_name, data_key, policy in MONITOR_STRUCTURE:
+            for block_name, data_key, _, _ in MONITOR_STRUCTURE:
                 new_blocks[block_name] = {
                     'timestamp': self.data['status']['summary']['ctime'],
                     'block_name': block_name,
@@ -813,7 +814,7 @@ class ACUAgent:
                 }
 
             # Only keep blocks that have changed or have new data.
-            for k, _, policy in MONITOR_STRUCTURE:
+            for k, _, policy, delta in MONITOR_STRUCTURE:
                 B, N = data_blocks.get(k), new_blocks[k]
                 if len(N['data']) == 0:
                     del new_blocks[k]
@@ -823,8 +824,10 @@ class ACUAgent:
                 if policy == 'tick':  # always store.
                     continue
                 overdue = (N['timestamp'] - B['timestamp'] > MONITOR_MAX_TIME_DELTA)
+                underdue = delta is not None and \
+                    (N['timestamp'] - B['timestamp'] < delta)
                 changes = any([B['data'][_k] != _v for _k, _v in N['data'].items()])
-                if ((overdue and policy != 'changed') or changes):
+                if (overdue and policy != 'changed') or changes and not underdue:
                     continue
                 del new_blocks[k]
 
