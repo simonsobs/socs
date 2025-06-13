@@ -1148,15 +1148,48 @@ class PysmurfController:
         """restart_rssi()
 
         **Task** - Restarts the RSSI. Use to recover from lock-up.
+
+        Notes
+        ------
+        The following data will be written to the session.data object::
+
+            >> response.session['data']
+            {
+                'rssi_responsive': Boolean indicating whether queries over RSSI succeed,
+                'last_updated': The time of the update,
+            }
         """
         with self.lock.acquire_timeout(0, job='restart_rssi') as acquired:
             if not acquired:
                 return False, f"Operation failed: {self.lock.job} is running."
 
-            # if the system is locked up, spawning a SmurfControl instance will hang
-            epics.caput(f"smurf_server_s{self.slot}:AMCc:RestartRssi", 1)
+            # this register being unresponsive is a symptom of an rssi lock-up
+            slot_reg = f"smurf_server_s{self.slot}:AMCc:FpgaTopLevel:AmcCarrierCore:AmcCarrierBsi:SlotNumber"
 
-            return True, "RestartRssi sent"
+            # if the system is locked up, spawning a SmurfControl instance will hang so we use epics
+            slot = epics.caget(slot_reg, timeout=2)
+
+            # reset if RSSI is locked-up
+            success = True
+            msg = ""
+            if slot is not None:  # query suceeded
+                success, msg = True, "RSSI is not locked-up -- Doing nothing."
+            else:
+                # send the reset command
+                epics.caput(f"smurf_server_s{self.slot}:AMCc:RestartRssi", 1)
+
+                # check the system has recovered
+                slot = epics.caget(slot_reg, timeout=2)
+                success = slot is not None
+                msg = "RSSI remains locked-up" if slot is None else "RSSI has recovered"
+
+            # store state in the session data
+            session.data.update({
+                "rssi_responsive": slot is not None,
+                "last_updated": time.time()
+            })
+
+            return success, msg
 
 
 def make_parser(parser=None):
