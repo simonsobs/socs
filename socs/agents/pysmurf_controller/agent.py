@@ -426,6 +426,8 @@ class PysmurfController:
 
             >> response.session['data']
             {
+                'stream_on': True,
+                'last_updated': 1749846521.2596238,
                 'stream_id': Stream-id for the slot,
                 'sid': Session-id for the streaming session,
             }
@@ -444,6 +446,8 @@ class PysmurfController:
             if not acquired:
                 return False, f"Operation failed: {self.lock.job} is running."
 
+            session.data['stream_on'] = False
+            session.data['last_updated'] = time.time()
             S, cfg = self._get_smurf_control(session=session,
                                              load_tune=params['load_tune'])
 
@@ -453,7 +457,9 @@ class PysmurfController:
 
             session.data['stream_id'] = cfg.stream_id
             session.data['sid'] = sdl.stream_g3_on(S, **params['kwargs'])
+            session.data['stream_on'] = True
             while session.status in ['starting', 'running']:
+                session.data['last_updated'] = time.time()
                 if stop_time is not None:
                     if time.time() > stop_time:
                         break
@@ -462,6 +468,8 @@ class PysmurfController:
                 if params['test_mode']:
                     break
             sdl.stream_g3_off(S)
+            session.data['stream_on'] = False
+            session.data['last_updated'] = time.time()
 
         return True, 'Finished streaming data'
 
