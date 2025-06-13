@@ -26,9 +26,6 @@ from socs.agents.acu import exercisor, hwp_iface
 FULL_STACK = 10000
 
 
-#: Maximum update time (in s) for "monitor" process data, even with no changes
-MONITOR_MAX_TIME_DELTA = 2.
-
 #: Initial default scan params by platform type.
 INIT_DEFAULT_SCAN_PARAMS = {
     'ccat': {
@@ -74,6 +71,50 @@ OK_RESPONSES = [
     b'OK, Command executed.',
     b'OK, Command send.',
 ]
+
+
+# The data structure below defines how data fields are organized in
+# the "status" readout of the "monitor" process.  Each entry in the
+# list is a tuple:
+#
+#   (block_name, fields_key, policy, sample_period)
+#
+# The "block_name" is the block name in the sense of housekeeping data
+# format. The "fields_key" corresponds a labeled group of ACU fields,
+# as defined in soaculib.status_keys.  The "policy" is a description,
+# for the monitor process, of how to store the data.  The values for
+# policy are:
+#
+#   - None: publish the data at least every X seconds (see
+#     MONITOR_MAX_TIME_DELTA), or if any of the values have changed.
+#   - 'tick': publish every sample (as a reference tick).
+#   - 'changed': publish only when values change (otherwise, stale).
+#
+# The sample_period is the minimum spacing between samples, even if
+# values have changed.
+
+#: Block names and update policy for status fields in monitor process.
+MONITOR_STRUCTURE = [
+    ('ACU_summary_output', 'summary', 'tick', None),
+    ('ACU_axis_faults', 'axis_faults_errors_overages', None, None),
+    ('ACU_position_errors', 'position_errors', None, None),
+    ('ACU_axis_limits', 'axis_limits', None, None),
+    ('ACU_axis_warnings', 'axis_warnings', None, None),
+    ('ACU_axis_failures', 'axis_failures', None, None),
+    ('ACU_axis_state', 'axis_state', None, None),
+    ('ACU_oscillation_alarm', 'osc_alarms', None, None),
+    ('ACU_command_status', 'commands', None, None),
+    ('ACU_general_errors', 'ACU_failures_errors', None, None),
+    ('ACU_platform_status', 'platform_status', None, None),
+    ('ACU_emergency', 'ACU_emergency', None, None),
+    ('ACU_corotator', 'corotator', None, None),
+    ('ACU_shutter', 'shutter', None, None),
+    ('ACU_tilt', 'tilt_slow', 'changed', 0.5),
+]
+
+
+#: Maximum update time (in s) for "monitor" process data, even with no changes
+MONITOR_MAX_TIME_DELTA = 2.
 
 
 class ACUAgent:
@@ -143,6 +184,7 @@ class ACUAgent:
             'status': _dsets.get('default_dataset'),
             'third': _dsets.get('third_axis_dataset'),
             'shutter': _dsets.get('shutter_dataset'),
+            'pointing': _dsets.get('pointing_dataset'),
         }
         for k, v in self.datasets.items():
             if v is not None:
@@ -226,27 +268,15 @@ class ACUAgent:
         # self.data provides a place to reference data from the monitors.
         # 'status' is populated by the monitor operation
         # 'broadcast' is populated by the udp_monitor operation
+        # 'hwp' is populated by the monitor_hwp operation
 
         self.data = {
-            'status': {
-                'summary': {},
-                'position_errors': {},
-                'axis_limits': {},
-                'axis_faults_errors_overages': {},
-                'axis_warnings': {},
-                'axis_failures': {},
-                'axis_state': {},
-                'osc_alarms': {},
-                'commands': {},
-                'ACU_failures_errors': {},
-                'platform_status': {},
-                'ACU_emergency': {},
-                'corotator': {},
-                'shutter': {},
-            },
-            'hwp': {},
+            'status': {},
             'broadcast': {},
+            'hwp': {},
         }
+        for _, k, _, _ in MONITOR_STRUCTURE:
+            self.data['status'][k] = {}
 
         # Structure for the broadcast process to communicate state to
         # the monitor process, for a data quality feed.
@@ -594,7 +624,9 @@ class ACUAgent:
             for short, collection in [
                     ('status', 'StatusDetailed'),
                     ('third', 'Status3rdAxis'),
-                    ('shutter', 'StatusShutter')]:
+                    ('shutter', 'StatusShutter'),
+                    ('pointing', 'CmdPointingCorrection'),
+            ]:
                 if self.datasets[short]:
                     output[collection] = (
                         yield self.acu_read.Values(self.datasets[short]))
@@ -760,9 +792,9 @@ class ACUAgent:
                 if k not in influx_blocks:
                     continue
                 B, N = influx_blocks[k], new_influx_blocks[k]
-                if N['timestamp'] - B['timestamp'] > MONITOR_MAX_TIME_DELTA:
-                    continue
-                if any([B['data'][_k] != _v for _k, _v in N['data'].items()]):
+                overdue = (N['timestamp'] - B['timestamp'] > MONITOR_MAX_TIME_DELTA)
+                changes = any([B['data'][_k] != _v for _k, _v in N['data'].items()])
+                if overdue or changes:
                     continue
                 del new_influx_blocks[k]
 
@@ -774,22 +806,7 @@ class ACUAgent:
 
             # Assemble data for aggregator ...
             new_blocks = {}
-            for block_name, data_key in [
-                    ('ACU_summary_output', 'summary'),
-                    ('ACU_axis_faults', 'axis_faults_errors_overages'),
-                    ('ACU_position_errors', 'position_errors'),
-                    ('ACU_axis_limits', 'axis_limits'),
-                    ('ACU_axis_warnings', 'axis_warnings'),
-                    ('ACU_axis_failures', 'axis_failures'),
-                    ('ACU_axis_state', 'axis_state'),
-                    ('ACU_oscillation_alarm', 'osc_alarms'),
-                    ('ACU_command_status', 'commands'),
-                    ('ACU_general_errors', 'ACU_failures_errors'),
-                    ('ACU_platform_status', 'platform_status'),
-                    ('ACU_emergency', 'ACU_emergency'),
-                    ('ACU_corotator', 'corotator'),
-                    ('ACU_shutter', 'shutter'),
-            ]:
+            for block_name, data_key, _, _ in MONITOR_STRUCTURE:
                 new_blocks[block_name] = {
                     'timestamp': self.data['status']['summary']['ctime'],
                     'block_name': block_name,
@@ -797,16 +814,20 @@ class ACUAgent:
                 }
 
             # Only keep blocks that have changed or have new data.
-            block_keys = list(new_blocks.keys())
-            for k in block_keys:
-                if k == 'summary':  # always store these, as a sort of reference tick.
+            for k, _, policy, delta in MONITOR_STRUCTURE:
+                B, N = data_blocks.get(k), new_blocks[k]
+                if len(N['data']) == 0:
+                    del new_blocks[k]
                     continue
-                if k not in data_blocks:
+                if B is None:
                     continue
-                B, N = data_blocks[k], new_blocks[k]
-                if N['timestamp'] - B['timestamp'] > MONITOR_MAX_TIME_DELTA:
+                if policy == 'tick':  # always store.
                     continue
-                if any([B['data'][_k] != _v for _k, _v in N['data'].items()]):
+                overdue = (N['timestamp'] - B['timestamp'] > MONITOR_MAX_TIME_DELTA)
+                underdue = delta is not None and \
+                    (N['timestamp'] - B['timestamp'] < delta)
+                changes = any([B['data'][_k] != _v for _k, _v in N['data'].items()])
+                if (overdue and policy != 'changed') or changes and not underdue:
                     continue
                 del new_blocks[k]
 
