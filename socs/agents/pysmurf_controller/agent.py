@@ -1148,6 +1148,18 @@ class PysmurfController:
         """restart_rssi()
 
         **Task** - Restarts the RSSI. Use to recover from lock-up.
+
+        Notes
+        ------
+        The following data will be written to the session.data object::
+
+            >> response.session['data']
+            {
+                'fields': {
+                    'rssi_responsive': Boolean indicating whether queries over RSSI succeed,
+                },
+                'last_updated': The time of the update,
+            }
         """
         with self.lock.acquire_timeout(0, job='restart_rssi') as acquired:
             if not acquired:
@@ -1156,7 +1168,18 @@ class PysmurfController:
             # if the system is locked up, spawning a SmurfControl instance will hang
             epics.caput(f"smurf_server_s{self.slot}:AMCc:RestartRssi", 1)
 
-            return True, "RestartRssi sent"
+            # check the system has recovered
+            slot = epics.caget(
+                f"smurf_server_s{self.slot}:AMCc:FpgaTopLevel:AmcCarrierCore:AmcCarrierBsi:SlotNumber"
+            )
+            session.data.update({
+                "fields": {"rssi_responsive": slot is not None},
+                "last_updated": time.time()
+            })
+
+            if slot is None:
+                return False, "RSSI remains locked-up"
+            return True, "RSSI is responsive"
 
 
 def make_parser(parser=None):
