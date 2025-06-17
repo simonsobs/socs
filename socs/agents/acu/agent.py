@@ -49,7 +49,8 @@ INIT_SUN_CONFIGS = {
     'ccat': {
         'enabled': False,
         'exclusion_radius': 20,
-        'el_horizon': 10,
+        'el_horizon': 0,
+        'el_dodging': True,
         'min_sun_time': 1800,
         'response_time': 7200,
     },
