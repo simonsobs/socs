@@ -388,6 +388,10 @@ class ACUAgent:
         agent.register_task('clear_faults',
                             self.clear_faults,
                             blocking=False)
+        agent.register_task('special_action',
+                            self.special_action,
+                            blocking=False,
+                            aborter=self._simple_task_abort)
         agent.register_task('update_sun',
                             self.update_sun,
                             blocking=False)
@@ -1732,6 +1736,67 @@ class ACUAgent:
 
         session.set_status('stopping')
         return True, 'Job completed'
+
+    @ocs_agent.param('action', choices=['unstow', 'elsync'])
+    @ocs_agent.param('force', type=bool, default=False)
+    @ocs_agent.param('elsync_ref', type=float, default=None)
+    @inlineCallbacks
+    def special_action(self, session, params):
+        """special_action(action, force=False, elsync_ref=None)
+
+        **Task** - Perform a special action or set a special mode.
+
+        Args:
+          action (str): Action to perform.  See notes.
+          force (bool): Perform the action even if conditions suggest
+            it need not or should not be run.
+          elsync_ref (float): For action='elsync', sets the reference
+            elevation for the locked co-rotator mode. (This is the
+            negative of the ACU offset parameter.)
+
+        Notes:
+          - 'unstow': Set the el and az axis modes to "UnStow".  This
+            is used to recover the LAT from "maintenance stow"
+            position, where el=-90 and pins inserted.  The Task
+            returns after setting the mode; transition to Stop will
+            normally occur after a few seconds.
+          - 'elsync': Put the LAT corotator into ElSync mode. If
+            elsync_ref is provided, that is sent to the ACU
+            first. Otherwise the offset is left unchanged. Unless
+            force=True, the corotator axis should be in Stop before
+            when this is called.
+
+        """
+        if params['action'] == 'unstow':
+            if not params['force']:
+                el_mode = self.data['status']['summary']['Elevation_mode']
+                if el_mode.lower() not in ['stow', 'maintenancestow']:
+                    return False, f"Not unstowing because elevation mode is {el_mode}; "\
+                        "override with force=True."
+            response = yield self._set_modes(az='Stop', el='UnStow')
+            self.log.info('response to UnStow: {response}', response=response)
+            yield dsleep(0.5)
+
+        elif params['action'] == 'elsync':
+            if not params['force']:
+                third_mode = self.data['status']['corotator']['Corotator_mode']
+                if third_mode.lower() != 'stop':
+                    return False, f"Not going to elsync mode because corotator mode is {third_mode}; "\
+                        "override with force=True."
+            if params['elsync_ref'] is not None:
+                response = yield self.acu_control.http.Command(
+                    'DataSets.Corotator', 'SetOffsetToElevation', '%.6f' % (-params['elsync_ref']))
+                self.log.info('response to set elsync_ref : {response}', response=response)
+                yield dsleep(0.5)
+
+            response = yield self._set_modes(third='ElSync')
+            self.log.info('response to set ElSync mode: {response}', response=response)
+            yield dsleep(0.5)
+
+        else:
+            return False, f"Unimplemented action '{params['action']}'."
+
+        return True, 'Done.'
 
     @ocs_agent.param('filename', type=str)
     @ocs_agent.param('absolute_times', type=bool, default=False)
