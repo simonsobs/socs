@@ -318,6 +318,11 @@ class ACUAgent:
                                self._simple_process_stop,
                                blocking=False,
                                startup=startup_idle_reset)
+        agent.register_process('fromfile_scan',
+                               self.fromfile_scan,
+                               self._simple_process_stop,
+                               blocking=False)
+
         basic_agg_params = {'frame_length': 60}
         fullstatus_agg_params = {'frame_length': 60,
                                  'exclude_influx': True,
@@ -369,10 +374,6 @@ class ACUAgent:
         agent.register_task('set_scan_params',
                             self.set_scan_params,
                             blocking=False)
-        agent.register_task('fromfile_scan',
-                            self.fromfile_scan,
-                            blocking=False,
-                            aborter=self._simple_task_abort)
         agent.register_task('set_boresight',
                             self.set_boresight,
                             blocking=False,
@@ -1732,68 +1733,68 @@ class ACUAgent:
         return True, 'Job completed'
 
     @ocs_agent.param('filename', type=str)
-    @ocs_agent.param('adjust_times', type=bool, default=True)
+    @ocs_agent.param('absolute_times', type=bool, default=False)
     @ocs_agent.param('azonly', type=bool, default=True)
     @inlineCallbacks
     def fromfile_scan(self, session, params=None):
-        """fromfile_scan(filename, adjust_times=True, azonly=True)
+        """fromfile_scan(filename, absolute_times=False, azonly=True)
 
-        **Task** - Upload and execute a scan pattern from numpy file.
+        **Process** - Upload and execute a scan pattern from a file.
 
         Parameters:
-            filename (str): full path to desired numpy file. File should
-                contain an array of shape (5, nsamp) or (7, nsamp).  See Note.
-            adjust_times (bool): If True (the default), the track
-                timestamps are interpreted as relative times, only,
-                and the track will be formatted so the first point
-                happens a few seconds in the future.  If False, the
-                track times will be taken at face value (even if the
-                first one is, like, 0).
+            filename (str): full path to the track file.
+            absolute_times (bool): If True, the track timestamps are
+                taken at face value.  Otherwise, the timestamps are
+                treated as relative to the track start time, which
+                will be a few seconds in the future from when this
+                function is called.
             azonly (bool): If True, the elevation part of the track
                 will be uploaded but the el axis won't be put in
                 ProgramTrack mode.  It might be put in Stop mode
                 though.
 
         Notes:
-            The columns in the numpy array are:
+            See :func:`drivers.from_file
+            <socs.agents.acu.drivers.from_file>` for discussion of the
+            file structure.
 
-            - 0: timestamps, in seconds.
-            - 1: azimuth, in degrees.
-            - 2: elevation, in degrees.
-            - 3: az_vel, in deg/s.
-            - 4: el_vel, in deg/s.
-            - 5: az_flags (2 if last point in a leg; 1 otherwise.)
-            - 6: el_flags (2 if last point in a leg; 1 otherwise.)
-
-            It is acceptable to omit columns 5 and 6.
         """
+        ff_scan = sh.from_file(params['filename'])
 
-        times, azs, els, vas, ves, azflags, elflags = sh.from_file(params['filename'])
-        if min(azs) <= self.motion_limits['azimuth']['lower'] \
-           or max(azs) >= self.motion_limits['azimuth']['upper']:
+        if ff_scan.az_range[0] <= self.motion_limits['azimuth']['lower'] \
+           or ff_scan.az_range[1] >= self.motion_limits['azimuth']['upper']:
             return False, 'Azimuth location out of range!'
-        if min(els) <= self.motion_limits['elevation']['lower'] \
-           or max(els) >= self.motion_limits['elevation']['upper']:
+        if ff_scan.el_range[0] <= self.motion_limits['elevation']['lower'] \
+           or ff_scan.el_range[1] >= self.motion_limits['elevation']['upper']:
             return False, 'Elevation location out of range!'
 
         # Modify times?
-        if params['adjust_times']:
-            times = times + time.time() - times[0] + 5.
+        t_shift = 0
+        if not params['absolute_times']:
+            t_shift = time.time() + 5.
 
         # Turn those lines into a generator.
-        all_lines = sh.ptstack_format(times, azs, els, vas, ves, azflags, elflags,
-                                      absolute=True)
+        def line_batcher(ff_scan, t_shift=0., n=10):
+            lines = [sh.track_point_time_shift(p, t_shift)
+                     for p in ff_scan.points]
+            while True:
+                while len(lines):
+                    some, lines = lines[:n], lines[n:]
+                    yield some
+                if ff_scan.loop_time <= 0:
+                    break
+                t_shift += ff_scan.loop_time
+                lines = [sh.track_point_time_shift(p, t_shift)
+                         for p in ff_scan.points[ff_scan.preamble_count:]]
 
-        def line_batcher(lines, n=10):
-            while len(lines):
-                some, lines = lines[:n], lines[n:]
-                yield some
+        point_gen = line_batcher(ff_scan, t_shift)
 
-        point_gen = line_batcher(all_lines)
-        step_time = np.median(np.diff(times))
-
-        ok, err = yield self._run_track(session, point_gen, step_time,
-                                        azonly=params['azonly'])
+        ok, err = yield self._run_track(
+            session,
+            point_gen,
+            step_time=ff_scan.step_time,
+            free_form=ff_scan.free_form,
+            azonly=params['azonly'])
         return ok, err
 
     @ocs_agent.param('az_endpoint1', type=float)
@@ -2015,7 +2016,7 @@ class ACUAgent:
 
     @inlineCallbacks
     def _run_track(self, session, point_gen, step_time, azonly=False,
-                   point_batch_count=None):
+                   point_batch_count=None, free_form=False):
         """Run a ProgramTrack track scan, with points provided by a
         generator.
 
@@ -2030,6 +2031,8 @@ class ACUAgent:
           point_batch_count: number of points to include in batch
             uploads.  This parameter can be used to increase the value
             beyond the minimum set internally based on step_time.
+          free_form: if True, disable ACU linear interpolation and
+            turn-around profiling.
 
         Returns:
           Tuple (success, msg) where success is a bool.
@@ -2071,16 +2074,32 @@ class ACUAgent:
             'Turnaround_time_too_short',
         ]
 
-        with self.azel_lock.acquire_timeout(0, job='generate_scan') as acquired:
+        if free_form:
+            init_cmds = [
+                ('Clear Stack', 0.),
+                ('Set Profiler Off', 0.),
+                ('Set Interpolation Spline', 0.5)
+            ]
+        else:
+            init_cmds = [
+                ('Clear Stack', 0.),
+                ('Set Profiler On', 0.),
+                ('Set Interpolation Linear', 0.5)
+            ]
 
+        with self.azel_lock.acquire_timeout(0, job='generate_scan') as acquired:
             if not acquired:
                 return False, f"Operation failed: {self.azel_lock.job} is running."
             if session.status not in ['starting', 'running']:
                 return False, "Operation aborted before motion began."
 
-            yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
-                                                'Clear Stack')
-            yield dsleep(0.5)
+            for _c, _d in init_cmds:
+                resp = yield self.acu_control.http.Command(
+                    'DataSets.CmdTimePositionTransfer', _c)
+                if resp != b'OK, Command executed.':
+                    return False, f"Failed to init: {_c}"
+                if _d > 0:
+                    yield dsleep(_d)
 
             if azonly:
                 yield self._set_modes(az='ProgramTrack')

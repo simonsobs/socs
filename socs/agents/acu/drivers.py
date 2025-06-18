@@ -1,8 +1,9 @@
 import calendar
 import datetime
 import math
+import pickle
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 
@@ -18,6 +19,16 @@ def _progtrack_format_time(timestamp):
     fmt = '%j, %H:%M:%S'
     return (time.strftime(fmt, time.gmtime(timestamp))
             + '{:.6f}'.format(timestamp % 1.)[1:])
+
+
+class FromFileScan:
+    loop_time: float
+    free_form: bool
+    points: list
+    preamble_count: int
+    step_time: float
+    az_range: tuple
+    el_range: tuple
 
 
 @dataclass
@@ -50,6 +61,10 @@ class TrackPoint:
     group_flag: int = 0
 
 
+def track_point_time_shift(p, dt):
+    return replace(p, timestamp=p.timestamp + dt)
+
+
 def get_track_points_text(tpl, timestamp_offset=None, with_group_flag=False,
                           text_block=False):
     """Get a list of ProgramTrack lines for upload to ACU.
@@ -80,177 +95,148 @@ def get_track_points_text(tpl, timestamp_offset=None, with_group_flag=False,
     return all_lines
 
 
-def constant_velocity_scanpoints(azpts, el, azvel, acc, ntimes):
-    """
-    Produces lists of times, azimuths, elevations, azimuthal velocities,
-    elevation velocities, azimuth motion flags, and elevation motion flags
-    for a finitely long azimuth scan with constant velocity. Scan begins
-    at the first azpts value.
+def from_file(filename, fmt=None):
+    """Load a ProgramTrack trajectory from a file.  This function
+    supports two formats. The modern format is a pickle file. The
+    older numpy format is also supported.
 
     Parameters:
-        azpts (2-tuple): The endpoints of motion in azimuth, where the
-            first point is the start position of the scan.
-        el (float): The elevation that is maintained throughout the scan
-        azvel (float): Desired speed of the azimuth motion in degrees/sec
-        acc (float): The turnaround acceleration in degrees/sec^2
-        ntimes(int): Number of times to travel between the endpoints.
-            ntimes = 1 corresponds to a scan from, ex., left to right, and does not
-            return to left.
+      filename (str): Full path to the file.
+      fmt (str): Optional, one of "pickle" or "numpy". If this is
+        unspecified, the code will assume pickle format unless the
+        filename ends in "npy".
 
     Returns:
-        tuple of lists : (times, azimuths, elevations, azimuth veolicities,
-        elevation velocities, azimuth flags, elevation flags)
-    """
-    if float(azvel) == 0.0:
-        print('Azimuth velocity is zero, invalid scan parameter')
-        return False
-    if float(acc) == 0.0:
-        print('Acceleration is zero, unable to calculate turnaround')
-        return False
-    turn_time = 2 * azvel / acc
-    tot_time_dir = float((abs(azpts[1] - azpts[0])) / azvel)
-    num_dirpoints = int(tot_time_dir * 10.)
-    if num_dirpoints < 2:
-        print('Scan is too short to run')
-        return False
-    sect_start_time = 0.0
-    conctimes = []
-    concaz = []
-    el1 = np.linspace(el, el, num_dirpoints)
-    concel = list(el1)
-    concva = []
-    ve1 = np.zeros(num_dirpoints)
-    concve = list(ve1)
+      FromFileScan: Object containing the loaded points and
+        supporting config for ProgramTrack mode.
 
-    # Flag values:
-    # 0 : unidentified portion of the scan
-    # 1 : constant velocity, with the next point at the same velocity
-    # 2 : final point before a turnaround
-    azflags = [1 for i in range(num_dirpoints - 1)]
-    azflags += [2]
-    all_azflags = []
+    Notes:
 
-    elflags = [0 for i in range(num_dirpoints)]
-    all_elflags = []
+      For the pickle-based file format, the file must encode a
+      single dict. Here is a minimal example::
 
-    for n in range(ntimes):
-        # print(str(n)+' '+str(sect_start_time))
-        end_dir_time = sect_start_time + tot_time_dir
-        time_for_section = np.linspace(sect_start_time, end_dir_time,
-                                       num_dirpoints)
-        if n % 2 != 0:
-            new_az = np.linspace(azpts[1], azpts[0], num_dirpoints)
-            new_va = np.zeros(num_dirpoints) + \
-                np.sign(azpts[0] - azpts[1]) * azvel
-        else:
-            new_az = np.linspace(azpts[0], azpts[1], num_dirpoints)
-            new_va = np.zeros(num_dirpoints) + \
-                np.sign(azpts[1] - azpts[0]) * azvel
+        {
+         'timestamp': [1747233498, 1747233499, ..., 1747233523],
+         'az': [180, 181, ..., 160],
+         'el': [60, 60, ..., 60],
+        }
 
-        conctimes.extend(time_for_section)
-        concaz.extend(new_az)
-        concel.extend(el1)
-        concva.extend(new_va)
-        concve.extend(ve1)
-        all_azflags.extend(azflags)
-        all_elflags.extend(elflags)
-        sect_start_time = time_for_section[-1] + turn_time
+      Those 3 required entries are "vectors", with the same
+      length. The vectors may be any iterable type but please use
+      lists or ndarrays. Optionally, the user may specify these other
+      vectors:
 
-    all_azflags[-1] = 0
+        - 'az_vel': the az velocity at each point.
+        - 'el_vel': the el velocity at each point.
+        - 'az_flag': the az flag.
+        - 'el_flag': the el flag.
+        - 'group_flag': the point grouping flag.
 
-    return conctimes, concaz, concel, concva, concve, all_azflags, \
-        all_elflags
+      If not provided, the "vel" vectors will be computed from the
+      gradient of the position vectors.  The "flag" vectors will
+      default to all 0.  See :class:`TrackPoint
+      <socs.agents.acu.drivers.TrackPoint>` for purpose of the various
+      flags.
 
+      The following settings (stated with their default values) may
+      also be included in the dict:
 
-def from_file(filename):
-    """
-    Produces properly formatted lists of times, azimuth and elevation
-    locations, azimuth and elevation velocities, and azimuth and elevation
-    motion flags for a finitely long scan from a numpy file. Numpy file
-    must be formatted as an array of arrays in the order [times, azimuths,
-    elevations, azimuth velocities, elevation velocities]
+        - 'free_form' (bool, False): Specifies whether the track
+          should be run with the turn-around profiler disabled and
+          spline (rather than linear) interpolation enabled. When
+          false, the ACU will do linear interpolation *and* automatic
+          profiling of turn-arounds, between constant velocity
+          segments. Setting free_form=False is appropriate for
+          constant elevation, constant az speed scans.  Set
+          free_form=True for more complex scans.
+        - 'loopable' (bool, False): Specifies whether the track should
+          be repeated, forever.  When this is the case, the final
+          point of the track (i.e. the last point in all the vectors)
+          is ignored *except for the timestamp*, which is used to set
+          the time at which the next loop iteration is started.
+        - 'preamble_count' (int, 0): If loopable, this specifies the
+          number of points in the track (i.e. in each vector) that are
+          not included in the loopable portion.  This permits the
+          track to have a ramp-up, or partial initial scan segment,
+          prior to entering the repetable template.
 
-    Parameters:
-        filename (str): Full path to the numpy file containing scan
-            parameter array
-
-    Returns:
-        tuple of lists: (times, azimuths, elevations, azimuth velocities,
-        elevation velocities, azimuth flags, elevation flags)
-
-    NOTE: Flags can be set in the numpy file (0=unspecified, 1=constant
-    velocity, 2=last point before turnaround). If flags are not set in
-    the file, all flags are set to 0 to accommodate non-linear scans
-    """
-    info = np.load(filename)
-    if len(info) not in [5, 7]:
-        raise ValueError(f'Unexpected field count ({len(info)}) in {filename}')
-    conctimes = info[0]
-    concaz = info[1]
-    concel = info[2]
-    concva = info[3]
-    concve = info[4]
-    if len(info) == 5:
-        az_flags = np.zeros(len(conctimes), int)
-        el_flags = az_flags
-    elif len(info) == 7:
-        az_flags = info[5].astype('int')
-        el_flags = info[6].astype('int')
-    return conctimes, concaz, concel, concva, concve, az_flags, el_flags
-
-
-def ptstack_format(conctimes, concaz, concel, concva, concve, az_flags,
-                   el_flags, group_flag=None, start_offset=0, absolute=False):
-    """Produces a list of lines in the format necessary to upload to the ACU
-    to complete a scan. Params are the outputs of from_file,
-    constant_velocity_scanpoints, or generate_constant_velocity_scan.
-
-    Parameters:
-        conctimes (list): Times starting at 0 for the ACU to reach
-            associated positions
-        concaz (list): Azimuth positions associated with conctimes
-        concel (list): Elevation positions associated with conctimes
-        concva (list): Azimuth velocities associated with conctimes
-        concve (list): Elevation velocities associated with conctimes
-        az_flags (list): Flags associated with azimuth motions at
-            conctimes
-        el_flags (list): Flags associated with elevation motions at
-            conctimes
-        group_flag (list): If not None, must be a list drawn from [0,
-            1] where 1 indicates that the point should not be uploaded
-            unless the subsequent point is also immediately uploaded.
-        start_offset (float): Offset, in seconds, to apply to all
-            timestamps.
-        absolute (bool): If true, timestamps are taken at face value,
-            and only start_offset is added.  If false, then the current
-            time is also added (but note that if the first timestamp
-            is 0, then you will need to also pass start_offset > 0).
-
-    Returns:
-        list: Lines in the correct format to upload to the ACU.  If
-        group_flag was included, then each upload line is returned as
-        a tuple (group_flag, line_text).
+      The older numpy-based format does not support the additional
+      settings.  The numpy file must contain an iterable with 5 or 7
+      entries, where all entries are 1-d arrays of the same length.
+      The first 5 arrays will correspond to 'timestamp', 'az', 'el',
+      'az_vel', 'el_vel'.  The 2 optional arrays are 'az_flag' and
+      'el_flag'.
 
     """
+    if fmt is None:
+        fmt = 'pickle'
+        if filename.endswith('npy'):
+            fmt = 'numpy'
 
-    fmt = '%j, %H:%M:%S'
-    if not absolute:
-        start_offset = time.time() + start_offset
-    true_times = [start_offset + i for i in conctimes]
-    fmt_times = [time.strftime(fmt, time.gmtime(t))
-                 + ('{tt:.6f}'.format(tt=t % 1.))[1:] for t in true_times]
+    if fmt == 'numpy':
+        info = np.load(filename)
+        if len(info) not in [5, 7]:
+            raise ValueError(f'Unexpected field count ({len(info)}) in {filename}')
+        times, az, el, vaz, vel = info[:5]
+        if len(info) == 5:
+            az_flags = np.zeros(len(times), int)
+            el_flags = az_flags
+        elif len(info) == 7:
+            az_flags = info[5].astype('int')
+            el_flags = info[6].astype('int')
 
-    all_lines = [('{ftime}; {az:.6f}; {el:.6f}; {azvel:.4f}; '
-                  '{elvel:.4f}; {azflag}; {elflag}'
-                  '\r\n'.format(ftime=fmt_times[n], az=concaz[n],
-                                el=concel[n], azvel=concva[n], elvel=concve[n],
-                                azflag=az_flags[n], elflag=el_flags[n]))
-                 for n in range(len(fmt_times))]
+        output = FromFileScan()
+        output.loop_time = 0.
+        output.free_form = False
+        output.step_time = np.diff(times).min()
+        output.points = [TrackPoint(*a) for a in zip(
+            times, az, el, vaz, vel, az_flags, el_flags)]
+        output.az_range = (az.min(), az.max())
+        output.el_range = (el.min(), el.max())
 
-    if group_flag is not None:
-        all_lines = [(i, line) for i, line in zip(group_flag, all_lines)]
+    elif fmt == 'pickle':
+        data = pickle.load(open(filename, 'rb'))
+        output = FromFileScan()
+        output.loop_time = 0.
+        output.free_form = data.get('free_form', False)
 
-    return all_lines
+        keys = ['timestamp', 'az', 'el', 'az_vel', 'el_vel',
+                'az_flag', 'el_flag', 'group_flag']
+        vects = {k: data.get(k) for k in keys}
+        n = len(vects['az'])
+
+        dtv = np.gradient(vects['timestamp'])
+        if vects['az_vel'] is None:
+            vects['az_vel'] = np.gradient(vects['az']) / dtv
+        if vects['el_vel'] is None:
+            vects['el_vel'] = np.gradient(vects['el']) / dtv
+        if vects['az_flag'] is None:
+            vects['az_flag'] = np.zeros(n, int)
+        if vects['el_flag'] is None:
+            vects['el_flag'] = np.zeros(n, int)
+        if vects['group_flag'] is None:
+            vects['group_flag'] = np.zeros(n, int)
+
+        output.preamble_count = data.get('preamble_count', 0)
+        if data.get('loopable'):
+            # Measure repeat time.
+            output.loop_time = (vects['timestamp'][-1]
+                                - vects['timestamp'][output.preamble_count])
+            # ... and drop last point.
+            for k in keys:
+                vects[k] = vects[k][:-1]
+
+        columns = [vects[k] for k in keys]
+        output.points = [TrackPoint(*row) for row in zip(*columns)]
+
+        output.step_time = np.diff(vects['timestamp']).min()
+        output.az_range = (vects['az'].min(), vects['az'].max())
+        output.el_range = (vects['el'].min(), vects['el'].max())
+
+    else:
+        raise ValueError(f"Invalid fmt={fmt}")
+
+    return output
 
 
 def timecode(acutime, now=None):
