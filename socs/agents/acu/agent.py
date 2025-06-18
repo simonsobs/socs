@@ -2377,7 +2377,8 @@ class ACUAgent:
               ],
               "sun_down": false,
               "sun_dist": 41.75087242151837,
-              "sun_safe_time": 71760
+              "sun_safe_time": 71760,
+              "platform_down": false
             },
             "avoidance": {
               "safety_unknown": false,

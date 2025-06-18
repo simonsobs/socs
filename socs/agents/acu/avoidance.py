@@ -22,7 +22,7 @@ by two numbers and a boolean:
     radius of the Sun.  Although some positions will "never" see the
     Sun, the sun_time for such positions is set to about 2 days, as a
     place-holder for "the future".  When the boresight is well below
-    the horizoon, the sun_time is set to "never", i.e. 2 days.  When
+    the horizon, the sun_time is set to "never", i.e. 2 days.  When
     the sun is below the horizon, then the sun_time will always be at
     least the time until next sun-rise.
 
@@ -396,7 +396,7 @@ class SunTracker:
             t = self._now()
         eff_t = t + self.sun_time_shift
 
-        v = self._sun(eff_t)  # This applies sun_time_shift, internally
+        v = self._sun(eff_t)
         qsun = quat.rotation_lonlat(v.ra, v.dec)
         qzen = coords.CelestialSightLine.naive_az_el(eff_t, 0, np.pi / 2).Q
         neg_sun_az, sun_el, _ = quat.decompose_lonlat(~qzen * qsun)
