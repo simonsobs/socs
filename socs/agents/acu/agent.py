@@ -1692,7 +1692,7 @@ class ACUAgent:
     @ocs_agent.param('azonly', type=bool, default=True)
     @inlineCallbacks
     def fromfile_scan(self, session, params=None):
-        """fromfile_scan(filename, absolute_times=True, azonly=True)
+        """fromfile_scan(filename, absolute_times=False, azonly=True)
 
         **Process** - Upload and execute a scan pattern from a file.
 
@@ -1709,8 +1709,9 @@ class ACUAgent:
                 though.
 
         Notes:
-            See :func:`drivers.from_file` for discussion of the file
-            structure.
+            See :func:`drivers.from_file
+            <socs.agents.acu.drivers.from_file>` for discussion of the
+            file structure.
 
         """
         ff_scan = sh.from_file(params['filename'])

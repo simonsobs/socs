@@ -107,19 +107,18 @@ def from_file(filename, fmt=None):
         filename ends in "npy".
 
     Returns:
-      scan : FromFileScan
-        Object containing the loaded points and supporting config
-        for ProgramTrack mode.
+      FromFileScan: Object containing the loaded points and
+        supporting config for ProgramTrack mode.
 
     Notes:
 
       For the pickle-based file format, the file must encode a
-      single dict. Here is a minimal example:
+      single dict. Here is a minimal example::
 
         {
          'timestamp': [1747233498, 1747233499, ..., 1747233523],
          'az': [180, 181, ..., 160],
-         'el': [60, 60, 60],
+         'el': [60, 60, ..., 60],
         }
 
       Those 3 required entries are "vectors", with the same
@@ -135,8 +134,9 @@ def from_file(filename, fmt=None):
 
       If not provided, the "vel" vectors will be computed from the
       gradient of the position vectors.  The "flag" vectors will
-      default to all 0.  See TrackPoint class for purpose of the
-      various flags.
+      default to all 0.  See :class:`TrackPoint
+      <socs.agents.acu.drivers.TrackPoint>` for purpose of the various
+      flags.
 
       The following settings (stated with their default values) may
       also be included in the dict:
@@ -159,6 +159,13 @@ def from_file(filename, fmt=None):
           not included in the loopable portion.  This permits the
           track to have a ramp-up, or partial initial scan segment,
           prior to entering the repetable template.
+
+      The older numpy-based format does not support the additional
+      settings.  The numpy file must contain an iterable with 5 or 7
+      entries, where all entries are 1-d arrays of the same length.
+      The first 5 arrays will correspond to 'timestamp', 'az', 'el',
+      'az_vel', 'el_vel'.  The 2 optional arrays are 'az_flag' and
+      'el_flag'.
 
     """
     if fmt is None:
@@ -213,7 +220,8 @@ def from_file(filename, fmt=None):
         output.preamble_count = data.get('preamble_count', 0)
         if data.get('loopable'):
             # Measure repeat time.
-            output.loop_time = np.dot([-1, 1], vects['timestamp'][[output.preamble_count, -1]])
+            output.loop_time = (vects['timestamp'][-1]
+                                - vects['timestamp'][output.preamble_count])
             # ... and drop last point.
             for k in keys:
                 vects[k] = vects[k][:-1]
@@ -229,60 +237,6 @@ def from_file(filename, fmt=None):
         raise ValueError(f"Invalid fmt={fmt}")
 
     return output
-
-
-def ptstack_format(conctimes, concaz, concel, concva, concve, az_flags,
-                   el_flags, group_flag=None, start_offset=0, absolute=False):
-    """Produces a list of lines in the format necessary to upload to the ACU
-    to complete a scan. Params are the outputs of from_file,
-    constant_velocity_scanpoints, or generate_constant_velocity_scan.
-
-    Parameters:
-        conctimes (list): Times starting at 0 for the ACU to reach
-            associated positions
-        concaz (list): Azimuth positions associated with conctimes
-        concel (list): Elevation positions associated with conctimes
-        concva (list): Azimuth velocities associated with conctimes
-        concve (list): Elevation velocities associated with conctimes
-        az_flags (list): Flags associated with azimuth motions at
-            conctimes
-        el_flags (list): Flags associated with elevation motions at
-            conctimes
-        group_flag (list): If not None, must be a list drawn from [0,
-            1] where 1 indicates that the point should not be uploaded
-            unless the subsequent point is also immediately uploaded.
-        start_offset (float): Offset, in seconds, to apply to all
-            timestamps.
-        absolute (bool): If true, timestamps are taken at face value,
-            and only start_offset is added.  If false, then the current
-            time is also added (but note that if the first timestamp
-            is 0, then you will need to also pass start_offset > 0).
-
-    Returns:
-        list: Lines in the correct format to upload to the ACU.  If
-        group_flag was included, then each upload line is returned as
-        a tuple (group_flag, line_text).
-
-    """
-
-    fmt = '%j, %H:%M:%S'
-    if not absolute:
-        start_offset = time.time() + start_offset
-    true_times = [start_offset + i for i in conctimes]
-    fmt_times = [time.strftime(fmt, time.gmtime(t))
-                 + ('{tt:.6f}'.format(tt=t % 1.))[1:] for t in true_times]
-
-    all_lines = [('{ftime}; {az:.6f}; {el:.6f}; {azvel:.4f}; '
-                  '{elvel:.4f}; {azflag}; {elflag}'
-                  '\r\n'.format(ftime=fmt_times[n], az=concaz[n],
-                                el=concel[n], azvel=concva[n], elvel=concve[n],
-                                azflag=az_flags[n], elflag=el_flags[n]))
-                 for n in range(len(fmt_times))]
-
-    if group_flag is not None:
-        all_lines = [(i, line) for i, line in zip(group_flag, all_lines)]
-
-    return all_lines
 
 
 def timecode(acutime, now=None):
