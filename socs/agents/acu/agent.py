@@ -1740,7 +1740,7 @@ class ACUAgent:
     @ocs_agent.param('elsync_ref', type=float, default=None)
     @inlineCallbacks
     def special_action(self, session, params):
-        """special_action(action)
+        """special_action(action, force=False, elsync_ref=None)
 
         **Task** - Perform a special action or set a special mode.
 
