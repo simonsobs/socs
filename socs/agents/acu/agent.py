@@ -49,7 +49,8 @@ INIT_SUN_CONFIGS = {
     'ccat': {
         'enabled': False,
         'exclusion_radius': 20,
-        'el_horizon': 10,
+        'el_horizon': 0,
+        'el_dodging': True,
         'min_sun_time': 1800,
         'response_time': 7200,
     },
@@ -2393,8 +2394,10 @@ class ACUAgent:
                 78.24269024936028,
                 60.919554369324096
               ],
+              "sun_down": false,
               "sun_dist": 41.75087242151837,
-              "sun_safe_time": 71760
+              "sun_safe_time": 71760,
+              "platform_down": false
             },
             "avoidance": {
               "safety_unknown": false,
@@ -2450,6 +2453,8 @@ class ACUAgent:
             'sun_el': (('sun_pos', 'sun_azel', 1), float),
             'sun_dist': (('sun_pos', 'sun_dist'), float),
             'sun_safe_time': (('sun_pos', 'sun_safe_time'), float),
+            'sun_down': (('sun_pos', 'sun_down'), int),
+            'platform_down': (('sun_pos', 'platform_down'), int),
         }
         for k in ['warning_zone', 'danger_zone',
                   'escape_triggered', 'escape_active']:

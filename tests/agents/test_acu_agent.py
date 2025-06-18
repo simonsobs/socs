@@ -1,3 +1,5 @@
+import numpy as np
+
 from socs.agents.acu import avoidance as av
 from socs.agents.acu import drivers, hwp_iface
 from socs.agents.acu.agent import ACUAgent  # noqa: F401
@@ -52,14 +54,43 @@ HWP_IFACE_TEST_CONFIG = {
 }
 
 
-def test_avoidance():
-    az0, el0 = 72, 67
-    t0 = 1698850000
+#
+# Sun avoidance
+#
 
-    sun = av.SunTracker(fake_now=t0)
+def get_sun(t0, az, el, **kwargs):
+    # Get a SunTracker at time t0 and confirm the sun is close to
+    # requested (az, el) at that time.  Returns (t0, az_sun, el_sun,
+    # sun).
+    sun = av.SunTracker(fake_now=t0, policy=kwargs)
     pos = sun.get_sun_pos()
-    az, el = pos['sun_azel']
+    az0, el0 = pos['sun_azel']
     assert abs(az - az0) < .5 and abs(el - el0) < .5
+    return t0, az0, el0, sun
+
+
+def test_avoidance_support():
+    t0 = 1698850000
+    sun = av.SunTracker(fake_now=t0)
+
+    # Scalar rebranch
+    az, el, inv = sun._horizon_branch(0, 90)
+    assert abs(el - 90) < .001
+    assert not inv
+    az, el, inv = sun._horizon_branch(0, 110)
+    assert abs(el - 70) < .001
+    assert inv
+
+    # Vector rebranch
+    az, el, inv = sun._horizon_branch(
+        np.array([0, 30, 90, -110, 420]),
+        np.array([-20, 80, 90, 170, 190]))
+    assert np.allclose(el, np.array([-20, 80, 90, 10, -10]))
+    assert np.all(inv == np.array([False, False, False, True, True]))
+
+
+def test_avoidance_basics():
+    t0, az0, el0, sun = get_sun(1698850000, 72, 67, max_el=180.)
 
     # Zenith should be about 23 deg away.
     assert abs(sun.get_sun_pos(0, 90)['sun_dist'] - 23) < 0.5
@@ -67,9 +98,13 @@ def test_avoidance():
     # Unsafe positions.
     assert sun.check_trajectory([90], [60])['sun_time'] == 0
 
+    # Upsidedown (el > 90)
+    assert sun.check_trajectory([270], [120])['sun_time'] == 0
+
     # Safe positions
     assert sun.check_trajectory([90], [20])['sun_time'] > 0
     assert sun.check_trajectory([270], [60])['sun_time'] > 0
+    assert sun.check_trajectory([72], [170])['sun_time'] > 0
 
     # Find safe paths
     paths = sun.analyze_paths(180, 30, 270, 40)
@@ -97,6 +132,11 @@ def test_avoidance():
     assert path is not None
     assert len(path['moves'].nodes) == 1
 
+    paths = sun.analyze_paths(70, 120, 70, 120)
+    path, analysis = sun.select_move(paths)
+    assert path is not None
+    assert len(path['moves'].nodes) == 1
+
     # No safe moves to Sun position.
     paths = sun.analyze_paths(180, 20, az0, el0)
     path, analysis = sun.select_move(paths)
@@ -112,6 +152,136 @@ def test_avoidance():
     path = sun.find_escape_paths(az0 + 10, el0)
     assert path is not None
 
+    # Including from upsidedown.
+    az1, el1 = az0 + 180, 180 - el0
+    assert (el1 > 90)
+    path = sun.find_escape_paths(az1, el1 - 5)
+    assert path is not None
+    path = sun.find_escape_paths(az1, el1 + 5)
+    assert path is not None
+    path = sun.find_escape_paths(az1 - 10, el1)
+    assert path is not None
+    path = sun.find_escape_paths(az1 + 10, el1)
+    assert path is not None
+
+
+def test_avoidance_night():
+    # Check correct behavior when sun is below horizon.
+    t0, az0, el0, sun = get_sun(1750142000, 83, -62,
+                                min_el=-90.)
+
+    # It is safe to point at the Sun, if the earth is in the way
+    info = sun.check_trajectory([az0], [el0])
+    assert info['sun_dist_min'] < 1.
+    assert info['sun_time'] > 12 * 3600
+
+    # Find safe paths
+    paths = sun.analyze_paths(az0 - 50, el0, az0 + 50, el0)
+    path, analysis = sun.select_move(paths)
+    assert path is not None
+    assert len(path['moves'].nodes) == 2
+
+    # Escape paths.
+    path = sun.find_escape_paths(az0, el0 - 5)
+    assert path is not None
+    path = sun.find_escape_paths(az0, el0 + 5)
+    assert path is not None
+    path = sun.find_escape_paths(az0 - 10, el0)
+    assert path is not None
+    path = sun.find_escape_paths(az0 + 10, el0)
+    assert path is not None
+
+
+def test_avoidance_zenith():
+    # Check behavior when Sun near zenith.
+    t0, az0, el0, sun = get_sun(
+        1702311400, 91.8, 87.9)
+
+    # Zenith should be about 2 deg away.
+    assert abs(sun.get_sun_pos(0, 90)['sun_dist'] - 2) < 0.5
+
+    for az in np.arange(0, 360, 30):
+        # Unsafe positions.
+        assert sun.check_trajectory([az], [90])['sun_time'] == 0
+        # Safe positions
+        assert sun.check_trajectory([az], [0])['sun_time'] > 0
+        assert sun.check_trajectory([az], [180])['sun_time'] > 0
+
+    # Find safe paths
+    paths = sun.analyze_paths(0, 30, 270, 40)
+    path, analysis = sun.select_move(paths)
+    assert path is not None
+    assert len(path['moves'].nodes) > 1
+
+    # No safe moves to Sun position.
+    paths = sun.analyze_paths(180, 20, az0, el0)
+    path, analysis = sun.select_move(paths)
+    assert path is None
+
+    # Escape paths.
+    path = sun.find_escape_paths(az0, el0 - 5)
+    assert path is not None
+    path = sun.find_escape_paths(az0, el0 + 5)
+    assert path is not None
+    path = sun.find_escape_paths(az0 - 10, el0)
+    assert path is not None
+    path = sun.find_escape_paths(az0 + 10, el0)
+    assert path is not None
+
+    # A similar point, but now check that extended el branch scopes
+    # can find paths effectively.
+    t0, az0, el0, sun = get_sun(
+        1702312400, 268, 87.9, max_el=180)
+
+    path = sun.find_escape_paths(az0, el0 - 5)
+    assert path is not None
+    path = sun.find_escape_paths(az0, el0 + 5)
+    assert path is not None
+    path = sun.find_escape_paths(az0 - 10, el0)
+    assert path is not None
+    path = sun.find_escape_paths(az0 + 10, el0)
+    assert path is not None
+
+
+def test_avoidance_sunrise():
+    # Check behavior when Sun near horizon, rising.
+    # Just after sunrise
+    t0, az0, el0, sun = get_sun(1750159200, 64, 0.9)
+
+    info = sun.check_trajectory([az0], [1.])
+    assert info['sun_dist_min'] < 10
+    assert info['sun_time'] == 0
+
+    # Just before sunrise
+    t0, az0, el0, sun = get_sun(1750158000, 66, -3)
+
+    info = sun.check_trajectory([az0], [1.])
+    assert info['sun_dist_min'] < 10
+
+    # Even though Sun distance is within exclusion radius, sun_time
+    # should be positive (though not very big).
+    assert info['sun_time'] > 0
+    assert info['sun_time'] < abs(el0) * 3600 / 15 * 2
+
+
+def test_avoidance_sunset():
+    # Check behavior when Sun near horizon, setting.
+    # Just before sunset
+    t0, az0, el0, sun = get_sun(1750110000, 297, 2.2)
+
+    info = sun.check_trajectory([az0], [1.])
+    assert info['sun_dist_min'] < 10
+    assert info['sun_time'] == 0
+
+    # Just after sunset
+    t0, az0, el0, sun = get_sun(1750110900, 295, -0.8)
+
+    # Even though Sun distance is within exclusion radius, sun_time
+    # should be positive -- well over 12 hours, closer to 24.
+    info = sun.check_trajectory([az0], [1.])
+    assert info['sun_dist_min'] < 10
+    assert info['sun_time'] > 16 * 3600
+
 
 def test_tracks():
     # Basic function testing.
@@ -122,6 +292,10 @@ def test_tracks():
     drivers.get_track_points_text(points, text_block=True,
                                   timestamp_offset=3)
 
+
+#
+# HWP interface system
+#
 
 def test_hwp_iface_ranges_math():
     misc = [
