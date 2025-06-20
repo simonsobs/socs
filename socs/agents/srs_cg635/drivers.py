@@ -79,7 +79,7 @@ class SRSCG635Interface(PrologixInterface):
         timb = self.read()
 
         return int(timb)
-    
+
     def get_all_status(self):
         self.write("FREQ?;STDC?;RUNS?;TIMB?")
         freq, stdc, runs, timb = self.read().split(';')
