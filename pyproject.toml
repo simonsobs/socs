@@ -135,4 +135,4 @@ include = [
 ]
 
 [tool.isort]
-skip = ["versioneer.py", "socs/_version.py"]
+skip = ["socs/_version.py"]
