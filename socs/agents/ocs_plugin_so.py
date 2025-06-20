@@ -46,6 +46,7 @@ for n, f in [
         ('SmurfFileEmulator', 'smurf_file_emulator/agent.py'),
         ('SmurfStreamSimulator', 'smurf_stream_simulator/agent.py'),
         ('SmurfTimingCardAgent', 'smurf_timing_card/agent.py'),
+        ('SRSCG635Agent', 'srs_cg635/agent.py'),
         ('SupRsync', 'suprsync/agent.py'),
         ('SynaccessAgent', 'synacc/agent.py'),
         ('SynthAgent', 'holo_synth/agent.py'),
