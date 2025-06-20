@@ -35,7 +35,6 @@ class SRSCG635Agent:
 
         self.clock = None
 
-        # Registers Temperature and Voltage feeds
         agg_params = {
             'frame_length': 10 * 60,
         }
@@ -70,8 +69,7 @@ class SRSCG635Agent:
             self.log.info("Connected to Clock: {}".format(self.idn))
 
         # Start data acquisition if requested in site-config
-        auto_acquire = params.get('auto_acquire', False)
-        if auto_acquire:
+        if params['auto_acquire']:
             self.agent.start('acq')
 
         return True, 'Initialized Clock.'
@@ -83,21 +81,22 @@ class SRSCG635Agent:
         except (socket.timeout, OSError) as e:
             self.log.error(f"Clock timed out during connect: {e}")
             self.clock = None
-            return False
+            raise ConnectionError
 
         self.idn = self.clock.identify()
         self.log.info("Connected to Clock: {}".format(self.idn))
         self.log.info("Clearing event registers and error queue.")
         self.clock.clear()
-        return True
 
     @ocs_agent.param('test_mode', default=False, type=bool)
     @ocs_agent.param('wait', default=1, type=float)
     def acq(self, session, params):
         """acq(wait=1, test_mode=False)
 
-        **Process** - Continuously monitor srs clock lock registers
-        and publish to a feed.
+        **Process** - Continuously monitor SRS clock registers
+        and publish to a feed. Note that local changes on the clock
+        (physically pressing buttons) will be unavailable during this
+        process.
 
         The ``session.data`` object stores the most recent published values
         in a dictionary. For example::
@@ -109,13 +108,7 @@ class SRSCG635Agent:
                     'Frequency': 122880000.0
                     'Standard_CMOS_Output': 3,
                     'Running_State': 1,
-                    'Timebase': 3,
-                    'PLL_RF_UNLOCKED': 1,
-                    'PLL_19MHZ_UNLOCKED': 1,
-                    'PLL_10MHz_UNLOCKED': 0,
-                    'PLL_RB_UNLOCKED': 1,
-                    'PLL_OUT_UNLOCKED': 0,
-                    'PLL_Phase_Shift': 0,
+                    'Timebase': 3
                 }
             }
 
@@ -123,8 +116,11 @@ class SRSCG635Agent:
 
         Parameters
         ----------
-        wait: float, optional
-            time to wait between measurements [seconds]. Default=1s.
+        wait : float, optional
+            Time to wait between measurements [seconds]. Default=1s.
+        test_mode : bool, optional
+            Run the process loop only once. Meant for testing only.
+            Default=False
 
         """
         self.monitor = True
@@ -134,8 +130,16 @@ class SRSCG635Agent:
                 if acquired:
                     if not self.clock:
                         self.log.info("Trying to reconnect...")
-                        self._initialize_interface()
-                        continue
+                        try:
+                            self._initialize_interface()
+                            if session.degraded:
+                                self.log.info("Connection re-established.")
+                                session.degraded = False
+                        except ConnectionError:
+                            self.log.error("Failed to reconnect. Check network connection.")
+                            session.degraded = True
+                            time.sleep(1)
+                            continue
 
                     data = {
                         'timestamp': time.time(),
@@ -144,22 +148,16 @@ class SRSCG635Agent:
                     }
 
                     try:
-                        data['data']['Frequency'] = self.clock.get_freq()
-                        data['data']['Standard_CMOS_Output'] = self.clock.get_stdc()
-                        data['data']['Running_State'] = self.clock.get_runs()
-                        data['data']['Timebase'] = self.clock.get_timebase()
-
-                        # get_lock_statuses returns a dict of the register bits
-                        # Loop through the items to add each to the data
-                        lock_statuses = self.clock.get_lock_statuses()
-                        for register, status in lock_statuses.items():
-                            # Not adding PLL causes a naming error
-                            # Two of the registers start with an number
-                            data['data']["PLL_" + register] = status
+                        freq, stdc, runs, timb = self.clock.get_all_status()
+                        data['data']['Frequency'] = freq
+                        data['data']['Standard_CMOS_Output'] = stdc
+                        data['data']['Running_State'] = runs
+                        data['data']['Timebase'] = timb
 
                     except socket.timeout as e:
                         self.log.error(f"Timeout in retrieving clock data: {e}")
                         self.clock = None
+                        session.degraded = True
                         continue
 
                     self.agent.publish_to_feed('srs_clock', data)
@@ -196,7 +194,7 @@ def make_parser(parser=None):
 
     # Add options specific to this agent.
     pgroup = parser.add_argument_group('Agent Options')
-    pgroup.add_argument('--ip-address', type=str, help="Internal GPIB IP Address")
+    pgroup.add_argument('--ip-address', type=str, help="Prologix IP Address")
     pgroup.add_argument('--gpib-slot', type=int, help="Internal SRS GPIB Address")
     pgroup.add_argument('--mode', type=str, default='acq',
                         choices=['idle', 'init', 'acq'],
@@ -209,11 +207,7 @@ def main(args=None):
     # Start logging
     txaio.start_logging(level=environ.get("LOGLEVEL", "info"))
 
-    parser = site_config.add_arguments()
-
-    # Get the default ocs agrument parser
     parser = make_parser()
-
     args = site_config.parse_args(agent_class='SRSCG635Agent',
                                   parser=parser,
                                   args=args)
@@ -225,7 +219,7 @@ def main(args=None):
 
     agent, runner = ocs_agent.init_site_agent(args)
 
-    p = SRSCG635Agent(agent, args.ip_address, int(args.gpib_slot))
+    p = SRSCG635Agent(agent, args.ip_address, args.gpib_slot)
 
     agent.register_task('init', p.init, startup=init_params)
     agent.register_process('acq', p.acq, p._stop_acq)
