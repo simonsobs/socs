@@ -94,8 +94,10 @@ OK_RESPONSES = [
 # The sample_period is the minimum spacing between samples, even if
 # values have changed.
 #
-# To drop a block of data (as defined by fields_key) from the output
-# data, set the block_name to None.
+# Note that *all groups found in soaculib.status_keys* must be listed
+# here -- or an error will be raised on startup.  To drop a block of
+# data (as defined by fields_key) from the output data, set the
+# block_name to None.
 
 #: Block names and update policy for status fields in monitor process.
 MONITOR_STRUCTURE = [
@@ -115,6 +117,8 @@ MONITOR_STRUCTURE = [
     ('ACU_shutter', 'shutter', None, None),
     ('ACU_tilt', 'tilt_slow', 'changed', 0.5),
     (None, 'tilt_fast', None, None),
+    ('ACU_sun_avoidance', 'sun_avoidance', 'changed', 1.),
+    ('ACU_corrections', 'corrections', 'changed', 10.),
 ]
 
 
@@ -206,7 +210,7 @@ class ACUAgent:
                 if block_group == group:
                     break
             else:
-                raise ValueError("status_key block '{group}' not configured for monitoring.")
+                raise ValueError(f"status_key block '{group}' not configured for monitoring.")
             for acu_key, block_key in group_fields.items():
                 self.status_field_map[acu_key] = (group, block_name, block_key)
 
