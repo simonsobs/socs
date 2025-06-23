@@ -117,8 +117,8 @@ MONITOR_STRUCTURE = [
     ('ACU_shutter', 'shutter', None, None),
     ('ACU_tilt', 'tilt_slow', 'changed', 0.5),
     (None, 'tilt_fast', None, None),
-    ('ACU_sun_avoidance', 'sun_avoidance', 'changed', 1.),
-    ('ACU_corrections', 'corrections', 'changed', 10.),
+    ('ACU_sun_avoidance', 'sun_avoidance', None, 1.),
+    ('ACU_corrections', 'corrections', None, 10.),
 ]
 
 
@@ -869,9 +869,10 @@ class ACUAgent:
                     continue
                 if policy == 'tick':  # always store.
                     continue
-                overdue = (N['timestamp'] - B['timestamp'] > MONITOR_MAX_TIME_DELTA)
                 underdue = delta is not None and \
                     (N['timestamp'] - B['timestamp'] < delta)
+                overdue = (N['timestamp'] - B['timestamp'] > MONITOR_MAX_TIME_DELTA) \
+                    and not underdue
                 changes = any([B['data'][_k] != _v for _k, _v in N['data'].items()])
                 if (overdue and policy != 'changed') or changes and not underdue:
                     continue
