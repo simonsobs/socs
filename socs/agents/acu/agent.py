@@ -210,7 +210,7 @@ class ACUAgent:
                 if block_group == group:
                     break
             else:
-                raise ValueError(f"status_key block '{group}' not configured for monitoring.")
+                raise ValueError(f"status_key block '{group}' not found in MONITOR_STRUCTURE.")
             for acu_key, block_key in group_fields.items():
                 self.status_field_map[acu_key] = (group, block_name, block_key)
 
