@@ -76,9 +76,6 @@ Here is an example of a device definition for a SATP::
                 'active': False,
             },
         },
-        'status': {
-            'status_name': 'Datasets.StatusSATPDetailed8100',
-            },
 
         'platform': 'satp',
         'motion_limits': {
