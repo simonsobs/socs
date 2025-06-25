@@ -93,6 +93,11 @@ OK_RESPONSES = [
 #
 # The sample_period is the minimum spacing between samples, even if
 # values have changed.
+#
+# Note that *all groups found in soaculib.status_keys* must be listed
+# here -- or an error will be raised on startup.  To drop a block of
+# data (as defined by fields_key) from the output data, set the
+# block_name to None.
 
 #: Block names and update policy for status fields in monitor process.
 MONITOR_STRUCTURE = [
@@ -111,6 +116,9 @@ MONITOR_STRUCTURE = [
     ('ACU_corotator', 'corotator', None, None),
     ('ACU_shutter', 'shutter', None, None),
     ('ACU_tilt', 'tilt_slow', 'changed', 0.5),
+    (None, 'tilt_fast', None, None),
+    ('ACU_sun_avoidance', 'sun_avoidance', None, 1.),
+    ('ACU_corrections', 'corrections', None, 10.),
 ]
 
 
@@ -177,9 +185,11 @@ class ACUAgent:
         self.udp_schema = aculib.get_stream_schema(self.udp['schema'])
         self.udp_ext = self.acu_config['streams']['ext']
 
-        # The 'status' dataset is necessary; the 'third' axis can be
-        # None (in SATP it's all included in default); the 'shutter'
-        # is enabled for LAT.
+        # List of datasets to read as "status".  The 'status' dataset
+        # is necessary; the 'third' axis can be None (in SATP all the
+        # boresight info is included in the status dataset); the
+        # 'shutter' is for LAT shutter and 'pointing' is for LAT
+        # tiltmeter.
         _dsets = self.acu_config['_datasets']
         self.datasets = {
             'status': _dsets.get('default_dataset'),
@@ -191,7 +201,18 @@ class ACUAgent:
             if v is not None:
                 self.datasets[k] = dict(_dsets['datasets'])[v]
 
-        self.monitor_fields = status_keys.status_fields[self.platform_type]['status_fields']
+        # Create a map from each status key (read through the
+        # self.datasets) to the output block and field name.
+        self.status_field_map = {}
+        for group, group_fields in \
+                status_keys.status_fields[self.platform_type]['status_fields'].items():
+            for block_name, block_group, _, _ in MONITOR_STRUCTURE:
+                if block_group == group:
+                    break
+            else:
+                raise ValueError(f"status_key block '{group}' not found in MONITOR_STRUCTURE.")
+            for acu_key, block_key in group_fields.items():
+                self.status_field_map[acu_key] = (group, block_name, block_key)
 
         # Config file + overrides processing
 
@@ -276,7 +297,9 @@ class ACUAgent:
             'broadcast': {},
             'hwp': {},
         }
-        for _, k, _, _ in MONITOR_STRUCTURE:
+        for b, k, _, _ in MONITOR_STRUCTURE:
+            if b is None:
+                continue
             self.data['status'][k] = {}
 
         # Structure for the broadcast process to communicate state to
@@ -648,6 +671,7 @@ class ACUAgent:
         last_resp_rate = None
         data_blocks = {}
         influx_blocks = {}
+        unknown_fields = set()
 
         while session.status in ['running']:
 
@@ -703,20 +727,32 @@ class ACUAgent:
                     session.data['connected'] = False
                 yield dsleep(1)
                 continue
+
             for k, v in session.data.items():
                 if k in not_data_keys:
                     continue
                 for (key, value) in v.items():
-                    for category in self.monitor_fields:
-                        if key in self.monitor_fields[category]:
-                            if isinstance(value, bool):
-                                self.data['status'][category][self.monitor_fields[category][key]] = int(value)
-                            elif isinstance(value, int) or isinstance(value, float):
-                                self.data['status'][category][self.monitor_fields[category][key]] = value
-                            elif value is None:
-                                self.data['status'][category][self.monitor_fields[category][key]] = float('nan')
-                            else:
-                                self.data['status'][category][self.monitor_fields[category][key]] = str(value)
+                    try:
+                        group, block, field = self.status_field_map[key]
+                    except KeyError:
+                        if key not in unknown_fields:
+                            self.log.warn(
+                                'unknown status field (ignored hereafter): "%s"' % key)
+                            unknown_fields.add(key)
+                        continue
+                    if block is None:
+                        continue
+                    # Cast value to saveable type.
+                    if isinstance(value, bool):
+                        value = int(value)
+                    elif isinstance(value, int) or isinstance(value, float):
+                        pass
+                    elif value is None:
+                        value = float('nan')
+                    else:
+                        value = str(value)
+                    # Store.
+                    self.data['status'][group][field] = value
 
             self.data['status']['summary']['ctime'] =\
                 sh.timecode(self.data['status']['summary']['Time'])
@@ -813,6 +849,8 @@ class ACUAgent:
             # Assemble data for aggregator ...
             new_blocks = {}
             for block_name, data_key, _, _ in MONITOR_STRUCTURE:
+                if block_name is None:
+                    continue
                 new_blocks[block_name] = {
                     'timestamp': self.data['status']['summary']['ctime'],
                     'block_name': block_name,
@@ -821,6 +859,8 @@ class ACUAgent:
 
             # Only keep blocks that have changed or have new data.
             for k, _, policy, delta in MONITOR_STRUCTURE:
+                if k is None:
+                    continue
                 B, N = data_blocks.get(k), new_blocks[k]
                 if len(N['data']) == 0:
                     del new_blocks[k]
@@ -829,9 +869,10 @@ class ACUAgent:
                     continue
                 if policy == 'tick':  # always store.
                     continue
-                overdue = (N['timestamp'] - B['timestamp'] > MONITOR_MAX_TIME_DELTA)
                 underdue = delta is not None and \
                     (N['timestamp'] - B['timestamp'] < delta)
+                overdue = (N['timestamp'] - B['timestamp'] > MONITOR_MAX_TIME_DELTA) \
+                    and not underdue
                 changes = any([B['data'][_k] != _v for _k, _v in N['data'].items()])
                 if (overdue and policy != 'changed') or changes and not underdue:
                     continue
