@@ -36,6 +36,11 @@ using all of the available arguments::
 .. note::
     The ``--ip-address`` argument should be the IP address of the Prologix GPIB interface.
     The ``--gpib-slot`` argument should be the GPIB address set on the SRS CG635.
+    For first time setup, use the utility software available on the `Prologix website`_.
+    The ``NetFinder`` utility should be used to find the IP address of the Prologix GPIB interface.
+    The ``Prologix GPIB Interface`` utility should be used to set the GPIB address.
+
+.. _Prologix website: https://prologix.biz/resources/?srsltid=AfmBOoptDPt0wUbjz1A5lLDYLksBkqL1ynYDqLJorgIeZ1tQf-BY_3Il
 
 Docker Compose
 --------------
