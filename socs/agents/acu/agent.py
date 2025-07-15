@@ -26,9 +26,6 @@ from socs.agents.acu import exercisor, hwp_iface
 FULL_STACK = 10000
 
 
-#: Maximum update time (in s) for "monitor" process data, even with no changes
-MONITOR_MAX_TIME_DELTA = 2.
-
 #: Initial default scan params by platform type.
 INIT_DEFAULT_SCAN_PARAMS = {
     'ccat': {
@@ -52,7 +49,8 @@ INIT_SUN_CONFIGS = {
     'ccat': {
         'enabled': False,
         'exclusion_radius': 20,
-        'el_horizon': 10,
+        'el_horizon': 0,
+        'el_dodging': True,
         'min_sun_time': 1800,
         'response_time': 7200,
     },
@@ -74,6 +72,58 @@ OK_RESPONSES = [
     b'OK, Command executed.',
     b'OK, Command send.',
 ]
+
+
+# The data structure below defines how data fields are organized in
+# the "status" readout of the "monitor" process.  Each entry in the
+# list is a tuple:
+#
+#   (block_name, fields_key, policy, sample_period)
+#
+# The "block_name" is the block name in the sense of housekeeping data
+# format. The "fields_key" corresponds a labeled group of ACU fields,
+# as defined in soaculib.status_keys.  The "policy" is a description,
+# for the monitor process, of how to store the data.  The values for
+# policy are:
+#
+#   - None: publish the data at least every X seconds (see
+#     MONITOR_MAX_TIME_DELTA), or if any of the values have changed.
+#   - 'tick': publish every sample (as a reference tick).
+#   - 'changed': publish only when values change (otherwise, stale).
+#
+# The sample_period is the minimum spacing between samples, even if
+# values have changed.
+#
+# Note that *all groups found in soaculib.status_keys* must be listed
+# here -- or an error will be raised on startup.  To drop a block of
+# data (as defined by fields_key) from the output data, set the
+# block_name to None.
+
+#: Block names and update policy for status fields in monitor process.
+MONITOR_STRUCTURE = [
+    ('ACU_summary_output', 'summary', 'tick', None),
+    ('ACU_axis_faults', 'axis_faults_errors_overages', None, None),
+    ('ACU_position_errors', 'position_errors', None, None),
+    ('ACU_axis_limits', 'axis_limits', None, None),
+    ('ACU_axis_warnings', 'axis_warnings', None, None),
+    ('ACU_axis_failures', 'axis_failures', None, None),
+    ('ACU_axis_state', 'axis_state', None, None),
+    ('ACU_oscillation_alarm', 'osc_alarms', None, None),
+    ('ACU_command_status', 'commands', None, None),
+    ('ACU_general_errors', 'ACU_failures_errors', None, None),
+    ('ACU_platform_status', 'platform_status', None, None),
+    ('ACU_emergency', 'ACU_emergency', None, None),
+    ('ACU_corotator', 'corotator', None, None),
+    ('ACU_shutter', 'shutter', None, None),
+    ('ACU_tilt', 'tilt_slow', 'changed', 0.5),
+    (None, 'tilt_fast', None, None),
+    ('ACU_sun_avoidance', 'sun_avoidance', None, 1.),
+    ('ACU_corrections', 'corrections', None, 10.),
+]
+
+
+#: Maximum update time (in s) for "monitor" process data, even with no changes
+MONITOR_MAX_TIME_DELTA = 2.
 
 
 class ACUAgent:
@@ -135,20 +185,34 @@ class ACUAgent:
         self.udp_schema = aculib.get_stream_schema(self.udp['schema'])
         self.udp_ext = self.acu_config['streams']['ext']
 
-        # The 'status' dataset is necessary; the 'third' axis can be
-        # None (in SATP it's all included in default); the 'shutter'
-        # is enabled for LAT.
+        # List of datasets to read as "status".  The 'status' dataset
+        # is necessary; the 'third' axis can be None (in SATP all the
+        # boresight info is included in the status dataset); the
+        # 'shutter' is for LAT shutter and 'pointing' is for LAT
+        # tiltmeter.
         _dsets = self.acu_config['_datasets']
         self.datasets = {
             'status': _dsets.get('default_dataset'),
             'third': _dsets.get('third_axis_dataset'),
             'shutter': _dsets.get('shutter_dataset'),
+            'pointing': _dsets.get('pointing_dataset'),
         }
         for k, v in self.datasets.items():
             if v is not None:
                 self.datasets[k] = dict(_dsets['datasets'])[v]
 
-        self.monitor_fields = status_keys.status_fields[self.platform_type]['status_fields']
+        # Create a map from each status key (read through the
+        # self.datasets) to the output block and field name.
+        self.status_field_map = {}
+        for group, group_fields in \
+                status_keys.status_fields[self.platform_type]['status_fields'].items():
+            for block_name, block_group, _, _ in MONITOR_STRUCTURE:
+                if block_group == group:
+                    break
+            else:
+                raise ValueError(f"status_key block '{group}' not found in MONITOR_STRUCTURE.")
+            for acu_key, block_key in group_fields.items():
+                self.status_field_map[acu_key] = (group, block_name, block_key)
 
         # Config file + overrides processing
 
@@ -226,27 +290,17 @@ class ACUAgent:
         # self.data provides a place to reference data from the monitors.
         # 'status' is populated by the monitor operation
         # 'broadcast' is populated by the udp_monitor operation
+        # 'hwp' is populated by the monitor_hwp operation
 
         self.data = {
-            'status': {
-                'summary': {},
-                'position_errors': {},
-                'axis_limits': {},
-                'axis_faults_errors_overages': {},
-                'axis_warnings': {},
-                'axis_failures': {},
-                'axis_state': {},
-                'osc_alarms': {},
-                'commands': {},
-                'ACU_failures_errors': {},
-                'platform_status': {},
-                'ACU_emergency': {},
-                'corotator': {},
-                'shutter': {},
-            },
-            'hwp': {},
+            'status': {},
             'broadcast': {},
+            'hwp': {},
         }
+        for b, k, _, _ in MONITOR_STRUCTURE:
+            if b is None:
+                continue
+            self.data['status'][k] = {}
 
         # Structure for the broadcast process to communicate state to
         # the monitor process, for a data quality feed.
@@ -288,6 +342,11 @@ class ACUAgent:
                                self._simple_process_stop,
                                blocking=False,
                                startup=startup_idle_reset)
+        agent.register_process('fromfile_scan',
+                               self.fromfile_scan,
+                               self._simple_process_stop,
+                               blocking=False)
+
         basic_agg_params = {'frame_length': 60}
         fullstatus_agg_params = {'frame_length': 60,
                                  'exclude_influx': True,
@@ -339,10 +398,6 @@ class ACUAgent:
         agent.register_task('set_scan_params',
                             self.set_scan_params,
                             blocking=False)
-        agent.register_task('fromfile_scan',
-                            self.fromfile_scan,
-                            blocking=False,
-                            aborter=self._simple_task_abort)
         agent.register_task('set_boresight',
                             self.set_boresight,
                             blocking=False,
@@ -356,6 +411,10 @@ class ACUAgent:
         agent.register_task('clear_faults',
                             self.clear_faults,
                             blocking=False)
+        agent.register_task('special_action',
+                            self.special_action,
+                            blocking=False,
+                            aborter=self._simple_task_abort)
         agent.register_task('update_sun',
                             self.update_sun,
                             blocking=False)
@@ -594,7 +653,9 @@ class ACUAgent:
             for short, collection in [
                     ('status', 'StatusDetailed'),
                     ('third', 'Status3rdAxis'),
-                    ('shutter', 'StatusShutter')]:
+                    ('shutter', 'StatusShutter'),
+                    ('pointing', 'CmdPointingCorrection'),
+            ]:
                 if self.datasets[short]:
                     output[collection] = (
                         yield self.acu_read.Values(self.datasets[short]))
@@ -610,6 +671,7 @@ class ACUAgent:
         last_resp_rate = None
         data_blocks = {}
         influx_blocks = {}
+        unknown_fields = set()
 
         while session.status in ['running']:
 
@@ -665,20 +727,32 @@ class ACUAgent:
                     session.data['connected'] = False
                 yield dsleep(1)
                 continue
+
             for k, v in session.data.items():
                 if k in not_data_keys:
                     continue
                 for (key, value) in v.items():
-                    for category in self.monitor_fields:
-                        if key in self.monitor_fields[category]:
-                            if isinstance(value, bool):
-                                self.data['status'][category][self.monitor_fields[category][key]] = int(value)
-                            elif isinstance(value, int) or isinstance(value, float):
-                                self.data['status'][category][self.monitor_fields[category][key]] = value
-                            elif value is None:
-                                self.data['status'][category][self.monitor_fields[category][key]] = float('nan')
-                            else:
-                                self.data['status'][category][self.monitor_fields[category][key]] = str(value)
+                    try:
+                        group, block, field = self.status_field_map[key]
+                    except KeyError:
+                        if key not in unknown_fields:
+                            self.log.warn(
+                                'unknown status field (ignored hereafter): "%s"' % key)
+                            unknown_fields.add(key)
+                        continue
+                    if block is None:
+                        continue
+                    # Cast value to saveable type.
+                    if isinstance(value, bool):
+                        value = int(value)
+                    elif isinstance(value, int) or isinstance(value, float):
+                        pass
+                    elif value is None:
+                        value = float('nan')
+                    else:
+                        value = str(value)
+                    # Store.
+                    self.data['status'][group][field] = value
 
             self.data['status']['summary']['ctime'] =\
                 sh.timecode(self.data['status']['summary']['Time'])
@@ -760,9 +834,9 @@ class ACUAgent:
                 if k not in influx_blocks:
                     continue
                 B, N = influx_blocks[k], new_influx_blocks[k]
-                if N['timestamp'] - B['timestamp'] > MONITOR_MAX_TIME_DELTA:
-                    continue
-                if any([B['data'][_k] != _v for _k, _v in N['data'].items()]):
+                overdue = (N['timestamp'] - B['timestamp'] > MONITOR_MAX_TIME_DELTA)
+                changes = any([B['data'][_k] != _v for _k, _v in N['data'].items()])
+                if overdue or changes:
                     continue
                 del new_influx_blocks[k]
 
@@ -774,22 +848,9 @@ class ACUAgent:
 
             # Assemble data for aggregator ...
             new_blocks = {}
-            for block_name, data_key in [
-                    ('ACU_summary_output', 'summary'),
-                    ('ACU_axis_faults', 'axis_faults_errors_overages'),
-                    ('ACU_position_errors', 'position_errors'),
-                    ('ACU_axis_limits', 'axis_limits'),
-                    ('ACU_axis_warnings', 'axis_warnings'),
-                    ('ACU_axis_failures', 'axis_failures'),
-                    ('ACU_axis_state', 'axis_state'),
-                    ('ACU_oscillation_alarm', 'osc_alarms'),
-                    ('ACU_command_status', 'commands'),
-                    ('ACU_general_errors', 'ACU_failures_errors'),
-                    ('ACU_platform_status', 'platform_status'),
-                    ('ACU_emergency', 'ACU_emergency'),
-                    ('ACU_corotator', 'corotator'),
-                    ('ACU_shutter', 'shutter'),
-            ]:
+            for block_name, data_key, _, _ in MONITOR_STRUCTURE:
+                if block_name is None:
+                    continue
                 new_blocks[block_name] = {
                     'timestamp': self.data['status']['summary']['ctime'],
                     'block_name': block_name,
@@ -797,16 +858,23 @@ class ACUAgent:
                 }
 
             # Only keep blocks that have changed or have new data.
-            block_keys = list(new_blocks.keys())
-            for k in block_keys:
-                if k == 'summary':  # always store these, as a sort of reference tick.
+            for k, _, policy, delta in MONITOR_STRUCTURE:
+                if k is None:
                     continue
-                if k not in data_blocks:
+                B, N = data_blocks.get(k), new_blocks[k]
+                if len(N['data']) == 0:
+                    del new_blocks[k]
                     continue
-                B, N = data_blocks[k], new_blocks[k]
-                if N['timestamp'] - B['timestamp'] > MONITOR_MAX_TIME_DELTA:
+                if B is None:
                     continue
-                if any([B['data'][_k] != _v for _k, _v in N['data'].items()]):
+                if policy == 'tick':  # always store.
+                    continue
+                underdue = delta is not None and \
+                    (N['timestamp'] - B['timestamp'] < delta)
+                overdue = (N['timestamp'] - B['timestamp'] > MONITOR_MAX_TIME_DELTA) \
+                    and not underdue
+                changes = any([B['data'][_k] != _v for _k, _v in N['data'].items()])
+                if (overdue and policy != 'changed') or changes and not underdue:
                     continue
                 del new_blocks[k]
 
@@ -1710,69 +1778,130 @@ class ACUAgent:
         session.set_status('stopping')
         return True, 'Job completed'
 
+    @ocs_agent.param('action', choices=['unstow', 'elsync'])
+    @ocs_agent.param('force', type=bool, default=False)
+    @ocs_agent.param('elsync_ref', type=float, default=None)
+    @inlineCallbacks
+    def special_action(self, session, params):
+        """special_action(action, force=False, elsync_ref=None)
+
+        **Task** - Perform a special action or set a special mode.
+
+        Args:
+          action (str): Action to perform.  See notes.
+          force (bool): Perform the action even if conditions suggest
+            it need not or should not be run.
+          elsync_ref (float): For action='elsync', sets the reference
+            elevation for the locked co-rotator mode. (This is the
+            negative of the ACU offset parameter.)
+
+        Notes:
+          - 'unstow': Set the el and az axis modes to "UnStow".  This
+            is used to recover the LAT from "maintenance stow"
+            position, where el=-90 and pins inserted.  The Task
+            returns after setting the mode; transition to Stop will
+            normally occur after a few seconds.
+          - 'elsync': Put the LAT corotator into ElSync mode. If
+            elsync_ref is provided, that is sent to the ACU
+            first. Otherwise the offset is left unchanged. Unless
+            force=True, the corotator axis should be in Stop before
+            when this is called.
+
+        """
+        if params['action'] == 'unstow':
+            if not params['force']:
+                el_mode = self.data['status']['summary']['Elevation_mode']
+                if el_mode.lower() not in ['stow', 'maintenancestow']:
+                    return False, f"Not unstowing because elevation mode is {el_mode}; "\
+                        "override with force=True."
+            response = yield self._set_modes(az='Stop', el='UnStow')
+            self.log.info('response to UnStow: {response}', response=response)
+            yield dsleep(0.5)
+
+        elif params['action'] == 'elsync':
+            if not params['force']:
+                third_mode = self.data['status']['corotator']['Corotator_mode']
+                if third_mode.lower() != 'stop':
+                    return False, f"Not going to elsync mode because corotator mode is {third_mode}; "\
+                        "override with force=True."
+            if params['elsync_ref'] is not None:
+                response = yield self.acu_control.http.Command(
+                    'DataSets.Corotator', 'SetOffsetToElevation', '%.6f' % (-params['elsync_ref']))
+                self.log.info('response to set elsync_ref : {response}', response=response)
+                yield dsleep(0.5)
+
+            response = yield self._set_modes(third='ElSync')
+            self.log.info('response to set ElSync mode: {response}', response=response)
+            yield dsleep(0.5)
+
+        else:
+            return False, f"Unimplemented action '{params['action']}'."
+
+        return True, 'Done.'
+
     @ocs_agent.param('filename', type=str)
-    @ocs_agent.param('adjust_times', type=bool, default=True)
+    @ocs_agent.param('absolute_times', type=bool, default=False)
     @ocs_agent.param('azonly', type=bool, default=True)
     @inlineCallbacks
     def fromfile_scan(self, session, params=None):
-        """fromfile_scan(filename, adjust_times=True, azonly=True)
+        """fromfile_scan(filename, absolute_times=False, azonly=True)
 
-        **Task** - Upload and execute a scan pattern from numpy file.
+        **Process** - Upload and execute a scan pattern from a file.
 
         Parameters:
-            filename (str): full path to desired numpy file. File should
-                contain an array of shape (5, nsamp) or (7, nsamp).  See Note.
-            adjust_times (bool): If True (the default), the track
-                timestamps are interpreted as relative times, only,
-                and the track will be formatted so the first point
-                happens a few seconds in the future.  If False, the
-                track times will be taken at face value (even if the
-                first one is, like, 0).
+            filename (str): full path to the track file.
+            absolute_times (bool): If True, the track timestamps are
+                taken at face value.  Otherwise, the timestamps are
+                treated as relative to the track start time, which
+                will be a few seconds in the future from when this
+                function is called.
             azonly (bool): If True, the elevation part of the track
                 will be uploaded but the el axis won't be put in
                 ProgramTrack mode.  It might be put in Stop mode
                 though.
 
         Notes:
-            The columns in the numpy array are:
+            See :func:`drivers.from_file
+            <socs.agents.acu.drivers.from_file>` for discussion of the
+            file structure.
 
-            - 0: timestamps, in seconds.
-            - 1: azimuth, in degrees.
-            - 2: elevation, in degrees.
-            - 3: az_vel, in deg/s.
-            - 4: el_vel, in deg/s.
-            - 5: az_flags (2 if last point in a leg; 1 otherwise.)
-            - 6: el_flags (2 if last point in a leg; 1 otherwise.)
-
-            It is acceptable to omit columns 5 and 6.
         """
+        ff_scan = sh.from_file(params['filename'])
 
-        times, azs, els, vas, ves, azflags, elflags = sh.from_file(params['filename'])
-        if min(azs) <= self.motion_limits['azimuth']['lower'] \
-           or max(azs) >= self.motion_limits['azimuth']['upper']:
+        if ff_scan.az_range[0] <= self.motion_limits['azimuth']['lower'] \
+           or ff_scan.az_range[1] >= self.motion_limits['azimuth']['upper']:
             return False, 'Azimuth location out of range!'
-        if min(els) <= self.motion_limits['elevation']['lower'] \
-           or max(els) >= self.motion_limits['elevation']['upper']:
+        if ff_scan.el_range[0] <= self.motion_limits['elevation']['lower'] \
+           or ff_scan.el_range[1] >= self.motion_limits['elevation']['upper']:
             return False, 'Elevation location out of range!'
 
         # Modify times?
-        if params['adjust_times']:
-            times = times + time.time() - times[0] + 5.
+        t_shift = 0
+        if not params['absolute_times']:
+            t_shift = time.time() + 5.
 
         # Turn those lines into a generator.
-        all_lines = sh.ptstack_format(times, azs, els, vas, ves, azflags, elflags,
-                                      absolute=True)
+        def line_batcher(ff_scan, t_shift=0., n=10):
+            lines = [sh.track_point_time_shift(p, t_shift)
+                     for p in ff_scan.points]
+            while True:
+                while len(lines):
+                    some, lines = lines[:n], lines[n:]
+                    yield some
+                if ff_scan.loop_time <= 0:
+                    break
+                t_shift += ff_scan.loop_time
+                lines = [sh.track_point_time_shift(p, t_shift)
+                         for p in ff_scan.points[ff_scan.preamble_count:]]
 
-        def line_batcher(lines, n=10):
-            while len(lines):
-                some, lines = lines[:n], lines[n:]
-                yield some
+        point_gen = line_batcher(ff_scan, t_shift)
 
-        point_gen = line_batcher(all_lines)
-        step_time = np.median(np.diff(times))
-
-        ok, err = yield self._run_track(session, point_gen, step_time,
-                                        azonly=params['azonly'])
+        ok, err = yield self._run_track(
+            session,
+            point_gen,
+            step_time=ff_scan.step_time,
+            free_form=ff_scan.free_form,
+            azonly=params['azonly'])
         return ok, err
 
     @ocs_agent.param('az_endpoint1', type=float)
@@ -1994,7 +2123,7 @@ class ACUAgent:
 
     @inlineCallbacks
     def _run_track(self, session, point_gen, step_time, azonly=False,
-                   point_batch_count=None):
+                   point_batch_count=None, free_form=False):
         """Run a ProgramTrack track scan, with points provided by a
         generator.
 
@@ -2009,6 +2138,8 @@ class ACUAgent:
           point_batch_count: number of points to include in batch
             uploads.  This parameter can be used to increase the value
             beyond the minimum set internally based on step_time.
+          free_form: if True, disable ACU linear interpolation and
+            turn-around profiling.
 
         Returns:
           Tuple (success, msg) where success is a bool.
@@ -2050,16 +2181,32 @@ class ACUAgent:
             'Turnaround_time_too_short',
         ]
 
-        with self.azel_lock.acquire_timeout(0, job='generate_scan') as acquired:
+        if free_form:
+            init_cmds = [
+                ('Clear Stack', 0.),
+                ('Set Profiler Off', 0.),
+                ('Set Interpolation Spline', 0.5)
+            ]
+        else:
+            init_cmds = [
+                ('Clear Stack', 0.),
+                ('Set Profiler On', 0.),
+                ('Set Interpolation Linear', 0.5)
+            ]
 
+        with self.azel_lock.acquire_timeout(0, job='generate_scan') as acquired:
             if not acquired:
                 return False, f"Operation failed: {self.azel_lock.job} is running."
             if session.status not in ['starting', 'running']:
                 return False, "Operation aborted before motion began."
 
-            yield self.acu_control.http.Command('DataSets.CmdTimePositionTransfer',
-                                                'Clear Stack')
-            yield dsleep(0.5)
+            for _c, _d in init_cmds:
+                resp = yield self.acu_control.http.Command(
+                    'DataSets.CmdTimePositionTransfer', _c)
+                if resp != b'OK, Command executed.':
+                    return False, f"Failed to init: {_c}"
+                if _d > 0:
+                    yield dsleep(_d)
 
             if azonly:
                 yield self._set_modes(az='ProgramTrack')
@@ -2353,8 +2500,10 @@ class ACUAgent:
                 78.24269024936028,
                 60.919554369324096
               ],
+              "sun_down": false,
               "sun_dist": 41.75087242151837,
-              "sun_safe_time": 71760
+              "sun_safe_time": 71760,
+              "platform_down": false
             },
             "avoidance": {
               "safety_unknown": false,
@@ -2410,6 +2559,8 @@ class ACUAgent:
             'sun_el': (('sun_pos', 'sun_azel', 1), float),
             'sun_dist': (('sun_pos', 'sun_dist'), float),
             'sun_safe_time': (('sun_pos', 'sun_safe_time'), float),
+            'sun_down': (('sun_pos', 'sun_down'), int),
+            'platform_down': (('sun_pos', 'platform_down'), int),
         }
         for k in ['warning_zone', 'danger_zone',
                   'escape_triggered', 'escape_active']:
