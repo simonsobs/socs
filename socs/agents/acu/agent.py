@@ -3166,6 +3166,11 @@ class ACUAgent:
         Args:
           action (str): 'open' or 'close'
 
+        Notes:
+          If the shutter reads out as in the requested state already,
+          then no action is taken and the task will quickly return as
+          succeeded.
+
         """
         def log(msg):
             session.add_message(msg)
@@ -3211,14 +3216,18 @@ class ACUAgent:
                 pass
 
             elif state == 'init':
-                # Issue the command
-                result = yield self.acu_control.Command(self.datasets['shutter'], dset_cmd)
-                if result in OK_RESPONSES:
-                    state = 'wait-moving'
-                    timeout = time.time() + STATE_WAIT
+                if shutter[desired_key] and not shutter[undesired_key]:
+                    state = 'done'
+                    message = f'Shutter already reporting state={desired_key}'
                 else:
-                    state = 'error'
-                    message = 'Failed to issue shutter command.'
+                    # Issue the command
+                    result = yield self.acu_control.Command(self.datasets['shutter'], dset_cmd)
+                    if result in OK_RESPONSES:
+                        state = 'wait-moving'
+                        timeout = time.time() + STATE_WAIT
+                    else:
+                        state = 'error'
+                        message = 'Failed to issue shutter command.'
 
             elif state == 'wait-moving':
                 if now > timeout:
