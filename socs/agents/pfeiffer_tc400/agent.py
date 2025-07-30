@@ -96,8 +96,16 @@ class PfeifferTC400Agent:
                 'timestamp': 1598626144.5365012,
                 'block_name': 'turbo_output',
                 'data': {
-                    "Turbo_Motor_Temp": 40.054,
-                    "Rotation_Speed": 823.655,
+                    "Drive_Voltage": 46.65,
+                    "Drive_Current": 3.02,
+                    "Drive_Power": 139.95,
+                    "Turbo_Power_Stage_Temp": 42,
+                    "Turbo_Electronics_Temp": 38,
+                    "Turbo_Pump_Bottom_Temp": 26,
+                    "Turbo_Bearing_Temp": 28,
+                    "Turbo_Motor_Temp": 32,
+                    "Rotation_Speed": 819,
+                    "Acceleration": 60,
                     "Error_Code": "Err001",
                 }
             }
@@ -120,9 +128,18 @@ class PfeifferTC400Agent:
                     }
 
                     try:
+                        data['data']["Drive_Voltage"] = self.turbo.get_turbo_drive_voltage()
+                        data['data']["Drive_Current"] = self.turbo.get_turbo_drive_current()
+                        data['data']["Drive_Power"] = self.turbo.get_turbo_drive_power()
+                        data['data']["Turbo_Power_Stage_Temp"] = self.turbo.get_turbo_power_stage_temperature()
+                        data['data']["Turbo_Electronics_Temp"] = self.turbo.get_turbo_electronic_temperature()
+                        data['data']["Turbo_Pump_Bottom_Temp"] = self.turbo.get_turbo_pump_bottom_temperature()
+                        data['data']["Turbo_Bearing_Temp"] = self.turbo.get_turbo_bearing_temperature()
                         data['data']["Turbo_Motor_Temp"] = self.turbo.get_turbo_motor_temperature()
                         data['data']["Rotation_Speed"] = self.turbo.get_turbo_actual_rotation_speed()
+                        data['data']["Acceleration"] = self.turbo.get_turbo_acceleration()
                         data['data']['Error_Code'] = self.turbo.get_turbo_error_code()
+
                     except ValueError as e:
                         self.log.error(f"Error in collecting data: {e}")
                         continue
