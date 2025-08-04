@@ -51,6 +51,39 @@ class PfeifferTC400:
 
         self.turbo_address = turbo_address
 
+    def get_turbo_temperatures(self):
+        """Gets the temperatures of the various turbo parts from the turbo controller.
+
+        Returns:
+        --------
+        dict
+            pwrstg: The power stage temperature in Celsius
+            electronic: The electronic temperature in Celsius
+            pmpbot: The pump bottom temperature in Celsius
+            bearing: The bearing temperature in Celsius
+            motor: The motor temperature in Celsius
+        """
+
+        temp_dict = {"pwrstg": None,
+                     "electronic": None,
+                     "pmpbot": None,
+                     "bearing": None,
+                     "motor": None}
+
+        addr_dict = {"pwrstg": 324,
+                     "electronic": 326,
+                     "pmpbot": 330,
+                     "bearing": 342,
+                     "motor": 346}
+
+        for stage, stage_addr in addr_dict.items():
+            send_data_request(self.ser, self.turbo_address, stage_addr)
+            addr, rw, param_num, temp = read_gauge_response(self.ser)
+
+            temp_dict[stage] = int(temp)
+
+        return temp_dict
+
     def get_turbo_motor_temperature(self):
         """Gets the temperatures of the turbo rotor from the turbo controller.
 

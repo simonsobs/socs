@@ -96,9 +96,13 @@ class PfeifferTC400Agent:
                 'timestamp': 1598626144.5365012,
                 'block_name': 'turbo_output',
                 'data': {
+                    "Turbo_PowerStage_Temp": 30.5,
+                    "Turbo_Electronics_Temp": 29.2,
+                    "Turbo_PumpBottom_Temp": 31.4,
+                    "Turbo_Bearing_Temp": 39.5,
                     "Turbo_Motor_Temp": 40.054,
                     "Rotation_Speed": 823.655,
-                    "Error_Code": "Err001",
+                    "Error_Code": "1",
                 }
             }
 
@@ -120,7 +124,12 @@ class PfeifferTC400Agent:
                     }
 
                     try:
-                        data['data']["Turbo_Motor_Temp"] = self.turbo.get_turbo_motor_temperature()
+                        temp_data = self.turbo.get_turbo_temperatures()
+                        data['data']["Turbo_PowerStage_Temp"] = temp_data['pwrstg']
+                        data['data']["Turbo_Electronics_Temp"] = temp_data['electronic']
+                        data['data']["Turbo_PumpBottom_Temp"] = temp_data['pmpbot']
+                        data['data']["Turbo_Bearing_Temp"] = temp_data['bearing']
+                        data['data']["Turbo_Motor_Temp"] = temp_data['motor']
                         data['data']["Rotation_Speed"] = self.turbo.get_turbo_actual_rotation_speed()
                         data['data']['Error_Code'] = self.turbo.get_turbo_error_code()
                     except ValueError as e:
