@@ -24,6 +24,15 @@ jobs:
         fetch-depth: 0
 
     # Dockerize
-    - name: Build docker images
+    - name: Check docker version
+      run: |
+        docker --version
+        docker compose version
+
+    - name: Build base docker image
+      run: |
+        docker build -t socs:latest .
+
+    - name: Build additional docker images
       run: |
         docker compose build
