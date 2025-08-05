@@ -82,9 +82,9 @@ class SRSCG635Interface(PrologixInterface):
 
     def get_all_status(self):
         self.write("FREQ?;STDC?;RUNS?;TIMB?")
-        freq, stdc, runs, timb = self.read().split(';')
+        output = self.read()
 
-        return float(freq), int(stdc), int(runs), int(timb)
+        return output
 
     def clear(self):
         """Clear all the event registers and error queue."""
