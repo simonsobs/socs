@@ -52,10 +52,6 @@ jobs:
       run: |
         COVERAGE_FILE=.coverage.unit python3 -m pytest --cov -m 'not integtest'
 
-    - name: Build docker test images
-      run: |
-        docker compose build socs
-
     # Integration Tests
     - name: Run integration tests
       working-directory: ./tests
