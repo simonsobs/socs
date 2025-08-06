@@ -318,6 +318,12 @@ class ACUAgent:
                                self._simple_process_stop,
                                blocking=False,
                                startup=startup)
+        if 'ext' in self.acu_control.streams:
+            agent.register_process('broadcast_ext',
+                                   self.broadcast_ext,
+                                   self._simple_process_stop,
+                                   blocking=False,
+                                   startup=False)
         agent.register_process('monitor_sun',
                                self.monitor_sun,
                                self._simple_process_stop,
@@ -372,6 +378,15 @@ class ACUAgent:
                             record=True,
                             agg_params=influx_agg_params,
                             buffer_time=1)
+        if 'ext' in self.acu_control.streams:
+            agent.register_feed('acu_ext_stream',
+                                record=True,
+                                agg_params=fullstatus_agg_params,
+                                buffer_time=1)
+            agent.register_feed('acu_ext_influx',
+                                record=True,
+                                agg_params=influx_agg_params,
+                                buffer_time=1)
         agent.register_feed('acu_error',
                             record=True,
                             agg_params=basic_agg_params,
@@ -927,12 +942,41 @@ class ACUAgent:
         return self._udp_stream_handler(
             session, 'main', control, self.data['broadcast'],
             'acu_udp_stream', 'acu_broadcast_influx',
-            auto_enable=params['auto_enable'])
+            auto_enable=params['auto_enable'],
+            influx_suffix='_bcast_influx')
+
+    @ocs_agent.param('auto_enable', type=bool, default=True)
+    def broadcast_ext(self, session, params):
+        """broadcast_ext(auto_enable=True)
+
+        **Process** - Read UDP data from the "ext" UDP stream, as
+        defined in self.acu_config.  Like the broadcast process, this
+        will write full rate data to an aggregator feed and
+        downsampled data to an influx feed.
+
+        Args:
+          auto_enable (bool): If True, the Process will try to
+            configure and (re-)enable the UDP stream if at any point
+            the stream seems to drop out.
+
+        Notes:
+          The session.data is as you would find for the broadcast
+          process with a "Time" field and a bunch of readings, updated
+          about once per second.
+
+        """
+        control = self.acu_control.streams['ext']
+        data_store = {}
+        return self._udp_stream_handler(
+            session, 'ext', control, data_store,
+            'acu_ext_stream', 'acu_ext_influx',
+            auto_enable=params['auto_enable'],
+            influx_suffix='_ext')
 
     @inlineCallbacks
     def _udp_stream_handler(self, session, stream_name, stream_control,
                             data_store, agg_feed, influx_feed,
-                            auto_enable=True):
+                            auto_enable=True, influx_suffix=''):
         """Collect data from UDP (200 Hz) stream. This is a helper
         function that can be used to monitor either PositionBroadcast
         or PositionBroadcastExt.
@@ -946,6 +990,7 @@ class ACUAgent:
           influx_feed (str): feed name for downsampled data
           auto_enable (bool): whether to use http API to turn stream on/off
             if needed.
+          influx_suffix (str): suffix to append to all influx fields.
 
         """
         session.data = {}
@@ -979,10 +1024,7 @@ class ACUAgent:
 
         handler = reactor.listenUDP(int(UDP_PORT), MonitorUDP())
 
-        influx_data = {}
-        influx_data['Time_bcast_influx'] = []
-        for f in fields:
-            influx_data[f + '_bcast_influx'] = []
+        influx_data = {k: [] for k in ['Time'] + fields}
 
         best_dt = None
 
@@ -1008,28 +1050,26 @@ class ACUAgent:
                         best_dt = recv_time - data_ctime
 
                     data_store['Time'] = data_ctime
-                    influx_data['Time_bcast_influx'].append(data_ctime)
+                    influx_data['Time'].append(data_ctime)
                     for _f, _d in zip(fields, fields_d):
                         data_store[_f] = _d
-                        influx_data[_f + '_bcast_influx'].append(_d)
+                        influx_data[_f].append(_d)
                     acu_udp_stream = {'timestamp': data_store['Time'],
                                       'block_name': 'ACU_broadcast',
                                       'data': data_store
                                       }
                     self.agent.publish_to_feed(agg_feed, acu_udp_stream)
                 influx_means = {}
-                for key in influx_data.keys():
-                    influx_means[key] = np.mean(influx_data[key])
+                for key, vals in influx_data.items():
+                    influx_means[key] = np.mean(vals)
                     influx_data[key] = []
-                acu_broadcast_influx = {'timestamp': influx_means['Time_bcast_influx'],
-                                        'block_name': 'ACU_bcast_influx',
-                                        'data': influx_means,
-                                        }
+                acu_broadcast_influx = {
+                    'timestamp': influx_means['Time'],
+                    'block_name': 'ACU_bcast_influx',
+                    'data': {k + influx_suffix: v for k, v in influx_means.items()},
+                }
                 self.agent.publish_to_feed(influx_feed, acu_broadcast_influx)
-                sd = {}
-                for ky in influx_means:
-                    sd[ky.split('_bcast_influx')[0]] = influx_means[ky]
-                session.data.update(sd)
+                session.data.update(influx_means)
             else:
                 # Consider logging an outage, attempting reconfig.
                 if active and now - last_packet_time > 3:
