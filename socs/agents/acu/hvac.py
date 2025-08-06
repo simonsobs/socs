@@ -141,5 +141,6 @@ class HvacManager:
         output = {}
         for group, fields in self.groups.items():
             for f in fields:
-                output[f.acu_name] = (f.feed_group, 'ACU_' + f.feed_group, f.name)
+                if f.feed_group:
+                    output[f.acu_name] = (f.feed_group, 'ACU_' + f.feed_group, f.name)
         return output
