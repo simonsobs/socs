@@ -20,7 +20,7 @@ from twisted.internet.defer import DeferredList, inlineCallbacks
 
 from socs.agents.acu import avoidance
 from socs.agents.acu import drivers as sh
-from socs.agents.acu import exercisor, hwp_iface
+from socs.agents.acu import exercisor, hvac, hwp_iface
 
 #: The number of free ProgramTrack positions, when stack is empty.
 FULL_STACK = 10000
@@ -119,6 +119,9 @@ MONITOR_STRUCTURE = [
     (None, 'tilt_fast', None, None),
     ('ACU_sun_avoidance', 'sun_avoidance', None, 1.),
     ('ACU_corrections', 'corrections', None, 10.),
+    ('ACU_hvac_data', 'hvac_data', None, 10.),
+    ('ACU_hvac_ctrl', 'hvac_ctrl', None, None),
+    ('ACU_hvac_faults', 'hvac_faults', None, None),
 ]
 
 
@@ -196,6 +199,7 @@ class ACUAgent:
             'third': _dsets.get('third_axis_dataset'),
             'shutter': _dsets.get('shutter_dataset'),
             'pointing': _dsets.get('pointing_dataset'),
+            'hvac': _dsets.get('hvac_dataset'),
         }
         for k, v in self.datasets.items():
             if v is not None:
@@ -522,6 +526,15 @@ class ACUAgent:
               "3rd axis computer disabled": "No Fault",
               ...
             },
+            "StatusShutter": {
+              "Shutter Closed": false,
+              ...
+            },
+            "Hvac": {
+              "Booster EL Housing Failure": false,
+              "Booster EL Housing on": false,
+              ...
+            },
             "StatusResponseRate": 19.237531827325963,
             "PlatformType": "satp",
             "IgnoredAxes": [],
@@ -538,10 +551,15 @@ class ACUAgent:
             "connected": True,
           }
 
-        In the case of an SATP, the Status3rdAxis is not populated
-        (the Boresight info can be found in StatusDetailed).  In the
-        case of the LAT, the corotator info is queried separately and
-        stored under Status3rdAxis.
+        Differences between SATP and LAT structures:
+
+        - The PlatformType reports "satp" for SATP and "ccat" for LAT.
+        - In the case of an SATP, the Status3rdAxis is not populated;
+          the Boresight info can be found in StatusDetailed.  In the
+          case of the LAT, the corotator info is queried separately
+          and stored under Status3rdAxis.
+        - The StatusShutter and Hvac entries will be populated for the
+          LAT, but empty for SATP.
 
         """
 
@@ -655,6 +673,7 @@ class ACUAgent:
                     ('third', 'Status3rdAxis'),
                     ('shutter', 'StatusShutter'),
                     ('pointing', 'CmdPointingCorrection'),
+                    ('hvac', 'Hvac'),
             ]:
                 if self.datasets[short]:
                     output[collection] = (
@@ -666,6 +685,8 @@ class ACUAgent:
         session.data['StatusResponseRate'] = n_ok / (query_t - report_t)
         session.data.update((yield _get_status()))
         qual_pacer = Pacemaker(.1)
+
+        hvm = hvac.HvacManager()
 
         was_remote = False
         last_resp_rate = None
@@ -731,6 +752,15 @@ class ACUAgent:
             for k, v in session.data.items():
                 if k in not_data_keys:
                     continue
+
+                if k == 'Hvac' and len(v) > 0 and (hvm.grouped_fields is None):
+                    # Runs when first HVAC data are received. These
+                    # fields aren't listed explicitly in soaculib so
+                    # they're analyzed here.
+                    hvm.parse_fields(v)
+                    assert len(hvm.grouped_fields['unclassified']) == 0
+                    self.status_field_map.update(hvm.get_block_info())
+
                 for (key, value) in v.items():
                     try:
                         group, block, field = self.status_field_map[key]

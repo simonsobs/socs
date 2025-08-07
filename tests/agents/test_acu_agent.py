@@ -1,7 +1,7 @@
 import numpy as np
 
 from socs.agents.acu import avoidance as av
-from socs.agents.acu import drivers, hwp_iface
+from socs.agents.acu import drivers, hvac, hwp_iface
 from socs.agents.acu.agent import ACUAgent  # noqa: F401
 
 HWP_IFACE_TEST_CONFIG = {
@@ -291,6 +291,48 @@ def test_tracks():
     points = next(iter(g))
     drivers.get_track_points_text(points, text_block=True,
                                   timestamp_offset=3)
+
+
+#
+# HVAC parsing
+#
+
+def test_hvac_parsing():
+    hvm = hvac.HvacManager()
+
+    # This test set has one entry for each regex group (except the two
+    # timecode fields).
+    test_data = {
+        "Time": 212.06530052088,
+        "Year": 2025,
+        "Temperature EL Housing 1": -7.5,
+        "Temperature Average Yoke Arm A Instrument Space": -1.41,
+        "Setpoint Temperature Yoke Traverse": 13.0,
+        "Setpoint Speed Fan Yoke Arm B": 95,
+        "Booster Yoke Traverse B Process Space Failure": False,
+        "Fan EL Housing Failure": False,
+        "Booster Yoke Traverse A Electronic Space on": False,
+        "Fan Yoke Traverse B Process Space on": False,
+        "Heater on": False,
+        "Something weird": 199.,
+    }
+
+    hvm.parse_fields(test_data)
+
+    weird_counts = {'ignore': 2,
+                    'unclassified': 1}
+
+    # Check the weird group counts
+    for k, n in weird_counts.items():
+        assert len(hvm.grouped_fields[k]) == n
+
+    # Remaining groups should show 1 item each.
+    for k, v in hvm.grouped_fields.items():
+        if k not in weird_counts:
+            assert len(v) == 1
+
+    # This will discard weird groups on its own.
+    hvm.get_block_info()
 
 
 #
