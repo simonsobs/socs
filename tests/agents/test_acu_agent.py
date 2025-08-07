@@ -322,17 +322,16 @@ def test_hvac_parsing():
     weird_counts = {'ignore': 2,
                     'unclassified': 1}
 
-    # Check the weird groups and then discard.
+    # Check the weird group counts
     for k, n in weird_counts.items():
         assert len(hvm.groups[k]) == n
-        hvm.groups[k] = []
 
     # Remaining groups should show 1 item each.
     for k, v in hvm.groups.items():
         if k not in weird_counts:
             assert len(v) == 1
 
-    # This should succeed once weird groups are removed.
+    # This will discard weird groups on its own.
     hvm.get_block_info()
 
 

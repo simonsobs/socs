@@ -753,12 +753,12 @@ class ACUAgent:
                 if k in not_data_keys:
                     continue
 
-                if k == 'Hvac' and len(v) > 0 and hvm.groups is None:
+                if k == 'Hvac' and len(v) > 0 and (hvm.grouped_fields is None):
                     # Runs when first HVAC data are received. These
                     # fields aren't listed explicitly in soaculib so
                     # they're analyzed here.
                     hvm.parse_fields(v)
-                    assert len(hvm.groups['unclassified']) == 0
+                    assert len(hvm.grouped_fields['unclassified']) == 0
                     self.status_field_map.update(hvm.get_block_info())
 
                 for (key, value) in v.items():

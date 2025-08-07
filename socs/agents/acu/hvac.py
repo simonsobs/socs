@@ -21,66 +21,65 @@ _FAULTS = 'hvac_faults'
 
 
 HVAC_SCHEMA = [
-    {'group': 'ignore',
+    {'type': 'ignore',
      'regex': r'Time|Year',
      'name_pattern': '{sname}',
      },
 
-    {'group': 'T_indexed',
+    {'type': 'T_indexed',
      'regex': r'Temperature (?P<loc>.*) (?P<idx>\d+)',
      'name_pattern': 'Temp_{sloc}_{idx}',
      'feed_group': _DATA,
      },
 
-    {'group': 'T_average',
+    {'type': 'T_average',
      'regex': r'Temperature Average (?P<loc>.*)',
      'name_pattern': 'Temp_{sloc}_avg',
      'feed_group': _DATA,
      },
 
-    {'group': 'T_setpoint',
+    {'type': 'T_setpoint',
      'regex': r'Setpoint Temperature (?P<loc>.*)',
      'name_pattern': 'Temp_{sloc}_setpoint',
      'feed_group': _CTRL,
      },
 
-    {'group': 'fan_on',
+    {'type': 'fan_on',
      'regex': r'Fan (?P<loc>.*) on',
      'name_pattern': 'Fan_{sloc}_on',
      'feed_group': _CTRL,
      },
 
-    {'group': 'fan_fault',
+    {'type': 'fan_fault',
      'regex': r'Fan (?P<loc>.*) Failure',
      'name_pattern': 'Fan_{sloc}_fault',
      'feed_group': _FAULTS,
      },
 
-    {'group': 'fan_setpoint',
+    {'type': 'fan_setpoint',
      'regex': r'Setpoint Speed Fan (?P<loc>.*)',
      'name_pattern': 'Fan_{sloc}_setpoint',
      'feed_group': _CTRL,
      },
 
-    {'group': 'booster_on',
+    {'type': 'booster_on',
      'regex': r'Booster (?P<loc>.*) on',
      'name_pattern': 'Booster_{sloc}_on',
      'feed_group': _CTRL,
      },
-
-    {'group': 'booster_fault',
+    {'type': 'booster_fault',
      'regex': r'Booster (?P<loc>.*) Failure',
      'name_pattern': 'Booster_{sloc}_fault',
      'feed_group': _FAULTS,
      },
 
-    {'group': 'heater_on',
+    {'type': 'heater_on',
      'regex': r'Heater on',
      'name_pattern': 'Heater_on',
      'feed_group': _CTRL,
      },
 
-    {'group': 'unclassified',
+    {'type': 'unclassified',
      'regex': r'.+',
      'name_pattern': '{sname}',
      },
@@ -90,8 +89,10 @@ HVAC_SCHEMA = [
 @dataclass
 class HvacItem:
     """Describes the type, name, shortened name, and feed details for
-    a single entry in DataSets.HVAC."""
-    ftype: str
+    a single entry in DataSets.HVAC.
+
+    """
+    type: str
     name: str
     acu_name: str
     feed_group: str
@@ -99,19 +100,34 @@ class HvacItem:
 
 
 class HvacManager:
-    groups = None
+    """Interface class for collecting info about HVAC status fields
+    from ACU.
+
+    For now this assists with analyzing the HVAC dataset to classify
+    the fields and assign them to the appropriate feed group.  Those
+    are achieved by instantiating an instance (with no args) and then
+    calling ``parse_fields`` followed by ``get_block_info``.
+
+    In the future it may also help with generating control commands.
+
+    """
+
+    #: dict from field type to list of HvacItem.
+    grouped_fields = None
+
+    #: dict from ACU field name to the HvacItem.
     field_map = None
 
     def parse_fields(self, data):
         """Given the output from DataSets.HVAC, analyzes the fields
-        therein and populates self.groups and self.field_map.  This
-        should be called on first valid data retrieval -- it will fail
-        if self.groups has been popualted already.
+        therein and populates self.grouped_fields and self.field_map.
+        This should be called on first valid data retrieval -- it will
+        fail if self.grouped_fields has been populated already.
 
         """
-        assert self.groups is None
+        assert self.grouped_fields is None
 
-        fields = {r['group']: [] for r in HVAC_SCHEMA}
+        fields = {r['type']: [] for r in HVAC_SCHEMA}
         field_map = {}
         for f in data.keys():
             for sch in HVAC_SCHEMA:
@@ -121,25 +137,25 @@ class HvacManager:
                         data['sloc'] = data['loc'].replace(' ', '')
                     data['sname'] = f.replace(' ', '')
                     name = sch['name_pattern'].format(**data)
-                    hv = HvacItem(ftype=sch['group'],
+                    hv = HvacItem(type=sch['type'],
                                   name=name,
                                   acu_name=f,
                                   feed_group=sch.get('feed_group'),
                                   data=data)
-                    fields[sch['group']].append(hv)
+                    fields[sch['type']].append(hv)
                     field_map[f] = hv
                     break
-        self.groups = fields
+        self.grouped_fields = fields
         self.field_map = field_map
 
     def get_block_info(self):
         """Provides block info for monitor() process.  To be called
-        after parse_fields.  Returns a map from acu_key to (group,
-        block_name, block_key).
+        after parse_fields.  Returns a map from acu_key to
+        (feed_group, block_name, block_key).
 
         """
         output = {}
-        for group, fields in self.groups.items():
+        for fields in self.grouped_fields.values():
             for f in fields:
                 if f.feed_group:
                     output[f.acu_name] = (f.feed_group, 'ACU_' + f.feed_group, f.name)
