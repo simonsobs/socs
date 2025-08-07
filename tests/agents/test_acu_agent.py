@@ -324,10 +324,10 @@ def test_hvac_parsing():
 
     # Check the weird group counts
     for k, n in weird_counts.items():
-        assert len(hvm.groups[k]) == n
+        assert len(hvm.grouped_fields[k]) == n
 
     # Remaining groups should show 1 item each.
-    for k, v in hvm.groups.items():
+    for k, v in hvm.grouped_fields.items():
         if k not in weird_counts:
             assert len(v) == 1
 
