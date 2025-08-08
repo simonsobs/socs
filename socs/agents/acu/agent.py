@@ -20,7 +20,7 @@ from twisted.internet.defer import DeferredList, inlineCallbacks
 
 from socs.agents.acu import avoidance
 from socs.agents.acu import drivers as sh
-from socs.agents.acu import exercisor, hwp_iface
+from socs.agents.acu import exercisor, hvac, hwp_iface
 
 #: The number of free ProgramTrack positions, when stack is empty.
 FULL_STACK = 10000
@@ -119,6 +119,9 @@ MONITOR_STRUCTURE = [
     (None, 'tilt_fast', None, None),
     ('ACU_sun_avoidance', 'sun_avoidance', None, 1.),
     ('ACU_corrections', 'corrections', None, 10.),
+    ('ACU_hvac_data', 'hvac_data', None, 10.),
+    ('ACU_hvac_ctrl', 'hvac_ctrl', None, None),
+    ('ACU_hvac_faults', 'hvac_faults', None, None),
 ]
 
 
@@ -181,10 +184,6 @@ class ACUAgent:
         self.acu_config = aculib.guess_config(acu_config)
         self.platform_type = self.acu_config['platform']  # ccat, satp.
 
-        self.udp = self.acu_config['streams']['main']
-        self.udp_schema = aculib.get_stream_schema(self.udp['schema'])
-        self.udp_ext = self.acu_config['streams']['ext']
-
         # List of datasets to read as "status".  The 'status' dataset
         # is necessary; the 'third' axis can be None (in SATP all the
         # boresight info is included in the status dataset); the
@@ -196,6 +195,7 @@ class ACUAgent:
             'third': _dsets.get('third_axis_dataset'),
             'shutter': _dsets.get('shutter_dataset'),
             'pointing': _dsets.get('pointing_dataset'),
+            'hvac': _dsets.get('hvac_dataset'),
         }
         for k, v in self.datasets.items():
             if v is not None:
@@ -322,6 +322,12 @@ class ACUAgent:
                                self._simple_process_stop,
                                blocking=False,
                                startup=startup)
+        if 'ext' in self.acu_control.streams:
+            agent.register_process('broadcast_ext',
+                                   self.broadcast_ext,
+                                   self._simple_process_stop,
+                                   blocking=False,
+                                   startup=False)
         agent.register_process('monitor_sun',
                                self.monitor_sun,
                                self._simple_process_stop,
@@ -376,6 +382,15 @@ class ACUAgent:
                             record=True,
                             agg_params=influx_agg_params,
                             buffer_time=1)
+        if 'ext' in self.acu_control.streams:
+            agent.register_feed('acu_ext_stream',
+                                record=True,
+                                agg_params=fullstatus_agg_params,
+                                buffer_time=1)
+            agent.register_feed('acu_ext_influx',
+                                record=True,
+                                agg_params=influx_agg_params,
+                                buffer_time=1)
         agent.register_feed('acu_error',
                             record=True,
                             agg_params=basic_agg_params,
@@ -522,6 +537,15 @@ class ACUAgent:
               "3rd axis computer disabled": "No Fault",
               ...
             },
+            "StatusShutter": {
+              "Shutter Closed": false,
+              ...
+            },
+            "Hvac": {
+              "Booster EL Housing Failure": false,
+              "Booster EL Housing on": false,
+              ...
+            },
             "StatusResponseRate": 19.237531827325963,
             "PlatformType": "satp",
             "IgnoredAxes": [],
@@ -538,10 +562,15 @@ class ACUAgent:
             "connected": True,
           }
 
-        In the case of an SATP, the Status3rdAxis is not populated
-        (the Boresight info can be found in StatusDetailed).  In the
-        case of the LAT, the corotator info is queried separately and
-        stored under Status3rdAxis.
+        Differences between SATP and LAT structures:
+
+        - The PlatformType reports "satp" for SATP and "ccat" for LAT.
+        - In the case of an SATP, the Status3rdAxis is not populated;
+          the Boresight info can be found in StatusDetailed.  In the
+          case of the LAT, the corotator info is queried separately
+          and stored under Status3rdAxis.
+        - The StatusShutter and Hvac entries will be populated for the
+          LAT, but empty for SATP.
 
         """
 
@@ -655,6 +684,7 @@ class ACUAgent:
                     ('third', 'Status3rdAxis'),
                     ('shutter', 'StatusShutter'),
                     ('pointing', 'CmdPointingCorrection'),
+                    ('hvac', 'Hvac'),
             ]:
                 if self.datasets[short]:
                     output[collection] = (
@@ -666,6 +696,8 @@ class ACUAgent:
         session.data['StatusResponseRate'] = n_ok / (query_t - report_t)
         session.data.update((yield _get_status()))
         qual_pacer = Pacemaker(.1)
+
+        hvm = hvac.HvacManager()
 
         was_remote = False
         last_resp_rate = None
@@ -731,6 +763,15 @@ class ACUAgent:
             for k, v in session.data.items():
                 if k in not_data_keys:
                     continue
+
+                if k == 'Hvac' and len(v) > 0 and (hvm.grouped_fields is None):
+                    # Runs when first HVAC data are received. These
+                    # fields aren't listed explicitly in soaculib so
+                    # they're analyzed here.
+                    hvm.parse_fields(v)
+                    assert len(hvm.grouped_fields['unclassified']) == 0
+                    self.status_field_map.update(hvm.get_block_info())
+
                 for (key, value) in v.items():
                     try:
                         group, block, field = self.status_field_map[key]
@@ -886,7 +927,6 @@ class ACUAgent:
         return True, 'Acquisition exited cleanly.'
 
     @ocs_agent.param('auto_enable', type=bool, default=True)
-    @inlineCallbacks
     def broadcast(self, session, params):
         """broadcast(auto_enable=True)
 
@@ -928,19 +968,79 @@ class ACUAgent:
             }
 
         """
-        FMT = self.udp_schema['format']
+        control = self.acu_control.streams['main']
+        return self._udp_stream_handler(
+            session, 'main', control, self.data['broadcast'],
+            'acu_udp_stream', 'acu_broadcast_influx',
+            auto_enable=params['auto_enable'],
+            influx_suffix='_bcast_influx')
+
+    @ocs_agent.param('auto_enable', type=bool, default=True)
+    def broadcast_ext(self, session, params):
+        """broadcast_ext(auto_enable=True)
+
+        **Process** - Read UDP data from the "ext" UDP stream, as
+        defined in self.acu_config.  Like the broadcast process, this
+        will write full rate data to an aggregator feed and
+        downsampled data to an influx feed.
+
+        Args:
+          auto_enable (bool): If True, the Process will try to
+            configure and (re-)enable the UDP stream if at any point
+            the stream seems to drop out.
+
+        Notes:
+          The session.data is as you would find for the broadcast
+          process with a "Time" field and a bunch of readings, updated
+          about once per second.
+
+        """
+        control = self.acu_control.streams['ext']
+        data_store = {}
+        return self._udp_stream_handler(
+            session, 'ext', control, data_store,
+            'acu_ext_stream', 'acu_ext_influx',
+            auto_enable=params['auto_enable'],
+            influx_suffix='_ext')
+
+    @inlineCallbacks
+    def _udp_stream_handler(self, session, stream_name, stream_control,
+                            data_store, agg_feed, influx_feed,
+                            auto_enable=True, influx_suffix=''):
+        """Collect data from UDP (200 Hz) stream. This is a helper
+        function that can be used to monitor either PositionBroadcast
+        or PositionBroadcastExt.
+
+        Args:
+          session: session object for parent Process
+          stream_name (str): stream identifier string for log messages
+          stream_control: soaculib BroadcastStreamControl instance
+          data_store (dict): place to put the latest readings
+          agg_feed (str): feed name for full rate data
+          influx_feed (str): feed name for downsampled data
+          auto_enable (bool): whether to use http API to turn stream on/off
+            if needed.
+          influx_suffix (str): suffix to append to all influx fields.
+
+        """
+        session.data = {}
+
+        UDP_PORT = stream_control.p['Port']
+        schema = stream_control.p['schema']
+
+        # For unpacking
+        FMT = schema['format']
         FMT_LEN = struct.calcsize(FMT)
-        UDP_PORT = self.udp['port']
+
+        # Confirm that first two fields are the timecode.
+        fields = list(schema['fields'])
+        assert fields[:2] == ['Day', 'Time']
+        fields = [f.replace(' ', '_') for f in fields[2:]]
 
         # The udp_data list is used as a queue; it contains
         # struct-unpacked samples from the UDP stream in the form
         # (time_received, data).
         udp_data = []
-        fields = self.udp_schema['fields']
-        session.data = {}
-
-        # BroadcastStreamControl instance.
-        stream = self.acu_control.streams['main']
 
         class MonitorUDP(protocol.DatagramProtocol):
             def datagramReceived(self, data, src_addr):
@@ -953,10 +1053,8 @@ class ACUAgent:
                     offset += FMT_LEN
 
         handler = reactor.listenUDP(int(UDP_PORT), MonitorUDP())
-        influx_data = {}
-        influx_data['Time_bcast_influx'] = []
-        for i in range(2, len(fields)):
-            influx_data[fields[i].replace(' ', '_') + '_bcast_influx'] = []
+
+        influx_data = {k: [] for k in ['Time'] + fields}
 
         best_dt = None
 
@@ -968,7 +1066,7 @@ class ACUAgent:
 
             if len(udp_data) >= 200:
                 if not active:
-                    self.log.info('UDP packets are being received.')
+                    self.log.info(f'UDP packets are being received [{stream_name}].')
                     active = True
                 last_packet_time = now
                 best_dt = None
@@ -976,45 +1074,45 @@ class ACUAgent:
                 process_data = udp_data[:200]
                 udp_data = udp_data[200:]
                 for recv_time, d in process_data:
-                    data_ctime = sh.timecode(d[0] + d[1] / sh.DAY)
+                    time_d, fields_d = d[:2], d[2:]
+                    data_ctime = sh.timecode(time_d[0] + time_d[1] / sh.DAY)
                     if best_dt is None or abs(recv_time - data_ctime) < best_dt:
                         best_dt = recv_time - data_ctime
 
-                    self.data['broadcast']['Time'] = data_ctime
-                    influx_data['Time_bcast_influx'].append(data_ctime)
-                    for i in range(2, len(d)):
-                        self.data['broadcast'][fields[i].replace(' ', '_')] = d[i]
-                        influx_data[fields[i].replace(' ', '_') + '_bcast_influx'].append(d[i])
-                    acu_udp_stream = {'timestamp': self.data['broadcast']['Time'],
+                    data_store['Time'] = data_ctime
+                    influx_data['Time'].append(data_ctime)
+                    for _f, _d in zip(fields, fields_d):
+                        data_store[_f] = _d
+                        influx_data[_f].append(_d)
+                    acu_udp_stream = {'timestamp': data_store['Time'],
                                       'block_name': 'ACU_broadcast',
-                                      'data': self.data['broadcast']
+                                      'data': data_store
                                       }
-                    self.agent.publish_to_feed('acu_udp_stream', acu_udp_stream)
+                    self.agent.publish_to_feed(agg_feed, acu_udp_stream)
                 influx_means = {}
-                for key in influx_data.keys():
-                    influx_means[key] = np.mean(influx_data[key])
+                for key, vals in influx_data.items():
+                    influx_means[key] = np.mean(vals)
                     influx_data[key] = []
-                acu_broadcast_influx = {'timestamp': influx_means['Time_bcast_influx'],
-                                        'block_name': 'ACU_bcast_influx',
-                                        'data': influx_means,
-                                        }
-                self.agent.publish_to_feed('acu_broadcast_influx', acu_broadcast_influx)
-                sd = {}
-                for ky in influx_means:
-                    sd[ky.split('_bcast_influx')[0]] = influx_means[ky]
-                session.data.update(sd)
+                acu_broadcast_influx = {
+                    'timestamp': influx_means['Time'],
+                    'block_name': 'ACU_bcast_influx',
+                    'data': {k + influx_suffix: v for k, v in influx_means.items()},
+                }
+                self.agent.publish_to_feed(influx_feed, acu_broadcast_influx)
+                session.data.update(influx_means)
             else:
                 # Consider logging an outage, attempting reconfig.
                 if active and now - last_packet_time > 3:
-                    self.log.info('No UDP packets are being received.')
+                    self.log.info(f'No UDP packets are being received [{stream_name}].')
                     active = False
                     next_reconfig = time.time()
-                if not active and params['auto_enable'] and next_reconfig <= time.time():
-                    self.log.info('Requesting UDP stream enable.')
+                if not active and auto_enable and next_reconfig <= time.time():
+                    self.log.info(f'Requesting UDP stream enable [{stream_name}].')
                     try:
-                        cfg, raw = yield stream.safe_enable()
+                        cfg, raw = yield stream_control.safe_enable()
                     except Exception as err:
-                        self.log.info('Exception while trying to enable stream: {err}', err=err)
+                        self.log.info('Exception while trying to enable stream'
+                                      '[{stream_name}]: {err}', stream_name=stream_name, err=err)
                     next_reconfig += 60
 
             self._broadcast_qual = {
