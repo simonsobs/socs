@@ -1,4 +1,3 @@
-import socket
 import time
 
 from socs.tcp import TCPInterface
@@ -37,22 +36,11 @@ class PMX(TCPInterface):
         self.comm.close()
 
     def send_message(self, msg, read=True):
-        for attempt in range(2):
-            try:
-                self.conn.sendall(msg)
-                time.sleep(0.5)
-                if read:
-                    data = self.conn.recv(self.buffer_size).strip().decode('utf-8')
-                    return data
-                return
-            except (socket.timeout, OSError):
-                print("Caught timeout waiting for responce from PMX. Trying again...")
-                time.sleep(1)
-                if attempt == 1:
-                    print("Resetting connection")
-                    self.conn.close()
-                    self.conn = self._establish_connection(self.ip, int(self.port))
-                    return self.send_message(msg, read=read)
+        self.send(msg)
+        time.sleep(0.5)
+        if read:
+            data = self.recv(self.buffer_size).strip().decode('utf-8')
+            return data
 
     def wait(self):
         time.sleep(self.wait_time)
