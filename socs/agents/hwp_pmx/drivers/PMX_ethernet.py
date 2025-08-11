@@ -1,6 +1,8 @@
 import socket
 import time
 
+from socs.tcp import TCPInterface
+
 protection_status_key = [
     'Over voltage',
     'Over current',
@@ -13,36 +15,26 @@ protection_status_key = [
 ]
 
 
-class PMX:
+class PMX(TCPInterface):
     """The PMX object for communicating with the Kikusui PMX power supplies.
+
     Args:
-        tcp_ip (str): TCP IP address
-        tcp_port (int): TCP port
+        ip_address (str): IP address of the device.
+        port (int): Associated port for TCP communication.
+        timeout (float): Duration in seconds that operations wait before giving
+            up.
+
     """
 
-    def __init__(self, ip, port):
-        self.ip = ip
-        self.port = port
+    def __init__(self, ip_address, port=5025, timeout=10):
         self.wait_time = 0.01
         self.buffer_size = 128
-        self.conn = self._establish_connection(self.ip, int(self.port))
 
-    def _establish_connection(self, ip, port, timeout=2):
-        conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        conn.settimeout(timeout)
-        attempts = 3
-        for attempt in range(attempts):
-            try:
-                conn.connect((ip, port))
-                break
-            except (ConnectionRefusedError, OSError):
-                print(f"Failed to connect to device at {ip}:{port}")
-        else:
-            raise RuntimeError('Could not connect to PMX.')
-        return conn
+        # Setup the TCP Interface
+        super().__init__(ip_address, port, timeout)
 
     def close(self):
-        self.conn.close()
+        self.comm.close()
 
     def send_message(self, msg, read=True):
         for attempt in range(2):
