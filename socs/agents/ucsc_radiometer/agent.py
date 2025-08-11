@@ -80,7 +80,14 @@ class UCSCRadiometerAgent:
                 self.log.warn(f"Timeout exception occurred: {e}")
                 pm.sleep()
                 continue
-            data = r.json()
+            try:
+                data = r.json()
+            # Occurs at midnight when PWV files rotate
+            except requests.exceptions.JSONDecodeError as e:
+                self.log.warn(f"Unable to decode response: {r.text}")
+                self.log.warn(f"JSONDecodeError: {e}")
+                pm.sleep()
+                continue
             last_pwv = data['pwv']
             last_timestamp = data['timestamp']
 
