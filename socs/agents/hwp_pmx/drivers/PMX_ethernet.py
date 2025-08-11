@@ -2,6 +2,7 @@ import time
 
 from socs.tcp import TCPInterface
 
+WAIT_TIME = 0.01
 BUFFSIZE = 128
 
 protection_status_key = [
@@ -28,8 +29,6 @@ class PMX(TCPInterface):
     """
 
     def __init__(self, ip_address, port=5025, timeout=10):
-        self.wait_time = 0.01
-
         # Setup the TCP Interface
         super().__init__(ip_address, port, timeout)
 
@@ -44,7 +43,7 @@ class PMX(TCPInterface):
             return data
 
     def _wait(self):
-        time.sleep(self.wait_time)
+        time.sleep(WAIT_TIME)
 
     def check_output(self):
         """ Return the output status """
