@@ -2,6 +2,8 @@ import time
 
 from socs.tcp import TCPInterface
 
+BUFFSIZE = 128
+
 protection_status_key = [
     'Over voltage',
     'Over current',
@@ -27,7 +29,6 @@ class PMX(TCPInterface):
 
     def __init__(self, ip_address, port=5025, timeout=10):
         self.wait_time = 0.01
-        self.buffer_size = 128
 
         # Setup the TCP Interface
         super().__init__(ip_address, port, timeout)
@@ -39,7 +40,7 @@ class PMX(TCPInterface):
         self.send(msg)
         time.sleep(0.5)
         if read:
-            data = self.recv(self.buffer_size).strip().decode('utf-8')
+            data = self.recv(BUFFSIZE).strip().decode('utf-8')
             return data
 
     def wait(self):
