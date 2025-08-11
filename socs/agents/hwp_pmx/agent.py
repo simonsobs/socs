@@ -343,28 +343,29 @@ class HWPPMXAgent:
                  'last_updated': 1649085992.719602}
 
         """
-        PMX = None
+        PMX = pmx.PMX(ip_address=self.ip, port=self.port)
 
         threads.blockingCallFromThread(reactor, self._clear_queue)
 
         sleep_time = 1 / self.f_sample - 0.01
         last_daq = 0
         while session.status in ['starting', 'running']:
-            if PMX is None:
-                try:
-                    PMX = pmx.PMX(ip=self.ip, port=self.port)
-                except ConnectionRefusedError:
-                    self.log.error(
-                        "Could not connect to PMX. "
-                        "Retrying after 30 sec..."
-                    )
-                    time.sleep(30)
-                    continue
+            try:
+                now = time.time()
+                if now - last_daq > sleep_time:
+                    self._get_and_publish_data(PMX, session)
+                    last_daq = now
 
-            now = time.time()
-            if now - last_daq > sleep_time:
-                self._get_and_publish_data(PMX, session)
-                last_daq = now
+                if session.degraded:
+                    self.log.info("Connection re-established")
+                    session.degraded = False
+            except ConnectionError:
+                self.log.error("Failed to send command to PMX. "
+                               "Check network connection. "
+                               "Retrying in 30 seconds...")
+                session.degraded = True
+                time.sleep(30)
+                continue
 
             self._process_actions(PMX)
             time.sleep(0.1)
@@ -406,37 +407,33 @@ class HWPPMXAgent:
                 'block_name': 'hwppmx',
                 'data': {}}
 
-        try:
-            msg, curr = PMX.meas_current()
-            data['data']['current'] = curr
+        msg, curr = PMX.meas_current()
+        data['data']['current'] = curr
 
-            msg, volt = PMX.meas_voltage()
-            data['data']['voltage'] = volt
+        msg, volt = PMX.meas_voltage()
+        data['data']['voltage'] = volt
 
-            msg, code = PMX.check_error()
-            data['data']['err_code'] = code
-            data['data']['err_msg'] = msg
+        msg, code = PMX.check_error()
+        data['data']['err_code'] = code
+        data['data']['err_msg'] = msg
 
-            prot_code = PMX.check_prot()
-            if prot_code != 0:
-                self.prot = prot_code
+        prot_code = PMX.check_prot()
+        if prot_code != 0:
+            self.prot = prot_code
 
-            prot_msg = PMX.get_prot_msg(self.prot)
-            data['data']['prot_code'] = self.prot
-            data['data']['prot_msg'] = prot_msg
+        prot_msg = PMX.get_prot_msg(self.prot)
+        data['data']['prot_code'] = self.prot
+        data['data']['prot_msg'] = prot_msg
 
-            msg, src = PMX.check_source()
-            data['data']['source'] = src
-            self.agent.publish_to_feed('hwppmx', data)
-            session.data = {'curr': curr,
-                            'volt': volt,
-                            'prot': self.prot,
-                            'prot_msg': prot_msg,
-                            'source': src,
-                            'last_updated': now}
-        except BaseException:
-            self.log.warn("Exception in getting data")
-            return
+        msg, src = PMX.check_source()
+        data['data']['source'] = src
+        self.agent.publish_to_feed('hwppmx', data)
+        session.data = {'curr': curr,
+                        'volt': volt,
+                        'prot': self.prot,
+                        'prot_msg': prot_msg,
+                        'source': src,
+                        'last_updated': now}
 
     def monitor_supervisor(self, session, params):
         """monitor_supervisor()
