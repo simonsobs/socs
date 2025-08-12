@@ -1170,8 +1170,11 @@ class ControlStateMachine:
                                       kwargs={'direction': state.direction})
                 self.run_and_validate(clients.pid.declare_freq,
                                       kwargs={'freq': state.target_freq})
-                self.run_and_validate(clients.pmx.use_ext)
-                self.run_and_validate(clients.pmx.set_on)
+                try:
+                    self.run_and_validate(clients.pmx.use_ext)
+                    self.run_and_validate(clients.pmx.set_on)
+                except Exception:
+                    self.log.info('skipped failed pmx tasks')
                 self.run_and_validate(clients.pid.tune_freq, timeout=60)
                 self.run_and_validate(
                     clients.pcu.send_command,
@@ -1247,7 +1250,7 @@ class ControlStateMachine:
                 # power off
                 if state.max_duration is not None:
                     if time.time() - state.start_time > state.max_duration:
-                        self.action.set_state(ControlState.PmxOff())
+                        self.action.set_state(ControlState.PmxOff(wait_stop=True))
 
                 if f is None:
                     state.freq_within_tol_start = None
@@ -1278,7 +1281,10 @@ class ControlStateMachine:
                 self.action.set_state(ControlState.Done(success=True))
 
             elif isinstance(state, ControlState.PmxOff):
-                self.run_and_validate(clients.pmx.set_off)
+                try:
+                    self.run_and_validate(clients.pmx.set_off)
+                except Exception:
+                    self.log.info('skipped failed pmx tasks')
                 self.run_and_validate(clients.pid.declare_freq,
                                       kwargs={'freq': 0})
                 self.run_and_validate(clients.pid.tune_freq)
@@ -1291,6 +1297,7 @@ class ControlStateMachine:
                         target_freq=0,
                         freq_tol=state.freq_tol,
                         freq_tol_duration=state.freq_tol_duration,
+                        max_duration=1200,
                     ))
                 else:
                     self.action.set_state(ControlState.Done(success=state.success))
@@ -1319,9 +1326,12 @@ class ControlStateMachine:
                                       kwargs=dict(direction=new_d))
                 self.run_and_validate(clients.pid.tune_stop)
 
-                self.run_and_validate(clients.pmx.ign_ext)
-                self.run_and_validate(clients.pmx.set_v, kwargs={'volt': state.brake_voltage})
-                self.run_and_validate(clients.pmx.set_on)
+                try:
+                    self.run_and_validate(clients.pmx.ign_ext)
+                    self.run_and_validate(clients.pmx.set_v, kwargs={'volt': state.brake_voltage})
+                    self.run_and_validate(clients.pmx.set_on)
+                except Exception:
+                    self.log.info('skipped failed pmx tasks')
 
                 time.sleep(10)
                 self.action.set_state(ControlState.WaitForBrake(
@@ -2096,6 +2106,7 @@ def make_parser(parser=None):
 
 
 def main(args=None):
+    print('this is temporary hwp-supervisor which ignores hwp-pmx')
     parser = make_parser()
     args = site_config.parse_args(agent_class='HWPSupervisor',
                                   parser=parser,
