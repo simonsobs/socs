@@ -16,6 +16,7 @@ from ocs.ocs_client import OCSClient, OCSReply
 from ocs.ocs_twisted import Pacemaker
 
 MAX_SPIN_UP_DURATION: float = 1800.
+MAX_SPIN_DOWN_DURATION: float = 1200.
 
 client_cache: Dict[str, ControlClient] = {}
 
@@ -1297,7 +1298,7 @@ class ControlStateMachine:
                         target_freq=0,
                         freq_tol=state.freq_tol,
                         freq_tol_duration=state.freq_tol_duration,
-                        max_duration=1200,
+                        max_duration=MAX_SPIN_DOWN_DURATION,
                     ))
                 else:
                     self.action.set_state(ControlState.Done(success=state.success))
@@ -1354,6 +1355,7 @@ class ControlStateMachine:
                         target_freq=0,
                         freq_tol=0.05,
                         freq_tol_duration=30,
+                        max_duration=MAX_SPIN_DOWN_DURATION,
                     ))
                     return
 
