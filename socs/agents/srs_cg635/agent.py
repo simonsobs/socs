@@ -148,18 +148,11 @@ class SRSCG635Agent:
                     }
 
                     try:
-                        try:
-                            freq, stdc, runs, timb = self.clock.get_all_status().split(';')
-                            data['data']['Frequency'] = float(freq)
-                            data['data']['Standard_CMOS_Output'] = int(stdc)
-                            data['data']['Running_State'] = int(runs)
-                            data['data']['Timebase'] = int(timb)
-                        except ValueError:
-                            self.clock.clear()
-                            data['data']['Frequency'] = self.clock.get_freq()
-                            data['data']['Standard_CMOS_Output'] = self.clock.get_stdc()
-                            data['data']['Running_State'] = self.clock.get_runs()
-                            data['data']['Timebase'] = self.clock.get_timebase()
+                        freq, stdc, runs, timb = self.clock.get_all_status()
+                        data['data']['Frequency'] = freq
+                        data['data']['Standard_CMOS_Output'] = stdc
+                        data['data']['Running_State'] = runs
+                        data['data']['Timebase'] = timb
                     except socket.timeout as e:
                         self.log.error(f"Timeout in retrieving clock data: {e}")
                         self.clock = None
