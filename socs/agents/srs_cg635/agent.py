@@ -153,7 +153,6 @@ class SRSCG635Agent:
                         data['data']['Standard_CMOS_Output'] = stdc
                         data['data']['Running_State'] = runs
                         data['data']['Timebase'] = timb
-
                     except socket.timeout as e:
                         self.log.error(f"Timeout in retrieving clock data: {e}")
                         self.clock = None
