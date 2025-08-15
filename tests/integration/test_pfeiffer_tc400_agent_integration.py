@@ -167,8 +167,16 @@ def test_pfeiffer_tc400_acknowledge_turbo_errors(wait_for_crossbar, emulator,
 def test_pfeiffer_tc400_acq(wait_for_crossbar, emulator, run_agent, client):
     client.init()
 
-    responses = {'0010034602=?108': format_reply('000300'),  # get_turbo_motor_temperature()
-                 '0010030902=?107': format_reply('000800'),  # get_turbo_actual_rotation_speed()
+    responses = {'0010031302=?102': format_reply('004796'),  # get_turbo_drive_voltage()
+                 '0010031002=?099': format_reply('000316'),  # get_turbo_drive_current()
+                 '0010031602=?105': format_reply('000152'),  # get_turbo_drive_power()
+                 '0010032402=?104': format_reply('000320'),  # get_turbo_power_stage_temperature()
+                 '0010032602=?106': format_reply('000310'),  # get_turbo_electronic_temperature()
+                 '0010033002=?101': format_reply('000310'),  # get_turbo_pump_bottom_temperature()
+                 '0010034202=?104': format_reply('000310'),  # get_turbo_bearing_temperature()
+                 '0010034602=?108': format_reply('000310'),  # get_turbo_motor_temperature()
+                 '0010030902=?107': format_reply('000860'),  # get_turbo_actual_rotation_speed()
+                 '0010033602=?107': format_reply('001000'),  # get_turbo_acceleration()
                  '0010030302=?101': format_reply('Err001'),  # get_turbo_error_code()
                  }
     emulator.define_responses(responses)
