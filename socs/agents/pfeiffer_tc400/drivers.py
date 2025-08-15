@@ -51,6 +51,106 @@ class PfeifferTC400:
 
         self.turbo_address = turbo_address
 
+    def get_turbo_drive_voltage(self):
+        """Gets the drive voltage supplied to the turbo controller.
+
+        Returns
+        -------
+        int
+            The drive voltage supplied to the turbo controller in Volts.
+        """
+
+        send_data_request(self.ser, self.turbo_address, 313)
+        addr, rw, param_num, drive_voltage = read_gauge_response(self.ser)
+
+        # The turbo response should be interpreted as having two decimal points
+        return float(drive_voltage) * 0.01
+
+    def get_turbo_drive_current(self):
+        """Gets the drive current supplied to the turbo controller.
+
+        Returns
+        -------
+        int
+            The drive current supplied to the turbo controller in Amps.
+        """
+
+        send_data_request(self.ser, self.turbo_address, 310)
+        addr, rw, param_num, drive_current = read_gauge_response(self.ser)
+
+        # The turbo response should be interpreted as having two decimal points
+        return float(drive_current) * 0.01
+
+    def get_turbo_drive_power(self):
+        """Gets the drive power supplied to the turbo controller.
+
+        Returns
+        -------
+        int
+            The drive power supplied to the turbo controller in Watts.
+        """
+
+        send_data_request(self.ser, self.turbo_address, 316)
+        addr, rw, param_num, drive_power = read_gauge_response(self.ser)
+
+        return float(drive_power)
+
+    def get_turbo_power_stage_temperature(self):
+        """Gets the temperatures of the turbo power stage from the turbo controller.
+
+        Returns
+        -------
+        int
+            The power temperature of the turbo in Celsius.
+        """
+
+        send_data_request(self.ser, self.turbo_address, 324)
+        addr, rw, param_num, power_stage_temp = read_gauge_response(self.ser)
+
+        return int(power_stage_temp)
+
+    def get_turbo_electronic_temperature(self):
+        """Gets the temperatures of the turbo electronics from the turbo controller.
+
+        Returns
+        -------
+        int
+            The electronics temperature of the turbo in Celsius.
+        """
+
+        send_data_request(self.ser, self.turbo_address, 326)
+        addr, rw, param_num, electronic_temp = read_gauge_response(self.ser)
+
+        return int(electronic_temp)
+
+    def get_turbo_pump_bottom_temperature(self):
+        """Gets the temperatures of the turbo pump bottom from the turbo controller.
+
+        Returns
+        -------
+        int
+            The pump bottom temperature of the turbo in Celsius.
+        """
+
+        send_data_request(self.ser, self.turbo_address, 330)
+        addr, rw, param_num, pump_bottom_temp = read_gauge_response(self.ser)
+
+        return int(pump_bottom_temp)
+
+    def get_turbo_bearing_temperature(self):
+        """Gets the temperatures of the turbo bearing from the turbo controller.
+
+        Returns
+        -------
+        int
+            The bearing temperature of the turbo in Celsius.
+        """
+
+        send_data_request(self.ser, self.turbo_address, 342)
+        addr, rw, param_num, bearing_temp = read_gauge_response(self.ser)
+
+        return int(bearing_temp)
+
     def get_turbo_motor_temperature(self):
         """Gets the temperatures of the turbo rotor from the turbo controller.
 
@@ -95,6 +195,20 @@ class PfeifferTC400:
         addr, rw, param_num, set_rotation_speed = read_gauge_response(self.ser)
 
         return int(set_rotation_speed)
+
+    def get_turbo_acceleration(self):
+        """Gets the current acceleration of the turbo from the turbo controller.
+
+        Returns
+        -------
+        int
+            The current acceleration of the turbo in rpm/s.
+        """
+
+        send_data_request(self.ser, self.turbo_address, 336)
+        addr, rw, param_num, acceleration = read_gauge_response(self.ser)
+
+        return int(acceleration)
 
     def get_turbo_error_code(self):
         """Gets the current error code of the turbo from the turbo controller.
