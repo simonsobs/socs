@@ -31,10 +31,12 @@ INIT_DEFAULT_SCAN_PARAMS = {
     'ccat': {
         'az_speed': 2,
         'az_accel': 1,
+        'el_freq': .15,
     },
     'satp': {
         'az_speed': 1,
         'az_accel': 1,
+        'el_freq': 0,
     },
 }
 
@@ -234,7 +236,7 @@ class ACUAgent:
                       sun_config=self.sun_config)
         self._reset_sun_params()
 
-        # Scan params (default vel / accel).
+        # Scan params (default vel / accel / el freq).
         self.default_scan_params = \
             dict(INIT_DEFAULT_SCAN_PARAMS[self.platform_type])
         for _k in self.default_scan_params.keys():
@@ -1781,6 +1783,7 @@ class ACUAgent:
 
     @ocs_agent.param('az_speed', type=float, default=None)
     @ocs_agent.param('az_accel', type=float, default=None)
+    @ocs_agent.param('el_freq', type=float, default=None)
     @ocs_agent.param('reset', default=False, type=bool)
     @inlineCallbacks
     def set_scan_params(self, session, params):
@@ -1793,13 +1796,15 @@ class ACUAgent:
           az_speed (float, optional): The azimuth scan speed.
           az_accel (float, optional): The (average) azimuth
             acceleration at turn-around.
+          el_freq (float, optional): The frequency of elevation nods in
+            type 3 scans.
           reset (bool, optional): If True, reset all params to default
             values before applying any updates passed explicitly here.
 
         """
         if params['reset']:
             self.scan_params.update(self.default_scan_params)
-        for k in ['az_speed', 'az_accel']:
+        for k in ['az_speed', 'az_accel', 'el_freq']:
             if params[k] is not None:
                 self.scan_params[k] = params[k]
         self.log.info('Updated default scan params to {sp}', sp=self.scan_params)
@@ -2009,6 +2014,7 @@ class ACUAgent:
     @ocs_agent.param('el_endpoint1', type=float, default=None)
     @ocs_agent.param('el_endpoint2', type=float, default=None)
     @ocs_agent.param('el_speed', type=float, default=0.)
+    @ocs_agent.param('el_freq', type=float, default=None)
     @ocs_agent.param('num_scans', type=float, default=None)
     @ocs_agent.param('start_time', type=float, default=None)
     @ocs_agent.param('wait_to_start', type=float, default=None)
@@ -2018,6 +2024,7 @@ class ACUAgent:
                               'mid_inc', 'mid_dec'])
     @ocs_agent.param('az_drift', type=float, default=None)
     @ocs_agent.param('az_only', type=bool, default=True)
+    @ocs_agent.param('type', default=1, choices=[1, 2, 3])
     @ocs_agent.param('scan_upload_length', type=float, default=None)
     @inlineCallbacks
     def generate_scan(self, session, params):
@@ -2100,10 +2107,13 @@ class ACUAgent:
         # Params with defaults configured ...
         az_speed = params['az_speed']
         az_accel = params['az_accel']
+        el_freq = params['el_freq']
         if az_speed is None:
             az_speed = self.scan_params['az_speed']
         if az_accel is None:
             az_accel = self.scan_params['az_accel']
+        if el_freq is None:
+            el_freq = self.scan_params['el_freq']
 
         # Do we need to limit the az_accel?  This limit comes from a
         # maximum jerk parameter; the equation below (without the
@@ -2206,18 +2216,41 @@ class ACUAgent:
                 return False, f'Start position seek failed with message: {msg}'
 
         # Prepare the point generator.
-        g = sh.generate_constant_velocity_scan(az_endpoint1=az_endpoint1,
-                                               az_endpoint2=az_endpoint2,
-                                               az_speed=az_speed, acc=az_accel,
-                                               el_endpoint1=el_endpoint1,
-                                               el_endpoint2=el_endpoint2,
-                                               el_speed=el_speed,
-                                               az_first_pos=plan['init_az'],
-                                               **scan_params)
+        free_form = False
+        if params["type"] == 1:
+            g = sh.generate_constant_velocity_scan(az_endpoint1=az_endpoint1,
+                                                   az_endpoint2=az_endpoint2,
+                                                   az_speed=az_speed, acc=az_accel,
+                                                   el_endpoint1=el_endpoint1,
+                                                   el_endpoint2=el_endpoint2,
+                                                   el_speed=el_speed,
+                                                   az_first_pos=plan['init_az'],
+                                                   **scan_params)
+        elif params["type"] == 2:
+            free_form = True
+            g = sh.generate_type2_scan(az_endpoint1=az_endpoint1,
+                                       az_endpoint2=az_endpoint2,
+                                       az_speed=az_speed, acc=az_accel,
+                                       el_endpoint1=el_endpoint1,
+                                       az_first_pos=plan['init_az'],
+                                       **scan_params)
+        elif params["type"] == 3:
+            free_form = True
+            azonly = False
+            g = sh.generate_type3_scan(az_endpoint1=az_endpoint1,
+                                       az_endpoint2=az_endpoint2,
+                                       az_speed=az_speed, acc=az_accel,
+                                       el_endpoint1=el_endpoint1,
+                                       el_endpoint2=el_endpoint2,
+                                       el_freq=el_freq,
+                                       az_first_pos=plan['init_az'],
+                                       **scan_params)
+        else:
+            raise ValueError("Scan type must be 1, 2, or 3")
 
         return (yield self._run_track(
             session=session, point_gen=g, step_time=step_time,
-            azonly=azonly, point_batch_count=point_batch_count))
+            azonly=azonly, point_batch_count=point_batch_count, free_form=free_form))
 
     @inlineCallbacks
     def _run_track(self, session, point_gen, step_time, azonly=False,
