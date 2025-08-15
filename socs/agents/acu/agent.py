@@ -2219,32 +2219,32 @@ class ACUAgent:
         free_form = False
         if params["type"] == 1:
             g = sh.generate_constant_velocity_scan(az_endpoint1=az_endpoint1,
-                                               az_endpoint2=az_endpoint2,
-                                               az_speed=az_speed, acc=az_accel,
-                                               el_endpoint1=el_endpoint1,
-                                               el_endpoint2=el_endpoint2,
-                                               el_speed=el_speed,
-                                               az_first_pos=plan['init_az'],
-                                               **scan_params)
+                                                   az_endpoint2=az_endpoint2,
+                                                   az_speed=az_speed, acc=az_accel,
+                                                   el_endpoint1=el_endpoint1,
+                                                   el_endpoint2=el_endpoint2,
+                                                   el_speed=el_speed,
+                                                   az_first_pos=plan['init_az'],
+                                                   **scan_params)
         elif params["type"] == 2:
-            free_form = True 
+            free_form = True
             g = sh.generate_type2_scan(az_endpoint1=az_endpoint1,
-                                               az_endpoint2=az_endpoint2,
-                                               az_speed=az_speed, acc=az_accel,
-                                               el_endpoint1=el_endpoint1,
-                                               az_first_pos=plan['init_az'],
-                                               **scan_params)
+                                       az_endpoint2=az_endpoint2,
+                                       az_speed=az_speed, acc=az_accel,
+                                       el_endpoint1=el_endpoint1,
+                                       az_first_pos=plan['init_az'],
+                                       **scan_params)
         elif params["type"] == 3:
-            free_form = True 
+            free_form = True
             azonly = False
             g = sh.generate_type3_scan(az_endpoint1=az_endpoint1,
-                                               az_endpoint2=az_endpoint2,
-                                               az_speed=az_speed, acc=az_accel,
-                                               el_endpoint1=el_endpoint1,
-                                               el_endpoint2=el_endpoint2,
-                                               el_freq=el_freq,
-                                               az_first_pos=plan['init_az'],
-                                               **scan_params)
+                                       az_endpoint2=az_endpoint2,
+                                       az_speed=az_speed, acc=az_accel,
+                                       el_endpoint1=el_endpoint1,
+                                       el_endpoint2=el_endpoint2,
+                                       el_freq=el_freq,
+                                       az_first_pos=plan['init_az'],
+                                       **scan_params)
         else:
             raise ValueError("Scan type must be 1, 2, or 3")
 
