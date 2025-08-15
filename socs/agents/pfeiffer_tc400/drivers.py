@@ -91,7 +91,6 @@ class PfeifferTC400:
         """
 
         send_data_request(self.ser, self.turbo_address, 316)
-
         addr, rw, param_num, drive_power = read_gauge_response(self.ser)
 
         return float(drive_power)
@@ -106,7 +105,6 @@ class PfeifferTC400:
         """
 
         send_data_request(self.ser, self.turbo_address, 324)
-
         addr, rw, param_num, power_stage_temp = read_gauge_response(self.ser)
 
         return int(power_stage_temp)
@@ -121,7 +119,6 @@ class PfeifferTC400:
         """
 
         send_data_request(self.ser, self.turbo_address, 326)
-
         addr, rw, param_num, electronic_temp = read_gauge_response(self.ser)
 
         return int(electronic_temp)
@@ -136,7 +133,6 @@ class PfeifferTC400:
         """
 
         send_data_request(self.ser, self.turbo_address, 330)
-
         addr, rw, param_num, pump_bottom_temp = read_gauge_response(self.ser)
 
         return int(pump_bottom_temp)
@@ -210,7 +206,6 @@ class PfeifferTC400:
         """
 
         send_data_request(self.ser, self.turbo_address, 336)
-
         addr, rw, param_num, acceleration = read_gauge_response(self.ser)
 
         return int(acceleration)
