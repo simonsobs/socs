@@ -669,12 +669,17 @@ class ACUAgent:
         n_ok = 0
         min_query_period = 0.05   # Seconds
         query_t = 0
-        prev_checkdata = {'ctime': time.time(),
-                          'Azimuth_mode': None,
-                          'Elevation_mode': None,
-                          'Boresight_mode': None,
-                          'Corotator_mode': None,
-                          }
+
+        # Assist monitoring and logging changes in certain fields.
+        checkdata = [
+            ('summary', 'ctime'),
+            ('platform_status', 'Remote_mode'),
+            ('summary', 'Azimuth_mode'),
+            ('summary', 'Elevation_mode'),
+            ('summary', 'Boresight_mode'),
+            ('corotator', 'Corotator_mode'),
+        ]
+        prev_checkdata = {k: None for g, k in checkdata}
 
         @inlineCallbacks
         def _get_status():
@@ -699,7 +704,6 @@ class ACUAgent:
 
         hvm = hvac.HvacManager()
 
-        was_remote = False
         last_resp_rate = None
         data_blocks = {}
         influx_blocks = {}
@@ -795,29 +799,31 @@ class ACUAgent:
                     # Store.
                     self.data['status'][group][field] = value
 
-            self.data['status']['summary']['ctime'] =\
+            self.data['status']['summary']['ctime'] = \
                 sh.timecode(self.data['status']['summary']['Time'])
-            if self.data['status']['platform_status']['Remote_mode'] == 0:
-                if was_remote:
-                    was_remote = False
-                    self.log.warn('ACU in local mode!')
-            elif not was_remote:
-                was_remote = True
-                self.log.warn('ACU now in remote mode.')
-            if self.data['status']['summary']['ctime'] == prev_checkdata['ctime']:
-                self.log.warn('ACU time has not changed from previous data point!')
 
-            # Alert on any axis mode change.
-            for axis_mode in prev_checkdata.keys():
-                if 'mode' not in axis_mode:
+            # Check for state changes in some key fields.
+            new_checkdata = {k: self.data['status'][g].get(k)
+                             for g, k in checkdata}
+
+            if new_checkdata['Remote_mode'] != prev_checkdata['Remote_mode']:
+                if new_checkdata['Remote_mode']:
+                    self.log.warn('ACU now in remote mode.')
+                else:
+                    self.log.warn('ACU in local mode!')
+
+            for axis_mode, v in new_checkdata.items():
+                if 'mode' not in axis_mode or 'Remote' in axis_mode:
                     continue
-                v = self.data['status']['summary'].get(axis_mode)
-                if v is None:
-                    v = self.data['status']['corotator'].get(axis_mode)
                 if v != prev_checkdata[axis_mode]:
                     self.log.info('{axis_mode} is now "{v}"',
                                   axis_mode=axis_mode, v=v)
-                    prev_checkdata[axis_mode] = v
+
+            if new_checkdata['ctime'] == prev_checkdata['ctime']:
+                self.log.warn('ACU time has not changed from previous data point!')
+                continue
+
+            prev_checkdata = new_checkdata
 
             # influx_blocks are constructed based on refers to all
             # other self.data['status'] keys. Do not add more keys to
