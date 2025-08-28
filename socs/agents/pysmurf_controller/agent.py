@@ -129,7 +129,7 @@ class PysmurfController:
                 'observatory.{}.feeds.pysmurf_session_data'.format(args.monitor_id),
             )
 
-        self.good_threshold_relock = args.good_threshold
+        self.good_threshold_relock = args.good_threshold_relock
 
         self.agent.register_feed('tracking_results', record=True)
         self.agent.register_feed('bias_step_results', record=True)
@@ -1223,8 +1223,8 @@ def make_parser(parser=None):
                         help="Smurf slot that this agent will be controlling")
     pgroup.add_argument('--poll-interval', type=float,
                         help="Time between check-state polls")
-    pgroup.add_argument('--good_threshold', type=float, default=0.5,
-                        help="Time between check-state polls")
+    pgroup.add_argument('--good_threshold_relock', type=float, default=0.5,
+                        help="Alarm system threshold for relock quality check")
     return parser
 
 
