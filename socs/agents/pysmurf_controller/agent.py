@@ -129,6 +129,8 @@ class PysmurfController:
                 'observatory.{}.feeds.pysmurf_session_data'.format(args.monitor_id),
             )
 
+        self.good_threshold_relock = args.good_threshold
+
         self.agent.register_feed('tracking_results', record=True)
         self.agent.register_feed('bias_step_results', record=True)
         self.agent.register_feed('noise_results', record=True)
@@ -623,7 +625,7 @@ class PysmurfController:
                 for iband, (iall, igood) in enumerate(zip(result.return_val['all_det_num'], result.return_val['good_det_num'])):
                     block_data[f'alldet_band{iband}'] = iall
                     block_data[f'gooddet_band{iband}'] = igood
-                    block_data[f'alarm_band{iband}'] = 1 if (iall - igood) > igood else 0
+                    block_data[f'alarm_band{iband}'] = 1 if igood/iall < self.good_threshold_relock else 0
                 data = {
                     'timestamp': time.time(),
                     'block_name': 'tracking_results',
@@ -1220,6 +1222,8 @@ def make_parser(parser=None):
     pgroup.add_argument('--slot', type=int,
                         help="Smurf slot that this agent will be controlling")
     pgroup.add_argument('--poll-interval', type=float,
+                        help="Time between check-state polls")
+    pgroup.add_argument('--good_threshold', type=float, default=0.5,
                         help="Time between check-state polls")
     return parser
 
