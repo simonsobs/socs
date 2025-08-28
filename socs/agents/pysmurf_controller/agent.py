@@ -1223,7 +1223,7 @@ def make_parser(parser=None):
                         help="Smurf slot that this agent will be controlling")
     pgroup.add_argument('--poll-interval', type=float,
                         help="Time between check-state polls")
-    pgroup.add_argument('--good_threshold_relock', type=float, default=0.5,
+    pgroup.add_argument('--good-threshold-relock', type=float, default=0.5,
                         help="Alarm system threshold for relock quality check")
     return parser
 
