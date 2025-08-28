@@ -625,11 +625,13 @@ class PysmurfController:
                 for iband, (iall, igood) in enumerate(zip(result.return_val['all_det_num'], result.return_val['good_det_num'])):
                     block_data[f'alldet_band{iband}'] = iall
                     block_data[f'gooddet_band{iband}'] = igood
-<<<<<<< HEAD
+
+
+<< << << < HEAD
                     block_data[f'alarm_band{iband}'] = 1 if (iall == 0 or igood / iall < self.good_threshold_relock) else 0
-=======
+== == == =
                     block_data[f'alarm_band{iband}'] = 1 if igood / iall < self.good_threshold_relock else 0
->>>>>>> 8a778485bfd203aca1e7999ba1c4a9e60fa0b7ff
+>>>>>> > 8a778485bfd203aca1e7999ba1c4a9e60fa0b7ff
                 data = {
                     'timestamp': time.time(),
                     'block_name': 'tracking_results',
