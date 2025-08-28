@@ -248,10 +248,10 @@ class WiregridActuatorAgent:
         # Please use +/- distance for insertion/ejection, respectively.
         ret = self.actuator.move(0.5 * (float)(1. if is_insert else -1.), speedrate=0.2)
         if not ret:
-            msg = '_insert_eject(): WARNING!:'\
+            msg = '_insert_eject(): ERROR!:'\
                   'Failed to move in the additional small moving after the last slow moving.'
-            self.log.warn(msg)
-            return False, msg, LSL or LSR
+            self.log.error(msg)
+            return False, msg
 
         # Lock the actuator by the stoppers
         self.actuator.st.set_alloff()
