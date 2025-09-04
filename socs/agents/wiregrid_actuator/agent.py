@@ -242,6 +242,18 @@ class WiregridActuatorAgent:
             self.log.error(msg)
             return False, msg
 
+        # Additional small move to ensure the limit switch ON
+        # No limit switch check during this move
+        # `self.actuator.move()` preserves the sign of `distance`.
+        # In contrast, `move_func()` sets the sign automatically based on `is_insert`.
+        # Pass a positive distance for insertion and a negative distance for ejection.
+        ret = self.actuator.move(0.5 * (1. if is_insert else -1.), speedrate=0.2)
+        if not ret:
+            msg = '_insert_eject(): ERROR!:'\
+                  'Failed to move in the additional small move after the last slow move.'
+            self.log.error(msg)
+            return False, msg
+
         # Lock the actuator by the stoppers
         self.actuator.st.set_alloff()
         # Check the stopper until all the stoppers are OFF (locked)
