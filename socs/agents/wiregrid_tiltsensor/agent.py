@@ -42,12 +42,12 @@ class WiregridTiltSensorAgent:
                                  agg_params=agg_params,
                                  buffer_time=1.)
 
-
     ######################
     # Internal functions #
     ######################
 
     # Return: Nothing
+
     def _connect(self):
         self.tiltsensor = connect(self.ip, self.port, self.sensor_type)
 
@@ -121,7 +121,7 @@ class WiregridTiltSensorAgent:
                     self.pm.sleep()  # DAQ interval
                     continue
                 # No implementation of `get_temp()` now and ignore the below lines
-                #if self.sensor_type == 'sherborne':
+                # if self.sensor_type == 'sherborne':
                 #    msg, temperatures = self.tiltsensor.get_temp()
                 #    self.log.info(f'self.tiltsensor.get_temp(): {msg}')
                 #    if temperatures[0] == -999:
@@ -201,6 +201,7 @@ class WiregridTiltSensorAgent:
 
         # True if task succeeds, False if not
         return True, 'Reset the tiltsensor'
+
 
 def make_parser(parser_in=None):
     if parser_in is None:
