@@ -2,6 +2,7 @@ import argparse
 import os
 import time
 
+import serial
 import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
@@ -123,25 +124,46 @@ class LS425Agent:
 
             last_release = time.time()
             while self.take_data:
-                if time.time() - last_release > 1.:
-                    last_release = time.time()
-                    if not self.lock.release_and_acquire(timeout=10):
-                        self.log.warn(f"Failed to re-acquire lock, currently held by {self.lock.job}.")
+                if self.dev is None:
+                    try:
+                        self.dev = ls.LakeShore425(self.port)
+                        self.log.info('Connected to LS425')
+                    except (ConnectionRefusedError, serial.serialutil.SerialException):
+                        self.log.error(
+                            "Could not connect to LS425. "
+                            "Retrying after 30 sec..."
+                        )
+                        time.sleep(30)
                         continue
+                try:
+                    if time.time() - last_release > 1.:
+                        last_release = time.time()
+                        if not self.lock.release_and_acquire(timeout=10):
+                            self.log.warn(f"Failed to re-acquire lock, currently held by {self.lock.job}.")
+                            continue
 
-                Bfield = self.dev.get_field()
-                current_time = time.time()
-                data = {
-                    'timestamp': current_time,
-                    'block_name': 'mag_field',
-                    'data': {'Bfield': Bfield}
-                }
+                    Bfield = self.dev.get_field()
+                    current_time = time.time()
+                    data = {
+                        'timestamp': current_time,
+                        'block_name': 'mag_field',
+                        'data': {'Bfield': Bfield}
+                    }
 
-                self.agent.publish_to_feed('mag_field', data)
-                session.data.update({'timestamp': current_time})
-                self.agent.feeds['mag_field'].flush_buffer()
+                    self.agent.publish_to_feed('mag_field', data)
+                    session.data.update({'timestamp': current_time})
+                    self.agent.feeds['mag_field'].flush_buffer()
 
-                time.sleep(sleep_time)
+                    session.degraded = False
+                    time.sleep(sleep_time)
+                except Exception:
+                    self.log.error(
+                        "Decive reports readiness to read but returned no data. "
+                        "Reconnect to PCU."
+                    )
+                    self.dev.close()
+                    self.dev = None
+                    session.degraded = True
 
         return True, 'Acquisition exited cleanly.'
 
