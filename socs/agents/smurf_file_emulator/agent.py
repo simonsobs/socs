@@ -558,6 +558,7 @@ class SmurfFileEmulator:
         return True, "Wrote tune files"
 
     @ocs_agent.param('wait', default=True)
+    @ocs_agent.param('kwargs', default=None)
     @ocs_agent.param('tag', default=None)
     def take_iv(self, session, params=None):
         """take_iv(wait=True, tag=None)
@@ -568,6 +569,9 @@ class SmurfFileEmulator:
             wait (bool, optional):
                 If true, will wait for the 5 seconds where fake IV data is
                 generated
+            kwargs : dict
+                Additional kwargs to pass to the ``take_iv`` function.
+                Ignored in the emulator.
             tag (str, optional):
                 User tag to add to the g3 stream.
         """
@@ -662,8 +666,10 @@ class SmurfFileEmulator:
         return True, 'Wrote det biasing files'
 
     @ocs_agent.param('duration', default=None)
+    @ocs_agent.param('kwargs', default=None)
     @ocs_agent.param('use_stream_between', default=False, type=bool)
     @ocs_agent.param('start_offset', default=0, type=float)
+    @ocs_agent.param('subtype', default=None)
     @ocs_agent.param('tag', default=None)
     def stream(self, session, params):
         """stream(duration=None, use_stream_between=False, start_offset=0, tag=None)
@@ -678,6 +684,9 @@ class SmurfFileEmulator:
         Parameters:
             duration (float, optional):
                 If set, will stop stream after specified amount of time (sec).
+            kwargs : dict
+                A dictionary containing additional keyword arguments to pass.
+                Ignored by the emulator.
             use_stream_between (bool, optional):
                 If True, will use the DataStreamer's `stream_between` function
                 instead of writing frames one at a time. This allows you to write
@@ -686,6 +695,8 @@ class SmurfFileEmulator:
                 If set, this will add an offset to the start time passed to the
                 `stream_between` function, allowing you to create offsets between
                 streams taken at the same time.
+            subtype : string, optional
+                Operation subtype used to tag the stream. Ignored by the emulator.
             tag (str, optional):
                 User tag to add to the g3 stream.
         """
