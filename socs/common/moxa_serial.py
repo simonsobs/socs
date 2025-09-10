@@ -1,3 +1,5 @@
+# 9/2025 Shun
+# Change all BaseExeption --> TimeoutError
 # 4/2009 BAS
 #  read() replicates behavior of pyserial
 #  readexactly() added, which is probably more useful
@@ -87,7 +89,7 @@ class Serial_TCPServer(object):
             self.settimeout(newtimeout)
             try:
                 msg = self.sock.recv(n, socket.MSG_PEEK)
-            except BaseException:
+            except (TimeoutError, BlockingIOError):
                 pass
         # Flush the message out if you got everything
         if len(msg) == n:
@@ -114,7 +116,7 @@ class Serial_TCPServer(object):
         try:
             for i in range(n):
                 msg += self.sock.recv(1)
-        except BaseException:
+        except (TimeoutError, BlockingIOError):
             pass
         self.sock.setblocking(1)  # belt and suspenders
         self.settimeout(self.__timeout)
@@ -132,9 +134,9 @@ class Serial_TCPServer(object):
             return ''
         try:
             msg = self.sock.recv(n)
-        except BaseException:
+        except (TimeoutError, BlockingIOError):
             msg = ''
-        n2 = min(n - len(msg), n / 2)
+        n2 = min(n - len(msg), (int)(n / 2))
         return msg + self.readbuf(n2)
 
     def readpacket(self, n):
@@ -147,7 +149,7 @@ class Serial_TCPServer(object):
         """
         try:
             msg = self.sock.recv(n)
-        except BaseException:
+        except (TimeoutError, BlockingIOError):
             msg = ''
         return msg
 
@@ -221,7 +223,7 @@ class Serial_TCPServer(object):
         try:
             while len(self.sock.recv(1)) > 0:
                 pass
-        except BaseException:
+        except (TimeoutError, BlockingIOError):
             pass
         self.sock.setblocking(1)
         self.sock.settimeout(self.__timeout)
