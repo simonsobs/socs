@@ -33,7 +33,7 @@ class WiregridTiltSensorAgent:
         self.ip = ip
         self.port = int(port)
         self.sensor_type = sensor_type
-        self.tiltsensor = connect(self.ip, self.port, self.sensor_type)
+        self._connect()
         self.pm = Pacemaker(2, quantize=True)
 
         agg_params = {'frame_length': 60}
@@ -41,6 +41,19 @@ class WiregridTiltSensorAgent:
                                  record=True,
                                  agg_params=agg_params,
                                  buffer_time=1.)
+
+
+    ######################
+    # Internal functions #
+    ######################
+
+    # Return: Nothing
+    def _connect(self):
+        self.tiltsensor = connect(self.ip, self.port, self.sensor_type)
+
+    ##################
+    # Main functions #
+    ##################
 
     def acq(self, session, params=None):
         """acq()
@@ -99,8 +112,25 @@ class WiregridTiltSensorAgent:
                 # data taking
                 current_time = time.time()
                 msg, angles = self.tiltsensor.get_angle()
-                if self.sensor_type == 'sherborne':
-                    msg, temperatures = self.tiltsensor.get_temp()
+                self.log.info(f'self.tiltsensor.get_angle(): {msg}')
+                if angles[0] == -999:
+                    msg = 'Failed to get angle. -> Reconnect to the sensor'
+                    self.log.warn(msg)
+                    del self.tiltsensor
+                    self._connect()
+                    self.pm.sleep()  # DAQ interval
+                    continue
+                # No implementation of `get_temp()` now and ignore the below lines
+                #if self.sensor_type == 'sherborne':
+                #    msg, temperatures = self.tiltsensor.get_temp()
+                #    self.log.info(f'self.tiltsensor.get_temp(): {msg}')
+                #    if temperatures[0] == -999:
+                #        msg = 'Failed to get temperature. -> Reconnect to the sensor'
+                #        self.log.warn(msg)
+                #        del self.tiltsensor
+                #        self._connect()
+                #        self.pm.sleep()  # DAQ interval
+                #        continue
 
                 tiltsensor_data['timestamp'] = current_time
                 tiltsensor_data['data']['angleX'] = angles[0]
@@ -171,7 +201,6 @@ class WiregridTiltSensorAgent:
 
         # True if task succeeds, False if not
         return True, 'Reset the tiltsensor'
-
 
 def make_parser(parser_in=None):
     if parser_in is None:
