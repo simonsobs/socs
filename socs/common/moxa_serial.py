@@ -1,5 +1,3 @@
-# 9/2025 Shun
-# Change all BaseExeption --> TimeoutError
 # 4/2009 BAS
 #  read() replicates behavior of pyserial
 #  readexactly() added, which is probably more useful
@@ -122,7 +120,7 @@ class Serial_TCPServer(object):
         self.settimeout(self.__timeout)
         return msg
 
-    def readbuf(self, n):
+    def readbuf(self, n, max_loop=10):
         """Returns whatever is currently in the buffer. Suitable for large
         buffers.
 
@@ -130,14 +128,19 @@ class Serial_TCPServer(object):
             n: Number of bytes to read.
 
         """
-        if n == 0:
-            return ''
-        try:
-            msg = self.sock.recv(n)
-        except (TimeoutError, BlockingIOError):
-            msg = ''
-        n2 = min(n - len(msg), (int)(n / 2))
-        return msg + self.readbuf(n2)
+        n_current = n
+        msg = ''
+        for i in range(max_loop):
+            if n_current <= 0:
+                return ''
+            try:
+                msg_current = self.sock.recv(n)
+            except (TimeoutError, BlockingIOError):
+                msg_current = ''
+            msg += msg_current
+            n_current -= len(msg_current)
+
+        return msg
 
     def readpacket(self, n):
         """Like ``read()``, but may not return everything if the moxa box
