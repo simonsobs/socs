@@ -132,7 +132,7 @@ class Serial_TCPServer(object):
         msg = ''
         for i in range(max_loop):
             if n_current <= 0:
-                return ''
+                return msg
             try:
                 msg_current = self.sock.recv(n)
             except (TimeoutError, BlockingIOError):
