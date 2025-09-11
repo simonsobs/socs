@@ -120,7 +120,8 @@ class WiregridTiltSensorAgent:
                     self._connect()
                     self.pm.sleep()  # DAQ interval
                     continue
-                # No implementation of `get_temp()` now and ignore the below lines
+                # the driver for sensor_type = 'sherborne' does NOT has
+                # the function of `get_temp()` now, so ignore the below lines
                 # if self.sensor_type == 'sherborne':
                 #    msg, temperatures = self.tiltsensor.get_temp()
                 #    self.log.info(f'self.tiltsensor.get_temp(): {msg}')
@@ -135,9 +136,9 @@ class WiregridTiltSensorAgent:
                 tiltsensor_data['timestamp'] = current_time
                 tiltsensor_data['data']['angleX'] = angles[0]
                 tiltsensor_data['data']['angleY'] = angles[1]
-                if self.sensor_type == 'sherborne':
-                    tiltsensor_data['data']['temperatureX'] = temperatures[0]
-                    tiltsensor_data['data']['temperatureY'] = temperatures[1]
+                # if self.sensor_type == 'sherborne':
+                #     tiltsensor_data['data']['temperatureX'] = temperatures[0]
+                #     tiltsensor_data['data']['temperatureY'] = temperatures[1]
 
                 self.agent.publish_to_feed('wgtiltsensor', tiltsensor_data)
 
