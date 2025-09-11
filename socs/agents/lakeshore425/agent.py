@@ -159,7 +159,7 @@ class LS425Agent:
                 except Exception:
                     self.log.error(
                         "Decive reports readiness to read but returned no data. "
-                        "Reconnect to PCU."
+                        "Reconnect to LS425."
                     )
                     self.dev.close()
                     self.dev = None
