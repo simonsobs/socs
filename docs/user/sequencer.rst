@@ -83,7 +83,7 @@ the backend database:
     to allow the backend to connect to the crossbar server. Your needs may differ
     depending on your network configuration. For details on an "ocs-net" like
     configuration see the `OCS Docs
-    <https://ocs.readthedocs.io/en/develop/user/docker_config.html#considerations-for-deployment>`_.
+    <https://ocs.readthedocs.io/en/main/user/docker_config.html#considerations-for-deployment>`_.
 
 .. note::
     Your site-config-file must point to the crossbar address as if from the
@@ -137,7 +137,7 @@ that config is:
     The entire point of the tool is remote code execution, making it dangerous
     if exposed to the open internet.
 
-Once you bring these containers up (with ``docker-compose up -d``), you should
+Once you bring these containers up (with ``docker compose up -d``), you should
 be able to access the Sequencer by pointing your web browser to
 http://localhost/nextline/.
 

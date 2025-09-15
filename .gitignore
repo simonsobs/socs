@@ -1,3 +1,6 @@
+# dynamic package version
+socs/_version.py
+
 # iPython Notebooks
 *.ipynb
 
@@ -137,3 +140,5 @@ key.*
 node.pid
 
 .DS_Store
+
+*.db

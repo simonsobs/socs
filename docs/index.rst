@@ -40,13 +40,23 @@ API Reference        Full API documentation for core parts of the SOCS library.
     agents/acu_agent
     agents/bluefors_agent
     agents/cryomech_cpa
+    agents/devantech_dS378
     agents/fts_agent
+    agents/generator
+    agents/hi6200
+    agents/http_camera
     agents/hwp_encoder
+    agents/hwp_gripper
+    agents/hwp_pcu
     agents/hwp_picoscope
-    agents/hwp_rotation_agent
+    agents/hwp_pid
+    agents/hwp_pmx
+    agents/hwp_supervisor_agent
     agents/holo_fpga
     agents/holo_synth
     agents/ibootbar
+    agents/ifm_sbn246_flowmeter
+    agents/kikusui_pcr500ma
     agents/labjack
     agents/lakeshore240
     agents/lakeshore336
@@ -54,23 +64,33 @@ API Reference        Full API documentation for core parts of the SOCS library.
     agents/lakeshore372
     agents/lakeshore425
     agents/latrt_xy_stage
+    agents/ld_monitor
     agents/magpie
     agents/meinberg_m1000_agent
+    agents/meinberg_syncbox_agent
+    agents/orientalmotor_blh
     agents/pfeiffer
     agents/pfeiffer_tc400
     agents/pysmurf-controller
     agents/pysmurf-monitor
+    agents/rtsp_camera
     agents/scpi_psu
     agents/smurf_crate_monitor
+    agents/smurf_timing_card
+    agents/srs_cg635
+    agents/stimulator_encoder
+    agents/stimulator_thermometer
     agents/suprsync
     agents/synacc
     agents/tektronix3021c
     agents/thorlabs_mc2000b
+    agents/ucsc_radiometer
     agents/ups
     agents/vantage_pro2
     agents/wiregrid_actuator
     agents/wiregrid_encoder
     agents/wiregrid_kikusui
+    agents/wiregrid_tiltsensor
 
 .. toctree::
     :caption: Simulator Reference
@@ -85,7 +105,8 @@ API Reference        Full API documentation for core parts of the SOCS library.
     :caption: Developer Guide
     :maxdepth: 2
 
-    developer/snmp
+    developer/interfaces/snmp
+    developer/interfaces/tcp
     developer/testing
 
 .. toctree::

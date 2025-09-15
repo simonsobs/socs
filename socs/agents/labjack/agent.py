@@ -133,7 +133,9 @@ class LabJackFunctions:
 
         # Import the Ohms to Celsius cal curve and apply cubic
         # interpolation to find the temperature
-        reader = csv.reader(open('cal_curves/GA10K4D25_cal_curve.txt'),
+        cal_curves = os.path.join(os.path.dirname(__file__),
+                                  'cal_curves/GA10K4D25_cal_curve.txt')
+        reader = csv.reader(open(cal_curves),
                             delimiter=' ')
         lists = [el for el in [row for row in reader]]
         T_cal = np.array([float(RT[0]) for RT in lists[1:]])
@@ -244,7 +246,6 @@ class LabJackAgent:
                               "{} is already running".format(self.lock.job))
                 return False, "Could not acquire lock."
 
-            session.set_status('starting')
             # Connect with the labjack
             self.handle = ljm.openS("ANY", "ANY", self.ip_address)
             info = ljm.getHandleInfo(self.handle)
@@ -276,6 +277,24 @@ class LabJackAgent:
             sampling_frequency (float):
                 Sampling frequency for data collection. Defaults to 2.5 Hz.
 
+        Notes:
+            An example of the session data is shown below. The keys in the
+            'data' dictionary correspond with configured channels from the
+            ``active_channels`` attribute::
+
+                >>> response.session['data']
+                {
+                  "block_name": "sens",
+                  "data": {
+                    "AIN0V": 0.0015984050696715713,
+                    "FIO0V": 1,
+                    "FIO1V": 1,
+                    "AIN55V": 0.00033546771737746894,
+                    "AIN116V": 0.000019733395674847998,
+                  },
+                  "timestamp": 1698439453.8471205
+                }
+
         """
         if params is None:
             params = {}
@@ -294,7 +313,6 @@ class LabJackAgent:
                               "{} is already running".format(self.lock.job))
                 return False, "Could not acquire lock."
 
-            session.set_status('running')
             self.take_data = True
 
             # Start the data stream. Use the scan rate returned by the stream,
@@ -422,7 +440,6 @@ class LabJackAgent:
                               "{} is already running".format(self.lock.job))
                 return False, "Could not acquire lock."
 
-            session.set_status('running')
             self.take_data = True
 
             while self.take_data:

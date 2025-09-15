@@ -149,7 +149,7 @@ class G3FrameGenerator:
     """
 
     def __init__(self, stream_id, sample_rate, tune,
-                 action=None, action_time=None):
+                 action=None, action_time=None, quantize=True, drop_chance=0):
         self.frame_num = 0
         self.sample_num = 0
         self.session_id = int(time.time())
@@ -159,6 +159,8 @@ class G3FrameGenerator:
         self.stream_id = stream_id
         self.action = action
         self.action_time = action_time
+        self.quantize = quantize
+        self.drop_chance = drop_chance
 
     def tag_frame(self, fr):
         fr['frame_num'] = self.frame_num
@@ -181,12 +183,15 @@ class G3FrameGenerator:
         self.tag_frame(fr)
         return fr
 
-    def get_status_frame(self):
+    def get_status_frame(self, tag=''):
         fr = core.G3Frame(core.G3FrameType.Wiring)
         s = get_smurf_status()
 
         tune_key = 'AMCc.FpgaTopLevel.AppTop.AppCore.SysgenCryo.tuneFilePath'
         s[tune_key] = self.tune.tune_path
+
+        tag_key = 'AMCc.SmurfProcessor.SOStream.stream_tag'
+        s[tag_key] = tag
 
         m = self.tune.channels != -1
         chmask = self.tune.channels[m] + self.tune.bands[m] * CHANS_PER_BAND
@@ -206,8 +211,18 @@ class G3FrameGenerator:
         return fr
 
     def get_data_frame(self, start, stop):
+        if self.quantize:
+            # When "quantized", this clamps (start) and (stop) to integers so
+            # timestamps created by np.arange are lined up when there's an
+            # integer sample rate
+            t0, t1 = int(start) - 1, int(stop) + 1
+            nsamp = int((t1 - t0) * self.sample_rate)
+            times = np.linspace(t0, t1, nsamp + 1, endpoint=True)
+            m = (start <= times) & (times < stop)
+            times = times[m]
+        else:
+            times = np.arange(start, stop, 1. / self.sample_rate)
 
-        times = np.arange(start, stop, 1. / self.sample_rate)
         nsamps = len(times)
         frame_counter = np.arange(self.sample_num, self.sample_num + nsamps, dtype=int)
         self.sample_num += nsamps
@@ -219,6 +234,13 @@ class G3FrameGenerator:
         data += count_per_phi0 * chans[:, None]
         data += (count_per_phi0 * 0.2 * np.sin(2 * np.pi * 8 * times)).astype(int)
         data += (count_per_phi0 * np.random.normal(0, 0.03, (self.nchans, nsamps))).astype(int)
+
+        # Toss samples based on drop_chance
+        m = self.drop_chance < np.random.uniform(0, 1, len(times))
+        times = times[m]
+        frame_counter = frame_counter[m]
+        data = data[:, m]
+        nsamps = len(times)
 
         fr = core.G3Frame(core.G3FrameType.Scan)
 
@@ -247,9 +269,12 @@ class DataStreamer:
     """
 
     def __init__(self, stream_id, sample_rate, tune, timestreamdir,
-                 file_duration, frame_len, action=None, action_time=None):
+                 file_duration, frame_len, action=None, action_time=None, drop_chance=0,
+                 tag=''):
         self.frame_gen = G3FrameGenerator(stream_id, sample_rate, tune,
-                                          action=action, action_time=action_time)
+                                          action=action, action_time=action_time,
+                                          drop_chance=drop_chance)
+
         self.session_id = self.frame_gen.session_id
         self.stream_id = stream_id
         self.timestreamdir = timestreamdir
@@ -259,6 +284,8 @@ class DataStreamer:
         self.writer = None
         self.file_list = []
         self.frame_len = frame_len
+        self.tag = tag
+        self._last_stop = None
 
     def _get_g3_filename(self):
         """
@@ -281,7 +308,7 @@ class DataStreamer:
         self.writer = core.G3Writer(fname)
         if self.seq == 0:
             self.writer(self.frame_gen.get_obs_start_frame())
-            self.writer(self.frame_gen.get_status_frame())
+            self.writer(self.frame_gen.get_status_frame(tag=self.tag))
         self.file_start = time.time()
         self.file_list.append(fname)
         self.seq += 1
@@ -300,11 +327,16 @@ class DataStreamer:
         current file start time and the file duration. This sleep wait
         for the frame-duration before writing the G3Frame to disk.
         """
-        start = time.time()
+        if self._last_stop is None:
+            start = time.time()
+        else:
+            start = self._last_stop
+
         if (start - self.file_start > self.file_duration) or (self.writer is None):
             self._new_file()
         time.sleep(self.frame_len)
         stop = time.time()
+        self._last_stop = stop
         self.writer(self.frame_gen.get_data_frame(start, stop))
 
     def stream_between(self, start, stop, wait=False):
@@ -338,7 +370,7 @@ class DataStreamer:
                 now = time.time()
                 if now < t1:
                     time.sleep(t1 - now)
-            self.writer(self.frame_gen.get_data_frame(start, stop))
+            self.writer(self.frame_gen.get_data_frame(t0, t1))
         self.end_file()
 
 
@@ -360,15 +392,17 @@ class SmurfFileEmulator:
         self.nchans = args.nchans
         self.sample_rate = args.sample_rate
         self.frame_len = args.frame_len
+        self.drop_chance = args.drop_chance
 
         self.streaming = False
         self.tune = None
 
-    def _new_streamer(self, action=None, action_time=None):
+    def _new_streamer(self, action=None, action_time=None, tag=''):
         return DataStreamer(
             self.stream_id, self.sample_rate, self.tune, self.timestreamdir,
             self.file_duration, self.frame_len,
-            action=action, action_time=action_time,
+            action=action, action_time=action_time, drop_chance=self.drop_chance,
+            tag=tag
         )
 
     def _get_action_dir(self, action, action_time=None, is_plot=False):
@@ -455,14 +489,16 @@ class SmurfFileEmulator:
         self._write_smurf_file(fname, action, action_time=action_time, prepend_ctime=False)
 
         # Short g3 stream
-        streamer = self._new_streamer(action=action, action_time=action_time)
+        streamer = self._new_streamer(action=action, action_time=action_time,
+                                      tag='oper,noise')
         now = time.time()
         streamer.stream_between(now, now + 30, wait=False)
         if session is not None:
             session.data['noise_file'] = streamer.file_list[0]
 
+    @ocs_agent.param('sleep', default=True)
     def uxm_setup(self, session, params):
-        """uxm_setup(test_mode=False)
+        """uxm_setup(sleep=True)
 
         **Task** - Emulates files that might come from a general tune dets
         function. These are some of the files found on simons1 registered when
@@ -472,21 +508,38 @@ class SmurfFileEmulator:
              2. setup_notches
              3. tracking_setup
              4. short g3 stream
+
+        Parameters:
+            sleep (bool, optional):
+                If True, will sleep for 1 sec after creating the tunefile,
+                which is required for preventing filename collisions in
+                end-to-end testing.
         """
         self._run_setup(action='uxm_setup', action_time=time.time(),
                         session=session)
-        time.sleep(1)
+        if params.get('sleep', True):
+            time.sleep(1)
         return True, "Wrote tune files"
 
+    @ocs_agent.param('tag', default=None)
     def take_noise(self, session, params=None):
-        """take_noise()
+        """take_noise(tag=None)
 
         **Task** - Takes a short noise timestream
+
+        Parameters:
+            tag (str, optional):
+                User tag to add to the g3 stream.
         """
         action = 'take_noise'
         action_time = time.time()
 
-        streamer = self._new_streamer(action=action, action_time=action_time)
+        tag = 'oper,noise'
+        if params.get('tag') is not None:
+            tag += f',{params["tag"]}'
+
+        streamer = self._new_streamer(action=action, action_time=action_time,
+                                      tag=tag)
         now = time.time()
         streamer.stream_between(now, now + 30, wait=False)
         session.data['noise_file'] = streamer.file_list[0]
@@ -505,16 +558,33 @@ class SmurfFileEmulator:
         return True, "Wrote tune files"
 
     @ocs_agent.param('wait', default=True)
+    @ocs_agent.param('kwargs', default=None)
+    @ocs_agent.param('tag', default=None)
     def take_iv(self, session, params=None):
-        """take_iv()
+        """take_iv(wait=True, tag=None)
 
         **Task** - Creates files generated associated with iv taking / analysis
+
+        Parameters:
+            wait (bool, optional):
+                If true, will wait for the 5 seconds where fake IV data is
+                generated
+            kwargs : dict
+                Additional kwargs to pass to the ``take_iv`` function.
+                Ignored in the emulator.
+            tag (str, optional):
+                User tag to add to the g3 stream.
         """
         action = 'take_iv'
         action_time = time.time()
         files = ['iv_analyze.npy', 'iv_bias_all.npy', 'iv_info.npy']
 
-        streamer = self._new_streamer(action=action, action_time=action_time)
+        tag = 'oper,iv'
+        if params.get('tag') is not None:
+            tag += f',{params["tag"]}'
+
+        streamer = self._new_streamer(action=action, action_time=action_time,
+                                      tag=tag)
         now = time.time()
         streamer.stream_between(now, now + 5, wait=params['wait'])
 
@@ -524,16 +594,29 @@ class SmurfFileEmulator:
         return True, "Wrote IV files"
 
     @ocs_agent.param('wait', default=True)
+    @ocs_agent.param('tag', default=None)
     def take_bias_steps(self, session, params=None):
-        """take_bias_steps()
+        """take_bias_steps(wait=True, tag=None)
 
         **Task** - Creates files associated with taking bias steps
+
+        Parameters:
+            wait (bool, optional):
+                If true, will wait for the 5 seconds where fake data is
+                generated
+            tag (str, optional):
+                User tag to add to the g3 stream.
         """
         action = 'take_bias_steps'
         action_time = time.time()
         files = ['bias_step_analysis.npy']
 
-        streamer = self._new_streamer(action=action, action_time=action_time)
+        tag = 'oper,bias_steps'
+        if params.get('tag') is not None:
+            tag += f',{params["tag"]}'
+
+        streamer = self._new_streamer(action=action, action_time=action_time,
+                                      tag=tag)
         now = time.time()
         streamer.stream_between(now, now + 5, wait=params['wait'])
 
@@ -543,15 +626,28 @@ class SmurfFileEmulator:
         return True, "Wrote Bias Step Files"
 
     @ocs_agent.param('wait', default=True)
+    @ocs_agent.param('tag', default=None)
     def take_bgmap(self, session, params=None):
-        """take_bgmap()
+        """take_bgmap(wait=True, tag=None)
 
         **Task** - Creates files associated with taking a bias group mapping.
+
+        Parameters:
+            wait (bool, optional):
+                If true, will wait for the 5 seconds where fake data is
+                generated
+            tag (str, optional):
+                User tag to add to the g3 stream.
         """
         action = 'take_bgmap'
         action_time = time.time()
 
-        streamer = self._new_streamer(action=action, action_time=action_time)
+        tag = 'oper,bgmap'
+        if params.get('tag') is not None:
+            tag += f',{params["tag"]}'
+
+        streamer = self._new_streamer(action=action, action_time=action_time,
+                                      tag=tag)
         now = time.time()
         streamer.stream_between(now, now + 5, wait=params['wait'])
 
@@ -570,8 +666,13 @@ class SmurfFileEmulator:
         return True, 'Wrote det biasing files'
 
     @ocs_agent.param('duration', default=None)
+    @ocs_agent.param('kwargs', default=None)
+    @ocs_agent.param('use_stream_between', default=False, type=bool)
+    @ocs_agent.param('start_offset', default=0, type=float)
+    @ocs_agent.param('subtype', default=None)
+    @ocs_agent.param('tag', default=None)
     def stream(self, session, params):
-        """stream(duration=None)
+        """stream(duration=None, use_stream_between=False, start_offset=0, tag=None)
 
         **Process** - Generates example fake-files organized in the same way as
         they would be a regular smurf-stream. For end-to-end testing, we want
@@ -583,8 +684,22 @@ class SmurfFileEmulator:
         Parameters:
             duration (float, optional):
                 If set, will stop stream after specified amount of time (sec).
+            kwargs : dict
+                A dictionary containing additional keyword arguments to pass.
+                Ignored by the emulator.
+            use_stream_between (bool, optional):
+                If True, will use the DataStreamer's `stream_between` function
+                instead of writing frames one at a time. This allows you to write
+                an entire timestream for the specified duration without waiting.
+            start_offset (float, optional):
+                If set, this will add an offset to the start time passed to the
+                `stream_between` function, allowing you to create offsets between
+                streams taken at the same time.
+            subtype : string, optional
+                Operation subtype used to tag the stream. Ignored by the emulator.
+            tag (str, optional):
+                User tag to add to the g3 stream.
         """
-        session.set_status('starting')
 
         if self.tune is None:
             raise ValueError("No tune loaded!")
@@ -600,14 +715,22 @@ class SmurfFileEmulator:
         for f in files:
             self._write_smurf_file(f, action, action_time=action_time)
 
+        start_time = time.time() + params['start_offset']
         end_time = None
         if params.get('duration') is not None:
-            end_time = time.time() + params['duration']
+            end_time = start_time + params['duration']
 
-        session.set_status('running')
-        streamer = self._new_streamer(action=action, action_time=action_time)
+        tag = 'obs,cmb'
+        if params.get('tag') is not None:
+            tag += f',{params["tag"]}'
+
+        streamer = self._new_streamer(action=action, action_time=action_time, tag='obs,cmb')
         session.data['session_id'] = streamer.session_id
         session.data['g3_files'] = streamer.file_list
+
+        if params['use_stream_between']:
+            streamer.stream_between(start_time, end_time)
+            return True, "Finished Stream"
 
         self.streaming = True
         while self.streaming:
@@ -648,6 +771,8 @@ def make_parser(parser=None):
                         help="Sample rate for streaming data")
     pgroup.add_argument('--frame-len', default=2, type=float,
                         help="Time per G3 data frame (seconds)")
+    pgroup.add_argument('--drop-chance', default=0, type=float,
+                        help="Fractional chance to drop samples")
 
     return parser
 

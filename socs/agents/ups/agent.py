@@ -1,5 +1,6 @@
 import argparse
 import os
+import signal
 import time
 
 import txaio
@@ -64,7 +65,7 @@ def _extract_oid_field_and_value(get_result):
     return field_name, oid_value, oid_description
 
 
-def _build_message(get_result, time):
+def _build_message(get_result, time, blockname):
     """Build the message for publication on an OCS Feed.
 
     Parameters
@@ -80,7 +81,7 @@ def _build_message(get_result, time):
         OCS Feed formatted message for publishing
     """
     message = {
-        'block_name': 'ups',
+        'block_name': blockname,
         'timestamp': time,
         'data': {}
     }
@@ -106,10 +107,13 @@ def update_cache(get_result, timestamp):
     The cache consists of a dictionary, with the unique OIDs as keys, and
     another dictionary as the value. Each of these nested dictionaries contains the
     OID values, name, and description (decoded string). An example for a single OID::
+
         {"upsBatteryStatus":
             {"status": 2,
                 "description": "batteryNormal"}}
+
     Additionally there is connection status and timestamp information under::
+
         {"ups_connection":
             {"last_attempt": 1598543359.6326838,
             "connected": True}
@@ -123,24 +127,23 @@ def update_cache(get_result, timestamp):
         Timestamp for when the SNMP GET was issued.
     """
     oid_cache = {}
-    try:
-        for item in get_result:
-            field_name, oid_value, oid_description = _extract_oid_field_and_value(item)
-            if oid_value is None:
-                continue
-
-            # Update OID Cache for session.data
-            oid_cache[field_name] = {"status": oid_value}
-            oid_cache[field_name]["description"] = oid_description
-            oid_cache['ups_connection'] = {'last_attempt': time.time(),
-                                           'connected': True}
-            oid_cache['timestamp'] = timestamp
-    # This is a TypeError due to nothing coming back from the yield,
-    # so get_result is None here and can't be iterated.
-    except TypeError:
+    # Return disconnected if SNMP response is empty
+    if get_result is None:
         oid_cache['ups_connection'] = {'last_attempt': time.time(),
                                        'connected': False}
-        raise ConnectionError('No SNMP response. Check your connection.')
+        return oid_cache
+
+    for item in get_result:
+        field_name, oid_value, oid_description = _extract_oid_field_and_value(item)
+        if oid_value is None:
+            continue
+
+        # Update OID Cache for session.data
+        oid_cache[field_name] = {"status": oid_value}
+        oid_cache[field_name]["description"] = oid_description
+        oid_cache['ups_connection'] = {'last_attempt': time.time(),
+                                       'connected': True}
+        oid_cache['timestamp'] = timestamp
 
     return oid_cache
 
@@ -170,7 +173,7 @@ class UPSAgent:
         txaio logger object, created by the OCSAgent
     """
 
-    def __init__(self, agent, address, port=161, version=1):
+    def __init__(self, agent, address, port=161, version=1, restart_time=0):
         self.agent = agent
         self.is_streaming = False
         self.log = self.agent.log
@@ -179,6 +182,8 @@ class UPSAgent:
         self.log.info(f'Using SNMP version {version}.')
         self.version = version
         self.snmp = SNMPTwister(address, port)
+        self.connected = True
+        self.restart = restart_time
 
         self.lastGet = 0
 
@@ -304,14 +309,22 @@ class UPSAgent:
         """
 
         self.is_streaming = True
+        timeout = time.time() + 60 * self.restart  # exit loop after self.restart minutes
         while self.is_streaming:
+            if ((self.restart != 0) and (time.time() > timeout)):
+                break
             yield dsleep(1)
+            if not self.connected:
+                self.log.error('No SNMP response. Check your connection.')
+                self.log.info('Trying to reconnect.')
+
             read_time = time.time()
 
             # Check if 60 seconds has passed before getting status
             if (read_time - self.lastGet) < 60:
                 continue
 
+            main_get_list = []
             get_list = []
 
             # Create the list of OIDs to send get commands
@@ -327,7 +340,14 @@ class UPSAgent:
                     'upsOutputSource']
 
             for oid in oids:
+                main_get_list.append(('UPS-MIB', oid, 0))
                 get_list.append(('UPS-MIB', oid, 0))
+
+            ups_get_result = yield self.snmp.get(get_list, self.version)
+            if ups_get_result is None:
+                self.connected = False
+                continue
+            self.connected = True
 
             # Append input OIDs to GET list
             input_oids = ['upsInputVoltage',
@@ -335,13 +355,21 @@ class UPSAgent:
                           'upsInputTruePower']
 
             # Use number of input lines used to append correct number of input OIDs
-            num_lines = [('UPS-MIB', 'upsInputNumLines', 0)]
-            num_res = yield self.snmp.get(num_lines, self.version)
-            if num_res is not None:
-                inputs = num_res[0][1]._value
-                for i in range(inputs):
-                    for oid in input_oids:
-                        get_list.append(('UPS-MIB', oid, i + 1))
+            input_num_lines = [('UPS-MIB', 'upsInputNumLines', 0)]
+            num_res = yield self.snmp.get(input_num_lines, self.version)
+            if num_res is None:
+                self.connected = False
+                continue
+            self.connected = True
+            input_get_results = []
+            inputs = num_res[0][1]._value
+            for i in range(inputs):
+                get_list = []
+                for oid in input_oids:
+                    main_get_list.append(('UPS-MIB', oid, i + 1))
+                    get_list.append(('UPS-MIB', oid, i + 1))
+                input_get_result = yield self.snmp.get(get_list, self.version)
+                input_get_results.append(input_get_result)
 
             # Append output OIDs to GET list
             output_oids = ['upsOutputVoltage',
@@ -350,28 +378,56 @@ class UPSAgent:
                            'upsOutputPercentLoad']
 
             # Use number of output lines used to append correct number of output OIDs
-            num_lines = [('UPS-MIB', 'upsOutputNumLines', 0)]
-            num_res = yield self.snmp.get(num_lines, self.version)
-            if num_res is not None:
-                outputs = num_res[0][1]._value
-                for i in range(outputs):
-                    for oid in output_oids:
-                        get_list.append(('UPS-MIB', oid, i + 1))
+            output_num_lines = [('UPS-MIB', 'upsOutputNumLines', 0)]
+            num_res = yield self.snmp.get(output_num_lines, self.version)
+            if num_res is None:
+                self.connected = False
+                continue
+            self.connected = True
+            output_get_results = []
+            outputs = num_res[0][1]._value
+            for i in range(outputs):
+                get_list = []
+                for oid in output_oids:
+                    main_get_list.append(('UPS-MIB', oid, i + 1))
+                    get_list.append(('UPS-MIB', oid, i + 1))
+                output_get_result = yield self.snmp.get(get_list, self.version)
+                output_get_results.append(output_get_result)
 
             # Issue SNMP GET command
-            get_result = yield self.snmp.get(get_list, self.version)
+            get_result = yield self.snmp.get(main_get_list, self.version)
+            if get_result is None:
+                self.connected = False
+                continue
+            self.connected = True
 
             # Do not publish if UPS connection has dropped
             try:
                 # Update session.data
                 session.data = update_cache(get_result, read_time)
                 self.log.debug("{data}", data=session.data)
-                self.lastGet = time.time()
 
+                if not self.connected:
+                    raise ConnectionError('No SNMP response. Check your connection.')
+
+                self.lastGet = time.time()
                 # Publish to feed
-                message = _build_message(get_result, read_time)
-                self.log.debug("{msg}", msg=message)
-                session.app.publish_to_feed('ups', message)
+                if ups_get_result is not None:
+                    message = _build_message(ups_get_result, read_time, 'ups')
+                    self.log.debug("{msg}", msg=message)
+                    session.app.publish_to_feed('ups', message)
+                for i, result in enumerate(input_get_results):
+                    if result is not None:
+                        blockname = f'input_{i}'
+                        message = _build_message(result, read_time, blockname)
+                        self.log.debug("{msg}", msg=message)
+                        session.app.publish_to_feed('ups', message)
+                for i, result in enumerate(output_get_results):
+                    if result is not None:
+                        blockname = f'output_{i}'
+                        message = _build_message(result, read_time, blockname)
+                        self.log.debug("{msg}", msg=message)
+                        session.app.publish_to_feed('ups', message)
             except ConnectionError as e:
                 self.log.error(f'{e}')
                 yield dsleep(1)
@@ -380,14 +436,24 @@ class UPSAgent:
             if params['test_mode']:
                 break
 
+        # Exit agent to release memory
+        # Add "restart: unless-stopped" to docker compose to automatically restart container
+        if ((not params['test_mode']) and (timeout != 0) and (self.is_streaming)):
+            self.log.info(f"{self.restart} minutes have elasped. Exiting agent.")
+            os.kill(os.getppid(), signal.SIGTERM)
+
         return True, "Finished Recording"
 
     def _stop_acq(self, session, params=None):
         """_stop_acq()
         **Task** - Stop task associated with acq process.
         """
-        self.is_streaming = False
-        return True, "Stopping Recording"
+        if self.is_streaming:
+            session.set_status('stopping')
+            self.is_streaming = False
+            return True, "Stopping Recording"
+        else:
+            return False, "Acq is not currently running"
 
 
 def add_agent_args(parser=None):
@@ -405,6 +471,8 @@ def add_agent_args(parser=None):
     pgroup.add_argument("--snmp-version", default='1', choices=['1', '2', '3'],
                         help="SNMP version for communication. Must match "
                              + "configuration on the UPS.")
+    pgroup.add_argument("--restart-time", default=0,
+                        help="Number of minutes before restarting agent.")
     pgroup.add_argument("--mode", choices=['acq', 'test'])
 
     return parser
@@ -428,7 +496,8 @@ def main(args=None):
     p = UPSAgent(agent,
                  address=args.address,
                  port=int(args.port),
-                 version=int(args.snmp_version))
+                 version=int(args.snmp_version),
+                 restart_time=int(args.restart_time))
 
     agent.register_process("acq",
                            p.acq,

@@ -114,8 +114,6 @@ class WiregridEncoderAgent:
                     .format(self.lock.job))
                 return False, 'Could not acquire lock.'
 
-            session.set_status('running')
-
             self.take_data = True
             # Initialize data containers
             session.data = {'fields': {'irig_data': {}, 'encoder_data': {},
@@ -136,13 +134,8 @@ class WiregridEncoderAgent:
             irig_last_updated = 0
             irig_fdata = {'timestamps': [],
                           'block_name': 'wgencoder_irig_raw',
-                          'data': {
-                              'quadrature': [],
-                              'pru_clock': [],
-                              'reference_degree': [],
-                              'error': []
-            }
-            }
+                          'data': {}
+                          }
             enc_rdata = {
                 'timestamps': [],
                 'block_name': 'wgencoder_rough',
@@ -180,6 +173,7 @@ class WiregridEncoderAgent:
                     synch_pulse_clock_counts = irig_data[3]
                     sys_time = irig_data[4]
 
+                    irig_rdata['timestamp'] = sys_time
                     irig_rdata['data']['irig_time'] = irig_time
                     irig_rdata['data']['rising_edge_count'] = rising_edge_count
                     irig_rdata['data']['edge_diff']\
@@ -316,7 +310,7 @@ class WiregridEncoderAgent:
                 }
                 session.data['timestamp'] = current_time
                 session.data['fields']['irig_data'] = irig_field_dict
-                session.data['fields']['enc_data'] = enc_field_dict
+                session.data['fields']['encoder_data'] = enc_field_dict
                 # End of loop
             # End of lock acquiring
 
