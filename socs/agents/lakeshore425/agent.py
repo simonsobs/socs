@@ -135,28 +135,15 @@ class LS425Agent:
                         )
                         time.sleep(30)
                         continue
+                if time.time() - last_release > 1.:
+                    last_release = time.time()
+                    if not self.lock.release_and_acquire(timeout=10):
+                        self.log.warn(f"Failed to re-acquire lock, currently held by {self.lock.job}.")
+                        continue
+
                 try:
-                    if time.time() - last_release > 1.:
-                        last_release = time.time()
-                        if not self.lock.release_and_acquire(timeout=10):
-                            self.log.warn(f"Failed to re-acquire lock, currently held by {self.lock.job}.")
-                            continue
-
                     Bfield = self.dev.get_field()
-                    current_time = time.time()
-                    data = {
-                        'timestamp': current_time,
-                        'block_name': 'mag_field',
-                        'data': {'Bfield': Bfield}
-                    }
-
-                    self.agent.publish_to_feed('mag_field', data)
-                    session.data.update({'timestamp': current_time})
-                    self.agent.feeds['mag_field'].flush_buffer()
-
-                    session.degraded = False
-                    time.sleep(sleep_time)
-                except Exception:
+                except serial.serialutil.SerialException:
                     self.log.error(
                         "Decive reports readiness to read but returned no data. "
                         "Reconnect to LS425."
@@ -164,6 +151,28 @@ class LS425Agent:
                     self.dev.close()
                     self.dev = None
                     session.degraded = True
+                    continue
+                except Exception as e:
+                    self.log.error(f"Caught unexpected {type(e).__name__} during get_field:")
+                    self.log.error(f"  {e}")
+                    self.dev.close()
+                    self.dev = None
+                    session.degraded = True
+                    continue
+
+                current_time = time.time()
+                data = {
+                    'timestamp': current_time,
+                    'block_name': 'mag_field',
+                    'data': {'Bfield': Bfield}
+                }
+
+                self.agent.publish_to_feed('mag_field', data)
+                session.data.update({'timestamp': current_time})
+                self.agent.feeds['mag_field'].flush_buffer()
+
+                session.degraded = False
+                time.sleep(sleep_time)
 
         return True, 'Acquisition exited cleanly.'
 
