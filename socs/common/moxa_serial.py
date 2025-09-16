@@ -87,7 +87,7 @@ class Serial_TCPServer(object):
             self.settimeout(newtimeout)
             try:
                 msg = self.sock.recv(n, socket.MSG_PEEK)
-            except BaseException:
+            except (TimeoutError, BlockingIOError):
                 pass
         # Flush the message out if you got everything
         if len(msg) == n:
@@ -114,13 +114,13 @@ class Serial_TCPServer(object):
         try:
             for i in range(n):
                 msg += self.sock.recv(1)
-        except BaseException:
+        except (TimeoutError, BlockingIOError):
             pass
         self.sock.setblocking(1)  # belt and suspenders
         self.settimeout(self.__timeout)
         return msg
 
-    def readbuf(self, n):
+    def readbuf(self, n, max_loop=10):
         """Returns whatever is currently in the buffer. Suitable for large
         buffers.
 
@@ -128,14 +128,19 @@ class Serial_TCPServer(object):
             n: Number of bytes to read.
 
         """
-        if n == 0:
-            return ''
-        try:
-            msg = self.sock.recv(n)
-        except BaseException:
-            msg = ''
-        n2 = min(n - len(msg), n / 2)
-        return msg + self.readbuf(n2)
+        n_current = n
+        msg = ''
+        for i in range(max_loop):
+            if n_current <= 0:
+                return msg
+            try:
+                msg_current = self.sock.recv(n)
+            except (TimeoutError, BlockingIOError):
+                msg_current = ''
+            msg += msg_current
+            n_current -= len(msg_current)
+
+        return msg
 
     def readpacket(self, n):
         """Like ``read()``, but may not return everything if the moxa box
@@ -147,7 +152,7 @@ class Serial_TCPServer(object):
         """
         try:
             msg = self.sock.recv(n)
-        except BaseException:
+        except (TimeoutError, BlockingIOError):
             msg = ''
         return msg
 
@@ -221,7 +226,7 @@ class Serial_TCPServer(object):
         try:
             while len(self.sock.recv(1)) > 0:
                 pass
-        except BaseException:
+        except (TimeoutError, BlockingIOError):
             pass
         self.sock.setblocking(1)
         self.sock.settimeout(self.__timeout)
