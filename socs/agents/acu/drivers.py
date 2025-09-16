@@ -266,6 +266,7 @@ def timecode(acutime, now=None):
     comptime = gyear + sec_of_day
     return comptime
 
+
 def _get_target_az(current_az, current_t, increasing, az_endpoint1, az_endpoint2, az_speed, az_drift):
     # Return the next endpoint azimuth, based on current (az, t)
     # and whether to move in +ve or -ve az direction.
@@ -492,17 +493,17 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
 
 
 def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
-                                    acc, el_endpoint1, el_endpoint2,
-                                    el_freq=.15,
-                                    num_batches=None,
-                                    num_scans=None,
-                                    start_time=None,
-                                    wait_to_start=10.,
-                                    step_time=1.,
-                                    batch_size=500,
-                                    az_start='mid_inc',
-                                    az_first_pos=None,
-                                    az_drift=None):
+                        acc, el_endpoint1, el_endpoint2,
+                        el_freq=.15,
+                        num_batches=None,
+                        num_scans=None,
+                        start_time=None,
+                        wait_to_start=10.,
+                        step_time=1.,
+                        batch_size=500,
+                        az_start='mid_inc',
+                        az_first_pos=None,
+                        az_drift=None):
     """Python generator to produce times, azimuth and elevation positions,
     azimuth and elevation velocities, azimuth and elevation flags for
     arbitrarily long type 3 scan.
@@ -552,23 +553,22 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
 
     """
     def get_scan_time(az0, az1, az_speed, az_cent):
-        upper = -1*np.cos(np.deg2rad(az1 - az_cent))
-        lower = -1*np.cos(np.deg2rad(az0 - az_cent))
+        upper = -1 * np.cos(np.deg2rad(az1 - az_cent))
+        lower = -1 * np.cos(np.deg2rad(az0 - az_cent))
 
-        return abs(upper - lower)/np.deg2rad(az_speed)
+        return abs(upper - lower) / np.deg2rad(az_speed)
 
     if az_endpoint1 == az_endpoint2:
         raise ValueError('Generator requires two different az endpoints!')
 
     if az_drift is not None:
-        raise ValueError ("Az drift not supported for type 2 or 3 scans!")
-
+        raise ValueError("Az drift not supported for type 2 or 3 scans!")
 
     if abs(az_endpoint1 - az_endpoint2) > 140:
         raise ValueError("Type 2 and 3 scans must have a throw less than or equal to 70 degrees")
 
     # Get center of az range
-    az_cent = (az_endpoint1 + az_endpoint1)/2. - 90
+    az_cent = (az_endpoint1 + az_endpoint1) / 2. - 90
 
     # Get el throw
     el_throw = abs(el_endpoint2 - el_endpoint1)
@@ -605,23 +605,23 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
     else:
         t0 = start_time
 
-    vel_0 = az_speed/np.sin(np.deg2rad(az_endpoint1 - az_cent))
-    vel_1 = az_speed/np.sin(np.deg2rad(az_endpoint2 - az_cent))
-    min_tt = {1:(0.85 * abs(vel_0) / 9 * 11.616)**.5, -1:(0.85 * abs(vel_1) / 9 * 11.616)**.5}
-    tt = {1: max(2*vel_0/acc, min_tt[1]), -1: max(2*vel_1/acc, min_tt[-1])}
+    vel_0 = az_speed / np.sin(np.deg2rad(az_endpoint1 - az_cent))
+    vel_1 = az_speed / np.sin(np.deg2rad(az_endpoint2 - az_cent))
+    min_tt = {1: (0.85 * abs(vel_0) / 9 * 11.616)**.5, -1: (0.85 * abs(vel_1) / 9 * 11.616)**.5}
+    tt = {1: max(2 * vel_0 / acc, min_tt[1]), -1: max(2 * vel_1 / acc, min_tt[-1])}
     t = 0
     el = el_endpoint1
     if step_time < 0.05:
         raise ValueError('Time step size too small, must be at least '
                          '0.05 seconds')
-    el_vel = el_throw*el_freq*2*np.pi*np.cos(t*el_freq*2*np.pi)
+    el_vel = el_throw * el_freq * 2 * np.pi * np.cos(t * el_freq * 2 * np.pi)
     az_flag = 0
     el_flag = 0
     if num_batches is None:
         stop_iter = float('inf')
     else:
         stop_iter = num_batches
-        batch_size = int(np.ceil(get_scan_time(az_endpoint1, az_endpoint2, az_speed, az_cent)/step_time))
+        batch_size = int(np.ceil(get_scan_time(az_endpoint1, az_endpoint2, az_speed, az_cent) / step_time))
 
     def dec_num_scans():
         nonlocal num_scans
@@ -631,7 +631,7 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
     def check_num_scans():
         return num_scans is None or num_scans > 0
 
-    target_az = _get_target_az(az, t, increasing, az_endpoint1, az_endpoint2, az_speed/np.sin(np.deg2rad(az - az_cent)), az_drift)
+    target_az = _get_target_az(az, t, increasing, az_endpoint1, az_endpoint2, az_speed / np.sin(np.deg2rad(az - az_cent)), az_drift)
     point_group_batch = 0
 
     i = 0
@@ -641,7 +641,7 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
         for j in range(batch_size):
             point_block.append(TrackPoint(
                 timestamp=t + t0,
-                az=az, el=el, az_vel=az_vel/np.sin(np.deg2rad(az - az_cent)), el_vel=el_vel,
+                az=az, el=el, az_vel=az_vel / np.sin(np.deg2rad(az - az_cent)), el_vel=el_vel,
                 az_flag=az_flag, el_flag=el_flag,
                 group_flag=int(point_group_batch > 0)))
 
@@ -649,23 +649,23 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
                 point_group_batch -= 1
 
             if increasing:
-                if get_scan_time(az, target_az, az_speed, az_cent) > 2*step_time:
+                if get_scan_time(az, target_az, az_speed, az_cent) > 2 * step_time:
                     t += step_time
-                    az += step_time*az_speed/np.sin(np.deg2rad(az - az_cent))
-                    el = el_endpoint1 + el_throw*np.sin(t*el_freq*2*np.pi)
+                    az += step_time * az_speed / np.sin(np.deg2rad(az - az_cent))
+                    el = el_endpoint1 + el_throw * np.sin(t * el_freq * 2 * np.pi)
                     az_vel = az_speed
-                    el_vel = el_throw*el_freq*2*np.pi*np.cos(t*el_freq*2*np.pi)
+                    el_vel = el_throw * el_freq * 2 * np.pi * np.cos(t * el_freq * 2 * np.pi)
                     az_flag = 1
                     el_flag = 0
                 elif az == target_az:
                     # Turn around.
-                    t += tt[1] 
+                    t += tt[1]
                     az_vel = -1 * az_speed
-                    el_vel = 0 
+                    el_vel = 0
                     az_flag = 1
                     el_flag = 0
                     increasing = False
-                    target_az = _get_target_az(az, t, increasing, az_endpoint1, az_endpoint2, az_speed/np.sin(np.deg2rad(az - az_cent)), az_drift)
+                    target_az = _get_target_az(az, t, increasing, az_endpoint1, az_endpoint2, az_speed / np.sin(np.deg2rad(az - az_cent)), az_drift)
                     dec_num_scans()
                     point_group_batch = MIN_GROUP_NEW_LEG - 1
                 else:
@@ -673,27 +673,27 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
                     az = target_az
                     t += time_remaining
                     az_vel = az_speed
-                    el_vel = 0 
+                    el_vel = 0
                     az_flag = 2
                     el_flag = 0
             else:
-                if get_scan_time(az, target_az, az_speed, az_cent) > 2*step_time:
+                if get_scan_time(az, target_az, az_speed, az_cent) > 2 * step_time:
                     t += step_time
-                    az -= step_time*az_speed/np.sin(np.deg2rad(az - az_cent))
-                    el = el_endpoint1 + el_throw*np.sin(t*el_freq*2*np.pi)
+                    az -= step_time * az_speed / np.sin(np.deg2rad(az - az_cent))
+                    el = el_endpoint1 + el_throw * np.sin(t * el_freq * 2 * np.pi)
                     az_vel = -1 * az_speed
-                    el_vel = el_throw*el_freq*2*np.pi*np.cos(t*el_freq*2*np.pi)
+                    el_vel = el_throw * el_freq * 2 * np.pi * np.cos(t * el_freq * 2 * np.pi)
                     az_flag = 1
                     el_flag = 0
                 elif az == target_az:
                     # Turn around.
                     t += tt[-1]
                     az_vel = az_speed
-                    el_vel = 0 
+                    el_vel = 0
                     az_flag = 1
                     el_flag = 0
                     increasing = True
-                    target_az = _get_target_az(az, t, increasing, az_endpoint1, az_endpoint2, az_speed/np.sin(np.deg2rad(az - az_cent)), az_drift)
+                    target_az = _get_target_az(az, t, increasing, az_endpoint1, az_endpoint2, az_speed / np.sin(np.deg2rad(az - az_cent)), az_drift)
                     dec_num_scans()
                     point_group_batch = MIN_GROUP_NEW_LEG - 1
                 else:
@@ -715,17 +715,18 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
 
         yield point_block
 
+
 def generate_type2_scan(az_endpoint1, az_endpoint2, az_speed,
-                                    acc, el_endpoint1,
-                                    num_batches=None,
-                                    num_scans=None,
-                                    start_time=None,
-                                    wait_to_start=10.,
-                                    step_time=1.,
-                                    batch_size=500,
-                                    az_start='mid_inc',
-                                    az_first_pos=None,
-                                    az_drift=None):
+                        acc, el_endpoint1,
+                        num_batches=None,
+                        num_scans=None,
+                        start_time=None,
+                        wait_to_start=10.,
+                        step_time=1.,
+                        batch_size=500,
+                        az_start='mid_inc',
+                        az_first_pos=None,
+                        az_drift=None):
     """Python generator to produce times, azimuth and elevation positions,
     azimuth and elevation velocities, azimuth and elevation flags for
     arbitrarily long type 2 scan.
@@ -772,17 +773,17 @@ def generate_type2_scan(az_endpoint1, az_endpoint2, az_speed,
 
     """
     return generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
-                                    acc, el_endpoint1, el_endpoint1,
-                                    el_freq=0,
-                                    num_batches=num_batches,
-                                    num_scans=num_scans,
-                                    start_time=start_time,
-                                    wait_to_start=wait_to_start,
-                                    step_time=step_time,
-                                    batch_size=batch_size,
-                                    az_start=az_start,
-                                    az_first_pos=az_first_pos,
-                                    az_drift=az_drift)
+                               acc, el_endpoint1, el_endpoint1,
+                               el_freq=0,
+                               num_batches=num_batches,
+                               num_scans=num_scans,
+                               start_time=start_time,
+                               wait_to_start=wait_to_start,
+                               step_time=step_time,
+                               batch_size=batch_size,
+                               az_start=az_start,
+                               az_first_pos=az_first_pos,
+                               az_drift=az_drift)
 
 
 def plan_scan(az_end1, az_end2, el, v_az=1, a_az=1, az_start=None):
