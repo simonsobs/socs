@@ -239,7 +239,7 @@ class PfeifferTC400:
         if turbo_response not in PFEIFFER_BOOL:
             raise ValueError(f"Unrecognized response from turbo: {turbo_response}")
         else:
-            return turbo_response == "111111"
+            return turbo_response == "000000"
 
     def ready_turbo(self):
         """Readies the turbo for spinning. Does not cause the turbo to spin up.
