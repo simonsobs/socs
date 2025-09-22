@@ -3,7 +3,7 @@ import numpy as np
 from drivers import TrackPoint
 
 
-def gen_3leg_turnaround(t0, az0, el0, v0, turntime, az_flag, el_flag, point_group_batch, **kwargs):
+def gen_three_leg_turnaround(t0, az0, el0, v0, turntime, az_flag, el_flag, point_group_batch, **kwargs):
     """
     Generates the trajectory of a 3part turnaround given the initial position and velocity of the platform.
     This function generates a turnaround in three "legs":
