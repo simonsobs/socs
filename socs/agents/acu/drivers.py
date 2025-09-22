@@ -3,9 +3,11 @@ import datetime
 import math
 import pickle
 import time
+
 from dataclasses import dataclass, replace
 
 import numpy as np
+import three_leg_turnaround as three_leg_tr
 
 #: The number of seconds in a day.
 DAY = 86400
@@ -278,7 +280,8 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                                     batch_size=500,
                                     az_start='mid_inc',
                                     az_first_pos=None,
-                                    az_drift=None):
+                                    az_drift=None,
+                                    three_leg_turnaround=True):
     """Python generator to produce times, azimuth and elevation positions,
     azimuth and elevation velocities, azimuth and elevation flags for
     arbitrarily long constant-velocity azimuth scans.
@@ -322,6 +325,11 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
         az_drift (float): The rate (deg / s) at which to shift the
             scan endpoints in time.  This can be used to better track
             celestial sources in targeted scans.
+        three_leg_turnaround (bool): Whether to generate a three leg turnaround
+            for azimuth turnarounds. This turnaround separates the azimuth turnarounds
+            into three legs: the initial deceleration, the middle low velocity/acceleration
+            leg that gently turns the gears in the opposite direction, and the final
+            acceleration.
 
     Yields:
         points (list): a list of TrackPoint objects.  Raises
@@ -412,81 +420,102 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
     point_group_batch = 0
 
     i = 0
+    point_queue = []
     while i < stop_iter and check_num_scans():
         i += 1
         point_block = []
         for j in range(batch_size):
-            point_block.append(TrackPoint(
-                timestamp=t + t0,
-                az=az, el=el, az_vel=az_vel, el_vel=el_vel,
-                az_flag=az_flag, el_flag=el_flag,
-                group_flag=int(point_group_batch > 0)))
+            if len(point_queue):  # Pull from points in the queue first
+                point_block.append(point_queue.pop(0))
 
-            if point_group_batch > 0:
-                point_group_batch -= 1
-
-            if increasing:
-                if az <= (target_az - 2 * daz):
-                    t += step_time
-                    az += daz
-                    az_vel = az_speed
-                    el_vel = el_speed
-                    az_flag = 1
-                    el_flag = 0
-                elif az == target_az:
-                    # Turn around.
-                    t += turntime
-                    az_vel = -1 * az_speed
-                    el_vel = el_speed
-                    az_flag = 1
-                    el_flag = 0
-                    increasing = False
-                    target_az = get_target_az(az, t, increasing)
-                    dec_num_scans()
-                    point_group_batch = MIN_GROUP_NEW_LEG - 1
-                else:
-                    time_remaining = (target_az - az) / az_speed
-                    az = target_az
-                    t += time_remaining
-                    az_vel = az_speed
-                    el_vel = el_speed
-                    az_flag = 2
-                    el_flag = 0
             else:
-                if az >= (target_az + 2 * daz):
-                    t += step_time
-                    az -= daz
-                    az_vel = -1 * az_speed
-                    el_vel = el_speed
-                    az_flag = 1
-                    el_flag = 0
-                elif az == target_az:
-                    # Turn around.
-                    t += turntime
-                    az_vel = az_speed
-                    el_vel = el_speed
-                    az_flag = 1
-                    el_flag = 0
-                    increasing = True
-                    target_az = get_target_az(az, t, increasing)
-                    dec_num_scans()
-                    point_group_batch = MIN_GROUP_NEW_LEG - 1
-                else:
-                    time_remaining = (az - target_az) / az_speed
-                    az = target_az
-                    t += time_remaining
-                    az_vel = -1 * az_speed
-                    el_vel = el_speed
-                    az_flag = 2
-                    el_flag = 0
+                point_block.append(TrackPoint(
+                    timestamp=t + t0,
+                    az=az, el=el, az_vel=az_vel, el_vel=el_vel,
+                    az_flag=az_flag, el_flag=el_flag,
+                    group_flag=int(point_group_batch > 0)))
 
-            if not check_num_scans():
-                # Kill the velocity on the last point and exit -- this
-                # was recommended at LAT FAT for smoothly stopping the
-                # motion at end of program.
-                point_block[-1].az_vel = 0
-                point_block[-1].el_vel = 0
-                break
+                if point_group_batch > 0:
+                    point_group_batch -= 1
+
+                if increasing:
+                    if az <= (target_az - 2 * daz):
+                        t += step_time
+                        az += daz
+                        az_vel = az_speed
+                        el_vel = el_speed
+                        az_flag = 1
+                        el_flag = 0
+                    elif az == target_az:
+                        # Turn around.
+                        if three_leg_turnaround:
+                            turnaround_track = three_leg_tr.gen_three_leg_turnaround(t0=t + t0, az0=az, el0=el, v0=az_vel,
+                                                                                     turntime=turntime,
+                                                                                     az_flag=az_flag, el_flag=el_flag,
+                                                                                     point_group_batch=point_group_batch)
+                            for track_point in turnaround_track:
+                                point_queue.append(track_point)  # Add the TrackPoints from the turnaround into the queue.
+
+                        t += turntime
+                        az_vel = -1 * az_speed
+                        el_vel = el_speed
+                        az_flag = 1
+                        el_flag = 0
+                        increasing = False
+                        target_az = get_target_az(az, t, increasing)
+                        dec_num_scans()
+                        point_group_batch = MIN_GROUP_NEW_LEG - 1
+                    else:
+                        time_remaining = (target_az - az) / az_speed
+                        az = target_az
+                        t += time_remaining
+                        az_vel = az_speed
+                        el_vel = el_speed
+                        az_flag = 2
+                        el_flag = 0
+                else:
+                    if az >= (target_az + 2 * daz):
+                        t += step_time
+                        az -= daz
+                        az_vel = -1 * az_speed
+                        el_vel = el_speed
+                        az_flag = 1
+                        el_flag = 0
+                    elif az == target_az:
+                        # Turn around.
+                        if three_leg_turnaround:
+                            turnaround_track = three_leg_tr.gen_three_leg_turnaround(t0=t + t0, az0=az, el0=el, v0=az_vel,
+                                                                                     turntime=turntime,
+                                                                                     az_flag=az_flag, el_flag=el_flag,
+                                                                                     point_group_batch=point_group_batch)
+                            for track_point in turnaround_track:
+                                point_queue.append(track_point)  # Add the TrackPoints from the turnaround into the queue.
+
+                        t += turntime
+                        az_vel = az_speed
+                        el_vel = el_speed
+                        az_flag = 1
+                        el_flag = 0
+                        increasing = True
+                        target_az = get_target_az(az, t, increasing)
+                        dec_num_scans()
+                        point_group_batch = MIN_GROUP_NEW_LEG - 1
+                    else:
+                        time_remaining = (az - target_az) / az_speed
+                        az = target_az
+                        t += time_remaining
+                        az_vel = -1 * az_speed
+                        el_vel = el_speed
+                        az_flag = 2
+                        el_flag = 0
+
+                if not check_num_scans():
+                    # Kill the velocity on the last point and exit -- this
+                    # was recommended at LAT FAT for smoothly stopping the
+                    # motion at end of program.
+                    point_block[-1].az_vel = 0
+                    point_block[-1].el_vel = 0
+                    break
 
         yield point_block
 
