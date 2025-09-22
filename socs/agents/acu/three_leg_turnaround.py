@@ -1,5 +1,4 @@
 import numpy as np
-
 from drivers import TrackPoint
 
 
@@ -53,7 +52,7 @@ def gen_three_leg_turnaround(t0, az0, el0, v0, turntime, az_flag, el_flag, point
 
     # Assert we have at least 0.5 seconds for the first and second legs of the turnaround!
     assert (turntime - midpoint_time) >= 1.0, \
-           "Time for the second leg of the turnaround is too long! The time remaining for the first and third legs is < 1.0 seconds!"
+        "Time for the second leg of the turnaround is too long! The time remaining for the first and third legs is < 1.0 seconds!"
 
     # Solve for the first leg of the turnaround
     t_start_1 = 0  # We have to solve the trajectory around 0 or the linear equations become very large. Add t back on later
