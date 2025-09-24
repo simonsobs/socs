@@ -243,6 +243,7 @@ class SmurfCrateMonitor:
         ipmbs, sensids, chan_names = self._init_data_stream(shm_addr=shm_addr)
         self.log.info('Got sensor names')
         self.take_data = True
+        last_data_dict = None
         while self.take_data:
             for _ in range(30):
                 if not self.take_data:
@@ -253,6 +254,16 @@ class SmurfCrateMonitor:
                                      sensids=sensids,
                                      chan_names=chan_names,
                                      crate_id=self.crate_id)
+            if last_data_dict is not None:
+                # Check if returned keys has changed if so get new sensor names
+                if datadict.keys() != last_data_dict.keys():
+                    ipmbs, sensids, chan_names = self._init_data_stream(shm_addr=shm_addr)
+                    datadict = get_data_dict(shm_addr=self.shm_addr,
+                                             ipmbs=ipmbs,
+                                             sensids=sensids,
+                                             chan_names=chan_names,
+                                             crate_id=self.crate_id)
+            last_data_dict = datadict
             data = {
                 'timestamp': time.time(),
                 'block_name': f'smurf_{self.crate_id}',
