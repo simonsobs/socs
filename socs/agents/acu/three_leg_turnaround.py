@@ -1,5 +1,6 @@
 import numpy as np
-from drivers import TrackPoint
+
+from socs.agents.acu.drivers import TrackPoint
 
 
 def gen_three_leg_turnaround(t0, az0, el0, v0, turntime, az_flag, el_flag, point_group_batch, **kwargs):
