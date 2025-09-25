@@ -129,14 +129,14 @@ class Serial_TCPServer(object):
 
         """
         n_current = n
-        msg = ''
+        msg = b''
         for i in range(max_loop):
             if n_current <= 0:
                 return msg
             try:
                 msg_current = self.sock.recv(n)
             except (TimeoutError, BlockingIOError):
-                msg_current = ''
+                msg_current = b''
             msg += msg_current
             n_current -= len(msg_current)
 
