@@ -576,8 +576,8 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
     az_cent = az_vel_ref - 90
 
     # Get el throw
-    el_throw = abs(el_endpoint2 - el_endpoint1)/2
-    el_cent = (el_endpoint1 + el_endpoint2)/2.
+    el_throw = abs(el_endpoint2 - el_endpoint1) / 2
+    el_cent = (el_endpoint1 + el_endpoint2) / 2.
 
     # Note that starting scan direction gets modified, below,
     # depending on az_start.
