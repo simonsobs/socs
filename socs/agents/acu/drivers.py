@@ -267,6 +267,23 @@ def timecode(acutime, now=None):
     return comptime
 
 
+def _get_target_az(current_az, current_t, increasing, az_endpoint1, az_endpoint2, az_speed, az_drift):
+    # Return the next endpoint azimuth, based on current (az, t)
+    # and whether to move in +ve or -ve az direction.
+    #
+    # Includes the effects of az_drift, to keep the scan endpoints
+    # (at least at the end of a scan) on the drifted trajectories.
+    if increasing:
+        target = max(az_endpoint1, az_endpoint2)
+    else:
+        target = min(az_endpoint1, az_endpoint2)
+    if az_drift is not None:
+        v = az_speed if increasing else -az_speed
+        target = target + az_drift / (v - az_drift) * (
+            (target - current_az + v * current_t))
+    return target
+
+
 def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                                     acc, el_endpoint1, el_endpoint2,
                                     el_speed=0,
@@ -328,22 +345,6 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
           StopIteration once exit condition, if defined, is met.
 
     """
-    def get_target_az(current_az, current_t, increasing):
-        # Return the next endpoint azimuth, based on current (az, t)
-        # and whether to move in +ve or -ve az direction.
-        #
-        # Includes the effects of az_drift, to keep the scan endpoints
-        # (at least at the end of a scan) on the drifted trajectories.
-        if increasing:
-            target = max(az_endpoint1, az_endpoint2)
-        else:
-            target = min(az_endpoint1, az_endpoint2)
-        if az_drift is not None:
-            v = az_speed if increasing else -az_speed
-            target = target + az_drift / (v - az_drift) * (
-                (target - current_az + v * current_t))
-        return target
-
     if az_endpoint1 == az_endpoint2:
         raise ValueError('Generator requires two different az endpoints!')
 
@@ -408,7 +409,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
     def check_num_scans():
         return num_scans is None or num_scans > 0
 
-    target_az = get_target_az(az, t, increasing)
+    target_az = _get_target_az(az, t, increasing, az_endpoint1, az_endpoint2, az_speed, az_drift)
     point_group_batch = 0
 
     i = 0
@@ -441,7 +442,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                     az_flag = 1
                     el_flag = 0
                     increasing = False
-                    target_az = get_target_az(az, t, increasing)
+                    target_az = _get_target_az(az, t, increasing, az_endpoint1, az_endpoint2, az_speed, az_drift)
                     dec_num_scans()
                     point_group_batch = MIN_GROUP_NEW_LEG - 1
                 else:
@@ -468,7 +469,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                     az_flag = 1
                     el_flag = 0
                     increasing = True
-                    target_az = get_target_az(az, t, increasing)
+                    target_az = _get_target_az(az, t, increasing, az_endpoint1, az_endpoint2, az_speed, az_drift)
                     dec_num_scans()
                     point_group_batch = MIN_GROUP_NEW_LEG - 1
                 else:
@@ -489,6 +490,310 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                 break
 
         yield point_block
+
+
+def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
+                        acc, el_endpoint1, el_endpoint2,
+                        el_freq=.15,
+                        az_vel_ref=None,
+                        num_batches=None,
+                        num_scans=None,
+                        start_time=None,
+                        wait_to_start=10.,
+                        step_time=1.,
+                        batch_size=500,
+                        az_start='mid_inc',
+                        az_first_pos=None,
+                        az_drift=None):
+    """Python generator to produce times, azimuth and elevation positions,
+    azimuth and elevation velocities, azimuth and elevation flags for
+    arbitrarily long type 3 scan.
+
+    Parameters:
+        az_endpoint1 (float): azimuth endpoint for the scan start
+        az_endpoint2 (float): second azimuth endpoint of the scan
+        az_speed (float): speed of the constant-velocity azimuth motion
+        acc (float): turnaround acceleration for the azimuth motion at the
+            endpoints
+        el_endpoint1 (float): elevation endpoint for the scan start
+        el_endpoint2 (float): second elevation endpoint of the scan. For
+            constant az scans, this must be equal to el_endpoint1.
+        el_freq(float): frequency of the elevation nods in Hz.
+        az_vel_ref(float or None): azimuth to center the velocity profile at.
+                                   If None then the average of the endpoints is used.
+        num_batches (int or None): sets the number of batches for the
+            generator to create. Default value is None (interpreted as infinite
+            batches).
+        num_scans (int or None): if not None, limits the points
+          returned to the specified number of constant velocity legs.
+        start_time (float or None): a ctime at which to start the scan.
+            Default is None, which is interpreted as starting now +
+            wait_to_start.
+        wait_to_start (float): number of seconds to wait between
+            start_time and when the scan actually starts. Default is 10 seconds.
+        step_time (float): time between points on the constant-velocity
+            parts of the motion. Default value is 1.0 seconds. Minimum value is
+            0.05 seconds.
+        batch_size (int): number of values to produce in each iteration.
+            Default is 500. Batch size is reset to the length of one leg of the
+            motion if num_batches is not None.
+        az_start (str): part of the scan to start at.  To start at one
+            of the extremes, use 'az_endpoint1', 'az_endpoint2', or
+            'end' (same as 'az_endpoint1').  To start in the midpoint
+            of the scan use 'mid_inc' (for first half-leg to have
+            positive az velocity), 'mid_dec' (negative az velocity),
+            or 'mid' (velocity oriented towards endpoint2).
+        az_first_pos (float): If not None, the first az scan will
+            start at this position (but otherwise proceed in the same
+            starting direction).
+        az_drift (float): The rate (deg / s) at which to shift the
+            scan endpoints in time.  This can be used to better track
+            celestial sources in targeted scans.
+
+    Yields:
+        points (list): a list of TrackPoint objects.  Raises
+          StopIteration once exit condition, if defined, is met.
+
+    """
+    def get_scan_time(az0, az1, az_speed, az_cent):
+        upper = -1 * np.cos(np.deg2rad(az1 - az_cent))
+        lower = -1 * np.cos(np.deg2rad(az0 - az_cent))
+
+        return abs(upper - lower) / np.deg2rad(az_speed)
+
+    if az_endpoint1 == az_endpoint2:
+        raise ValueError('Generator requires two different az endpoints!')
+
+    if az_drift is not None:
+        raise ValueError("Az drift not supported for type 2 or 3 scans!")
+
+    if abs(az_endpoint1 - az_endpoint2) > 140:
+        raise ValueError("Type 2 and 3 scans must have a throw less than or equal to 70 degrees")
+
+    # Get center of az range
+    if az_vel_ref is None:
+        az_vel_ref = (az_endpoint1 + az_endpoint1) / 2.
+    az_cent = az_vel_ref - 90
+
+    # Get el throw
+    el_throw = abs(el_endpoint2 - el_endpoint1) / 2
+    el_cent = (el_endpoint1 + el_endpoint2) / 2.
+
+    # Note that starting scan direction gets modified, below,
+    # depending on az_start.
+    increasing = az_endpoint2 > az_endpoint1
+
+    if az_start in ['az_endpoint1', 'az_endpoint2', 'end']:
+        if az_start in ['az_endpoint1', 'end']:
+            az = az_endpoint1
+        else:
+            az = az_endpoint2
+            increasing = not increasing
+    elif az_start in ['mid_inc', 'mid_dec', 'mid']:
+        az = (az_endpoint1 + az_endpoint2) / 2
+        if az_start == 'mid':
+            pass
+        elif az_start == 'mid_inc':
+            increasing = True
+        else:
+            increasing = False
+    else:
+        raise ValueError(f'az_start value "{az_start}" not supported. Choose from '
+                         'az_endpoint1, az_endpoint2, mid_inc, mid_dec')
+    az_vel = az_speed if increasing else -az_speed
+
+    # Bias the starting point for the first leg?
+    if az_first_pos is not None:
+        az = az_first_pos
+
+    if start_time is None:
+        t0 = time.time() + wait_to_start
+    else:
+        t0 = start_time
+
+    vel_0 = az_speed / np.sin(np.deg2rad(az_endpoint1 - az_cent))
+    vel_1 = az_speed / np.sin(np.deg2rad(az_endpoint2 - az_cent))
+    min_tt = {1: (0.85 * abs(vel_0) / 9 * 11.616)**.5, -1: (0.85 * abs(vel_1) / 9 * 11.616)**.5}
+    tt = {1: max(2 * vel_0 / acc, min_tt[1]), -1: max(2 * vel_1 / acc, min_tt[-1])}
+    t = 0
+    el = el_endpoint1
+    if step_time < 0.05:
+        raise ValueError('Time step size too small, must be at least '
+                         '0.05 seconds')
+    el_vel = el_throw * el_freq * 2 * np.pi * np.cos(t * el_freq * 2 * np.pi)
+    az_flag = 0
+    el_flag = 0
+    if num_batches is None:
+        stop_iter = float('inf')
+    else:
+        stop_iter = num_batches
+        batch_size = int(np.ceil(get_scan_time(az_endpoint1, az_endpoint2, az_speed, az_cent) / step_time))
+
+    def dec_num_scans():
+        nonlocal num_scans
+        if num_scans is not None:
+            num_scans -= 1
+
+    def check_num_scans():
+        return num_scans is None or num_scans > 0
+
+    target_az = _get_target_az(az, t, increasing, az_endpoint1, az_endpoint2, az_speed / np.sin(np.deg2rad(az - az_cent)), az_drift)
+    point_group_batch = 0
+
+    i = 0
+    while i < stop_iter and check_num_scans():
+        i += 1
+        point_block = []
+        for j in range(batch_size):
+            point_block.append(TrackPoint(
+                timestamp=t + t0,
+                az=az, el=el, az_vel=az_vel / np.sin(np.deg2rad(az - az_cent)), el_vel=el_vel,
+                az_flag=az_flag, el_flag=el_flag,
+                group_flag=int(point_group_batch > 0)))
+
+            if point_group_batch > 0:
+                point_group_batch -= 1
+
+            if increasing:
+                if get_scan_time(az, target_az, az_speed, az_cent) > 2 * step_time:
+                    t += step_time
+                    az += step_time * az_speed / np.sin(np.deg2rad(az - az_cent))
+                    el = el_cent + el_throw * np.sin(t * el_freq * 2 * np.pi)
+                    az_vel = az_speed
+                    el_vel = el_throw * el_freq * 2 * np.pi * np.cos(t * el_freq * 2 * np.pi)
+                    az_flag = 1
+                    el_flag = 0
+                elif az == target_az:
+                    # Turn around.
+                    t += tt[1]
+                    az_vel = -1 * az_speed
+                    el_vel = 0
+                    az_flag = 1
+                    el_flag = 0
+                    increasing = False
+                    target_az = _get_target_az(az, t, increasing, az_endpoint1, az_endpoint2, az_speed / np.sin(np.deg2rad(az - az_cent)), az_drift)
+                    dec_num_scans()
+                    point_group_batch = MIN_GROUP_NEW_LEG - 1
+                else:
+                    time_remaining = get_scan_time(az, target_az, az_speed, az_cent)
+                    az = target_az
+                    t += time_remaining
+                    az_vel = az_speed
+                    el_vel = 0
+                    az_flag = 2
+                    el_flag = 0
+            else:
+                if get_scan_time(az, target_az, az_speed, az_cent) > 2 * step_time:
+                    t += step_time
+                    az -= step_time * az_speed / np.sin(np.deg2rad(az - az_cent))
+                    el = el_cent + el_throw * np.sin(t * el_freq * 2 * np.pi)
+                    az_vel = -1 * az_speed
+                    el_vel = el_throw * el_freq * 2 * np.pi * np.cos(t * el_freq * 2 * np.pi)
+                    az_flag = 1
+                    el_flag = 0
+                elif az == target_az:
+                    # Turn around.
+                    t += tt[-1]
+                    az_vel = az_speed
+                    el_vel = 0
+                    az_flag = 1
+                    el_flag = 0
+                    increasing = True
+                    target_az = _get_target_az(az, t, increasing, az_endpoint1, az_endpoint2, az_speed / np.sin(np.deg2rad(az - az_cent)), az_drift)
+                    dec_num_scans()
+                    point_group_batch = MIN_GROUP_NEW_LEG - 1
+                else:
+                    time_remaining = get_scan_time(az, target_az, az_speed, az_cent)
+                    az = target_az
+                    t += time_remaining
+                    az_vel = -1 * az_speed
+                    el_vel = 0
+                    az_flag = 2
+                    el_flag = 0
+
+            if not check_num_scans():
+                # Kill the velocity on the last point and exit -- this
+                # was recommended at LAT FAT for smoothly stopping the
+                # motion at end of program.
+                point_block[-1].az_vel = 0
+                point_block[-1].el_vel = 0
+                break
+
+        yield point_block
+
+
+def generate_type2_scan(az_endpoint1, az_endpoint2, az_speed,
+                        acc, el_endpoint1,
+                        az_vel_ref=None,
+                        num_batches=None,
+                        num_scans=None,
+                        start_time=None,
+                        wait_to_start=10.,
+                        step_time=1.,
+                        batch_size=500,
+                        az_start='mid_inc',
+                        az_first_pos=None,
+                        az_drift=None):
+    """Python generator to produce times, azimuth and elevation positions,
+    azimuth and elevation velocities, azimuth and elevation flags for
+    arbitrarily long type 2 scan.
+
+    Parameters:
+        az_endpoint1 (float): azimuth endpoint for the scan start
+        az_endpoint2 (float): second azimuth endpoint of the scan
+        az_speed (float): speed of the constant-velocity azimuth motion
+        acc (float): turnaround acceleration for the azimuth motion at the
+            endpoints
+        el_endpoint1 (float): elevation endpoint for the scan start
+        az_vel_ref(float or None): azimuth to center the velocity profile at.
+                                   If None then the average of the endpoints is used.
+        num_batches (int or None): sets the number of batches for the
+            generator to create. Default value is None (interpreted as infinite
+            batches).
+        num_scans (int or None): if not None, limits the points
+          returned to the specified number of constant velocity legs.
+        start_time (float or None): a ctime at which to start the scan.
+            Default is None, which is interpreted as starting now +
+            wait_to_start.
+        wait_to_start (float): number of seconds to wait between
+            start_time and when the scan actually starts. Default is 10 seconds.
+        step_time (float): time between points on the constant-velocity
+            parts of the motion. Default value is 1.0 seconds. Minimum value is
+            0.05 seconds.
+        batch_size (int): number of values to produce in each iteration.
+            Default is 500. Batch size is reset to the length of one leg of the
+            motion if num_batches is not None.
+        az_start (str): part of the scan to start at.  To start at one
+            of the extremes, use 'az_endpoint1', 'az_endpoint2', or
+            'end' (same as 'az_endpoint1').  To start in the midpoint
+            of the scan use 'mid_inc' (for first half-leg to have
+            positive az velocity), 'mid_dec' (negative az velocity),
+            or 'mid' (velocity oriented towards endpoint2).
+        az_first_pos (float): If not None, the first az scan will
+            start at this position (but otherwise proceed in the same
+            starting direction).
+        az_drift (float): The rate (deg / s) at which to shift the
+            scan endpoints in time.  This can be used to better track
+            celestial sources in targeted scans.
+
+    Yields:
+        points (list): a list of TrackPoint objects.  Raises
+          StopIteration once exit condition, if defined, is met.
+
+    """
+    return generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
+                               acc, el_endpoint1, el_endpoint1,
+                               el_freq=0,
+                               az_vel_ref=az_vel_ref,
+                               num_batches=num_batches,
+                               num_scans=num_scans,
+                               start_time=start_time,
+                               wait_to_start=wait_to_start,
+                               step_time=step_time,
+                               batch_size=batch_size,
+                               az_start=az_start,
+                               az_first_pos=az_first_pos,
+                               az_drift=az_drift)
 
 
 def plan_scan(az_end1, az_end2, el, v_az=1, a_az=1, az_start=None):
