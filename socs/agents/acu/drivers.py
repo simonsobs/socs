@@ -6,8 +6,7 @@ import time
 from dataclasses import dataclass, replace
 
 import numpy as np
-
-import socs.agent.acu.three_leg_turnaround as three_leg_tr
+import socs.agents.acu.three_leg_turnaround as three_leg_tr
 
 #: The number of seconds in a day.
 DAY = 86400
