@@ -6,6 +6,7 @@ import time
 from dataclasses import dataclass, replace
 
 import numpy as np
+import three_leg_turnaround as three_leg_tr
 
 #: The number of seconds in a day.
 DAY = 86400
@@ -295,7 +296,8 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                                     batch_size=500,
                                     az_start='mid_inc',
                                     az_first_pos=None,
-                                    az_drift=None):
+                                    az_drift=None,
+                                    turnaround_method=None):
     """Python generator to produce times, azimuth and elevation positions,
     azimuth and elevation velocities, azimuth and elevation flags for
     arbitrarily long constant-velocity azimuth scans.
@@ -337,8 +339,12 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
             start at this position (but otherwise proceed in the same
             starting direction).
         az_drift (float): The rate (deg / s) at which to shift the
-            scan endpoints in time.  This can be used to better track
+            scan endpoints i n time.  This can be used to better track
             celestial sources in targeted scans.
+        turnaround_method (str): The method used for generating turnaround.
+            Default (None) generates the baseline minimal jerk trajectory.
+            'three_leg' generates a three-leg turnaround which attempts to
+            minimize the acceleration at the midpoint of the turnaround.
 
     Yields:
         points (list): a list of TrackPoint objects.  Raises
@@ -413,10 +419,15 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
     point_group_batch = 0
 
     i = 0
+    point_queue = []
     while i < stop_iter and check_num_scans():
         i += 1
         point_block = []
         for j in range(batch_size):
+            if len(point_queue):  # Pull from points in the queue first
+                point_block.append(point_queue.pop(0))
+                continue
+
             point_block.append(TrackPoint(
                 timestamp=t + t0,
                 az=az, el=el, az_vel=az_vel, el_vel=el_vel,
@@ -436,6 +447,14 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                     el_flag = 0
                 elif az == target_az:
                     # Turn around.
+                    if turnaround_method is not None and turnaround_method == "three_leg":
+                        turnaround_track = three_leg_tr.gen_three_leg_turnaround(t0=t + t0, az0=az, el0=el, v0=az_vel,
+                                                                                 turntime=turntime,
+                                                                                 az_flag=az_flag, el_flag=el_flag,
+                                                                                 point_group_batch=point_group_batch)
+                        for track_point in turnaround_track:
+                            point_queue.append(track_point)  # Add the TrackPoints from the turnaround into the queue.
+
                     t += turntime
                     az_vel = -1 * az_speed
                     el_vel = el_speed
@@ -463,6 +482,14 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                     el_flag = 0
                 elif az == target_az:
                     # Turn around.
+                    if turnaround_method is not None and turnaround_method == "three_leg":
+                        turnaround_track = three_leg_tr.gen_three_leg_turnaround(t0=t + t0, az0=az, el0=el, v0=az_vel,
+                                                                                 turntime=turntime,
+                                                                                 az_flag=az_flag, el_flag=el_flag,
+                                                                                 point_group_batch=point_group_batch)
+                        for track_point in turnaround_track:
+                            point_queue.append(track_point)  # Add the TrackPoints from the turnaround into the queue.
+
                     t += turntime
                     az_vel = az_speed
                     el_vel = el_speed
