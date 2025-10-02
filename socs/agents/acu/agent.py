@@ -2031,6 +2031,8 @@ class ACUAgent:
     @ocs_agent.param('az_drift', type=float, default=None)
     @ocs_agent.param('az_only', type=bool, default=True)
     @ocs_agent.param('type', default=1, choices=[1, 2, 3])
+    @ocs_agent.param('turnaround_method', default=None,
+                     choices=[None, 'three_leg'])
     @ocs_agent.param('az_vel_ref', type=float, default=1)
     @ocs_agent.param('scan_upload_length', type=float, default=None)
     @inlineCallbacks
@@ -2098,6 +2100,12 @@ class ACUAgent:
                 of uploaded points. If this is not specified, the
                 track manager will try to use as short a time as is
                 reasonable.
+            turnaround_method (str): The method used for generating turnaround.
+                Default (None) generates the baseline minimal jerk trajectory.
+                'three_leg' generates a three-leg turnaround which attempts to
+                minimize the acceleration at the midpoint of the turnaround.
+                Type 2 and 3 scans will ALWAYS use the baseline turnaround method
+                regardless of selection.
 
         Notes:
           Note that all parameters are optional except for
