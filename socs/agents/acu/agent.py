@@ -32,11 +32,13 @@ INIT_DEFAULT_SCAN_PARAMS = {
         'az_speed': 2,
         'az_accel': 1,
         'el_freq': .15,
+        'turnaround_method': 'standard',
     },
     'satp': {
         'az_speed': 1,
         'az_accel': 1,
         'el_freq': 0,
+        'turnaround_method': 'standard',
     },
 }
 
@@ -1794,6 +1796,8 @@ class ACUAgent:
     @ocs_agent.param('az_speed', type=float, default=None)
     @ocs_agent.param('az_accel', type=float, default=None)
     @ocs_agent.param('el_freq', type=float, default=None)
+    @ocs_agent.param('turnaround_method', type=str, default=None,
+                     choices=[None, 'standard', 'three_leg'])
     @ocs_agent.param('reset', default=False, type=bool)
     @inlineCallbacks
     def set_scan_params(self, session, params):
@@ -1814,7 +1818,7 @@ class ACUAgent:
         """
         if params['reset']:
             self.scan_params.update(self.default_scan_params)
-        for k in ['az_speed', 'az_accel', 'el_freq']:
+        for k in ['az_speed', 'az_accel', 'el_freq', 'turnaround_method']:
             if params[k] is not None:
                 self.scan_params[k] = params[k]
         self.log.info('Updated default scan params to {sp}', sp=self.scan_params)
@@ -2035,10 +2039,9 @@ class ACUAgent:
     @ocs_agent.param('az_drift', type=float, default=None)
     @ocs_agent.param('az_only', type=bool, default=True)
     @ocs_agent.param('type', default=1, choices=[1, 2, 3])
-<<<<<<< HEAD
     @ocs_agent.param('az_vel_ref', type=float, default=None)
     @ocs_agent.param('turnaround_method', default=None,
-                     choices=[None, 'three_leg'])
+                     choices=[None, 'standard', 'three_leg'])
     @ocs_agent.param('scan_upload_length', type=float, default=None)
     @inlineCallbacks
     def generate_scan(self, session, params):
@@ -2137,12 +2140,15 @@ class ACUAgent:
         az_speed = params['az_speed']
         az_accel = params['az_accel']
         el_freq = params['el_freq']
+        turnaround_method = params['turnaround_method']
         if az_speed is None:
             az_speed = self.scan_params['az_speed']
         if az_accel is None:
             az_accel = self.scan_params['az_accel']
         if el_freq is None:
             el_freq = self.scan_params['el_freq']
+        if turnaround_method is None:
+            turnaround_method = self.scan_paraks['turnaround_method']
 
         # Do we need to limit the az_accel?  This limit comes from a
         # maximum jerk parameter; the equation below (without the
