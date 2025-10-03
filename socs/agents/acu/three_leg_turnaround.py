@@ -143,7 +143,7 @@ def _gen_trajectory(t_i, t_f, xn1_i, x0_i, x0_f, x1_i, x1_f, x2_i, x2_f, step_ti
 
     ts = np.arange(t_i, t_f + step_time, step_time)  # Divide our times into points with step_time spacing
     vs = np.polyval(A[::-1], ts)
-    
+
     xs = np.polyval(np.polyint(A[::-1]), ts)
     xs = xs - xs[0] + xn1_i  # Solve for the positions of each point
 
