@@ -142,9 +142,9 @@ def _gen_trajectory(t_i, t_f, xn1_i, x0_i, x0_f, x1_i, x1_f, x2_i, x2_f, step_ti
     A = solve_fifth_polynomial_lin_eqs(t_i, t_f, x0_i, x0_f, x1_i, x1_f, x2_i, x2_f)
 
     ts = np.arange(t_i, t_f + step_time, step_time)  # Divide our times into points with step_time spacing
-    vs = x0(ts, *A)  # Solve for the velocity at every time using our solved components
-
-    xs = xn1(ts, 0, *A)
+    vs = np.polyval(A[::-1], ts)
+    
+    xs = np.polyval(np.polyint(A[::-1]), ts)
     xs = xs - xs[0] + xn1_i  # Solve for the positions of each point
 
     return ts, xs, vs
