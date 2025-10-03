@@ -32,11 +32,13 @@ INIT_DEFAULT_SCAN_PARAMS = {
         'az_speed': 2,
         'az_accel': 1,
         'el_freq': .15,
+        'turnaround_method': 'standard',
     },
     'satp': {
         'az_speed': 1,
         'az_accel': 1,
         'el_freq': 0,
+        'turnaround_method': 'standard',
     },
 }
 
@@ -1790,6 +1792,8 @@ class ACUAgent:
     @ocs_agent.param('az_speed', type=float, default=None)
     @ocs_agent.param('az_accel', type=float, default=None)
     @ocs_agent.param('el_freq', type=float, default=None)
+    @ocs_agent.param('turnaround_method', type=str, default=None,
+                     choices=[None, 'standard', 'three_leg'])
     @ocs_agent.param('reset', default=False, type=bool)
     @inlineCallbacks
     def set_scan_params(self, session, params):
@@ -1810,7 +1814,7 @@ class ACUAgent:
         """
         if params['reset']:
             self.scan_params.update(self.default_scan_params)
-        for k in ['az_speed', 'az_accel', 'el_freq']:
+        for k in ['az_speed', 'az_accel', 'el_freq', 'turnaround_method']:
             if params[k] is not None:
                 self.scan_params[k] = params[k]
         self.log.info('Updated default scan params to {sp}', sp=self.scan_params)
@@ -2031,6 +2035,8 @@ class ACUAgent:
     @ocs_agent.param('az_drift', type=float, default=None)
     @ocs_agent.param('az_only', type=bool, default=True)
     @ocs_agent.param('type', default=1, choices=[1, 2, 3])
+    @ocs_agent.param('turnaround_method', default=None,
+                     choices=[None, 'standard', 'three_leg'])
     @ocs_agent.param('az_vel_ref', type=float, default=1)
     @ocs_agent.param('scan_upload_length', type=float, default=None)
     @inlineCallbacks
@@ -2098,6 +2104,12 @@ class ACUAgent:
                 of uploaded points. If this is not specified, the
                 track manager will try to use as short a time as is
                 reasonable.
+            turnaround_method (str): The method used for generating turnaround.
+                Default (None) generates the baseline minimal jerk trajectory.
+                'three_leg' generates a three-leg turnaround which attempts to
+                minimize the acceleration at the midpoint of the turnaround.
+                Type 2 and 3 scans will ALWAYS use the baseline turnaround method
+                regardless of selection.
 
         Notes:
           Note that all parameters are optional except for
@@ -2122,12 +2134,19 @@ class ACUAgent:
         az_speed = params['az_speed']
         az_accel = params['az_accel']
         el_freq = params['el_freq']
+        turnaround_method = params['turnaround_method']
         if az_speed is None:
             az_speed = self.scan_params['az_speed']
         if az_accel is None:
             az_accel = self.scan_params['az_accel']
         if el_freq is None:
             el_freq = self.scan_params['el_freq']
+        if turnaround_method is None:
+            turnaround_method = self.scan_params['turnaround_method']
+
+        # Check if the turnaround method is usable for the called scan type.
+        if turnaround_method != "standard" and params['type'] != 1:
+            raise ValueError("Cannot use non-standard turnaround method with type 2 or 3 scans!")
 
         # Do we need to limit the az_accel?  This limit comes from a
         # maximum jerk parameter; the equation below (without the
@@ -2235,6 +2254,7 @@ class ACUAgent:
             g = sh.generate_constant_velocity_scan(az_endpoint1=az_endpoint1,
                                                    az_endpoint2=az_endpoint2,
                                                    az_speed=az_speed, acc=az_accel,
+                                                   turnaround_method=turnaround_method,
                                                    el_endpoint1=el_endpoint1,
                                                    el_endpoint2=el_endpoint2,
                                                    el_speed=el_speed,
