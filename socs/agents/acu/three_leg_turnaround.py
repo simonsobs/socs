@@ -202,33 +202,3 @@ def solve_fifth_polynomial_lin_eqs(t_i, t_f, x0_i, x0_f, x1_i, x1_f, x2_i, x2_f)
     B[5] = x2_f
 
     return np.linalg.solve(A, B)
-
-
-def xn1(t, an1, a0, a1, a2, a3, a4, a5):
-    """
-    Returns the solution to the first anti-derivative of the order five polynomial given its solved parameters and a given time.
-
-    Args:
-        t (float): The time of the desired solution. This should probably stay within the original given time bounds of the solution.
-        an1-a5 (floats): The solved parameters of the order five polynomial from `solve_fifth_polynomial_lin_eqs` and `get_an1`.
-
-    Returns:
-        xn1(t) (float): The solution of the first anti-derivative of the order five polynomial equation calculated at time t.
-    """
-
-    return an1 + a0 * t + (1 / 2) * a1 * t**2 + (1 / 3) * a2 * t**3 + (1 / 4) * a3 * t**4 + (1 / 5) * a4 * t**5 + (1 / 6) * a5 * t**6
-
-
-def x0(t, a0, a1, a2, a3, a4, a5):
-    """
-    Returns the solution to the order five polynomial given its solved parameters and a given time.
-
-    Args:
-        t (float): The time of the desired solution. This should probably stay within the original given time bounds of the solution.
-        a0-a5 (floats): The solved parameters of the order five polynomial from `solve_fifth_polynomial_lin_eqs` and `get_an1`.
-
-    Returns:
-        x0(t) (float): The solution of the order five polynomial equation calculated at time t.
-    """
-
-    return a0 + a1 * t + a2 * t**2 + a3 * t**3 + a4 * t**4 + a5 * t**5

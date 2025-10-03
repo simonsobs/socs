@@ -303,7 +303,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                                     az_start='mid_inc',
                                     az_first_pos=None,
                                     az_drift=None,
-                                    turnaround_method=None):
+                                    turnaround_method='standard'):
     """Python generator to produce times, azimuth and elevation positions,
     azimuth and elevation velocities, azimuth and elevation flags for
     arbitrarily long constant-velocity azimuth scans.
@@ -348,7 +348,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
             scan endpoints i n time.  This can be used to better track
             celestial sources in targeted scans.
         turnaround_method (str): The method used for generating turnaround.
-            Default (None) generates the baseline minimal jerk trajectory.
+            Default ('standard') generates the baseline minimal jerk trajectory.
             'three_leg' generates a three-leg turnaround which attempts to
             minimize the acceleration at the midpoint of the turnaround.
 
@@ -453,7 +453,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                     el_flag = 0
                 elif az == target_az:
                     # Turn around.
-                    if turnaround_method is not None and turnaround_method == "three_leg":
+                    if turnaround_method == "three_leg":
                         turnaround_track = three_leg_tr.gen_three_leg_turnaround(t0=t + t0, az0=az, el0=el, v0=az_vel,
                                                                                  turntime=turntime,
                                                                                  az_flag=az_flag, el_flag=el_flag,
@@ -488,7 +488,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                     el_flag = 0
                 elif az == target_az:
                     # Turn around.
-                    if turnaround_method is not None and turnaround_method == "three_leg":
+                    if turnaround_method == "three_leg":
                         turnaround_track = three_leg_tr.gen_three_leg_turnaround(t0=t + t0, az0=az, el0=el, v0=az_vel,
                                                                                  turntime=turntime,
                                                                                  az_flag=az_flag, el_flag=el_flag,

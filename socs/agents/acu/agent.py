@@ -2148,7 +2148,11 @@ class ACUAgent:
         if el_freq is None:
             el_freq = self.scan_params['el_freq']
         if turnaround_method is None:
-            turnaround_method = self.scan_paraks['turnaround_method']
+            turnaround_method = self.scan_params['turnaround_method']
+
+        # Check if the turnaround method is usable for the called scan type.
+        if turnaround_method != "standard" and params['type'] != 1:
+            raise ValueError("Cannot use non-standard turnaround method with type 2 or 3 scans!")
 
         # Do we need to limit the az_accel?  This limit comes from a
         # maximum jerk parameter; the equation below (without the
@@ -2256,6 +2260,7 @@ class ACUAgent:
             g = sh.generate_constant_velocity_scan(az_endpoint1=az_endpoint1,
                                                    az_endpoint2=az_endpoint2,
                                                    az_speed=az_speed, acc=az_accel,
+                                                   turnaround_method=turnaround_method,
                                                    el_endpoint1=el_endpoint1,
                                                    el_endpoint2=el_endpoint2,
                                                    el_speed=el_speed,
