@@ -155,7 +155,7 @@ ignorance:
   :class:`ACUAgent <socs.agents.acu.agent.ACUAgent>`.
 - ``scan_params``: Default scan parameters; currently ``az_speed``
   (float, deg/s) ``az_accel`` (float, deg/s/s), ``el_freq`` (float, Hz),
-  and ``turnaround_method`` (str). If not specfied, these are given 
+  and ``turnaround_method`` (str). If not specfied, these are given
   default values depending on the platform type.
 
 
