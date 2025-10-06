@@ -35,7 +35,7 @@ class Sherborne:
 
     def __del__(self):
         print(f"Disconnecting from TCP IP {self.tcp_ip} at port {self.tcp_port}")
-        self.ser.close()
+        self.ser.sock.close()
         return
 
     def get_angle(self):
