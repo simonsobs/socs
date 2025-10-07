@@ -1,9 +1,12 @@
 import time
 
 import serial
-import toml
+import yaml
 
 from socs.tcp import TCPInterface
+
+countspermm = 4000
+countsperdeg = 2000
 
 
 class GalilAxis(TCPInterface):
@@ -17,11 +20,34 @@ class GalilAxis(TCPInterface):
 
     def query(self, expr):
         """Send MG query and return decoded response string."""
-        msg = f"MG {expr}\r".encode("ascii")
+        msg = f"MG _{expr}\r".encode("ascii")
         self.send(msg)
         resp = self.recv(4096).decode("ascii", errors="ignore")
 
         return resp.strip(": \r\n")
+
+    def query_relative_position(self, axis, movetype=None):
+        """Query relative position set for a specified axis"""
+
+        units_map = {'linear': 'mm', 'angular': 'deg'}
+        units = units_map.get(movetype, '')
+
+        self.query(f'PR{axis}')
+        self.send(msg)
+        resp = self.recv(4096).decode("ascii", errors="ignore").strip(": \r\n")
+
+        try:
+            value = float(resp)
+        except ValueError as e:
+            print(f'Raised exception {e}, value type not a number.')
+            value = None
+
+        if movetype == 'linear':
+            value /= countspermm
+        elif movetype == 'angular':
+            value /= countsperdeg
+
+        return value, units
 
     def get_data(self):
         """
@@ -31,14 +57,92 @@ class GalilAxis(TCPInterface):
         data = {}
 
         for axis in axes:
-            data[axis] = {
-                'position': float(self.query(f"_TP{axis}").strip(': \r\n')),
-                'velocity': float(self.query(f"_TV{axis}").strip(': \r\n')),
-                'torque': float(self.query(f"_TT{axis}").strip(': \r\n')),
-                # 'gearing_ratio': float(self.query_status(f"_GA{axis}").strip(': \r\n')),
-            }
+            try:
+                pos = float(self.query(f"TP{axis}").strip(": \r\n"))
+                vel = float(self.query(f"TV{axis}").strip(": \r\n"))
+                trq = float(self.query(f"TT{axis}").strip(": \r\n"))
+            except (ValueError, AttributeError):
+                pos, vel, trq = float("nan"), float("nan"), float("nan")
+                self.log.warning(f"Invalid response while querying axis {axis}")
+
+            data[axis] = {"position": pos, "velocity": vel, "torque": trq, }
 
         return data
+
+    def query_brake_status(self):
+        """query brake status for both linear and angular axes"""
+        # Brakes A–D correspond to outputs 1–4
+        for i, label in enumerate(['A', 'B', 'C', 'D'], start=1):
+            val = self.query(f'@OUT[{i}]').strip()  # query Galil, remove whitespace/newlines
+            state = bool(int(val))                  # convert '0'/'1' → 0/1 → False/True
+            brake_states[label] = state
+        {1: 'Brake Released',
+         0: 'Brake Engaged'}
+
+        # Optional: print results nicely
+        for label, state in brake_states.items():
+            print(f"Brake {label}: {'Engaged' if state else 'Released'}")
+
+        brakeA = self.query('@OUT[1]')
+
+    def set_linear(self, axis, lindist):
+        """Move all linear axes by a given distance in mm, which is converted
+        into encoder counts."""
+
+        msg = f"PR{a}={lindist*countspermm:.0f};\r".encode("ascii")
+        self.send(msg)
+        resp = self.recv(4096).decode("ascii", errors="ignore")
+
+        return resp
+
+    def begin_motion(self, axis):
+        """Move all linear axes by a given distance in mm, which is converted
+        into encoder counts to communicate to the galil axis controller."""
+
+        msg = f"BG{axis};".encode("ascii")
+        self.send(msg)
+        resp = self.recv(4096).decode("ascii", errors="ignore")
+
+        return resp
+
+    def set_angular(self, axis, angdist):
+        """Move all angular axes by a given distance in degrees, which is converted
+        into encoder counts."""
+
+        f"PR{a}={angdist*countsperdeg:.0f};"
+        self.send(msg)
+        resp = self.recv(4096).decode("ascii", errors="ignore")
+
+        return resp
+
+    def home(self, axes):
+        # TODO: homing logic
+        # TODO: when moving using a `goto` function, some conditions to make sure it's homed
+        # or it won't move; specifically check for gearing ratio
+        # can set scripts such that galil will start the script automatically on startup for
+        # comparing A and B axes TPA and if offset, shut motor off
+        """Send homing sequence for all axes (example)."""
+        msg = f"HM{a};"
+        self.send(msg)
+        resp = self.recv(4096).decode("ascii", errors="ignore")
+
+        return resp
+
+    def command_rawsignal(self, command=None, axis=None, value=None):
+        "for just getting some commands with raw functions"
+        if axis is not None:
+            cmd = f'{command}{axis}'
+        if axis is not None and value is not None:
+            cmd = f'{command}{axis} = {value}'
+        elif command and value:
+            cmd = f'{command} = {value}'
+        else:
+            cmd = f'{command}'
+
+        self.send_(cmd)
+        resp = self.recv(4096).decode("ascii", errors="ignore")
+
+        return resp
 
     '''
     def command_config(self):
