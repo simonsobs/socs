@@ -10,7 +10,7 @@ from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import Pacemaker, TimeoutLock
 from twisted.internet import reactor
 
-from socs.agents.galildmc_axis_controller.drivers import GalilStage
+from socs.agents.galildmc_axis_controller.drivers import GalilAxis
 
 
 class GalilAxisControllerAgent:
@@ -63,7 +63,7 @@ class GalilAxisControllerAgent:
                 return False, "Could not acquire lock."
 
             # Establish connection to galil stage controller
-            self.stage = GalilStage(self.ip, self.port)
+            self.stage = GalilAxis(self.ip, self.port)
             # print('self.ip is ', self.ip)
             # print('self.configfile is', self.configfile)
 
