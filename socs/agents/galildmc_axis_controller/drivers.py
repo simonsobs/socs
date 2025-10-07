@@ -9,6 +9,9 @@ countspermm = 4000
 countsperdeg = 2000
 
 
+brake_output_map = {'A': 1, 'B': 2, 'C': 3, 'D': 4}
+
+
 class GalilAxis(TCPInterface):
     def __init__(self, ip, port=23, timeout=10):
         """Interface class for connecting to GalilStageController for SO SAT Coupling Optics."""
@@ -20,7 +23,7 @@ class GalilAxis(TCPInterface):
 
     def query(self, expr):
         """Send MG query and return decoded response string."""
-        msg = f"MG _{expr}\r".encode("ascii")
+        msg = f"MG {expr}\r".encode("ascii")
         self.send(msg)
         resp = self.recv(4096).decode("ascii", errors="ignore")
 
@@ -32,7 +35,7 @@ class GalilAxis(TCPInterface):
         units_map = {'linear': 'mm', 'angular': 'deg'}
         units = units_map.get(movetype, '')
 
-        self.query(f'PR{axis}')
+        self.query(f'_PR{axis}')
         self.send(msg)
         resp = self.recv(4096).decode("ascii", errors="ignore").strip(": \r\n")
 
@@ -58,9 +61,9 @@ class GalilAxis(TCPInterface):
 
         for axis in axes:
             try:
-                pos = float(self.query(f"TP{axis}").strip(": \r\n"))
-                vel = float(self.query(f"TV{axis}").strip(": \r\n"))
-                trq = float(self.query(f"TT{axis}").strip(": \r\n"))
+                pos = float(self.query(f"_TP{axis}").strip(": \r\n"))
+                vel = float(self.query(f"_TV{axis}").strip(": \r\n"))
+                trq = float(self.query(f"_TT{axis}").strip(": \r\n"))
             except (ValueError, AttributeError):
                 pos, vel, trq = float("nan"), float("nan"), float("nan")
                 self.log.warning(f"Invalid response while querying axis {axis}")
@@ -68,22 +71,6 @@ class GalilAxis(TCPInterface):
             data[axis] = {"position": pos, "velocity": vel, "torque": trq, }
 
         return data
-
-    def query_brake_status(self):
-        """query brake status for both linear and angular axes"""
-        # Brakes A–D correspond to outputs 1–4
-        for i, label in enumerate(['A', 'B', 'C', 'D'], start=1):
-            val = self.query(f'@OUT[{i}]').strip()  # query Galil, remove whitespace/newlines
-            state = bool(int(val))                  # convert '0'/'1' → 0/1 → False/True
-            brake_states[label] = state
-        {1: 'Brake Released',
-         0: 'Brake Engaged'}
-
-        # Optional: print results nicely
-        for label, state in brake_states.items():
-            print(f"Brake {label}: {'Engaged' if state else 'Released'}")
-
-        brakeA = self.query('@OUT[1]')
 
     def set_linear(self, axis, lindist):
         """Move all linear axes by a given distance in mm, which is converted
@@ -109,11 +96,58 @@ class GalilAxis(TCPInterface):
         """Move all angular axes by a given distance in degrees, which is converted
         into encoder counts."""
 
-        f"PR{a}={angdist*countsperdeg:.0f};"
+        msg = f"PR{axis}={angdist*countsperdeg:.0f};\r".encode("ascii")
         self.send(msg)
         resp = self.recv(4096).decode("ascii", errors="ignore")
 
         return resp
+
+    def release_brake(self, axis):
+        """Release brake to axis by using the GalilDMC SB command which sets the digital
+        output to 1 which somehow means it releases the brake. Galil command expects an int
+        for digital output number"""
+        digital_output = brake_output_map[axis]
+        msg = f"SB{digital_output};\r".encode("ascii")
+        self.send(msg)
+        resp = self.recv(4096).decode("ascii", errors="ignore")
+
+        return resp
+
+    def engage_brake(self, axis):
+        """Release brake to axis by using the GalilDMC SB command which clears the digital
+        output bit which somehow engages the brake. Galil command expects an int
+        for digital output number"""
+        digital_output = brake_output_map[axis]
+        msg = f"CB{digital_output};\r".encode("ascii")
+        self.send(msg)
+        resp = self.recv(4096).decode("ascii", errors="ignore")
+
+        return resp
+
+    def query_brake_status(self):
+        """query brake status for both linear and angular axes"""
+        axes = list(brake_output_map)
+
+        brake_states = {}
+        for label, i in brake_output_map.items():
+            # query will return 0 or 1 float
+            val = self.query(f'@OUT[{i}]')
+
+            try:
+                num_val = float(val)
+                state = int(round(num_val))
+                brake_states[label] = state
+            except ValueError:
+                print(f"Could not parse brake value '{val}' for axis {label}")
+
+            if state == 1:  # False
+                status = "Brake Released"
+            elif state == 0:  # True
+                status = "Brake Engaged"
+
+            brake_states[label] = {"state": state, "status": status}
+
+        return brake_states
 
     def home(self, axes):
         # TODO: homing logic

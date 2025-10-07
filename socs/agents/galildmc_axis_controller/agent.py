@@ -126,7 +126,7 @@ class GalilAxisControllerAgent:
                     time.sleep(1)
                     continue
 
-                session.data = {"data": data,
+                session.data = {"fields": data,
                                 "timestamp": time.time()}
 
                 pub_data = {'timestamp': time.time(),
@@ -151,6 +151,181 @@ class GalilAxisControllerAgent:
             return True, 'requested to stop taking data.'
         else:
             return False, 'acq is not currently running'
+
+    @ocs_agent.param('axis', type=str)
+    @ocs_agent.param('lindist', type=float)
+    def move_relative_linear(self, session, params):
+        """move_linear(axis, lindist)
+
+        **Task** - Move axis stage in linear +/- direction for a specified axis
+        and distance.
+
+        Parameters:
+            axis (str): Axis to set the linear distance for. Ex: 'A'
+            lindist (int): Specified linear distance in millimeters (mm)
+
+        Note:
+            The use of `move_linear` vs `move_angular` is important as the
+            conversion values for turning mm to encoder counts is different
+            from the conversion value for turning degrees to encoder counts.
+            Be sure NOT to use this task if you want to move in angular distance.
+        """
+        axis = params['axis']
+        dist = params['lindist']
+        with self.lock.acquire_timeout(0, job='move_relative_linear') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self.lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            self.stage.set_linear(axis, dist)
+            time.sleep(0.5)
+            value, units = self.stage.query_relative_position(axis=axis, movetype='linear')
+            session.add_message(f'{axis} set to relative linear position: {value}{units}')
+
+            if value == dist:
+                self.stage.begin_motion(axis)
+                self.log.info(f'Starting motion to {dist}{units}')
+            else:
+                self.log.info(f"{axis} position mismatch: expected {dist} {units}, got {value} {units}.")
+
+    @ocs_agent.param('axis', type=str)
+    @ocs_agent.param('angdist', type=float)
+    def move_relative_angular(self, session, params):
+        """move_linear(axis, lindist)
+
+        **Task** - Move axis stage in linear +/- direction for a specified axis
+        and distance.
+
+        Parameters:
+            axis (str): Axis to set the linear distance for. Ex: 'A'
+            lindist (int): Specified linear distance in millimeters (mm)
+
+        Note:
+            The use of `move_linear` vs `move_angular` is important as the
+            conversion values for turning mm to encoder counts is different
+            from the conversion value for turning degrees to encoder counts.
+            Be sure NOT to use this task if you want to move in angular distance.
+        """
+        axis = params['axis']
+        dist = params['angdist']
+        with self.lock.acquire_timeout(timeout=3, job='move_relative_angular') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self.lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            self.stage.set_angular(axis, dist)
+            time.sleep(0.5)
+            value, units = self.stage.query_relative_position(axis=axis, movetype='angular')
+            session.add_message(f'{axis} set to relative angular position: {value}{units}')
+
+            if value == dist:
+                self.stage.begin_motion(axis)
+                self.log.info(f'Starting motion to {dist}{units}')
+            else:
+                self.log.info(f"{axis} position mismatch: expected {dist} {units}, got {value} {units}.")
+
+        return True, f'Set {axis} to {dist}'
+
+    @ocs_agent.param('_')
+    def get_brake_status(self, session, params):
+        """get_brake_status()
+
+        **Task** - Query brakes status for all 4 axess
+
+        """
+        with self.lock.acquire_timeout(timeout=5, job='get_brake_status') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self.lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            response = self.stage.query_brake_status()
+            session.add_message(str(response))
+
+        return True, 'Queried brake status'
+
+    @ocs_agent.param('axis', type=str)
+    def release_axis_brake(self, session, params):
+        """release_axis_brake(axis)
+
+        **Task** - Releases the brake for specified axis
+
+        Parameters:
+            axis (str): Specified axis for releasing brake. Ex. 'A'
+
+        """
+        axis = params['axis']
+        with self.lock.acquire_timeout(timeout=5, job='release_axis_brake') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self.lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            self.stage.release_brake(axis)
+            new_response = self.stage.query_brake_status()
+            new_brake_status = new_response[axis]['status']
+            self.log.info(f'Brake now set to {new_brake_status}')
+
+        return True, f'Commanded brake to {new_brake_status} for {axis}.'
+
+    @ocs_agent.param('axis', type=str)
+    def engage_axis_brake(self, session, params):
+        """engage_axis_brake(axis)
+
+        **Task** - Engages the brake for specified axis
+
+        Parameters:
+            axis (str): Specified axis for releasing brake. Ex. 'A'
+
+        """
+        axis = params['axis']
+        with self.lock.acquire_timeout(timeout=5, job='engage_axis_brake') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self.lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            self.stage.engage_brake(axis)
+            new_response = self.stage.query_brake_status()
+            new_brake_status = new_response[axis]['status']
+            self.log.info(f'Brake now set to {new_brake_status}')
+
+        return True, f'Commanded brake to {new_brake_status} for {axis}.'
+
+
+'''
+    @ocs_agent.param('configfile', type=str, default=None)
+    def input_configfile(self, session, params=None):
+        """input_configfile(configfile=None)
+
+        **Task** Upload GalilDMC Axis Controller configuration file to initialize device
+        and axes on device
+
+        Parameters:
+            configfile (str, optional):
+                name of .yaml config file. Defaults to the fite set in the site config
+
+
+        """
+
+        configfile = params['configfile']
+        if configfile is NOne:
+            configfile = self.configfile
+        if configfile is None:
+            raise ValueError("No configfile specified")
+        configfile = os.path.join(os.environ['OCS_CONFIG_DIR'], configfile)
+
+        with self.lock.acquire_timeout(job='input_configfile') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            with open(configfile) as f:
+                config = yaml.safe_load(f)
+'''
 
 
 def make_parser(parser=None):
@@ -190,9 +365,14 @@ def main(args=None):
     agent, runner = ocs_agent.init_site_agent(args)
 
     # create agent instance and run log creation
-    stage = GalilAxisControllerAgent(agent, args.ip, args.port)
-    agent.register_task('init', stage.init, startup=init_params)
-    agent.register_process('acq', stage.acq, stage._stop_acq)
+    galilaxis_agent = GalilAxisControllerAgent(agent, args.ip, args.port)
+    agent.register_task('init', galilaxis_agent.init, startup=init_params)
+    agent.register_task('move_relative_linear', galilaxis_agent.move_relative_linear)
+    agent.register_task('move_relative_angular', galilaxis_agent.move_relative_angular)
+    agent.register_task('get_brake_status', galilaxis_agent.get_brake_status)
+    agent.register_task('release_axis_brake', galilaxis_agent.release_axis_brake)
+    agent.register_task('engage_axis_brake', galilaxis_agent.engage_axis_brake)
+    agent.register_process('acq', galilaxis_agent.acq, galilaxis_agent._stop_acq)
 
     runner.run(agent, auto_reconnect=True)
 
