@@ -12,7 +12,7 @@ from ocs.ocs_twisted import Pacemaker, TimeoutLock
 from twisted.internet import reactor
 
 
-from socs.agents.galil_stage_controller.drivers.drivers import GalilStage
+from socs.agents.galil_stage_controller.drivers import GalilStage
 
 class GalilStageControllerAgent:
     """ Agent to connect to galil linear stage motors for SAT coupling optics for passband measurements on-site.
