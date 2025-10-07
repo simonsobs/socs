@@ -3,18 +3,17 @@ import os
 import time
 
 import numpy as np
+import toml  # # TODO: switch to .yaml??
 import txaio
-import toml ## TODO: switch to .yaml??
 import yaml
-
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import Pacemaker, TimeoutLock
 from twisted.internet import reactor
 
-
 from socs.agents.galil_stage_controller.drivers import GalilStage
 
-class GalilStageControllerAgent:
+
+class GalilAxisControllerAgent:
     """ Agent to connect to galil linear stage motors for SAT coupling optics for passband measurements on-site.
 
     Args:
@@ -43,7 +42,6 @@ class GalilStageControllerAgent:
                                  agg_params=agg_params,
                                  buffer_time=1)
 
-
     @ocs_agent.param('auto_acquire', default=False, type=bool)
     def init(self, session, params=None):
         """init(auto_acquire=False)
@@ -63,11 +61,11 @@ class GalilStageControllerAgent:
                 self.log.warn(f"Could not start init because "
                               "{self.lock.job} is already running")
                 return False, "Could not acquire lock."
-            
+
             # Establish connection to galil stage controller
             self.stage = GalilStage(self.ip, self.port)
-            #print('self.ip is ', self.ip)
-            #print('self.configfile is', self.configfile)
+            # print('self.ip is ', self.ip)
+            # print('self.configfile is', self.configfile)
 
             # test connection and display identifying info
             try:
@@ -75,7 +73,6 @@ class GalilStageControllerAgent:
             except ConnectionError:
                 self.log.error("Could not establish connection to galil stage motor controller")
                 return False, "Galil Stage Controller agent initialization failed"
-
 
         self.initialized = True
 
@@ -86,7 +83,6 @@ class GalilStageControllerAgent:
 
         return True, "Galil Stage Controller agent initialized"
 
-        
     @ocs_agent.param('test_mode', default=False, type=bool)
     def acq(self, session, params):
         """acq()
@@ -106,14 +102,13 @@ class GalilStageControllerAgent:
             last_release = time.time()
 
             self.take_data = True
-                
 
-            pm = Pacemaker(1)#, quantize=True)
+            pm = Pacemaker(1)  # , quantize=True)
             while self.take_data:
                 pm.sleep()
                 # Reliqinuish sampling lock occassionally
                 if time.time() - last_release > 1:
-                    last_release  = time.time()
+                    last_release = time.time()
                     if not self.lock.release_and_acquire(timeout=10):
                         self.log.warn(f"Failed to re-acquire sampling lock, "
                                       f"currently held by {self.lock.job}.")
@@ -133,22 +128,21 @@ class GalilStageControllerAgent:
 
                 session.data = {"data": data,
                                 "timestamp": time.time()}
-                
+
                 pub_data = {'timestamp': time.time(),
                             'block_name': 'stage_status',
                             'data': {}}
-                
+
                 pub_data['data'] = data
-                
+
                 self.agent.publish_to_feed('stage_status', pub_data)
 
                 if params['test_mode']:
                     break
-                
+
         self.agent.feeds['stage_status'].flush_buffer()
 
         return True, 'Acquisition exited cleanly.'
-
 
     def _stop_acq(self, session, params):
         """Stops acquisition of data from the galil stage controller"""
@@ -159,11 +153,10 @@ class GalilStageControllerAgent:
             return False, 'acq is not currently running'
 
 
-        
 def make_parser(parser=None):
     """Build the argument parser for the Agent. Allows sphinx to automaticall build documenation based on this function.
 
-    
+
     """
     if parser is None:
         parser = argparse.ArgumentParser()
@@ -175,13 +168,12 @@ def make_parser(parser=None):
     pgroup.add_argument('--port', default=23)
     pgroup.add_argument('--mode', choices=['init', 'acq'])
 
-
     return parser
 
 
 def main(args=None):
     parser = make_parser()
-    args = site_config.parse_args(agent_class='GalilStageControllerAgent',
+    args = site_config.parse_args(agent_class='GalilAxisControllerAgent',
                                   parser=parser,
                                   args=args)
 
@@ -192,19 +184,17 @@ def main(args=None):
     elif args.mode == 'acq':
         init_params = {'auto_acquire': True}
 
-
     # Call launcher function (initiates connection to appropriate
     # WAMP hub and realm).
 
     agent, runner = ocs_agent.init_site_agent(args)
 
     # create agent instance and run log creation
-    stage = GalilStageControllerAgent(agent, args.ip, args.port)
+    stage = GalilAxisControllerAgent(agent, args.ip, args.port)
     agent.register_task('init', stage.init, startup=init_params)
-    agent.register_process('acq', stage.acq,  stage._stop_acq)
+    agent.register_process('acq', stage.acq, stage._stop_acq)
 
-    runner.run(agent, auto_reconnect = True)
-
+    runner.run(agent, auto_reconnect=True)
 
 
 if __name__ == '__main__':

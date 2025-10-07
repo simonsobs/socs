@@ -1,10 +1,12 @@
-import serial
 import time
+
+import serial
 import toml
 
 from socs.tcp import TCPInterface
 
-class GalilStage(TCPInterface):
+
+class GalilAxis(TCPInterface):
     def __init__(self, ip, port=23, timeout=10):
         """Interface class for connecting to GalilStageController for SO SAT Coupling Optics."""
         self.ip = ip
@@ -13,7 +15,6 @@ class GalilStage(TCPInterface):
 
         super().__init__(self.ip, self.port, self.timeout)
 
-
     def query(self, expr):
         """Send MG query and return decoded response string."""
         msg = f"MG {expr}\r".encode("ascii")
@@ -21,7 +22,6 @@ class GalilStage(TCPInterface):
         resp = self.recv(4096).decode("ascii", errors="ignore")
 
         return resp.strip(": \r\n")
-
 
     def get_data(self):
         """
@@ -35,12 +35,10 @@ class GalilStage(TCPInterface):
                 'position': float(self.query(f"_TP{axis}").strip(': \r\n')),
                 'velocity': float(self.query(f"_TV{axis}").strip(': \r\n')),
                 'torque': float(self.query(f"_TT{axis}").strip(': \r\n')),
-               # 'gearing_ratio': float(self.query_status(f"_GA{axis}").strip(': \r\n')),
+                # 'gearing_ratio': float(self.query_status(f"_GA{axis}").strip(': \r\n')),
             }
 
         return data
-
-
 
     '''
     def command_config(self):
@@ -152,7 +150,7 @@ class GalilStage(TCPInterface):
         """CN -1 means active low, CN +1 is active high. And we want active high"""
         cmd = f"CN {pol}"
         return self.send_command(cmd)
-    
+
     def command_rawsignal(self, command=None, axis=None, value=None):
         "for just getting some commands with raw functions"
         if axis is not None:
@@ -164,7 +162,7 @@ class GalilStage(TCPInterface):
         else:
             cmd = f'{command}'
         return self.send_command(cmd)
-    
+
     def begin_axis_motion(self, axis):
         """Set jog speed for axis and begin jogging."""
         cmd = f"BG{axis}"
