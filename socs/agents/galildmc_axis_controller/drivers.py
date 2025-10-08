@@ -7,6 +7,7 @@ from socs.tcp import TCPInterface
 
 countspermm = 4000
 countsperdeg = 2000
+maxspeed = 100000
 
 
 brake_output_map = {'A': 1, 'B': 2, 'C': 3, 'D': 4}
@@ -140,14 +141,78 @@ class GalilAxis(TCPInterface):
             except ValueError:
                 print(f"Could not parse brake value '{val}' for axis {label}")
 
-            if state == 1:  # False
+            if state == 1:
                 status = "Brake Released"
-            elif state == 0:  # True
+            elif state == 0:  
                 status = "Brake Engaged"
 
             brake_states[label] = {"state": state, "status": status}
 
         return brake_states
+
+    def set_motor_type(self, axis, type=1):
+        """set the motor type for each axis. defaults to 1, the servo motor (3-phased brushless)"""
+         msg = f"MT{axis}={type};\r".encode("ascii")
+         self.send(msg)
+         resp = self.recv(4096).decode("ascii", errors="ignore")
+         return resp
+
+
+    def disable_off_on_error(self, axis):
+        """Disables the Off-On-Error (OE) function for the specified axis, preventing the controller from shutting off motor commands in response to position errors."""
+         msg = f"OE{axis}={0};\r".encode("ascii")
+         self.send(msg)
+         resp = self.recv(4096).decode("ascii", errors="ignore")
+         return resp
+
+    def set_amp_gain(self, axis, val=2):
+        """ set amplifier current/voltage gain for internal amplifier per axis. Default is 2"""
+
+        msg = f"AG{axis}={val};\r".encode("ascii")
+        self.send(msg)
+        resp = self.recv(4096).decode("ascii", errors="ignore")
+        return resp
+
+
+    def set_torque_limit(self, axis, val=5):
+        """ set motor torque limit per axis. Default is 5."""
+        msg = f"TL{axis}={val};\r".encode("ascii")
+        self.send(msg)
+        resp = self.recv(4096).decode("ascii", errors="ignore")
+        return resp
+
+
+    def set_amp_currentloop_gain(self, axis, val=9):
+        """ set amplifier current loop gain per axis. Default is 9."""
+        msg = f"AU{axis}={val};\r".encode("ascii")
+        self.send(msg)
+        resp = self.recv(4096).decode("ascii", errors="ignore")
+        return resp
+
+    # init
+    def enable_sin_commutation(self, axis):
+        """ for axes with a sinusoidal amplifier, the BA command is necessary to configure each axis for sinusoidal commutation"""
+        msg = f"BA{axis};\r".encode("ascii")
+        self.send(msg)
+        resp = self.recv(4096).decode("ascii", errors="ignore")
+        return resp
+
+    # init
+    def set_magnetic_cycle(self, axis, val='3276.8'):
+        """defines the length of the motors magnetic cycle in encoder counts, required for correctly configuring sinusoidal commutation. Default is 3276.8"""
+        msg = f"BM{axis}={val};\r".encode("ascii")
+        self.send(msg)
+        resp = self.recv(4096).decode("ascii", errors="ignore")
+        return resp
+
+    
+    def initialize_axis(self, axis):
+        """initializes axes configured for sinusoidal commutation. BZ command will drive the motor to 2 different magnetic positions and then set the appropriate commutation angel. Cannot command with BZ unless BA and BM commands are sent first."""
+        msg = f"BZ{axis};\r".encode("ascii")
+        self.send(msg)
+        resp = self.recv(4096).decode("ascii", errors="ignore")
+        return resp
+
 
     def home(self, axes):
         # TODO: homing logic
@@ -177,6 +242,7 @@ class GalilAxis(TCPInterface):
         resp = self.recv(4096).decode("ascii", errors="ignore")
 
         return resp
+
 
     '''
     def command_config(self):
