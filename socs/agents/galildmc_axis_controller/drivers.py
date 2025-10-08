@@ -206,9 +206,9 @@ class GalilAxis(TCPInterface):
         return resp
 
     
-    def initialize_axis(self, axis):
-        """initializes axes configured for sinusoidal commutation. BZ command will drive the motor to 2 different magnetic positions and then set the appropriate commutation angel. Cannot command with BZ unless BA and BM commands are sent first."""
-        msg = f"BZ{axis};\r".encode("ascii")
+    def initialize_axis(self, axis, val=3):
+        """initializes axes configured for sinusoidal commutation. BZ command will drive the motor to 2 different magnetic positions and then set the appropriate commutation angel. Cannot command with BZ unless BA and BM commands are sent first. Default value is 3 volts."""
+        msg = f"BZ{axis}={val};\r".encode("ascii")
         self.send(msg)
         resp = self.recv(4096).decode("ascii", errors="ignore")
         time.sleep(5) # wait b/c motors change the position to figure out the right angle so takes a few secs
@@ -252,7 +252,66 @@ class GalilAxis(TCPInterface):
         return resp
 
 
-    '''
+    def disable_limit_switch(self, axis):
+        """Disable limit switch detection on a given axis (LDx=3)."""
+        cmd = f"LD{axis}=3"
+        return self.send_command(cmd)
+
+
+    def flip_limitswitch_polarity(self, pol=1):
+        """CN -1 means active low, CN +1 is active high. And we want active high"""
+        cmd = f"CN {pol}"
+        return self.send_command(cmd)
+
+
+    def stop(self, axis=None):
+        """Stop motion. If axis is None, stop all."""
+        cmd = "ST" if axis is None else f"ST {axis}"
+        return self.send_command(cmd)
+
+
+    def set_gearing(self, lead, follow):
+        """Set gearing: lead axis drives follow axis."""
+        return self.send_command(f"GA {lead},{follow}")
+
+
+    def set_gearing_ratio(self, *ratios):
+        """Set gearing ratios, e.g. GR -1,1 for axes B and D."""
+        args = ",".join(str(r) for r in ratios)
+        return self.send_command(f"GR {args}")
+
+
+    def jog_axis(self, axis, speed):
+        """Set jog speed for axis and begin jogging."""
+        cmd = f"JG{axis}={speed}"
+        return self.send_command(cmd)
+
+
+    def begin_axis_motion(self, axis):
+        """Set jog speed for axis and begin jogging."""
+        cmd = f"BG{axis}"
+        return self.send_command(cmd)
+
+
+    def enable_axis(self, axis=None):
+        """Enable servo for an axis (e.g. A, B, C, D)."""
+        if axis is None:
+            cmd = 'SH'
+        else:
+            cmd = f'{SH}{axis}'
+        return self.send_command(cmd)
+
+
+    def disable_axis(self, axis):
+        """Motor off for an axis."""
+        return self.send_command(f"MO{axis}")
+
+
+    def disable_limit_switch(self, axis):
+        """Disable limit switch detection on a given axis (LDx=3)."""
+        cmd = f"LD{axis}=3"
+        return self.send_command(cmd)
+'''
     def command_config(self):
         """Send all relevant Galil config commands from loaded TOML."""
         # 1. Global confcomm
@@ -304,41 +363,13 @@ class GalilAxis(TCPInterface):
         cmd = f"HM {axis}"
         return self.send_command(cmd)
 
-    def stop(self, axis=None):
-        """Stop motion. If axis is None, stop all."""
-        cmd = "ST" if axis is None else f"ST {axis}"
-        return self.send_command(cmd)
 
     def get_position(self, axis):
         """Query position of an axis."""
         cmd = f"TP {axis}"
         return self.send_command(cmd)
 
-    def enable_axis(self, axis=None):
-        """Enable servo for an axis (e.g. A, B, C, D)."""
-        if axis is None:
-            cmd = 'SH'
-        else:
-            cmd = f'{SH}{axis}'
-        return self.send_command(cmd)
 
-    def disable_axis(self, axis):
-        """Motor off for an axis."""
-        return self.send_command(f"MO{axis}")
-
-    def set_gearing(self, lead, follow):
-        """Set gearing: lead axis drives follow axis."""
-        return self.send_command(f"GA {lead},{follow}")
-
-    def set_gearing_ratio(self, *ratios):
-        """Set gearing ratios, e.g. GR -1,1 for axes B and D."""
-        args = ",".join(str(r) for r in ratios)
-        return self.send_command(f"GR {args}")
-
-    def jog_axis(self, axis, speed):
-        """Set jog speed for axis and begin jogging."""
-        cmd = f"JG{axis}={speed}"
-        return self.send_command(cmd)
 
     def query_status(self, code):
         """Send MG query, e.g. query_status('_MOA')."""
@@ -353,10 +384,6 @@ class GalilAxis(TCPInterface):
         """Send a generic MG query and return the value."""
         return self.send_command(f"MG {code}")
 
-    def disable_limit_switch(self, axis):
-        """Disable limit switch detection on a given axis (LDx=3)."""
-        cmd = f"LD{axis}=3"
-        return self.send_command(cmd)
 
     def flip_limitswitch_polarity(self, pol=1):
         """CN -1 means active low, CN +1 is active high. And we want active high"""
@@ -375,8 +402,4 @@ class GalilAxis(TCPInterface):
             cmd = f'{command}'
         return self.send_command(cmd)
 
-    def begin_axis_motion(self, axis):
-        """Set jog speed for axis and begin jogging."""
-        cmd = f"BG{axis}"
-        return self.send_command(cmd)
     '''
