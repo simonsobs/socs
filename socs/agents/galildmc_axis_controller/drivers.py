@@ -152,18 +152,18 @@ class GalilAxis(TCPInterface):
 
     def set_motor_type(self, axis, type=1):
         """set the motor type for each axis. defaults to 1, the servo motor (3-phased brushless)"""
-         msg = f"MT{axis}={type};\r".encode("ascii")
-         self.send(msg)
-         resp = self.recv(4096).decode("ascii", errors="ignore")
-         return resp
+        msg = f"MT{axis}={type};\r".encode("ascii")
+        self.send(msg)
+        resp = self.recv(4096).decode("ascii", errors="ignore")
+        return resp
 
 
     def disable_off_on_error(self, axis):
         """Disables the Off-On-Error (OE) function for the specified axis, preventing the controller from shutting off motor commands in response to position errors."""
-         msg = f"OE{axis}={0};\r".encode("ascii")
-         self.send(msg)
-         resp = self.recv(4096).decode("ascii", errors="ignore")
-         return resp
+        msg = f"OE{axis}={0};\r".encode("ascii")
+        self.send(msg)
+        resp = self.recv(4096).decode("ascii", errors="ignore")
+        return resp
 
     def set_amp_gain(self, axis, val=2):
         """ set amplifier current/voltage gain for internal amplifier per axis. Default is 2"""
