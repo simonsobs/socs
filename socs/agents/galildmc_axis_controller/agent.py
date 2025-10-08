@@ -3,7 +3,6 @@ import os
 import time
 
 import numpy as np
-import toml  # # TODO: switch to .yaml??
 import txaio
 import yaml
 from ocs import ocs_agent, site_config
@@ -17,17 +16,24 @@ class GalilAxisControllerAgent:
     """ Agent to connect to galil linear stage motors for SAT coupling optics for passband measurements on-site.
 
     Args:
-        ip (str): IP address for the Galil Stage Motor Controller
-        config-file (str): .toml config file for initializing hardware axes
-        port (int, optional): TCP port to connect, default is 23
+        ip (str): 
+            IP address for the Galil Stage Motor Controller
+        config-file (str): 
+            .toml config file for initializing hardware axes
+        port (int, optional): 
+            TCP port to connect, default is 23
+        configfile (str, optional):
+            Path to a GalilDMC axis config file. This will be loaded by `input_configfile` 
+            by default
     """
 
-    def __init__(self, agent, ip, port=23):
+    def __init__(self, agent, ip, port=23, configfile=None):
         self.lock = TimeoutLock()
         self.agent = agent
         self.log = agent.log
         self.ip = ip
         self.port = port
+        self.configfile = configfile
 
         self.initialized = False
         self.take_data = False
@@ -295,7 +301,7 @@ class GalilAxisControllerAgent:
         return True, f'Commanded brake to {new_brake_status} for {axis}.'
 
 
-'''
+
     @ocs_agent.param('configfile', type=str, default=None)
     def input_configfile(self, session, params=None):
         """input_configfile(configfile=None)
@@ -311,7 +317,7 @@ class GalilAxisControllerAgent:
         """
 
         configfile = params['configfile']
-        if configfile is NOne:
+        if configfile is None:
             configfile = self.configfile
         if configfile is None:
             raise ValueError("No configfile specified")
@@ -325,7 +331,46 @@ class GalilAxisControllerAgent:
 
             with open(configfile) as f:
                 config = yaml.safe_load(f)
-'''
+            
+            axes = list(config['galil']['motorconfigparams'].keys())
+            
+            for a in axes:
+                # set motor type
+                motortype = config['galil']['motorconfigparams'][a]['MT']
+                self.stage.set_motor_type(a, type=motortype)
+
+                # disable off on error
+                errtype = config['galil']['motorconfigparams'][a]['OE']
+                errtype = int(errtype)
+                if errtype == 0:
+                    self.stage.disable_off_on_error(a)
+
+                # set amp gain
+                gn = config['galil']['motorconfigparams'][a]['AG']
+                self.stage.set_amp_gain(a, val=gn)
+
+                # set torque limit
+                tl = config['galil']['motorconfigparams'][a]['TL']
+                self.stage.set_torque_limitn(a, val=tl)
+
+                # set current loop gain
+                clgn = config['galil']['motorconfigparams'][a]['AU']
+                self.stage.set_amp_currentloop_gain(a, val=clgn)
+
+                # enable sin commutation
+                initstate = config['galil']['initaxisparams']['BA']
+                if initstate == 'True':
+                    # enable sin commutation
+                    stage.enable_sin_commutation(a)
+                    # set magnetic cycle
+                    mag = config['galil']['initaxisparams']['BM']
+                    stage.set_magnetic_cycle(a, val=mag)
+                    # initialize 
+                    stage.initialize_axis(a)
+
+
+            
+
 
 
 def make_parser(parser=None):
@@ -372,6 +417,7 @@ def main(args=None):
     agent.register_task('get_brake_status', galilaxis_agent.get_brake_status)
     agent.register_task('release_axis_brake', galilaxis_agent.release_axis_brake)
     agent.register_task('engage_axis_brake', galilaxis_agent.engage_axis_brake)
+    agent.register_task('input_configfile', galilaxis_agent.input_configfile)
     agent.register_process('acq', galilaxis_agent.acq, galilaxis_agent._stop_acq)
 
     runner.run(agent, auto_reconnect=True)

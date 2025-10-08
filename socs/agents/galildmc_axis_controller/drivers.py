@@ -211,6 +211,15 @@ class GalilAxis(TCPInterface):
         msg = f"BZ{axis};\r".encode("ascii")
         self.send(msg)
         resp = self.recv(4096).decode("ascii", errors="ignore")
+        time.sleep(5) # wait b/c motors change the position to figure out the right angle so takes a few secs
+        return resp
+
+
+    def query_current_position(self, axis):
+        """query axis position using TP (tell position) command"""
+        msg = f"TP{axis};\r".encode("ascii")
+        self.send(msg)
+        resp = self.recv(4096).decode("ascii", errors="ignore")
         return resp
 
 
