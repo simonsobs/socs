@@ -239,17 +239,16 @@ class GalilAxis(TCPInterface):
     def command_rawsignal(self, command=None, axis=None, value=None):
         "for just getting some commands with raw functions"
         if axis is not None:
-            cmd = f'{command}{axis}'
+            cmd = f"{command}{axis}"
         if axis is not None and value is not None:
             cmd = f'{command}{axis} = {value}'
         elif command and value:
             cmd = f'{command} = {value}'
         else:
             cmd = f'{command}'
-
-        self.send_(cmd)
-        resp = self.recv(4096).decode("ascii", errors="ignore")
-
+        msg = f"{cmd}\r".encode("ascii")
+        self.send(msg)
+        resp = self.recv(4096).decode("ascii", errors="ignore").strip(":\r\n")
         return resp
 
 
