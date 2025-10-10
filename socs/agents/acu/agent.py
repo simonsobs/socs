@@ -405,6 +405,10 @@ class ACUAgent:
                             record=True,
                             agg_params=basic_agg_params,
                             buffer_time=0)
+        agent.register_feed('scan_params',
+                            record=True,
+                            agg_params=basic_agg_params,
+                            buffer_time=0)
         agent.register_task('go_to',
                             self.go_to,
                             blocking=False,
@@ -2107,6 +2111,8 @@ class ACUAgent:
           Process .stop method is called)..
 
         """
+        init_time = time.time()  # for params feed.
+
         if self._get_sun_policy('motion_blocked'):
             return False, "Motion blocked; Sun avoidance in progress."
 
@@ -2264,9 +2270,38 @@ class ACUAgent:
         else:
             raise ValueError("Scan type must be 1, 2, or 3")
 
-        return (yield self._run_track(
+        scan_params_bundle = {'session_id': session.session_id,
+                              'schema': 1,
+                              'event': 1,
+                              'init_time': init_time,
+                              }
+        scan_params_bundle.update({
+            'az1': az_endpoint1,
+            'az2': az_endpoint2,
+            'az_vel': az_speed,
+            'az_accel': az_accel,
+            'el1': el_endpoint1,
+            'el2': el_endpoint2,
+            'el_freq': el_freq,
+            'type': params['type'],
+            'turnaround_type': sh.TURNAROUNDS_ENUM['standard'],
+        })
+
+        self.agent.publish_to_feed('scan_params',
+                                   {'timestamp': time.time(),
+                                    'block_name': 'info',
+                                    'data': scan_params_bundle})
+
+        ret_val = (yield self._run_track(
             session=session, point_gen=g, step_time=step_time,
             azonly=azonly, point_batch_count=point_batch_count, free_form=free_form))
+
+        self.agent.publish_to_feed('scan_params',
+                                   {'timestamp': time.time(),
+                                    'block_name': 'exit',
+                                    'data': {'session_id': session.session_id,
+                                             'event': 2}})
+        return ret_val
 
     @inlineCallbacks
     def _run_track(self, session, point_gen, step_time, azonly=False,

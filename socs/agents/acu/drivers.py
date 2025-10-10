@@ -14,6 +14,11 @@ DAY = 86400
 # leg, to not trigger programtrack error.
 MIN_GROUP_NEW_LEG = 4
 
+#: Registry for turn-around profile types.
+TURNAROUNDS_ENUM = {
+    'standard': 0,
+}
+
 
 def _progtrack_format_time(timestamp):
     fmt = '%j, %H:%M:%S'
