@@ -2031,7 +2031,7 @@ class ACUAgent:
     @ocs_agent.param('az_drift', type=float, default=None)
     @ocs_agent.param('az_only', type=bool, default=True)
     @ocs_agent.param('type', default=1, choices=[1, 2, 3])
-    @ocs_agent.param('az_vel_ref', type=float, default=1)
+    @ocs_agent.param('az_vel_ref', type=float, default=None)
     @ocs_agent.param('scan_upload_length', type=float, default=None)
     @inlineCallbacks
     def generate_scan(self, session, params):
