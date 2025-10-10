@@ -2482,6 +2482,12 @@ class ACUAgent:
                             mode = 'stop'
                             stop_message = 'Stop due to end of the planned track.'
 
+                        if len(lines) > FULL_STACK / 2:
+                            # This could occur if group_flag was always set, for example.
+                            mode = 'abort'
+                            self.log.warn('Problem with point generator; too many points.')
+                            lines = []
+
                     # Grab the minimum batch
                     upload_lines, lines = lines[:new_line_target], lines[new_line_target:]
 
