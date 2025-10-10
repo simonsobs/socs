@@ -572,7 +572,7 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
 
     # Get center of az range
     if az_vel_ref is None:
-        az_vel_ref = (az_endpoint1 + az_endpoint1) / 2.
+        az_vel_ref = (az_endpoint1 + az_endpoint2) / 2.
     az_cent = az_vel_ref - 90
 
     # Get el throw
