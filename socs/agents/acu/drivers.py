@@ -14,6 +14,11 @@ DAY = 86400
 # leg, to not trigger programtrack error.
 MIN_GROUP_NEW_LEG = 4
 
+#: Registry for turn-around profile types.
+TURNAROUNDS_ENUM = {
+    'standard': 0,
+}
+
 
 def _progtrack_format_time(timestamp):
     fmt = '%j, %H:%M:%S'
@@ -567,13 +572,15 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
     if az_drift is not None:
         raise ValueError("Az drift not supported for type 2 or 3 scans!")
 
-    if abs(az_endpoint1 - az_endpoint2) > 140:
-        raise ValueError("Type 2 and 3 scans must have a throw less than or equal to 70 degrees")
-
     # Get center of az range
     if az_vel_ref is None:
         az_vel_ref = (az_endpoint1 + az_endpoint2) / 2.
     az_cent = az_vel_ref - 90
+
+    if any([abs(_az - az_vel_ref) > 70.
+            for _az in [az_endpoint1, az_endpoint2]]):
+        raise ValueError("Az limits for type 2 and 3 scans must not be more than 70 "
+                         "degrees away from az_vel_ref.")
 
     # Get el throw
     el_throw = abs(el_endpoint2 - el_endpoint1) / 2
